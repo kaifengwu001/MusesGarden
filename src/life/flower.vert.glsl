@@ -52,15 +52,19 @@ void main() {
   }
   vec3 dir = aDir;
   float seed = aBirth.y;
-  vec4 meadow;
-  float inside;
-  vec4 f = fieldSample(dir, meadow, inside);
+  // species first, from two fetches: most instances belong to another draw
+  vec3 m = fieldCoords(dir);
+  vec2 fuv = m.xy * 0.5 + 0.5;
+  vec4 f = textureLod(uFieldMap, fuv, 0.0);
+  vec4 meadow = textureLod(uFieldMeadow, fuv, 0.0);
   float nearWater = smoothstep(6.0, 1.0, f.y);
   int species = pickSpecies(rnd(seed, 1.0), meadow.y, meadow.x, nearWater);
   if (float(species) != uFlowers.z) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
+  float inside = step(m.z, 0.98);
+  vec4 wind = textureLod(uFieldWind, fuv, 0.0);
   float d = chordAngle(dir, uFieldCentre.xyz) * uRadius;
   float keep = mix(1.0, uFlowerFade.y, smoothstep(uFlowerFade.x, uFlowers.x, d));
   float grow = growthFade(0.5 * (aBirth.x - uFlowers.y - log(keep)));
@@ -88,7 +92,7 @@ void main() {
   vec3 side = t1 * cos(yaw) + t2 * sin(yaw);
   vec3 fwd = cross(side, up);
 
-  vec3 bend = windBend(dir, rnd(seed, 5.0), 1.1 + 0.4 * rnd(seed, 6.0));
+  vec3 bend = windPlant(dir, wind.xyz, rnd(seed, 5.0), 1.1 + 0.4 * rnd(seed, 6.0));
   float stemTop = uFlowerFade.z;
   vec3 base = dir * (uRadius + f.x - 0.02);
   vec3 local = position;

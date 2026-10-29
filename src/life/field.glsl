@@ -3,6 +3,7 @@
 //   uFieldMeadow: lushness, flower drift
 uniform sampler2D uFieldMap;
 uniform sampler2D uFieldMeadow;
+uniform sampler2D uFieldWind;
 uniform vec4 uFieldCentre; // focus direction, angular radius Θ
 uniform vec3 uFieldT1;
 
@@ -28,11 +29,12 @@ vec3 fieldCoords(vec3 dir) {
   return vec3(xy, r);
 }
 
-// Ground and meadow fields at a direction; inside = 0 beyond the map.
-vec4 fieldSample(vec3 dir, out vec4 meadow, out float inside) {
+// Ground, meadow fields and shared wind at a direction; inside = 0 beyond the map.
+vec4 fieldSample(vec3 dir, out vec4 meadow, out vec4 wind, out float inside) {
   vec3 m = fieldCoords(dir);
   inside = step(m.z, 0.98);
   vec2 uv = m.xy * 0.5 + 0.5;
   meadow = textureLod(uFieldMeadow, uv, 0.0);
+  wind = textureLod(uFieldWind, uv, 0.0);
   return textureLod(uFieldMap, uv, 0.0);
 }

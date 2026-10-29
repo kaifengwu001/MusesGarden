@@ -9,6 +9,7 @@ export function createFrameStats(): FrameStats {
     gpuMs: Number.NaN,
     drawCalls: 0,
     triangles: 0,
+    trianglesSubmitted: 0,
     grassInstances: 0,
     flowerInstances: 0,
     textures: 0,
@@ -129,7 +130,7 @@ export class PerfHud {
     this.set('js', `${js.toFixed(2)} / ${b.jsMs} ms`, js > b.jsMs);
     this.set('gpu', Number.isFinite(s.gpuMs) ? `${s.gpuMs.toFixed(2)} ms` : 'n/a (no timer query)', s.gpuMs > b.frameMs);
     this.set('draws', `${s.drawCalls} / ${b.drawCalls}`, s.drawCalls > b.drawCalls);
-    this.set('tris', `${compact(s.triangles)} / ${compact(b.triangles)}`, s.triangles > b.triangles);
+    this.set('tris', `${compact(s.triangles)} / ${compact(b.triangles)} · ${compact(s.trianglesSubmitted)} sent`, s.triangles > b.triangles);
     this.set('grass', `${compact(s.grassInstances)} / ${compact(b.grassInstances)} · flowers ${compact(s.flowerInstances)}`, s.grassInstances > b.grassInstances);
     this.set('memory', `${mem.toFixed(1)} / ${b.gpuMemoryMB} MB`, mem > b.gpuMemoryMB);
     this.set('objects', `${s.textures} tex · ${s.geometries} geo · ${s.programs} prog`);

@@ -25,20 +25,17 @@ float gustAt(vec3 dir) {
   return smoothstep(0.42, 0.85, g);
 }
 
-// Tangent bend vector at dir (≈ tip displacement per unit height).
-// phase: per-plant random in [0, 1).
-vec3 windBend(vec3 dir, float phase, float stiffness) {
+// The shared part of the bend at dir: steady flow, travelling gusts and click
+// rings. Expensive (noise), so the field map evaluates it once per texel and
+// plants read it back (fieldWind); windPlant adds the cheap per-plant part.
+vec3 windBase(vec3 dir) {
   vec3 w = windDir(dir);
   float strength = uWindVec.w;
   float t = uGust.x;
   float gust = gustAt(dir);
   float steady = strength * (0.18 + 0.42 * strength);
   float gusts = strength * uGust.z * 0.75 * gust;
-  float flutter = 0.07 * (0.3 + strength) * sin(t * (2.1 + phase * 1.7) + phase * 40.0);
-  vec3 bend = w * (steady + gusts + flutter);
-  // a cross-wind wobble so the meadow never moves in lockstep
-  vec3 side = cross(dir, w);
-  bend += side * 0.05 * (0.3 + strength) * sin(t * 1.3 + phase * 23.0);
+  vec3 bend = w * (steady + gusts);
   // click gust rings push outward from where you clicked
   for (int i = 0; i < MAX_GUST_RINGS; i++) {
     vec4 r = uGustRings[i];
@@ -52,5 +49,16 @@ vec3 windBend(vec3 dir, float phase, float stiffness) {
     float l = length(away);
     if (l > 1e-6) bend += away / l * push * 1.1;
   }
-  return bend / stiffness;
+  return bend;
+}
+
+// Per-plant flutter and a cross-wind wobble on top of the shared bend, so the
+// meadow never moves in lockstep. phase: per-plant random in [0, 1).
+vec3 windPlant(vec3 dir, vec3 base, float phase, float stiffness) {
+  vec3 w = windDir(dir);
+  float strength = uWindVec.w;
+  float t = uGust.x;
+  float flutter = 0.07 * (0.3 + strength) * sin(t * (2.1 + phase * 1.7) + phase * 40.0);
+  vec3 side = cross(dir, w);
+  return (base + w * flutter + side * 0.05 * (0.3 + strength) * sin(t * 1.3 + phase * 23.0)) / stiffness;
 }

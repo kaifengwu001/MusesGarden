@@ -53,9 +53,9 @@ function finish(b: Builder): InstancedBufferGeometry {
 export function pinkCup(): InstancedBufferGeometry {
   const b = builder();
   const h = 0.62;
-  stem(b, h, 0.016, 5, 0.04);
+  stem(b, h, 0.016, 4, 0.04);
   // a deep bell: base at the stem top, a waist, and an evenly flared lip
-  const n = 8;
+  const n = 7;
   const rings: Array<[number, number]> = [
     [0.022, 0.012],
     [0.05, 0.05],

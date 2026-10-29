@@ -1,4 +1,5 @@
-import { BufferAttribute, DoubleSide, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector4, type IUniform } from 'three';
+import { BufferAttribute, Color, DoubleSide, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector4, type IUniform } from 'three';
+import { ROW, type Palette } from '../render/palette';
 import { salt } from '../core/hash';
 import { smoothstep } from '../core/math';
 import fragmentShader from './grass.frag.glsl?raw';
@@ -23,10 +24,23 @@ function bladeGeometry(): InstancedBufferGeometry {
 
 export const GRASS_FADE = { fullRadius: 0.35, keepAtEdge: 0.16 };
 
+/** Palette cells the blades use, in uGrassPal order (see grass.vert.glsl). */
+const GRASS_COLOURS: ReadonlyArray<readonly [number, number]> = [
+  [ROW.GRASS, 0], // 0 light
+  [ROW.GRASS, 3], // 1 sunlit tips
+  [ROW.GRASS, 1], // 2 mid
+  [ROW.BRUSH, 1], // 3 brush mid
+  [ROW.GRASS, 5], // 4 deep shade
+  [ROW.GRASS, 2], // 5 shade
+  [ROW.BUD, 1], // 6 bud tip
+  [ROW.BUD, 0], // 7 bud green
+  [ROW.LIGHT, 3], // 8 rim
+];
+
 export class Grass {
   readonly mesh: Mesh;
   readonly layer: ScatterLayer;
-  readonly uniforms: { uPageSize: IUniform<number>; uPages: IUniform; uGrass: IUniform<Vector4>; uGrassFade: IUniform<Vector4> };
+  readonly uniforms: { uPageSize: IUniform<number>; uPages: IUniform; uGrass: IUniform<Vector4>; uGrassFade: IUniform<Vector4>; uGrassPal: IUniform<Color[]> };
   private readonly geometry: InstancedBufferGeometry;
 
   constructor(shared: Record<string, IUniform>, pages: number) {
@@ -47,17 +61,23 @@ export class Grass {
       uPages: { value: this.layer.pageTexture },
       uGrass: { value: new Vector4(0.42, 0.05, 24, 0) },
       uGrassFade: { value: new Vector4(8, GRASS_FADE.keepAtEdge, 0, 0) },
+      uGrassPal: { value: Array.from({ length: GRASS_COLOURS.length }, () => new Color()) },
     };
     // Blades bend and turn in the wind; draw both sides (no extra vertex work).
     const material = new ShaderMaterial({ name: 'grass', vertexShader, fragmentShader, uniforms: { ...shared, ...this.uniforms }, side: DoubleSide });
     this.mesh = new Mesh(this.geometry, material);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 1;
+    this.mesh.renderOrder = -20; // before the ground: early-z skips ground shading under blades
   }
 
   /** Fraction of full density kept at distance d (must match the shader). */
   static keep(d: number, near: number): number {
     return 1 + (GRASS_FADE.keepAtEdge - 1) * smoothstep(near * GRASS_FADE.fullRadius, near, d);
+  }
+
+  /** Copy this frame's grass colours from the palette (cheaper than per-vertex fetches). */
+  setColours(palette: Palette): void {
+    GRASS_COLOURS.forEach(([row, col], k) => palette.get(row, col, this.uniforms.uGrassPal.value[k]));
   }
 
   update(view: Omit<ScatterView, 'falloff'>, height: number): void {

@@ -10,7 +10,10 @@ export interface FrameStats {
   /** GPU time from a timer query, ms; NaN where unsupported (Safari). */
   gpuMs: number;
   drawCalls: number;
+  /** Triangles that can reach the rasteriser (collapsed instances excluded). */
   triangles: number;
+  /** Triangles submitted, including instances the vertex shaders collapse. */
+  trianglesSubmitted: number;
   grassInstances: number;
   flowerInstances: number;
   textures: number;
@@ -66,6 +69,8 @@ export interface MeadowHarness {
   parity(): { heightError: number; waterError: number; warpError: number; samples: number };
   /** Pick the planet at normalised device coordinates. */
   pick(ndcX: number, ndcY: number): { dir: [number, number, number]; water: number } | null;
+  /** Jump to a named view: 'homestead', 'range' or 'meadow'. */
+  preset(name: 'homestead' | 'range' | 'meadow'): void;
   /** Render `frames` frames back to back (GPU-synchronised); returns ms per frame. */
   benchmark(frames: number): number;
 }

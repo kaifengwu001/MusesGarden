@@ -55,6 +55,13 @@ export interface LodView {
   readonly warp?: WarpFrame | null;
   /** False disables horizon culling (tests). */
   readonly horizonCull: boolean;
+  /**
+   * Warped horizon: under the tiny-planet warp the ground near the focus
+   * curves like a sphere of radius `radiusEff`; seen from `eyeHeight`, ground
+   * of height H is hidden beyond √(2·R_eff·h) + √(2·R_eff·H) from the focus.
+   * `heightAt(cap)` bounds the ground height over a node.
+   */
+  readonly warpHorizon?: { focusDir: Vector3; radiusEff: number; eyeHeight: number; heightAt: (centre: Vector3, alpha: number) => number } | null;
 }
 
 const corner = new Vector3();
@@ -127,6 +134,13 @@ export class ChunkSelection {
     if (this.cosHorizon > -2) {
       const angle = Math.acos(clamp(centre.dot(this.camDir), -1, 1));
       if (Math.cos(Math.max(0, angle - alpha)) < this.cosHorizon) return;
+    }
+    // Warped horizon: beyond it, the bent ground hides everything below its peaks.
+    const wh = view.warpHorizon;
+    if (wh) {
+      const gap = Math.max(0, Math.acos(clamp(centre.dot(wh.focusDir), -1, 1)) - alpha) * R;
+      const reach = Math.sqrt(2 * wh.radiusEff * wh.eyeHeight) + Math.sqrt(2 * wh.radiusEff * Math.max(wh.heightAt(centre, alpha), 0.5));
+      if (gap > reach) return;
     }
     // Frustum: a sphere around the cap, tall enough for the highest ground.
     if (view.frustum) {

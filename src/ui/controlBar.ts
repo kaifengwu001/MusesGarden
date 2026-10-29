@@ -54,7 +54,10 @@ export class ControlBar {
     seed.addEventListener('click', () => actions.reroll());
     const reset = el('button', 'cb-button', 'Reset');
     reset.addEventListener('click', () => actions.reset());
-    this.el.append(this.group(this.cameraButton, seed, reset));
+    const postcard = el('button', 'cb-button', 'Postcard');
+    postcard.title = 'Frame this view as a postcard (Esc to close)';
+    postcard.addEventListener('click', () => store.set('ui.postcard', true));
+    this.el.append(this.group(this.cameraButton, seed, reset, postcard));
     parent.append(this.el);
 
     store.subscribe((changed) => {

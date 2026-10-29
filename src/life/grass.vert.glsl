@@ -17,6 +17,7 @@ uniform sampler2D uPages;
 uniform float uPageSize;
 uniform vec4 uGrass;     // height (m), width (m), near radius (m), ln density (per m²)
 uniform vec4 uGrassFade; // full-density radius (m), kept fraction at the edge
+uniform vec3 uGrassPal[9]; // palette cells, see GRASS_COLOURS in grass.ts
 
 varying vec3 vColour;
 
@@ -37,8 +38,9 @@ void main() {
   float keep = mix(1.0, uGrassFade.y, smoothstep(uGrassFade.x, uGrass.z, d));
   float grow = growthFade(0.5 * (aBirth.x - uGrass.w - log(keep)));
   vec4 meadow;
+  vec4 wind;
   float inside;
-  vec4 f = fieldSample(dir, meadow, inside);
+  vec4 f = fieldSample(dir, meadow, wind, inside);
   float clearing = max(f.z, 0.0);
   float rock = max(-f.z, 0.0);
   float mask = smoothstep(0.2, 0.7, f.y) * (1.0 - smoothstep(0.25, 0.65, clearing)) * (1.0 - smoothstep(0.2, 0.55, rock)) * inside;
@@ -70,7 +72,7 @@ void main() {
 
   // wind: tip moves along the bend, the blade keeps roughly its length
   float y = position.y;
-  vec3 bend = windBend(dir, rnd(seed, 3.0), 0.8 + 0.5 * rnd(seed, 4.0));
+  vec3 bend = windPlant(dir, wind.xyz, rnd(seed, 3.0), 0.8 + 0.5 * rnd(seed, 4.0));
   vec3 lean = (t1 * (rnd(seed, 5.0) - 0.5) + t2 * (rnd(seed, 6.0) - 0.5)) * 0.35;
   vec3 tip = bend + lean;
   float bl = length(tip);
@@ -78,17 +80,17 @@ void main() {
 
   // colour per vertex: dark roots, lit tips, paler ahead of the bloom front
   float b = toonLight(dot(up, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir));
-  vec3 lit = mix(pal(ROW_GRASS, 0), pal(ROW_GRASS, 3), smoothstep(0.55, 1.0, y) * 0.7);
-  vec3 mid = mix(pal(ROW_GRASS, 1), pal(ROW_BRUSH, 1), rnd(seed, 7.0) * 0.5);
-  vec3 shade = mix(pal(ROW_GRASS, 5), pal(ROW_GRASS, 2), y);
-  lit = mix(mix(lit, pal(ROW_BUD, 1), 0.45), lit, bloom);
-  mid = mix(mix(mid, pal(ROW_BUD, 0), 0.4), mid, bloom);
+  vec3 lit = mix(uGrassPal[0], uGrassPal[1], smoothstep(0.55, 1.0, y) * 0.7);
+  vec3 mid = mix(uGrassPal[2], uGrassPal[3], rnd(seed, 7.0) * 0.5);
+  vec3 shade = mix(uGrassPal[4], uGrassPal[5], y);
+  lit = mix(mix(lit, uGrassPal[6], 0.45), lit, bloom);
+  mid = mix(mix(mid, uGrassPal[7], 0.4), mid, bloom);
   float light = mix(0.12, 1.0, smoothstep(0.0, 0.9, y)) * b;
   vec3 col = tone3(lit, mid, shade, light);
   col *= 0.92 + 0.16 * rnd(seed, 8.0);
   // sun-side rim on the tips
   vec3 v = normalize(toCam);
-  col += pal(ROW_LIGHT, 3) * pow(y, 3.0) * clamp(dot(-v, uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.18 * uToon.z;
+  col += uGrassPal[8] * pow(y, 3.0) * clamp(dot(-v, uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.18 * uToon.z;
 
   vec3 wp = warpPosition(p);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);

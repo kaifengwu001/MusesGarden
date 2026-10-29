@@ -426,3 +426,71 @@ body {
     bottom: calc(var(--gutter) * 0.5 + 150px);
   }
 }
+
+/* ---- postcard ------------------------------------------------------------ */
+
+.postcard-frame {
+  display: none;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  border: clamp(18px, 3.4vw, 46px) solid var(--paper);
+  box-shadow:
+    inset 0 0 0 1px rgba(62, 58, 54, 0.12),
+    inset 0 10px 34px rgba(28, 40, 60, 0.12);
+}
+
+body.postcard .postcard-frame {
+  display: block;
+}
+
+body.postcard .controlbar,
+body.postcard .hints,
+body.postcard .hud,
+body.postcard .masthead,
+body.postcard .lil-gui.meadow-panel {
+  display: none !important;
+}
+
+.postcard-card {
+  position: absolute;
+  left: clamp(12px, 2.4vw, 32px);
+  bottom: clamp(12px, 2.4vw, 32px);
+  margin: 0;
+  padding: 14px 18px 12px;
+  background: var(--paper);
+  border-radius: 4px;
+  box-shadow: 0 6px 22px rgba(28, 40, 60, 0.18);
+  color: var(--ink);
+  pointer-events: auto;
+  transform: rotate(-0.6deg);
+}
+
+.postcard-place {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 340;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+.postcard-detail {
+  margin: 4px 0 8px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  font-variant-numeric: lining-nums tabular-nums;
+  opacity: 0.85;
+}
+
+.postcard-close {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}

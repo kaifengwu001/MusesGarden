@@ -442,6 +442,16 @@ export class Terrain {
     return this.sample(dir, scratch).height;
   }
 
+  /** Upper bound of ground height over a cap (centre, angular radius), for culling. */
+  heightBound(centre: Vector3, alpha: number): number {
+    const L = this.layout;
+    let roll = 0;
+    for (let k = 0; k < MEADOW_OCTAVES; k++) roll += this.meadowAmp[k];
+    const meadow = roll + this.macroAmp + 0.5;
+    const near = Math.min(arcDistance(centre, L.range), this.spurUnlock > 0 ? arcDistance(centre, L.spur) : Infinity) - alpha;
+    return near < RANGE_OUTER + 0.06 ? this.mountainH + meadow : meadow;
+  }
+
   /** Cottage local coordinates (m): x across, z toward the pond. Mirrors cottageLocal() in GLSL. */
   cottageLocal(dir: Vector3, out: { x: number; z: number }): { x: number; z: number } {
     const L = this.layout;

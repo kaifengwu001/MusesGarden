@@ -16,6 +16,7 @@ import { Post } from './render/post';
 import { ControlBar } from './ui/controlBar';
 import { worldLine } from './ui/format';
 import { createPanel } from './ui/panel';
+import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from './view/input';
 import { World } from './world';
@@ -113,6 +114,7 @@ async function boot(): Promise<void> {
     world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0, true);
   }
 
+  const postcard = new Postcard(uiRoot, store);
   const controls = new ControlBar(uiRoot, store, {
     reset: () => {
       store.reset();
@@ -170,6 +172,7 @@ async function boot(): Promise<void> {
 
   const applyUi = (): void => {
     hud.visible = store.values.ui.hud;
+    postcard.apply();
     ui.setWorldLine(worldLine(store.values, world.growth));
   };
 
@@ -196,6 +199,7 @@ async function boot(): Promise<void> {
       syncingMode = false;
     }
     if (world.rig.consumeChange()) hash.schedule();
+    postcard.update(world.rig.up, world.growth.radius);
   };
 
   const render = (): void => {
@@ -210,7 +214,8 @@ async function boot(): Promise<void> {
     stats.jsMs = jsMs;
     stats.gpuMs = gpuTimer.ms;
     stats.drawCalls = info.render.calls;
-    stats.triangles = info.render.triangles;
+    stats.trianglesSubmitted = info.render.triangles;
+    stats.triangles = world.effectiveTriangles(info.render.triangles);
     stats.textures = info.memory.textures;
     stats.geometries = info.memory.geometries;
     stats.programs = info.programs?.length ?? 0;
@@ -289,8 +294,10 @@ async function boot(): Promise<void> {
       gl,
       stats,
       renderFrame: () => {
+        const t0 = performance.now();
         update();
         render();
+        collectStats(performance.now() - t0);
       },
       settle: async () => {
         store.flush();
@@ -309,6 +316,10 @@ async function boot(): Promise<void> {
         return hit ? { dir: [hit.dir.x, hit.dir.y, hit.dir.z], water: hit.water } : null;
       },
       frameLog: recentFrames,
+      preset: (name) => {
+        world.cameraPreset(name);
+        userPosed = true;
+      },
     },
     ready,
   );

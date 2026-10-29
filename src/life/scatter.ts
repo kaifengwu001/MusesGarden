@@ -85,6 +85,14 @@ interface Tile {
 const corner = new Vector3();
 const sphere = new Sphere();
 
+/** Do two quadtree tiles (any levels) cover overlapping parts of the same face? */
+function overlaps(a: Tile, b: Tile): boolean {
+  if (a.face !== b.face) return false;
+  const [lo, hi] = a.level <= b.level ? [a, b] : [b, a];
+  const shift = hi.level - lo.level;
+  return hi.i >> shift === lo.i && hi.j >> shift === lo.j;
+}
+
 export class ScatterLayer {
   readonly buffer: InstancedInterleavedBuffer;
   readonly aDir: InterleavedBufferAttribute;
@@ -132,7 +140,6 @@ export class ScatterLayer {
     // 1. Which tiles cover the near field, and what density each needs.
     for (const t of this.tiles.values()) t.wanted = false;
     const reach = view.near / R;
-    let allReady = true;
     const visit = (face: number, l: number, i: number, j: number): void => {
       const n = 2 ** l;
       const centre = uvToSphere(face, (i + 0.5) / n, (j + 0.5) / n, new Vector3());
@@ -155,20 +162,33 @@ export class ScatterLayer {
       const nearest = Math.max(0, gap) * R;
       const need = view.density * view.radiusHi * view.radiusHi * view.falloff(nearest);
       if (need > tile.sigma && tile.building < need) this.schedule(tile, need * this.spec.headroom, nearest, view);
-      if (tile.sigma === 0 && need > 0) allReady = false;
     };
     for (let face = 0; face < 6; face++) visit(face, 0, 0, 0);
 
-    // 2. Drop tiles nobody wants. While re-tiling, the old tiling stays (and
-    //    is the only one drawn) until every new tile is ready.
-    let switching = false;
+    // 2. Re-tiling swaps region by region: an old-level tile stays (and keeps
+    //    drawing) until every wanted new tile over its area is ready; a new
+    //    tile stays hidden while an old one still covers it. Under pool
+    //    pressure the old tiles go first: a brief thin patch, never a stall.
+    const hidden = new Set<Tile>();
+    const pressed = this.freePages.length < 4;
     for (const t of [...this.tiles.values()]) {
       if (t.wanted) continue;
-      if (t.level !== level && !allReady) {
-        switching = true;
+      if (t.level === level || pressed) {
+        this.release(t, view.queue);
         continue;
       }
-      this.release(t, view.queue);
+      let covered = true;
+      let overlapping = 0;
+      for (const n of this.tiles.values()) {
+        if (!n.wanted || !overlaps(t, n)) continue;
+        overlapping++;
+        if (n.sigma === 0) covered = false;
+      }
+      if (overlapping === 0 || covered) {
+        this.release(t, view.queue);
+        continue;
+      }
+      for (const n of this.tiles.values()) if (n.wanted && overlaps(t, n)) hidden.add(n);
     }
 
     // 3. Page visibility: whole tiles against the (warped) frustum.
@@ -189,7 +209,7 @@ export class ScatterLayer {
         warpPoint(w, sphere.center, sphere.center);
         sphere.radius += 2 * Math.abs(w.k) * tLen * sphere.radius;
       }
-      const show = view.frustum.intersectsSphere(sphere) && !(switching && t.level === level);
+      const show = view.frustum.intersectsSphere(sphere) && !hidden.has(t);
       for (const p of t.pages) {
         this.pageVisible[p] = show ? 255 : 0;
         maxPage = Math.max(maxPage, p);
@@ -247,6 +267,7 @@ export class ScatterLayer {
     const count = data.length / SCATTER_STRIDE;
     // release the old pages first, then take enough for the new data
     for (const p of tile.pages) this.freePages.push(p);
+    this.keepLowPagesFirst();
     tile.pages = [];
     let needed = Math.ceil(count / size);
     if (needed > this.freePages.length) {
@@ -276,7 +297,13 @@ export class ScatterLayer {
   private release(tile: Tile, queue: BuildQueue): void {
     queue.cancel(`${this.spec.name}:${tile.key}`);
     for (const p of tile.pages) this.freePages.push(p);
+    this.keepLowPagesFirst();
     this.tiles.delete(tile.key);
+  }
+
+  /** Free pages sorted so pop() returns the lowest index: the draw range stays tight. */
+  private keepLowPagesFirst(): void {
+    this.freePages.sort((a, b) => b - a);
   }
 
   private clear(queue: BuildQueue): void {

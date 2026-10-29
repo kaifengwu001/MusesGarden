@@ -29,9 +29,10 @@ ever picks "a random position at the current size".
 
 The cube-to-sphere map is the spherified cube,
 `x′ = x·√(1 − y²/2 − z²/2 + y²z²/3)` and its permutations, not `normalize()`.
-It is close to equal-area but not exactly. Its area element J(a, b) (sphere
-area per unit face area, derived analytically and tabulated) is used wherever
-density matters.
+It is close to equal-area but not exactly (cells vary by ×1.33). Its area
+element J(a, b) is derived analytically (sphere area per unit face area:
+0.5 at a face centre, 0.577 at edge midpoints, 0.433 at corners) and divided
+out wherever density matters. The inverse map is closed-form.
 
 ## Growth
 
@@ -78,7 +79,10 @@ Instead the planet keeps one extra scalar, **R_lag**, which follows R with a
 1.5 s exponential lag in log space. A point's fade is where its birth radius
 sits inside the band between R_lag and R:
 
-    v = clamp((hi − ln R_i) / (hi − lo), 0, 1),   hi = max(ln R, ln R_lag),  lo = min(ln R, ln R_lag)
+    v = clamp((hi − ln R_i) / max(hi − lo, 0.015), 0, 1),   hi = max(ln R, ln R_lag),  lo = min(ln R, ln R_lag)
+
+The 0.015 minimum keeps the band from collapsing to a hard step: at rest the
+newest 3% of points sit partly grown, and nothing ever pops when growth stops.
 
 - **Steady growth:** the band moves at the growth rate, so every new point
   scales and fades in over exactly 1.5 s.
@@ -130,7 +134,47 @@ The press-and-hold layer is a list of (direction, angular radius, start time)
 discs stored in rest space. It survives growth and always covers the same
 flowers.
 
-## Chunks and the GPU data path
+## Chunks and the GPU data path (as built)
+
+Changed during the build: terrain is evaluated on the GPU from rest-space
+directions, with an exact CPU mirror, rather than computed per chunk on the
+CPU. Growth then never waits on terrain rebuilds, and picking, placement and
+tests still read the same fields from the CPU side.
+
+- **Terrain on the GPU:** `terrain.glsl` evaluates the meadow octaves,
+  mountains, channels, ponds and clearing from a direction, with R and the
+  layout as uniforms. `Terrain.sample` in `terrain.ts` mirrors it for CPU
+  use. The noise hashes integers (bit-identical in float32 and float64)
+  instead of the usual mod-289 float noise, which rounds differently on the
+  two sides.
+- **Channel field:** the only baked data. It holds angular distances to each
+  channel centreline per meander level, in a direction-space cube map baked
+  once per world on the GPU. It doesn't depend on R; widths stay in meters
+  because the shaders multiply by R.
+- **CDLOD:** six face quadtrees with one shared 17² grid and one instanced
+  draw. The range factor is k = 5.5 and the morph runs over 0.9–1.0 of the
+  range. The morph is symmetric: odd vertices blend toward the midpoint of
+  their parent-grid neighbours. Classic CDLOD slides them toward one
+  neighbour, which tears at cube-face seams where the two faces run the edge
+  parameter in opposite directions. Crack-freeness is proven by test on
+  every edge.
+- **Culling:** the camera's view frustum. Horizon culling uses the true sphere
+  in Overview and the warped curvature in Wander: ground of height H is
+  hidden beyond √(2·R_eff·h) + √(2·R_eff·H).
+- **Field maps:** every frame, three small passes evaluate the ground (height,
+  water distance, clearing or rock, bloom), the meadow fields (lushness,
+  drift) and the shared wind (bend vector, gust). Each is an azimuthal
+  projection around the focus. Grass, flowers and petals fetch these instead
+  of re-running noise per vertex.
+- **Scatter layer:** handles grass, flowers and later stones. Quadtree tiles
+  around the focus are enumerated from the rest-space point set by
+  time-sliced jobs (64 steps per tile, pooled typed buffers). They go into a
+  fixed instance pool split into pages and are drawn in one call. A page
+  visibility texture culls whole tiles. Density falls off by rank toward the
+  edge, so far tiles are built sparser. Re-tiling as R changes swaps region
+  by region, which never leaves a hole and never deadlocks a full pool.
+
+The original plan, kept for reference:
 
 - **Quadtrees:** six face quadtrees with CDLOD. Each node uses one shared grid
   mesh (33² on high, 17² on low). All selected nodes are drawn in **one
@@ -258,25 +302,38 @@ so any view can be shared.
 ## Module map
 
     src/
-      main.ts              boot, renderer, frame loop, quality tier wiring
+      main.ts              boot, renderer, frame loop, quality tier wiring, input and UI wiring
+      world.ts             the scene and every system; per-frame order; interactions
       params.ts            typed schema, store, URL query, presets
-      core/                clock, hash sync, quality tiers, GPU memory ledger, math, shared uniforms
+      core/                clock, hash sync, quality tiers, build queue, hashing, GPU memory ledger, shared uniforms
       planet/
         growth.ts          g → A → R, inverse
-        cubesphere.ts      spherified cube, its inverse and area element J
-        chunks.ts          face quadtrees, CDLOD selection and morph, time-sliced build queue
-        rest.ts            progressive point sets, birth radii, fades, unlock ranks
-        terrain.ts         height and biome fields, sampled from rest space
-        water.ts           channel splines, ponds, masks, depth; water.glsl
-      life/                grass, flowers, clouds, props
+        cubesphere.ts/.glsl spherified cube, closed-form inverse, analytic area element
+        rest.ts/.glsl      progressive point sets, birth radii, growth fade band
+        chunks.ts          face quadtrees, CDLOD selection, symmetric morph (CPU mirror), culling
+        surface.ts/.glsl   the instanced CDLOD ground: terrain, paint, rock and snow, water
+        noise.ts/.glsl     integer-hash gradient noise, identical on both sides
+        terrain.ts/.glsl   layout from the seed, meadow, mountains, ponds, homestead, unlocks
+        water.ts/.glsl     channel distance field bake; painted water shading
+        meadow.glsl        painted far meadow, bloom front, wind direction
+        geo.ts             spherical arcs and travel
+      life/
+        fieldMap.ts/.glsl  ground, meadow and wind maps around the focus
+        scatter.ts         tiles, paged instance pool, page culling, region-by-region re-tiling
+        grass.ts/.glsl     5-vertex blades in the wind
+        flowers.ts/.glsl   four species (meshes in flowerMeshes.ts), bloom, flutter
+        petals.ts/.glsl    petals lifting at the bloom front and in gusts
+        wind.glsl          one wind field: flow, travelling gusts, click rings
+        clouds.ts/.glsl    drifting clusters and mountain banks; cloudShadow.glsl
+        props.ts/.glsl     cottage, landing, rail, bench; outlines (inverted hull)
       render/
-        palette.ts         16×16 palette texture generated in code
+        palette.ts         16×16 palette generated in code, time-of-day keys, sun path
+        toon.glsl          soft bands, three-tone materials, rim
+        fog.glsl           aerial perspective
         warp.glsl / .ts    tiny-planet warp (GPU and its exact CPU mirror)
-        toon.glsl          banded lighting, rim, sky ambient
-        outline.ts         inverted-hull outlines for props
-        sky.ts             sky dome and backdrop, sun, aerial perspective
-        post.ts            HDR target, tone curve, highlight bloom, paper grain
-        glsl.ts            registers shared GLSL chunks (#include <meadow_*>)
-      view/                camera rig (Overview ↔ Wander), input, CPU picking
-      ui/                  title, hints, control bar, lil-gui panel
-      dev/                 perf HUD, GPU timer, test harness, Playwright specs, Vitest invariants
+        sky.ts/.glsl       backdrop and dome, sun glow
+        post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
+        look.ts, glsl.ts   shared look uniforms; shader chunk registry
+      view/                camera rig (Overview ↔ Wander), input gestures, CPU picking
+      ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
+      dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

@@ -15,6 +15,7 @@ export interface HarnessHost {
   parity(): ReturnType<MeadowHarness['parity']>;
   pick(ndcX: number, ndcY: number): ReturnType<MeadowHarness['pick']>;
   frameLog(count: number): ReturnType<MeadowHarness['frameLog']>;
+  preset(name: 'homestead' | 'range' | 'meadow'): void;
 }
 
 export const HARNESS_VERSION = 'S0';
@@ -63,6 +64,9 @@ export function installHarness(host: HarnessHost, ready: Promise<void>): MeadowH
     },
     pick(x, y) {
       return host.pick(x, y);
+    },
+    preset(name) {
+      host.preset(name);
     },
     benchmark(frames) {
       const gl = host.gl;

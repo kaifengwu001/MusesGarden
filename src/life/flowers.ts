@@ -55,7 +55,7 @@ export class Flowers {
       });
       const mesh = new Mesh(geometry, material);
       mesh.frustumCulled = false;
-      mesh.renderOrder = 2;
+      mesh.renderOrder = -19;
       this.meshes.push(mesh);
       this.shared.push(own);
     });

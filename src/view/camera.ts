@@ -33,6 +33,8 @@ export class CameraRig {
   /** Smoothed ground height under the focus, m. */
   private ground = 0;
   private radius = 128;
+  /** Overview altitude in R: the planet's disc fits the narrower field-of-view axis. */
+  private overviewAltitude = OVERVIEW_ALTITUDE;
   /** Glide in progress (double-click): start, end, progress. */
   private glideStart = new Quaternion();
   private glideEnd = new Quaternion();
@@ -47,7 +49,7 @@ export class CameraRig {
   private changed = false;
 
   get altitude(): number {
-    const top = OVERVIEW_ALTITUDE * this.radius;
+    const top = this.overviewAltitude * this.radius;
     return top * Math.pow(EYE_HEIGHT / top, this.zoom);
   }
 
@@ -116,6 +118,10 @@ export class CameraRig {
 
   update(realDt: number, radius: number, aspect: number, ground: GroundFn): void {
     this.radius = radius;
+    // portrait screens: keep the whole planet in frame (disc ≤ 80 % of the narrow axis)
+    const halfV = (35 * Math.PI) / 360;
+    const halfH = Math.atan(aspect * Math.tan(halfV));
+    this.overviewAltitude = Math.max(OVERVIEW_ALTITUDE, 1 / Math.sin(0.8 * Math.min(halfV, halfH)) - 1);
     if (this.glideT < 1) {
       this.glideT = Math.min(1, this.glideT + realDt / 1.6);
       const e = smoothstep(0, 1, this.glideT);

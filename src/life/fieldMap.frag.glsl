@@ -7,6 +7,7 @@ uniform float uRadius;
 #include <meadow_toon>
 #include <meadow_paint>
 #include <meadow_field>
+#include <meadow_wind>
 
 uniform float uFieldSize;
 uniform int uFieldPass;
@@ -17,9 +18,11 @@ void main() {
   if (uFieldPass == 0) {
     Ground g = sampleGround(dir);
     gl_FragColor = vec4(g.height, g.water, g.clearing > 0.0 ? g.clearing : -max(g.mountain, g.rock), bloomAt(dir));
-  } else {
+  } else if (uFieldPass == 1) {
     // pixel footprint irrelevant here: plants sample the meadow at its own scale
     vec3 f = meadowFields(dir, 0.0);
     gl_FragColor = vec4(f, 0.0);
+  } else {
+    gl_FragColor = vec4(windBase(dir), gustAt(dir));
   }
 }

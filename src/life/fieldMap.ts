@@ -22,10 +22,12 @@ import fragmentShader from './fieldMap.frag.glsl?raw';
 // bearing atan2(y, x) in the focus tangent frame.
 //   ground: height (m), signed distance to water (m), clearing − mountain, bloom
 //   meadow: lushness, flower drift, -, -
+//   wind:   shared bend vector (xyz, planet space), gust 0..1
 
 export interface FieldUniforms {
   uFieldMap: IUniform;
   uFieldMeadow: IUniform;
+  uFieldWind: IUniform;
   /** Focus direction xyz, angular radius Θ. */
   uFieldCentre: IUniform<Vector4>;
   /** Tangent t1 of the focus frame (t2 = centre × t1). */
@@ -46,6 +48,7 @@ function target(size: number): WebGLRenderTarget {
 export class FieldMap {
   readonly ground: WebGLRenderTarget;
   readonly meadow: WebGLRenderTarget;
+  readonly wind: WebGLRenderTarget;
   readonly uniforms: FieldUniforms;
   private readonly scene: Scene;
   private readonly camera = new OrthographicCamera();
@@ -56,10 +59,12 @@ export class FieldMap {
   constructor(shared: Record<string, IUniform>, size: number) {
     this.ground = target(size);
     this.meadow = target(size);
-    gpuMemory.set('field map', 2 * size * size * 8);
+    this.wind = target(size);
+    gpuMemory.set('field map', 3 * size * size * 8);
     this.uniforms = {
       uFieldMap: { value: this.ground.texture },
       uFieldMeadow: { value: this.meadow.texture },
+      uFieldWind: { value: this.wind.texture },
       uFieldCentre: { value: new Vector4(0, 1, 0, 0.3) },
       uFieldT1: { value: new Vector3(1, 0, 0) },
     };
@@ -86,6 +91,9 @@ export class FieldMap {
     renderer.render(this.scene, this.camera);
     this.pass.value = 1;
     renderer.setRenderTarget(this.meadow);
+    renderer.render(this.scene, this.camera);
+    this.pass.value = 2;
+    renderer.setRenderTarget(this.wind);
     renderer.render(this.scene, this.camera);
     renderer.setRenderTarget(previous);
   }

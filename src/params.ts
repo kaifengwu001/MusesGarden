@@ -96,9 +96,9 @@ export const schema = {
     snowline: num('snow', 'Snowline', 0.62, 0, 1, 0.01, 'live'),
   },
   grass: {
-    density: num('gd', 'Density', 240, 20, 1200, 1, 'life', { unit: '/m²' }),
+    density: num('gd', 'Density', 180, 20, 1200, 1, 'life', { unit: '/m²' }),
     height: num('gh', 'Height', 0.42, 0.08, 1.2, 0.01, 'live', { unit: 'm' }),
-    nearRadius: num('gr', 'Blade radius', 24, 6, 60, 0.5, 'life', { unit: 'm' }),
+    nearRadius: num('gr', 'Blade radius', 22, 6, 60, 0.5, 'life', { unit: 'm' }),
   },
   flowers: {
     density: num('fd', 'Density', 9, 0, 40, 0.1, 'life', { unit: '/m²' }),

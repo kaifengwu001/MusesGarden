@@ -22,7 +22,7 @@ import { ChannelField } from './planet/water';
 import { createLookUniforms } from './render/look';
 import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
-import { warpK } from './render/warp';
+import { effectiveVisualRadius, warpK } from './render/warp';
 import { CameraRig } from './view/camera';
 
 const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3 } as const;
@@ -78,6 +78,7 @@ export class World {
   private readonly tmp = new Vector3();
   private readonly windAxis = new Vector3();
   private posed = false;
+  private readonly heightBound = (centre: Vector3, alpha: number): number => this.terrain.heightBound(centre, alpha);
 
   constructor(
     private readonly renderer: WebGLRenderer,
@@ -138,6 +139,27 @@ export class World {
     this.posed = true;
   }
 
+  /** Named views for shots and tests: across the pond at the cottage, toward the range, over the meadow. */
+  cameraPreset(name: 'homestead' | 'range' | 'meadow'): void {
+    const L = this.terrain.layout;
+    const R = this.growth.radius;
+    const mid = L.range.a.clone().add(L.range.b).normalize();
+    if (name === 'homestead') {
+      // stand across the pond, looking back at the cottage and its landing
+      const bearing = L.homeBearing.clone().applyAxisAngle(L.cottage, Math.PI + 0.35);
+      const target = L.cottage.clone().multiplyScalar(Math.cos(14 / R)).addScaledVector(bearing, -Math.sin(14 / R)).normalize();
+      this.rig.lookAlong(target, bearing.addScaledVector(target, -bearing.dot(target)).normalize());
+      this.rig.setZoom(0.8, true);
+    } else {
+      const angle = Math.acos(Math.min(1, L.cottage.dot(mid)));
+      const axis = L.cottage.clone().cross(mid).normalize();
+      const target = L.cottage.clone().applyAxisAngle(axis, angle * (name === 'range' ? 0.6 : 0.4));
+      this.rig.lookAlong(target, mid.clone().addScaledVector(target, -mid.dot(target)).normalize());
+      this.rig.setZoom(name === 'range' ? 0.68 : 0.6, true);
+    }
+    this.posed = true;
+  }
+
   onParams(changed: ReadonlySet<ParamPath>): void {
     if (changed.has('world.seed') || changed.has('terrain.channelCount') || changed.has('terrain.pondCount')) {
       this.terrain.layout = this.makeLayout();
@@ -191,6 +213,7 @@ export class World {
 
     this.updateLight(p.light.timeOfDay);
     this.updateLook(clock);
+    this.grass.setColours(this.palette);
 
     // The homestead sits on its clearing, facing its pond; its shadow sweeps away from the sun.
     const L = this.terrain.layout;
@@ -213,6 +236,15 @@ export class World {
         frustum: this.frustum,
         warp: this.warp,
         horizonCull: rig.warpWeight < 0.05,
+        warpHorizon:
+          rig.warpWeight >= 0.05
+            ? {
+                focusDir: rig.up,
+                radiusEff: 1 / (rig.warpWeight / effectiveVisualRadius(p.view.visualRadius, R) + (1 - rig.warpWeight) / R),
+                eyeHeight: rig.altitude + 0.5,
+                heightAt: this.heightBound,
+              }
+            : null,
       },
       this.lod,
     );
@@ -307,6 +339,22 @@ export class World {
     L.uWaterLook.value.set(p.water.shoreWidth, p.water.depthTint, 0.4 + 0.8 * p.wind.strength, clock.time);
     L.uSnow.value = p.terrain.snowline;
     L.uDebug.value = DEBUG_VIEWS[p.ui.debug];
+  }
+
+  /**
+   * Triangles that can actually reach the rasteriser: what three.js submits,
+   * minus the instances the vertex shaders collapse (pages outside the
+   * frustum, other species' flowers).
+   */
+  effectiveTriangles(submitted: number): number {
+    const grassTris = 3;
+    const g = this.grass;
+    let wasted = g.layer.instanceCount * grassTris - g.layer.visibleInstances * grassTris;
+    for (const mesh of this.flowers.meshes) {
+      const tris = (mesh.geometry.index?.count ?? 0) / 3;
+      wasted += mesh.geometry.instanceCount * tris - (this.flowers.layer.visibleInstances * tris) / this.flowers.meshes.length;
+    }
+    return Math.max(0, submitted - (this.grass.mesh.visible ? wasted : 0));
   }
 
   pick(ndcX: number, ndcY: number): Pick | null {
