@@ -54,23 +54,29 @@ export function pinkCup(): InstancedBufferGeometry {
   const b = builder();
   const h = 0.62;
   stem(b, h, 0.016, 5, 0.04);
-  const top = h;
-  const n = 6;
-  const base = vert(b, 0, top, 0, 1, 1);
-  const rim: number[] = [];
-  const lip: number[] = [];
-  for (let k = 0; k < n; k++) {
+  // a deep bell: base at the stem top, a waist, and an evenly flared lip
+  const n = 8;
+  const rings: Array<[number, number]> = [
+    [0.022, 0.012],
+    [0.05, 0.05],
+    [0.062, 0.095],
+    [0.078, 0.125],
+  ];
+  const base = vert(b, 0, h, 0, 1, 1);
+  const idx: number[][] = rings.map(([r, y]) => Array.from({ length: n }, (_, k) => {
     const a = (k / n) * Math.PI * 2;
-    const r = 0.055;
-    rim.push(vert(b, Math.cos(a) * r, top + 0.06, Math.sin(a) * r, 1, 1));
-    // petal tips flare slightly and alternate in height: a soft scalloped lip
-    const a2 = a + Math.PI / n;
-    lip.push(vert(b, Math.cos(a2) * 0.075, top + 0.105 + (k % 2) * 0.012, Math.sin(a2) * 0.075, 1, 1));
-  }
-  for (let k = 0; k < n; k++) {
-    const k1 = (k + 1) % n;
-    b.idx.push(base, rim[k1], rim[k]);
-    b.idx.push(rim[k], rim[k1], lip[k]);
+    return vert(b, Math.cos(a) * r, h + y, Math.sin(a) * r, 1, 1);
+  }));
+  for (let k = 0; k < n; k++) b.idx.push(base, idx[0][(k + 1) % n], idx[0][k]);
+  for (let ring = 0; ring + 1 < idx.length; ring++) {
+    for (let k = 0; k < n; k++) {
+      const k1 = (k + 1) % n;
+      const a = idx[ring][k];
+      const c = idx[ring][k1];
+      const d = idx[ring + 1][k];
+      const e = idx[ring + 1][k1];
+      b.idx.push(a, c, e, a, e, d);
+    }
   }
   return finish(b);
 }

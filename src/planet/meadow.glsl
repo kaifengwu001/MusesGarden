@@ -7,6 +7,8 @@
 uniform vec4 uBloom;   // front angle (rad), front softness, -, -
 uniform vec4 uWindVec; // rotation axis of the wind field (xyz), strength
 uniform vec4 uSpecies; // flower weights: pink, star, yellow, blue
+#define MAX_USER_BLOOMS 8
+uniform vec4 uUserBloom[MAX_USER_BLOOMS]; // press-and-hold discs: centre direction, angular radius
 
 // Wind direction at a point: a solid-body rotation field around uWindVec.xyz.
 vec3 windDir(vec3 dir) {
@@ -15,11 +17,19 @@ vec3 windDir(vec3 dir) {
   return l > 1e-5 ? w / l : normalize(cross(dir, vec3(0.0, 1.0, 0.0)));
 }
 
-// 1 behind the bloom front (in flower), 0 ahead of it.
+// 1 behind the bloom front (in flower), 0 ahead of it. Discs you hold open
+// bloom too; they live in rest space, so they cover the same flowers at any size.
 float bloomAt(vec3 dir) {
   float a = chordAngle(dir, uCottage.xyz);
   float wobble = 0.17 * gnoise(dir * 3.0, uTerrainSeed + 60u) + 0.05 * gnoise(dir * 13.0, uTerrainSeed + 61u);
-  return smoothstep(uBloom.x + uBloom.y, uBloom.x - uBloom.y, a + wobble);
+  float bloom = smoothstep(uBloom.x + uBloom.y, uBloom.x - uBloom.y, a + wobble);
+  for (int i = 0; i < MAX_USER_BLOOMS; i++) {
+    vec4 d = uUserBloom[i];
+    if (d.w <= 0.0) continue;
+    float r = chordAngle(dir, d.xyz) + wobble * 0.15 * d.w;
+    bloom = max(bloom, smoothstep(d.w, d.w * 0.7, r));
+  }
+  return bloom;
 }
 
 // Octave pair and blend for a pattern of `meters`-sized cells, never finer

@@ -111,13 +111,14 @@ void main() {
   }
 
   // colour by species and part
-  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT);
+  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * mix(1.0, 0.5, cottageShadow(dir));
   vec3 col;
   if (aPart < 0.5) {
     col = tone3(pal(ROW_PINK, 4), mix(pal(ROW_PINK, 4), pal(ROW_PINK, 5), 0.5), pal(ROW_PINK, 5), b * 0.85);
   } else if (species == 0) {
-    float inner = smoothstep(stemTop + 0.07, stemTop + 0.01, local.y); // the cup's paler heart
-    col = tone3(mix(pal(ROW_PINK, 0), pal(ROW_PINK, 2), inner), pal(ROW_PINK, 1), pal(ROW_PINK, 3), b);
+    float inner = smoothstep(stemTop + 0.06, stemTop + 0.0, local.y); // the cup's paler heart
+    float lipLight = smoothstep(stemTop + 0.08, stemTop + 0.125, local.y);
+    col = tone3(mix(mix(pal(ROW_PINK, 1), pal(ROW_PINK, 0), lipLight), pal(ROW_PINK, 2), inner * 0.6), pal(ROW_PINK, 1), pal(ROW_PINK, 3), b * mix(0.75, 1.0, lipLight));
   } else if (species == 1) {
     col = aPart > 1.5 ? tone3(pal(ROW_STAR, 3), pal(ROW_STAR, 2), pal(ROW_SCATTER, 1), b) : tone3(pal(ROW_STAR, 0), pal(ROW_STAR, 0), pal(ROW_STAR, 1), b);
   } else if (species == 2) {

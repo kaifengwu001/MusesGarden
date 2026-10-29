@@ -77,7 +77,7 @@ void main() {
   vec3 p = base + up * (h * y * (1.0 - 0.32 * min(bl * bl, 1.2) * y)) + side * (w * position.x) + tip * (h * y * y);
 
   // colour per vertex: dark roots, lit tips, paler ahead of the bloom front
-  float b = toonLight(dot(up, uSunDir));
+  float b = toonLight(dot(up, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir));
   vec3 lit = mix(pal(ROW_GRASS, 0), pal(ROW_GRASS, 3), smoothstep(0.55, 1.0, y) * 0.7);
   vec3 mid = mix(pal(ROW_GRASS, 1), pal(ROW_BRUSH, 1), rnd(seed, 7.0) * 0.5);
   vec3 shade = mix(pal(ROW_GRASS, 5), pal(ROW_GRASS, 2), y);

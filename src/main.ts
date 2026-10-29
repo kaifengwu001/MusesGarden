@@ -7,6 +7,8 @@ import { HashSync } from './core/hashSync';
 import { QualityController, detectDevice, runBenchmark, type TierChoice } from './core/quality';
 import { GpuTimer } from './dev/gpuTimer';
 import { installHarness } from './dev/harness';
+import { measureParity } from './dev/parity';
+import type { ParamPath } from './params';
 import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
 import { registerShaderChunks } from './render/glsl';
@@ -80,6 +82,7 @@ async function boot(): Promise<void> {
   if (import.meta.env.DEV) (window as unknown as { __world: World }).__world = world;
   const camera = world.rig.camera;
   const post = new Post(renderer);
+  post.bloomEnabled = quality.tier.bloom;
   const gpuTimer = new GpuTimer(gl);
   const stats = createFrameStats();
   const hud = new PerfHud(uiRoot);
@@ -88,8 +91,9 @@ async function boot(): Promise<void> {
   ui.setHints([
     ['drag', 'orbit · glide'],
     ['scroll', 'down to the meadow'],
-    ['H', 'perf'],
-    ['P', 'parameters'],
+    ['click', 'gust · ripple'],
+    ['double-click', 'glide there'],
+    ['hold', 'bloom'],
   ]);
 
   // Camera pose in the URL; without one, frame the homestead.
@@ -128,11 +132,25 @@ async function boot(): Promise<void> {
       world.rig.zoomBy(delta);
       userPosed = true;
     },
-    tap: () => undefined,
-    doubleTap: () => undefined,
-    holdStart: () => undefined,
+    tap: (x, y) => {
+      const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+      if (!hit) return;
+      if (hit.water < 0) world.ripple(hit.dir, clock.time);
+      else world.gust(hit.dir, clock.time);
+    },
+    doubleTap: (x, y) => {
+      const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+      if (hit) {
+        world.rig.glideTo(hit.dir);
+        userPosed = true;
+      }
+    },
+    holdStart: (x, y) => {
+      const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+      if (hit && hit.water >= 0) world.bloomStart(hit.dir);
+    },
     holdMove: () => undefined,
-    holdEnd: () => undefined,
+    holdEnd: () => world.bloomEnd(),
   });
 
   const bufferSize = new Vector2();
@@ -161,6 +179,7 @@ async function boot(): Promise<void> {
     if (changed.has('quality.tier')) {
       chooseTier(store.values.quality.tier);
       world.applyTier(quality.tier);
+      post.bloomEnabled = quality.tier.bloom;
       resize();
     }
     if (changed.has('view.mode') && !syncingMode) world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0);
@@ -218,6 +237,15 @@ async function boot(): Promise<void> {
     stats.frozen = clock.frozen;
   };
 
+  // the last few seconds of frames, for hitch tests (a preallocated ring)
+  const LOG = 600;
+  const frameLog = Array.from({ length: LOG }, () => ({ frameMs: 0, jsMs: 0, buildMs: 0 }));
+  let logHead = 0;
+  let logCount = 0;
+  const recentFrames = (count: number): Array<{ frameMs: number; jsMs: number; buildMs: number }> => {
+    const n = Math.min(count, logCount);
+    return Array.from({ length: n }, (_, k) => ({ ...frameLog[(logHead - n + k + LOG) % LOG] }));
+  };
   const frame = (now: number): void => {
     clock.tick(now);
     const t0 = performance.now();
@@ -231,9 +259,18 @@ async function boot(): Promise<void> {
     const jsMs = performance.now() - t0;
     if (Number.isNaN(stats.firstFrameMs)) stats.firstFrameMs = performance.now();
     collectStats(jsMs);
+    const entry = frameLog[logHead];
+    entry.frameMs = clock.frameMs;
+    entry.jsMs = jsMs;
+    entry.buildMs = world.queue.lastMs;
+    logHead = (logHead + 1) % LOG;
+    logCount = Math.min(logCount + 1, LOG);
     quality.locked = clock.frozen; // never change resolution under a deterministic capture
     const change = quality.observe(clock.frameMs);
-    if (change === 'tier') world.applyTier(quality.tier);
+    if (change === 'tier') {
+      world.applyTier(quality.tier);
+      post.bloomEnabled = quality.tier.bloom;
+    }
     if (change) resize();
     hud.frame(stats, quality.tier.budgets, now);
   };
@@ -262,6 +299,16 @@ async function boot(): Promise<void> {
         world.settle();
         await post.warm(world.scene, camera);
       },
+      set: (path, value) => {
+        store.set(path as ParamPath, value);
+        store.flush();
+      },
+      parity: () => measureParity(world, renderer),
+      pick: (x, y) => {
+        const hit = world.pick(x, y);
+        return hit ? { dir: [hit.dir.x, hit.dir.y, hit.dir.z], water: hit.water } : null;
+      },
+      frameLog: recentFrames,
     },
     ready,
   );

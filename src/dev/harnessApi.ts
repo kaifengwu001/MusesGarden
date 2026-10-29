@@ -58,6 +58,16 @@ export interface MeadowHarness {
   /** Render one frame and return an FNV-1a hash of the canvas pixels. */
   frameHash(): string;
   stats(): FrameStats;
+  /** Set one parameter by path, e.g. set('world.growth', 0.7). */
+  set(path: string, value: number | string | boolean): void;
+  /** Per-frame stats of the last `count` frames (for hitch tests). */
+  frameLog(count: number): Array<{ frameMs: number; jsMs: number; buildMs: number }>;
+  /** CPU ↔ GPU agreement: terrain (field map) and the tiny-planet warp. */
+  parity(): { heightError: number; waterError: number; warpError: number; samples: number };
+  /** Pick the planet at normalised device coordinates. */
+  pick(ndcX: number, ndcY: number): { dir: [number, number, number]; water: number } | null;
+  /** Render `frames` frames back to back (GPU-synchronised); returns ms per frame. */
+  benchmark(frames: number): number;
 }
 
 declare global {

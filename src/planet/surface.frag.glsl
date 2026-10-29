@@ -43,8 +43,8 @@ void main() {
   vec3 v = toCam / viewDist;
   float pixelMeters = viewDist * uPixelAngle / max(dot(n, v), 0.3);
 
-  float shadow = cloudShadow(dir);
-  float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.55, shadow);
+  float shadow = max(cloudShadow(dir), cottageShadow(dir));
+  float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.5, shadow);
 
   float water = waterDistance(dir, vMountain);
   float aa = max(fwidth(water), 0.015);

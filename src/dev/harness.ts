@@ -11,6 +11,10 @@ export interface HarnessHost {
   renderFrame(): void;
   /** Finish pending work so the next frame is a pure function of the state. */
   settle(): Promise<void>;
+  set(path: string, value: number | string | boolean): void;
+  parity(): ReturnType<MeadowHarness['parity']>;
+  pick(ndcX: number, ndcY: number): ReturnType<MeadowHarness['pick']>;
+  frameLog(count: number): ReturnType<MeadowHarness['frameLog']>;
 }
 
 export const HARNESS_VERSION = 'S0';
@@ -47,6 +51,28 @@ export function installHarness(host: HarnessHost, ready: Promise<void>): MeadowH
     },
     stats() {
       return { ...host.stats };
+    },
+    set(path, value) {
+      host.set(path, value);
+    },
+    frameLog(count) {
+      return host.frameLog(count);
+    },
+    parity() {
+      return host.parity();
+    },
+    pick(x, y) {
+      return host.pick(x, y);
+    },
+    benchmark(frames) {
+      const gl = host.gl;
+      const pixel = new Uint8Array(4);
+      host.renderFrame();
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      const t0 = performance.now();
+      for (let i = 0; i < frames; i++) host.renderFrame();
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); // waits for the GPU
+      return (performance.now() - t0) / frames;
     },
   };
   void ready.then(() => {

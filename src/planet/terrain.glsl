@@ -25,6 +25,8 @@ uniform vec4 uPondC[MAX_PONDS]; // outline amplitudes 1–3, first islet
 uniform vec4 uPondD[MAX_PONDS]; // outline phases 1–3, islet count
 uniform vec4 uIslets[MAX_ISLETS]; // pond-normalised x, y, radius
 uniform vec4 uCottage; // direction, clearing level (m)
+uniform vec4 uCottageB; // toward the pond
+uniform vec4 uCottageSun; // shadow sweep per meter of height in cottage-local x, z
 
 struct Ground {
   float height;   // above the base sphere, m
@@ -129,13 +131,44 @@ float pondDistance(vec3 dir, int i) {
   return sdf;
 }
 
+// Cottage-local meters: x across, z toward the pond (mirrors Terrain.cottageLocal).
+vec2 cottageLocal(vec3 dir) {
+  vec3 off = dir - uCottage.xyz;
+  return vec2(dot(off, cross(uCottage.xyz, uCottageB.xyz)), dot(off, uCottageB.xyz)) * uRadius;
+}
+
+float clearingAt(vec3 dir, float dc) {
+  float disc = smoothstep(3.6, 2.9, dc);
+  if (dc > 9.0) return disc;
+  vec2 c = cottageLocal(dir);
+  float rect = smoothstep(0.35, 0.0, max(max(-2.6 - c.x, c.x - 1.3), max(-0.2 - c.y, c.y - 5.9)));
+  return max(disc, rect);
+}
+
+float boxDistance(vec2 p, vec2 halfSize) {
+  vec2 d = abs(p) - halfSize;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
+// Soft shadow of the cottage on the ground: the footprint swept toward the sun.
+float cottageShadow(vec3 dir) {
+  vec2 c = cottageLocal(dir);
+  if (dot(c, c) > 400.0) return 0.0;
+  float best = 1e3;
+  for (int k = 1; k <= 4; k++) {
+    float h = 0.85 * float(k);
+    best = min(best, boxDistance(c + uCottageSun.xy * h, vec2(2.75, 2.3)));
+  }
+  return smoothstep(0.45, -0.25, best);
+}
+
 Ground sampleGround(vec3 dir) {
   Ground g;
   float h = meadowHeight(dir) + mountainAt(dir, g.mountain, g.rock);
   float dc = chordAngle(dir, uCottage.xyz) * uRadius;
   float flat_ = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
   h += (uCottage.w - h) * flat_;
-  g.clearing = smoothstep(COTTAGE_FLAT, COTTAGE_FLAT - 1.2, dc);
+  g.clearing = clearingAt(dir, dc);
   float sc = channelDistance(dir) + 4.0 * g.mountain + 6.0 * flat_;
   float water = sc;
   h -= 0.24 * smoothstep(0.7, -0.2, sc);

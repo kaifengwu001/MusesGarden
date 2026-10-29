@@ -94,12 +94,14 @@ export class ScatterLayer {
   instanceCount = 0;
   /** Instances held in visible pages (perf stat). */
   visibleInstances = 0;
-  /** True when a build had to be truncated because the pool was full. */
-  saturated = false;
+  /** Builds that had to wait because the pool was full (perf stat; no logging in the frame). */
+  saturated = 0;
   private readonly pool: Float32Array;
   private readonly pageVisible: Uint8Array;
   private readonly freePages: number[] = [];
   private readonly tiles = new Map<string, Tile>();
+  /** Staging buffers returned by finished builds, reused to avoid GC pauses. */
+  private readonly spare: Float32Array[] = [];
   private seed = -1;
 
   constructor(readonly spec: ScatterSpec) {
@@ -204,28 +206,43 @@ export class ScatterLayer {
     const spec = this.spec;
     const seed = view.seed;
     const alive = (): boolean => this.tiles.has(tile.key);
-    const commit = (data: number[]): void => this.commit(tile, data, sigma);
+    const commit = (data: Float32Array): void => this.commit(tile, data, sigma);
+    const take = (): Float32Array => this.spare.pop() ?? new Float32Array(16384 * SCATTER_STRIDE);
+    const give = (buffer: Float32Array): void => {
+      if (this.spare.length < 6) this.spare.push(buffer);
+    };
     function* build(): Generator<void, void, void> {
-      const staging: number[] = [];
-      // 16 sub-cells, so the queue can pause between them
-      const sub = 2;
+      // a typed staging buffer from the spare pool, doubled as needed (no per-point garbage)
+      let staging = take();
+      let used = 0;
+      // 64 sub-cells, so one step of this job stays well under the frame budget
+      const sub = 3;
       const n = 1 << sub;
       for (let a = 0; a < n; a++) {
         for (let b = 0; b < n; b++) {
           enumerateCell(spec.cls, seed, tile.face, tile.level + sub, tile.i * n + a, tile.j * n + b, sigma, (p) => {
+            if (used + SCATTER_STRIDE > staging.length) {
+              const bigger = new Float32Array(staging.length * 2);
+              bigger.set(staging);
+              staging = bigger;
+            }
             uvToSphere(p.face, p.u, p.v, corner);
-            staging.push(corner.x, corner.y, corner.z, Math.log(p.threshold), p.seed / 4294967296);
+            staging[used++] = corner.x;
+            staging[used++] = corner.y;
+            staging[used++] = corner.z;
+            staging[used++] = Math.log(p.threshold);
+            staging[used++] = p.seed / 4294967296;
           });
           yield;
         }
       }
-      if (!alive()) return; // released while building
-      commit(staging);
+      if (alive()) commit(staging.subarray(0, used)); // else: released while building
+      give(staging);
     }
     view.queue.add(`${spec.name}:${tile.key}`, distance, build());
   }
 
-  private commit(tile: Tile, data: number[], sigma: number): void {
+  private commit(tile: Tile, data: Float32Array, sigma: number): void {
     const size = this.spec.pageSize;
     const count = data.length / SCATTER_STRIDE;
     // release the old pages first, then take enough for the new data
@@ -234,8 +251,7 @@ export class ScatterLayer {
     let needed = Math.ceil(count / size);
     if (needed > this.freePages.length) {
       needed = this.freePages.length;
-      if (!this.saturated) console.warn(`${this.spec.name}: instance pool full; thinning`);
-      this.saturated = true;
+      this.saturated++;
     }
     // Only add ranges: several tiles can commit in one frame, and three.js
     // clears the ranges itself once they are uploaded.
@@ -245,13 +261,15 @@ export class ScatterLayer {
       const from = k * size * SCATTER_STRIDE;
       const to = Math.min(data.length, from + size * SCATTER_STRIDE);
       const base = page * size * SCATTER_STRIDE;
-      for (let x = from; x < to; x++) this.pool[base + (x - from)] = data[x]!;
+      this.pool.set(data.subarray(from, to), base);
       for (let x = base + (to - from); x < base + size * SCATTER_STRIDE; x += SCATTER_STRIDE) this.pool[x + 3] = NEVER;
     }
     for (const page of tile.pages) this.buffer.addUpdateRange(page * size * SCATTER_STRIDE, size * SCATTER_STRIDE);
     this.buffer.needsUpdate = true;
     tile.count = Math.min(count, needed * size);
-    tile.sigma = sigma;
+    // A truncated tile is not complete: leave it eligible for a rebuild once
+    // pages free up, so the settled state never depends on history.
+    tile.sigma = tile.count < count ? 0 : sigma;
     tile.building = 0;
   }
 

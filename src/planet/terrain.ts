@@ -422,7 +422,7 @@ export class Terrain {
     const dc = angleBetween(dir, this.layout.cottage) * this.radius;
     const flat = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
     h += (this.cottageLevel - h) * flat;
-    out.clearing = smoothstep(COTTAGE_FLAT, COTTAGE_FLAT - 1.2, dc);
+    out.clearing = this.clearingAt(dir, dc);
     const sc = this.channelDistance(dir) + 4 * out.mountain + 6 * flat;
     let water = sc;
     h -= 0.24 * smoothstep(0.7, -0.2, sc);
@@ -440,6 +440,25 @@ export class Terrain {
 
   height(dir: Vector3): number {
     return this.sample(dir, scratch).height;
+  }
+
+  /** Cottage local coordinates (m): x across, z toward the pond. Mirrors cottageLocal() in GLSL. */
+  cottageLocal(dir: Vector3, out: { x: number; z: number }): { x: number; z: number } {
+    const L = this.layout;
+    tmpA.subVectors(dir, L.cottage);
+    tmpB.crossVectors(L.cottage, L.homeBearing);
+    out.x = tmpA.dot(tmpB) * this.radius;
+    out.z = tmpA.dot(L.homeBearing) * this.radius;
+    return out;
+  }
+
+  /** No grass, flowers or stones: right around the house and on the landing. */
+  clearingAt(dir: Vector3, dc: number): number {
+    const disc = smoothstep(3.6, 2.9, dc);
+    if (dc > 9) return disc;
+    const c = this.cottageLocal(dir, localTmp);
+    const rect = smoothstep(0.35, 0, Math.max(-2.6 - c.x, c.x - 1.3, -0.2 - c.z, c.z - 5.9));
+    return Math.max(disc, rect);
   }
 
   /** Uniform values for terrain.glsl (shared by every material that samples the ground). */
@@ -469,10 +488,12 @@ export class Terrain {
       u.uIslets.value[k].set(islet?.[0] ?? 0, islet?.[1] ?? 0, islet?.[2] ?? 0, 0);
     }
     u.uCottage.value.set(L.cottage.x, L.cottage.y, L.cottage.z, this.cottageLevel);
+    u.uCottageB.value.set(L.homeBearing.x, L.homeBearing.y, L.homeBearing.z, 0);
   }
 }
 
 const scratch: GroundSample = { height: 0, water: 0, mountain: 0, rock: 0, clearing: 0 };
+const localTmp = { x: 0, z: 0 };
 const mixf = (a: number, b: number, t: number): number => a + (b - a) * t;
 
 /** Angular distance from p to a polyline of great-circle segments (capped at 0.25 rad). */
@@ -503,6 +524,10 @@ export interface TerrainUniforms {
   uPondD: { value: Vector4[] };
   uIslets: { value: Vector4[] };
   uCottage: { value: Vector4 };
+  /** Toward the pond (xyz). */
+  uCottageB: { value: Vector4 };
+  /** Shadow sweep per meter of height in cottage-local x, z (sun direction / its elevation). */
+  uCottageSun: { value: Vector4 };
 }
 
 export function createTerrainUniforms(): TerrainUniforms {
@@ -523,5 +548,7 @@ export function createTerrainUniforms(): TerrainUniforms {
     uPondD: { value: v4s(MAX_PONDS) },
     uIslets: { value: v4s(MAX_ISLETS) },
     uCottage: { value: new Vector4(0, 1, 0, 0) },
+    uCottageB: { value: new Vector4(1, 0, 0, 0) },
+    uCottageSun: { value: new Vector4(0, 0, 0, 0) },
   };
 }

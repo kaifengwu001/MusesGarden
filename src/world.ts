@@ -5,8 +5,12 @@ import type { Globals } from './core/globals';
 import type { Tier } from './core/quality';
 import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
+import { Clouds } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
+import { Petals } from './life/petals';
+import { Homestead } from './life/props';
+import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
 import { LOD_DEFAULT, type LodConfig } from './planet/chunks';
 import { tangentToward } from './planet/geo';
@@ -47,6 +51,15 @@ export class World {
   readonly field: FieldMap;
   readonly grass: Grass;
   readonly flowers: Flowers;
+  homestead: Homestead;
+  readonly clouds: Clouds;
+  readonly petals: Petals;
+  /** Press-and-hold bloom discs (rest space): direction, angular radius. */
+  readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
+  private growingBloom = -1;
+  private nextBloom = 0;
+  private nextRipple = 0;
+  private nextGust = 0;
   private tier: Tier;
   terrain: Terrain;
   /** Uniform objects every world material shares. */
@@ -89,9 +102,15 @@ export class World {
     this.field = new FieldMap(this.shared, tier.name === 'high' ? 384 : 256);
     Object.assign(this.shared, this.field.uniforms);
     this.surface = new Surface(this.shared, tier.terrainGrid);
-    this.grass = new Grass(this.shared, tier.name === 'high' ? 360 : 140);
-    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 96 : 48);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.grass.mesh, ...this.flowers.meshes);
+    this.grass = new Grass(this.shared, tier.name === 'high' ? 520 : 200);
+    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 192 : 96);
+    this.shared.uOutline = { value: new Vector4(1.25, 0, 0, 0) };
+    this.homestead = new Homestead(this.shared, store.values.world.seed);
+    this.clouds = new Clouds(this.shared);
+    this.shared.uCloudShadows.value = this.clouds.shadows;
+    this.shared.uUserBloom = { value: this.userBlooms };
+    this.petals = new Petals(this.shared);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -109,11 +128,12 @@ export class World {
     this.posed = true;
   }
 
-  /** Frame the homestead with the mountains beyond it. */
+  /** Frame the homestead low on the disc with the snowy range rising beyond it. */
   defaultPose(): void {
     const L = this.terrain.layout;
-    const target = this.tmp.copy(L.cottage).lerp(L.range.a.clone().add(L.range.b).normalize(), 0.22).normalize();
-    const toward = tangentToward(target, L.range.a.clone().add(L.range.b).normalize(), new Vector3());
+    const mid = L.range.a.clone().add(L.range.b).normalize();
+    const target = this.tmp.copy(L.cottage).lerp(mid, 0.5).normalize();
+    const toward = tangentToward(target, mid, new Vector3());
     this.rig.lookAlong(target, toward);
     this.posed = true;
   }
@@ -123,7 +143,11 @@ export class World {
       this.terrain.layout = this.makeLayout();
       this.terrainKey = '';
     }
-    if (changed.has('view.mode')) this.rig.setZoom(this.store.values.view.mode === 'wander' ? 1 : 0);
+    if (changed.has('world.seed')) {
+      this.scene.remove(this.homestead.group);
+      this.homestead = new Homestead(this.shared, this.store.values.world.seed);
+      this.scene.add(this.homestead.group);
+    }
   }
 
   private makeLayout() {
@@ -167,6 +191,16 @@ export class World {
 
     this.updateLight(p.light.timeOfDay);
     this.updateLook(clock);
+
+    // The homestead sits on its clearing, facing its pond; its shadow sweeps away from the sun.
+    const L = this.terrain.layout;
+    this.homestead.place(this.tmp.copy(L.cottage).multiplyScalar(R + this.terrain.cottageLevel), L.cottage, L.homeBearing);
+    const across = this.east.crossVectors(L.cottage, L.homeBearing);
+    const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
+    this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
+    (this.shared.uOutline.value as Vector4).x = p.style.outlineWidth;
+    this.clouds.update(this.terrain.layout, R, clock.time, { ...p.clouds, mountainHeight: p.terrain.mountainHeight }, this.windAxis);
+    this.shared.uCloudShadowStrength.value = 0.35 + 0.4 * p.clouds.coverage;
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -217,6 +251,11 @@ export class World {
       1,
     );
     this.surface.uniforms.uNearField.value.set(rig.up.x, rig.up.y, rig.up.z, Math.max(flowerNear, 0.001));
+    this.petals.update(grassNear);
+    if (this.growingBloom >= 0) {
+      const disc = this.userBlooms[this.growingBloom];
+      disc.w = Math.min(disc.w + (clock.realDt * 1.6) / R, 0.6);
+    }
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }
@@ -268,6 +307,32 @@ export class World {
     L.uWaterLook.value.set(p.water.shoreWidth, p.water.depthTint, 0.4 + 0.8 * p.wind.strength, clock.time);
     L.uSnow.value = p.terrain.snowline;
     L.uDebug.value = DEBUG_VIEWS[p.ui.debug];
+  }
+
+  pick(ndcX: number, ndcY: number): Pick | null {
+    return pickSurface(this.rig.camera, ndcX, ndcY, this.warp, this.terrain);
+  }
+
+  /** A gust ring bursting out from a point on the meadow. */
+  gust(dir: Vector3, time: number): void {
+    const rings = this.shared.uGustRings.value as Vector4[];
+    rings[this.nextGust++ % rings.length].set(dir.x, dir.y, dir.z, time);
+  }
+
+  /** A ripple ring on the water. */
+  ripple(dir: Vector3, time: number): void {
+    const ripples = this.look.uRipples.value;
+    ripples[this.nextRipple++ % ripples.length].set(dir.x, dir.y, dir.z, time);
+  }
+
+  /** Start growing a bloom disc at a point (press and hold). */
+  bloomStart(dir: Vector3): void {
+    this.growingBloom = this.nextBloom++ % this.userBlooms.length;
+    this.userBlooms[this.growingBloom].set(dir.x, dir.y, dir.z, 0.4 / this.growth.radius);
+  }
+
+  bloomEnd(): void {
+    this.growingBloom = -1;
   }
 
   /** Close fade bands, finish queued work and snap the camera: the next frame is a pure function of state. */
