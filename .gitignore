@@ -10,3 +10,4 @@ shots/
 
 # local probe scripts
 .*.mjs
+.*.py

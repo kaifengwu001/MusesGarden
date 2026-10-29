@@ -3,6 +3,7 @@ import cloudShadow from '../life/cloudShadow.glsl?raw';
 import field from '../life/field.glsl?raw';
 import wind from '../life/wind.glsl?raw';
 import cubesphere from '../planet/cubesphere.glsl?raw';
+import fields from '../planet/fields.glsl?raw';
 import meadow from '../planet/meadow.glsl?raw';
 import noise from '../planet/noise.glsl?raw';
 import rest from '../planet/rest.glsl?raw';
@@ -22,6 +23,7 @@ const chunks: Record<string, string> = {
   meadow_warp: warp,
   meadow_rest: rest,
   meadow_terrain: terrain,
+  meadow_fields: fields,
   meadow_toon: toon,
   meadow_fog: fog,
   meadow_paint: meadow,

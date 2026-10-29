@@ -82,6 +82,8 @@ export function enumerateCell(
   sigmaMax: number,
   visit: PointVisitor,
 ): void {
+  // A bound that is not a finite positive density would never stop descending.
+  if (!(sigmaMax > 0 && sigmaMax < Number.POSITIVE_INFINITY)) return;
   const base = mix(cls.salt, worldSeed);
   const jitter = cls.jitter;
   // No point with a rank above this can be born by sigmaMax anywhere on the face.

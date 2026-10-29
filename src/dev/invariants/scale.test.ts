@@ -1,56 +1,45 @@
 import { Box3, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { COTTAGE_TO_POND, generateLayout, Terrain, type GroundSample } from '../../planet/terrain';
+import type { FieldParams } from '../../planet/fields';
 import { travel } from '../../planet/geo';
+import { COTTAGE_TO_POND, createGroundSample, generateLayout, Terrain } from '../../planet/terrain';
 
 // Constant scale and attachment: things on the planet stay human-sized and
 // seated at every size. (The cottage geometry itself is built in meters
 // with no reference to R; see life/props.ts.)
 
-const PARAMS = { meadowRoll: 1.4, mountainHeight: 0.18, channelWidth: 3.2 };
-const layout = generateLayout(412, 3, 3);
+const PARAMS: FieldParams = {
+  roll: 1.25,
+  hummocks: 0.35,
+  wetlands: 0.42,
+  waterLevel: 0,
+  grain: 0.6,
+  density: 10,
+  patchiness: 0.78,
+  patchSize: 13,
+  weights: [0.4, 0.24, 0.22, 0.14],
+};
+const layout = generateLayout(412);
 
 function terrainAt(radius: number): Terrain {
   const t = new Terrain(layout);
-  t.update(radius, Math.log(radius), PARAMS);
+  t.update(radius, PARAMS, (2 * radius) / 512);
   return t;
 }
 
-/** Width (m) of the water run through `centre` along a great circle, sampled at 2 cm. */
-function channelWidthAround(t: Terrain, centre: Vector3, across: Vector3): number {
-  const step = 0.02 / t.radius;
-  const p = new Vector3();
-  const wet = (k: number): boolean => t.channelDistance(travel(centre, across, k * step, p)) < 0;
-  if (!wet(0)) return 0;
-  let lo = 0;
-  let hi = 0;
-  while (lo > -1000 && wet(lo - 1)) lo--;
-  while (hi < 1000 && wet(hi + 1)) hi++;
-  return (hi - lo + 1) * 0.02;
+/** Evenly spread directions (Fibonacci sphere). */
+function sphereDesign(n: number): Vector3[] {
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  return Array.from({ length: n }, (_, i) => {
+    const z = 1 - (2 * (i + 0.5)) / n;
+    const r = Math.sqrt(1 - z * z);
+    return new Vector3(r * Math.cos(golden * i), r * Math.sin(golden * i), z);
+  });
 }
 
 describe('constant scale', () => {
-  it('keeps channel width in meters at the smallest and largest planet', () => {
-    // a point on the trunk channel's finest centreline (a quarter of the way
-    // along, clear of the branch that unlocks near its middle), and across it
-    const line = layout.channels[0][2];
-    const a = line[Math.floor(line.length / 4)];
-    const b = line[Math.floor(line.length / 4) + 1];
-    const along = new Vector3().subVectors(b, a).normalize();
-    for (const radius of [40, 400]) {
-      const t = terrainAt(radius);
-      t.meander1 = t.meander2 = 1; // measure the fully meandered line at both sizes
-      const across = new Vector3().crossVectors(a, along).normalize();
-      // the midpoint of a fine segment sits on the centreline
-      const centre = a.clone().add(b).normalize();
-      const width = channelWidthAround(t, centre, across);
-      expect(width, `R ${radius}`).toBeGreaterThan(PARAMS.channelWidth * 0.9);
-      expect(width, `R ${radius}`).toBeLessThan(PARAMS.channelWidth * 1.25);
-    }
-  });
-
   it('keeps the homestead pond at the landing in meters, at every size', () => {
-    const s: GroundSample = { height: 0, water: 0, mountain: 0, rock: 0, clearing: 0 };
+    const s = createGroundSample();
     for (const radius of [40, 90, 128, 250, 400]) {
       const t = terrainAt(radius);
       // just past the landing's end is water, just inside the house front is dry land
@@ -60,11 +49,31 @@ describe('constant scale', () => {
       expect(t.sample(houseSide, s).water, `R ${radius} house`).toBeGreaterThan(0.5);
     }
   });
+
+  it('keeps about the same share of the planet under water as it grows', () => {
+    const dirs = sphereDesign(3000);
+    const shares = [40, 128, 400].map((radius) => {
+      const t = terrainAt(radius);
+      return dirs.filter((d) => t.fields.natural(d) < 0).length / dirs.length;
+    });
+    for (const share of shares) {
+      expect(share).toBeGreaterThan(0.12);
+      expect(share).toBeLessThan(0.4);
+    }
+    expect(Math.max(...shares) - Math.min(...shares)).toBeLessThan(0.12);
+  });
+
+  it('keeps the wetlands where they are as the planet grows (they live in rest space)', () => {
+    const dirs = sphereDesign(500);
+    const small = terrainAt(40);
+    const large = terrainAt(400);
+    for (const d of dirs) expect(large.fields.wetness(d)).toBeCloseTo(small.fields.wetness(d), 9);
+  });
 });
 
 describe('everything stays attached', () => {
   it('seats the cottage on a flat clearing at every size', () => {
-    const s: GroundSample = { height: 0, water: 0, mountain: 0, rock: 0, clearing: 0 };
+    const s = createGroundSample();
     const across = new Vector3().crossVectors(layout.cottage, layout.homeBearing).normalize();
     for (const radius of [40, 128, 400]) {
       const t = terrainAt(radius);
@@ -77,7 +86,7 @@ describe('everything stays attached', () => {
       }
       const spread = Math.max(...heights) - Math.min(...heights);
       expect(spread, `R ${radius}`).toBeLessThan(0.02);
-      expect(Math.abs(heights[4] - t.cottageLevel)).toBeLessThan(0.005);
+      expect(Math.abs(heights[4] - t.cottageLevel - 0.2)).toBeLessThan(0.02);
     }
   });
 

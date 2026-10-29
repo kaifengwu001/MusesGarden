@@ -15,14 +15,14 @@ import { gpuMemory } from '../core/gpuMemory';
 import { fullscreenMesh } from '../render/fullscreen';
 import fragmentShader from './fieldMap.frag.glsl?raw';
 
-// The ground around the focus, evaluated once per frame into two small
-// textures so vegetation never re-runs the terrain or meadow noise per vertex.
-// Both are an azimuthal equidistant projection centred on the focus
+// The ground around the focus, evaluated once per frame into three small
+// textures so vegetation never re-runs the terrain, cloud or wind noise per
+// vertex. All are an azimuthal equidistant projection centred on the focus
 // direction: texel (x, y) ∈ [-1, 1]² lies at angle |(x, y)|·Θ from the focus,
 // bearing atan2(y, x) in the focus tangent frame.
-//   ground: height (m), signed distance to water (m), clearing − mountain, bloom
-//   meadow: lushness, flower drift, -, -
-//   wind:   shared bend vector (xyz, planet space), gust 0..1
+//   ground: height (m), signed distance to the shore (m), clearing, bloom
+//   meadow: lushness, wetness, cloud shadow, colour variant
+//   wind:   shared bend vector (xyz, planet space), wind sheen 0..1
 
 export interface FieldUniforms {
   uFieldMap: IUniform;

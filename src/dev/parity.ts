@@ -1,5 +1,5 @@
 import { DataTexture, FloatType, NearestFilter, OrthographicCamera, RGBAFormat, Scene, ShaderMaterial, Vector3, WebGLRenderTarget, type WebGLRenderer } from 'three';
-import type { GroundSample } from '../planet/terrain';
+import { createGroundSample } from '../planet/terrain';
 import { fullscreenMesh } from '../render/fullscreen';
 import { warpPoint } from '../render/warp';
 import type { World } from '../world';
@@ -43,7 +43,7 @@ export function measureParity(world: World, renderer: WebGLRenderer): Parity {
   const t1 = u.uFieldT1.value.clone();
   const t2 = new Vector3().crossVectors(c, t1);
   const theta = u.uFieldCentre.value.w;
-  const s: GroundSample = { height: 0, water: 0, mountain: 0, rock: 0, clearing: 0 };
+  const s = createGroundSample();
   let heightError = 0;
   let waterError = 0;
   let n = 0;

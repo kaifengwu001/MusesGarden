@@ -52,15 +52,15 @@ function finish(b: Builder): InstancedBufferGeometry {
  */
 export function pinkCup(): InstancedBufferGeometry {
   const b = builder();
-  const h = 0.62;
-  stem(b, h, 0.016, 4, 0.04);
+  const h = 0.5;
+  stem(b, h, 0.014, 4, 0.035);
   // a deep bell: base at the stem top, a waist, and an evenly flared lip
   const n = 7;
   const rings: Array<[number, number]> = [
-    [0.022, 0.012],
-    [0.05, 0.05],
-    [0.062, 0.095],
-    [0.078, 0.125],
+    [0.018, 0.01],
+    [0.041, 0.041],
+    [0.051, 0.078],
+    [0.064, 0.103],
   ];
   const base = vert(b, 0, h, 0, 1, 1);
   const idx: number[][] = rings.map(([r, y]) => Array.from({ length: n }, (_, k) => {
@@ -84,13 +84,13 @@ export function pinkCup(): InstancedBufferGeometry {
 /** White star: a flat five-pointed star with a yellow centre, mid height. */
 export function whiteStar(): InstancedBufferGeometry {
   const b = builder();
-  const h = 0.34;
+  const h = 0.44;
   stem(b, h, 0.012, 3, 0.025);
   const centre = vert(b, 0, h + 0.012, 0, 2, 1);
   const ring: number[] = [];
   for (let k = 0; k < 10; k++) {
     const a = (k / 10) * Math.PI * 2;
-    const r = k % 2 === 0 ? 0.07 : 0.028;
+    const r = k % 2 === 0 ? 0.078 : 0.03;
     ring.push(vert(b, Math.cos(a) * r, h + (k % 2 === 0 ? 0.0 : 0.008), Math.sin(a) * r, 1, 1));
   }
   const disc: number[] = [];
@@ -103,37 +103,37 @@ export function whiteStar(): InstancedBufferGeometry {
   return finish(b);
 }
 
-/** Yellow button: a short stem and a small domed disc at ground level. */
+/** Button: a wiry stem and a small domed disc just above the grass. */
 export function yellowButton(): InstancedBufferGeometry {
   const b = builder();
-  const h = 0.16;
-  stem(b, h, 0.01, 2, 0.015);
-  const centre = vert(b, 0, h + 0.022, 0, 2, 1);
+  const h = 0.34;
+  stem(b, h, 0.01, 3, 0.02);
+  const centre = vert(b, 0, h + 0.026, 0, 2, 1);
   const ring: number[] = [];
   for (let k = 0; k < 7; k++) {
     const a = (k / 7) * Math.PI * 2;
-    ring.push(vert(b, Math.cos(a) * 0.038, h, Math.sin(a) * 0.038, 1, 1));
+    ring.push(vert(b, Math.cos(a) * 0.048, h, Math.sin(a) * 0.048, 1, 1));
   }
   for (let k = 0; k < 7; k++) b.idx.push(centre, ring[(k + 1) % 7], ring[k]);
   return finish(b);
 }
 
-/** Small blue clusters: three tiny four-petal florets on a short stem. */
+/** Small blue clusters: three four-petal florets on a slender stem. */
 export function blueCluster(): InstancedBufferGeometry {
   const b = builder();
-  const h = 0.2;
-  stem(b, h, 0.01, 2, 0.02);
+  const h = 0.38;
+  stem(b, h, 0.01, 3, 0.025);
   const florets: Array<[number, number, number]> = [
-    [0, h + 0.02, 0],
-    [0.03, h - 0.005, 0.015],
-    [-0.025, h - 0.01, -0.02],
+    [0, h + 0.025, 0],
+    [0.038, h - 0.005, 0.02],
+    [-0.032, h - 0.012, -0.025],
   ];
   for (const [x, y, z] of florets) {
-    const c = vert(b, x, y + 0.006, z, 2, 1);
+    const c = vert(b, x, y + 0.007, z, 2, 1);
     const ring: number[] = [];
     for (let k = 0; k < 4; k++) {
       const a = (k / 4) * Math.PI * 2 + 0.4;
-      ring.push(vert(b, x + Math.cos(a) * 0.02, y, z + Math.sin(a) * 0.02, 1, 1));
+      ring.push(vert(b, x + Math.cos(a) * 0.025, y, z + Math.sin(a) * 0.025, 1, 1));
     }
     for (let k = 0; k < 4; k++) b.idx.push(c, ring[(k + 1) % 4], ring[k]);
   }

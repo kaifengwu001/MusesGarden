@@ -2,7 +2,7 @@ import { Color, Vector3, Vector4, type Texture } from 'three';
 
 /**
  * Look uniforms shared by every lit material: palette, sun, toon bands, haze,
- * bloom front, wind, flower species and water. One object, spread into each
+ * bloom front, wind, meadow paint and water. One object, spread into each
  * material's uniforms, written once per frame by the world.
  */
 export interface LookUniforms {
@@ -17,10 +17,15 @@ export interface LookUniforms {
   uWindVec: { value: Vector4 };
   /** Gust field: wave phase, gust strength, gustiness, wind speed. */
   uGust: { value: Vector4 };
-  uSpecies: { value: Vector4 };
+  /** Wind sheen, flower dabs, colour variation, -. */
+  uMeadowLook: { value: Vector4 };
+  /** Each flower species' middle colour in sun: far drifts blend these. */
+  uFloraWash: { value: Color[] };
+  /** Dark band under the banks (m), depth tint, glints, time (s). */
   uWaterLook: { value: Vector4 };
+  /** Reflection strength, lily pads, -, -. */
+  uWaterSky: { value: Vector4 };
   uRipples: { value: Vector4[] };
-  uSnow: { value: number };
   /** Radians per pixel, vertical (pattern level of detail). */
   uPixelAngle: { value: number };
   uDebug: { value: number };
@@ -40,10 +45,11 @@ export function createLookUniforms(): LookUniforms {
     uBloom: { value: new Vector4(2, 0.06, 0, 0) },
     uWindVec: { value: new Vector4(0, 1, 0, 0.45) },
     uGust: { value: new Vector4(0, 0, 0.5, 0.45) },
-    uSpecies: { value: new Vector4(0.38, 0.26, 0.22, 0.14) },
-    uWaterLook: { value: new Vector4(0.45, 0.6, 1, 0) },
+    uMeadowLook: { value: new Vector4(0.6, 1, 0.6, 0) },
+    uFloraWash: { value: Array.from({ length: 4 }, () => new Color()) },
+    uWaterLook: { value: new Vector4(0.6, 0.6, 0.7, 0) },
+    uWaterSky: { value: new Vector4(0.8, 0.6, 0, 0) },
     uRipples: { value: Array.from({ length: MAX_RIPPLES }, () => new Vector4(0, 1, 0, -1)) },
-    uSnow: { value: 0.62 },
     uPixelAngle: { value: 0.001 },
     uDebug: { value: 0 },
   };

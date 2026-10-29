@@ -1,24 +1,25 @@
-import { Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
 import type { Tier } from './core/quality';
 import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
-import { Clouds } from './life/clouds';
+import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
+import { TerrainBake } from './planet/bake';
 import { LOD_DEFAULT, type LodConfig } from './planet/chunks';
-import { tangentToward } from './planet/geo';
+import type { FieldParams } from './planet/fields';
+import { tangentToward, travel } from './planet/geo';
 import { growthState, type GrowthState } from './planet/growth';
 import { GrowthBand } from './planet/rest';
 import { Surface } from './planet/surface';
-import { createTerrainUniforms, generateLayout, Terrain, type GroundSample } from './planet/terrain';
-import { ChannelField } from './planet/water';
+import { createGroundSample, createTerrainUniforms, generateLayout, gradientFrame, Terrain, type Layout } from './planet/terrain';
 import { createLookUniforms } from './render/look';
 import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
@@ -30,11 +31,29 @@ const NOON_SUN = new Palette().get(ROW.LIGHT, 0);
 const NOON_SKY = new Palette().get(ROW.LIGHT, 1);
 const WORLD_UP = new Vector3(0, 1, 0);
 const WORLD_X = new Vector3(1, 0, 0);
+/** Parameters the meadow fields (and so the bake and the flower sorting) depend on. */
+const FIELD_PATHS: ReadonlySet<string> = new Set([
+  'terrain.roll',
+  'terrain.hummocks',
+  'terrain.wetlands',
+  'terrain.waterLevel',
+  'terrain.grain',
+  'flowers.density',
+  'flowers.patchiness',
+  'flowers.patchSize',
+  'flowers.pink',
+  'flowers.star',
+  'flowers.yellow',
+  'flowers.blue',
+]);
+
+export type CameraPreset = 'homestead' | 'lakes' | 'meadow';
 
 /**
- * The scene and every system in it. Each frame: growth → fade band → terrain
- * state → camera → light, wind and look uniforms → warp → LOD → sky → build
- * queue. main.ts owns the renderer and the loop; this owns the world.
+ * The scene and every system in it. Each frame: growth → fade band → fields
+ * (re-baked only when they change) → camera → light, wind and look uniforms
+ * → warp → LOD → near field → sky → build queue. main.ts owns the renderer
+ * and the loop; this owns the world.
  */
 export class World {
   readonly scene = new Scene();
@@ -42,12 +61,13 @@ export class World {
   readonly palette = new Palette();
   readonly look = createLookUniforms();
   readonly terrainUniforms = createTerrainUniforms();
+  readonly cloudUniforms = createCloudUniforms();
   readonly band = new GrowthBand();
   readonly queue = new BuildQueue();
   readonly growth: GrowthState = { g: 0, area: 0, radius: 128 };
-  readonly sky = new Sky();
+  readonly sky: Sky;
   readonly surface: Surface;
-  readonly channels: ChannelField;
+  readonly bake: TerrainBake;
   readonly field: FieldMap;
   readonly grass: Grass;
   readonly flowers: Flowers;
@@ -68,17 +88,25 @@ export class World {
   readonly sunDir = new Vector3(0, 1, 0);
   lod: LodConfig = LOD_DEFAULT;
 
-  private layoutKey = '';
-  private terrainKey = '';
+  /** The meadow-field parameters, and a key naming them (rebuilt only when they change). */
+  private fieldParams!: FieldParams;
+  private fieldKey = '';
+  /** What the fields were last refreshed for, whether that bake was the full one, and frames since. */
+  private fieldsR = Number.NaN;
+  private fieldsKey = '';
+  private fieldsLayout: Layout | null = null;
+  private fieldsFull = false;
+  private fieldsStill = 0;
   private readonly frustum = new Frustum();
   private readonly projView = new Matrix4();
-  private readonly ground: GroundSample = { height: 0, water: 0, mountain: 0, rock: 0, clearing: 0 };
+  private readonly ground = createGroundSample();
   private readonly north = new Vector3();
   private readonly east = new Vector3();
   private readonly tmp = new Vector3();
   private readonly windAxis = new Vector3();
+  private readonly washTmp = new Color();
   private posed = false;
-  private readonly heightBound = (centre: Vector3, alpha: number): number => this.terrain.heightBound(centre, alpha);
+  private readonly heightBound = (): number => this.terrain.maxHeight;
 
   constructor(
     private readonly renderer: WebGLRenderer,
@@ -87,29 +115,31 @@ export class World {
     tier: Tier,
   ) {
     this.tier = tier;
-    this.channels = new ChannelField(tier.name === 'high' ? 512 : 384);
-    this.terrain = new Terrain(this.makeLayout());
+    this.bake = new TerrainBake(tier.name === 'high' ? 512 : 384);
+    this.terrain = new Terrain(generateLayout(store.values.world.seed));
+    this.refreshFieldParams();
     this.look.uPalette.value = this.palette.texture;
+    this.terrainUniforms.uTerrainBake.value = this.bake.terrainTexture(false);
+    this.terrainUniforms.uFloraBake.value = this.bake.floraTexture(false);
     this.shared = {
       ...globals,
       ...this.look,
       ...this.terrainUniforms,
-      uChannelField: { value: this.channels.texture },
-      uCloudShadows: { value: Array.from({ length: 8 }, () => new Vector4()) },
-      uCloudShadowStrength: { value: 0 },
-      uGustRot: { value: new Vector4(1, 0, 8, 0) },
+      ...this.cloudUniforms,
+      uGustRot: { value: new Vector4(1, 0, 1, 0) },
+      uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
+      uUserBloom: { value: this.userBlooms },
+      uOutline: { value: new Vector4(1.25, 0, 0, 0) },
     };
-    this.field = new FieldMap(this.shared, tier.name === 'high' ? 384 : 256);
+    this.sky = new Sky(this.shared);
+    this.field = new FieldMap(this.shared, tier.name === 'high' ? 256 : 192);
     Object.assign(this.shared, this.field.uniforms);
     this.surface = new Surface(this.shared, tier.terrainGrid);
     this.grass = new Grass(this.shared, tier.name === 'high' ? 520 : 200);
-    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 192 : 96);
-    this.shared.uOutline = { value: new Vector4(1.25, 0, 0, 0) };
+    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 320 : 160);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
-    this.clouds = new Clouds(this.shared);
-    this.shared.uCloudShadows.value = this.clouds.shadows;
-    this.shared.uUserBloom = { value: this.userBlooms };
+    this.clouds = new Clouds(this.shared, this.cloudUniforms);
     this.petals = new Petals(this.shared);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.clouds.mesh);
     this.applyTier(tier);
@@ -129,55 +159,130 @@ export class World {
     this.posed = true;
   }
 
-  /** Frame the homestead low on the disc with the snowy range rising beyond it. */
+  /** Stand by the first water at the edge of the nearest wetland, looking across its lakes. */
   defaultPose(): void {
-    const L = this.terrain.layout;
-    const mid = L.range.a.clone().add(L.range.b).normalize();
-    const target = this.tmp.copy(L.cottage).lerp(mid, 0.5).normalize();
-    const toward = tangentToward(target, mid, new Vector3());
-    this.rig.lookAlong(target, toward);
+    const R = this.growth.radius;
+    const spot = this.wetlandEdge();
+    const into = this.wetnessGradient(spot);
+    // from the margin: walk in to the first water (or, standing in it, back out to land)
+    const p = new Vector3();
+    const t = this.terrain;
+    let d = 0;
+    if (t.height0(spot) >= 0) while (d < 150 && t.height0(travel(spot, into, d / R, p)) >= 0) d += 1.5;
+    else while (d > -150 && t.height0(travel(spot, into, d / R, p)) < 0) d -= 1.5;
+    d -= 8;
+    // and stand on firm ground, not a spit of water
+    for (let k = 0; k < 30 && t.height0(travel(spot, into, d / R, p)) < 0.15; k++) d -= 1.5;
+    const target = travel(spot, into, d / R, new Vector3());
+    this.rig.lookAlong(target, tangentToward(target, travel(spot, into, 0.3, p), new Vector3()));
     this.posed = true;
   }
 
-  /** Named views for shots and tests: across the pond at the cottage, toward the range, over the meadow. */
-  cameraPreset(name: 'homestead' | 'range' | 'meadow'): void {
+  /** Named views for shots and tests: across the pond at the cottage, across the lakes, over the meadow. */
+  cameraPreset(name: CameraPreset): void {
     const L = this.terrain.layout;
     const R = this.growth.radius;
-    const mid = L.range.a.clone().add(L.range.b).normalize();
     if (name === 'homestead') {
       // stand across the pond, looking back at the cottage and its landing
       const bearing = L.homeBearing.clone().applyAxisAngle(L.cottage, Math.PI + 0.35);
       const target = L.cottage.clone().multiplyScalar(Math.cos(14 / R)).addScaledVector(bearing, -Math.sin(14 / R)).normalize();
       this.rig.lookAlong(target, bearing.addScaledVector(target, -bearing.dot(target)).normalize());
       this.rig.setZoom(0.8, true);
+    } else if (name === 'lakes') {
+      // the nearest wetland margin (where land and water interlace), from a little above
+      this.defaultPose();
+      this.rig.setZoom(0.74, true);
     } else {
-      const angle = Math.acos(Math.min(1, L.cottage.dot(mid)));
-      const axis = L.cottage.clone().cross(mid).normalize();
-      const target = L.cottage.clone().applyAxisAngle(axis, angle * (name === 'range' ? 0.6 : 0.4));
-      this.rig.lookAlong(target, mid.clone().addScaledVector(target, -mid.dot(target)).normalize());
-      this.rig.setZoom(name === 'range' ? 0.68 : 0.6, true);
+      const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
+      const target = travel(L.cottage, across, 0.16, new Vector3());
+      this.rig.lookAlong(target, tangentToward(target, travel(L.cottage, L.homeBearing, 0.4, new Vector3()), new Vector3()));
+      this.rig.setZoom(0.6, true);
     }
     this.posed = true;
   }
 
-  onParams(changed: ReadonlySet<ParamPath>): void {
-    if (changed.has('world.seed') || changed.has('terrain.channelCount') || changed.has('terrain.pondCount')) {
-      this.terrain.layout = this.makeLayout();
-      this.terrainKey = '';
+  /** A point near the cottage where the wetland is half land, half water. */
+  private wetlandEdge(): Vector3 {
+    const L = this.terrain.layout;
+    const R = this.growth.radius;
+    const f = this.terrain.fields;
+    const east = new Vector3().crossVectors(L.homeBearing, L.cottage);
+    const t = new Vector3();
+    const p = new Vector3();
+    const spot = travel(L.cottage, L.homeBearing, 0.3, new Vector3());
+    let best = -Infinity;
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      t.copy(L.homeBearing).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
+      for (let d = 36; d < 0.6 * Math.PI * R; d += 8) {
+        const w = f.wetness(travel(L.cottage, t, d / R, p));
+        const score = w * (1 - w) - (0.6 * d) / (Math.PI * R);
+        if (score > best) {
+          best = score;
+          spot.copy(p);
+        }
+      }
     }
+    return spot;
+  }
+
+  /** Unit tangent at p pointing into the wetland. */
+  private wetnessGradient(p: Vector3): Vector3 {
+    const f = this.terrain.fields;
+    const e = 3 / this.growth.radius;
+    const a = new Vector3();
+    const b = new Vector3();
+    gradientFrame(p, a, b);
+    const w0 = f.wetness(p);
+    const wa = f.wetness(p.clone().addScaledVector(a, e).normalize()) - w0;
+    const wb = f.wetness(p.clone().addScaledVector(b, e).normalize()) - w0;
+    const g = a.multiplyScalar(wa).addScaledVector(b, wb);
+    return g.lengthSq() > 1e-12 ? g.normalize() : tangentToward(p, this.terrain.layout.homeBearing, g);
+  }
+
+  onParams(changed: ReadonlySet<ParamPath>): void {
     if (changed.has('world.seed')) {
+      this.terrain.setLayout(generateLayout(this.store.values.world.seed));
       this.scene.remove(this.homestead.group);
       this.homestead = new Homestead(this.shared, this.store.values.world.seed);
       this.scene.add(this.homestead.group);
     }
+    for (const path of changed) {
+      if (FIELD_PATHS.has(path)) {
+        this.refreshFieldParams();
+        break;
+      }
+    }
   }
 
-  private makeLayout() {
+  private refreshFields(full: boolean): void {
+    const L = this.terrain.layout;
+    const R = this.growth.radius;
+    this.fieldsR = R;
+    this.fieldsKey = this.fieldKey;
+    this.fieldsLayout = L;
+    this.fieldsFull = full;
+    this.terrain.update(R, this.fieldParams, this.bake.texelMeters(R, full));
+    this.terrain.writeUniforms(this.terrainUniforms);
+    this.bake.bake(this.renderer, this.terrain.fields, `${L.seed}/${R}/${this.fieldKey}`, full);
+    this.terrainUniforms.uTerrainBake.value = this.bake.terrainTexture(full);
+    this.terrainUniforms.uFloraBake.value = this.bake.floraTexture(full);
+  }
+
+  private refreshFieldParams(): void {
     const p = this.store.values;
-    this.layoutKey = `${p.world.seed}/${p.terrain.channelCount}/${p.terrain.pondCount}`;
-    const layout = generateLayout(p.world.seed, p.terrain.channelCount, p.terrain.pondCount);
-    this.channels.bake(this.renderer, layout);
-    return layout;
+    this.fieldParams = {
+      roll: p.terrain.roll,
+      hummocks: p.terrain.hummocks,
+      wetlands: p.terrain.wetlands,
+      waterLevel: p.terrain.waterLevel,
+      grain: p.terrain.grain,
+      density: p.flowers.density,
+      patchiness: p.flowers.patchiness,
+      patchSize: p.flowers.patchSize,
+      weights: [p.flowers.pink, p.flowers.star, p.flowers.yellow, p.flowers.blue],
+    };
+    this.fieldKey = JSON.stringify(this.fieldParams);
   }
 
   update(clock: FrameClock, aspect: number, viewportHeight: number): void {
@@ -186,13 +291,13 @@ export class World {
     const R = this.growth.radius;
     this.band.update(R, clock.realDt);
 
-    // Terrain state depends on R, the band and a few params: refresh only on change.
-    const key = `${R.toFixed(6)}/${this.band.hi.toFixed(6)}/${p.terrain.meadowRoll}/${p.terrain.mountainHeight}/${p.water.channelWidth}/${this.layoutKey}`;
-    if (key !== this.terrainKey) {
-      this.terrainKey = key;
-      this.terrain.update(R, this.band.hi, { meadowRoll: p.terrain.meadowRoll, mountainHeight: p.terrain.mountainHeight, channelWidth: p.water.channelWidth });
-      this.terrain.writeUniforms(this.terrainUniforms);
-    }
+    // The fields depend on R, the layout and a few params: refresh and re-bake
+    // only on change, quickly while changing, fully once still for a moment.
+    const L = this.terrain.layout;
+    if (R !== this.fieldsR || this.fieldKey !== this.fieldsKey || L !== this.fieldsLayout) {
+      this.refreshFields(false);
+      this.fieldsStill = 0;
+    } else if (!this.fieldsFull && ++this.fieldsStill >= 6) this.refreshFields(true);
 
     // Camera rides the surface; the ground under the focus keeps it above the grass.
     this.rig.update(clock.realDt, R, aspect, (dir) => this.terrain.sample(dir, this.ground).height);
@@ -216,14 +321,13 @@ export class World {
     this.grass.setColours(this.palette);
 
     // The homestead sits on its clearing, facing its pond; its shadow sweeps away from the sun.
-    const L = this.terrain.layout;
-    this.homestead.place(this.tmp.copy(L.cottage).multiplyScalar(R + this.terrain.cottageLevel), L.cottage, L.homeBearing);
+    this.homestead.place(this.tmp.copy(L.cottage).multiplyScalar(R + this.terrain.cottageGround), L.cottage, L.homeBearing);
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
     (this.shared.uOutline.value as Vector4).x = p.style.outlineWidth;
-    this.clouds.update(this.terrain.layout, R, clock.time, { ...p.clouds, mountainHeight: p.terrain.mountainHeight }, this.windAxis);
-    this.shared.uCloudShadowStrength.value = 0.35 + 0.4 * p.clouds.coverage;
+    // the puffs belong to the view from afar; down in the meadow the painted deck is the sky
+    this.clouds.update(L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, 1 - smoothstep(0.3, 0.75, this.rig.warpWeight));
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -231,8 +335,8 @@ export class World {
       {
         camera: cam.position,
         radius: R,
-        heightAbove: this.terrain.mountainH + 4,
-        heightBelow: 4,
+        heightAbove: this.terrain.maxHeight,
+        heightBelow: 3,
         frustum: this.frustum,
         warp: this.warp,
         horizonCull: rig.warpWeight < 0.05,
@@ -248,12 +352,12 @@ export class World {
       },
       this.lod,
     );
-    // Near field: grass blades (and later flowers) replace the paint around the focus.
+    // Near field: grass blades and flowers replace the paint around the focus.
     const lowness = smoothstep(90, 30, rig.altitude);
     const grassNear = p.grass.nearRadius * this.tier.grassRadiusScale * lowness;
     const flowerNear = 30 * this.tier.flowerRadiusScale * lowness;
     this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
-    this.field.render(this.renderer, rig.up, rig.forward, R);
+    if (grassNear > 0.5 || flowerNear > 0.5) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.grass.update(
       {
         seed: p.world.seed,
@@ -268,12 +372,17 @@ export class World {
       },
       p.grass.height,
     );
+    const flowerScale = this.tier.name === 'high' ? 1 : 0.6;
+    this.flowers.classifier.set(L, R, this.fieldParams, this.fieldKey, p.flowers.density * flowerScale, flowerScale, {
+      sizeVariation: p.flowers.sizeVariation,
+      colourVariation: p.flowers.colourVariation,
+    });
     this.flowers.update(
       {
         seed: p.world.seed,
         radius: R,
         radiusHi: this.band.radiusHi,
-        density: p.flowers.density * (this.tier.name === 'high' ? 1 : 0.6),
+        density: p.flowers.density * flowerScale,
         focus: rig.up,
         near: flowerNear,
         frustum: this.frustum,
@@ -331,29 +440,40 @@ export class World {
     const axis = this.windAxis.crossVectors(c, w).normalize();
     L.uWindVec.value.set(axis.x, axis.y, axis.z, p.wind.strength);
     L.uGust.value.set(clock.time, 0, p.wind.gustiness, p.wind.strength);
-    // gust bands advect with the flow: rotate about the wind axis at the wind speed
+    // gust bands and the quicker ripples advect with the flow: rotate about the wind axis
     const R = this.growth.radius;
-    const angle = (-clock.time * (2.5 + 6 * p.wind.strength)) / R;
-    (this.shared.uGustRot.value as Vector4).set(Math.cos(angle), Math.sin(angle), R / 16, 0);
-    L.uSpecies.value.set(p.flowers.pink, p.flowers.star, p.flowers.yellow, p.flowers.blue);
-    L.uWaterLook.value.set(p.water.shoreWidth, p.water.depthTint, 0.4 + 0.8 * p.wind.strength, clock.time);
-    L.uSnow.value = p.terrain.snowline;
+    const gusts = (-clock.time * (2.5 + 6 * p.wind.strength)) / R;
+    const ripples = (-clock.time * (3.5 + 9 * p.wind.strength)) / R;
+    (this.shared.uGustRot.value as Vector4).set(Math.cos(gusts), Math.sin(gusts), Math.cos(ripples), Math.sin(ripples));
+    (this.shared.uGustFreq.value as Vector4).set(R / 16, R / 5.5, 0, 0);
+    L.uMeadowLook.value.set(p.wind.sheen, 1, p.flowers.colourVariation, 0);
+    // middle colours of the four species (floraColour() at variant 0.5, in sun)
+    const wash = L.uFloraWash.value;
+    this.palette.get(ROW.PINK, 0, wash[0]);
+    this.palette.get(ROW.STAR, 0, wash[1]).lerp(this.palette.get(ROW.STAR, 4, this.washTmp), 0.35);
+    this.palette.get(ROW.SCATTER, 0, wash[2]);
+    this.palette.get(ROW.SCATTER, 2, wash[3]).lerp(this.palette.get(ROW.SCATTER, 8, this.washTmp), 0.2);
+    L.uWaterLook.value.set(p.water.shoreWidth, p.water.depthTint, p.water.glints, clock.time);
+    L.uWaterSky.value.set(p.water.reflection, p.water.lilyPads, 0, 0);
     L.uDebug.value = DEBUG_VIEWS[p.ui.debug];
   }
 
   /**
    * Triangles that can actually reach the rasteriser: what three.js submits,
    * minus the instances the vertex shaders collapse (pages outside the
-   * frustum, other species' flowers).
+   * frustum, blades beyond the thinning).
    */
   effectiveTriangles(submitted: number): number {
     const grassTris = 3;
     const g = this.grass;
     let wasted = g.layer.instanceCount * grassTris - g.layer.visibleInstances * grassTris;
-    for (const mesh of this.flowers.meshes) {
+    const f = this.flowers.layer;
+    const all = Math.max(f.instanceCount, 1);
+    this.flowers.meshes.forEach((mesh, s) => {
       const tris = (mesh.geometry.index?.count ?? 0) / 3;
-      wasted += mesh.geometry.instanceCount * tris - (this.flowers.layer.visibleInstances * tris) / this.flowers.meshes.length;
-    }
+      const drawn = f.instanceCounts[s];
+      wasted += (drawn - (f.visibleInstances * drawn) / all) * tris;
+    });
     return Math.max(0, submitted - (this.grass.mesh.visible ? wasted : 0));
   }
 
@@ -388,6 +508,7 @@ export class World {
     this.band.settle();
     this.queue.drain();
     this.rig.settle();
-    this.terrainKey = '';
+    growthState(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax, this.growth);
+    this.refreshFields(true);
   }
 }

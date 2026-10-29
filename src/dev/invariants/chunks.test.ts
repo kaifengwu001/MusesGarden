@@ -120,7 +120,7 @@ describe('CDLOD selection', () => {
         }
       }
     }
-  });
+  }, 30_000); // brute force over every edge vertex: slow by design
 
   it('stays within the triangle budget for real views', () => {
     const camera = new PerspectiveCamera(55, 16 / 10, 0.1, 1e5);

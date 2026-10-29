@@ -18,20 +18,34 @@ float gradDot(uint h, vec3 f) {
   return ((k & 1u) == 0u ? u : -u) + ((k & 2u) == 0u ? v : -v);
 }
 
-// Range ≈ [-1, 1].
+// meadowHash's final mix, for corners whose coordinate products are known.
+uint finishHash(uint h) {
+  h *= 0x27d4eb2du;
+  return h ^ (h >> 15);
+}
+
+// Range ≈ [-1, 1]. The eight corner hashes share their per-axis products
+// ((x + 1)·K = x·K + K, mod 2³²), so this is bit-identical to calling
+// meadowHash per corner, with a third of the integer multiplies.
 float gnoise(vec3 p, uint seed) {
   vec3 fl = floor(p);
   ivec3 i = ivec3(fl);
   vec3 f = p - fl;
   vec3 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-  float n000 = gradDot(meadowHash(i, seed), f);
-  float n100 = gradDot(meadowHash(i + ivec3(1, 0, 0), seed), f - vec3(1.0, 0.0, 0.0));
-  float n010 = gradDot(meadowHash(i + ivec3(0, 1, 0), seed), f - vec3(0.0, 1.0, 0.0));
-  float n110 = gradDot(meadowHash(i + ivec3(1, 1, 0), seed), f - vec3(1.0, 1.0, 0.0));
-  float n001 = gradDot(meadowHash(i + ivec3(0, 0, 1), seed), f - vec3(0.0, 0.0, 1.0));
-  float n101 = gradDot(meadowHash(i + ivec3(1, 0, 1), seed), f - vec3(1.0, 0.0, 1.0));
-  float n011 = gradDot(meadowHash(i + ivec3(0, 1, 1), seed), f - vec3(0.0, 1.0, 1.0));
-  float n111 = gradDot(meadowHash(i + ivec3(1, 1, 1), seed), f - vec3(1.0, 1.0, 1.0));
+  uint x0 = uint(i.x) * 73856093u;
+  uint y0 = uint(i.y) * 19349663u;
+  uint z0 = (uint(i.z) * 83492791u) ^ seed;
+  uint x1 = x0 + 73856093u;
+  uint y1 = y0 + 19349663u;
+  uint z1 = (uint(i.z) * 83492791u + 83492791u) ^ seed;
+  float n000 = gradDot(finishHash(x0 ^ y0 ^ z0), f);
+  float n100 = gradDot(finishHash(x1 ^ y0 ^ z0), f - vec3(1.0, 0.0, 0.0));
+  float n010 = gradDot(finishHash(x0 ^ y1 ^ z0), f - vec3(0.0, 1.0, 0.0));
+  float n110 = gradDot(finishHash(x1 ^ y1 ^ z0), f - vec3(1.0, 1.0, 0.0));
+  float n001 = gradDot(finishHash(x0 ^ y0 ^ z1), f - vec3(0.0, 0.0, 1.0));
+  float n101 = gradDot(finishHash(x1 ^ y0 ^ z1), f - vec3(1.0, 0.0, 1.0));
+  float n011 = gradDot(finishHash(x0 ^ y1 ^ z1), f - vec3(0.0, 1.0, 1.0));
+  float n111 = gradDot(finishHash(x1 ^ y1 ^ z1), f - vec3(1.0, 1.0, 1.0));
   float x00 = mix(n000, n100, w.x);
   float x10 = mix(n010, n110, w.x);
   float x01 = mix(n001, n101, w.x);

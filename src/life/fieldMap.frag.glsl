@@ -1,5 +1,5 @@
-// Evaluates the ground (pass 0) or the meadow fields (pass 1) for every
-// texel of the field maps (see fieldMap.ts).
+// Evaluates the ground (pass 0), the meadow and light (pass 1) or the wind
+// (pass 2) for every texel of the field maps (see fieldMap.ts).
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
@@ -8,6 +8,7 @@ uniform float uRadius;
 #include <meadow_paint>
 #include <meadow_field>
 #include <meadow_wind>
+#include <meadow_clouds_shadow>
 
 uniform float uFieldSize;
 uniform int uFieldPass;
@@ -17,12 +18,13 @@ void main() {
   vec3 dir = fieldDirection(vUv);
   if (uFieldPass == 0) {
     Ground g = sampleGround(dir);
-    gl_FragColor = vec4(g.height, g.water, g.clearing > 0.0 ? g.clearing : -max(g.mountain, g.rock), bloomAt(dir));
+    gl_FragColor = vec4(g.height, g.water, g.clearing, bloomAt(dir));
   } else if (uFieldPass == 1) {
-    // pixel footprint irrelevant here: plants sample the meadow at its own scale
-    vec3 f = meadowFields(dir, 0.0);
-    gl_FragColor = vec4(f, 0.0);
+    vec4 f = textureLod(uTerrainBake, dir, 0.0);
+    gl_FragColor = vec4(f.g, f.b, cloudShadow(dir), f.a);
   } else {
-    gl_FragColor = vec4(windBase(dir), gustAt(dir));
+    float gust = gustAt(dir);
+    float ripple = rippleAt(dir);
+    gl_FragColor = vec4(windBase(dir, gust, ripple), windSheen(gust, ripple));
   }
 }

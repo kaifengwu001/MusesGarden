@@ -56,9 +56,10 @@ test.describe('CPU and GPU agree', () => {
     await page.evaluate(async () => window.__meadow?.settle());
     const p = await page.evaluate(() => window.__meadow?.parity());
     expect(p?.samples).toBe(64);
-    expect(p?.heightError).toBeLessThan(0.02); // m, half-float field map
-    // m, near shores: channels come from a baked distance field (half-float cube
-    // texels ~0.3 m at R 128, bilinear), the CPU computes the exact distance
+    // m: the GPU reads the meadow from a half-float cube bake (texels ~0.5 m at
+    // R 128, bilinear) where the CPU evaluates the noise exactly
+    expect(p?.heightError).toBeLessThan(0.02);
+    // m, near shores: distance to the shore is height over slope on both sides
     expect(p?.waterError).toBeLessThan(0.12);
     expect(p?.warpError).toBeLessThan(0.005); // m
   });

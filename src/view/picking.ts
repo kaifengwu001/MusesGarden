@@ -1,5 +1,5 @@
 import { Vector3, type PerspectiveCamera } from 'three';
-import type { GroundSample, Terrain } from '../planet/terrain';
+import { createGroundSample, type Terrain } from '../planet/terrain';
 import { unwarpPoint, type WarpFrame } from '../render/warp';
 
 // CPU picking that hits what you see. The GPU draws the warped surface, so
@@ -21,7 +21,7 @@ const origin = new Vector3();
 const ray = new Vector3();
 const q = new Vector3();
 const p = new Vector3();
-const ground: GroundSample = { height: 0, water: 0, mountain: 0, rock: 0, clearing: 0 };
+const ground = createGroundSample();
 
 function above(t: number, warp: WarpFrame, terrain: Terrain): number {
   q.copy(origin).addScaledVector(ray, t);

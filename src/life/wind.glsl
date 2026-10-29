@@ -1,41 +1,58 @@
-// One coherent wind field for grass, flowers, petals, clouds and water.
-// The steady flow is a solid-body rotation about uWindVec.xyz (so it is a
-// smooth tangent field on the whole sphere), which makes advection exact:
-// gust patterns are sampled at the point rotated back along the flow.
+// One coherent wind field for grass, flowers, petals, clouds, water and the
+// painted meadow. The steady flow is a solid-body rotation about uWindVec.xyz
+// (a smooth tangent field on the whole sphere), which makes advection exact:
+// a travelling pattern is sampled at the point rotated back along the flow.
+// Two travel at once: broad gust bands, and finer ripples that run ahead of
+// them. Together they lay the grass over in waves that catch the light.
 // Requires: noise, meadow (windDir), terrain (chordAngle, uRadius).
 #define MAX_GUST_RINGS 4
-uniform vec4 uGust;                        // time (s), -, gustiness, strength
-uniform vec4 uGustRot;                     // cos, sin of the advection angle; gust frequency; -
+uniform vec4 uGust;                       // time (s), -, gustiness, strength
+uniform vec4 uGustRot;                    // cos, sin of the advection angle: gust bands; cos, sin: ripples
+uniform vec4 uGustFreq;                   // gust and ripple frequencies (direction space), -, -
 uniform vec4 uGustRings[MAX_GUST_RINGS];  // centre direction, start time (s); w < 0 = unused
 
-vec3 rotateAboutWind(vec3 p) {
+vec3 rotateAboutWind(vec3 p, float c, float s) {
   vec3 a = uWindVec.xyz;
-  float c = uGustRot.x;
-  float s = uGustRot.y;
   return p * c + cross(a, p) * s + a * dot(a, p) * (1.0 - c);
 }
 
 // 0..1 gust bands, long across the wind, travelling downwind.
 float gustAt(vec3 dir) {
-  vec3 q = rotateAboutWind(dir);
+  vec3 q = rotateAboutWind(dir, uGustRot.x, uGustRot.y);
   vec3 along = windDir(q);
-  vec3 p = q * uGustRot.z;
-  p += along * dot(p, along) * 1.6;
+  vec3 p = q * uGustFreq.x;
+  p += along * dot(p, along) * 2.8; // crests long across the wind
   float g = 0.5 + 0.5 * gnoise(p, uTerrainSeed + 150u);
-  return smoothstep(0.42, 0.85, g);
+  return smoothstep(0.5, 0.74, g);
 }
 
-// The shared part of the bend at dir: steady flow, travelling gusts and click
-// rings. Expensive (noise), so the field map evaluates it once per texel and
-// plants read it back (fieldWind); windPlant adds the cheap per-plant part.
-vec3 windBase(vec3 dir) {
+// 0..1 ripples: narrower crests, quicker than the gusts.
+float rippleAt(vec3 dir) {
+  vec3 q = rotateAboutWind(dir, uGustRot.z, uGustRot.w);
+  vec3 along = windDir(q);
+  vec3 p = q * uGustFreq.y;
+  p += along * dot(p, along) * 3.4;
+  return smoothstep(0.4, 0.75, 0.5 + 0.5 * gnoise(p, uTerrainSeed + 151u));
+}
+
+// How strongly the grass at dir is laid over right now (0..1): the gust band
+// with its ripples. Drives the sheen in the paint and on the blades.
+float windSheen(float gust, float ripple) {
+  float strength = uWindVec.w;
+  return clamp(gust * (0.45 + 0.55 * ripple) * (0.35 + uGust.z) * smoothstep(0.02, 0.35, strength) * 1.3, 0.0, 1.0);
+}
+
+// The shared part of the bend at dir: steady flow, travelling gusts and
+// ripples, and click rings. Expensive (noise), so the field map evaluates it
+// once per texel and plants read it back; windPlant adds the cheap per-plant part.
+vec3 windBase(vec3 dir, float gust, float ripple) {
   vec3 w = windDir(dir);
   float strength = uWindVec.w;
   float t = uGust.x;
-  float gust = gustAt(dir);
   float steady = strength * (0.18 + 0.42 * strength);
   float gusts = strength * uGust.z * 0.75 * gust;
-  vec3 bend = w * (steady + gusts);
+  float ripples = strength * 0.22 * (ripple - 0.4) * (0.4 + gust);
+  vec3 bend = w * (steady + gusts + ripples);
   // click gust rings push outward from where you clicked
   for (int i = 0; i < MAX_GUST_RINGS; i++) {
     vec4 r = uGustRings[i];

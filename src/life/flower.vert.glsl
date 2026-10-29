@@ -1,5 +1,6 @@
-// Flowers near the camera: one rest-space point set, four species meshes.
-// Each species draw keeps only the instances whose species it is.
+// Flowers near the camera: each species mesh draws its own pool, sorted on
+// the CPU by the colony fields (flowers.ts). Per instance: where, when it is
+// born at the local density, a seed, a size and a colour variant.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -13,29 +14,18 @@ uniform float uRadius;
 #include <meadow_wind>
 
 attribute vec3 aDir;
-attribute vec2 aBirth; // ln birth threshold, seed in [0, 1)
+attribute vec2 aBirth; // ln birth threshold (at the local density), seed in [0, 1)
+attribute vec2 aLook;  // size factor, colour variant
 attribute float aPart; // 0 stem, 1 petal, 2 centre
 attribute float aT;    // along the stem 0..1; 1 on the head
 uniform sampler2D uPages;
 uniform float uPageSize;
-uniform vec4 uFlowers;    // near radius (m), ln density (per m²), species id, size scale
+uniform vec4 uFlowers;    // near radius (m), ln mean density (per m²), species id, size scale
 uniform vec4 uFlowerFade; // full-density radius (m), kept fraction at the edge, stem top (m), nod
 varying vec3 vColour;
 
 float rnd(float s, float k) {
   return fract(sin(s * 78.233 + k * 12.9898) * 43758.5453);
-}
-
-int pickSpecies(float s, float drift, float lush, float nearWater) {
-  vec4 w = uSpecies * vec4(0.55 + 1.8 * nearWater + 1.5 * drift * drift,
-                           0.55 + 1.3 * (1.0 - drift) + 0.4 * lush,
-                           0.6 + 0.9 * lush,
-                           0.5 + 0.9 * (1.0 - lush));
-  w /= max(dot(w, vec4(1.0)), 1e-4);
-  if (s < w.x) return 0;
-  if (s < w.x + w.y) return 1;
-  if (s < w.x + w.y + w.z) return 2;
-  return 3;
 }
 
 vec3 rotateAxis(vec3 v, vec3 axis, float angle) {
@@ -52,25 +42,15 @@ void main() {
   }
   vec3 dir = aDir;
   float seed = aBirth.y;
-  // species first, from two fetches: most instances belong to another draw
-  vec3 m = fieldCoords(dir);
-  vec2 fuv = m.xy * 0.5 + 0.5;
-  vec4 f = textureLod(uFieldMap, fuv, 0.0);
-  vec4 meadow = textureLod(uFieldMeadow, fuv, 0.0);
-  float nearWater = smoothstep(6.0, 1.0, f.y);
-  int species = pickSpecies(rnd(seed, 1.0), meadow.y, meadow.x, nearWater);
-  if (float(species) != uFlowers.z) {
-    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
-    return;
-  }
-  float inside = step(m.z, 0.98);
-  vec4 wind = textureLod(uFieldWind, fuv, 0.0);
+  int species = int(uFlowers.z + 0.5);
   float d = chordAngle(dir, uFieldCentre.xyz) * uRadius;
   float keep = mix(1.0, uFlowerFade.y, smoothstep(uFlowerFade.x, uFlowers.x, d));
   float grow = growthFade(0.5 * (aBirth.x - uFlowers.y - log(keep)));
-  float clearing = max(f.z, 0.0);
-  float rock = max(-f.z, 0.0);
-  float mask = smoothstep(0.25, 0.8, f.y) * (1.0 - smoothstep(0.2, 0.6, clearing)) * (1.0 - smoothstep(0.15, 0.45, rock)) * inside;
+  vec4 meadow;
+  vec4 wind;
+  float inside;
+  vec4 f = fieldSample(dir, meadow, wind, inside);
+  float mask = smoothstep(0.25, 0.8, f.y) * (1.0 - smoothstep(0.2, 0.6, f.z)) * inside;
   float edge = 1.0 - smoothstep(uFlowers.x * 0.8, uFlowers.x, d);
   float vis = grow * mask * edge;
   if (vis <= 0.002) {
@@ -80,7 +60,7 @@ void main() {
 
   // Bloom: buds ahead of the front, opening behind it with a per-flower delay.
   float open = clamp((f.w - 0.35 * rnd(seed, 2.0)) * 2.4, 0.0, 1.0);
-  float scale = uFlowers.w * (0.75 + 0.5 * rnd(seed, 3.0)) * (0.3 + 0.7 * vis);
+  float scale = uFlowers.w * aLook.x * (0.85 + 0.3 * rnd(seed, 3.0)) * (0.3 + 0.7 * vis);
   float stemScale = scale * mix(0.6, 1.0, open);
 
   // local frame: up = surface normal, random yaw
@@ -114,30 +94,31 @@ void main() {
     world = top + side * (head.x * scale) + up * (head.y * scale) + fwd * (head.z * scale);
   }
 
-  // colour by species and part
-  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * mix(1.0, 0.5, cottageShadow(dir));
+  // colour by species, colony variant and part; cloud and cottage shadows
+  float shadow = max(meadow.z, 0.5 * cottageShadow(dir));
+  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.85 * shadow);
+  float v = aLook.y;
   vec3 col;
   if (aPart < 0.5) {
     col = tone3(pal(ROW_PINK, 4), mix(pal(ROW_PINK, 4), pal(ROW_PINK, 5), 0.5), pal(ROW_PINK, 5), b * 0.85);
   } else if (species == 0) {
-    float inner = smoothstep(stemTop + 0.06, stemTop + 0.0, local.y); // the cup's paler heart
-    float lipLight = smoothstep(stemTop + 0.08, stemTop + 0.125, local.y);
-    col = tone3(mix(mix(pal(ROW_PINK, 1), pal(ROW_PINK, 0), lipLight), pal(ROW_PINK, 2), inner * 0.6), pal(ROW_PINK, 1), pal(ROW_PINK, 3), b * mix(0.75, 1.0, lipLight));
+    float inner = smoothstep(stemTop + 0.05, stemTop + 0.0, local.y); // the cup's paler heart
+    float lipLight = smoothstep(stemTop + 0.065, stemTop + 0.103, local.y);
+    vec3 petal = tone3(floraColour(0, v, 1.0), floraColour(0, v, 0.55), floraColour(0, v, 0.0), b * mix(0.75, 1.0, lipLight));
+    col = mix(petal, tone3(pal(ROW_PINK, 2), pal(ROW_PINK, 2), floraColour(0, v, 0.4), b), inner * 0.6);
   } else if (species == 1) {
-    col = aPart > 1.5 ? tone3(pal(ROW_STAR, 3), pal(ROW_STAR, 2), pal(ROW_SCATTER, 1), b) : tone3(pal(ROW_STAR, 0), pal(ROW_STAR, 0), pal(ROW_STAR, 1), b);
+    col = aPart > 1.5 ? tone3(pal(ROW_STAR, 3), pal(ROW_STAR, 2), pal(ROW_SCATTER, 1), b) : tone3(floraColour(1, v, 1.0), floraColour(1, v, 0.6), floraColour(1, v, 0.0), b);
   } else if (species == 2) {
-    bool red = rnd(seed, 8.0) < 0.08;
-    vec3 lit = red ? pal(ROW_SCATTER, 4) : pal(ROW_SCATTER, 0);
-    vec3 shade = red ? pal(ROW_SCATTER, 5) : pal(ROW_SCATTER, 1);
-    col = tone3(lit, mix(lit, shade, 0.4), shade, b);
+    col = tone3(floraColour(2, v, 1.0), floraColour(2, v, 0.6), floraColour(2, v, 0.0), b);
     if (aPart > 1.5) col *= 0.85;
   } else {
-    col = aPart > 1.5 ? pal(ROW_STAR, 0) : tone3(pal(ROW_SCATTER, 2), mix(pal(ROW_SCATTER, 2), pal(ROW_SCATTER, 3), 0.5), pal(ROW_SCATTER, 3), b);
+    col = aPart > 1.5 ? pal(ROW_STAR, 0) : tone3(floraColour(3, v, 1.0), floraColour(3, v, 0.5), floraColour(3, v, 0.0), b);
   }
   // buds: green, tinted toward the bloom colour as they open
   if (aPart > 0.5) col = mix(tone3(pal(ROW_BUD, 0), pal(ROW_BUD, 0), pal(ROW_GRASS, 2), b), col, smoothstep(0.15, 0.85, open));
+  col *= cloudTint(meadow.z);
   vec3 toCam = cameraPosition - world;
-  col += pal(ROW_LIGHT, 3) * aT * clamp(dot(-normalize(toCam), uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.12 * uToon.z;
+  col += pal(ROW_LIGHT, 3) * aT * clamp(dot(-normalize(toCam), uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.12 * uToon.z * (1.0 - shadow);
 
   vec3 wp = warpPosition(world);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);

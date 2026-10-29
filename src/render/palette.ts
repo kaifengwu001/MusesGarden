@@ -28,18 +28,18 @@ type Rows = Partial<Record<number, readonly string[]>>;
 
 // Noon. Column meanings per row are noted; shaders reference them by index.
 const NOON: Rows = {
-  // light, mid, shade, sunlit tips, pale (ahead of bloom), deep shade, far blue-green, pale light
-  [ROW.GRASS]: ['#A9D46A', '#7DBF4A', '#4F8F34', '#C9DE7A', '#9DBF6A', '#3F7A2E', '#79B37C', '#BFDB86'],
+  // light, mid, shade, sunlit tips, pale (ahead of bloom), deep shade, far blue-green, pale light, wind sheen
+  [ROW.GRASS]: ['#AFD663', '#7DBF4A', '#448C37', '#D2E07C', '#9DBF6A', '#2F6E33', '#6FAF7A', '#C2DD86', '#E4ECA6'],
   // painted far meadow: brush light, brush mid, brush dark, dry highlight, cool strokes, warm strokes
-  [ROW.BRUSH]: ['#A3D163', '#86C150', '#62A443', '#D3E39A', '#7DBC7A', '#B9D66C'],
-  // shallow, deep, shore band, highlight, sky-tinted, mid, lily pad, lily pad shade
-  [ROW.WATER]: ['#4FA0C8', '#2E6E9E', '#D7EEE8', '#EEF8F6', '#78B9DA', '#3B86B4', '#6FA548', '#4A7F35'],
-  // cup light, cup mid, inner, cup shade, stem, stem shade
-  [ROW.PINK]: ['#F7B4AA', '#E98A8F', '#F7C9B8', '#D06F7A', '#6E9E4A', '#4D7A36'],
-  // petal, petal shade, centre, centre bright
-  [ROW.STAR]: ['#FBF8EE', '#E1DCD0', '#E9D9A6', '#F2D45C'],
-  // yellow, yellow shade, blue, blue shade, red, red shade
-  [ROW.SCATTER]: ['#F2D45C', '#D7AE3A', '#6E8FD8', '#4E6BB3', '#E05A4F', '#B6433B'],
+  [ROW.BRUSH]: ['#A3D163', '#86C150', '#62A443', '#D3E39A', '#6FB47E', '#B9D66C'],
+  // shallow, deep, shore band, highlight, sky-tinted, mid, lily pad, lily pad shade, under the banks, ruffle
+  [ROW.WATER]: ['#4A9AC6', '#2356A4', '#D7EEE8', '#F6FCFF', '#78B9DA', '#3473B6', '#6FA548', '#4A7F35', '#183C74', '#A4CDEA'],
+  // cup light, cup mid, inner, cup shade, stem, stem shade, blush, rose, coral, rose shade
+  [ROW.PINK]: ['#F7B4AA', '#E98A8F', '#F7C9B8', '#D06F7A', '#6E9E4A', '#4D7A36', '#FAD2D2', '#E5638C', '#F49A7C', '#B9497A'],
+  // petal, petal shade, centre, centre bright, cream, pale lilac
+  [ROW.STAR]: ['#FBF8EE', '#E1DCD0', '#E9D9A6', '#F2D45C', '#F5EACB', '#E3DCF2'],
+  // yellow, yellow shade, blue, blue shade, red, red shade, orange, orange shade, violet, violet shade, lemon
+  [ROW.SCATTER]: ['#F2D45C', '#D7AE3A', '#6E8FD8', '#4E6BB3', '#E05A4F', '#B6433B', '#F2A03C', '#C77A24', '#9B7BD8', '#6E55AE', '#F8EA8C'],
   // zenith, horizon, haze, sun glow, mid sky
   [ROW.SKY]: ['#2F7CC4', '#A9D3EE', '#D6EAF1', '#FFF4D8', '#5E9BD5'],
   // lit, shadowed, mid, rim, base dark

@@ -35,6 +35,7 @@ const GRASS_COLOURS: ReadonlyArray<readonly [number, number]> = [
   [ROW.BUD, 1], // 6 bud tip
   [ROW.BUD, 0], // 7 bud green
   [ROW.LIGHT, 3], // 8 rim
+  [ROW.GRASS, 8], // 9 wind sheen
 ];
 
 export class Grass {
@@ -53,12 +54,12 @@ export class Grass {
       headroom: 1.25,
     });
     this.geometry = bladeGeometry();
-    this.geometry.setAttribute('aDir', this.layer.aDir);
-    this.geometry.setAttribute('aBirth', this.layer.aBirth);
+    this.geometry.setAttribute('aDir', this.layer.aDir[0]);
+    this.geometry.setAttribute('aBirth', this.layer.aBirth[0]);
     this.geometry.instanceCount = 0;
     this.uniforms = {
       uPageSize: { value: 2048 },
-      uPages: { value: this.layer.pageTexture },
+      uPages: { value: this.layer.pageTextures[0] },
       uGrass: { value: new Vector4(0.42, 0.05, 24, 0) },
       uGrassFade: { value: new Vector4(8, GRASS_FADE.keepAtEdge, 0, 0) },
       uGrassPal: { value: Array.from({ length: GRASS_COLOURS.length }, () => new Color()) },
@@ -72,6 +73,7 @@ export class Grass {
 
   /** Fraction of full density kept at distance d (must match the shader). */
   static keep(d: number, near: number): number {
+    if (near <= 0) return 0;
     return 1 + (GRASS_FADE.keepAtEdge - 1) * smoothstep(near * GRASS_FADE.fullRadius, near, d);
   }
 

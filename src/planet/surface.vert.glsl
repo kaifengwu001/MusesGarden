@@ -11,23 +11,31 @@ uniform float uRadius;
 attribute vec4 aNode; // u0, v0, size (uv), face
 attribute vec4 aLod;  // morph start, morph end (m), level, -
 uniform float uGridSteps;
-uniform float uPixelAngle;
 
 varying vec3 vDir;
 varying vec3 vWarped;
 varying vec3 vNormal;       // warped (lighting, rims)
-varying vec3 vPlanetNormal; // unwarped (slope)
-varying float vMountain;
-varying float vRock;
 varying float vClearing;
+varying float vSlope;       // |∇h|: turns height into distance to the shore per pixel
+varying float vBloom;
 varying vec2 vGrid;
 varying float vMorph;
-varying vec3 vFields; // lushness, flower drift, bloom
 flat varying vec2 vNodeInfo; // face, level
+
+// The mesh's ground at d (banked for its distance, water flat at the table).
+float meshHeight(vec3 d, Ground g) {
+  return max(bankedAt(g.height0, g.water, distance(cameraPosition, d * uRadius)), 0.0);
+}
 
 vec3 surfacePoint(int face, vec2 uv) {
   vec3 d = uvToSphere(face, uv);
-  return d * (uRadius + sampleGround(d).height);
+  return d * (uRadius + meshHeight(d, sampleGround(d)));
+}
+
+// The ground at a neighbour, sharing this vertex's slope.
+float neighbourHeight(vec3 d, float slope) {
+  float h = height0(d);
+  return max(bankedAt(h, h / max(slope, uBank.w), distance(cameraPosition, d * uRadius)), 0.0);
 }
 
 void main() {
@@ -36,7 +44,8 @@ void main() {
   vec2 uv = aNode.xy + idx / uGridSteps * aNode.z;
   vec3 dir = uvToSphere(face, uv);
   Ground g = sampleGround(dir);
-  vec3 p = dir * (uRadius + g.height);
+  float height = meshHeight(dir, g);
+  vec3 p = dir * (uRadius + height);
 
   // Symmetric geomorph: odd vertices blend toward the midpoint of their two
   // parent-grid neighbours (see chunks.ts).
@@ -54,27 +63,24 @@ void main() {
   // Normal from two neighbours about half a grid step away.
   float spacing = aNode.z * 1.5707963 * uRadius / uGridSteps;
   float e = clamp(0.5 * spacing, 0.15, 30.0) / uRadius;
-  vec3 ref = abs(dir.y) < 0.95 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-  vec3 t1 = normalize(cross(dir, ref));
-  vec3 t2 = cross(dir, t1);
+  vec3 t1, t2;
+  gradientFrame(dir, t1, t2);
   vec3 d1 = normalize(dir + t1 * e);
   vec3 d2 = normalize(dir + t2 * e);
-  vec3 p0 = dir * (uRadius + g.height);
-  vec3 p1 = d1 * (uRadius + sampleGround(d1).height);
-  vec3 p2 = d2 * (uRadius + sampleGround(d2).height);
+  vec3 p0 = dir * (uRadius + height);
+  vec3 p1 = d1 * (uRadius + neighbourHeight(d1, g.slope));
+  vec3 p2 = d2 * (uRadius + neighbourHeight(d2, g.slope));
   vec3 n = normalize(cross(p1 - p0, p2 - p0));
 
   vec3 w = warpPosition(p);
   vDir = dir;
   vWarped = w;
-  vPlanetNormal = n;
   vNormal = warpNormal(p, n);
-  vMountain = g.mountain;
-  vRock = g.rock;
   vClearing = g.clearing;
+  vSlope = g.slope;
+  vBloom = bloomAt(dir);
   vGrid = position.xy;
   vMorph = k;
   vNodeInfo = vec2(aNode.w, aLod.z);
-  vFields = meadowFields(dir, distance(cameraPosition, w) * uPixelAngle);
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }

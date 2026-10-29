@@ -96,29 +96,40 @@ use the same band with a longer width, so they bloom in instead of popping.
 
 ### Terrain that grows without sliding
 
-Meadow roll is a sum of direction-space noise octaves. Their weights depend on
-R so that the spectrum **in meters** stays constant. An octave's amplitude is a
-function of its wavelength in meters (λ_k · R): it peaks in the meadow band
-(about 15 to 80 m) and rolls off on either side. As R grows, coarse octaves
-stretch out of the band and settle, and finer ones swell in. Hills never slide;
-they rise and subside in place.
+The relief is a sum of direction-space noise octaves: rolling hills plus
+hummocks. Their weights depend on R so that the spectrum **in meters** stays
+constant. An octave's amplitude is a function of its wavelength in meters
+(λ_k · R): rolling hills peak at about 30–120 m, hummocks at 7–12 m. As R
+grows, coarse octaves stretch out of the band and settle, and finer ones swell
+in. Hills never slide; they rise and subside in place. The noise is compressed
+along a grain axis from the seed, so hills, islands and inlets run long.
 
-Mountains are one range: ridged noise in direction space inside a range mask.
-Height ∝ R (`mountainHeight` is a fraction of R). Snowline depends on height and
-slope. Spurs unlock by rank.
+(Iteration 2 removed the mountain range and the river channels; they did not
+look right. Both live in git history at 9ddb8f2 if they come back.)
 
-### Channels and ponds
+### Lakes and the water table
 
-- **Channel:** a spline through stable nodes in direction space. Meander detail
-  is added by rank. Subdivision level k inserts sideways-displaced midpoints and
-  unlocks when the channel's length in meters passes L_k, fading in through the
-  lag band. At R = 40 m a channel is a gentle curve; at R = 400 m it wanders.
-- **Width** is in meters, from a geodesic distance field: there is water where
-  `angle × R < width / 2`.
-- **Pond:** the centre is in direction space. The radius is in meters with mild
-  growth (∝ R^0.3), so the cottage pond stays cottage-sized. Outline, islets and
-  lily pads live in pond-normalized coordinates, so they scale with the pond and
-  are never resampled.
+There is one water table, h = 0. A lake is wherever the ground dips under it,
+so every shore is a contour of the hills: water lies in the hollows between
+them, and the hilltops stand out of it as islands.
+
+- **Wetlands:** a macro field in direction space (two domain-warped octaves)
+  says where the meadow sinks toward the table. Its threshold comes from the
+  field's own sampled distribution, so the `wetlands` share is what you get,
+  and the margin is wide so the hills interlace with the water across it.
+- **Height:** relief + lift − (lift + sink)·wetness − water level. Uplands
+  stand clear (a kettle pond in the deepest hollows); deep in a wetland the
+  table sits near the middle of the relief, so a wetland is lace: islands,
+  spits and inlets rather than open water. Hummocks grow there too.
+- **Banks:** a lip, tanh(distance to shore / 0.3 m) × 0.2 m, lifts the land at
+  the waterline and drops the water off, like a cut turf bank. The distance is
+  height over slope (a finite difference one bake texel wide).
+- **Wetlands live in rest space,** so they grow with the planet while the hills
+  and banks inside them keep their size in meters; the share of water stays
+  about the same from R = 40 m to 400 m (tested).
+- **Homestead pond:** laid out in meters from the cottage (radius ∝ R^0.3, an
+  outline and one islet in pond-normalized coordinates), carved into a dry
+  plateau, so the cottage always stands by its pond with its landing over it.
 
 ### Bloom front
 
@@ -141,16 +152,24 @@ directions, with an exact CPU mirror, rather than computed per chunk on the
 CPU. Growth then never waits on terrain rebuilds, and picking, placement and
 tests still read the same fields from the CPU side.
 
-- **Terrain on the GPU:** `terrain.glsl` evaluates the meadow octaves,
-  mountains, channels, ponds and clearing from a direction, with R and the
-  layout as uniforms. `Terrain.sample` in `terrain.ts` mirrors it for CPU
-  use. The noise hashes integers (bit-identical in float32 and float64)
-  instead of the usual mod-289 float noise, which rounds differently on the
-  two sides.
-- **Channel field:** the only baked data. It holds angular distances to each
-  channel centreline per meander level, in a direction-space cube map baked
-  once per world on the GPU. It doesn't depend on R; widths stay in meters
-  because the shaders multiply by R.
+- **Terrain bake:** the meadow fields (`fields.ts` / `fields.glsl`) are baked
+  into two direction-space cube maps: terrain (natural height, lushness,
+  wetness, colour variant; 512² per face) and flora (flowers per m² for each
+  species; 256²). The ground, paint and vegetation read them back with one
+  fetch. They are re-baked only when the fields change; while R or a slider
+  is moving, a quarter-size set is baked each frame and the full set once
+  things hold still (a full bake is ~10 ms of GPU on an M1 Pro).
+- **Terrain on the GPU:** `terrain.glsl` reads the bake and applies the
+  homestead and the bank lip from a direction. `Terrain.sample` in
+  `terrain.ts` mirrors it for CPU use, evaluating the fields exactly (the bake
+  is bilinear; parity is within 1 cm of height). The noise hashes integers
+  (bit-identical in float32 and float64) instead of the usual mod-289 float
+  noise, which rounds differently on the two sides.
+- **Shores per pixel:** the water mask is the sign of the height, read per
+  pixel from the bake, so shores are crisp at any mesh density. The mesh's
+  bank lip widens with distance (CDLOD spacing grows with it), so far shores
+  do not saw-tooth; it is a function of distance, not of the node, so the
+  mesh stays watertight.
 - **CDLOD:** six face quadtrees with one shared 17² grid and one instanced
   draw. The range factor is k = 5.5 and the morph runs over 0.9–1.0 of the
   range. The morph is symmetric: odd vertices blend toward the midpoint of
@@ -161,11 +180,12 @@ tests still read the same fields from the CPU side.
 - **Culling:** the camera's view frustum. Horizon culling uses the true sphere
   in Overview and the warped curvature in Wander: ground of height H is
   hidden beyond √(2·R_eff·h) + √(2·R_eff·H).
-- **Field maps:** every frame, three small passes evaluate the ground (height,
-  water distance, clearing or rock, bloom), the meadow fields (lushness,
-  drift) and the shared wind (bend vector, gust). Each is an azimuthal
-  projection around the focus. Grass, flowers and petals fetch these instead
-  of re-running noise per vertex.
+- **Field maps:** every frame, three small passes (256² on high) evaluate the
+  ground (height, distance to the shore, clearing, bloom), the meadow and its
+  light (lushness, wetness, cloud shadow, colour variant) and the shared wind
+  (bend vector, sheen). Each is an azimuthal projection around the focus.
+  Grass, flowers and petals fetch these instead of re-running noise per
+  vertex. They are skipped when no vegetation is in view.
 - **Scatter layer:** handles grass, flowers and later stones. Quadtree tiles
   around the focus are enumerated from the rest-space point set by
   time-sliced jobs (64 steps per tile, pooled typed buffers). They go into a
@@ -173,6 +193,26 @@ tests still read the same fields from the CPU side.
   visibility texture culls whole tiles. Density falls off by rank toward the
   edge, so far tiles are built sparser. Re-tiling as R changes swaps region
   by region, which never leaves a hole and never deadlocks a full pool.
+- **Classified layers (flowers):** a classifier sees each tile first (the
+  flora fields on a 4×4 grid, from the CPU mirror), says how far the local
+  density rises above the mean (the enumeration bound), then sorts each point
+  into one pool per species mesh or drops it, thinning by rank against the
+  local density. Each species draws only its own instances, so no vertex is
+  spent on another species' flowers. R is quantised to 4 % steps for this,
+  so a settled world never depends on its history.
+
+### Flower colonies
+
+Flowers per m² for each species come from `fields.ts`: colonies of one species
+(thresholded noise whose area share follows the species' weight), bare and
+rich ground (a slower field), and damp ground the pink cups favour. With
+patchiness p, a species' density is ρ·w·(1 − p + p·colony/cover), so the mean
+stays ρ·w whatever the patchiness. Each flower also gets a size (lusher ground
+grows bigger flowers, plus its own spread) and a colour variant, set per colony
+(blush → rose → coral pinks, cream and lilac whites, lemon → golden → a few
+orange and red buttons, cornflower → violet blues) with a little per-flower
+spread. The far paint reads the same fields from the bake: dabs by species,
+and far away a wash of the colonies' colours, so near and far agree.
 
 The original plan, kept for reference:
 
@@ -237,9 +277,21 @@ click is what you see.
 - **Far meadow:** painted brushstroke noise with flower-coloured dabs in the
   terrain shader. Near blades cross-fade into it with a dithered fade, never a
   ring.
-- **Water:** painted, not simulated. Flat surface, shallow→deep gradient, pale
-  shore band, faint sky reflection, sparkles, lily pads and islets. No
-  refraction.
+- **Water:** painted, not simulated. Flat surface; teal shallows deepening to
+  ultramarine; a dark band under the banks; the sky and the clouds mirrored
+  along the reflected ray (天光云影共徘徊), broken by wind ruffles; glints that
+  swell and fade on their own slow sine and never shrink below a couple of
+  pixels (no popping); sparse lily pads in calm shallows. No refraction.
+- **Clouds and their light:** drifting puff clusters (seen from afar; they
+  shrink away as you descend) and a high broken deck: one noise field on a
+  shell above the meadow, advected with the wind. The deck is painted into the
+  Wander sky, mirrored in the lakes, and casts the shadows that sweep across
+  the meadow. Shadows have brushed edges (the paint's stroke noise), darken
+  the light band and cool the colour; sunlit ground warms a little.
+- **Wind:** broad gust bands and quicker ripples travel with the flow (both
+  advected exactly by rotating about the wind axis). Where they lay the grass
+  over, blades and paint take on a pale sheen, brightest in sun; between the
+  bands the grass reads deeper. The same field bends the blades and flowers.
 - **Post:** tone curve, gentle highlight bloom, and about 2% static paper grain.
 
 ## Frame
@@ -293,7 +345,7 @@ so any view can be shared.
 |---|---|
 | Determinism | Playwright: two loads of one URL at frozen time give an identical frame hash |
 | No swimming | Vitest: sample features at g = 0.3 → 0.7 → 0.3; directions and seeds unchanged |
-| Constant scale | Vitest: blade height, flower size, channel width and cottage size are equal at R_min and R_max |
+| Constant scale | Vitest: the homestead pond meets the landing in meters at five sizes; the share of water stays within a band from R 40 to 400; wetlands sit in rest space; the cottage geometry is size-independent |
 | Constant density | Vitest: flowers per m² within ±5% at 9 growth values, both globally and in local patches |
 | Attached | Vitest and Playwright: every prop, stone and flower base lies within ε of the warped terrain at 5 growth values |
 | No LOD rings or pops | Playwright: a 10 s dolly from Overview to Wander; morph factors stay continuous and per-frame image deltas show no ring-shaped spikes |
@@ -311,27 +363,29 @@ so any view can be shared.
         cubesphere.ts/.glsl spherified cube, closed-form inverse, analytic area element
         rest.ts/.glsl      progressive point sets, birth radii, growth fade band
         chunks.ts          face quadtrees, CDLOD selection, symmetric morph (CPU mirror), culling
-        surface.ts/.glsl   the instanced CDLOD ground: terrain, paint, rock and snow, water
+        surface.ts/.glsl   the instanced CDLOD ground: terrain, paint, cloud light, water
         noise.ts/.glsl     integer-hash gradient noise, identical on both sides
-        terrain.ts/.glsl   layout from the seed, meadow, mountains, ponds, homestead, unlocks
-        water.ts/.glsl     channel distance field bake; painted water shading
-        meadow.glsl        painted far meadow, bloom front, wind direction
+        fields.ts/.glsl    meadow fields: relief, wetlands, patterns, flower colonies
+        bake.ts            the fields baked into cube maps (quick while changing, full when still)
+        terrain.ts/.glsl   layout from the seed, water table and banks, homestead
+        water.glsl         painted water: depth, mirror, ruffles, glints, lily pads
+        meadow.glsl        painted far meadow, flower dabs and colours, bloom front, wind direction
         geo.ts             spherical arcs and travel
       life/
         fieldMap.ts/.glsl  ground, meadow and wind maps around the focus
-        scatter.ts         tiles, paged instance pool, page culling, region-by-region re-tiling
-        grass.ts/.glsl     5-vertex blades in the wind
-        flowers.ts/.glsl   four species (meshes in flowerMeshes.ts), bloom, flutter
+        scatter.ts         tiles, paged pools (one per channel), classifier hook, page culling, re-tiling
+        grass.ts/.glsl     5-vertex blades in the wind, sheen
+        flowers.ts/.glsl   colony classifier, four species pools (meshes in flowerMeshes.ts), bloom, flutter
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
-        wind.glsl          one wind field: flow, travelling gusts, click rings
-        clouds.ts/.glsl    drifting clusters and mountain banks; cloudShadow.glsl
+        wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
+        clouds.ts/.glsl    drifting puffs; cloudShadow.glsl: shadows, the deck, reflections
         props.ts/.glsl     cottage, landing, rail, bench; outlines (inverted hull)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
         fog.glsl           aerial perspective
         warp.glsl / .ts    tiny-planet warp (GPU and its exact CPU mirror)
-        sky.ts/.glsl       backdrop and dome, sun glow
+        sky.ts/.glsl       backdrop and dome, sun glow, the cloud deck from below
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
       view/                camera rig (Overview ↔ Wander), input gestures, CPU picking
