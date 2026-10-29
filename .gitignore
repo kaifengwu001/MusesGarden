@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-single/
+test-results/
+playwright-report/
+# `npm run shots` output; checkpoint copies live in docs/checkpoints/
+shots/
+.DS_Store
+*.log

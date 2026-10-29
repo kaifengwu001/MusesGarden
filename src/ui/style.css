@@ -1,0 +1,274 @@
+:root {
+  --ink: #3e3a36;
+  --ink-soft: rgba(62, 58, 54, 0.62);
+  --paper: #fbf8ee;
+  --sky-deep: #2f7cc4;
+  --sky-pale: #a9d3ee;
+  --coral: #e05a4f;
+  --card: rgba(251, 248, 238, 0.8);
+  --font-serif: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 3.4vw, 52px);
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sky-pale);
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  touch-action: none;
+  outline: none;
+}
+
+/* ---- masthead ---------------------------------------------------------- */
+
+.masthead {
+  position: fixed;
+  left: var(--gutter);
+  top: calc(var(--gutter) * 0.85);
+  pointer-events: none;
+  color: var(--paper);
+  text-shadow: 0 1px 28px rgba(22, 62, 112, 0.18);
+}
+
+.masthead h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 330;
+  font-size: clamp(44px, 6.6vw, 104px);
+  line-height: 0.9;
+  letter-spacing: -0.028em;
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 60;
+}
+
+.world-line {
+  margin: 0.85em 0 0 0.12em;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 340;
+  font-size: clamp(13px, 1.05vw, 16px);
+  letter-spacing: 0.012em;
+  font-variant-numeric: lining-nums tabular-nums;
+  opacity: 0.9;
+}
+
+/* ---- hints ------------------------------------------------------------- */
+
+.hints {
+  position: fixed;
+  left: var(--gutter);
+  bottom: calc(var(--gutter) * 0.75);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-width: min(520px, calc(100vw - 2 * var(--gutter)));
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+.hints kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 1px 5px;
+  border: 1px solid rgba(62, 58, 54, 0.22);
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-align: center;
+  color: var(--ink);
+}
+
+/* ---- perf HUD ---------------------------------------------------------- */
+
+.hud {
+  position: fixed;
+  right: calc(var(--gutter) * 0.6);
+  bottom: calc(var(--gutter) * 0.6);
+  width: 292px;
+  padding: 10px 12px 11px;
+  border-radius: 10px;
+  background: var(--card);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: blur(12px) saturate(1.1);
+  box-shadow: 0 8px 28px rgba(28, 60, 96, 0.12);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud[hidden] {
+  display: none;
+}
+
+.hud header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.hud canvas {
+  width: 120px;
+  height: 22px;
+}
+
+.hud dl {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  margin: 0;
+}
+
+.hud dt {
+  color: var(--ink-soft);
+}
+
+.hud dd {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud dd.over {
+  color: var(--coral);
+}
+
+/* ---- parameter panel (lil-gui, restyled) -------------------------------- */
+
+/* lil-gui re-declares its theme variables on every nested .lil-gui (folders),
+   so the light theme has to be set on the folders as well as the root. */
+.lil-gui.meadow-panel,
+.lil-gui.meadow-panel .lil-gui {
+  --background-color: rgba(251, 248, 238, 0.84);
+  --text-color: #3e3a36;
+  --title-background-color: transparent;
+  --title-text-color: #3e3a36;
+  --widget-color: rgba(62, 58, 54, 0.07);
+  --hover-color: rgba(62, 58, 54, 0.11);
+  --focus-color: rgba(62, 58, 54, 0.15);
+  --number-color: #2e6e9e;
+  --string-color: #4f8f34;
+  --font-family: var(--font-ui);
+  --font-family-mono: var(--font-mono);
+  --font-size: 11px;
+  --input-font-size: 11px;
+  --padding: 5px;
+  --spacing: 5px;
+  --widget-height: 21px;
+  --name-width: 44%;
+  --slider-input-width: 30%;
+  --slider-input-min-width: 58px;
+  --slider-knob-width: 2px;
+  --widget-border-radius: 4px;
+  --folder-indent: 0px;
+}
+
+.lil-gui.meadow-panel .lil-gui {
+  --background-color: transparent;
+}
+
+.lil-gui.meadow-panel {
+  font-weight: 400;
+  border-radius: 12px;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: 0 10px 34px rgba(28, 60, 96, 0.14);
+}
+
+.lil-gui.meadow-panel.lil-root {
+  top: calc(var(--gutter) * 0.6);
+  right: calc(var(--gutter) * 0.6);
+  max-height: calc(100vh - var(--gutter) * 1.2);
+}
+
+.lil-gui.meadow-panel .lil-title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.lil-gui.meadow-panel .lil-gui .lil-title {
+  font-size: 12px;
+  border-top: 1px solid rgba(62, 58, 54, 0.08);
+}
+
+.lil-gui.meadow-panel .lil-controller.lil-number .lil-fill {
+  background: rgba(46, 110, 158, 0.16);
+}
+
+/* ---- fallback ---------------------------------------------------------- */
+
+.fallback {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--ink);
+}
+
+.fallback h1 {
+  margin: 0 0 0.3em;
+  font-family: var(--font-serif);
+  font-weight: 330;
+  font-size: 56px;
+}
+
+/* Phones: the title keeps the top, the panel trigger moves to the bottom
+   right within thumb reach, and the HUD tucks under the masthead. */
+@media (max-width: 640px) {
+  .lil-gui.meadow-panel.lil-root {
+    top: auto;
+    bottom: calc(var(--gutter) * 0.75);
+    right: var(--gutter);
+    width: calc(100vw - 2 * var(--gutter));
+    max-height: 62vh;
+  }
+  .lil-gui.meadow-panel.lil-root.lil-closed {
+    width: 128px;
+  }
+  .hints {
+    max-width: calc(100vw - 2 * var(--gutter) - 140px);
+  }
+  .hud {
+    top: calc(var(--gutter) + 104px);
+    bottom: auto;
+    left: var(--gutter);
+    right: auto;
+    width: min(286px, calc(100vw - 2 * var(--gutter)));
+    font-size: 9.5px;
+  }
+}
