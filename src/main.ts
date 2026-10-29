@@ -1,5 +1,5 @@
 import './ui/style.css';
-import { NoToneMapping, PerspectiveCamera, Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer } from 'three';
+import { NoToneMapping, SRGBColorSpace, Vector2, WebGLRenderer } from 'three';
 import { FrameClock } from './core/clock';
 import { createGlobals } from './core/globals';
 import { gpuMemory } from './core/gpuMemory';
@@ -9,13 +9,14 @@ import { GpuTimer } from './dev/gpuTimer';
 import { installHarness } from './dev/harness';
 import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
-import { growthState, type GrowthState } from './planet/growth';
 import { registerShaderChunks } from './render/glsl';
 import { Post } from './render/post';
-import { Sky } from './render/sky';
+import { ControlBar } from './ui/controlBar';
 import { worldLine } from './ui/format';
 import { createPanel } from './ui/panel';
 import { Ui } from './ui/ui';
+import { attachInput } from './view/input';
+import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
   try {
@@ -39,12 +40,15 @@ function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
   }
 }
 
+/** Budget for background work (tile builds) per frame, ms. */
+const BUILD_BUDGET_MS = 2;
+
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
   const uiRoot = document.querySelector<HTMLElement>('#ui');
   if (!canvas || !uiRoot) throw new Error('index.html is missing #scene or #ui');
 
-  // State: parameters live in the URL hash, and so does frozen time (t=12).
+  // State: parameters live in the URL hash, and so do frozen time and the camera pose.
   const store = new ParamStore();
   const hash = new HashSync(store);
   const clock = new FrameClock();
@@ -72,10 +76,9 @@ async function boot(): Promise<void> {
   chooseTier(store.values.quality.tier);
 
   const globals = createGlobals();
-  const scene = new Scene();
-  const camera = new PerspectiveCamera(35, 1, 0.1, 20_000);
-  const sky = new Sky();
-  scene.add(sky.mesh);
+  const world = new World(renderer, globals, store, quality.tier);
+  if (import.meta.env.DEV) (window as unknown as { __world: World }).__world = world;
+  const camera = world.rig.camera;
   const post = new Post(renderer);
   const gpuTimer = new GpuTimer(gl);
   const stats = createFrameStats();
@@ -83,19 +86,56 @@ async function boot(): Promise<void> {
   const ui = new Ui(uiRoot);
   const panel = createPanel(store);
   ui.setHints([
-    ['H', 'perf HUD'],
+    ['drag', 'orbit · glide'],
+    ['scroll', 'down to the meadow'],
+    ['H', 'perf'],
     ['P', 'parameters'],
   ]);
 
-  const growth: GrowthState = { g: 0, area: 0, radius: 0 };
-  const skyUp = new Vector3(0, 1, 0);
+  // Camera pose in the URL; without one, frame the homestead.
+  let userPosed = false;
+  hash.register({
+    key: 'pose',
+    read: () => (userPosed ? world.rig.poseString() : null),
+    write: (value) => {
+      if (value && world.rig.applyPose(value)) {
+        userPosed = true;
+        world.markPosed();
+      }
+    },
+  });
+  if (world.needsDefaultPose) {
+    world.defaultPose();
+    world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0, true);
+  }
+
+  const controls = new ControlBar(uiRoot, store, {
+    reset: () => {
+      store.reset();
+      userPosed = false;
+      world.defaultPose();
+      world.rig.setZoom(0);
+    },
+    reroll: () => store.set('world.seed', Math.floor(Math.random() * 10000)),
+  });
+
+  attachInput(canvas, {
+    drag: (dx, dy) => {
+      world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
+      userPosed = true;
+    },
+    zoom: (delta) => {
+      world.rig.zoomBy(delta);
+      userPosed = true;
+    },
+    tap: () => undefined,
+    doubleTap: () => undefined,
+    holdStart: () => undefined,
+    holdMove: () => undefined,
+    holdEnd: () => undefined,
+  });
+
   const bufferSize = new Vector2();
-
-  const updateGrowth = (): void => {
-    const w = store.values.world;
-    growthState(w.growth, w.areaMin, w.areaMax, growth);
-  };
-
   const resize = (): void => {
     // A hidden or collapsed host (iframe, side pane) reports 0×0; zero-size
     // render targets are incomplete framebuffers, so never go below 1×1.
@@ -106,45 +146,47 @@ async function boot(): Promise<void> {
     renderer.setSize(width, height);
     renderer.getDrawingBufferSize(bufferSize);
     post.setSize(bufferSize.x, bufferSize.y, quality.samples(pixelRatio));
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
     globals.uResolution.value.copy(bufferSize);
     gpuMemory.set('canvas', bufferSize.x * bufferSize.y * 4 * 2); // front + back buffer
   };
 
   const applyUi = (): void => {
-    updateGrowth();
     hud.visible = store.values.ui.hud;
-    ui.setWorldLine(worldLine(store.values, growth));
+    ui.setWorldLine(worldLine(store.values, world.growth));
   };
 
+  // The Overview/Wander param follows the zoom, and the toggle drives it.
+  let syncingMode = false;
   store.subscribe((changed) => {
     if (changed.has('quality.tier')) {
       chooseTier(store.values.quality.tier);
+      world.applyTier(quality.tier);
       resize();
     }
+    if (changed.has('view.mode') && !syncingMode) world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0);
+    world.onParams(changed);
     applyUi();
   });
 
   const update = (): void => {
-    updateGrowth();
-    globals.uTime.value = clock.time;
-    globals.uRadius.value = growth.radius;
-    globals.uRadiusLag.value = growth.radius; // S1: the lagged follower that drives growth fades
-    // S0: a fixed Overview framing of the planet to come; the camera rig arrives in S1.
-    camera.position.set(0, 0, growth.radius * 3.4);
-    camera.lookAt(0, 0, 0);
-    camera.updateMatrixWorld();
-    sky.update(camera, skyUp, 0);
+    world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), bufferSize.y);
+    if (world.rig.mode !== store.values.view.mode) {
+      syncingMode = true;
+      store.set('view.mode', world.rig.mode);
+      store.flush();
+      syncingMode = false;
+    }
+    if (world.rig.consumeChange()) hash.schedule();
   };
 
   const render = (): void => {
     renderer.info.reset();
-    post.render(scene, camera, store.values.style.grain);
+    post.render(world.scene, camera, store.values.style.grain);
   };
 
   const collectStats = (jsMs: number): void => {
     const info = renderer.info;
+    const sel = world.surface.selection;
     stats.frameMs = clock.frameMs;
     stats.jsMs = jsMs;
     stats.gpuMs = gpuTimer.ms;
@@ -162,9 +204,16 @@ async function boot(): Promise<void> {
     stats.tierChoice = quality.choice;
     stats.benchMs = quality.benchMs;
     stats.renderScale = quality.renderScale;
-    stats.growth = growth.g;
-    stats.area = growth.area;
-    stats.radius = growth.radius;
+    stats.growth = world.growth.g;
+    stats.area = world.growth.area;
+    stats.radius = world.growth.radius;
+    stats.grassInstances = world.grass.layer.visibleInstances;
+    stats.flowerInstances = world.flowers.layer.visibleInstances;
+    stats.chunks = sel.count;
+    stats.lodMin = sel.minLevel;
+    stats.lodMax = sel.maxLevel;
+    stats.buildQueue = world.queue.size;
+    stats.buildMs = world.queue.lastMs;
     stats.time = clock.time;
     stats.frozen = clock.frozen;
   };
@@ -173,7 +222,9 @@ async function boot(): Promise<void> {
     clock.tick(now);
     const t0 = performance.now();
     gpuTimer.begin();
+    controls.tick(clock.realDt);
     update();
+    world.queue.run(BUILD_BUDGET_MS);
     render();
     gpuTimer.end();
     gpuTimer.poll();
@@ -181,14 +232,16 @@ async function boot(): Promise<void> {
     if (Number.isNaN(stats.firstFrameMs)) stats.firstFrameMs = performance.now();
     collectStats(jsMs);
     quality.locked = clock.frozen; // never change resolution under a deterministic capture
-    if (quality.observe(clock.frameMs)) resize();
+    const change = quality.observe(clock.frameMs);
+    if (change === 'tier') world.applyTier(quality.tier);
+    if (change) resize();
     hud.frame(stats, quality.tier.budgets, now);
   };
 
   // Warm every shader before the first frame, against the real render target.
   resize();
   update();
-  await post.warm(scene, camera);
+  await post.warm(world.scene, camera);
 
   let markReady: () => void = () => undefined;
   const ready = new Promise<void>((resolve) => (markReady = resolve));
@@ -204,7 +257,10 @@ async function boot(): Promise<void> {
       },
       settle: async () => {
         store.flush();
-        await post.warm(scene, camera);
+        world.settle();
+        update();
+        world.settle();
+        await post.warm(world.scene, camera);
       },
     },
     ready,

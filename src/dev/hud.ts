@@ -27,6 +27,8 @@ export function createFrameStats(): FrameStats {
     area: 0,
     radius: 0,
     chunks: 0,
+    lodMin: 0,
+    lodMax: 0,
     buildQueue: 0,
     buildMs: 0,
     firstFrameMs: Number.NaN,
@@ -136,7 +138,7 @@ export class PerfHud {
     const scale = s.renderScale < 1 ? ` · scale ${s.renderScale.toFixed(2)}` : '';
     this.set('tier', `${s.tier} (${s.tierChoice})${bench}${scale}`);
     this.set('planet', `R ${s.radius.toFixed(1)} m · ${formatArea(s.area)} m² · g ${s.growth.toFixed(4)}`);
-    this.set('chunks', `${s.chunks} · queue ${s.buildQueue} · build ${s.buildMs.toFixed(2)} ms`);
+    this.set('chunks', `${s.chunks} nodes L${s.lodMin}–${s.lodMax} · queue ${s.buildQueue} · ${s.buildMs.toFixed(2)} ms`);
     const t = `t ${s.time.toFixed(2)} s${s.frozen ? ' (frozen)' : ''}`;
     this.set('boot', `${Number.isFinite(s.firstFrameMs) ? `first frame ${s.firstFrameMs.toFixed(0)} ms` : '…'} · ${t}`, s.firstFrameMs > 2000);
     this.paintSpark(b.frameMs);

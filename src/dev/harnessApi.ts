@@ -30,6 +30,8 @@ export interface FrameStats {
   area: number;
   radius: number;
   chunks: number;
+  lodMin: number;
+  lodMax: number;
   buildQueue: number;
   buildMs: number;
   /** Time from navigation start to the first presented frame, ms. */

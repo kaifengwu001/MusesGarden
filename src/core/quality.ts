@@ -38,7 +38,7 @@ export const TIERS: Readonly<Record<TierName, Tier>> = {
     flowerRadiusScale: 1,
     shadowMapSize: 2048,
     bloom: true,
-    terrainGrid: 33,
+    terrainGrid: 17,
     budgets: { drawCalls: 120, triangles: 1_500_000, grassInstances: 250_000, gpuMemoryMB: 256, jsMs: 4, frameMs: FRAME_60 },
   },
   low: {

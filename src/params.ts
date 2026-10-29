@@ -92,11 +92,11 @@ export const schema = {
     meadowRoll: num('roll', 'Meadow roll', 1.4, 0, 4, 0.01, 'terrain', { unit: 'm' }),
     channelCount: int('ch', 'Channels', 3, 0, 6, 'world'),
     pondCount: int('pd', 'Ponds', 3, 1, 6, 'world'),
-    mountainHeight: num('mh', 'Mountain height', 0.24, 0, 0.6, 0.005, 'terrain', { unit: '× R' }),
+    mountainHeight: num('mh', 'Mountain height', 0.18, 0, 0.6, 0.005, 'terrain', { unit: '× R' }),
     snowline: num('snow', 'Snowline', 0.62, 0, 1, 0.01, 'live'),
   },
   grass: {
-    density: num('gd', 'Density', 300, 20, 1200, 1, 'life', { unit: '/m²' }),
+    density: num('gd', 'Density', 240, 20, 1200, 1, 'life', { unit: '/m²' }),
     height: num('gh', 'Height', 0.42, 0.08, 1.2, 0.01, 'live', { unit: 'm' }),
     nearRadius: num('gr', 'Blade radius', 24, 6, 60, 0.5, 'life', { unit: 'm' }),
   },
@@ -109,7 +109,7 @@ export const schema = {
     driftScale: num('fdr', 'Drift scale', 14, 2, 60, 0.5, 'life', { unit: 'm' }),
   },
   water: {
-    channelWidth: num('cw', 'Channel width', 2.6, 0.8, 6, 0.05, 'live', { unit: 'm' }),
+    channelWidth: num('cw', 'Channel width', 3.2, 0.8, 6, 0.05, 'live', { unit: 'm' }),
     shoreWidth: num('sw', 'Shore band', 0.45, 0, 1.5, 0.01, 'live', { unit: 'm' }),
     depthTint: num('dt', 'Depth tint', 0.6, 0, 1, 0.01, 'live'),
   },
@@ -140,6 +140,7 @@ export const schema = {
   ui: {
     hud: bool('hud', 'Perf HUD', import.meta.env.DEV, 'ui'),
     postcard: bool('pc', 'Postcard', false, 'ui'),
+    debug: choice('dbg', 'Debug view', ['off', 'chunks', 'morph', 'normals'], 'off', 'ui'),
   },
 } as const;
 
