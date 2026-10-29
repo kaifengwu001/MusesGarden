@@ -97,12 +97,16 @@ async function boot(): Promise<void> {
   };
 
   const resize = (): void => {
+    // A hidden or collapsed host (iframe, side pane) reports 0×0; zero-size
+    // render targets are incomplete framebuffers, so never go below 1×1.
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
     const pixelRatio = quality.pixelRatio(window.devicePixelRatio || 1);
     renderer.setPixelRatio(pixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(width, height);
     renderer.getDrawingBufferSize(bufferSize);
     post.setSize(bufferSize.x, bufferSize.y, quality.samples(pixelRatio));
-    camera.aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
     globals.uResolution.value.copy(bufferSize);
     gpuMemory.set('canvas', bufferSize.x * bufferSize.y * 4 * 2); // front + back buffer
