@@ -69,18 +69,37 @@ export class CameraRig {
     return this.zoomTarget >= 0.5 ? 'wander' : 'overview';
   }
 
-  /** Drag by (dx, dy) pixels in a viewport of the given size. */
+  /**
+   * Drag by (dx, dy) pixels in a viewport of the given size. You hold the
+   * world: drag down and it comes toward you (you glide forward); drag
+   * sideways and the globe spins with your hand (Overview) or the scene turns
+   * with it (Wander: drag right, look left).
+   */
   drag(dx: number, dy: number, width: number, height: number): void {
     const t = this.tilt;
     const perPixel = (0.75 * (this.altitude + 8)) / (this.radius * height);
     this.axes(this.frameTarget);
-    // vertical: roll the planet about the right axis (glide forward / back)
-    this.rotate(this.right, -dy * perPixel);
+    // vertical: roll the planet about the right axis (glide forward / back), quicker down in the meadow
+    this.rotate(this.right, -dy * perPixel * (1 + 0.7 * t));
     // horizontal: spin the globe (Overview) blending into turning on the spot (Wander)
     if (t < 1) this.rotate(this.forward, -dx * perPixel * (1 - t));
-    if (t > 0) this.rotate(this.up, (-dx * Math.PI * 0.9 * t) / width);
+    if (t > 0) this.rotate(this.up, (dx * Math.PI * 0.9 * t) / width);
     this.glideT = 1;
     this.changed = true;
+  }
+
+  /** Walk the focus along the surface (keys): `ahead` and `aside` (to the right) in meters. */
+  move(ahead: number, aside: number): void {
+    this.axes(this.frameTarget);
+    if (ahead !== 0) this.rotate(this.right, -ahead / this.radius);
+    if (aside !== 0) this.rotate(this.forward, aside / this.radius);
+    this.glideT = 1;
+    this.changed = true;
+  }
+
+  /** How fast the keys walk you (m/s): a brisk run in the meadow, about a turn of the globe in seven seconds from orbit. */
+  get walkSpeed(): number {
+    return Math.min(1.1 * (this.altitude + 4.5), 0.9 * this.radius);
   }
 
   zoomBy(delta: number): void {
