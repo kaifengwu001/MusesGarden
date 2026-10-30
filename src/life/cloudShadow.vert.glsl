@@ -9,6 +9,8 @@
 //   RADIAL             straight down: the cloud cover seen from below, which
 //                      the lakes read from orbit (cloudsFromOrbit)
 // Nothing here depends on the camera, so the maps are fixed to the planet.
+// The shadows are drawn twice: the cube map, and a sharper window of one
+// face about where you stand (clouds.ts), its texels fixed to the planet.
 #include <meadow_noise>
 #include <meadow_cloud_lumps>
 #include <meadow_sun>
@@ -16,6 +18,7 @@ uniform highp sampler2D uCloudData;
 uniform vec4 uCloudLook; // -, -, clouds, -
 uniform float uRadius;
 uniform mat3 uCubeFace;  // this face's axes as columns: across, up, out (the GL cube-map convention)
+uniform vec3 uFaceWindow; // the part of the face drawn: centre (face units), 1 / half-width ((0, 0, 1): the whole face)
 
 varying vec2 vOff;        // across the splat, × the puff's radius
 flat varying float vRadius;
@@ -60,5 +63,5 @@ void main() {
   vec3 corner = centre + (a * vOff.x * stretch + b * vOff.y) * puff.w;
   // projected from the planet's centre onto this face: perspective-correct, so the splat keeps its shape
   vec3 f = corner * uCubeFace;
-  gl_Position = vec4(f.xy, 0.0, f.z);
+  gl_Position = vec4((f.xy - uFaceWindow.xy * f.z) * uFaceWindow.z, 0.0, f.z);
 }

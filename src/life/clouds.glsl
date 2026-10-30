@@ -26,6 +26,9 @@
 #define PUFFS 8
 uniform highp sampler2D uCloudData;
 uniform samplerCube uCloudShadowCube; // optical depth where the shadows reach the water table
+uniform sampler2D uCloudShadowLocal;  // the same, sharper, over a window of one face about the focus
+uniform mat3 uShadowLocalFace;        // that face's axes (columns: across, up, out)
+uniform vec4 uShadowWindow;           // the window's centre on the face, 1 / its half-width (face units), on (0 or 1)
 uniform samplerCube uCloudLayerCube;  // the cloud cover seen from below (optical depth)
 uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, -
 uniform vec4 uCloudOrbit; // weight of the view from orbit in the lakes (0..1), mean height of the clouds (m), -, -
@@ -269,9 +272,10 @@ vec4 cloudsFromOrbit(vec3 wp, vec3 r) {
   return vec4(mix(pal(ROW_CLOUD, 2), pal(ROW_CLOUD, 0), 0.65) * a, a);
 }
 
-// 0..1 cloud shadow at a point (planet space, m). The map holds where the
+// 0..1 cloud shadow at a point (planet space, m). The maps hold where the
 // shadows reach the water table, so a point above it looks up where its own
-// sun ray, carried on down, would reach it. edge: noise in [-1, 1] that
+// sun ray, carried on down, would reach it: in the sharper window about the
+// focus where it covers the point, otherwise in the cube map. edge: noise in [-1, 1] that
 // roughens the outline (the paint passes its brushstrokes, so shadow edges
 // look brushed).
 float cloudShadowAt(vec3 p, float edge) {
@@ -281,6 +285,15 @@ float cloudShadowAt(vec3 p, float edge) {
   float sinE = max(dot(sun, d), 0.2);
   vec3 q = normalize(d + (d * sinE - sun) * ((r - uRadius) / (sinE * uRadius)));
   float tau = textureLod(uCloudShadowCube, q, 0.0).r;
+  // near the focus, the sharper window (the two agree but for sharpness, and blend at its rim)
+  if (uShadowWindow.w > 0.0) {
+    vec3 f = q * uShadowLocalFace;
+    if (f.z > 0.0) {
+      vec2 xy = (f.xy / f.z - uShadowWindow.xy) * uShadowWindow.z;
+      float inside = 1.0 - smoothstep(0.82, 0.96, max(abs(xy.x), abs(xy.y)));
+      if (inside > 0.0) tau = mix(tau, textureLod(uCloudShadowLocal, xy * 0.5 + 0.5, 0.0).r, inside);
+    }
+  }
   float s = 1.0 - exp(-tau * uCloudLook.y * (1.0 + 0.45 * edge));
   return smoothstep(0.1, 0.5, s) * uCloudLook.x;
 }

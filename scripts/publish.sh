@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Publish a commit as the page for iteration N, kept for comparison: its own
-# Vercel project, garden-of-muse-iteration-N, whose production address
-# (https://garden-of-muse-iteration-N.vercel.app) is public. With --latest it
+# Vercel project, muses-garden-iteration-N, whose production address
+# (https://muses-garden-iteration-N.vercel.app) is public (iterations 4 and 5,
+# published as Garden of Muse, are garden-of-muse-iteration-N). With --latest it
 # also becomes the latest at the main project's production address. Needs the
 # Vercel CLI, logged in to the scope that owns the projects.
 #
@@ -53,7 +54,7 @@ deploy() {
   done
   echo "${address:-$url}"
 }
-echo "iteration $n: $(deploy "garden-of-muse-iteration-$n")"
+echo "iteration $n: $(deploy "muses-garden-iteration-$n")"
 if $latest; then
   echo "latest: $(deploy "$MAIN")"
 fi

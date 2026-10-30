@@ -1,9 +1,10 @@
 // A bird's shadow (birds.ts): a small soft disc where its shadow reaches the
 // water table, down the sun its place sees, splatted into the clouds' shadow
-// map a face at a time (cloudShadow.vert.glsl).
+// map a face (or the window of one) at a time (cloudShadow.vert.glsl).
 #include <meadow_sun>
 uniform float uRadius;
 uniform mat3 uCubeFace;
+uniform vec3 uFaceWindow;
 attribute vec3 aPos;
 attribute vec4 aWing; // -, -, -, size (× the mesh)
 varying vec2 vOff;
@@ -18,5 +19,5 @@ void main() {
   vec3 b = cross(g, a);
   vec3 corner = centre + (a * position.x + b * position.y) * 0.42 * aWing.w;
   vec3 f = corner * uCubeFace;
-  gl_Position = vec4(f.xy, 0.0, f.z);
+  gl_Position = vec4((f.xy - uFaceWindow.xy * f.z) * uFaceWindow.z, 0.0, f.z);
 }

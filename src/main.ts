@@ -180,7 +180,7 @@ async function boot(): Promise<void> {
     renderer.setPixelRatio(pixelRatio);
     renderer.setSize(width, height);
     renderer.getDrawingBufferSize(bufferSize);
-    post.setSize(bufferSize.x, bufferSize.y, quality.samples(pixelRatio));
+    post.setSize(bufferSize.x, bufferSize.y, quality.samples(window.devicePixelRatio || 1));
     globals.uResolution.value.copy(bufferSize);
     gpuMemory.set('canvas', bufferSize.x * bufferSize.y * 4 * 2); // front + back buffer
   };

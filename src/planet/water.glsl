@@ -255,8 +255,12 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
     mirror = house.rgb;
     bank.w = max(bank.w, 0.0);
   }
-  else {
-    // from near the ground the mirror pass; from far above the cloud cover; cross-faded on the way
+  else if (bank.w < 0.0) {
+    // the clouds only past the meadow: a bank or hill the mirrored ray meets
+    // stands in front of every cloud (they float above anything the meadow
+    // reaches), so the clouds show only where the ray clears the land.
+    // From near the ground the mirror pass; from far above the cloud cover;
+    // cross-faded on the way
     if (uCloudOrbit.x < 1.0) cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution);
     if (uCloudOrbit.x > 0.0) cl = mix(cl, cloudsFromOrbit(wp, r), uCloudOrbit.x);
   }

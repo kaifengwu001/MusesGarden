@@ -22,8 +22,6 @@ function bladeGeometry(): InstancedBufferGeometry {
   return g;
 }
 
-export const GRASS_FADE = { fullRadius: 0.35, keepAtEdge: 0.16 };
-
 /** Palette cells the blades use, in uGrassPal order (see grass.vert.glsl). */
 const GRASS_COLOURS: ReadonlyArray<readonly [number, number]> = [
   [ROW.GRASS, 0], // 0 light
@@ -37,6 +35,12 @@ const GRASS_COLOURS: ReadonlyArray<readonly [number, number]> = [
   [ROW.LIGHT, 3], // 8 rim
   [ROW.GRASS, 8], // 9 wind sheen
 ];
+
+/** How the blades thin toward the edge of their radius (a tier's grassFade). */
+export interface GrassFade {
+  readonly full: number;
+  readonly edge: number;
+}
 
 export class Grass {
   readonly mesh: Mesh;
@@ -61,7 +65,7 @@ export class Grass {
       uPageSize: { value: 2048 },
       uPages: { value: this.layer.pageTextures[0] },
       uGrass: { value: new Vector4(0.42, 0.05, 24, 0) },
-      uGrassFade: { value: new Vector4(8, GRASS_FADE.keepAtEdge, 0, 0) },
+      uGrassFade: { value: new Vector4(8, 0.16, 0, 0) },
       uGrassPal: { value: Array.from({ length: GRASS_COLOURS.length }, () => new Color()) },
     };
     // Blades bend and turn in the wind; draw both sides (no extra vertex work).
@@ -71,10 +75,10 @@ export class Grass {
     this.mesh.renderOrder = -20; // before the ground: early-z skips ground shading under blades
   }
 
-  /** Fraction of full density kept at distance d (must match the shader). */
-  static keep(d: number, near: number): number {
+  /** Fraction of full density kept at distance d (must match the shader): full out to `fade.full` of the radius, `fade.edge` kept at its edge. */
+  static keep(d: number, near: number, fade: GrassFade): number {
     if (near <= 0) return 0;
-    return 1 + (GRASS_FADE.keepAtEdge - 1) * smoothstep(near * GRASS_FADE.fullRadius, near, d);
+    return 1 + (fade.edge - 1) * smoothstep(near * fade.full, near, d);
   }
 
   /** Copy this frame's grass colours from the palette (cheaper than per-vertex fetches). */
@@ -82,12 +86,12 @@ export class Grass {
     GRASS_COLOURS.forEach(([row, col], k) => palette.get(row, col, this.uniforms.uGrassPal.value[k]));
   }
 
-  update(view: Omit<ScatterView, 'falloff'>, height: number): void {
-    const near = view.near;
-    this.layer.update({ ...view, falloff: (d) => Grass.keep(d, near) });
+  update(view: Omit<ScatterView, 'falloff'> & { fade: GrassFade }, height: number): void {
+    const { near, fade } = view;
+    this.layer.update({ ...view, falloff: (d) => Grass.keep(d, near, fade) });
     this.geometry.instanceCount = this.layer.instanceCount;
     this.uniforms.uGrass.value.set(height, 0.05, near, Math.log(view.density));
-    this.uniforms.uGrassFade.value.set(near * GRASS_FADE.fullRadius, GRASS_FADE.keepAtEdge, 0, 0);
+    this.uniforms.uGrassFade.value.set(near * fade.full, fade.edge, 0, 0);
     this.mesh.visible = near > 0.5 && view.density > 0;
   }
 }

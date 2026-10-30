@@ -16,10 +16,13 @@ import vertexShader from './butterfly.vert.glsl?raw';
 // the lattice changes only at an octave); those within REACH of
 // where you stand fly, fading out toward its edge and as you rise. Each one's
 // flight is closed-form in time: a slow, wandering loop about the height of
-// the flowers' tops to eye level, with a quick flutter, and every so often it settles on a
-// flower, its wings slowly fanning, before taking off again. Six kinds, by
-// their colours: whites, sulphurs, orange-tips, blues, tortoiseshells and
-// peacocks (patterns painted in butterfly.frag.glsl).
+// the flowers' tops to eye level, in bursts of a few slow, full wingbeats
+// (the body bobbing up on each downstroke and climbing through the burst)
+// and glides on wings held in a shallow V, sinking a little; and every so
+// often it settles on a flower, its wings slowly fanning, before taking off
+// again. Six kinds, by their colours: whites, sulphurs, orange-tips, blues,
+// tortoiseshells and peacocks (patterns painted in butterfly.frag.glsl), the
+// whites fluttering on longest, the tortoiseshells and peacocks gliding most.
 
 const MAX_BUTTERFLIES = 96;
 /** Lattice cell (m), reach of the flying set about the focus (m), share of cells holding one at full bloom. */
@@ -30,6 +33,17 @@ const SHARE = 0.8;
 const SEEN = [8, 13] as const;
 /** The kinds and how common each is (cumulative). */
 const KINDS = [0.3, 0.55, 0.7, 0.85, 0.95, 1] as const;
+/** Each kind's flight: wingbeat (Hz), beats in a burst, and the glide after it (s). */
+const FLIGHTS = [
+  { beat: 3.6, beats: [4, 6], glide: [0.3, 0.6] },
+  { beat: 3.4, beats: [3, 5], glide: [0.4, 0.8] },
+  { beat: 3.6, beats: [3, 5], glide: [0.3, 0.7] },
+  { beat: 4, beats: [3, 5], glide: [0.3, 0.6] },
+  { beat: 3, beats: [2, 3], glide: [0.7, 1.3] },
+  { beat: 2.8, beats: [2, 3], glide: [0.8, 1.5] },
+] as const;
+/** Wing angle (rad up from flat): the glide's shallow V, and a full beat's swing about it (to near closed above, below flat). */
+const WINGS = { glide: 0.42, swing: 0.88 } as const;
 /** The landing cycle: flying, settling, perched, taking off (shares of a cycle). */
 const PERCH = { settle: [0.72, 0.78], off: [0.95, 1] } as const;
 
@@ -218,33 +232,44 @@ export class Butterflies {
       this.t1.normalize();
       this.t2.crossVectors(home.dir, this.t1);
       const where = (t: number, out: Vector3): Vector3 => {
-        const x = (1.6 + 1.2 * r(1)) * Math.sin((0.28 + 0.2 * r(2)) * t + 6.3 * r(3)) + 0.7 * Math.sin((0.9 + 0.4 * r(4)) * t + 6.3 * r(5));
-        const y = (1.6 + 1.2 * r(6)) * Math.cos((0.24 + 0.2 * r(7)) * t + 6.3 * r(8)) + 0.7 * Math.sin((1.1 + 0.4 * r(9)) * t + 6.3 * r(12));
+        const x = (1.6 + 1.2 * r(1)) * Math.sin((0.22 + 0.16 * r(2)) * t + 6.3 * r(3)) + 0.5 * Math.sin((0.7 + 0.3 * r(4)) * t + 6.3 * r(5));
+        const y = (1.6 + 1.2 * r(6)) * Math.cos((0.2 + 0.16 * r(7)) * t + 6.3 * r(8)) + 0.5 * Math.sin((0.8 + 0.3 * r(9)) * t + 6.3 * r(12));
         out.copy(this.t1).multiplyScalar(x).addScaledVector(this.t2, y);
         return travel(home.dir, out.normalize(), Math.hypot(x, y) / R, out);
       };
       where(s - 0.1, this.a);
       where(s + 0.1, this.b);
       where(s, this.p);
-      // a quick flutter aside, then up above the grass (or down onto a flower)
-      const flutter = 0.08 * Math.sin(time * 3.7 + 9 * r(13)) * (1 - settled);
+      // a slow sway aside, then up above the grass (or down onto a flower)
+      const flutter = 0.06 * Math.sin(time * 2.2 + 9 * r(13)) * (1 - settled);
       this.a.subVectors(this.b, this.a);
       this.a.addScaledVector(this.p, -this.a.dot(this.p));
       if (this.a.lengthSq() < 1e-14) this.a.copy(this.t1);
       this.a.normalize();
       this.b.crossVectors(this.p, this.a);
-      const beat = (9 + 3 * r(14)) * Math.PI * 2;
-      const lift = 0.8 + 0.7 * (0.5 + 0.5 * Math.sin(0.5 * time + 6.3 * r(15))) + 0.035 * Math.sin(time * beat);
+      // the bursts: `beats` full beats (easing in and out over half a beat), then a glide
+      const kindRoll = r(17);
+      const kind = KINDS.findIndex((k) => kindRoll < k);
+      const fl = FLIGHTS[kind];
+      const hz = fl.beat * (0.92 + 0.16 * r(14));
+      const flapping = Math.round(fl.beats[0] + (fl.beats[1] - fl.beats[0]) * r(20)) / hz;
+      const burst = flapping + fl.glide[0] + (fl.glide[1] - fl.glide[0]) * r(21);
+      const tau = (((time + burst * r(22)) % burst) + burst) % burst;
+      const ease = 0.5 / hz;
+      const env = smoothstep(0, ease, tau) * (1 - smoothstep(flapping - ease, flapping, tau));
+      const stroke = env * Math.sin(Math.PI * 2 * hz * tau);
+      // the body bobs up on each downstroke, climbs through the burst and sinks a little gliding
+      const climb = (0.12 + 0.1 * r(23)) * ((tau < flapping ? smoothstep(0, flapping, tau) : 1 - smoothstep(flapping, burst, tau)) - 0.5);
+      const lift = 0.8 + 0.7 * (0.5 + 0.5 * Math.sin(0.5 * time + 6.3 * r(15))) - 0.03 * stroke + climb;
       const ground = Math.max(terrain.height0(this.p), 0);
       const above = lift + (0.34 - lift) * settled;
       this.p.multiplyScalar(R + ground + above).addScaledVector(this.b, flutter);
-      // wings: a quick full beat in flight, a slow fan when settled
-      const flap = (1 - settled) * (0.45 + 0.85 * Math.sin(time * beat)) + settled * (0.55 + 0.5 * Math.sin(time * 1.9 + 6.3 * r(16)));
-      const kindRoll = r(17);
-      const kind = KINDS.findIndex((k) => kindRoll < k);
+      // wings: slow full beats and held glides in flight, a slow fan when settled
+      const glide = WINGS.glide + 0.05 * (1 - env) * Math.sin(0.9 * time + 6.3 * r(24));
+      const flap = (1 - settled) * (glide + WINGS.swing * stroke) + settled * (0.55 + 0.5 * Math.sin(time * 1.3 + 6.3 * r(16)));
       pos.set([this.p.x, this.p.y, this.p.z], n * 3);
       heading.set([this.a.x, this.a.y, this.a.z, flap], n * 4);
-      look.set([kind, (1.25 + 0.4 * r(18)) * fade, 0.25 * (1 - settled), r(19)], n * 4);
+      look.set([kind, (1.25 + 0.4 * r(18)) * fade, (0.12 + 0.14 * env) * (1 - settled), r(19)], n * 4);
       n++;
     }
     this.count = n;

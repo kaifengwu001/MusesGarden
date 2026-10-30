@@ -2,7 +2,7 @@ import { Color, Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type W
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
-import type { Tier } from './core/quality';
+import { POOL_PAGES, type Tier } from './core/quality';
 import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
@@ -121,7 +121,7 @@ export class World {
     tier: Tier,
   ) {
     this.tier = tier;
-    this.bake = new TerrainBake(tier.name === 'high' ? 512 : 384);
+    this.bake = new TerrainBake(tier.maps.bake);
     this.terrain = new Terrain(generateLayout(store.values.world.seed));
     this.refreshFieldParams();
     this.look.uPalette.value = this.palette.texture;
@@ -138,13 +138,13 @@ export class World {
       uUserBloom: { value: this.userBlooms },
     };
     this.sky = new Sky();
-    this.field = new FieldMap(this.shared, tier.name === 'high' ? 256 : 192);
+    this.field = new FieldMap(this.shared, tier.maps.field);
     Object.assign(this.shared, this.field.uniforms);
     this.surface = new Surface(this.shared, tier.terrainGrid);
-    this.grass = new Grass(this.shared, tier.name === 'high' ? 760 : 260);
-    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 420 : 180);
+    this.grass = new Grass(this.shared, POOL_PAGES.grass);
+    this.flowers = new Flowers(this.shared, POOL_PAGES.flowers);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
-    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 1536 : 768, tier.name === 'high' ? 768 : 384);
+    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.butterflies = new Butterflies(this.shared);
@@ -400,13 +400,14 @@ export class World {
         density: p.grass.density * this.tier.grassDensityScale,
         focus: rig.up,
         near: grassNear,
+        fade: this.tier.grassFade,
         frustum: this.frustum,
         warp: this.warp,
         queue: this.queue,
       },
       p.grass.height,
     );
-    const flowerScale = this.tier.name === 'high' ? 1 : 0.6;
+    const flowerScale = this.tier.flowerDensityScale;
     this.flowers.classifier.set(L, R, this.fieldParams, this.fieldKey, p.flowers.density * flowerScale, flowerScale, {
       sizeVariation: p.flowers.sizeVariation,
       colourVariation: p.flowers.colourVariation,

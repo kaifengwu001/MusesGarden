@@ -33,6 +33,8 @@ Started from iteration 5 (b1209d0). This table fills in as the notes are done.
 | 9 | Grade: about 10 % more contrast, 5 % less brightness | |
 | 10 | Petals blown off by the wind are hard to find in places | |
 | 11 | The painted flower strokes seen from far out should follow the flower map and turn straight into the flowers on the way down | |
+| 12 | (added during the iteration) Cloud reflections are layered over the reflections of the grass and the ground | |
+| 13 | (added during the iteration) The name: Muse's Garden | |
 
 ## Iteration 5: the review notes
 

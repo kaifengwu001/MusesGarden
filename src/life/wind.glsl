@@ -4,9 +4,11 @@
 // a travelling pattern is sampled at the point rotated back along the flow.
 // Two travel at once: broad gust bands, and finer ripples that run ahead of
 // them. Together they lay the grass over in waves that catch the light: a
-// pale crest where a gust presses the grass flat, and just behind it (upwind)
-// a dark trough where the grass springs back up and shows its shaded depth,
-// so the meadow reads like a swell running across it.
+// pale crest where a gust presses the grass well over, and just behind it
+// (upwind) a dark trough where the grass springs back up past upright and
+// shows its shaded depth, so the meadow reads like a swell running across it.
+// The blades bow and straighten with the same waves the light shows, and
+// flutter harder in a stronger wind and where a gust is pressing.
 // Requires: noise, meadow (windDir), terrain (chordAngle, uRadius).
 #define MAX_GUST_RINGS 4
 uniform vec4 uGust;                       // time (s), -, gustiness, strength
@@ -67,10 +69,11 @@ vec3 windBase(vec3 dir, float gust, float trough, float ripple) {
   float strength = uWindVec.w;
   float t = uGust.x;
   float steady = strength * (0.18 + 0.42 * strength);
-  float gusts = strength * uGust.z * 0.75 * gust;
-  float ripples = strength * 0.22 * (ripple - 0.4) * (0.4 + gust);
-  // behind a crest the grass springs back, leaning a little upwind of its rest
-  float spring = -strength * uGust.z * 0.3 * trough;
+  // a crest lays the grass well over (about 35° more at the defaults), its ripples ruffle it
+  float gusts = strength * uGust.z * 2.0 * gust;
+  float ripples = strength * 0.3 * (ripple - 0.4) * (0.4 + gust);
+  // behind a crest the grass springs back, a little past upright
+  float spring = -strength * uGust.z * 0.6 * trough;
   vec3 bend = w * (steady + gusts + ripples + spring);
   // click gust rings push outward from where you clicked
   for (int i = 0; i < MAX_GUST_RINGS; i++) {
@@ -94,7 +97,11 @@ vec3 windPlant(vec3 dir, vec3 base, float phase, float stiffness) {
   vec3 w = windDir(dir);
   float strength = uWindVec.w;
   float t = uGust.x;
-  float flutter = 0.07 * (0.3 + strength) * sin(t * (2.1 + phase * 1.7) + phase * 40.0);
+  // quicker and wider in a stronger wind, and wider still where a gust presses
+  float push = clamp(dot(base, w), 0.0, 1.5);
+  float rate = 0.7 + 0.9 * strength;
+  float flutter = (0.03 + 0.08 * strength + 0.12 * push) * sin(t * (2.6 + phase * 2.2) * rate + phase * 40.0);
+  float wobble = (0.02 + 0.05 * strength + 0.06 * push) * sin(t * 1.7 * rate + phase * 23.0);
   vec3 side = cross(dir, w);
-  return (base + w * flutter + side * 0.05 * (0.3 + strength) * sin(t * 1.3 + phase * 23.0)) / stiffness;
+  return (base + w * flutter + side * wobble) / stiffness;
 }

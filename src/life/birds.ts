@@ -21,14 +21,15 @@ import shadowVertex from './birdShadow.vert.glsl?raw';
 
 // Small flocks of white birds over the meadow, like the egrets and gulls
 // that cross painted fields. Every flock belongs to the planet. Most travel:
-// each flies a great circle round the world at 6–8 m/s, the circle slowly
+// each flies a great circle round the world at 5–6 m/s, the circle slowly
 // swinging so that over the minutes its route crosses the whole meadow, with
 // a long, gentle meander from side to side. Two wheel in steady loops where
 // you are most likely to be: over the meadow just behind the cottage (above
 // its roof seen across the pond), and over the wetland's edge nearest it. They fly level, a few meters above the
 // highest ground (rising over the cottage), in loose V's or clusters, each
-// bird keeping its place with only a slight drift, beating steadily with now
-// and then a short glide, banking into the turns. Every pose is a
+// bird keeping its place with only a slight drift, with the slow, deep
+// beats of an egret (about two a second) and long glides on raised wings,
+// banking into the turns. Every pose is a
 // closed-form function of time, so a frozen frame is a pure function of
 // state. Each bird drops a small soft disc into the clouds' shadow map, so
 // its shadow falls on the meadow as theirs do.
@@ -45,7 +46,9 @@ const HALF_SPAN = 0.48;
  * nearer two and a half), flocks fly this far over them (m), and rise this
  * much more within this far of the cottage (m).
  */
-const FLIGHT = { hilltops: 0.62, height: [3.2, 5.2], cottage: 1.5, cottageRadius: 16 } as const;
+const FLIGHT = { hilltops: 0.5, height: [2.4, 3.8], cottage: 1.5, cottageRadius: 16 } as const;
+/** Wingbeat (Hz), its swing at the shoulder (rad), and the glides: their rhythm (s a cycle) and the sine level below which a bird glides. */
+const WINGBEAT = { hz: [1.7, 2.1], swing: 0.66, cycle: [8, 14], glide: [-0.5, -0.15] } as const;
 
 interface Bird {
   /** Place in the flock (m): ahead, to the side, up. */
@@ -187,7 +190,7 @@ export class Birds {
         name: 'bird shadows',
         vertexShader: shadowVertex,
         fragmentShader: shadowFragment,
-        uniforms: { uCubeFace: shared.uCubeFace, uRadius: shared.uRadius, uSunAngles: shared.uSunAngles },
+        uniforms: { uCubeFace: shared.uCubeFace, uFaceWindow: shared.uFaceWindow, uRadius: shared.uRadius, uSunAngles: shared.uSunAngles },
         side: DoubleSide,
         blending: AdditiveBlending,
         depthTest: false,
@@ -241,7 +244,7 @@ export class Birds {
     this.flocks = Array.from({ length: MAX_FLOCKS }, (_, f): Flock => {
       const axis = unitVector();
       const start = tangentToward(axis, unitVector(), new Vector3());
-      const speed = 6 + 2 * rand();
+      const speed = 4.8 + 1.4 * rand();
       const home = f === 0;
       const loopRadius = home ? 12 + 2 * rand() : 18 + 8 * rand();
       const v = rand() < 0.55; // a loose V, or a cluster
@@ -260,7 +263,7 @@ export class Birds {
         birds: Array.from({ length: n }, (_, k): Bird => {
           const rank = Math.ceil(k / 2);
           const side = k === 0 ? 0 : k % 2 === 1 ? 1 : -1;
-          const beat = 2.7 + 0.4 * rand();
+          const beat = WINGBEAT.hz[0] + (WINGBEAT.hz[1] - WINGBEAT.hz[0]) * rand();
           return {
             ahead: v ? -1.3 * rank + (rand() - 0.5) * 0.5 : (rand() - 0.5) * 5,
             side: v ? side * 1.5 * rank + (rand() - 0.5) * 0.5 : (rand() - 0.5) * 5,
@@ -268,7 +271,7 @@ export class Birds {
             phase: [rand() * 6.28, rand() * 6.28, rand() * 6.28],
             beat,
             beatPhase: rand() * Math.PI * 2,
-            glide: (Math.PI * 2) / (7 + 6 * rand()),
+            glide: (Math.PI * 2) / (WINGBEAT.cycle[0] + (WINGBEAT.cycle[1] - WINGBEAT.cycle[0]) * rand()),
             span: (0.88 + 0.3 * rand()) * HALF_SPAN,
           };
         }),
@@ -337,11 +340,11 @@ export class Birds {
         this.p.copy(this.centre).multiplyScalar(lift + wu).addScaledVector(this.ahead, wa).addScaledVector(this.side, ws);
         const up = this.p.length();
         this.fwd.copy(this.ahead).addScaledVector(this.p, -this.ahead.dot(this.p) / (up * up)).normalize();
-        // steady beats, now and then a short glide with the wings held a little raised
-        const flap = smoothstep(-0.85, -0.55, Math.sin(time * b.glide + b.phase[2]));
+        // slow, deep beats, and about a third of the time a glide with the wings held a little raised
+        const flap = smoothstep(WINGBEAT.glide[0], WINGBEAT.glide[1], Math.sin(time * b.glide + b.phase[2]));
         pos.set([this.p.x, this.p.y, this.p.z], n * 3);
         frame.set([this.fwd.x, this.fwd.y, this.fwd.z, bank], n * 4);
-        wing.set([(time * b.beat + b.beatPhase / (Math.PI * 2)) * Math.PI * 2, 0.62 * flap, 0.16 - 0.1 * flap, b.span / HALF_SPAN], n * 4);
+        wing.set([(time * b.beat + b.beatPhase / (Math.PI * 2)) * Math.PI * 2, WINGBEAT.swing * flap, 0.16 - 0.1 * flap, b.span / HALF_SPAN], n * 4);
         n++;
       }
     }

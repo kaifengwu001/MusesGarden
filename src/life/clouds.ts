@@ -103,6 +103,15 @@ const FACES = [
 /** Each face's axis (out), and the farthest a direction on the face lies from it (rad, to a corner). */
 const FACE_AXES = [new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1)];
 const FACE_REACH = Math.acos(1 / Math.sqrt(3));
+/**
+ * The sharper window of the shadows about the focus: its half-width (m)
+ * grows with the camera's height (from `min`, `perMeter` a meter of height,
+ * to `max`) in steps of `step` (the texels stay put between steps); it is
+ * drawn only while narrower than `share` of R (wider, and the cube map is
+ * nearly as sharp), on the face nearest the focus (kept until another leads
+ * by `margin`).
+ */
+const WINDOW = { min: 70, perMeter: 3, max: 320, step: 1.25, share: 0.6, margin: 0.08 } as const;
 /** Cloudiness over the threshold at which a cloud is fully grown. */
 const FADE = 0.07;
 /**
@@ -132,8 +141,13 @@ export interface CloudUniforms {
   uCloudLook: IUniform<Vector4>;
   /** Weight of the view from orbit in the lakes, mean height of the clouds (m), -, -. */
   uCloudOrbit: IUniform<Vector4>;
-  /** The cube face being drawn (the maps above, a face at a time). */
+  /** The sharper shadows over a window of one face about the focus, that face, and the window (centre, 1 / half-width, on). */
+  uCloudShadowLocal: IUniform<Texture | null>;
+  uShadowLocalFace: IUniform<Matrix3>;
+  uShadowWindow: IUniform<Vector4>;
+  /** The cube face being drawn (the maps above, a face at a time), and the part of it (centre, 1 / half-width). */
   uCubeFace: IUniform<Matrix3>;
+  uFaceWindow: IUniform<Vector3>;
   /** The puffs' lumps, baked once (cloudLumps.glsl). */
   uCloudLumps: IUniform<Texture | null>;
   /** The camera (clouds dissolve around it, in the mirror too). */
@@ -399,7 +413,11 @@ export function createCloudUniforms(): CloudUniforms {
     uCloudLayerCube: { value: null },
     uCloudLook: { value: new Vector4(0.7, 0.12, 0, 0) },
     uCloudOrbit: { value: new Vector4(0, 12, 0, 0) },
+    uCloudShadowLocal: { value: null },
+    uShadowLocalFace: { value: new Matrix3() },
+    uShadowWindow: { value: new Vector4(0, 0, 1, 0) },
     uCubeFace: { value: new Matrix3() },
+    uFaceWindow: { value: new Vector3(0, 0, 1) },
     uCloudLumps: { value: null },
     uCloudEye: { value: new Vector3() },
     uCloudMirror: { value: null },
@@ -431,6 +449,11 @@ export class Clouds {
   readonly mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
   private readonly shadowCube: WebGLCubeRenderTarget;
   private readonly layerCube: WebGLCubeRenderTarget;
+  /** The sharper window of the shadows (WINDOW), its face (-1: none yet) and size. */
+  private readonly shadowLocal: WebGLRenderTarget;
+  private localFace = -1;
+  private localLevel = Number.NaN;
+  private readonly localSize: number;
   private readonly shadowScene: Scene;
   private readonly layerScene: Scene;
   private readonly shadowGeometry: InstancedBufferGeometry;
@@ -468,13 +491,18 @@ export class Clouds {
 
   /**
    * `uniforms` must already be in `shared` (materials copy it when they are
-   * made). Sizes: a face of the shadow cube and of the cover-from-below cube.
+   * made). Sizes: a face of the shadow cube and of the cover-from-below
+   * cube, and the sharper window of the shadows.
    */
-  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number) {
+  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number, localSize: number) {
     const cube = (size: number): WebGLCubeRenderTarget =>
       new WebGLCubeRenderTarget(size, { type: HalfFloatType, format: RedFormat, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
     this.shadowCube = cube(shadowSize);
     this.layerCube = cube(layerSize);
+    this.localSize = localSize;
+    this.shadowLocal = new WebGLRenderTarget(localSize, localSize, { type: HalfFloatType, format: RedFormat, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
+    uniforms.uCloudShadowLocal.value = this.shadowLocal.texture;
+    gpuMemory.set('cloud shadow window', localSize * localSize * 2);
     gpuMemory.set('cloud shadow map', 6 * shadowSize * shadowSize * 2);
     gpuMemory.set('cloud cover map', 6 * layerSize * layerSize * 2);
     gpuMemory.set('cloud lumps', 6 * 64 * 64 * 4);
@@ -527,6 +555,7 @@ export class Clouds {
           uCloudLook: uniforms.uCloudLook,
           uCloudLumps: uniforms.uCloudLumps,
           uCubeFace: uniforms.uCubeFace,
+          uFaceWindow: uniforms.uFaceWindow,
           uTime: shared.uTime,
           uRadius: shared.uRadius,
           uSunAngles: shared.uSunAngles,
@@ -827,7 +856,10 @@ export class Clouds {
     const clearAlpha = renderer.getClearAlpha();
     renderer.setClearColor(0x000000, 0);
     const faces = FACE_AXES.map((axis) => Math.acos(clamp(axis.dot(focus), -1, 1)) < seen + FACE_REACH);
-    if (n > 0 || this.casters > 0) this.renderCube(renderer, this.shadowCube, this.shadowScene, faces);
+    if (n > 0 || this.casters > 0) {
+      this.renderCube(renderer, this.shadowCube, this.shadowScene, faces);
+      this.renderWindow(renderer, focus, radius, camera.position.length() - radius);
+    } else this.uniforms.uShadowWindow.value.w = 0;
     if (orbit > 0) this.renderCube(renderer, this.layerCube, this.layerScene, faces);
     if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearColor(this.clearColour, clearAlpha);
@@ -843,6 +875,46 @@ export class Clouds {
       renderer.clear(true, false, false);
       renderer.render(scene, this.shadowCamera);
     });
+  }
+
+  /**
+   * The sharper window of the shadows about the focus (WINDOW): a square of
+   * the face nearest the focus, its centre moved in whole texels and its
+   * size in steps, so its texels stay fixed to the planet as you move (they
+   * change only at a step in its size, or a change of face).
+   */
+  private renderWindow(renderer: WebGLRenderer, focus: Vector3, radius: number, height: number): void {
+    const window = this.uniforms.uShadowWindow.value;
+    // the face nearest the focus, kept until another leads
+    const lead = (f: number): number => FACE_AXES[f].dot(focus);
+    let face = this.localFace;
+    for (let f = 0; f < 6; f++) if (face < 0 || lead(f) > lead(face) + WINDOW.margin) face = f;
+    this.localFace = face;
+    const m = FACES[face].elements; // columns: across, up, out
+    const out = focus.x * m[6] + focus.y * m[7] + focus.z * m[8];
+    // half-width in face units: a meter of ground across the face's slant there is 1 / (R·out²) of it
+    const want = clamp(WINDOW.min + WINDOW.perMeter * height, WINDOW.min, WINDOW.max) / (radius * out * out);
+    const base = WINDOW.min / radius;
+    const level = Math.log(want / base) / Math.log(WINDOW.step);
+    if (!Number.isFinite(this.localLevel) || Math.abs(level - this.localLevel) > 0.6) this.localLevel = Math.round(level);
+    const h = base * WINDOW.step ** this.localLevel;
+    if (h * radius * out * out > WINDOW.share * radius) {
+      window.w = 0;
+      return;
+    }
+    const fx = (focus.x * m[0] + focus.y * m[1] + focus.z * m[2]) / out;
+    const fy = (focus.x * m[3] + focus.y * m[4] + focus.z * m[5]) / out;
+    const texel = (2 * h) / this.localSize;
+    const cx = Math.round(fx / texel) * texel;
+    const cy = Math.round(fy / texel) * texel;
+    window.set(cx, cy, 1 / h, 1);
+    this.uniforms.uShadowLocalFace.value.copy(FACES[face]);
+    this.uniforms.uCubeFace.value.copy(FACES[face]);
+    this.uniforms.uFaceWindow.value.set(cx, cy, 1 / h);
+    renderer.setRenderTarget(this.shadowLocal);
+    renderer.clear(true, false, false);
+    renderer.render(this.shadowScene, this.shadowCamera);
+    this.uniforms.uFaceWindow.value.set(0, 0, 1);
   }
 
   /**

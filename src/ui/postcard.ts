@@ -28,7 +28,7 @@ export class Postcard {
   constructor(root: HTMLElement, private readonly store: ParamStore) {
     this.frame = el('div', 'postcard-frame');
     const card = el('figure', 'postcard-card');
-    this.place = el('p', 'postcard-place', 'Garden of Muse');
+    this.place = el('p', 'postcard-place', 'Muse’s Garden');
     this.detail = el('p', 'postcard-detail');
     const close = el('button', 'postcard-close', 'Close');
     close.addEventListener('click', () => store.set('ui.postcard', false));

@@ -121,7 +121,7 @@ export const schema = {
     strength: num('ws', 'Strength', 0.45, 0, 1, 0.01, 'live'),
     direction: num('wd', 'Direction', 64, 0, 360, 1, 'live', { unit: '°' }),
     gustiness: num('wg', 'Gustiness', 0.55, 0, 1, 0.01, 'live'),
-    sheen: num('wsh', 'Sheen', 0.85, 0, 1, 0.01, 'live'),
+    sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
     coverage: num('cc', 'Coverage', 0.45, 0, 1, 0.01, 'life'),
@@ -140,7 +140,7 @@ export const schema = {
     grain: num('gn', 'Paper grain', 0.02, 0, 0.1, 0.001, 'live'),
   },
   quality: {
-    tier: choice('q', 'Tier', ['auto', 'low', 'high'], 'auto', 'quality'),
+    tier: choice('q', 'Tier', ['auto', 'low', 'medium', 'high'], 'auto', 'quality'),
   },
   ui: {
     hud: bool('hud', 'Perf HUD', import.meta.env.DEV, 'ui'),
