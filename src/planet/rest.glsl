@@ -11,3 +11,12 @@ float birthLnRadius(float lnThreshold, float lnDensity) {
 float growthFade(float lnBirthRadius) {
   return clamp((uGrowthBand.x - lnBirthRadius) * uGrowthBand.z, 0.0, 1.0);
 }
+
+// A blade's or a flower's presence in the near field: while the planet grows
+// it fades in across the band (growthFade); otherwise it is there or not, so
+// as you move over the meadow nothing grows in or shrinks out (the thinning
+// toward the near field's edge drops plants one by one, at full size).
+float presence(float lnBirthRadius) {
+  float v = growthFade(lnBirthRadius);
+  return uGrowthBand.x - uGrowthBand.y > 0.016 ? v : step(0.5, v);
+}

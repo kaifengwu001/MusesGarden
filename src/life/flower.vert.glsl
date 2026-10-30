@@ -45,14 +45,15 @@ void main() {
   int species = int(uFlowers.z + 0.5);
   float d = chordAngle(dir, uFieldCentre.xyz) * uRadius;
   float keep = mix(1.0, uFlowerFade.y, smoothstep(uFlowerFade.x, uFlowers.x, d));
-  float grow = growthFade(0.5 * (aBirth.x - uFlowers.y - log(keep)));
+  float grow = presence(0.5 * (aBirth.x - uFlowers.y - log(keep)));
   vec4 meadow;
   vec4 wind;
   float inside;
   vec4 f = fieldSample(dir, meadow, wind, inside);
   float mask = smoothstep(0.1, 0.45, f.y) * (1.0 - smoothstep(0.2, 0.6, f.z)) * inside;
+  // at the near field's edge the flowers thin out (each at a random distance of its own), at full size
   float edge = 1.0 - smoothstep(uFlowers.x * 0.8, uFlowers.x, d);
-  float vis = grow * mask * edge;
+  float vis = grow * mask * step(rnd(seed, 9.0), edge);
   if (vis <= 0.002) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;

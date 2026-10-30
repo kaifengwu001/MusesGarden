@@ -6,8 +6,8 @@
 //               meadow behind it, so it widens and narrows along the shore
 //   the cottage its terrace, pier, walls, roof and chimney as plain solids
 //               (homeSegment), painted in a few broad strokes (homeColour);
-//               found by the same march as the banks (mirrorAlong), so
-//               whichever is nearer shows
+//               stepped along the same ray as the banks (homeAlong after
+//               bankAlong), so whichever is nearer shows
 //   the clouds  the same puffs the sky shows, drawn from the mirrored camera
 //               (cloudsInMirror, clouds.glsl); from orbit, the cloud cover
 //               seen from below (cloudsFromOrbit)
@@ -85,9 +85,9 @@ float underPier(vec3 c) {
   return step(-8.2, c.x) * step(c.x, -3.4) * step(1.83, c.z) * step(c.z, 5.63) * step(abs(c.y), 6.0);
 }
 
-// How far along a mirrored ray (view space) it enters the homestead's
-// bounding sphere (1e9: it never does); most rays never come near it.
-float homeEnter(vec3 wp, vec3 r) {
+// Where a mirrored ray (view space) is inside the homestead's bounding
+// sphere: from x to y along it (x = 1e9: never); most rays never come near.
+vec2 homeSpan(vec3 wp, vec3 r) {
   vec3 U = uCottage.xyz;
   vec3 Z = uCottageB.xyz;
   vec3 c = normalize(U * uRadius - cross(U, Z) * 2.0 + Z * 1.5) * (uRadius + uCottage.w + uBank.x + 2.5);
@@ -95,9 +95,9 @@ float homeEnter(vec3 wp, vec3 r) {
   float rad = 10.5 + abs(uWarpK) * (2.0 * length(warpTangent(c)) * 10.5 + 110.0);
   float b = dot(o, r);
   float disc = b * b - dot(o, o) + rad * rad;
-  if (disc < 0.0) return 1e9;
+  if (disc < 0.0) return vec2(1e9);
   float s = sqrt(disc);
-  return -b + s < 0.0 ? 1e9 : max(-b - s, 0.0);
+  return -b + s < 0.0 ? vec2(1e9) : vec2(max(-b - s, 0.0), -b + s);
 }
 
 // Where a segment a → a + d first enters a box (lo, hi): its fraction along
@@ -139,6 +139,10 @@ void clipHalf(float p, float q, vec3 m, inout float s0, inout float s1, inout ve
 vec2 homeSegment(vec3 a, vec3 d, out vec3 n) {
   vec2 best = vec2(2.0, 0.0);
   vec3 m;
+  // most steps pass nowhere near the house: one box round all of it first
+  vec3 lo = min(a, a + d);
+  vec3 hi = max(a, a + d);
+  if (any(lessThan(hi, vec3(-8.2, -3.0, -3.08))) || any(greaterThan(lo, vec3(4.75, HOME_TOP, 5.72)))) return best;
   float s = segmentBox(a, d, vec3(-4.4, -3.0, 2.33), vec3(4.1, 0.72, 4.73), m);
   if (s < best.x) { best = vec2(s, 1.0); n = m; }
   s = segmentBox(a, d, vec3(-8.2, -3.0, 1.83), vec3(-3.4, 0.72, 5.63), m);
@@ -165,68 +169,74 @@ vec2 homeSegment(vec3 a, vec3 d, out vec3 n) {
   return best;
 }
 
-// Along a mirrored ray (view space) from the water outward, the first thing
-// it meets, the meadow or (near it) the cottage, found by the same steps so
-// the nearer always wins: each step is unwarped back to the planet, so the
-// tiny-planet warp and the planet's curve bend the ray as they bend the view.
-// The meadow is sampled at each step (and the crossing refined); the cottage
-// is met exactly, on the straight segment between two steps. shore: distance
-// to the nearest shore (m): no land is nearer, so the march starts most of
-// the way there (or where the ray comes near the cottage), and is skipped
-// when the ray will have climbed above everything by then. rise: the ray's
-// climb per meter. Returns the hit (planet space) and what it is: 0 nothing,
-// 1 the meadow, 2 + the id the cottage (then c: the point in its local
-// meters, n: the face's normal).
-vec4 mirrorAlong(vec3 wp, vec3 r, float shore, float rise, out vec3 c, out vec3 n) {
-  float enter = homeEnter(wp, r);
-  bool home = enter < 1e8;
-  float top = home ? max(uWaterSky.w, uCottage.w + uBank.x + HOME_TOP) : uWaterSky.w;
-  float t = home ? min(0.7 * shore, enter) : 0.7 * shore;
-  if (t * rise > top) return vec4(0.0);
-  float dt = (home ? 0.05 : 0.08) + 0.05 * t;
-  vec3 a = home ? homeLocal(unwarpPosition(wp + r * t)) : vec3(0.0);
-  for (int i = 0; i < 18; i++) {
+// The meadow along a mirrored ray (view space), from the water outward: how
+// far along the ray it meets the meadow (its ground, bank lip and grass),
+// refined, or 1e9. Each step is unwarped back to the planet, so the tiny-
+// planet warp and the planet's curve bend the ray as they bend the view.
+// shore: distance to the nearest shore (m): no land is nearer, so the march
+// starts most of the way there, and is skipped when the ray will have
+// climbed above the highest meadow by the time it gets there. rise: the
+// ray's climb per meter.
+float bankAlong(vec3 wp, vec3 r, float shore, float rise) {
+  float t = 0.7 * shore;
+  if (t * rise > uWaterSky.w) return 1e9;
+  float dt = 0.08 + 0.05 * t;
+  for (int i = 0; i < 13; i++) {
     float tn = t + dt;
     vec3 q = unwarpPosition(wp + r * tn);
-    if (length(q) - uRadius > top) break; // above anything there is
-    if (home) {
-      vec3 b = homeLocal(q);
-      vec3 m;
-      vec2 hit = homeSegment(a, b - a, m);
-      if (hit.x <= 1.0) {
-        // the cottage, unless the meadow comes first on the way to it
-        float th = mix(t, tn, hit.x);
-        vec3 qh = unwarpPosition(wp + r * th);
-        float lh = length(qh);
-        if (lh - uRadius >= bankTop(qh / lh)) {
-          c = mix(a, b, hit.x);
-          n = m;
-          return vec4(qh, 1.0 + hit.y);
-        }
-        tn = th;
-        q = qh;
-      }
-      a = b;
-    }
-    float l = length(q);
-    if (l - uRadius < bankTop(q / l)) {
+    float len = length(q);
+    if (len - uRadius > uWaterSky.w) break; // above anything the meadow reaches
+    if (len - uRadius < bankTop(q / len)) {
       // refine the crossing between t and tn
       float lo = t;
       float hi = tn;
       for (int k = 0; k < 3; k++) {
         float mid = 0.5 * (lo + hi);
-        vec3 mq = unwarpPosition(wp + r * mid);
-        float ml = length(mq);
-        if (ml - uRadius < bankTop(mq / ml)) hi = mid;
+        vec3 m = unwarpPosition(wp + r * mid);
+        float ml = length(m);
+        if (ml - uRadius < bankTop(m / ml)) hi = mid;
         else lo = mid;
       }
-      return vec4(unwarpPosition(wp + r * hi), 1.0);
+      return hi;
     }
     t = tn;
-    // (near the cottage the steps stay short enough that the segments follow the ray's curve)
-    dt = home ? min(dt * 1.4, 2.0) : dt * 1.4;
+    dt *= 1.4;
   }
-  return vec4(0.0);
+  return 1e9;
+}
+
+// The cottage along the same mirrored ray, before `until` (where the meadow
+// was met): stepped through the warped view as the meadow is, and met exactly
+// on the straight segment between two steps, so no step passes through an
+// edge of it. Only rays that come near it look. Returns how far along the
+// ray (1e9: not before `until`) and which stand-in (the ids above); c: the
+// point in its local meters, n: the face's normal. With bankAlong this finds
+// whichever is nearer: the pier hides the ground under it, a bank in front
+// hides the house.
+vec2 homeAlong(vec3 wp, vec3 r, float until, out vec3 c, out vec3 n) {
+  vec2 span = homeSpan(wp, r);
+  float end = min(until, span.y);
+  if (span.x >= end) return vec2(1e9, 0.0);
+  float t = span.x;
+  float dt = 0.05 + 0.05 * t;
+  vec3 a = homeLocal(unwarpPosition(wp + r * t));
+  for (int i = 0; i < 13; i++) {
+    float tn = min(t + dt, end);
+    vec3 b = homeLocal(unwarpPosition(wp + r * tn));
+    vec3 m;
+    vec2 hit = homeSegment(a, b - a, m);
+    if (hit.x <= 1.0) {
+      c = mix(a, b, hit.x);
+      n = m;
+      return vec2(mix(t, tn, hit.x), hit.y);
+    }
+    if (tn >= end) break;
+    a = b;
+    t = tn;
+    // (short enough that the segments follow the ray's curve)
+    dt = min(dt * 1.4, 3.0);
+  }
+  return vec2(1e9, 0.0);
 }
 
 // The cottage as the water shows it at a point c (local meters) on one of
@@ -319,15 +329,19 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec3 r = normalize(r0 + along * stroke * 0.06 * (0.2 + gust) * uWindVec.w);
   float rise = dot(r, n);
   vec3 mirror = waterSky(rise);
+  // the meadow, then the cottage (if it comes first): what the mirrored ray meets nearest
+  float tBank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec3 hc;
   vec3 hn;
-  vec4 hit = mirrorAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)), hc, hn);
+  vec2 home = homeAlong(wp, r, tBank, hc, hn);
+  float met = home.x < 1e8 ? 2.0 : tBank < 1e8 ? 1.0 : 0.0;
   vec4 cl = vec4(0.0);
-  if (hit.w > 1.5) {
-    mirror = homeColour(hc, hit.w - 1.0, hn);
-  } else if (hit.w > 0.5) {
-    float hl = length(hit.xyz);
-    mirror = bankColour(hit.xyz / hl, hl - uRadius);
+  if (met > 1.5) {
+    mirror = homeColour(hc, home.y, hn);
+  } else if (met > 0.5) {
+    vec3 q = unwarpPosition(wp + r * tBank);
+    float ql = length(q);
+    mirror = bankColour(q / ql, ql - uRadius);
   } else {
     // the clouds only past the meadow and the cottage: whatever the mirrored
     // ray meets stands in front of every cloud (they float above it all), so
@@ -340,7 +354,7 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   float reflectance = mix(0.45, 0.95, pow(1.0 - facing, 1.6)) * (1.0 - 0.25 * gust) * uWaterSky.x;
   vec3 col = mix(body, mirror, reflectance);
   // banks and the cottage stay solid, and clouds bright, in the mirror even looking down into the water
-  if (hit.w > 0.5) col = mix(col, mirror, 0.5 * uWaterSky.x);
+  if (met > 0.5) col = mix(col, mirror, 0.5 * uWaterSky.x);
   col = mix(col, cl.rgb / max(cl.a, 1e-3) * vec3(0.92, 0.96, 1.0), cl.a * 0.9 * uWaterSky.x);
 
   // wind ruffles: pale streaks along the wind, stronger in the gusts
@@ -362,7 +376,7 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   float glint = mix(glintOctave(dir, f0, along, uTerrainSeed + 130u + lv), glintOctave(dir, f1, along, uTerrainSeed + 131u + lv), t);
   vec3 hv = normalize(uSunDir + v);
   float toward = pow(clamp(dot(n, hv), 0.0, 1.0), 20.0);
-  col += pal(ROW_WATER, 3) * glint * (0.25 + 1.6 * toward) * (0.4 + 0.6 * gust) * uWaterLook.z * (1.0 - cloud) * (1.0 - pad) * (1.0 - step(0.5, hit.w));
+  col += pal(ROW_WATER, 3) * glint * (0.25 + 1.6 * toward) * (0.4 + 0.6 * gust) * uWaterLook.z * (1.0 - cloud) * (1.0 - pad) * (1.0 - step(0.5, met));
 
   // clicks ripple out
   col = mix(col, pal(ROW_WATER, 3), clamp(rippleRing(dir), 0.0, 1.0) * 0.5);

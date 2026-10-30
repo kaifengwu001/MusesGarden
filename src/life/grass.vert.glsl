@@ -36,15 +36,16 @@ void main() {
   // Thinning by rank toward the edge: a point stays only while it would be
   // born at the thinned density, so the far field is a blue-noise subset.
   float keep = mix(1.0, uGrassFade.y, smoothstep(uGrassFade.x, uGrass.z, d));
-  float grow = growthFade(0.5 * (aBirth.x - uGrass.w - log(keep)));
+  float grow = presence(0.5 * (aBirth.x - uGrass.w - log(keep)));
   vec4 meadow;
   vec4 wind;
   float inside;
   vec4 f = fieldSample(dir, meadow, wind, inside);
   // right to the water's edge: the blades along a shore fringe the bank
   float mask = smoothstep(-0.03, 0.15, f.y) * (1.0 - smoothstep(0.25, 0.65, f.z)) * inside;
+  // at the near field's edge the blades thin out (each at a random distance of its own), at full size
   float edge = 1.0 - smoothstep(uGrass.z * 0.78, uGrass.z, d);
-  float vis = grow * mask * edge;
+  float vis = grow * mask * step(rnd(aBirth.y, 9.0), edge);
   if (vis <= 0.002) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;

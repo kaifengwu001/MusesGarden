@@ -6,6 +6,9 @@ import { clamp, damp, lerp, smoothstep } from '../core/math';
 //   z = 0  Overview: the whole planet, looking at its centre, FOV 35°
 //   z = 1  Wander:   a glide 1.6 m above the grass, looking at the horizon, FOV 55°
 //
+// The wheel and the keys settle on four stops: the two ends, a bird's-eye
+// view 10 m up and eye level (STOPS_M), when you stop zooming near one.
+//
 // The camera rides a surface frame (up = local vertical at the focus F,
 // forward, right) stored as a quaternion, so there are no poles. Altitude is
 // log-interpolated; tilt toward the horizon, FOV and the tiny-planet warp
@@ -14,6 +17,12 @@ import { clamp, damp, lerp, smoothstep } from '../core/math';
 export const EYE_HEIGHT = 1.6;
 const OVERVIEW_ALTITUDE = 4.2; // × R
 const MAX_TILT = (82 * Math.PI) / 180;
+/** The zoom (z) over which the camera tilts from looking straight down to the horizon: early, so a bird's-eye view still sees far. */
+const TILT_RAMP = [0.15, 0.9] as const;
+/** Stops between the ends (altitude over the ground, m): a bird's-eye view, and eye level. */
+const STOPS_M = [10, 2.8] as const;
+/** Zoom settles on a stop when it is left this near one (in z), after this long without zooming (s). */
+const SNAP = { reach: 0.045, after: 0.18 } as const;
 
 const X = new Vector3(1, 0, 0);
 const Y = new Vector3(0, 1, 0);
@@ -54,12 +63,14 @@ export class CameraRig {
    */
   private pitch = 0;
   private pitchTarget = 0;
+  /** Seconds since the last zoom by the wheel or the keys (Infinity: settled). */
+  private zoomIdle = Number.POSITIVE_INFINITY;
 
   /** Altitude (m), tilt from straight down (rad) and vertical field of view (°) at zoom z. */
   framing(z: number): { altitude: number; tilt: number; fov: number } {
     const top = this.overviewAltitude * this.radius;
     const t = smoothstep(0.3, 1, z);
-    return { altitude: top * Math.pow(EYE_HEIGHT / top, z), tilt: MAX_TILT * t, fov: lerp(35, 55, t) };
+    return { altitude: top * Math.pow(EYE_HEIGHT / top, z), tilt: MAX_TILT * smoothstep(TILT_RAMP[0], TILT_RAMP[1], z), fov: lerp(35, 55, t) };
   }
 
   /** The zoom at which the camera stands `altitude` m over the ground. */
@@ -136,7 +147,22 @@ export class CameraRig {
   zoomBy(delta: number): void {
     this.pitchTarget = 0;
     this.zoomTarget = clamp(this.zoomTarget + delta, 0, 1);
+    this.zoomIdle = 0;
     this.changed = true;
+  }
+
+  /** Settle the zoom on the nearest stop, if it was left near one (SNAP). */
+  private snapZoom(): void {
+    let best = this.zoomTarget;
+    let gap: number = SNAP.reach;
+    for (const stop of [0, 1, ...STOPS_M.map((m) => this.zoomForAltitude(m))]) {
+      const g = Math.abs(stop - this.zoomTarget);
+      if (g < gap) {
+        gap = g;
+        best = stop;
+      }
+    }
+    this.zoomTarget = best;
   }
 
   setZoom(z: number, immediate = false): void {
@@ -145,7 +171,6 @@ export class CameraRig {
     this.changed = true;
   }
 
-  /** Glide the focus to a direction on the planet over ~1.6 s. */
   /** Look up by `angle` (rad) from the zoom's tilt until the next move (named views). */
   lookUp(angle: number, immediate = true): void {
     this.pitchTarget = angle;
@@ -153,6 +178,7 @@ export class CameraRig {
     this.changed = true;
   }
 
+  /** Glide the focus to a direction on the planet over ~1.6 s. */
   glideTo(dir: Vector3): void {
     this.pitchTarget = 0;
     this.axes(this.frameTarget);
@@ -191,6 +217,10 @@ export class CameraRig {
       this.frameTarget.slerpQuaternions(this.glideStart, this.glideEnd, e);
     }
     this.frame.slerp(this.frameTarget, damp(realDt, 0.09)).normalize();
+    if (this.zoomIdle < SNAP.after) {
+      this.zoomIdle += realDt;
+      if (this.zoomIdle >= SNAP.after) this.snapZoom();
+    }
     this.zoom += (this.zoomTarget - this.zoom) * damp(realDt, 0.16);
     if (Math.abs(this.zoomTarget - this.zoom) < 1e-5) this.zoom = this.zoomTarget;
     this.axes(this.frame);
@@ -200,7 +230,7 @@ export class CameraRig {
     this.focus.copy(this.up).multiplyScalar(radius + this.ground);
 
     this.pitch += (this.pitchTarget - this.pitch) * damp(realDt, 0.25);
-    const tilt = Math.min(MAX_TILT * this.tilt + this.pitch, Math.PI / 2 - 0.02);
+    const tilt = Math.min(MAX_TILT * smoothstep(TILT_RAMP[0], TILT_RAMP[1], this.zoom) + this.pitch, Math.PI / 2 - 0.02);
     const alt = this.altitude;
     const cam = this.camera;
     cam.position.copy(this.up).multiplyScalar(radius + this.ground + alt);
@@ -230,6 +260,10 @@ export class CameraRig {
   settle(): void {
     this.glideT = 1;
     this.frame.copy(this.frameTarget);
+    if (this.zoomIdle < SNAP.after) {
+      this.snapZoom();
+      this.zoomIdle = Number.POSITIVE_INFINITY;
+    }
     this.zoom = this.zoomTarget;
     this.ground = Number.NaN;
   }

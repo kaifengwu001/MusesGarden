@@ -7,14 +7,15 @@
 //            green-grey damp at the foot, a darker stroke down each corner
 //   roof     each course of tiles grey-brown, a few warm or blue; its foot a
 //            pale lip catching the light with a line of shadow under the
-//            next course above it; moss gathering yellow-green in the lower
+//            next course above it; moss gathering olive and yellow-green over much of it, thickest in the lower
 //            courses and in patches higher up; pale beaded capping tiles on
 //            the hips and the ridge; the tiles' ends along the eaves
 //   wood     a warm plank door with iron straps, dark frames, a tan bench
 //            and chair
 //   glass    small panes: the meadow's yellow-green below, the sky above
 //   landing  the terrace, pier and steps plastered like the walls, their
-//            tops pale; damp at the waterline, a stone arch in the pier
+//            tops pale; damp and moss creeping up from the water and the
+//            meadow in patches and along the joints, a stone arch in the pier
 // The shadows are painted too, each from the sun the cottage sees: the
 // eaves' shadow down the top of each wall (as deep as the sun is steep on
 // that wall, an olive grey), walls turned from the sun an olive grey with
@@ -140,6 +141,9 @@ void main() {
       base *= 1.0 - 0.045 * st.x * smoothstep(-0.2, 0.4, brush + 0.2) - 0.035 * (st.y - 0.5);
       // damp at the foot, a darker stroke down each corner
       base = mix(base, pal(ROW_STONE, 15), (1.0 - smoothstep(0.05, 0.42, height + 0.12 * brush)) * 0.6);
+      // moss creeping up from the ground in patches, along the stones' joints first
+      float wallMoss = (1.0 - smoothstep(0.1, 0.7 + 0.35 * gnoise(vec3(uv.x * 0.8, 0.0, 6.6), 962u), height)) * smoothstep(-0.1, 0.35, gnoise(vec3(uv * 1.9, 3.9), 963u) + 0.4 * st.x);
+      base = mix(base, mix(pal(ROW_ROOF, 7), pal(ROW_STONE, 6), 0.4), wallMoss * 0.55);
       base *= 1.0 - 0.09 * (1.0 - smoothstep(0.0, 0.16, vPaint.y + 0.03 * brush));
     }
     // the shadows: the eaves', the bench's (on the front), the reveals' own
@@ -168,7 +172,7 @@ void main() {
     float mn = gnoise(vec3(uv.x * 0.9, k * 0.55 + f * 0.25, 3.3), 971u);
     float mf = gnoise(vec3(uv.x * 3.1, (k + f) * 1.9, 5.1), 972u);
     float mx = gnoise(vec3(uv.x * 7.0, (k + f) * 4.5, 6.4), 973u);
-    float moss = smoothstep(0.3, 0.62, (1.0 - smoothstep(0.8, 7.0, k)) * 0.45 + 0.42 * mn + 0.2 * mf + 0.12 * mx - 0.12);
+    float moss = smoothstep(0.26, 0.6, (1.0 - smoothstep(1.0, 9.0, k)) * 0.5 + 0.44 * mn + 0.22 * mf + 0.12 * mx - 0.04);
     // moss: olive, flecked yellow where it catches the light
     vec3 mossCol = mix(pal(ROW_ROOF, 7), pal(ROW_ROOF, 6), smoothstep(-0.2, 0.6, mf + 0.4 * (1.0 - f)) * 0.75);
     mossCol = mix(mossCol, pal(ROW_ROOF, 6) * 1.12, smoothstep(0.35, 0.55, mx) * 0.5);
@@ -184,7 +188,7 @@ void main() {
       c *= mix(1.05, 0.88, f);
       float joint = 1.0 - smoothstep(0.0, 0.04 + fwidth(tx), min(fract(tx), 1.0 - fract(tx)));
       c *= 1.0 - 0.18 * joint * (1.0 - moss * 0.7);
-      base = mix(c, mossCol, moss * (0.55 + 0.2 * smoothstep(-0.2, 0.4, mx)));
+      base = mix(c, mossCol, moss * (0.68 + 0.22 * smoothstep(-0.2, 0.4, mx)));
       float under = smoothstep(0.6, 0.88, f);
       base *= 1.0 - 0.62 * under;
       // small pale dabs along the course's foot
@@ -211,7 +215,7 @@ void main() {
       float lapped = smoothstep(0.7, 1.0, uv.x) * step(-0.5, vPaint.x);
       float side = 1.0 - smoothstep(0.0, 0.3, min(around, 1.0 - around));
       base = mix(pal(ROW_ROOF, 8), pal(ROW_ROOF, 14), smoothstep(0.3, 0.6, 1.0 - abs(around - 0.5) * 2.0) * 0.6);
-      base = mix(base, mossCol, smoothstep(0.35, 0.6, mn + 0.3 * (1.0 - smoothstep(0.0, 6.0, k))) * 0.55);
+      base = mix(base, mossCol, smoothstep(0.3, 0.58, mn + 0.35 * (1.0 - smoothstep(0.0, 8.0, k))) * 0.65);
       base *= (1.0 - 0.45 * lapped) * (1.0 - 0.25 * side);
       if (vPaint.x < -0.5) base = pal(ROW_ROOF, 14) * 0.95;
       col = painted(base, sunlight(n, sun, cloud), vec3(0.66, 0.7, 0.8));
@@ -264,7 +268,16 @@ void main() {
     float brush = gnoise(vec3(p * vec2(2.4, 1.2), 8.7), 957u);
     vec2 st = courses(p, top ? 0.9 : 0.3, top ? 1.1 : 0.6);
     base = mix(base, pal(ROW_STONE, 5), st.x * (top ? 0.12 : 0.18) * smoothstep(-0.4, 0.4, brush));
-    if (!top) base = mix(base, pal(ROW_STONE, 6) * 0.85, (1.0 - smoothstep(-1.15, -0.75, vLocal.y + 0.12 * brush)) * 0.65);
+    if (!top) {
+      base = mix(base, pal(ROW_STONE, 6) * 0.85, (1.0 - smoothstep(-1.15, -0.75, vLocal.y + 0.12 * brush)) * 0.65);
+      // moss: thick near the water and the meadow, climbing in patches and along the joints, here and there to the top
+      float mn = gnoise(vec3(p * vec2(0.9, 1.4), 2.7), 964u);
+      float mf = gnoise(vec3(p * 3.2, 5.9), 965u);
+      float rise = 1.0 - smoothstep(-1.2, 0.2 + 0.45 * mn, vLocal.y);
+      float moss = smoothstep(0.15, 0.55, rise * 0.8 + 0.45 * mn + 0.25 * mf + 0.3 * st.x - 0.25);
+      vec3 mossCol = mix(pal(ROW_ROOF, 7), pal(ROW_ROOF, 6), smoothstep(-0.2, 0.7, mf) * 0.6);
+      base = mix(base, mix(mossCol, pal(ROW_STONE, 6), 0.2), moss * 0.7);
+    }
     if (!top && vLocalNormal.z > 0.7 && abs(vLocal.z - PIER_FRONT) < 0.05) {
       // the ring of stones round the tunnel's mouth
       vec2 q = (vLocal.xy - ARCH.xy) / ARCH.zw;
