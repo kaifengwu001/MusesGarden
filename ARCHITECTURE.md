@@ -113,6 +113,14 @@ There is one water table, h = 0. A lake is wherever the ground dips under it,
 so every shore is a contour of the hills: water lies in the hollows between
 them, and the hilltops stand out of it as islands.
 
+- **Twirls:** every meadow field (wetlands, relief, lushness, colour variant,
+  flower drifts and colonies) is sampled at a twirled direction: four
+  rotations about random centres (two broad, two tight), each by an angle
+  that falls off as exp(−(θ/ρ)²) from its centre, applied in turn, like a
+  marbler's comb. Lakes, islands, hills and drifts curve and spiral instead
+  of lying about as plain noise. It lives in direction space, so nothing
+  slides as R grows, and the CPU fields and the GPU bake share it, so picking
+  and placement stay exact.
 - **Wetlands:** a macro field in direction space (two domain-warped octaves)
   says where the meadow sinks toward the table. Its threshold comes from the
   field's own sampled distribution, so the `wetlands` share is what you get,
@@ -252,7 +260,7 @@ The original plan, kept for reference:
 ## Tiny-planet warp
 
 `warp.glsl` is included by every vertex shader: terrain and water, grass,
-flowers, props, outlines, clouds and the shadow pass. `warp.ts` mirrors it
+flowers, props, birds, clouds and the shadow pass. `warp.ts` mirrors it
 exactly on the CPU.
 
     t  = (P − F) − ((P − F)·U) U                  tangent offset from the focus F
@@ -285,7 +293,7 @@ click is what you see.
   warp and comparing the water's share per row (and per cell) with the still's
   layout (16 × 9, measured once), then the best few refined in place, heading
   and zoom, with the clouds and the flowers in view counted. The terrain
-  stage is cached per world; a search takes about 0.7 s the first time.
+  stage is cached per world; a search takes about 1 s the first time.
 
 ## Look
 
@@ -299,9 +307,16 @@ click is what you see.
 - **Toon lighting:** `toon.glsl` has three bands with 0.08-wide soft
   transitions, a warm sun, a cool sky ambient from above, and a sun-side rim on
   grass and flower heads.
-- **Outlines:** on the cottage and props only (inverted hull, #3E3A36,
-  1 to 1.5 px equivalent). Terrain, grass, flowers, water and clouds keep soft
-  edges.
+- **No outlines:** everything keeps soft, painted edges, the cottage too.
+- **The cottage** is painted in the shader, never textured: limewashed walls
+  a warm white whose stones show only where the wash has worn (each face
+  vertex carries its distance to the nearest edge and corner, so quoins,
+  jambs, the plinth and a few flaked patches show stone), damp at the foot,
+  ivy up one corner, the eaves' shadow painted along the top; a hipped roof
+  bent out of true (sagging ridge, a drooping eave, dipping slopes) with
+  mossy slates in wandering courses; a flagstone landing with a painted arch
+  at the waterline. Soft light (warm sun, cool lavender shade), and the
+  clouds' shadows pass over it. The building is an original design.
 - **Aerial perspective:** distance pales the meadow toward a grey-green haze,
   thicker as the camera comes down into the meadow (the far meadow reads like
   a painted distance); the planet's limb from orbit dissolves into the sky's
@@ -313,27 +328,42 @@ click is what you see.
   ray mirrored off the level surface, nearest first: the banks (marched over
   the terrain plus its bank lip and grass; this is the dark band under every
   shore, as tall as the bank and the meadow behind it, so it widens and
-  narrows along the shore), the clouds (the same puffs, cloudsAlong), and the
-  sky painted as the lakes' cobalt. Looking down into the water shows more of
+  narrows along the shore), the clouds (read from the clouds' mirror pass at
+  the pixel itself, nudged by the wind's ruffle), and the sky painted as the
+  lakes' cobalt. Looking down into the water shows more of
   the navy body, looking across it more of the mirror (Fresnel-like). Wind
   ruffles streak the mirror; glints swell and fade on their own slow sine and
   never shrink below a couple of pixels; lily pads are off by default. The
   march starts near the shore distance and is skipped where the mirrored ray
   would climb above the highest meadow before reaching land. No refraction.
-- **Clouds and their light (天光云影):** low cumulus, bases about 5 m above the
-  meadow, gathered in banks of one to four, drifting with the wind. Each cloud
-  is eight soft spheres heaped over a flat base, written once a frame into a
-  data texture (clouds.ts, clouds.glsl). The same puffs draw the cloud (one
-  billboard each, fitted to its puffs, traced per pixel: optical depth with
-  soft rims and a soft base, billowy edges, normals blended by each puff's
-  share, a silver rim against the sun, and the depth of its front written so
-  hills hide it), cast its shadow (puffs splatted into a sun-space map of
-  optical depth over the whole planet, one fetch per ground pixel and per
-  field-map texel) and show in the lakes (traced along the mirrored ray). So a
-  cloud, its shadow and its reflection always agree. Clouds keep a human scale
-  as the planet grows: count ∝ R, size ∝ √R, the next cloud fading in. A cloud
-  the camera is in thins away. Shadows have brushed edges (the paint's stroke
-  noise), darken the light band and cool the colour.
+- **Clouds and their light (天光云影):** low cumulus, bases about 5 m above
+  the meadow, drifting with the wind. Each cloud is eight puffs heaped over a
+  flat base, written once a frame into a data texture (clouds.ts,
+  clouds.glsl). The puffs are solid spheres with lumpy, cauliflower outlines
+  (billows baked once into a 64² cube map, four patterns turned per puff),
+  antialiased to a pixel; the heap is lit lobe by lobe, with soft creases
+  where lobes meet, each puff's shadow from the others toward the sun, a
+  white top, blue-grey shade and a little meadow green at the base. The same
+  puffs draw the cloud (a billboard each, fitted to the puffs' clipped screen
+  bounds, traced per pixel, its front's depth written so hills hide it), cast
+  its shadow (puffs splatted with the same lumpy outline into a 2048² sun-
+  space map of optical depth) and show in the lakes (the billboards drawn
+  again from the mirrored camera), so a cloud, its shadow and its reflection
+  always agree. **Where** they are is weather: a flow over the sphere (four
+  or five vortices spiralling in or out, and banded east–west winds) traced
+  into streamlines about a cloud's width apart (Jobard and Lefer, the spacing
+  wandering); clouds are strung along them, long axis with the flow, and a
+  cloudiness field smoothed along each line picks the stretches that hold
+  cloud: broad patches, long streaks, cloudlets at the fringes, clear sky
+  between. Coverage sets the share. As R grows the lines stay put, cloud size
+  grows with √R and the clouds along a line slide closer, so streaks stay
+  whole. A cloud near the camera erodes from its edges. Shadows are a deep,
+  cool green with brushed edges.
+- **Birds:** small flocks of white birds fly loose figure-of-eight circuits a
+  few meters up (one over the cottage's pond, a few over the wetlands, one
+  just ahead of the view), banking into turns and beating two-panel wings in
+  bursts between glides. Every pose is closed-form in time. Each casts a
+  small soft shadow through the clouds' shadow map.
 - **Wind:** broad gust bands and quicker ripples travel with the flow (both
   advected exactly by rotating about the wind axis). Where they lay the grass
   over, blades and paint take on a pale sheen, brightest in sun; between the
@@ -343,8 +373,11 @@ click is what you see.
 ## Frame
 
 The main pass renders into a linear HDR target, with MSAA only where it is
-affordable (see Budgets), in this order: sky → terrain and water → props and
-outlines → grass → flowers → clouds → particles. Post then draws to the screen.
+affordable (see Budgets), in this order: sky → terrain and water → props →
+grass → flowers → birds → clouds → particles. Before it, each frame, the
+clouds render their sun-space shadow map (with the birds' discs) and their
+mirror (the billboards from the camera mirrored in the water, at a third of
+the resolution). Post then draws to the screen.
 
 One shared set of uniform objects (time, wind, warp, R, R_lag, sun, palette) is
 referenced by every material, so each frame writes each value once.
@@ -425,8 +458,10 @@ so any view can be shared.
         flowers.ts/.glsl   drift, colony and clump classifier, four species pools (meshes in flowerMeshes.ts), bloom, flutter
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
-        clouds.ts/.glsl    low cumulus: puffs in a data texture, billboards, sun-space shadow map, mirror tracing
-        props.ts/.glsl     cottage, landing, rail, bench; outlines (inverted hull)
+        clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow map, mirror pass
+        cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
+        birds.ts/.glsl     flocks of white birds, wing hinges, shadow discs
+        props.ts/.glsl     cottage, landing, rail, bench, built as painted faces (edge and corner distances per vertex)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim

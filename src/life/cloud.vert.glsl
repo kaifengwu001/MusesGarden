@@ -1,7 +1,7 @@
 // One billboard per cloud (clouds.ts), drawn farthest first: a quad just in
-// front of the camera, fitted to the cloud's puffs on screen. The cloud's
-// frame and its puffs go to the fragment shader as flat varyings, read and
-// warped once here, and the fragment shader traces them (clouds.glsl).
+// front of the camera, fitted to the cloud's puffs on screen. The fragment
+// shader reads the cloud again by its row (a handful of cached texels beats
+// a dozen flat varyings per pixel) and traces it (clouds.glsl).
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -9,12 +9,7 @@
 #include <meadow_clouds>
 
 varying vec3 vPoint; // on the billboard, view space
-flat varying vec4 vCloudA; // centre (view space), bounding radius
-flat varying vec4 vCloudB; // base point (view space), noise seed
-flat varying vec4 vCloudC; // base normal (view space), size (m)
-flat varying vec4 vPuffs[PUFFS];
-flat varying vec4 vShadowA; // puffShadows()
-flat varying vec4 vShadowB;
+flat varying int vRow;
 
 // The extent along one screen axis (a / -z) of a sphere in camera space,
 // centre c = (a, z), clipped to z < nearZ (after Mara and McGuire, 2D
@@ -51,11 +46,9 @@ void main() {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
-  vCloudA = vec4(cl.centre, cl.radius);
-  vCloudB = vec4(cl.basePoint, float(cl.seed));
-  vCloudC = vec4(cl.baseNormal, cl.size);
-  loadPuffs(row, vPuffs);
-  puffShadows(vPuffs, cl.size, vShadowA, vShadowB);
+  vRow = row;
+  vec4 puffs[PUFFS];
+  loadPuffs(row, puffs);
 
   // the puffs' extent on screen: each puff's exact projected bounds, clipped
   // to the near plane (sphereBounds), clamped to the view, so a cloud above
@@ -66,7 +59,7 @@ void main() {
   vec2 lo = vec2(1e9);
   vec2 hi = vec2(-1e9);
   for (int k = 0; k < PUFFS; k++) {
-    vec4 puff = vPuffs[k];
+    vec4 puff = puffs[k];
     if (puff.w <= 0.0) continue;
     float r = puff.w * (1.0 + 1.5 * CLOUD_LUMPS);
     vec3 c = rot * (puff.xyz - cameraPosition);

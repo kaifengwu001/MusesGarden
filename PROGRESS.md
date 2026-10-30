@@ -4,6 +4,137 @@ The plan and the growth model are in [ARCHITECTURE.md](ARCHITECTURE.md). This
 file tracks what is done, what is known to be wrong or missing, and what comes
 next.
 
+## Iteration 4: the six review notes
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Clouds soft and hazy rather than sculpted; closer to the references without a big perf loss | Clouds are solid now. Each puff is a sphere with a lumpy, cauliflower outline (the lumps baked once into a small cube map and shared by the cloud, its shadow and its reflection), antialiased to a pixel. The heap is lit lobe by lobe: soft creases where lobes meet, shading from the puffs between each lobe and the sun, a white top, blue-grey shade, and a little meadow green at the base. A cloud near the camera erodes from its edges instead of fading into fog. |
+| 2 | From above, clouds and lakes look like generic noise: longer streaks, larger patches, swirly and natural | **Clouds** follow weather: a flow over the sphere (four or five vortices spiralling in or out, plus banded east–west winds) is traced into streamlines spaced about a cloud's width apart, and clouds are strung along them, long axis with the flow. A cloudiness field, smoothed along each line, decides which stretches hold cloud: broad patches where neighbouring lines are all cloudy, single streaks trailing off, small cloudlets at the fringes, clear sky between. Streaks swell and thin, and their spacing wanders. **Lakes:** every meadow field (wetlands, hills, lushness, flower drifts) is sampled through four twirls, the direction turned about a centre by an angle that fades with distance, so lakes, islands and drifts curve and swirl. |
+| 3 | Cloud shadows deeper and a little sharper | Default strength 0.72 → 0.88, a deeper and cooler green under them (reds drop, greens and blues hold), a steeper edge, and a 2048² shadow map on high (R16F, the same memory as the old 1024² RGBA). The shadow has the cloud's lumpy outline. Flowers under a cloud now dim with the grass while keeping their hue. |
+| 4 | Pinks slightly darker and redder; more whites and yellows; bunched more | Pink cups regraded toward rose; species weights pink 0.21, white stars 0.35, yellow buttons 0.33, blue 0.11. Clumps now cover 30 % of a drift (was 40 %) at about three times the drift's density, with barer grass between (floor 6 %). |
+| 5 | Small flocks of white birds | Flocks of five to eleven white birds fly loose figure-of-eight circuits a few meters up: one over the cottage's pond, a few over the wetlands, and one that keeps you company about a point just ahead of the view. Two-panel wings beat in bursts between glides; birds bank into the turns; each casts a small soft shadow through the clouds' shadow map. |
+| 6 | The hut jumps out: a painted warm-white stone wall, stone shapes near the edges only, a slightly crooked roof | The cottage is repainted, not rebuilt as the film's: solid limewashed walls (no separate bricks) where stones show only at the corners (quoins), around the openings, along the plinth and in a few flaked patches, with damp at the foot and ivy climbing one corner; walls lean and belly a little. The roof's ridge sags, one eave droops, the slopes dip, and the slates wander in mossy courses. The landing is flagstones and coursed stone with a painted arch at the waterline. Soft painted light (warm sun, lavender shade), cloud shadows pass over it, and the black outlines are gone. |
+
+Checkpoint images: [docs/checkpoints/iteration-4](docs/checkpoints/iteration-4/).
+
+### How it is built (summary)
+
+- **Clouds:** up to 512 clouds of eight puffs, written each frame into one
+  data texture (13 texels a cloud: header, puffs, and each puff's
+  self-shadow, traced on the CPU). Billboards are fitted to each puff's exact
+  clipped screen bounds (Mara and McGuire), so a cloud above the frame costs
+  nothing; clouds the warped ground hides are culled on the CPU by testing
+  sightlines against the water table. The fragment shader reads its cloud by
+  row and traces it in two light loops (no per-pixel arrays: register
+  pressure was the cost).
+- **The lakes' mirror:** the cloud billboards are drawn a second time, at a
+  third of the resolution, from the camera mirrored in the water's level
+  plane under the focus; a point of that plane lands on its own pixel from
+  either camera, so the water looks its reflection up at its own pixel,
+  shifted by the wind's ruffle. Replaces tracing eight clouds per water
+  pixel (the lakes view went from 23 to 16 ms).
+- **Twirls:** shared by the CPU fields and the GPU bake, so picking and
+  placement stay exact (the CPU/GPU parity test passes unchanged).
+- **Birds:** closed-form in time (frozen frames stay deterministic), one
+  instanced mesh with wing hinges in the vertex shader, and a disc each in
+  the clouds' shadow map.
+- **Cottage:** procedural faces built on a 0.2 m grid; every vertex carries
+  its distance to the nearest edge and corner, its height and an ivy weight,
+  and the shader paints from those.
+
+### Squint test (the vista against the still, mean ΔE76 per cell)
+
+| | Overall | Far meadow and clouds | Lake and islands | Near meadow |
+|---|---|---|---|---|
+| Iteration 2 (lakes view) | 30.8 | 35.4 | 32.7 | 24.2 |
+| Iteration 3 (vista) | 24.5 | 15.5 | 34.2 | 23.8 |
+| Iteration 4 (vista) | 22.3 | 16.0 | 23.6 | 27.2 |
+
+The goal is 14; the test fails above 26. The lake band improved most (more
+water across the middle, and reflections). The near-meadow third got worse:
+this vista's foreground is a strip of grass and white stars, where the
+still's is thick with mixed flowers. The vista search now treats clouds as a
+bonus rather than a penalty (there are many more of them) and refines 28
+stands instead of 16.
+
+## Measured (iteration 4)
+
+Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
+waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
+(same script and viewports).
+
+| Viewport | ms / frame | Grass in visible pages | Flowers in visible pages |
+|---|---|---|---|
+| 1440×900 at DPR 2, Overview | 8.0 (4.3) | – | – |
+| 1440×900 at DPR 2, Wander, R 128 m | 8.7 (5.2) | 155k | 30k |
+| 1440×900 at DPR 2, Wander, R 400 m | 6.7 (10.8) | 143k | 32k |
+| 1440×900 at DPR 2, Vista | 16.1 (12.6) | 152k | 36k |
+| 1440×900 at DPR 2, lakes view | 16.1 (17.9) | 172k | 15k |
+| 1440×900 at DPR 2, cottage view | 16.5 (–) | 163k | 21k |
+| 390×844 @1.5 (phone, low tier), Overview | 2.0 (1.6) | – | – |
+| 390×844 @1.5 (phone, low tier), Wander | 2.2 (1.8) | 36k | 15k |
+| 390×844 @1.5 (phone, low tier), Vista | 4.2 (3.8) | 40k | 15k |
+
+- **What the clouds cost:** about 2–3 ms at this size wherever big clouds
+  fill the sky (Overview, the default Wander, which now faces a cumulus up
+  close, and the cottage view), and less than iteration 3 where the old
+  per-pixel mirror was expensive (the lakes view). The default Wander and
+  the Vista are different views from iteration 3's: the terrain changed.
+- **GPU memory:** 151 MB on high at 2560×1440 (149 MB before), 184 MB at
+  2880×1800; 45 MB on a phone (low tier).
+- **Vista search:** about 1 s the first time on a world (0.7 s before: the
+  twirls make each field sample dearer, and more stands are refined); 0.5 s
+  after.
+
+## Trades (quality for performance)
+
+- **Cloud reflections** come from a third-resolution render from the
+  mirrored camera, treating the lakes as one level plane under the focus:
+  far lakes, where the planet curves away, reflect a little out of place
+  (the ripples hide it), and there are none from orbit.
+- **Cloud self-shadowing** is one value per puff (traced on the CPU from the
+  puff's sunward side), not per pixel: a lobe is lit or shaded as a whole,
+  softened by its own normal.
+- **Cloud lumps** are four patterns in a 64² cube map, turned per puff, not
+  noise per pixel.
+- **Clouds near the camera** erode away within about 20 m; you never stand
+  under one.
+- **Bird shadows** are soft discs in the 2048² cloud shadow map (about four
+  texels at R 128), not their wing shapes.
+- **The cottage** is painted per pixel with a few noise lookups; no shadow
+  map: its eaves' shadow on the walls is painted, its shadow on the ground
+  is the analytic footprint as before.
+- Carried over: the 13-step bank march; quick bake while growing; 256² field
+  maps; MSAA only below DPR 1.75; grass 180 blades/m² within 22 m.
+
+## Known issues
+
+- **Composition:** the vista finds water across the middle, but its
+  foreground is often plain grass, and its cloud seldom sits where the
+  still's does. Squint 22.3 against a goal of 14.
+- **Overview costs 8 ms** at 2880×1800 (was 4.3): about ninety clouds in view,
+  each traced per pixel.
+- **Mirror approximations:** reflections of clouds close above far lakes can
+  slide a little against their clouds; mirrored cloud order is the camera's,
+  not the mirror's, so two overlapping reflected clouds can composite in the
+  wrong order.
+- **Birds** are plain from below at a distance (a white shape with raised
+  wings); they read best from above, as in the reference.
+- **The growth-scrub invariant** (build slice under 2.6 ms) failed in 3 of
+  12 runs during this iteration (2.6 to 4.1 ms), and passed 3 of 3 at
+  iteration 3's commit: it sits close to its limit and is sensitive to load.
+  The last three full runs passed.
+- **Carried over:** the warp's flat band on the way down; triangle figure,
+  pools after a scrub, tier probe, LOD-ring test.
+
+## Next
+
+1. Composition: a vista whose foreground is thick with flowers and whose cloud
+   sits upper right (or a few vistas to choose from).
+2. Cheaper clouds from orbit (a lower-detail path for small, distant clouds).
+3. Birds that take off from the meadow when you come close.
+4. Then dawn and golden hour, graded the same way.
+
 ## Iteration 3: the six review notes
 
 | # | Note | What changed |
@@ -52,7 +183,7 @@ still's lake runs the full width of the frame with islands, and this
 planet's wetlands give ponds and channels at that scale; the still's big
 cloud sits in frame, while the vista's clouds mostly show as reflections.
 
-## Measured (iteration 3)
+### Measured (iteration 3)
 
 Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
 waiting for the GPU. Iteration 2 in brackets.
@@ -75,7 +206,7 @@ waiting for the GPU. Iteration 2 in brackets.
 - **Vista search:** about 0.7 s the first time on a world (cached after).
 - Wander got cheaper mostly because the default stand sees less water.
 
-## Trades (quality for performance)
+### Trades (iteration 3)
 
 - **Cloud mirror:** only the ten clouds nearest the camera reflect, without
   their billows (the ripples soften them anyway).
@@ -91,7 +222,7 @@ waiting for the GPU. Iteration 2 in brackets.
 - Carried over: quick bake while growing; 256² field maps; MSAA only below
   DPR 1.75; grass 180 blades/m² within 22 m; no shadow-map pass for the cottage.
 
-## Known issues
+### Known issues (iteration 3)
 
 - **Water-heavy views cost more:** the lakes view is 17.9 ms at 1440p on an
   M1 Pro (13.2 ms before); an M1 Air would need the render scale lowered.
@@ -105,7 +236,7 @@ waiting for the GPU. Iteration 2 in brackets.
 - **Triangle figure, pools after a scrub, tier probe, LOD-ring test:** as in
   iteration 2.
 
-## Next
+### Next (iteration 3)
 
 1. Composition: wider lakes with islands at vista scale (or a vista that
    frames from higher up), and clouds that sit in frame.
@@ -257,4 +388,4 @@ Every state lives in the URL hash, including the camera pose (`pose=`) and froze
 | `npm run test:gpu` | Playwright browser invariants (determinism, parity, scrub, budgets) |
 | `npm run shots` | 15 screenshots into `/shots` (`MEADOW_GL=swiftshader` for the CPU rasterizer) |
 | `npm run squint` | the vista against `reference/howls-lake.webp` (kept out of git), shrunk and blurred: mean ΔE, and `shots/squint.png` |
-| `npm run build` / `npm run build:single` | `dist/`, or one self-contained `dist-single/index.html` (729 kB) |
+| `npm run build` / `npm run build:single` | `dist/`, or one self-contained `dist-single/index.html` (774 kB) |

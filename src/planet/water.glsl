@@ -4,13 +4,14 @@
 //               terrain (with its bank lip and its grass). This is the dark
 //               band under every shore: as tall as the bank and the meadow
 //               behind it, so it widens and narrows along the shore
-//   the clouds  the same puffs the sky shows (cloudsAlong, clouds.glsl)
+//   the clouds  the same puffs the sky shows, drawn from the mirrored camera
+//               (cloudsInMirror, clouds.glsl)
 //   the sky     painted as the deep cobalt of the lakes, paler toward the horizon
 // Looking down into the water you see more of its navy body, looking across
 // it more of the mirror. Gusts ruffle the mirror into streaks; a few glints
 // swell and fade (never pop); clicks ripple. No refraction.
 // Requires: toon, meadow (windDir, patternOctaves), terrain (height0, uBank),
-// warp (unwarpPosition), clouds (cloudsAlong), uPixelAngle.
+// warp (unwarpPosition), clouds (cloudsInMirror), uResolution.
 
 #define MAX_RIPPLES 6
 uniform vec4 uWaterLook;             // -, depth tint, glints, time (s)
@@ -133,14 +134,14 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec3 body = mix(pal(ROW_WATER, 1), pal(ROW_WATER, 5), smoothstep(0.5, 0.05, depth) * 0.3 * uWaterLook.y);
 
   // the mirror, ruffled along the wind where it gusts
-  vec3 r = reflect(-v, n);
-  r = normalize(r + along * stroke * 0.06 * (0.2 + gust) * uWindVec.w);
+  vec3 r0 = reflect(-v, n);
+  vec3 r = normalize(r0 + along * stroke * 0.06 * (0.2 + gust) * uWindVec.w);
   float rise = dot(r, n);
   vec3 mirror = waterSky(rise);
   vec4 bank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec4 cl = vec4(0.0);
   if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
-  else cl = cloudsAlong(wp, r, uPixelAngle);
+  else cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution);
   float reflectance = mix(0.45, 0.95, pow(1.0 - facing, 1.6)) * (1.0 - 0.25 * gust) * uWaterSky.x;
   vec3 col = mix(body, mirror, reflectance);
   // banks stay dark and clouds stay bright in the mirror even looking down into the water

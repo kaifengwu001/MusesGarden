@@ -4,6 +4,7 @@
 #include <meadow_noise>
 uniform float uRadius;
 uniform float uPixelAngle;
+uniform vec2 uResolution;
 #include <meadow_terrain>
 #include <meadow_toon>
 #include <meadow_fog>

@@ -1,6 +1,7 @@
 // A cloud: its puffs traced along the view ray (clouds.glsl), a little paler
 // and bluer far off. Writes the depth of its front, so hills in front of it
-// hide it.
+// hide it. With MIRROR_PASS, the same cloud seen from the camera mirrored in
+// the water, shaded as the lakes paint their reflections.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -12,24 +13,23 @@ uniform mat4 uProjection; // projectionMatrix is not declared in fragment shader
 uniform float uPixelAngle;
 
 varying vec3 vPoint;
-flat varying vec4 vCloudA;
-flat varying vec4 vCloudB;
-flat varying vec4 vCloudC;
-flat varying vec4 vPuffs[PUFFS];
-flat varying vec4 vShadowA;
-flat varying vec4 vShadowB;
+flat varying int vRow;
 
 void main() {
   vec3 rd = normalize(vPoint - cameraPosition);
-  Cloud cl;
-  cl.centre = vCloudA.xyz;
-  cl.radius = vCloudA.w;
-  cl.basePoint = vCloudB.xyz;
-  cl.seed = uint(vCloudB.w);
-  cl.baseNormal = vCloudC.xyz;
-  cl.size = vCloudC.w;
+  Cloud cl = loadCloud(vRow);
+  vec4 puffs[PUFFS];
+  loadPuffs(vRow, puffs);
+  vec4 shadowA;
+  vec4 shadowB;
+  loadShadows(vRow, shadowA, shadowB);
   float t;
-  vec4 c = shadeCloud(cl, vPuffs, vShadowA, vShadowB, cameraPosition, rd, false, uPixelAngle, t);
+#ifdef MIRROR_PASS
+  bool mirror = true;
+#else
+  bool mirror = false;
+#endif
+  vec4 c = shadeCloud(cl, puffs, shadowA, shadowB, cameraPosition, rd, mirror, uPixelAngle, t);
   if (c.a < 0.004) discard;
   vec3 p = cameraPosition + rd * t;
   // clouds pale toward the sky's haze, not the meadow's, and only a third as fast: they keep their form

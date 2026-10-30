@@ -1,5 +1,10 @@
 import {
   AdditiveBlending,
+  Color,
+  DoubleSide,
+  FrontSide,
+  PerspectiveCamera,
+  Vector2,
   BufferAttribute,
   CustomBlending,
   DataTexture,
@@ -22,7 +27,6 @@ import {
   WebGLCubeRenderTarget,
   WebGLRenderTarget,
   type IUniform,
-  type PerspectiveCamera,
   type Texture,
   type WebGLRenderer,
 } from 'three';
@@ -42,8 +46,10 @@ import shadowVertex from './cloudShadow.vert.glsl?raw';
 // cloud is a heap of PUFFS lumpy spheres over a flat base, written once a
 // frame into one data texture (clouds.glsl reads it). The same puffs draw the
 // cloud (a billboard each, traced per pixel), cast its shadow (splatted into
-// a sun-space map of optical depth) and show in the lakes (traced along the
-// mirrored ray), so a cloud, its shadow and its reflection always agree.
+// a sun-space map of optical depth) and show in the lakes (the billboards
+// drawn again, at a third of the resolution, from the camera mirrored in the water's
+// level plane under the focus), so a cloud, its shadow and its reflection
+// always agree.
 //
 // Where the clouds are is weather, not scatter. A flow over the sphere (a few
 // vortices spiralling in or out, and bands of wind east and west) is traced
@@ -62,9 +68,8 @@ import shadowVertex from './cloudShadow.vert.glsl?raw';
 export const MAX_CLOUDS = 512;
 const PUFFS = 8;
 const HEADER = 3;
-const COLUMNS = HEADER + PUFFS;
-/** Clouds the water traces for its mirror (the nearest to the camera). */
-const REFLECTED = 8;
+/** Texels per cloud: the header, the puffs, then the puffs' self-shadows (four a texel). */
+const COLUMNS = HEADER + PUFFS + 2;
 /** A cloud's size on an R = 128 m planet (m; the heap is about this tall). */
 const SIZE = 15;
 /**
@@ -75,6 +80,8 @@ const SIZE = 15;
 const STREAM = { sep: 0.17, test: 0.55, step: 0.25, minLength: 0.45, maxLength: 3.4 } as const;
 /** Share of the streamline slots that hold a cloud at coverage 0 and 1. */
 const SHARE = [0.1, 0.78] as const;
+/** The lakes' mirror is drawn at 1/MIRROR_SCALE of the resolution (the ripples soften it anyway). */
+const MIRROR_SCALE = 3;
 /** Cloudiness over the threshold at which a cloud is fully grown. */
 const FADE = 0.07;
 /**
@@ -104,6 +111,11 @@ export interface CloudUniforms {
   uCloudLook: IUniform<Vector4>;
   /** The puffs' lumps, baked once (cloudLumps.glsl). */
   uCloudLumps: IUniform<Texture | null>;
+  /** The camera (clouds dissolve around it, in the mirror too). */
+  uCloudEye: IUniform<Vector3>;
+  /** The clouds from the mirrored camera, and its view-projection. */
+  uCloudMirror: IUniform<Texture | null>;
+  uCloudMirrorVP: IUniform<Matrix4>;
 }
 
 interface Puff {
@@ -363,6 +375,9 @@ export function createCloudUniforms(): CloudUniforms {
     uCloudSunB: { value: new Vector4(0, 0, 1, 0) },
     uCloudLook: { value: new Vector4(0.7, 0.12, 0, 0) },
     uCloudLumps: { value: null },
+    uCloudEye: { value: new Vector3() },
+    uCloudMirror: { value: null },
+    uCloudMirrorVP: { value: new Matrix4() },
   };
 }
 
@@ -393,6 +408,12 @@ export class Clouds {
   private readonly shadowGeometry: InstancedBufferGeometry;
   private readonly shadowCamera = new OrthographicCamera();
   private readonly lumps = new WebGLCubeRenderTarget(64, { generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false });
+  private readonly mirrorTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
+  private readonly mirrorScene: Scene;
+  private readonly mirrorCamera = new PerspectiveCamera();
+  private readonly mirror = new Matrix4();
+  private readonly bufferSize = new Vector2();
+  private readonly clearColour = new Color();
   private lumpsBaked = false;
   private casters = 0;
   private lines: Line[] = [];
@@ -432,24 +453,36 @@ export class Clouds {
     uniforms.uCloudShadowMap.value = this.shadowTarget.texture;
     uniforms.uCloudLumps.value = this.lumps.texture;
 
-    const material = new ShaderMaterial({
-      name: 'clouds',
-      vertexShader,
-      fragmentShader,
-      uniforms: { ...shared, uProjection: this.projection },
-      transparent: true,
-      depthWrite: false,
-      blending: CustomBlending,
-      blendSrc: OneFactor,
-      blendDst: OneMinusSrcAlphaFactor,
-      blendSrcAlpha: OneFactor,
-      blendDstAlpha: OneMinusSrcAlphaFactor,
-    });
+    const cloudMaterial = (mirror: boolean): ShaderMaterial =>
+      new ShaderMaterial({
+        name: mirror ? 'clouds (mirror)' : 'clouds',
+        vertexShader,
+        fragmentShader,
+        uniforms: { ...shared, uProjection: this.projection },
+        defines: mirror ? { MIRROR_PASS: 1 } : {},
+        // a mirrored camera turns the billboards' winding
+        side: mirror ? DoubleSide : FrontSide,
+        transparent: true,
+        depthWrite: false,
+        blending: CustomBlending,
+        blendSrc: OneFactor,
+        blendDst: OneMinusSrcAlphaFactor,
+        blendSrcAlpha: OneFactor,
+        blendDstAlpha: OneMinusSrcAlphaFactor,
+      });
+    const material = cloudMaterial(false);
     const geometry = quad();
     geometry.instanceCount = 0;
     this.mesh = new Mesh(geometry, material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
+    // the same billboards, seen in the water
+    const mirrorMesh = new Mesh(geometry, cloudMaterial(true));
+    mirrorMesh.frustumCulled = false;
+    this.mirrorScene = new Scene().add(mirrorMesh);
+    this.mirrorCamera.matrixAutoUpdate = false;
+    this.mirrorCamera.matrixWorldAutoUpdate = false;
+    uniforms.uCloudMirror.value = this.mirrorTarget.texture;
 
     this.shadowGeometry = quad();
     this.shadowGeometry.instanceCount = 0;
@@ -688,6 +721,24 @@ export class Clouds {
         data[q + 3] = r;
         reach = Math.max(reach, this.p.distanceTo(this.centre) + r);
       });
+      // how much of the heap stands between each puff and the sun (from the
+      // upper, sunward part of the puff): 0 lit … 1 in the shade of the others
+      for (let k = 0; k < PUFFS; k++) {
+        const qk = o + (HEADER + k) * 4;
+        const rk = data[qk + 3];
+        this.q.set(data[qk], data[qk + 1], data[qk + 2]).addScaledVector(sunDir, 0.35 * rk);
+        let block = 0;
+        for (let j = 0; j < PUFFS; j++) {
+          const qj = o + (HEADER + j) * 4;
+          const rj = data[qj + 3];
+          if (j === k || rj <= 0) continue;
+          this.p.set(data[qj], data[qj + 1], data[qj + 2]).sub(this.q);
+          const tc = this.p.dot(sunDir);
+          const d2 = this.p.lengthSq() - tc * tc;
+          if (tc > 0 && d2 < rj * rj) block += 2 * Math.sqrt(rj * rj - d2);
+        }
+        data[o + (HEADER + PUFFS) * 4 + k] = rk > 0 ? smoothstep(0.1, 0.6, block / Math.max(size, 1e-3)) : 0;
+      }
       data[o] = this.centre.x;
       data[o + 1] = this.centre.y;
       data[o + 2] = this.centre.z;
@@ -702,6 +753,7 @@ export class Clouds {
     });
     this.uniforms.uCloudData.value.needsUpdate = true;
     this.projection.value.copy(camera.projectionMatrix);
+    this.uniforms.uCloudEye.value.copy(camera.position);
     this.count = n;
 
     // the shadow map: an orthographic view down the sun over the whole planet
@@ -711,7 +763,7 @@ export class Clouds {
     const extent = radius + top + 2;
     this.uniforms.uCloudSunA.value.set(this.axisA.x, this.axisA.y, this.axisA.z, 1 / extent);
     this.uniforms.uCloudSunB.value.set(this.axisB.x, this.axisB.y, this.axisB.z, 0);
-    this.uniforms.uCloudLook.value.set(p.shadow, 0.22, n, Math.min(n, REFLECTED));
+    this.uniforms.uCloudLook.value.set(p.shadow, 0.22, n, 0);
     this.mesh.geometry.instanceCount = n;
     this.mesh.visible = n > 0;
     this.shadowGeometry.instanceCount = n * PUFFS;
@@ -721,7 +773,48 @@ export class Clouds {
     renderer.setClearAlpha(0);
     renderer.clear(true, false, false);
     if (n > 0 || this.casters > 0) renderer.render(this.shadowScene, this.shadowCamera);
+    this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearAlpha(clearAlpha);
     renderer.setRenderTarget(previous);
+  }
+
+  /**
+   * The clouds as the lakes mirror them: the camera reflected in the water's
+   * level plane under the focus (the warp leaves the focus where it is),
+   * drawn at a third of the resolution. A point of that plane lands on the same pixel
+   * from either camera, so the water looks its reflection up where it is.
+   */
+  private renderMirror(renderer: WebGLRenderer, camera: PerspectiveCamera, radius: number, warp: WarpFrame, n: number): void {
+    renderer.getDrawingBufferSize(this.bufferSize);
+    const w = Math.max(1, Math.round(this.bufferSize.x / MIRROR_SCALE));
+    const h = Math.max(1, Math.round(this.bufferSize.y / MIRROR_SCALE));
+    if (w !== this.mirrorTarget.width || h !== this.mirrorTarget.height) {
+      this.mirrorTarget.setSize(w, h);
+      gpuMemory.set('cloud mirror', w * h * 4);
+    }
+    // X' = X − 2((X − P)·U)U with P = U·R: the water table under the focus
+    const u = warp.up;
+    const d = 2 * radius;
+    this.mirror.set(
+      1 - 2 * u.x * u.x, -2 * u.x * u.y, -2 * u.x * u.z, d * u.x,
+      -2 * u.y * u.x, 1 - 2 * u.y * u.y, -2 * u.y * u.z, d * u.y,
+      -2 * u.z * u.x, -2 * u.z * u.y, 1 - 2 * u.z * u.z, d * u.z,
+      0, 0, 0, 1,
+    );
+    const mc = this.mirrorCamera;
+    mc.projectionMatrix.copy(camera.projectionMatrix);
+    mc.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
+    mc.matrixWorld.multiplyMatrices(this.mirror, camera.matrixWorld);
+    mc.matrixWorldInverse.copy(mc.matrixWorld).invert();
+    this.uniforms.uCloudMirrorVP.value.multiplyMatrices(mc.projectionMatrix, mc.matrixWorldInverse);
+    // cleared to transparent black: the water reads it as premultiplied colour
+    renderer.getClearColor(this.clearColour);
+    renderer.setRenderTarget(this.mirrorTarget);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, false, false);
+    // from orbit the lakes are too small (and too curved) to mirror anything
+    const orbit = camera.position.length() - radius > 0.75 * radius;
+    if (n > 0 && !orbit) renderer.render(this.mirrorScene, mc);
+    renderer.setClearColor(this.clearColour, 0);
   }
 }
