@@ -18,6 +18,16 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 8: the review notes (in progress)
+
+Started from iteration 7 (1ca0327). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | A corner in the pier's reflection: geometry, or the reflections' draw order? | |
+| 2 | The flower paint: a very hard edge and a very even fill inside it, fine far away, unnatural up close | |
+| 3 | The grow-in of new grass and flowers makes the level-of-detail change more noticeable than just spawning in | |
+
 ## Iteration 7: the review notes
 
 Started from iteration 6 (3dbb552), the notes committed first (adecba8).
