@@ -20,6 +20,16 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 10: the review notes (in progress)
+
+Started from iteration 9 (8bfde67). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Jagged geometry around the hut's pond; make the pond twice as big | |
+| 2 | Bird shadows are round dots: slightly more detailed | |
+| 3 | Zoom stops: try 0.83 and 0.35 (for reference at R 128); their height in meters should not change as the planet grows or shrinks | |
+
 ## Iteration 9: the review notes
 
 Started from iteration 8 (a76417f), the notes committed first (c95587b).
