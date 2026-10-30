@@ -89,8 +89,8 @@ void main() {
   vec3 col = tone3(lit, mid, shade, light);
   col *= (0.92 + 0.16 * rnd(seed, 8.0)) * cloudTint(meadow.z);
   // wind sheen: blades laid over by a gust show their pale length to the light
-  col = mix(col, uGrassPal[9] * uSunTint, wind.w * uMeadowLook.x * (0.3 + 0.7 * (1.0 - meadow.z)) * (0.3 + 0.7 * y) * 0.8);
-  col *= 1.0 - 0.1 * uMeadowLook.x * (1.0 - wind.w);
+  col = mix(col, uGrassPal[9] * uSunTint, wind.w * uMeadowLook.x * (0.35 + 0.65 * (1.0 - meadow.z)) * (0.3 + 0.7 * y));
+  col *= 1.0 - 0.16 * uMeadowLook.x * (1.0 - wind.w);
   // sun-side rim on the tips
   vec3 v = normalize(toCam);
   col += uGrassPal[8] * pow(y, 3.0) * clamp(dot(-v, uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.18 * uToon.z * (1.0 - shadow);

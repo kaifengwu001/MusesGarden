@@ -10,6 +10,7 @@ export interface LookUniforms {
   uSunDir: { value: Vector3 };
   uSunTint: { value: Color };
   uShadeTint: { value: Color };
+  /** Toon bands, band softness, rim strength, hill shading (stronger from orbit). */
   uToon: { value: Vector4 };
   uFog: { value: Vector4 };
   uFogUp: { value: Vector3 };

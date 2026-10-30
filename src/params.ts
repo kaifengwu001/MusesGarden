@@ -89,8 +89,8 @@ export const schema = {
     visualRadius: num('rv', 'Visual radius', 60, 20, 400, 1, 'live', { unit: 'm' }),
   },
   terrain: {
-    roll: num('roll', 'Rolling hills', 1.25, 0, 4, 0.01, 'terrain', { unit: 'm' }),
-    hummocks: num('hum', 'Hummocks', 0.8, 0, 1.5, 0.01, 'terrain', { unit: 'm' }),
+    roll: num('roll', 'Rolling hills', 1.63, 0, 4, 0.01, 'terrain', { unit: 'm' }),
+    hummocks: num('hum', 'Hummocks', 1.04, 0, 1.5, 0.01, 'terrain', { unit: 'm' }),
     wetlands: num('wet', 'Wetlands', 0.45, 0, 0.9, 0.01, 'terrain'),
     waterLevel: num('lvl', 'Water level', 0, -1, 1, 0.01, 'terrain', { unit: 'm' }),
     grain: num('grn', 'Grain', 0.9, 0, 1, 0.01, 'terrain'),
@@ -121,7 +121,7 @@ export const schema = {
     strength: num('ws', 'Strength', 0.45, 0, 1, 0.01, 'live'),
     direction: num('wd', 'Direction', 64, 0, 360, 1, 'live', { unit: '°' }),
     gustiness: num('wg', 'Gustiness', 0.55, 0, 1, 0.01, 'live'),
-    sheen: num('wsh', 'Sheen', 0.65, 0, 1, 0.01, 'live'),
+    sheen: num('wsh', 'Sheen', 0.9, 0, 1, 0.01, 'live'),
   },
   clouds: {
     coverage: num('cc', 'Coverage', 0.45, 0, 1, 0.01, 'life'),

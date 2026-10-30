@@ -460,7 +460,8 @@ export class World {
   private updateLook(clock: FrameClock): void {
     const p = this.store.values;
     const L = this.look;
-    L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 0);
+    // hill shading: gentle at eye level, strong from orbit
+    L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 1.2 + 4 * (1 - smoothstep(0.15, 0.6, this.rig.zoom)));
     // haze thickens as you come down into the meadow, so the far meadow pales like a painted distance
     L.uFog.value.set(p.style.fogDensity * 0.0028 * (1 + 10 * this.rig.tilt), 0.06 + 0.34 * p.style.fogDensity, this.rig.altitude * 0.95, 0.8);
     L.uFogUp.value.copy(this.rig.up);
