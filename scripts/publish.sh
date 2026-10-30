@@ -42,9 +42,15 @@ deploy() {
   if ! (cd "$stage" && vercel link --yes --project "$1" >/dev/null 2>&1); then
     (cd "$stage" && vercel project add "$1" >/dev/null 2>&1 && vercel link --yes --project "$1" >/dev/null 2>&1)
   fi
-  local url
+  local url address
   url="$(cd "$stage" && vercel deploy --prod --yes 2>/dev/null)"
-  (cd "$stage" && vercel inspect "$url" 2>&1) | grep -oE 'https://[a-z0-9.-]+\.vercel\.app' | awk '{ print length, $0 }' | sort -n | head -1 | cut -d' ' -f2
+  # the project's addresses are assigned a moment after the deployment is ready
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    address="$( (cd "$stage" && vercel inspect "$url" 2>&1) | sed -n '/Aliases/,/Builds/p' | grep -oE 'https://[a-z0-9.-]+\.vercel\.app' | awk '{ print length, $0 }' | sort -n | head -1 | cut -d' ' -f2)"
+    [ -n "$address" ] && break
+    sleep 2
+  done
+  echo "${address:-$url}"
 }
 echo "iteration $n: $(deploy "garden-of-muse-iteration-$n")"
 if $latest; then
