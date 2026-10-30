@@ -96,7 +96,7 @@ void main() {
   }
 
   // colour by species, colony variant and part; cloud and cottage shadows
-  float shadow = max(fieldShade(meadow), 0.85 * cottageShadow(dir));
+  float shadow = max(meadow.z, 0.85 * cottageShadow(dir));
   float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.9 * shadow);
   float v = aLook.y;
   vec3 col;

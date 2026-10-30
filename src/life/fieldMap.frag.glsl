@@ -22,7 +22,7 @@ void main() {
     gl_FragColor = vec4(g.height, g.water, g.clearing, bloomAt(dir));
   } else if (uFieldPass == 1) {
     vec4 f = textureLod(uTerrainBake, dir, 0.0);
-    gl_FragColor = vec4(f.g, f.b, cloudCoverAt(dir * (uRadius + max(homestead(dir, f.r), 0.0)), 0.0), f.a);
+    gl_FragColor = vec4(f.g, f.b, cloudShadowAt(dir * (uRadius + max(homestead(dir, f.r), 0.0)), 0.0), f.a);
   } else {
     vec2 waves = gustWaves(dir);
     float ripple = rippleAt(dir);

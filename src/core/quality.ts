@@ -142,14 +142,39 @@ export function runBenchmark(renderer: WebGLRenderer): number {
 
 export type QualityChange = 'scale' | 'tier' | null;
 
+/** How the render scale follows the frame rate (see QualityController). */
+const SCALE = {
+  /** Smallest scale, and the factor of one step. */
+  floor: 0.6,
+  step: 0.9,
+  /** Frames slower than budget × this, for this long (ms), step it down. */
+  slow: 1.12,
+  slowFor: 1500,
+  /** Frames at budget × this or better, for this long (ms; doubled after each step up that proved too much, up to the most), step it up. */
+  steady: 1.06,
+  upAfter: 6000,
+  upAfterMost: 120000,
+  /** A step up that is followed by a step down within this long (ms) proved too much. */
+  proof: 4000,
+} as const;
+/** The last resort, for a machine still slow at the floor: frames slower than budget × this, for this long (ms), step an Auto tier down (once a tier). */
+const DESPERATE = { slow: 1.5, for: 5000 } as const;
+
 /**
- * Picks the tier and steps quality live against the frame budget (60 fps).
- * When frames stay slow for 2 s, the render scale drops first (×0.85 a
- * step, to 0.72), then an Auto tier steps down one level (high → medium →
- * low), its scale back at full. After 8 s of comfortable frames the scale
- * steps back up; after 12 s of easy frames at full scale, and at least a
- * minute after it stepped down, an Auto tier steps back up (never above the
- * tier it started at). Locked during deterministic captures.
+ * Picks the tier and keeps the frame rate by the render scale.
+ * Auto starts desktops on medium (phones, and desktops that fail the
+ * startup probe, on low) and does not change the tier as you go: a tier
+ * change rebuilds every blade and flower in sight, which reads as the
+ * meadow reloading and flickering (iterations 6–10 did it, and dropped the
+ * scale back to full each time, so frames got slower before they got
+ * faster). High is there to choose. Frames slow for 1.5 s step the render
+ * scale down (×0.9, to 0.6); steady frames step it back up, first after
+ * 6 s and, each time a step up proves too much, after twice as long (to
+ * 2 min), so it does not hunt. A 60 Hz display never shows a frame faster
+ * than 16.7 ms, so "steady" there is at the refresh rate, and only a step
+ * up can tell whether there is room. Only a machine still far too slow at
+ * the smallest scale steps an Auto tier down, keeping its scale, and never
+ * back up. Locked during deterministic captures.
  */
 export class QualityController {
   tier: Tier = TIERS.high;
@@ -157,24 +182,24 @@ export class QualityController {
   benchMs = Number.NaN;
   renderScale = 1;
   locked = false;
-  private emaMs = FRAME_BUDGET_MS * 0.7;
+  private emaMs = FRAME_BUDGET_MS;
   private slowMs = 0;
-  private fastMs = 0;
-  /** The tier Auto started at (it never climbs above it), and the time left before it may climb after stepping down (ms). */
-  private ceiling: TierName = 'high';
-  private cooldownMs = 0;
+  private steadyMs = 0;
+  private desperateMs = 0;
+  /** How long steady frames must last before a step up (ms), and the time since the last step up (ms). */
+  private upAfter: number = SCALE.upAfter;
+  private sinceUp = Number.POSITIVE_INFINITY;
 
   constructor(readonly device: DeviceInfo) {}
 
   choose(choice: TierChoice, benchMs: number): void {
     this.choice = choice;
     if (Number.isFinite(benchMs)) this.benchMs = benchMs;
-    const start = choice === 'auto' ? this.autoTier() : choice;
-    this.tier = TIERS[start];
-    this.ceiling = start;
-    this.cooldownMs = 0;
+    this.tier = TIERS[choice === 'auto' ? this.autoTier() : choice];
     this.renderScale = 1;
-    this.slowMs = this.fastMs = 0;
+    this.slowMs = this.steadyMs = this.desperateMs = 0;
+    this.upAfter = SCALE.upAfter;
+    this.sinceUp = Number.POSITIVE_INFINITY;
   }
 
   pixelRatio(devicePixelRatio: number): number {
@@ -189,47 +214,39 @@ export class QualityController {
   observe(frameMs: number): QualityChange {
     if (this.locked || document.hidden || frameMs > 250) return null; // tab switches and stalls
     this.emaMs += (frameMs - this.emaMs) * 0.05;
-    this.cooldownMs = Math.max(0, this.cooldownMs - frameMs);
+    this.sinceUp += frameMs;
     const budget = this.tier.budgets.frameMs;
-    if (this.emaMs > budget * 1.12) {
-      this.slowMs += frameMs;
-      this.fastMs = 0;
-    } else if (this.emaMs < budget * 0.8) {
-      this.fastMs += frameMs;
+    const slow = this.emaMs > budget * SCALE.slow;
+    this.slowMs = slow ? this.slowMs + frameMs : 0;
+    this.steadyMs = this.emaMs < budget * SCALE.steady ? this.steadyMs + frameMs : 0;
+    this.desperateMs = this.emaMs > budget * DESPERATE.slow && this.renderScale <= SCALE.floor + 1e-3 ? this.desperateMs + frameMs : 0;
+    if (this.slowMs > SCALE.slowFor && this.renderScale > SCALE.floor + 1e-3) {
       this.slowMs = 0;
-    } else {
-      this.slowMs = this.fastMs = 0;
+      // a step up that did not last: wait twice as long before the next
+      if (this.sinceUp < SCALE.proof) this.upAfter = Math.min(this.upAfter * 2, SCALE.upAfterMost);
+      this.sinceUp = Number.POSITIVE_INFINITY;
+      this.renderScale = Math.max(SCALE.floor, this.renderScale * SCALE.step);
+      return 'scale';
     }
-    const step = TIER_ORDER.indexOf(this.tier.name);
-    if (this.slowMs > 2000) {
-      this.slowMs = 0;
-      if (this.renderScale > 0.73) {
-        this.renderScale = Math.max(0.72, this.renderScale * 0.85);
-        return 'scale';
-      }
-      if (this.choice === 'auto' && step > 0) {
+    if (this.desperateMs > DESPERATE.for && this.choice === 'auto') {
+      this.desperateMs = 0;
+      const step = TIER_ORDER.indexOf(this.tier.name);
+      if (step > 0) {
         this.tier = TIERS[TIER_ORDER[step - 1]];
-        this.renderScale = 1;
-        this.cooldownMs = 60000;
         return 'tier';
       }
     }
-    if (this.fastMs > 8000 && this.renderScale < 1) {
-      this.fastMs = 0;
-      this.renderScale = Math.min(1, this.renderScale / 0.85);
+    if (this.steadyMs > this.upAfter && this.renderScale < 1) {
+      this.steadyMs = 0;
+      this.sinceUp = 0;
+      this.renderScale = Math.min(1, this.renderScale / SCALE.step);
       return 'scale';
-    }
-    if (this.fastMs > 12000 && this.choice === 'auto' && this.cooldownMs === 0 && step < TIER_ORDER.indexOf(this.ceiling) && this.emaMs < budget * 0.6) {
-      this.fastMs = 0;
-      this.tier = TIERS[TIER_ORDER[step + 1]];
-      return 'tier';
     }
     return null;
   }
 
   private autoTier(): TierName {
-    if (this.device.mobile) return 'low';
-    if (this.benchMs > 2.5) return 'low';
-    return this.benchMs > 1.2 ? 'medium' : 'high';
+    if (this.device.mobile || this.benchMs > 2.5) return 'low';
+    return 'medium';
   }
 }

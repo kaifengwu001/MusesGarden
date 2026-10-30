@@ -8,7 +8,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 10 | https://muses-garden-iteration-10.vercel.app | the commit with this table |
+| 11 | https://muses-garden-iteration-11.vercel.app | the commit with this table |
+| 10 | https://muses-garden-iteration-10.vercel.app | aadae30 |
 | 9 | https://muses-garden-iteration-9.vercel.app | 8bfde67 |
 | 8 | https://muses-garden-iteration-8.vercel.app | a76417f |
 | 7 | https://muses-garden-iteration-7.vercel.app | 1ca0327 |
@@ -21,14 +22,40 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 11: the review notes (in progress)
+## Iteration 11: the review notes
 
-Started from iteration 10 (aadae30). This table fills in as the notes are done.
+Started from iteration 10 (aadae30), the notes committed first (94ec2a0).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | The performance degradation is real, not just a change of scene | |
-| 2 | Grass loads in much more slowly, with a new flicker when moving around | |
+| 1 | The performance degradation is real, not just a change of scene | It was. My timings since iteration 6 froze the camera after everything had loaded, so they never saw the quality controller at work. A live walk with Auto (stand, walk, turn while walking, strafe, stand; every frame recorded) showed iteration 10 starting on High (2.5 times iteration 5's grass), trimming the resolution, then dropping to Medium and to Low. Each drop reset the resolution to full (slower frames first: 105 of 133 frames over 25 ms in the strafe) and rebuilt every blade and flower in sight. Iteration 5 never left its tier. Auto now starts desktops on Medium (iteration 5's High) and keeps the frame rate by the resolution alone, in smaller steps, backing off when a step up doesn't hold; it no longer changes tier as you go. The same walk now matches iteration 5 (below). High is unchanged and still there to choose. |
+| 2 | Grass loads in much more slowly, with a new flicker when moving around | Both came from those tier changes: each one threw away and rebuilt the grass and flowers in sight while you moved, and changed the resolution. On a fixed tier the grass fills in as fast as in iteration 8 (2.5 s on High), and walking flickers no more than it did (the distant strip of grass and flowers, finer than a pixel, as in every iteration). Iteration 10's change to how the grass reads the shadow map (crisp edges between the map's texels) is reverted too: it showed no difference, and a map that moves with you could make crisp edges crawl. |
+
+### Measured (iteration 11)
+
+Apple M1 Pro, 1440×900 at DPR 2, Auto, the same walk from the same spot,
+median frame time and frames over 25 ms per phase (the GPU was shared):
+
+| | Walk | Turn while walking | Strafe | Stand | Tier and resolution at the end |
+|---|---|---|---|---|---|
+| Iteration 5 | 17.9 / 1 | 18.6 / 11 | 17.1 / 2 | 16.7 / 0 | High (today's Medium) at 0.61 |
+| Iteration 10 | 18.3 / 1 | 20.1 / 19 | 30.1 / 105 | 24.1 / 91 | Low at 0.85, after High, Medium |
+| Iteration 11 | 17.8 / 1 | 18.4 / 13 | 18.7 / 2 | 17.3 / 0 | Medium at 0.73, throughout |
+| Iteration 11, High chosen | 17.9 / 8 | 18.3 / 11 | 19.2 / 4 | 18.3 / 0 | High at 0.60, throughout |
+
+### Trades (iteration 11)
+
+- **Auto's starting tier:** Medium on desktops (grass to 22 m), not High
+  (35 m). On this machine High holds about 55 fps at 0.6 resolution; Medium
+  holds 60 at 0.73.
+
+### Known issues
+
+- At 2880×1800 even Medium needs about 0.73 resolution for 60 fps on an M1
+  Pro; the heavy views need more trimming.
+- Carried over: the distant grass finer than a pixel sparkles a little as you
+  move; the cottage's reflection without its rail, chair, bench or window
+  frames.
 
 ## Iteration 10: the review notes
 

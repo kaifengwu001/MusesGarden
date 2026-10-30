@@ -541,13 +541,19 @@ so any view can be shared.
   across the meadow. The default stand (by the first water at the edge of
   the nearest wetland) is searched on the set-up ground (before iteration 10
   it ran at startup before the ground was set up).
-- **Tier selection:** `auto` picks a tier from a short startup benchmark
-  (phones low; desktops high, medium or low by the benchmark). A live
+- **Tier selection:** `auto` starts desktops on medium (phones, and desktops
+  that fail the startup probe, on low); high is chosen, not picked. A live
   controller aims at a steady 60 fps (16.7 ms; 24 ms, tried in iteration 6,
-  read as 30–40 fps with uneven frames on a 60 Hz screen): when frames stay slow for 2 s it lowers the
-  render scale (to 0.72), then steps the tier down one level; it climbs back
-  after easy frames, never above where it started and not within a minute of
-  stepping down.
+  read as 30–40 fps with uneven frames on a 60 Hz screen) by the render
+  scale alone: frames slow for 1.5 s step it down (×0.9, to 0.6); steady
+  frames step it back up after 6 s, and each time a step up proves too much
+  the next waits twice as long (to 2 min), so it does not hunt. It does not
+  change the tier as you go: a tier change rebuilds every blade and flower
+  in sight, which reads as the meadow reloading and flickering (iterations
+  6–10 did, and reset the scale to full each time, so frames got slower
+  before they got faster). Only a machine still far too slow at the smallest
+  scale (frames over 25 ms for 5 s) steps an Auto tier down, keeping its
+  scale, and never back up. Covered by quality.test.ts.
 - **MSAA:** a 4× HalfFloat MSAA target costs about 56 B per pixel, about
   200 MB at 1440p with DPR 2, which would break the memory budget on its own.
   So MSAA is used only on displays of DPR < 1.75 (whatever the render scale).
