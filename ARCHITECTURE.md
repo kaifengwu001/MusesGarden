@@ -330,11 +330,16 @@ click is what you see.
   shadow under it), beaded capping along the hips and the ridge, bent a
   little out of true. On the front a tall window toward the left end and the
   door right of the middle, a bench between them; a small window high on the
-  right end toward the back; a chimney on the middle of the ridge. A terrace
-  along the front at the floor's height with three steps down to the meadow
-  at its right end, and at its left end a stone pier out over the pond, an
-  arch at the waterline in its face, an iron rail along its back and a
-  wooden chair by the house's corner. The pond lies in front and to the left,
+  right end toward the back; a chimney just behind the ridge on the back
+  slope. A terrace along the front at the floor's height with three steps
+  down to the meadow at its right end, and at its left end a stone pier out
+  over the pond with an arched tunnel at the waterline (real geometry: its
+  mouth, walls, half-round vault and a back wall 1.6 m in; the terrain cuts
+  a channel of water in under it, and the water there lies dark, in its
+  mirror too), an iron rail along its back and a wooden chair by the
+  house's corner. Windows sit 0.22 m into the walls; the capping on the
+  ridge and hips is bedded down into the slopes; the walls and the terrace
+  are footed deep enough for the most curved planet. The pond lies in front and to the left,
   under the pier, and the layout keeps the cottage's sun ahead and to the
   left (the front lit, the right end in shade), as in the painting. Painted
   in the shader, never textured, in colours sampled from the painting: warm
@@ -365,7 +370,8 @@ click is what you see.
   the same brushed marks at every height, only finer in meters as you come
   down; the colonies' wash of colour under them holds all the way down too.
   Both give way to the flowers themselves in the near field, but only where
-  those are big enough on screen to carry the flowerbeds. Near blades
+  those are big enough on screen to carry the flowerbeds. They lie at 80 %
+  over the grass (`FLOWER_PAINT`). Near blades
   cross-fade into the paint with a dithered fade, never a ring.
 - **Water:** painted, not simulated: a mirror over a navy body. Along the view
   ray mirrored off the level surface, nearest first: the banks (marched over
@@ -459,7 +465,11 @@ faces holding ground in sight) and its sharper window about the focus, their cov
 only) and their mirror (the billboards from the camera mirrored in the
 water, at full resolution). Post then draws to the screen. The build queue
 gets what is left of 3.6 ms of JS after the update and the render (at least
-0.5 ms, at most 2 ms), and never starts a step that would not fit.
+0.5 ms, at most 2 ms; on a desktop with more than four jobs waiting, of 5 ms
+and at most 3.6 ms), and never starts a step that would not fit. Tiles in
+view are built before those out of it, nearest first, and a tile that opens
+new ground grows up from it over 0.35 s (its page's value in the
+visibility texture); one that replaces an old tile shows at once.
 
 One shared set of uniform objects (time, wind, warp, R, R_lag, sun, palette) is
 referenced by every material, so each frame writes each value once.
@@ -484,12 +494,12 @@ so any view can be shared.
 
 | | Desktop (M1 Air, 1440p, DPR ≤ 2) | Mobile (iPhone 15, DPR ≤ 1.5) |
 |---|---|---|
-| Frame time | ≤ 24 ms (Kai's budget, about 40 fps) | ≤ 24 ms |
+| Frame time | 16.7 ms (60 fps), Auto trimming the render scale first | 16.7 ms |
 | Draw calls | ≤ 120 | ≤ 120 |
 | Triangles | ≤ 4 M on high, 1.8 M on medium | ≤ 500 k |
 | Visible grass instances | ≤ 600 k on high, 250 k on medium | ≤ 60 k |
 | GPU memory | < 256 MB | < 256 MB |
-| JS per frame | ≤ 4 ms | ≤ 4 ms |
+| JS per frame | ≤ 4 ms (≤ 5 ms while catching up on a backlog of tiles) | ≤ 4 ms |
 | First frame | < 2 s | |
 
 - **Tiers:** low (phones), medium (iteration 5's high) and high: grass to
@@ -499,7 +509,8 @@ so any view can be shared.
   built.
 - **Tier selection:** `auto` picks a tier from a short startup benchmark
   (phones low; desktops high, medium or low by the benchmark). A live
-  controller aims at 24 ms: when frames stay slow for 2 s it lowers the
+  controller aims at a steady 60 fps (16.7 ms; 24 ms, tried in iteration 6,
+  read as 30–40 fps with uneven frames on a 60 Hz screen): when frames stay slow for 2 s it lowers the
   render scale (to 0.72), then steps the tier down one level; it climbs back
   after easy frames, never above where it started and not within a minute of
   stepping down.

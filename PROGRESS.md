@@ -8,7 +8,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 6 | https://muses-garden-iteration-6.vercel.app | the commit with this table |
+| 7 | https://muses-garden-iteration-7.vercel.app | the commit with this table |
+| 6 | https://muses-garden-iteration-6.vercel.app | 3dbb552 |
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
@@ -17,16 +18,55 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 7: the review notes (in progress)
+## Iteration 7: the review notes
 
-Started from iteration 6 (3dbb552). This table fills in as the notes are done.
+Started from iteration 6 (3dbb552), the notes committed first (adecba8).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Grass loads in late when zooming in, completing in chunks: jarring | |
-| 2 | Perceived performance is much worse: what changed? | |
-| 3 | The painterly flower pattern is a little too strong: about 20 % softer | |
-| 4 | The cottage: the ridge floats above the roof; the windows should sit deeper in the walls; the eaves' shadow should reach further down; the chimney sits behind the ridge, not on it; at high curvature the building's foot lifts above the water | |
+| 1 | Grass loads in late when zooming in, completing in chunks: jarring | High builds about 2.5 times the grass of iteration 5's High in the same time slice, so filling in took twice as long (4.6 s against 2.1–2.6 s), a 6 m tile popping in at a time. Now tiles in view are built first, a tile that opens new ground grows up from it over a third of a second instead of popping in, and while a backlog waits a desktop builds with up to 3.6 ms a frame (from 2). Zooming in on High now fills in 2.4 s, and what's in view within about 0.3 s ([frames](docs/checkpoints/iteration-7/zoom-in-grass.jpg)). |
+| 2 | Perceived performance is much worse: what changed? | Three things. Auto had been set to tolerate frames up to about 27 ms (your 24 ms budget), which a 60 Hz screen shows as 30–40 fps with uneven pacing; it now aims at a steady 60 again, trimming the resolution before the grass. High draws twice the grass and nearly twice the flowers of iteration 5's High (4–7 ms more). And the bigger cottage had made its ground shadow, worked out for every ground pixel, grass blade and flower within 40 m of the house, about 4 ms more expensive; it's now only worked out where the shadow can fall (about 4 ms back in the cottage view, about 3 in the vista). |
+| 3 | The painterly flower pattern is a little too strong: about 20 % softer | The paint's flowers (dabs and wash) lie 20 % lighter over the grass. |
+| 4 | The cottage: the ridge floats; the windows should sit deeper; the eaves' shadow should reach further down; the chimney; the foot at high curvature; the tunnel (added during the iteration: the chimney should sit behind the ridge, and the tunnel under the pier should be real) | The capping on the ridge and hips now sits on the roof, with bedding reaching down into the slopes, so no daylight shows under it. The window frames sit 0.22 m into the 0.36 m walls, the reveals in shade. The eaves' shadow is cast nearly as deep as the geometry would cast it (0.45–1.6 m by the sun on each wall). The chimney stands just behind the ridge on the back slope, the ridge's capping running in front of its foot. The pier's arch is a real tunnel: its mouth cut through the face, side walls, a half-round vault and a back wall 1.6 m in, the water cut in under it, dark inside and dark in its mirror. The walls go 0.7 m and the terrace and pier 3 m below the clearing, so even on the smallest planet the curve never opens a gap under them. |
+
+Checkpoint images: [docs/checkpoints/iteration-7](docs/checkpoints/iteration-7/).
+
+### Measured (iteration 7)
+
+Apple M1 Pro, 2880×1800, the GPU shared with another window, so each view
+alternated three times between iteration 5's build and this one, best of
+each (ms per frame, frames back to back):
+
+| View | Iteration 5 (High) | Iteration 7, Medium | Iteration 7, High |
+|---|---|---|---|
+| Wander | 6.8 | – | 14.0 |
+| Vista | 21.4 | 22.7 | 25.4 |
+| Lakes | 21.1 | 24.7 | 24.7 |
+| Cottage view (iteration 6's wider framing) | 22.4 | – | 27.5 |
+
+- At 60 fps, Auto keeps High's full resolution in Wander and trims it in
+  the heavy views (to about 0.72 there on this machine), as iteration 5's
+  Auto trimmed its heavy views.
+- Medium still costs 1.7–2.6 ms more than iteration 5's High in the heavy
+  views, spread thinly: about 1 ms in the ground and water paint, the rest
+  in the clouds' sharper shadow window and smaller things.
+
+### Trades (iteration 7)
+
+- **JS per frame** may reach 5 ms (from 4) while a desktop catches up on a
+  backlog of tiles (the growth-scrub invariant now allows 5.5 ms at p95).
+- **Render scale:** with Auto aiming at 60 fps instead of 24 ms, the heavy
+  views run at a lower resolution on machines that can't hold 60 at full
+  resolution. Choose High (not Auto) to keep full resolution at a lower
+  frame rate.
+
+### Known issues
+
+- The heavy views (vista, lakes, cottage) don't reach 60 fps at full
+  resolution on an M1 Pro at 2880×1800; Auto trims the resolution there.
+- Medium is a little slower than iteration 5's High (above).
+- Carried over: the lake darker than the still's in the squint test (23.7);
+  the cottage's mirror without its steps, bench or rail.
 
 ## Iteration 6: the review notes
 
@@ -79,7 +119,7 @@ is further off: darker than the still's (#5f856f against #71969d), from the
 grade and the far banks now reflected in front of the clouds. The guard
 (fails above 26) passes.
 
-## Measured (iteration 6)
+### Measured (iteration 6)
 
 Apple **M1 Pro**, headless Chromium on Metal, frames back to back waiting
 for the GPU, at 1440×900 and DPR 2 (2880×1800). The GPU was shared with a
@@ -107,7 +147,7 @@ the "iteration 5" column below (vista 18.0 ms then against 23.9 here).
 - **The shadow window** costs about 0.2 ms.
 - **Growth scrub, first frame, draw calls:** the invariants pass.
 
-## Trades (iteration 6)
+### Trades (iteration 6)
 
 None. Still standing from earlier iterations: cloud self-shadowing one value
 per puff; lumps from a baked cube map; bird shadows as soft discs; the
@@ -115,7 +155,7 @@ per puff; lumps from a baked cube map; bird shadows as soft discs; the
 MSAA only below DPR 1.75. The eaves' shadow is drawn a little shallower than
 the geometry would cast it (a choice of look).
 
-## Known issues
+### Known issues (iteration 6)
 
 - **The cottage view is the heaviest** (29.4 ms on High here with the GPU
   shared; about 22 ms quietly).
@@ -128,7 +168,7 @@ the geometry would cast it (a choice of look).
 - **Carried over:** the warp's flat band on the way down; triangle figure,
   pools after a scrub, tier probe, LOD-ring test.
 
-## Next
+### Next (iteration 6)
 
 1. Composition of the vista (flowers in front, the cloud upper right).
 2. The lake's colour against the still.
