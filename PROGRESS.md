@@ -8,7 +8,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 9 | https://muses-garden-iteration-9.vercel.app | the commit with this table |
+| 10 | https://muses-garden-iteration-10.vercel.app | the commit with this table |
+| 9 | https://muses-garden-iteration-9.vercel.app | 8bfde67 |
 | 8 | https://muses-garden-iteration-8.vercel.app | a76417f |
 | 7 | https://muses-garden-iteration-7.vercel.app | 1ca0327 |
 | 6 | https://muses-garden-iteration-6.vercel.app | 3dbb552 |
@@ -20,15 +21,50 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 10: the review notes (in progress)
+## Iteration 10: the review notes
 
-Started from iteration 9 (8bfde67). This table fills in as the notes are done.
+Started from iteration 9 (8bfde67), the notes committed first (3d62413).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Jagged geometry around the hut's pond; make the pond twice as big | |
-| 2 | Bird shadows are round dots: slightly more detailed | |
-| 3 | Zoom stops: try 0.83 and 0.35 (for reference at R 128); their height in meters should not change as the planet grows or shrinks | |
+| 1 | Jagged geometry around the hut's pond; make the pond twice as big | The teeth were the bank's steep face shaded by the ground mesh's slope, which steps from triangle to triangle where the mesh is coarse; the face is now shaded by the slope taken per pixel, so it follows the shore ([before and after from 70 m](docs/checkpoints/iteration-10/pond-rim-teeth-before-after.jpg)). Small notches remain right at the water's edge, where the coarse mesh meets the water. The pond's radius is now 17–22 m at R 128 (8.5–11 before), 7 m left of the cottage's middle so the pier still stands in it; its islet keeps its size in meters. The bigger pond made the pond's shaping run over three times the area (the reflections' march reads the ground a dozen times per water pixel); it now runs only within the pond's own reach, at no measurable cost. |
+| 2 | Bird shadows are round dots: a bit more detailed (and, during the iteration: 1.2 ms is steep, they needn't be super detailed) | Each bird now casts its silhouette into the shadow map: body, tail and wings, as far as they reach out at that point of the wingbeat, turned with its heading ([on bare ground](docs/checkpoints/iteration-10/bird-shadows-on-bare-ground.jpg), [old and new from above](docs/checkpoints/iteration-10/bird-shadows-before-after.jpg)). A first version had every grass blade and flower read the shadow map for crisp shapes in the grass, which cost 1.2 ms; that is gone. The grass reads the shapes through its field map as before (now stored so its edges stay crisp between texels). The blades' lean still softens the shapes, so in the grass they read as winged, oriented shadows rather than sharp silhouettes. No measurable cost. |
+| 3 | Zoom stops: try 0.83 and 0.35 at R 128; their height should not change with the planet's size | The stops are heights now: 4.3 m (standing, zoom 0.83 at R 128) and 70.2 m (bird's-eye, 0.35), the same on every planet (checked at R 40, 284 and 400). The camera's tilt goes by height too (as it was at R 128), so each stop also looks the same everywhere: 80° from straight down standing, 14° at the bird's-eye. |
+| 4 | (found while measuring) The default Wander stand moved | It was picked at startup, before the ground was set up for the world, so it never landed where it was meant to (by the first water at the edge of the nearest wetland): iteration 9 put you on a meadow hill 16 m from any water, and this iteration's pond change would have put you in a lake. The ground is now set up first, and you stand at the lake's edge, looking across it ([the default view](docs/checkpoints/iteration-10/wander-default.jpg)). |
+
+Checkpoint images: [docs/checkpoints/iteration-10](docs/checkpoints/iteration-10/).
+
+### Measured (iteration 10)
+
+Apple M1 Pro, 2880×1800, High, alternating with iteration 9's build three to
+five times per view (best of each; the GPU was shared, so the absolute times
+drift between runs):
+
+| View | Iteration 9 | Iteration 10 |
+|---|---|---|
+| Wander, from the same lakeside spot | 15.5 | 15.9 |
+| Wander, each build's default spot | 13.3 (the hill) | 15.7 (the lake's edge) |
+| Vista | 20.4 | 20.1 |
+| Lakes | 28.4 | 28.6 |
+| Cottage view | 29.9 | 29.8 |
+
+The code costs the same as iteration 9's. The default Wander view costs
+2.4 ms more because it now looks across water, as it was meant to.
+
+### Trades (iteration 10)
+
+None.
+
+### Known issues
+
+- Bird shadows in the grass are softer than on bare ground: the blades lean
+  away from the point they take their shadow from. Crisper would mean a
+  shadow lookup per blade (the 1.2 ms we turned down).
+- Small notches where the coarse ground mesh meets the water, seen from high
+  up.
+- Carried over: the cottage's reflection without its rail, chair, bench or
+  window frames; the heavy views don't hold 60 fps at full resolution on an
+  M1 Pro at 2880×1800 (Auto trims them).
 
 ## Iteration 9: the review notes
 

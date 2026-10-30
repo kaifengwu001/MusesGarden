@@ -84,8 +84,17 @@ void main() {
     m.pixelMeters = pixelMeters;
     m.nearFade = nearFade;
     land = meadowPaint(m);
-    // the bank's face: where the turf drops to the water it is steep, and in its own shade
-    float steep = 1.0 - dot(n, warpNormal(dir * (uRadius + h), dir));
+    // the bank's face: where the turf drops to the water it is steep, and in its own shade. The
+    // slope is taken per pixel (the height's screen derivatives over the position's, in the
+    // ground's tangent plane), so a steep bank's face follows the shore, not the mesh's triangles
+    vec3 a1;
+    vec3 a2;
+    gradientFrame(dir, a1, a2);
+    vec3 px = dFdx(dir) * uRadius;
+    vec3 py = dFdy(dir) * uRadius;
+    mat2 J = mat2(dot(px, a1), dot(py, a1), dot(px, a2), dot(py, a2));
+    float slope = abs(determinant(J)) > 1e-10 ? length(inverse(J) * vec2(dFdx(h), dFdy(h))) : vSlope;
+    float steep = 1.0 - inversesqrt(1.0 + slope * slope);
     land = mix(land, tone3(pal(ROW_GRASS, 2), pal(ROW_GRASS, 5), pal(ROW_WATER, 8), b * 0.7), smoothstep(0.06, 0.3, steep + 0.06 * stroke) * smoothstep(1.2, 0.2, shore) * 0.75);
     land *= cloudTint(cloud);
   }

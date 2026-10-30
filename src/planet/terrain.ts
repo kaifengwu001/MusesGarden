@@ -26,7 +26,7 @@ const LAYOUT_SUN_HOURS = 11.5;
 /** Distances (m) from the cottage centre: clearing flattened, the pond's near edge in front, and how far left of the middle the pond lies. */
 export const COTTAGE_FLAT = 7.5;
 export const COTTAGE_TO_POND = 4.3;
-export const POND_SHIFT = 5;
+export const POND_SHIFT = 7;
 /** The cottage clearing stands this high above the water (m): its landing is a terrace over the pond. */
 export const HOME_LEVEL = 1;
 /** The house's footprint (half sizes, m), and its terrace with the steps and its pier (props.ts COTTAGE, TERRACE, STEPS, PIER: x0, x1, z0, z1): cleared of plants. */
@@ -127,7 +127,8 @@ export function generateLayout(seed: number): Layout {
   ];
   const ia = Math.PI * (0.6 + 0.8 * rand());
   const ir = 0.3 + 0.25 * rand();
-  const pond: HomePond = { radius0: 8.5 + 2.5 * rand(), shape, islet: [Math.cos(ia) * ir, Math.sin(ia) * ir, 0.1 + 0.07 * rand()] };
+  // (the pond twice the size it was through iteration 9; its islet the same size in meters)
+  const pond: HomePond = { radius0: 17 + 5 * rand(), shape, islet: [Math.cos(ia) * ir, Math.sin(ia) * ir, 0.05 + 0.035 * rand()] };
   return { seed, noiseSeed, cottage, homeBearing: bearing, grain, pond };
 }
 
@@ -169,9 +170,10 @@ export class Terrain {
   radius = R_REF;
   fields: Fields;
   pondRadius = 0;
-  /** Pond centre (m) along the bearing from the cottage, and how far the pond can reach. */
+  /** Pond centre (m) along the bearing from the cottage, how far from the cottage the pond can reach, and how far from its own centre it can shape the ground (m). */
   pondCentre = 0;
   pondReach = 0;
+  pondShapeReach = 0;
   readonly cottageLevel = HOME_LEVEL;
   /** Step (m) of the finite-difference gradient behind the bank lip; at least a bake texel. */
   gradStep = 0.75;
@@ -195,7 +197,10 @@ export class Terrain {
     const edge = r * (1 + a1 * Math.cos(p1) + a2 * Math.cos(p2) + a3 * Math.cos(p3));
     this.pondRadius = r;
     this.pondCentre = edge + COTTAGE_TO_POND;
-    this.pondReach = Math.hypot(this.pondCentre, POND_SHIFT) + r * 1.45 + 1;
+    // past its widest outline, its banks rise above any ground there is
+    this.pondShapeReach = r * (1 + a1 + a2 + a3) + Math.max(this.maxHeight, HOME_LEVEL) / POND_BANK + 0.5;
+    // everything the homestead shapes: its plateau, and the pond as far as it shapes the ground
+    this.pondReach = Math.max(PLATEAU.outer, Math.hypot(this.pondCentre, POND_SHIFT) + this.pondShapeReach);
     this.gradStep = Math.max(0.6, bakeTexelMeters);
   }
 
@@ -231,12 +236,18 @@ export class Terrain {
     h += (Math.max(h, 0.4) * 0.5 + 0.25 - h) * dry;
     const flat = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
     h += (this.cottageLevel - h) * flat;
-    const d = this.homePond(dir);
-    h = Math.min(h, Math.max(d * (d > 0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
-    // the channel under the pier's arch
+    // the pond, only where it can shape the ground (near its middle: mirrors terrain.glsl)
     const c = this.cottageLocal(dir, localTmp);
-    const qx = Math.abs(c.x - CULVERT.x) - CULVERT.halfX;
-    const qz = Math.abs(c.z - CULVERT.z) - CULVERT.halfZ;
+    const cx = c.x;
+    const cz = c.z;
+    if ((cx + POND_SHIFT) ** 2 + (cz - this.pondCentre) ** 2 < this.pondShapeReach ** 2) {
+      const d = this.homePond(dir);
+      h = Math.min(h, Math.max(d * (d > 0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
+    }
+    // the channel under the pier's arch (it reaches about 11 m from the cottage's middle)
+    if (dc > 12) return h;
+    const qx = Math.abs(cx - CULVERT.x) - CULVERT.halfX;
+    const qz = Math.abs(cz - CULVERT.z) - CULVERT.halfZ;
     const box = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
     return Math.min(h, Math.max(box * 4 - 0.3, -0.5));
   }
@@ -298,7 +309,7 @@ export class Terrain {
     u.uCottageB.value.set(L.homeBearing.x, L.homeBearing.y, L.homeBearing.z, 0);
     u.uHomePond.value.set(this.pondRadius, this.pondCentre, this.pondReach, POND_SHIFT);
     const [a1, a2, a3, p1, p2, p3] = L.pond.shape;
-    u.uHomeShape.value.set(a1, a2, a3, 0);
+    u.uHomeShape.value.set(a1, a2, a3, this.pondShapeReach);
     u.uHomePhase.value.set(p1, p2, p3, 0);
     u.uHomeIslet.value.set(L.pond.islet[0], L.pond.islet[1], L.pond.islet[2], 0);
     const f = this.fields;

@@ -1,7 +1,12 @@
 // Field map lookups (fieldMap.ts): the ground around the focus.
 //   uFieldMap:    height (m), distance to the shore (m), clearing, bloom
-//   uFieldMeadow: lushness, wetness, cloud shadow, colour variant
+//   uFieldMeadow: lushness, wetness, cloud cover (cloudCoverAt: fieldShade
+//                 turns it into a shadow after filtering), colour variant
 //   uFieldWind:   shared bend (xyz), wind sheen (-1 trough … 1 crest)
+#ifndef HAVE_CLOUD_LOOK
+#define HAVE_CLOUD_LOOK
+uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, - (clouds.glsl declares it too)
+#endif
 uniform sampler2D uFieldMap;
 uniform sampler2D uFieldMeadow;
 uniform sampler2D uFieldWind;
@@ -28,6 +33,12 @@ vec3 fieldCoords(vec3 dir) {
   float r = a / uFieldCentre.w;
   vec2 xy = s > 1e-9 ? tan2 / s * r : vec2(0.0);
   return vec3(xy, r);
+}
+
+// The clouds' and birds' shadow from the map's cover (clouds.glsl cloudShade):
+// thresholded after the map is filtered, so its edge is crisp between texels.
+float fieldShade(vec4 meadow) {
+  return smoothstep(0.1, 0.5, meadow.z) * uCloudLook.x;
 }
 
 // Ground, meadow fields and shared wind at a direction; inside = 0 beyond the map.

@@ -176,6 +176,10 @@ export class World {
 
   /** Stand by the first water at the edge of the nearest wetland, looking across its lakes. */
   defaultPose(): void {
+    // the walk below reads the ground: set it up for this world first (at startup this runs before the first frame does it)
+    const world = this.store.values.world;
+    growthState(world.growth, world.areaMin, world.areaMax, this.growth);
+    if (this.growth.radius !== this.fieldsR || this.fieldKey !== this.fieldsKey || this.terrain.layout !== this.fieldsLayout) this.refreshFields(false);
     const R = this.growth.radius;
     const spot = this.wetlandEdge();
     const into = this.wetnessGradient(spot);

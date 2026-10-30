@@ -21,7 +21,7 @@ uniform vec4 uBank;               // bank height (m), bank width (m), gradient s
 uniform vec4 uCottage;            // direction, clearing level (m)
 uniform vec4 uCottageB;           // toward the pond
 uniform vec4 uHomePond;           // radius (m), centre along the bearing (m), reach (m), how far left of the middle (m)
-uniform vec4 uHomeShape;          // outline amplitudes 1–3
+uniform vec4 uHomeShape;          // outline amplitudes 1–3, how far from its centre the pond shapes the ground (m)
 uniform vec4 uHomePhase;          // outline phases 1–3
 uniform vec4 uHomeIslet;          // pond-normalised x, y, radius
 uniform vec4 uCottageSun;         // shadow sweep per meter of height in cottage-local x, z
@@ -56,17 +56,33 @@ float homePond(vec3 dir) {
 }
 
 // The homestead's plateau, clearing and pond, applied to the natural height h.
+// Most of the planet is far from it, and much of what is near is neither on
+// the plateau nor near the pond: cheap tests first (the reflections' march
+// calls this a dozen times a pixel).
 float homestead(vec3 dir, float h) {
+  vec3 off = dir - uCottage.xyz;
+  // (a chord is never longer than its arc: beyond the reach is beyond it on the planet too)
+  if (dot(off, off) * uRadius * uRadius > uHomePond.z * uHomePond.z) return h;
+  // cottage-local meters (cottageLocal), never more than the distance on the planet
+  vec2 c = vec2(dot(off, cross(uCottage.xyz, uCottageB.xyz)), dot(off, uCottageB.xyz)) * uRadius;
+  vec2 pc = vec2(c.x + uHomePond.w, c.y - uHomePond.y);
+  bool pond = dot(pc, pc) < uHomeShape.w * uHomeShape.w;
+  bool plateau = dot(c, c) < PLATEAU_OUTER * PLATEAU_OUTER;
+  if (!pond && !plateau) return h;
   float dc = chordAngle(dir, uCottage.xyz) * uRadius;
-  if (dc > uHomePond.z && dc > PLATEAU_OUTER) return h;
   float dry = smoothstep(PLATEAU_OUTER, PLATEAU_INNER, dc);
   h += (max(h, 0.4) * 0.5 + 0.25 - h) * dry;
   float flat_ = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
   h += (uCottage.w - h) * flat_;
-  float d = homePond(dir);
-  h = min(h, max(d * (d > 0.0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
-  // the channel under the pier's arch
-  vec2 q = abs(cottageLocal(dir) - CULVERT.xy) - CULVERT.zw;
+  // the pond, only where it can shape the ground (near its middle: past its widest outline its
+  // banks rise above any ground there is)
+  if (pond) {
+    float d = homePond(dir);
+    h = min(h, max(d * (d > 0.0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
+  }
+  // the channel under the pier's arch (it reaches about 11 m from the cottage's middle)
+  if (dc > 12.0) return h;
+  vec2 q = abs(c - CULVERT.xy) - CULVERT.zw;
   float box = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
   return min(h, max(box * 4.0 - 0.3, -0.5));
 }

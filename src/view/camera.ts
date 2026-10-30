@@ -7,8 +7,10 @@ import { clamp, damp, lerp, smoothstep } from '../core/math';
 //   z = 1  Wander:   a glide 1.6 m above the grass, looking at the horizon, FOV 55°
 //
 // The wheel and the keys settle on four stops: the two ends, a bird's-eye
-// view and a standing view (STOPS_Z, chosen by Kai), when you stop zooming
-// near one.
+// view and a standing view (STOPS_M, chosen by Kai), when you stop zooming
+// near one. The stops, and the camera's tilt, go by height in meters, so a
+// view 4 m up looks the same on every planet; the zoom's scale between the
+// ends does not (it reaches orbit at 4.2 R).
 //
 // The camera rides a surface frame (up = local vertical at the focus F,
 // forward, right) stored as a quaternion, so there are no poles. Altitude is
@@ -18,15 +20,22 @@ import { clamp, damp, lerp, smoothstep } from '../core/math';
 export const EYE_HEIGHT = 1.6;
 const OVERVIEW_ALTITUDE = 4.2; // × R
 const MAX_TILT = (82 * Math.PI) / 180;
-/** The zoom (z) over which the camera tilts from looking straight down to the horizon: early, so a bird's-eye view still sees far. */
-const TILT_RAMP = [0.15, 0.9] as const;
+/** Heights (m) at the zoom of a planet of R 128, the reference Kai's views were chosen on. */
+const REF_TOP = OVERVIEW_ALTITUDE * 128;
+const refHeight = (z: number): number => REF_TOP * Math.pow(EYE_HEIGHT / REF_TOP, z);
 /**
- * Stops between the ends (zoom z, so each keeps its tilt, field of view and
- * warp at every planet size): a bird's-eye view (about 52 m up at R 128,
- * looking down over the meadow) and a standing view (about 5.1 m up,
- * looking out across it).
+ * The heights (m) between which the camera tilts from looking straight down
+ * to the horizon, log-spaced (zoom 0.15 to 0.9 at R 128): early, so a
+ * bird's-eye view still sees far.
  */
-const STOPS_Z = [0.4, 0.8] as const;
+const TILT_HEIGHTS = [refHeight(0.15), refHeight(0.9)] as const;
+/**
+ * Stops between the ends (height over the ground, m, the same on every
+ * planet): a bird's-eye view (zoom 0.35 at R 128: about 70 m up, looking
+ * down over the meadow) and a standing view (zoom 0.83 at R 128: about
+ * 4.3 m up, looking out across it).
+ */
+const STOPS_M = [refHeight(0.35), refHeight(0.83)] as const;
 /** Zoom settles on a stop when it is left this near one (in z: half a wheel notch), after this long without zooming (s). */
 const SNAP = { reach: 0.06, after: 0.18 } as const;
 
@@ -76,7 +85,15 @@ export class CameraRig {
   framing(z: number): { altitude: number; tilt: number; fov: number } {
     const top = this.overviewAltitude * this.radius;
     const t = smoothstep(0.3, 1, z);
-    return { altitude: top * Math.pow(EYE_HEIGHT / top, z), tilt: MAX_TILT * smoothstep(TILT_RAMP[0], TILT_RAMP[1], z), fov: lerp(35, 55, t) };
+    const altitude = top * Math.pow(EYE_HEIGHT / top, z);
+    return { altitude, tilt: this.tiltAt(altitude, z), fov: lerp(35, 55, t) };
+  }
+
+  /** The camera's tilt from straight down (rad) at a height (m): by height, so the same on every planet (and straight down in orbit). */
+  private tiltAt(altitude: number, z: number): number {
+    const [hi, lo] = TILT_HEIGHTS;
+    const u = (Math.log(hi) - Math.log(Math.max(altitude, 1e-3))) / (Math.log(hi) - Math.log(lo));
+    return MAX_TILT * smoothstep(0, 1, u) * smoothstep(0, 0.08, z);
   }
 
   /** The zoom at which the camera stands `altitude` m over the ground. */
@@ -161,7 +178,7 @@ export class CameraRig {
   private snapZoom(): void {
     let best = this.zoomTarget;
     let gap: number = SNAP.reach;
-    for (const stop of [0, ...STOPS_Z, 1]) {
+    for (const stop of [0, ...STOPS_M.map((m) => this.zoomForAltitude(m)), 1]) {
       const g = Math.abs(stop - this.zoomTarget);
       if (g < gap) {
         gap = g;
@@ -236,8 +253,8 @@ export class CameraRig {
     this.focus.copy(this.up).multiplyScalar(radius + this.ground);
 
     this.pitch += (this.pitchTarget - this.pitch) * damp(realDt, 0.25);
-    const tilt = Math.min(MAX_TILT * smoothstep(TILT_RAMP[0], TILT_RAMP[1], this.zoom) + this.pitch, Math.PI / 2 - 0.02);
     const alt = this.altitude;
+    const tilt = Math.min(this.tiltAt(alt, this.zoom) + this.pitch, Math.PI / 2 - 0.02);
     const cam = this.camera;
     cam.position.copy(this.up).multiplyScalar(radius + this.ground + alt);
     cam.up.copy(this.forward).multiplyScalar(Math.cos(tilt)).addScaledVector(this.up, Math.sin(tilt));

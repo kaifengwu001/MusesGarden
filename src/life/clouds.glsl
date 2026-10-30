@@ -30,7 +30,10 @@ uniform sampler2D uCloudShadowLocal;  // the same, sharper, over a window of one
 uniform mat3 uShadowLocalFace;        // that face's axes (columns: across, up, out)
 uniform vec4 uShadowWindow;           // the window's centre on the face, 1 / its half-width (face units), on (0 or 1)
 uniform samplerCube uCloudLayerCube;  // the cloud cover seen from below (optical depth)
-uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, -
+#ifndef HAVE_CLOUD_LOOK
+#define HAVE_CLOUD_LOOK
+uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, - (field.glsl declares it too)
+#endif
 uniform vec4 uCloudOrbit; // weight of the view from orbit in the lakes (0..1), mean height of the clouds (m), -, -
 uniform vec3 uCloudEye;   // the camera (not the mirrored one): clouds dissolve around it
 uniform sampler2D uCloudMirror; // the clouds seen from the camera mirrored in the water, premultiplied
@@ -278,22 +281,35 @@ vec4 cloudsFromOrbit(vec3 wp, vec3 r) {
 // focus where it covers the point, otherwise in the cube map. edge: noise in [-1, 1] that
 // roughens the outline (the paint passes its brushstrokes, so shadow edges
 // look brushed).
-float cloudShadowAt(vec3 p, float edge) {
+float cloudCoverAt(vec3 p, float edge) {
   float r = length(p);
   vec3 d = p / r;
   vec3 sun = localSun(d);
   float sinE = max(dot(sun, d), 0.2);
   vec3 q = normalize(d + (d * sinE - sun) * ((r - uRadius) / (sinE * uRadius)));
-  float tau = textureLod(uCloudShadowCube, q, 0.0).r;
-  // near the focus, the sharper window (the two agree but for sharpness, and blend at its rim)
+  // near the focus, the sharper window (the two agree but for sharpness, and blend at its rim);
+  // well inside it the cube map is not read at all (the grass and the flowers are all in there)
+  float inside = 0.0;
+  vec2 xy = vec2(0.0);
   if (uShadowWindow.w > 0.0) {
     vec3 f = q * uShadowLocalFace;
     if (f.z > 0.0) {
-      vec2 xy = (f.xy / f.z - uShadowWindow.xy) * uShadowWindow.z;
-      float inside = 1.0 - smoothstep(0.82, 0.96, max(abs(xy.x), abs(xy.y)));
-      if (inside > 0.0) tau = mix(tau, textureLod(uCloudShadowLocal, xy * 0.5 + 0.5, 0.0).r, inside);
+      xy = (f.xy / f.z - uShadowWindow.xy) * uShadowWindow.z;
+      inside = 1.0 - smoothstep(0.82, 0.96, max(abs(xy.x), abs(xy.y)));
     }
   }
-  float s = 1.0 - exp(-tau * uCloudLook.y * (1.0 + 0.45 * edge));
-  return smoothstep(0.1, 0.5, s) * uCloudLook.x;
+  float tau = inside >= 1.0 ? 0.0 : textureLod(uCloudShadowCube, q, 0.0).r;
+  if (inside > 0.0) tau = mix(tau, textureLod(uCloudShadowLocal, xy * 0.5 + 0.5, 0.0).r, inside);
+  return 1.0 - exp(-tau * uCloudLook.y * (1.0 + 0.45 * edge));
+}
+
+// How deep a shadow a cover (cloudCoverAt) casts. Kept apart so a map can
+// store the cover and its readers threshold it after filtering: the shadow's
+// edge stays crisp between the map's texels (a bird's thin wings too).
+float cloudShade(float cover) {
+  return smoothstep(0.1, 0.5, cover) * uCloudLook.x;
+}
+
+float cloudShadowAt(vec3 p, float edge) {
+  return cloudShade(cloudCoverAt(p, edge));
 }

@@ -79,7 +79,8 @@ void main() {
   vec3 p = base + up * (h * y * (1.0 - 0.32 * min(bl * bl, 1.2) * y)) + side * (w * position.x) + tip * (h * y * y);
 
   // colour per vertex: dark roots, lit tips, paler ahead of the bloom front
-  float shadow = max(meadow.z, 0.85 * cottageShadow(dir));
+  float cloudShade = fieldShade(meadow);
+  float shadow = max(cloudShade, 0.85 * cottageShadow(dir));
   float b = toonLight(dot(up, uSunDir)) * (1.0 - 0.9 * shadow);
   vec3 lit = mix(uGrassPal[0], uGrassPal[1], smoothstep(0.55, 1.0, y) * 0.7);
   vec3 mid = mix(uGrassPal[2], uGrassPal[3], rnd(seed, 7.0) * 0.5);
@@ -93,7 +94,7 @@ void main() {
   // light; behind the crest they spring back up into their own shade
   float crest = max(wind.w, 0.0) * uMeadowLook.x;
   float trough = max(-wind.w, 0.0) * uMeadowLook.x;
-  col = mix(col, uGrassPal[9] * uSunTint, crest * (0.4 + 0.6 * (1.0 - meadow.z)) * (0.4 + 0.6 * y));
+  col = mix(col, uGrassPal[9] * uSunTint, crest * (0.4 + 0.6 * (1.0 - cloudShade)) * (0.4 + 0.6 * y));
   col *= mix(vec3(1.0), vec3(0.56, 0.66, 0.58), trough * 0.85 * (0.45 + 0.55 * y));
   // sun-side rim on the tips
   vec3 v = normalize(toCam);

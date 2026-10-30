@@ -31,8 +31,9 @@ import shadowVertex from './birdShadow.vert.glsl?raw';
 // beats of an egret (about two a second) and long glides on raised wings,
 // banking into the turns. Every pose is a
 // closed-form function of time, so a frozen frame is a pure function of
-// state. Each bird drops a small soft disc into the clouds' shadow map, so
-// its shadow falls on the meadow as theirs do.
+// state. Each bird drops its silhouette (body, swept wings as they beat,
+// fanned tail) into the clouds' shadow map, so its shadow falls on the
+// meadow as theirs do.
 
 const MAX_BIRDS = 256;
 /** Flocks on an R = 128 m planet; more as it grows (with R, so as many cross a place), up to MAX_FLOCKS. */
@@ -182,6 +183,7 @@ export class Birds {
 
     const sg = quad();
     sg.setAttribute('aPos', this.pos);
+    sg.setAttribute('aFrame', this.frame);
     sg.setAttribute('aWing', this.wing);
     sg.instanceCount = 0;
     this.shadowMesh = new Mesh(

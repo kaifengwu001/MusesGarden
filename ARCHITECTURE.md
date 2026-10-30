@@ -138,9 +138,15 @@ them, and the hilltops stand out of it as islands.
 - **Wetlands live in rest space,** so they grow with the planet while the hills
   and banks inside them keep their size in meters; the share of water stays
   about the same from R = 40 m to 400 m (tested).
-- **Homestead pond:** laid out in meters from the cottage (radius ∝ R^0.3, an
-  outline and one islet in pond-normalized coordinates), carved into a dry
-  plateau, so the cottage always stands by its pond with its landing over it.
+- **Homestead pond:** laid out in meters from the cottage (radius 17–22 m at
+  R 128, ∝ R^0.3; an outline and one islet in pond-normalized coordinates;
+  in front of the cottage and 7 m to its left, under the pier), carved into
+  a dry plateau, so the cottage always stands by its pond with its pier
+  over it. The pond shapes the ground only within its widest outline plus
+  the height its banks can reach (cheap tests first: the reflections' march
+  reads the ground a dozen times a pixel). Where the turf drops to the
+  water, the bank's face is shaded by the slope taken per pixel, so it
+  follows the shore rather than the ground mesh's triangles.
   The cottage's clearing stands 1 m above the water (1.2 m with the bank lip),
   a terrace, and the pond's banks drop to the water steeply (0.9 m per m) as
   a cut turf bank; the pond's bed slopes gently (0.3) to its depth. The
@@ -440,7 +446,12 @@ click is what you see.
   with a slight drift; slow, deep beats like an egret's (1.7–2.1 a second)
   and long glides on raised wings, about a third of the time;
   banking by the path's real turn rate. Every pose is closed-form in time.
-  Each casts a small soft shadow through the clouds' shadow map.
+  Each casts its silhouette (body, tail and the two-panel wings as far as
+  they reach out at that point of the wingbeat, turned with its heading)
+  into the clouds' shadow map. The ground reads the map directly; the grass
+  and the flowers read it through the field map, which keeps the cover and
+  thresholds it after filtering, so the shapes stay crisp between its texels
+  (the blades' lean still softens them).
 - **Butterflies** (`butterflies.ts`): six kinds, wings painted per kind, about
   the flowers once you are down in the meadow. Homes come from a lattice of
   5 m cells fixed to the planet in direction space (one lattice per octave of
@@ -521,11 +532,15 @@ so any view can be shared.
   later fills in completely; the map sizes are chosen when the world is
   built.
 - **Zoom stops:** the wheel and the keys settle on orbit, a bird's-eye view
-  (zoom 0.4, about 52 m up at R 128), a standing view (zoom 0.8, about
-  5.1 m) and the meadow (1.6 m) when you stop zooming within half a wheel
-  notch of one (CameraRig STOPS_Z, SNAP; Kai's values). The camera tilts from straight down to
-  the horizon over zoom 0.15–0.9 (TILT_RAMP), so the bird's-eye view sees
-  across the meadow.
+  70.2 m up, a standing view 4.3 m up (Kai's zooms 0.35 and 0.83 at R 128,
+  kept in meters on every planet) and the meadow (1.6 m) when you stop
+  zooming within half a wheel notch of one (CameraRig STOPS_M, SNAP). The
+  camera's tilt goes by height too: from straight down at 225 m to the
+  horizon at 2.9 m, log-spaced (zoom 0.15–0.9 at R 128), so a view at a
+  given height looks the same on every planet and the bird's-eye view sees
+  across the meadow. The default stand (by the first water at the edge of
+  the nearest wetland) is searched on the set-up ground (before iteration 10
+  it ran at startup before the ground was set up).
 - **Tier selection:** `auto` picks a tier from a short startup benchmark
   (phones low; desktops high, medium or low by the benchmark). A live
   controller aims at a steady 60 fps (16.7 ms; 24 ms, tried in iteration 6,
