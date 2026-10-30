@@ -16,6 +16,24 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 6: the review notes (in progress)
+
+Started from iteration 5 (b1209d0). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Commit before each iteration starts | This commit records the notes before any work. |
+| 2 | Butterflies and birds beat their wings too fast; butterflies look like flies and should move elegantly | |
+| 3 | Birds a little slower and lower | |
+| 4 | Sheen 0.5 by default | |
+| 5 | The grass's small, gentle sway doesn't match the wind speed and seems unrelated to the sheen | |
+| 6 | The budget is 24 ms: Auto culls grass too eagerly, and High doesn't go very high | |
+| 7 | Cloud shadows stutter across the ground (their map's resolution), most of all in a large world | |
+| 8 | The cottage: match the design 1 to 1 | |
+| 9 | Grade: about 10 % more contrast, 5 % less brightness | |
+| 10 | Petals blown off by the wind are hard to find in places | |
+| 11 | The painted flower strokes seen from far out should follow the flower map and turn straight into the flowers on the way down | |
+
 ## Iteration 5: the review notes
 
 | # | Note | What changed |
