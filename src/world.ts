@@ -6,6 +6,7 @@ import type { Tier } from './core/quality';
 import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
+import { Butterflies } from './life/butterflies';
 import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
@@ -77,6 +78,7 @@ export class World {
   homestead: Homestead;
   readonly clouds: Clouds;
   readonly birds: Birds;
+  readonly butterflies: Butterflies;
   readonly petals: Petals;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
@@ -144,8 +146,9 @@ export class World {
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 1536 : 768, tier.name === 'high' ? 768 : 384);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
+    this.butterflies = new Butterflies(this.shared);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.clouds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -353,7 +356,8 @@ export class World {
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
     this.birds.update(clock.time, this.terrain);
-    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp);
+    this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
+    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -425,6 +429,23 @@ export class World {
     }
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
+  }
+
+  /**
+   * How far from the focus (rad) the camera can see ground: to the true
+   * horizon from orbit; under the tiny-planet warp, as far as the bent meadow
+   * lets the highest ground show (as the terrain's own culling judges it).
+   */
+  private groundInSight(): number {
+    const R = this.growth.radius;
+    const k = this.warp.k;
+    const margin = 0.08;
+    if (Math.abs(k) * R < 0.01) return Math.acos(Math.min(1, R / this.rig.camera.position.length())) + margin;
+    const bend = 1 / R + 2 * k;
+    if (bend <= 1e-6) return Math.PI;
+    const radiusEff = 1 / bend;
+    const reach = Math.sqrt(2 * radiusEff * (this.rig.altitude + 0.5)) + Math.sqrt(2 * radiusEff * this.terrain.maxHeight);
+    return Math.min(Math.PI, reach / R + margin);
   }
 
   private updateLight(hours: number): void {

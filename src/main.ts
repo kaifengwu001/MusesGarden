@@ -46,6 +46,14 @@ function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
 
 /** Budget for background work (tile builds) per frame, ms. */
 const BUILD_BUDGET_MS = 2;
+/**
+ * The frame's JS (update, building, render submission) aims to stay under
+ * this (ms): the build queue gets what is left after the update and the
+ * render (as long as the last one took), never less than BUILD_MIN_MS so
+ * the meadow keeps growing in, never more than its slice.
+ */
+const FRAME_JS_MS = 3.6;
+const BUILD_MIN_MS = 0.5;
 
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -260,14 +268,18 @@ async function boot(): Promise<void> {
     const n = Math.min(count, logCount);
     return Array.from({ length: n }, (_, k) => ({ ...frameLog[(logHead - n + k + LOG) % LOG] }));
   };
+  let renderMs = 1;
   const frame = (now: number): void => {
     clock.tick(now);
     const t0 = performance.now();
     gpuTimer.begin();
     controls.tick(clock.realDt);
     update();
-    world.queue.run(BUILD_BUDGET_MS);
+    const spent = performance.now() - t0;
+    world.queue.run(Math.min(BUILD_BUDGET_MS, Math.max(BUILD_MIN_MS, FRAME_JS_MS - spent - renderMs)));
+    const r0 = performance.now();
     render();
+    renderMs += (performance.now() - r0 - renderMs) * 0.25;
     gpuTimer.end();
     gpuTimer.poll();
     const jsMs = performance.now() - t0;

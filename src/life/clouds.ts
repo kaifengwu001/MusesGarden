@@ -100,6 +100,9 @@ const FACES = [
   [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1)],
   [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)],
 ].map(([u, v, m]) => new Matrix3().set(u.x, v.x, m.x, u.y, v.y, m.y, u.z, v.z, m.z));
+/** Each face's axis (out), and the farthest a direction on the face lies from it (rad, to a corner). */
+const FACE_AXES = [new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1)];
+const FACE_REACH = Math.acos(1 / Math.sqrt(3));
 /** Cloudiness over the threshold at which a cloud is fully grown. */
 const FADE = 0.07;
 /**
@@ -668,9 +671,12 @@ export class Clouds {
 
   /**
    * Place the clouds for this frame, write them for the shaders (nearest the
-   * camera first) and render their shadow map.
+   * camera first) and render their shadow map. `focus` and `seen` (rad): the
+   * ground the camera can see lies within `seen` of the focus direction; only
+   * the faces of the cube maps that hold some of it are drawn (the others are
+   * never read this frame).
    */
-  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame): void {
+  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, focus: Vector3, seen: number): void {
     if (!this.lumpsBaked) this.bakeLumps(renderer);
     if (seed !== this.seed) this.build(seed);
     if (radius !== this.slotsR) this.layoutSlots(radius);
@@ -732,6 +738,7 @@ export class Clouds {
     const n = this.order.length;
 
     const data = this.uniforms.uCloudData.value.image.data as Float32Array;
+    const { x: sx, y: sy, z: sz } = sunDir;
     let heights = 0;
     this.order.forEach((at, row) => {
       const h = at.slot.seed;
@@ -742,38 +749,53 @@ export class Clouds {
       // bounding sphere about the heap's middle
       this.centre.copy(at.up).multiplyScalar(base + 0.45 * size);
       let reach = 0;
-      puffs.forEach((puff, k) => {
-        const breathe = 1 + 0.05 * Math.sin(time * 0.25 + puff.phase);
-        const r = puff.r * size * breathe * at.fade;
-        this.p
-          .copy(at.up)
-          .multiplyScalar(base + puff.y * size)
-          .addScaledVector(at.along, puff.x * size)
-          .addScaledVector(across, puff.z * size);
+      const { x: ux, y: uy, z: uz } = at.up;
+      const { x: ax, y: ay, z: az } = at.along;
+      const { x: cx, y: cy, z: cz } = across;
+      const { x: mx, y: my, z: mz } = this.centre;
+      for (let k = 0; k < PUFFS; k++) {
+        const puff = puffs[k];
+        const r = puff.r * size * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * at.fade;
+        const up = base + puff.y * size;
+        const al = puff.x * size;
+        const ac = puff.z * size;
+        const x = ux * up + ax * al + cx * ac;
+        const y = uy * up + ay * al + cy * ac;
+        const z = uz * up + az * al + cz * ac;
         const q = o + (HEADER + k) * 4;
-        data[q] = this.p.x;
-        data[q + 1] = this.p.y;
-        data[q + 2] = this.p.z;
+        data[q] = x;
+        data[q + 1] = y;
+        data[q + 2] = z;
         data[q + 3] = r;
-        reach = Math.max(reach, this.p.distanceTo(this.centre) + r);
-      });
+        reach = Math.max(reach, Math.hypot(x - mx, y - my, z - mz) + r);
+      }
       // how much of the heap stands between each puff and the sun (from the
       // upper, sunward part of the puff): 0 lit … 1 in the shade of the others
+      // (only for clouds that are drawn: the mirror and the shadows do without)
+      const lit = o + (HEADER + PUFFS) * 4;
       for (let k = 0; k < PUFFS; k++) {
         const qk = o + (HEADER + k) * 4;
         const rk = data[qk + 3];
-        this.q.set(data[qk], data[qk + 1], data[qk + 2]).addScaledVector(sunDir, 0.35 * rk);
+        if (!this.inSight[row] || rk <= 0) {
+          data[lit + k] = 0;
+          continue;
+        }
+        const ox = data[qk] + sx * 0.35 * rk;
+        const oy = data[qk + 1] + sy * 0.35 * rk;
+        const oz = data[qk + 2] + sz * 0.35 * rk;
         let block = 0;
         for (let j = 0; j < PUFFS; j++) {
           const qj = o + (HEADER + j) * 4;
           const rj = data[qj + 3];
           if (j === k || rj <= 0) continue;
-          this.p.set(data[qj], data[qj + 1], data[qj + 2]).sub(this.q);
-          const tc = this.p.dot(sunDir);
-          const d2 = this.p.lengthSq() - tc * tc;
+          const dx = data[qj] - ox;
+          const dy = data[qj + 1] - oy;
+          const dz = data[qj + 2] - oz;
+          const tc = dx * sx + dy * sy + dz * sz;
+          const d2 = dx * dx + dy * dy + dz * dz - tc * tc;
           if (tc > 0 && d2 < rj * rj) block += 2 * Math.sqrt(rj * rj - d2);
         }
-        data[o + (HEADER + PUFFS) * 4 + k] = rk > 0 ? smoothstep(0.1, 0.6, block / Math.max(size, 1e-3)) : 0;
+        data[lit + k] = smoothstep(0.1, 0.6, block / Math.max(size, 1e-3));
       }
       data[o] = this.centre.x;
       data[o + 1] = this.centre.y;
@@ -804,16 +826,18 @@ export class Clouds {
     renderer.getClearColor(this.clearColour);
     const clearAlpha = renderer.getClearAlpha();
     renderer.setClearColor(0x000000, 0);
-    if (n > 0 || this.casters > 0) this.renderCube(renderer, this.shadowCube, this.shadowScene);
-    if (orbit > 0) this.renderCube(renderer, this.layerCube, this.layerScene);
+    const faces = FACE_AXES.map((axis) => Math.acos(clamp(axis.dot(focus), -1, 1)) < seen + FACE_REACH);
+    if (n > 0 || this.casters > 0) this.renderCube(renderer, this.shadowCube, this.shadowScene, faces);
+    if (orbit > 0) this.renderCube(renderer, this.layerCube, this.layerScene, faces);
     if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearColor(this.clearColour, clearAlpha);
     renderer.setRenderTarget(previous);
   }
 
-  /** Clear each face of a cube map and splat into it. */
-  private renderCube(renderer: WebGLRenderer, target: WebGLCubeRenderTarget, scene: Scene): void {
+  /** Clear the faces of a cube map in sight and splat into them. */
+  private renderCube(renderer: WebGLRenderer, target: WebGLCubeRenderTarget, scene: Scene, faces: readonly boolean[]): void {
     FACES.forEach((face, f) => {
+      if (!faces[f]) return;
       this.uniforms.uCubeFace.value.copy(face);
       renderer.setRenderTarget(target, f);
       renderer.clear(true, false, false);

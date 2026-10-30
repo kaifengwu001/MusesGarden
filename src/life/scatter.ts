@@ -320,8 +320,8 @@ export class ScatterLayer {
         bound = sigma * prepared.boost;
         yield;
       }
-      // 64 sub-cells, so one step of this job stays well under the frame budget
-      const sub = 3;
+      // 256 sub-cells, so one step of this job stays well under the frame budget
+      const sub = 4;
       const n = 1 << sub;
       for (let a = 0; a < n; a++) {
         for (let b = 0; b < n; b++) {

@@ -34,8 +34,9 @@ import shadowVertex from './birdShadow.vert.glsl?raw';
 // its shadow falls on the meadow as theirs do.
 
 const MAX_BIRDS = 256;
-/** Flocks on an R = 128 m planet; more as it grows (with R, so as many cross a place). */
+/** Flocks on an R = 128 m planet; more as it grows (with R, so as many cross a place), up to MAX_FLOCKS. */
 const FLOCKS = 9;
+const MAX_FLOCKS = 32;
 /** Half wingspan (m) of the bird mesh below. */
 const HALF_SPAN = 0.48;
 /**
@@ -60,16 +61,16 @@ interface Bird {
 }
 
 interface Flock {
-  /** A travelling flock's route: a great circle (start, axis, rad/s), swinging about another axis. */
+  /** A travelling flock's route: a great circle (start, axis, speed in m/s, signed), swinging about another axis. */
   start: Vector3;
   axis: Vector3;
-  rate: number;
+  speed: number;
   swing: Vector3;
   swingRate: number;
   /** Side-to-side meander: amplitude (m), rate (rad/s), phase. */
   meander: [number, number, number];
-  /** The cottage flock wheels about a centre instead: centre, radius (m), rate (rad/s). */
-  loop: { centre: Vector3; radius: number; rate: number } | null;
+  /** The wheeling flocks loop about a centre instead: behind the cottage (null centre) or over the marsh; radius (m), rate (rad/s). */
+  loop: { centre: Vector3 | null; radius: number; rate: number } | null;
   /** Height above the highest ground (m), its slow swell (m, rad/s, phase). */
   height: number;
   swell: [number, number, number];
@@ -149,8 +150,6 @@ export class Birds {
   count = 0;
   private flocks: Flock[] = [];
   private layoutSeed = Number.NaN;
-  private flockCount = 0;
-  private flockR = Number.NaN;
   private readonly pos = new InstancedBufferAttribute(new Float32Array(MAX_BIRDS * 3), 3);
   private readonly frame = new InstancedBufferAttribute(new Float32Array(MAX_BIRDS * 4), 4);
   private readonly wing = new InstancedBufferAttribute(new Float32Array(MAX_BIRDS * 4), 4);
@@ -165,6 +164,7 @@ export class Birds {
   private readonly e1 = new Vector3();
   private readonly e2 = new Vector3();
   private readonly dir = new Vector3();
+  private readonly home = new Vector3();
 
   constructor(shared: Record<string, IUniform>) {
     for (const a of [this.pos, this.frame, this.wing]) a.setUsage(DynamicDrawUsage);
@@ -198,8 +198,11 @@ export class Birds {
     this.shadowMesh.frustumCulled = false;
   }
 
-  /** Flocks for a world: two wheeling near the cottage, the rest on routes round the planet. */
-  private build(terrain: Terrain, count: number): void {
+  /**
+   * Flocks for a world (once per seed; R only decides how many fly): two
+   * wheeling near the cottage, the rest on routes round the planet.
+   */
+  private build(terrain: Terrain): void {
     const L = terrain.layout;
     const R = terrain.radius;
     const rand = rng(L.seed ^ 0xb12d5);
@@ -235,7 +238,7 @@ export class Birds {
       const s = Math.sqrt(1 - z * z);
       return new Vector3(s * Math.cos(a), s * Math.sin(a), z);
     };
-    this.flocks = Array.from({ length: count }, (_, f): Flock => {
+    this.flocks = Array.from({ length: MAX_FLOCKS }, (_, f): Flock => {
       const axis = unitVector();
       const start = tangentToward(axis, unitVector(), new Vector3());
       const speed = 6 + 2 * rand();
@@ -246,12 +249,12 @@ export class Birds {
       return {
         start,
         axis,
-        rate: (speed / R) * (rand() < 0.5 ? -1 : 1),
+        speed: speed * (rand() < 0.5 ? -1 : 1),
         swing: unitVector(),
         swingRate: ((Math.PI * 2) / (600 + 600 * rand())) * (rand() < 0.5 ? -1 : 1),
         meander: [6 + 8 * rand(), (Math.PI * 2) / (28 + 22 * rand()), rand() * Math.PI * 2],
         // (the cottage loop's nearest pass stays 8 m clear of the chimney)
-        loop: home ? { centre: travel(L.cottage, L.homeBearing, -22 / R, new Vector3()), radius: loopRadius, rate: speed / loopRadius } : f === 1 ? { centre: marsh.clone(), radius: loopRadius, rate: -speed / loopRadius } : null,
+        loop: home ? { centre: null, radius: loopRadius, rate: speed / loopRadius } : f === 1 ? { centre: marsh.clone(), radius: loopRadius, rate: -speed / loopRadius } : null,
         height: home ? FLIGHT.height[0] - 1 : FLIGHT.height[0] + (FLIGHT.height[1] - FLIGHT.height[0]) * rand(),
         swell: [0.3 + 0.4 * rand(), (Math.PI * 2) / (18 + 14 * rand()), rand() * Math.PI * 2],
         birds: Array.from({ length: n }, (_, k): Bird => {
@@ -272,22 +275,24 @@ export class Birds {
       };
     });
     this.layoutSeed = L.seed;
-    this.flockCount = count;
-    this.flockR = R;
   }
 
   /** Where a flock's centre is at time t (unit direction, planet space). */
-  private route(f: Flock, t: number, R: number, out: Vector3): Vector3 {
+  private route(f: Flock, t: number, terrain: Terrain, out: Vector3): Vector3 {
+    const R = terrain.radius;
     if (f.loop) {
-      // a wide loop behind the cottage, leaning a little out of round
+      // a wide loop, leaning a little out of round
+      const L = terrain.layout;
+      const centre = f.loop.centre ?? travel(L.cottage, L.homeBearing, -22 / R, this.home);
       const a = f.loop.rate * t;
       const r = f.loop.radius * (1 + 0.12 * Math.sin(2 * a + f.meander[2]));
-      tangentToward(f.loop.centre, f.start, this.e1);
-      this.e2.crossVectors(f.loop.centre, this.e1);
+      tangentToward(centre, f.start, this.e1);
+      this.e2.crossVectors(centre, this.e1);
       this.dir.copy(this.e1).multiplyScalar(Math.cos(a)).addScaledVector(this.e2, Math.sin(a));
-      return travel(f.loop.centre, this.dir, r / R, out);
+      return travel(centre, this.dir, r / R, out);
     }
-    out.copy(f.start).applyAxisAngle(f.axis, f.rate * t).applyAxisAngle(f.swing, f.swingRate * t);
+    // (in m/s at every size, so while the planet grows a flock hops along its route)
+    out.copy(f.start).applyAxisAngle(f.axis, (f.speed * t) / R).applyAxisAngle(f.swing, f.swingRate * t);
     // the meander: aside from the great circle, along the axis it turns about
     this.e1.copy(f.axis).applyAxisAngle(f.swing, f.swingRate * t);
     this.e1.addScaledVector(out, -this.e1.dot(out)).normalize();
@@ -297,8 +302,8 @@ export class Birds {
   /** Fly every bird to where it is at `time` (s). */
   update(time: number, terrain: Terrain): void {
     const R = terrain.radius;
-    const count = Math.max(3, Math.round((FLOCKS * R) / 128));
-    if (terrain.layout.seed !== this.layoutSeed || count !== this.flockCount || R !== this.flockR) this.build(terrain, count);
+    if (terrain.layout.seed !== this.layoutSeed) this.build(terrain);
+    const count = Math.min(MAX_FLOCKS, Math.max(3, Math.round((FLOCKS * R) / 128)));
     const pos = this.pos.array as Float32Array;
     const frame = this.frame.array as Float32Array;
     const wing = this.wing.array as Float32Array;
@@ -306,11 +311,11 @@ export class Birds {
     const cottage = terrain.layout.cottage;
     const dt = 0.25;
     let n = 0;
-    for (const f of this.flocks) {
+    for (const f of this.flocks.slice(0, count)) {
       // heading and turn from the route a moment either side
-      this.route(f, time - dt, R, this.a);
-      this.route(f, time, R, this.centre);
-      this.route(f, time + dt, R, this.b);
+      this.route(f, time - dt, terrain, this.a);
+      this.route(f, time, terrain, this.centre);
+      this.route(f, time + dt, terrain, this.b);
       this.ahead.subVectors(this.b, this.a);
       this.ahead.addScaledVector(this.centre, -this.ahead.dot(this.centre)).normalize();
       this.side.crossVectors(this.centre, this.ahead);

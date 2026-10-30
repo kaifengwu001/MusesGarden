@@ -17,6 +17,8 @@ export class BuildQueue {
   /** Milliseconds spent in the most recent `run`. */
   lastMs = 0;
   private entries: Entry[] = [];
+  /** The longest recent job step (ms, slowly forgotten): a step is not started unless one that long would still fit. */
+  private stepMs = 0.2;
 
   get size(): number {
     return this.entries.length;
@@ -45,14 +47,24 @@ export class BuildQueue {
     }
   }
 
-  /** Resume jobs until `budgetMs` has elapsed. Returns the time spent. */
+  /**
+   * Resume jobs while the next step should end within `budgetMs` (one step
+   * always runs, so work never stalls). Returns the time spent.
+   */
   run(budgetMs: number): number {
     const t0 = performance.now();
     if (this.entries.length > 1) this.entries.sort((a, b) => a.priority - b.priority);
+    let stepped = false;
     while (this.entries.length > 0) {
       const entry = this.entries[0];
       let done = false;
-      while (!done && performance.now() - t0 < budgetMs) done = entry.job.next().done === true;
+      while (!done) {
+        const start = performance.now();
+        if (stepped && start - t0 + this.stepMs > budgetMs) break;
+        done = entry.job.next().done === true;
+        stepped = true;
+        this.stepMs = Math.max(performance.now() - start, this.stepMs * 0.995);
+      }
       if (!done) break;
       this.entries.shift();
     }
