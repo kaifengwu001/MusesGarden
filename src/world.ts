@@ -108,6 +108,7 @@ export class World {
   private readonly ground = createGroundSample();
   private readonly east = new Vector3();
   private readonly tmp = new Vector3();
+  private readonly tmp2 = new Vector3();
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
@@ -195,10 +196,10 @@ export class World {
     const R = this.growth.radius;
     if (name === 'homestead') {
       // stand across the pond, looking back at the cottage and its landing
-      const bearing = L.homeBearing.clone().applyAxisAngle(L.cottage, Math.PI + 0.35);
-      const target = L.cottage.clone().multiplyScalar(Math.cos(14 / R)).addScaledVector(bearing, -Math.sin(14 / R)).normalize();
+      const bearing = L.homeBearing.clone().applyAxisAngle(L.cottage, Math.PI + 0.3);
+      const target = L.cottage.clone().multiplyScalar(Math.cos(19 / R)).addScaledVector(bearing, -Math.sin(19 / R)).normalize();
       this.rig.lookAlong(target, bearing.addScaledVector(target, -bearing.dot(target)).normalize());
-      this.rig.setZoom(0.8, true);
+      this.rig.setZoom(0.88, true);
     } else if (name === 'vista') {
       const vista = this.findVista();
       this.rig.lookAlong(vista.focus, vista.forward, immediate);
@@ -352,9 +353,12 @@ export class World {
 
     // The homestead sits on its clearing, facing its pond; its shadow sweeps away from the sun.
     this.homestead.place(this.tmp.copy(L.cottage).multiplyScalar(R + this.terrain.cottageGround), L.cottage, L.homeBearing);
+    // (down the sun the cottage sees, as its walls are lit: render/sun.ts)
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
-    const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
-    this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
+    const sun = sunAt(p.light.timeOfDay);
+    const cs = localSun(L.cottage, sun.elevation, sun.azimuth, this.tmp2);
+    const sy = Math.max(cs.dot(L.cottage), 0.12);
+    this.terrainUniforms.uCottageSun.value.set(cs.dot(across) / sy, cs.dot(L.homeBearing) / sy, 0, 0);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());

@@ -2,6 +2,8 @@ import { Vector3, Vector4, type Texture } from 'three';
 import { hash32, mix, unit } from '../core/hash';
 import { smoothstep } from '../core/math';
 import { Fields, type FieldParams } from './fields';
+import { sunAt } from '../render/palette';
+import { localSun } from '../render/sun';
 import { angleBetween, tangentToward, travel } from './geo';
 
 // The ground: a rolling meadow with lakes in its hollows (fields.ts holds the
@@ -18,16 +20,22 @@ import { angleBetween, tangentToward, travel } from './geo';
 //              always sits by its pond whatever the size of the planet
 
 export const R_REF = 128;
+/** The hour the cottage is turned to face (the one light for now, params light.timeOfDay). */
+const LAYOUT_SUN_HOURS = 11.5;
 /** Distances (m) from the cottage centre: clearing flattened, and the pond's near edge. */
-export const COTTAGE_FLAT = 5.5;
+export const COTTAGE_FLAT = 6;
 export const COTTAGE_TO_POND = 4.6;
-/** The cottage clearing stands this high above the water (m). */
-export const HOME_LEVEL = 0.5;
+/** The cottage clearing stands this high above the water (m): its landing is a terrace over the pond. */
+export const HOME_LEVEL = 1;
+/** The house's footprint (half sizes, m) and the landing's area with its stair (props.ts COTTAGE, LANDING): cleared of plants. */
+export const HOUSE_FOOTPRINT = { halfX: 4.5, halfZ: 2.5 } as const;
+export const LANDING_AREA = { x0: -3.4, x1: 3.1, z1: 6.0 } as const;
 /** Dry plateau around the homestead (m): full inside, none outside. */
 export const PLATEAU = { inner: 10, outer: 26 } as const;
-/** The homestead pond's bed: slope from its edge (m/m) and deepest point (m). */
+/** The homestead pond's bed: slope from its edge (m/m) and deepest point (m); its banks: a steep cut turf slope (m/m). */
 const POND_SLOPE = 0.3;
 const POND_DEPTH = 1.4;
+const POND_BANK = 0.9;
 /** Bank lip: height (m) and the distance (m) over which it rises from the waterline. */
 export const BANK = { height: 0.2, width: 0.3, minSlope: 0.04 } as const;
 
@@ -64,7 +72,9 @@ function randomDirection(rand: () => number, out = new Vector3()): Vector3 {
 
 /**
  * The world's layout from its seed. The cottage goes on dry ground near the
- * edge of a wetland (so lakes are in view), facing the wettest way.
+ * edge of a wetland (so lakes are in view), facing the wettest way within
+ * 70° of the sun (the late-morning sun that place sees, render/sun.ts), so
+ * its front and its pond are in the light, seen from across the water.
  */
 export function generateLayout(seed: number): Layout {
   const rand = sequence(seed);
@@ -85,11 +95,14 @@ export function generateLayout(seed: number): Layout {
   const east = new Vector3().crossVectors(north, cottage);
   const t = new Vector3();
   const p = new Vector3();
-  let bearing = north.clone();
+  const sun = sunAt(LAYOUT_SUN_HOURS);
+  const towardSun = tangentToward(cottage, localSun(cottage, sun.elevation, sun.azimuth, new Vector3()), new Vector3());
+  let bearing = towardSun.clone();
   let wettest = -Infinity;
   for (let k = 0; k < 16; k++) {
     const a = (k / 16) * Math.PI * 2;
     t.copy(north).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
+    if (t.dot(towardSun) < Math.cos((70 * Math.PI) / 180)) continue;
     const w = probe.wetNoise(travel(cottage, t, 0.35, p));
     if (w > wettest) {
       wettest = w;
@@ -210,7 +223,8 @@ export class Terrain {
     h += (Math.max(h, 0.4) * 0.5 + 0.25 - h) * dry;
     const flat = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
     h += (this.cottageLevel - h) * flat;
-    return Math.min(h, Math.max(this.homePond(dir) * POND_SLOPE, -POND_DEPTH));
+    const d = this.homePond(dir);
+    return Math.min(h, Math.max(d * (d > 0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
   }
 
   /** Ground height before the bank lip (m above the water table). */
@@ -249,13 +263,17 @@ export class Terrain {
     return this.fields.lift + 4 * this.fields.reliefStd + BANK.height + 0.5;
   }
 
-  /** No grass, flowers or stones: right around the house and on the landing. */
+  /** No grass, flowers or stones: inside the house and on the landing. */
   clearingAt(dir: Vector3, dc: number): number {
-    const disc = smoothstep(3.6, 2.9, dc);
-    if (dc > 9) return disc;
+    if (dc > 9) return 0;
     const c = this.cottageLocal(dir, localTmp);
-    const rect = smoothstep(0.35, 0, Math.max(-2.6 - c.x, c.x - 1.3, -0.2 - c.z, c.z - 5.9));
-    return Math.max(disc, rect);
+    const H = HOUSE_FOOTPRINT;
+    const dx = Math.abs(c.x) - H.halfX;
+    const dz = Math.abs(c.z) - H.halfZ;
+    const house = smoothstep(0.3, 0, Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dz), 0));
+    const A = LANDING_AREA;
+    const landing = smoothstep(0.35, 0, Math.max(A.x0 - c.x, c.x - A.x1, -0.2 - c.z, c.z - A.z1));
+    return Math.max(house, landing);
   }
 
   /** Uniform values for terrain.glsl (shared by every material that samples the ground). */

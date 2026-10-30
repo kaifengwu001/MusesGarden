@@ -4,6 +4,8 @@
 //               terrain (with its bank lip and its grass). This is the dark
 //               band under every shore: as tall as the bank and the meadow
 //               behind it, so it widens and narrows along the shore
+//   the cottage its landing, walls and roof as plain solids, painted in a
+//               few broad strokes (cottageInMirror)
 //   the clouds  the same puffs the sky shows, drawn from the mirrored camera
 //               (cloudsInMirror, clouds.glsl); from orbit, the cloud cover
 //               seen from below (cloudsFromOrbit)
@@ -11,8 +13,8 @@
 // Looking down into the water you see more of its navy body, looking across
 // it more of the mirror. Gusts ruffle the mirror into streaks; a few glints
 // swell and fade (never pop); clicks ripple. No refraction.
-// Requires: toon, meadow (windDir, patternOctaves), terrain (height0, uBank),
-// warp (unwarpPosition), clouds (cloudsInMirror), uResolution.
+// Requires: toon, meadow (windDir, patternOctaves), terrain (height0, uBank,
+// uCottage), warp (unwarpPosition), clouds (cloudsInMirror, localSun), uResolution.
 
 #define MAX_RIPPLES 6
 uniform vec4 uWaterLook;             // -, depth tint, glints, time (s)
@@ -92,6 +94,110 @@ vec3 bankColour(vec3 d, float y) {
   return mix(face, grass, smoothstep(uBank.x * 0.5, uBank.x + uWaterSky.z, y) * 0.75);
 }
 
+// Where a ray (planet space) enters a box (lo, hi); x > y when it misses.
+vec2 boxEntry(vec3 ro, vec3 rd, vec3 lo, vec3 hi, out vec3 nrm) {
+  vec3 inv = 1.0 / rd;
+  vec3 t0 = (lo - ro) * inv;
+  vec3 t1 = (hi - ro) * inv;
+  vec3 tn = min(t0, t1);
+  vec3 tf = max(t0, t1);
+  float near = max(max(tn.x, tn.y), tn.z);
+  float far = min(min(tf.x, tf.y), tf.z);
+  nrm = near == tn.x ? vec3(-sign(rd.x), 0.0, 0.0) : near == tn.y ? vec3(0.0, -sign(rd.y), 0.0) : vec3(0.0, 0.0, -sign(rd.z));
+  return vec2(near, far);
+}
+
+// The cottage seen in the water (props.ts COTTAGE, ROOF, LANDING): the
+// mirrored ray from p (planet space) traced in the cottage's own frame
+// against its landing, its walls and its hipped roof (a convex solid: four
+// slopes at 38° above the eaves), and painted in a few broad strokes: cream
+// plaster with the eaves' blue band, the dark door and windows, the olive
+// roof striped by its courses and mossy low down. Colour, and the distance
+// along the ray (w < 0: it misses).
+vec4 cottageInMirror(vec3 p, vec3 r) {
+  vec3 U = uCottage.xyz;
+  vec3 Z = uCottageB.xyz;
+  vec3 X = cross(U, Z);
+  vec3 o = p - U * (uRadius + uCottage.w + uBank.x);
+  vec3 ro = vec3(dot(o, X), dot(o, U), dot(o, Z));
+  vec3 rd = vec3(dot(r, X), dot(r, U), dot(r, Z));
+  // most of the water's rays pass nowhere near it
+  vec3 oc = vec3(0.0, 1.6, 1.0) - ro;
+  float tc = dot(oc, rd);
+  if (tc < 0.0 || dot(oc, oc) - tc * tc > 64.0) return vec4(0.0, 0.0, 0.0, -1.0);
+  const float TAN = 0.7813; // tan 38°
+  const vec4 EAVES = vec4(5.12, 3.12, 2.136, 4.573); // half x, half z, eave height, ridge height
+  float best = 1e9;
+  vec3 col = vec3(0.0);
+  vec3 nrm = vec3(0.0);
+  vec3 n;
+  // the landing (with its arch at the waterline)
+  vec2 t = boxEntry(ro, rd, vec3(-3.3, -1.3, 2.5), vec3(3.0, 0.02, 5.4), n);
+  if (t.x < t.y && t.x > 0.0 && t.x < best) {
+    best = t.x;
+    nrm = n;
+    vec3 h = ro + rd * t.x;
+    col = mix(pal(ROW_STONE, 9), pal(ROW_STONE, 6), smoothstep(-0.8, -1.1, h.y));
+    vec2 q = (h.xy - vec2(-1.9, -0.85)) / vec2(0.42, 0.32);
+    if (n.z > 0.5 && abs(q.x) < 1.0 && (q.y < 0.0 || length(q) < 1.0)) col = vec3(0.06, 0.09, 0.09);
+  }
+  // the walls (the door and the windows on the front)
+  t = boxEntry(ro, rd, vec3(-4.5, -0.12, -2.5), vec3(4.5, 2.5, 2.5), n);
+  if (t.x < t.y && t.x > 0.0 && t.x < best) {
+    best = t.x;
+    nrm = n;
+    vec3 h = ro + rd * t.x;
+    col = mix(pal(ROW_STONE, 1), pal(ROW_STONE, 10), smoothstep(1.7, 1.85, h.y));
+    if (n.z > 0.5) {
+      if (abs(h.x + 0.35) < 0.5 && h.y < 1.95) col = mix(pal(ROW_ROOF, 3), pal(ROW_ROOF, 2), 0.4);
+      if ((abs(h.x + 2.62) < 0.72 || abs(h.x - 2.02) < 0.72) && abs(h.y - 1.42) < 0.5) col = mix(pal(ROW_ROOF, 9), pal(ROW_ROOF, 10), 0.45);
+    }
+  }
+  // the roof: inside every slope's plane and above the eaves
+  vec3 planes[4] = vec3[4](vec3(0.0, 1.0, TAN), vec3(0.0, 1.0, -TAN), vec3(TAN, 1.0, 0.0), vec3(-TAN, 1.0, 0.0));
+  float limits[4] = float[4](EAVES.y * TAN + EAVES.z, EAVES.y * TAN + EAVES.z, EAVES.x * TAN + EAVES.z, EAVES.x * TAN + EAVES.z);
+  float near = (EAVES.z - ro.y) / rd.y;
+  float far = 1e9;
+  vec3 nearN = vec3(0.0, -1.0, 0.0);
+  if (rd.y < 0.0) {
+    far = near;
+    near = -1e9;
+  }
+  for (int i = 0; i < 4; i++) {
+    float d = dot(planes[i], rd);
+    float num = limits[i] - dot(planes[i], ro);
+    if (abs(d) < 1e-6) {
+      if (num < 0.0) far = -1e9;
+      continue;
+    }
+    float ti = num / d;
+    if (d < 0.0) {
+      if (ti > near) {
+        near = ti;
+        nearN = normalize(planes[i]);
+      }
+    } else {
+      far = min(far, ti);
+    }
+  }
+  if (near < far && near > 0.0 && near < best) {
+    best = near;
+    nrm = nearN;
+    vec3 h = ro + rd * near;
+    float up = clamp((h.y - EAVES.z) / (EAVES.w - EAVES.z), 0.0, 1.0);
+    float course = fract(up * 9.0);
+    vec3 tile = mix(pal(ROW_ROOF, 0), pal(ROW_ROOF, 6), (1.0 - smoothstep(0.1, 0.55, up)) * 0.75);
+    tile *= 1.0 - 0.45 * smoothstep(0.65, 0.9, course);
+    col = mix(tile, pal(ROW_ROOF, 14), (1.0 - smoothstep(0.0, 0.14, course)) * 0.6);
+  }
+  if (best > 1e8) return vec4(0.0, 0.0, 0.0, -1.0);
+  // lit by the sun the cottage sees, a little darker in the water
+  vec3 sun = localSun(U);
+  vec3 sunLocal = vec3(dot(sun, X), dot(sun, U), dot(sun, Z));
+  float light = smoothstep(-0.3, 0.6, dot(nrm, sunLocal));
+  return vec4(col * mix(vec3(0.74, 0.76, 0.8), vec3(1.0), light) * 0.9, best);
+}
+
 // One octave of glints: a third of the lattice cells hold a short dash along
 // the wind that swells and fades on its own slow sine.
 float glintOctave(vec3 dir, float freq, vec3 along, uint seed) {
@@ -142,6 +248,13 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec4 bank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec4 cl = vec4(0.0);
   if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
+  // the cottage stands over its pond: in front of whatever bank is behind it
+  vec3 pw = unwarpPosition(wp);
+  vec4 house = cottageInMirror(pw, r);
+  if (house.w >= 0.0 && (bank.w < 0.0 || house.w < distance(pw, bank.xyz * (uRadius + bank.w)))) {
+    mirror = house.rgb;
+    bank.w = max(bank.w, 0.0);
+  }
   else {
     // from near the ground the mirror pass; from far above the cloud cover; cross-faded on the way
     if (uCloudOrbit.x < 1.0) cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution);

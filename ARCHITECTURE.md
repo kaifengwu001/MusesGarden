@@ -141,6 +141,11 @@ them, and the hilltops stand out of it as islands.
 - **Homestead pond:** laid out in meters from the cottage (radius ∝ R^0.3, an
   outline and one islet in pond-normalized coordinates), carved into a dry
   plateau, so the cottage always stands by its pond with its landing over it.
+  The cottage's clearing stands 1 m above the water (1.2 m with the bank lip),
+  a terrace, and the pond's banks drop to the water steeply (0.9 m per m) as
+  a cut turf bank; the pond's bed slopes gently (0.3) to its depth. The
+  cottage faces the late-morning sun its place sees (the wettest way within
+  70° of it), so from across the pond its front is in the light.
 
 ### Bloom front
 
@@ -307,16 +312,34 @@ click is what you see.
 - **Toon lighting:** `toon.glsl` has three bands with 0.08-wide soft
   transitions, a warm sun, a cool sky ambient from above, and a sun-side rim on
   grass and flower heads.
+- **The sun each place sees** (`sun.ts`, `sun.glsl`): one light, late morning,
+  everywhere: the same elevation and bearing from local north (world +Y
+  projected), climbing to the zenith near the poles so the field stays smooth.
+  It is fixed to the planet, so shadows stay put however the globe is turned.
+  The view is lit by the sun at the focus; cloud and bird shadows, the
+  cottage and its ground shadow each use their own place's sun.
 - **No outlines:** everything keeps soft, painted edges, the cottage too.
-- **The cottage** is painted in the shader, never textured: limewashed walls
-  a warm white whose stones show only where the wash has worn (each face
-  vertex carries its distance to the nearest edge and corner, so quoins,
-  jambs, the plinth and a few flaked patches show stone), damp at the foot,
-  ivy up one corner, the eaves' shadow painted along the top; a hipped roof
-  bent out of true (sagging ridge, a drooping eave, dipping slopes) with
-  mossy slates in wandering courses; a flagstone landing with a painted arch
-  at the waterline. Soft light (warm sun, cool lavender shade), and the
-  clouds' shadows pass over it. The building is an original design.
+- **The cottage** is built and painted after the reference's proportions and
+  brushwork (an original design: our own layout of door, windows, bench and
+  landing). A long, low house, 9 × 5 m, the walls under the eaves about 4.4
+  times as long as they are tall, under a hipped roof of one 38° pitch all
+  round with deep eaves just above the door and the windows, on a terrace
+  over its pond with a stair down to the water. The roof is nine courses of
+  tiles a side, each course's foot standing 5.5 cm proud (a real step: a lit
+  lip, and a painted line of shadow under it), beaded capping tiles along the
+  hips and the ridge, the tiles' ends along the eaves, bent a little out of
+  true. Painted in the shader, never textured: the plaster in broad ochre
+  blooms with darker dried rims, pink-lavender patches, horizontal streaks
+  and dabs, stones only where it has fallen away (each face vertex carries
+  its distance to the nearest edge and corner), damp at the foot; moss
+  settling olive and yellow in the lower courses; a plank door with iron
+  straps; small panes with the meadow below and the sky above. The shadows
+  are painted from the cottage's own sun: a blue-lavender band down the top
+  of each wall as deep as the sun is steep on it, cooler shaded walls with
+  the meadow's green bounced in, blue-grey shaded slopes, the bench's shadow
+  on the wall, the house's shadow (walls and hipped roof) deep and cool on
+  its landing and the meadow, the clouds' passing over. The cottage also
+  stands in the water's mirror (water.glsl, cottageInMirror).
 - **Aerial perspective:** distance pales the meadow toward a grey-green haze,
   thicker as the camera comes down into the meadow (the far meadow reads like
   a painted distance); the planet's limb from orbit dissolves into the sky's
@@ -328,9 +351,12 @@ click is what you see.
   ray mirrored off the level surface, nearest first: the banks (marched over
   the terrain plus its bank lip and grass; this is the dark band under every
   shore, as tall as the bank and the meadow behind it, so it widens and
-  narrows along the shore), the clouds (read from the clouds' mirror pass at
-  the pixel itself, nudged by the wind's ruffle), and the sky painted as the
-  lakes' cobalt. Looking down into the water shows more of
+  narrows along the shore), the cottage (its landing, walls and roof as plain
+  solids in its own frame, painted in a few broad strokes), the clouds (read
+  from the clouds' mirror pass at the pixel itself, nudged by the wind's
+  ruffle; from far above, from the cloud cover seen from below, where the
+  mirrored ray meets the clouds' mean height, cross-fading between 0.35 R and
+  0.8 R of altitude), and the sky painted as the lakes' cobalt. Looking down into the water shows more of
   the navy body, looking across it more of the mirror (Fresnel-like). Wind
   ruffles streak the mirror; glints swell and fade on their own slow sine and
   never shrink below a couple of pixels; lily pads are off by default. The
@@ -346,10 +372,13 @@ click is what you see.
   white top, blue-grey shade and a little meadow green at the base. The same
   puffs draw the cloud (a billboard each, fitted to the puffs' clipped screen
   bounds, traced per pixel, its front's depth written so hills hide it), cast
-  its shadow (puffs splatted with the same lumpy outline into a 2048² sun-
-  space map of optical depth) and show in the lakes (the billboards drawn
-  again from the mirrored camera), so a cloud, its shadow and its reflection
-  always agree. **Where** they are is weather: a flow over the sphere (four
+  its shadow (every cloud, in sight or not: puffs splatted with the same
+  lumpy outline, each down the sun its place sees, into a cube map of where
+  the shadows reach the water table, 1536² a face; the ground looks itself
+  up corrected for its height; only the faces holding ground in sight are
+  drawn) and show in the lakes (the billboards drawn again from the mirrored
+  camera; from orbit, a second cube map of the cover seen from below), so a
+  cloud, its shadow and its reflection always agree. **Where** they are is weather: a flow over the sphere (four
   or five vortices spiralling in or out, and banded east–west winds) traced
   into streamlines about a cloud's width apart (Jobard and Lefer, the spacing
   wandering); clouds are strung along them, long axis with the flow, and a
@@ -359,25 +388,42 @@ click is what you see.
   grows with √R and the clouds along a line slide closer, so streaks stay
   whole. A cloud near the camera erodes from its edges. Shadows are a deep,
   cool green with brushed edges.
-- **Birds:** small flocks of white birds fly loose figure-of-eight circuits a
-  few meters up (one over the cottage's pond, a few over the wetlands, one
-  just ahead of the view), banking into turns and beating two-panel wings in
-  bursts between glides. Every pose is closed-form in time. Each casts a
-  small soft shadow through the clouds' shadow map.
+- **Birds:** small flocks of white birds, all tied to the planet. Most
+  travel great circles round it at 6–8 m/s, the circle swinging slowly so
+  the routes cross the whole meadow, with a gentle meander; two wheel in
+  steady loops near the cottage (behind it, and over the nearest wetland).
+  Level flight a few meters over the hilltops, rising over the cottage; loose
+  V's and clusters with a slight drift; steady beats with short glides;
+  banking by the path's real turn rate. Every pose is closed-form in time.
+  Each casts a small soft shadow through the clouds' shadow map.
+- **Butterflies** (`butterflies.ts`): six kinds, wings painted per kind, about
+  the flowers once you are down in the meadow. Homes come from a lattice of
+  5 m cells fixed to the planet in direction space (one lattice per octave of
+  R; each home keeps its butterfly by rank as the density per m² changes),
+  kept more often among flowers and never on the water; those within 20 m of
+  the focus fly. Flight is closed-form: a wandering loop from the flower tops
+  to eye level with a flutter, now and then a settle on a flower, wings
+  fanning.
 - **Wind:** broad gust bands and quicker ripples travel with the flow (both
-  advected exactly by rotating about the wind axis). Where they lay the grass
-  over, blades and paint take on a pale sheen, brightest in sun; between the
-  bands the grass reads deeper. The same field bends the blades and flowers.
+  advected exactly by rotating about the wind axis). Where a gust lays the
+  grass over, blades and paint take on a pale sheen (the crest), brightest in
+  sun; just upwind of it the grass springs back up into its own shade (the
+  trough, dark and cool), so the meadow reads like a swell running across it.
+  The sheen is signed (-1 trough … 1 crest); the same field bends the blades
+  and flowers, which lean back a little in the troughs.
 - **Post:** tone curve, gentle highlight bloom, and about 2% static paper grain.
 
 ## Frame
 
 The main pass renders into a linear HDR target, with MSAA only where it is
 affordable (see Budgets), in this order: sky → terrain and water → props →
-grass → flowers → birds → clouds → particles. Before it, each frame, the
-clouds render their sun-space shadow map (with the birds' discs) and their
-mirror (the billboards from the camera mirrored in the water, at a third of
-the resolution). Post then draws to the screen.
+grass → flowers → birds → butterflies → clouds → particles. Before it, each
+frame, the clouds render their shadow cube map (with the birds' discs, on the
+faces holding ground in sight), their cover-from-below cube map (from orbit
+only) and their mirror (the billboards from the camera mirrored in the
+water, at full resolution). Post then draws to the screen. The build queue
+gets what is left of 3.6 ms of JS after the update and the render (at least
+0.5 ms, at most 2 ms), and never starts a step that would not fit.
 
 One shared set of uniform objects (time, wind, warp, R, R_lag, sun, palette) is
 referenced by every material, so each frame writes each value once.
@@ -458,18 +504,20 @@ so any view can be shared.
         flowers.ts/.glsl   drift, colony and clump classifier, four species pools (meshes in flowerMeshes.ts), bloom, flutter
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
-        clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow map, mirror pass
+        clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow and cover cube maps, mirror pass
         cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
-        birds.ts/.glsl     flocks of white birds, wing hinges, shadow discs
-        props.ts/.glsl     cottage, landing, rail, bench, built as painted faces (edge and corner distances per vertex)
+        birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
+        butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings
+        props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
         fog.glsl           aerial perspective
+        sun.ts/.glsl       the sun each place sees (fixed to the planet)
         warp.glsl / .ts    tiny-planet warp (GPU and its exact CPU mirror), its curvature by zoom
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, CPU picking
+      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

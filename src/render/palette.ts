@@ -49,12 +49,13 @@ const NOON: Rows = {
   [ROW.ROCK]: ['#6F7C8E', '#4E5D78', '#8F99AA', '#77739D'],
   // snow, blue-lilac shade, mid, highlight
   [ROW.SNOW]: ['#F1F3F7', '#C4C8E4', '#DCE1EF', '#FFFFFF'],
-  // wall light (butter cream), wall, -, stone, stone dark, joint, damp, warm patch, landing top, landing side,
-  // eave shadow (as a tint on the wall colour), plaster, brick, brick dark
-  [ROW.STONE]: ['#F3E3B6', '#E6D2A0', '#B9AC86', '#CDBA92', '#A69472', '#9C8C6E', '#98A07A', '#E3BE96', '#ECE2C6', '#D8C9A2', '#A7A0A8', '#EFE6CE', '#A65B3E', '#7E4330'],
-  // tile, tile shade, door wood, door wood shade, iron, tile light, moss light, moss dark, capping tiles,
-  // window frames, glass: the meadow, glass: the sky
-  [ROW.ROOF]: ['#5E5347', '#3F3832', '#A86B3C', '#6E4426', '#3A3632', '#8F826E', '#A9B054', '#6D7A35', '#9E9480', '#5A4030', '#A9C8A2', '#CFE3EA'],
+  // the cottage's plaster (colours taken from the reference): wall light (pale butter cream), wall, pink-lavender patch,
+  // stone, stone dark, joint, damp at the waterline, ochre bloom, landing top, landing side, eaves' shadow (lavender blue),
+  // -, brick, brick dark, stone where the plaster has fallen, damp at the foot
+  [ROW.STONE]: ['#F5E2B4', '#ECD5A5', '#ECD1C6', '#CBB291', '#A68F72', '#9A876C', '#8E9878', '#EACB80', '#EDE5CC', '#DCCFA8', '#8F94B6', '#EFE6CE', '#A65B3E', '#7E4330', '#C99E86', '#A8A98A'],
+  // tile, tile shade, door wood, door wood shade, iron, tile light, moss light, moss dark, capping tiles, window frames,
+  // glass: the meadow, glass: the sky, bench wood, under the eaves, tile edge (lit), tile grey
+  [ROW.ROOF]: ['#6E6148', '#3A332A', '#9C6845', '#6A452C', '#2E2A26', '#928663', '#A9A94E', '#66712F', '#C3B89A', '#5A3E2C', '#B7C47F', '#D3E7EE', '#B68E66', '#4E3D30', '#D9CDA8', '#706E64'],
   // sun light, sky ambient, ground bounce, rim, shadow tint
   [ROW.LIGHT]: ['#FFF3DE', '#BFD8F0', '#A7C27B', '#FFF5DA', '#7E92B8'],
   // buds and pale meadow ahead of the bloom: bud green, bud tip, dry grass

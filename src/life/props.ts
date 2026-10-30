@@ -1,7 +1,7 @@
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, FrontSide, Matrix4, Mesh, Object3D, ShaderMaterial, Vector3, type IUniform } from 'three';
 import { hash32, unit } from '../core/hash';
-import { smoothstep } from '../core/math';
 import { gnoise } from '../planet/noise';
+import { BANK, HOME_LEVEL } from '../planet/terrain';
 import fragmentShader from './props.frag.glsl?raw';
 import vertexShader from './props.vert.glsl?raw';
 
@@ -10,26 +10,47 @@ import vertexShader from './props.vert.glsl?raw';
 // pond) and painted in the shader (props.frag.glsl), never textured. Nothing
 // here depends on R; the frame is placed on the planet each frame, so the
 // cottage keeps its size and stays seated on its clearing. A long, low
-// house under a big roof, as the painted meadow cottages are:
+// house under a big roof, as the painted meadow cottages are (proportions
+// measured from the reference: the walls below the eaves about 4.4 times
+// as long as they are tall, the roof a little taller than them):
 //
-//   walls    solid, plastered and washed a butter cream, low (2.1 m) and long
-//            (7.6 m). Every face carries how far it is from an edge
-//            (corner, foot, top, an opening) and from a corner, so the
-//            shader can paint the stones faintly where the plaster thins:
-//            at the corners, round the openings, along the foot
-//   roof     hipped with a long ridge (about half the length), deep eaves
-//            just above the door, a little crooked: the ridge sags, one end
-//            droops, the slopes dip. Each slope carries how far it is from
-//            the eave and from the hips, for the tile courses, the moss and
-//            the capping tiles
+//   walls    solid, plastered, 9 × 5 m, 2.5 m to the roof (2.1 m below the
+//            eaves). Every face carries how far it is from an edge (corner,
+//            foot, top, an opening) and from a corner, for the paint
+//   roof     hipped, the same 38° pitch all round (so the ridge is the eaves'
+//            length less their depth), deep eaves just above the door and
+//            the windows, a little crooked: the ridge sags, one end droops,
+//            the slopes dip. Built of nine courses of tiles a side, each
+//            course's foot standing proud of the one below (a real step that
+//            catches the light and throws a line of shadow), with beaded
+//            capping tiles along the hips and the ridge
 //   chimney  small and plastered, on the ridge
-//   landing  a pale stone platform stepping down into the pond, a low brick
-//            arch at the waterline (painted), an iron rail, a bench under a
-//            window, a doorstep
+//   landing  a plastered stone terrace over the pond, as high as the
+//            cottage's ground stands above the water, a stair down to the
+//            water along its face, a low brick arch at the waterline
+//            (painted), an iron rail, a bench under a window, a doorstep
 
-export const COTTAGE = { halfX: 3.6, halfZ: 2.1, wall: 2.1, thickness: 0.36, ridgeRise: 2.35, overhang: 0.45, ridge: 2.0 } as const;
-/** Landing extent in local meters (x from, x to, z from, z to). */
-export const LANDING = { x0: -2.6, x1: 1.3, z0: 2.1, z1: 5.3, top: 0.02, base: -0.75 } as const;
+export const COTTAGE = { halfX: 4.32, halfZ: 2.32, wall: 2.5, thickness: 0.36, overhang: 0.62, pitch: (38 * Math.PI) / 180 } as const;
+
+/** The roof as built: eave half sizes, eave line height, rise, half ridge, slope length, ridge height (m). */
+export const ROOF = (() => {
+  const { halfX, halfZ, wall, thickness, overhang, pitch } = COTTAGE;
+  const ex = halfX + thickness / 2 + overhang;
+  const ez = halfZ + thickness / 2 + overhang;
+  const rise = ez * Math.tan(pitch);
+  // the slope clears the top of the walls' outer face by a few centimetres
+  const eave = wall + 0.12 - overhang * Math.tan(pitch);
+  return { ex, ez, eave, rise, ridge: ex - ez, slope: ez / Math.cos(pitch), top: eave + rise };
+})();
+
+/** Tile courses up each slope, how far each course's foot stands proud (m), the eave's edge (m), capping tiles' radius (m). */
+const COURSES = 9;
+const STEP_OUT = 0.055;
+const EAVE_BAND = 0.11;
+const CAP = 0.085;
+
+/** Landing extent in local meters (x from, x to, z from, z to); its foot is just under the water. */
+export const LANDING = { x0: -3.3, x1: 3.0, z0: COTTAGE.halfZ + COTTAGE.thickness / 2, z1: 5.4, top: 0.02, base: -(HOME_LEVEL + BANK.height + 0.07) } as const;
 
 type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
 const KIND_ID: Record<Kind, number> = { wall: 0, roof: 1, wood: 2, iron: 3, glass: 4, landing: 5 };
@@ -53,13 +74,18 @@ class Rand {
 
 /**
  * Paint data per vertex. Walls: distance to the nearest edge of the face
- * (m), to the nearest corner of the building (m), height above the ground
- * (m), and a flag (1 plain plaster, as the chimney). Roof: distance up the
- * slope from the eave (m), to the nearest hip (m), share of the way up, and
- * a flag (1 the eave's edge). Boxes: distance to the face's edge, to its
- * sides, height, and a flag (1 the door).
+ * (m), to the nearest corner of the building (m), height above the floor
+ * (m), and a flag (1 plain plaster, as the chimney). Roof: share of the way
+ * up the slope, distance to the nearest hip (m), the course (index + 0.5),
+ * and a flag (0 a course, 1 the eave's edge, 2 a course's foot, 3 a capping
+ * tile). Boxes: distance to the face's edge, to its sides, height, and a
+ * flag (1 the door, 2 the bench).
  */
 type Paint = [number, number, number, number];
+
+const e1 = new Vector3();
+const e2 = new Vector3();
+const fn = new Vector3();
 
 /** Accumulates painted geometry: positions, normals, face uv (m) and paint data. */
 class Builder {
@@ -73,6 +99,13 @@ class Builder {
     this.nrm.push(n.x, n.y, n.z);
     this.uv.push(u, v);
     this.paint.push(...paint);
+  }
+
+  /** A triangle facing `n` (wound to match it), each corner with its uv and paint. */
+  tri(p: [Vector3, Vector3, Vector3], n: Vector3, uv: [number, number][], paint: Paint[]): void {
+    fn.crossVectors(e1.subVectors(p[1], p[0]), e2.subVectors(p[2], p[0]));
+    const order = fn.dot(n) >= 0 ? [0, 1, 2] : [0, 2, 1];
+    for (const i of order) this.vertex(p[i], n, uv[i][0], uv[i][1], paint[i]);
   }
 
   /**
@@ -120,6 +153,21 @@ class Builder {
           [d, u0, v1],
         ];
         for (const [p, u, v] of quad) this.vertex(p, n, u, v, paint(u, v));
+      }
+    }
+  }
+
+  /**
+   * A grid over (s, f) ∈ [0, 1]², `cols` × `rows`, wound so that the
+   * s-direction × the f-direction faces out. `at` gives each corner its
+   * position, normal, uv and paint.
+   */
+  grid(cols: number, rows: number, at: (s: number, f: number) => { p: Vector3; n: Vector3; u: number; v: number; paint: Paint }): void {
+    const corners = Array.from({ length: (cols + 1) * (rows + 1) }, (_, k) => at((k % (cols + 1)) / cols, Math.floor(k / (cols + 1)) / rows));
+    const c = (i: number, j: number): (typeof corners)[number] => corners[j * (cols + 1) + i];
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        for (const v of [c(i, j), c(i + 1, j), c(i + 1, j + 1), c(i, j), c(i + 1, j + 1), c(i, j + 1)]) this.vertex(v.p, v.n, v.u, v.v, v.paint);
       }
     }
   }
@@ -203,26 +251,27 @@ function walls(b: Builder, rand: Rand): WallFace[] {
     length,
     openings,
   });
+  // doors and windows reach up to just under the eaves, as in the paintings
   const faces = [
-    // front (toward the pond): a small window, the door left of the middle, a window over the bench
+    // front (toward the pond): a window, the door left of the middle, a window over the bench
     W(-ex, ez, 1, 0, 0, 1, 2 * ex, [
-      { from: 0.9, to: 1.6, bottom: 0.95, top: 1.5, door: false },
-      { from: 2.6, to: 3.45, bottom: 0, top: 1.72, door: true },
-      { from: 4.6, to: 5.5, bottom: 0.85, top: 1.55, door: false },
+      { from: 1.15, to: 2.6, bottom: 0.92, top: 1.92, door: false },
+      { from: 3.65, to: 4.65, bottom: 0, top: 1.95, door: true },
+      { from: 5.8, to: 7.25, bottom: 0.92, top: 1.92, door: false },
     ]),
-    // right side: a window
-    W(ex, ez, 0, -1, 1, 0, 2 * ez, [{ from: 1.75, to: 2.55, bottom: 0.9, top: 1.55, door: false }]),
+    // right end: a small window
+    W(ex, ez, 0, -1, 1, 0, 2 * ez, [{ from: 2.1, to: 2.9, bottom: 1.1, top: 1.85, door: false }]),
     // back: a small window
-    W(ex, -ez, -1, 0, 0, -1, 2 * ex, [{ from: ex - 0.35, to: ex + 0.35, bottom: 0.95, top: 1.5, door: false }]),
-    // left side: blind
+    W(ex, -ez, -1, 0, 0, -1, 2 * ex, [{ from: ex - 0.4, to: ex + 0.4, bottom: 1.05, top: 1.85, door: false }]),
+    // left end: blind
     W(-ex, -ez, 0, 1, -1, 0, 2 * ez, []),
   ];
   const height = wall - foot;
   const p = new Vector3();
   for (const f of faces) {
     // hand-built: each wall leans in a touch and bellies out a little
-    const lean = rand.range(0.012, 0.03);
-    const belly = rand.range(-0.025, 0.035);
+    const lean = rand.range(0.008, 0.02);
+    const belly = rand.range(-0.02, 0.03);
     const at = (u: number, v: number, out: Vector3): Vector3 => {
       const t = v / height;
       const ends = Math.min(u, f.length - u);
@@ -243,7 +292,7 @@ function walls(b: Builder, rand: Rand): WallFace[] {
     const breaksV = f.openings.flatMap((o) => [o.bottom - foot, o.top - foot]);
     const inside = (u: number, v: number): boolean => f.openings.some((o) => u > o.from && u < o.to && v + foot > o.bottom && v + foot < o.top);
     b.face(f.along, new Vector3(0, 1, 0), f.length, height, at, paint, breaksU, breaksV, inside);
-    // reveals: the wall's thickness inside each opening, stone all over
+    // reveals: the wall's thickness inside each opening
     for (const o of f.openings) {
       const depth = thickness;
       const inward = f.out.clone().negate();
@@ -262,102 +311,144 @@ function walls(b: Builder, rand: Rand): WallFace[] {
 }
 
 /**
- * The hipped roof, bent out of true: the ridge sags in the middle, one end of
- * the eaves droops, the slopes dip between the rafters, and the eaves wander
- * a little, kicking up a touch at the very edge. Displacement is a function
- * of position, so the hips stay closed. uv: meters along the eave and up the
- * slope (for the tile courses).
+ * The hipped roof: four slopes of tile courses, the eaves' edge, and the
+ * capping tiles along the hips and the ridge. Bent out of true (the ridge
+ * sags, one end of the eaves droops, the slopes dip, the courses wander a
+ * little), as a function of position, so the hips stay closed.
  */
 function roof(b: Builder, rand: Rand): void {
-  const { halfX, halfZ, wall, thickness, ridgeRise, overhang, ridge } = COTTAGE;
-  const ex = halfX + thickness / 2 + overhang;
-  const ez = halfZ + thickness / 2 + overhang;
-  // the slope clears the top of the walls' outer face by a few centimetres
-  const y0 = wall + 0.08 - (overhang * ridgeRise) / ez;
-  const y1 = y0 + ridgeRise;
-  const sag = rand.range(0.1, 0.15);
-  const droop = rand.range(0.07, 0.11) * (rand.next() < 0.5 ? -1 : 1);
+  const { ex, ez, eave, rise, ridge, slope, top } = ROOF;
+  const sag = rand.range(0.08, 0.12);
+  const droop = rand.range(0.05, 0.09) * (rand.next() < 0.5 ? -1 : 1);
   const bend = (p: Vector3): Vector3 => {
-    const up = (p.y - y0) / ridgeRise;
+    const up = (p.y - eave) / rise;
     const along = p.x / ex;
     p.y -= sag * Math.max(0, 1 - along * along) * up * up;
     p.y -= droop * Math.max(0, along * Math.sign(droop)) ** 2 * (1 - up);
-    p.y -= 0.035 * Math.sin(Math.PI * up) * (1 - along * along) * 0.8;
-    p.y += 0.03 * gnoise(p.x * 1.4, p.z * 1.4, 1.5, 4402) * (1 - up * 0.5);
-    p.y += 0.07 * (1 - smoothstep(0, 0.12, up)); // the eave's kick
+    p.y -= 0.03 * Math.sin(Math.PI * up) * (1 - along * along);
+    p.y += 0.025 * gnoise(p.x * 1.4, p.z * 1.4, 1.5, 4402) * (1 - up * 0.5);
     return p;
   };
-  const A = new Vector3(-ex, y0, ez);
-  const B = new Vector3(ex, y0, ez);
-  const C = new Vector3(ex, y0, -ez);
-  const D = new Vector3(-ex, y0, -ez);
-  const P = new Vector3(ridge, y1, 0);
-  const Q = new Vector3(-ridge, y1, 0);
-  const slope = Math.hypot(ez, ridgeRise);
-  const hip = Math.hypot(ex - ridge, ridgeRise);
-  const rows = 10;
+  const A = new Vector3(-ex, eave, ez);
+  const B = new Vector3(ex, eave, ez);
+  const C = new Vector3(ex, eave, -ez);
+  const D = new Vector3(-ex, eave, -ez);
+  const P = new Vector3(ridge, top, 0);
+  const Q = new Vector3(-ridge, top, 0);
+  const course = slope / COURSES;
+  const lerp3 = (a: Vector3, c: Vector3, t: number, out: Vector3): Vector3 => out.lerpVectors(a, c, t);
   const tmpA = new Vector3();
   const tmpB = new Vector3();
-  // each slope a grid in (s along the eave, t up the slope), its uv scaled to meters after
-  const slopeFace = (a: Vector3, bb: Vector3, top0: Vector3, top1: Vector3, lenU: number, lenV: number): void => {
-    const start = b.uv.length;
+
+  // the four slopes: the eave from a to bb (left to right seen from outside), the top edge t0 → t1
+  const slopes = [
+    [A, B, Q, P],
+    [C, D, P, Q],
+    [B, C, P, P],
+    [D, A, Q, Q],
+  ].map(([a, bb, t0, t1]) => {
     const ua = new Vector3().subVectors(bb, a).normalize();
-    const va = new Vector3().subVectors(top0.clone().add(top1).multiplyScalar(0.5), a.clone().add(bb).multiplyScalar(0.5)).normalize();
-    const topLength = top0.distanceTo(top1);
-    b.face(
-      ua,
-      va,
-      1,
-      1,
-      (s, t, out) => bend(out.lerpVectors(tmpA.lerpVectors(a, bb, s), tmpB.lerpVectors(top0, top1, s), t)),
-      (s, t) => [t * lenV, Math.min(s, 1 - s) * (lenU + (topLength - lenU) * t), t, 0],
-      Array.from({ length: 19 }, (_, k) => (k + 1) / 20),
-      Array.from({ length: rows - 1 }, (_, k) => (k + 1) / rows),
-    );
-    for (let i = start; i < b.uv.length; i += 2) {
-      b.uv[i] *= lenU;
-      b.uv[i + 1] *= lenV;
+    const va = new Vector3().subVectors(tmpA.addVectors(t0, t1).multiplyScalar(0.5), tmpB.addVectors(a, bb).multiplyScalar(0.5)).normalize();
+    const n = new Vector3().crossVectors(ua, va).normalize();
+    return { a, bb, t0, t1, ua, va, n, lenU: a.distanceTo(bb), topLen: t0.distanceTo(t1) };
+  });
+  for (const f of slopes) {
+    const point = (s: number, t: number, out: Vector3): Vector3 => bend(lerp3(lerp3(f.a, f.bb, s, tmpA), lerp3(f.t0, f.t1, s, tmpB), t, out));
+    const width = (t: number): number => f.lenU + (f.topLen - f.lenU) * t;
+    const tilted = f.n.clone().multiplyScalar(course).addScaledVector(f.va, STEP_OUT).normalize();
+    const down = f.va.clone().negate();
+    for (let k = 0; k < COURSES; k++) {
+      const cols = Math.max(2, Math.round(20 * width(k / COURSES) / f.lenU));
+      // the course: its foot stands STEP_OUT proud, its top tucked under the next course
+      b.grid(cols, 4, (s, g) => {
+        const t = (k + g) / COURSES;
+        const p = point(s, t, new Vector3()).addScaledVector(f.n, STEP_OUT * (1 - g));
+        return { p, n: tilted, u: (s - 0.5) * width(t), v: t * slope, paint: [t, Math.min(s, 1 - s) * width(t), k + 0.5, 0] };
+      });
+      // the course's foot: the step down to the course below, facing down the slope
+      if (k === 0) continue;
+      b.grid(cols, 1, (s, g) => {
+        const t = k / COURSES;
+        const p = point(s, t, new Vector3()).addScaledVector(f.n, STEP_OUT * g);
+        return { p, n: down, u: (s - 0.5) * width(t), v: t * slope + g * STEP_OUT, paint: [t, Math.min(s, 1 - s) * width(t), k + 0.5, 2] };
+      });
+    }
+    // the eave's edge: the lowest course's tile ends, hanging down from its foot
+    const out = f.n.clone().setY(0).normalize();
+    b.grid(20, 1, (s, g) => {
+      const p = point(s, 0, new Vector3()).addScaledVector(f.n, STEP_OUT);
+      p.y -= EAVE_BAND * (1 - g);
+      return { p, n: out, u: (s - 0.5) * f.lenU, v: g * EAVE_BAND, paint: [0, Math.min(s, 1 - s) * f.lenU, 0.5, 1] };
+    });
+  }
+
+  // the capping tiles: a chain of half-round tiles along each hip and the ridge,
+  // each tile's foot lifted and flared a little over the head of the one below
+  const capLine = (from: Vector3, to: Vector3, up: Vector3, count: number): void => {
+    const axis = new Vector3();
+    const side = new Vector3();
+    const ring = (centre: Vector3, r: number, theta: number, out: Vector3): Vector3 =>
+      out.copy(centre).addScaledVector(side, Math.cos(theta) * r).addScaledVector(up, Math.sin(theta) * r);
+    const SEG = 7;
+    for (let k = 0; k < count; k++) {
+      const c0 = bend(lerp3(from, to, k / count, new Vector3()));
+      const c1 = bend(lerp3(from, to, (k + 1) / count, new Vector3()));
+      axis.subVectors(c1, c0).normalize();
+      side.crossVectors(up, axis).normalize();
+      const lift = CAP * 0.3 + STEP_OUT * 0.6;
+      c0.addScaledVector(up, lift + 0.022);
+      c1.addScaledVector(up, lift - 0.012);
+      const r0 = CAP * 1.06;
+      const r1 = CAP * 0.86;
+      const pa = new Vector3();
+      const pb = new Vector3();
+      const pc = new Vector3();
+      const pd = new Vector3();
+      const n = new Vector3();
+      const paint = (along: number, across: number): Paint => [along, across, k + 0.5, 3];
+      for (let i = 0; i < SEG; i++) {
+        const t0 = (Math.PI * i) / SEG;
+        const t1 = (Math.PI * (i + 1)) / SEG;
+        ring(c0, r0, t0, pa);
+        ring(c0, r0, t1, pb);
+        ring(c1, r1, t1, pc);
+        ring(c1, r1, t0, pd);
+        const tm = (t0 + t1) / 2;
+        n.copy(side).multiplyScalar(Math.cos(tm)).addScaledVector(up, Math.sin(tm)).addScaledVector(axis, -0.12).normalize();
+        const a0 = i / SEG;
+        const a1 = (i + 1) / SEG;
+        b.tri([pa, pb, pc], n, [[0, a0], [0, a1], [1, a1]], [paint(0, a0), paint(0, a1), paint(1, a1)]);
+        b.tri([pa, pc, pd], n, [[0, a0], [1, a1], [1, a0]], [paint(0, a0), paint(1, a1), paint(1, a0)]);
+        // the tile's foot, its half-round end facing down the line
+        b.tri([c0.clone(), pa.clone(), pb.clone()], axis.clone().negate(), [[0, 0.5], [0, a0], [0, a1]], [paint(-1, 0.5), paint(-1, a0), paint(-1, a1)]);
+      }
     }
   };
-  slopeFace(A, B, Q, P, 2 * ex, slope);
-  slopeFace(C, D, P, Q, 2 * ex, slope);
-  slopeFace(B, C, P, P, 2 * ez, hip);
-  slopeFace(D, A, Q, Q, 2 * ez, hip);
-  // the roof's thickness at the eaves: a band all round, the tiles' ends
-  const band = 0.1;
-  for (const [a, bb, len] of [
-    [A, B, 2 * ex],
-    [B, C, 2 * ez],
-    [C, D, 2 * ex],
-    [D, A, 2 * ez],
-  ] as const) {
-    const start = b.uv.length;
-    b.face(
-      new Vector3().subVectors(bb, a).normalize(),
-      new Vector3(0, 1, 0),
-      1,
-      band,
-      (s, t, out) => {
-        const y = bend(tmpA.lerpVectors(a, bb, s)).y;
-        return out.copy(tmpA).setY(y - band + t);
-      },
-      () => [0, 9, 0, 1],
-      Array.from({ length: 19 }, (_, k) => (k + 1) / 20),
-    );
-    for (let i = start; i < b.uv.length; i += 2) b.uv[i] *= len;
-  }
+  const hipCount = COURSES;
+  const capUp = (i: number, j: number): Vector3 => slopes[i].n.clone().add(slopes[j].n).normalize();
+  capLine(B, P, capUp(0, 2), hipCount);
+  capLine(A, Q, capUp(0, 3), hipCount);
+  capLine(C, P, capUp(1, 2), hipCount);
+  capLine(D, Q, capUp(1, 3), hipCount);
+  capLine(Q, P, capUp(0, 1), Math.max(2, Math.round((2 * ridge) / course)));
 }
 
-/** The landing, its steps and the doorstep: stone all over, painted per face. */
+/** The landing, its stair down to the water and the doorstep: plastered stone, painted per face. */
 function landing(b: Builder, rand: Rand): void {
   const L = LANDING;
   const top = L.top - 0.02;
   b.box(new Vector3((L.x0 + L.x1) / 2, (L.base + top) / 2, (L.z0 + L.z1) / 2), new Vector3((L.x1 - L.x0) / 2, (top - L.base) / 2, (L.z1 - L.z0) / 2), null, L.top, 0, 'xXYZ');
-  for (let k = 0; k < 3; k++) {
-    b.box(new Vector3(L.x1 - 0.55, L.top - 0.2 * (k + 1) - 0.04, L.z1 + 0.16 + 0.3 * k), new Vector3(0.46, 0.1, 0.17), new Matrix4().makeRotationY(rand.range(-0.04, 0.04)), L.top - 0.6, 0, 'xXYZz');
+  // a stair along the landing's face, from its right end down into the water
+  const rise = 0.2;
+  const tread = 0.34;
+  const steps = Math.ceil((L.top - L.base - 0.1) / rise);
+  for (let k = 0; k < steps; k++) {
+    const stepTop = L.top - rise * (k + 1);
+    const x = L.x1 - tread * (k + 0.5);
+    b.box(new Vector3(x, (stepTop + L.base) / 2, L.z1 + 0.25), new Vector3(tread / 2, (stepTop - L.base) / 2, 0.25), new Matrix4().makeRotationY(rand.range(-0.01, 0.01)), L.base, 0, 'xXYZ');
   }
   // the doorstep, under the door
-  b.box(new Vector3(-0.755, 0.04, COTTAGE.halfZ + COTTAGE.thickness / 2 + 0.2), new Vector3(0.55, 0.07, 0.2), null, 0, 0, 'xXYZz');
+  b.box(new Vector3(-0.35, 0.05, L.z0 + 0.18), new Vector3(0.58, 0.06, 0.18), null, 0, 0, 'xXYZz');
 }
 
 /** Wood (door, window frames, bench), glass and iron, from boxes (flags: 1 the door, 2 the bench). */
@@ -373,32 +464,33 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
       const h = o.top - o.bottom;
       const mid = (o.from + o.to) / 2;
       if (o.door) {
-        // planks, painted with their iron straps (flag 1)
-        wood.box(along(mid, o.bottom + h / 2, thickness * 0.55), new Vector3(w / 2, h / 2, 0.03), turn, 0, 1);
+        // planks, painted with their iron straps (flag 1), set back in the wall
+        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, 0.03), turn, 0, 1);
         continue;
       }
-      // frame, small panes (glazing bars in thirds), the glass set back
+      // frame, small panes (four across the big windows, two the small), the glass set back
       const fy = o.bottom + h / 2;
+      const across = w > 1 ? 4 : 2;
+      const up = w > 1 ? 3 : 2;
       wood.box(along(mid, o.bottom + 0.035, 0.1), new Vector3(w / 2 + 0.02, 0.035, 0.05), turn, 0);
       wood.box(along(mid, o.top - 0.035, 0.1), new Vector3(w / 2 + 0.02, 0.035, 0.05), turn, 0);
       wood.box(along(o.from + 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, 0);
       wood.box(along(o.to - 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, 0);
-      for (const k of [1, 2]) {
-        wood.box(along(o.from + (w * k) / 3, fy, 0.11), new Vector3(0.016, h / 2, 0.025), turn, 0);
-        wood.box(along(mid, o.bottom + (h * k) / 3, 0.11), new Vector3(w / 2, 0.016, 0.025), turn, 0);
-      }
+      for (let k = 1; k < across; k++) wood.box(along(o.from + (w * k) / across, fy, 0.11), new Vector3(0.016, h / 2, 0.025), turn, 0);
+      for (let k = 1; k < up; k++) wood.box(along(mid, o.bottom + (h * k) / up, 0.11), new Vector3(w / 2, 0.016, 0.025), turn, 0);
       glass.box(along(mid, fy, 0.14), new Vector3(w / 2, h / 2, 0.01), turn, 0);
     }
   }
   // a bench under the window right of the door
   const face = halfZ + thickness / 2;
-  wood.box(new Vector3(1.27, 0.45, face + 0.22), new Vector3(0.7, 0.035, 0.19), null, 0, 2);
-  wood.box(new Vector3(0.67, 0.21, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, 0, 2);
-  wood.box(new Vector3(1.87, 0.21, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, 0, 2);
+  wood.box(new Vector3(2.0, 0.45, face + 0.22), new Vector3(0.72, 0.035, 0.19), null, 0, 2);
+  wood.box(new Vector3(1.38, 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, 0, 2);
+  wood.box(new Vector3(2.62, 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, 0, 2);
+  wood.box(new Vector3(2.0, 0.14, face + 0.22), new Vector3(0.62, 0.025, 0.02), null, 0, 2);
   // the rail along the landing's open side
-  for (const z of [2.4, 3.6, 4.8]) iron.box(new Vector3(L.x0 + 0.12, L.top + 0.45, z), new Vector3(0.022, 0.45, 0.022), null, 0);
-  iron.box(new Vector3(L.x0 + 0.12, L.top + 0.9, 3.6), new Vector3(0.02, 0.022, 1.25), null, 0);
-  iron.box(new Vector3(L.x0 + 0.12, L.top + 0.48, 3.6), new Vector3(0.015, 0.015, 1.2), null, 0);
+  for (const z of [L.z0 + 0.4, (L.z0 + L.z1) / 2 + 0.2, L.z1 - 0.12]) iron.box(new Vector3(L.x0 + 0.12, L.top + 0.45, z), new Vector3(0.022, 0.45, 0.022), null, 0);
+  iron.box(new Vector3(L.x0 + 0.12, L.top + 0.9, (L.z0 + L.z1) / 2 + 0.14), new Vector3(0.02, 0.022, (L.z1 - L.z0) / 2 - 0.24), null, 0);
+  iron.box(new Vector3(L.x0 + 0.12, L.top + 0.48, (L.z0 + L.z1) / 2 + 0.14), new Vector3(0.015, 0.015, (L.z1 - L.z0) / 2 - 0.26), null, 0);
 }
 
 const axisX = new Vector3();
@@ -413,11 +505,9 @@ export class Homestead {
     const wallB = new Builder();
     const faces = walls(wallB, rand);
     // a small plastered chimney on the ridge, left of the middle, leaning a touch
-    const C = COTTAGE;
-    const ridgeTop = C.wall + 0.08 - (C.overhang * C.ridgeRise) / (C.halfZ + C.thickness / 2 + C.overhang) + C.ridgeRise;
     const lean = new Matrix4().makeRotationZ(rand.range(-0.025, -0.01)).multiply(new Matrix4().makeRotationX(rand.range(-0.012, 0.012)));
-    wallB.box(new Vector3(-1.05, ridgeTop + 0.02, 0.05), new Vector3(0.22, 0.5, 0.22), lean, ridgeTop - 0.4, 1, 'xXYzZ');
-    wallB.box(new Vector3(-1.05, ridgeTop + 0.56, 0.05), new Vector3(0.27, 0.045, 0.27), lean, ridgeTop - 0.4, 1);
+    wallB.box(new Vector3(-1.25, ROOF.top + 0.18, 0.04), new Vector3(0.25, 0.62, 0.25), lean, ROOF.top - 0.45, 1, 'xXYzZ');
+    wallB.box(new Vector3(-1.25, ROOF.top + 0.83, 0.04), new Vector3(0.31, 0.05, 0.31), lean, ROOF.top - 0.45, 1);
     const roofB = new Builder();
     roof(roofB, rand);
     const stoneB = new Builder();

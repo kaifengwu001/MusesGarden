@@ -2,11 +2,14 @@
 // meters around the cottage. GPU mirror of Terrain.sample (terrain.ts).
 // Change both together. Requires: uRadius (globals).
 
-const float COTTAGE_FLAT = 5.5;
+const float COTTAGE_FLAT = 6.0;
 const float PLATEAU_INNER = 10.0;
 const float PLATEAU_OUTER = 26.0;
 const float POND_SLOPE = 0.3;
 const float POND_DEPTH = 1.4;
+const float POND_BANK = 0.9;
+const vec2 HOUSE_FOOTPRINT = vec2(4.5, 2.5);   // half sizes (m), terrain.ts
+const vec3 LANDING_AREA = vec3(-3.4, 3.1, 6.0); // x0, x1, z1 (m)
 
 uniform uint uTerrainSeed;
 uniform samplerCube uTerrainBake; // natural height (m), lushness, wetness, colour variant
@@ -57,7 +60,8 @@ float homestead(vec3 dir, float h) {
   h += (max(h, 0.4) * 0.5 + 0.25 - h) * dry;
   float flat_ = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
   h += (uCottage.w - h) * flat_;
-  return min(h, max(homePond(dir) * POND_SLOPE, -POND_DEPTH));
+  float d = homePond(dir);
+  return min(h, max(d * (d > 0.0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
 }
 
 // Ground height before the bank lip (m above the water table).
@@ -78,11 +82,12 @@ float bankedAt(float h, float shore, float dist) {
 }
 
 float clearingAt(vec3 dir, float dc) {
-  float disc = smoothstep(3.6, 2.9, dc);
-  if (dc > 9.0) return disc;
+  if (dc > 9.0) return 0.0;
   vec2 c = cottageLocal(dir);
-  float rect = smoothstep(0.35, 0.0, max(max(-2.6 - c.x, c.x - 1.3), max(-0.2 - c.y, c.y - 5.9)));
-  return max(disc, rect);
+  vec2 d = abs(c) - HOUSE_FOOTPRINT;
+  float house = smoothstep(0.3, 0.0, length(max(d, 0.0)) + min(max(d.x, d.y), 0.0));
+  float landing = smoothstep(0.35, 0.0, max(max(LANDING_AREA.x - c.x, c.x - LANDING_AREA.y), max(-0.2 - c.y, c.y - LANDING_AREA.z)));
+  return max(house, landing);
 }
 
 void gradientFrame(vec3 dir, out vec3 a, out vec3 b) {
@@ -115,16 +120,17 @@ float boxDistance(vec2 p, vec2 halfSize) {
 }
 
 // Soft shadow of the cottage on the ground: its walls, then its hipped roof
-// narrowing to the ridge (props.ts COTTAGE), swept away from the sun.
+// narrowing from the eaves to the ridge (props.ts COTTAGE, ROOF), swept away
+// from the sun.
 float cottageShadow(vec3 dir) {
   vec2 c = cottageLocal(dir);
-  if (dot(c, c) > 900.0) return 0.0;
+  if (dot(c, c) > 1600.0) return 0.0;
   float best = 1e3;
-  for (int k = 0; k <= 8; k++) {
-    float h = 0.55 * float(k);
-    // walls (to 2.1 m), then the roof from its eaves (1.8 m, 4.23 × 2.73 m) to the ridge (4.15 m, 2.0 × 0)
-    float roof = clamp((h - 1.8) / 2.35, 0.0, 1.0);
-    vec2 half_ = h < 1.8 ? vec2(3.78, 2.28) : mix(vec2(4.23, 2.73), vec2(2.0, 0.05), roof);
+  for (int k = 0; k <= 9; k++) {
+    float h = 0.5 * float(k);
+    // walls to the eaves (2.1 m), then the roof from its eaves (5.12 × 3.12 m) to the ridge (4.57 m, 2.0 × 0)
+    float roof = clamp((h - 2.1) / 2.47, 0.0, 1.0);
+    vec2 half_ = h < 2.1 ? vec2(4.5, 2.5) : mix(vec2(5.12, 3.12), vec2(2.0, 0.05), roof);
     best = min(best, boxDistance(c + uCottageSun.xy * h, half_));
   }
   return smoothstep(0.4, -0.3, best);

@@ -2,7 +2,124 @@
 
 The plan and the growth model are in [ARCHITECTURE.md](ARCHITECTURE.md). This
 file tracks what is done, what is known to be wrong or missing, and what comes
-next.
+next. Each iteration has its own page, kept for comparison (Versions).
+
+## Versions
+
+| Iteration | Page | Commit |
+|---|---|---|
+| 5 | https://garden-of-muse-iteration-5.vercel.app | the commit with this table |
+| 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
+
+The latest is also at https://the-meadow-omega.vercel.app. Each iteration is
+its own Vercel project, so its production address is public and stays put.
+`scripts/publish.sh N --latest` publishes the checkout as iteration N and as
+the latest; `scripts/publish.sh N <commit>` publishes an older commit.
+
+## Iteration 5: the review notes
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Some cloud shadows move the wrong way when the globe spins | They were cast down the one sun the view is lit by, which turned with the view, and only clouds in sight cast any. Now every place on the planet sees its own sun (late morning everywhere: the same height and bearing from local north), and every cloud, in sight or not, casts its shadow down its own place's sun into a cube map of where the shadows reach the ground. The shadows are fixed to the planet: each stays under its cloud however the globe turns. |
+| 2 | Some birds stay in place while the globe turns, zoomed out | One flock followed the view, to keep birds in sight. Gone: every bird belongs to the planet. |
+| 3 | No cloud reflections zoomed out | From orbit each lake now reads the cloud cover seen from below (a second cube map) where its mirrored ray meets the clouds; it cross-fades with the close-up mirror on the way down. |
+| 4 | Wind sheen: darker dark bands, brighter bright bands, with the sway; no wider | Each gust crest trails a dark, cool trough where the grass springs back into its own shade; crests are crisper and brighter, not wider; the blades lean back a little in the troughs, so light and sway move together. Sheen 0.65 → 0.85. |
+| 5 | Birds: a little faster, better paths, less like butterflies | Most flocks travel great circles round the planet at 6–8 m/s (2–4 before), the route swinging slowly so it crosses the whole meadow, with a gentle meander; two wheel in steady loops near the cottage. Level flight over the hilltops instead of bobbing over every hummock, loose V's and clusters with only a slight drift, steady beats with short glides, banking by the real turn rate. Nine flocks at R 128. |
+| 6 | Butterflies of various colours when close, 2–3 on screen | Six kinds (whites, sulphurs, orange-tips, blues, tortoiseshells, peacocks) over the flowers once you are below about 13 m: about three on screen at a time in Wander (median over 40 places, most 1–5). They wander and flutter, and now and then settle on a flower. |
+| 7 | The cottage: closer to the reference, no vines, strokes and proportions, paint the shadows | Measured from the reference and rebuilt: a long, low house (9 × 5 m) under a roof of one 38° pitch all round, the eaves just above the door and the windows, on a terrace 1.2 m over its pond with a stair down to the water. The roof is nine real courses a side (each a lit lip with a line of shadow under it), moss settling olive and yellow in the lower courses, beaded capping on the hips and ridge. The plaster is laid on in broad ochre blooms and pink-lavender patches, the stones showing only where it has fallen away. The shadows are painted from the cottage's own sun: a blue-lavender band under the eaves, cooler shaded walls, the bench's shadow, the house's shadow on its landing and the meadow. The cottage now faces the sun across its pond, as in the reference, and stands in the water's mirror. No ivy. |
+| 8 | Navigation in Wander: sideways turning backwards, moving too slow; W A S D, Q E | Sideways drags turn the other way (you hold the scene), drags toward you glide 70 % faster. W A S D walk (about 4.6 m/s in the meadow, faster higher up; Shift runs), Q rises and E descends as the wheel does, the arrows turn and walk. |
+| 9 | A page per iteration, the old ones kept | Versions, above. |
+| 10 | Don't trade graphics for performance | Nothing new was traded away, and the one earlier cut is undone: the lakes' cloud mirror is back at full resolution (it was a third). |
+| 11 | The headline should say Garden of Muse | The headline, the browser tab, the postcard and the fallback screen. |
+
+Checkpoint images: [docs/checkpoints/iteration-5](docs/checkpoints/iteration-5/)
+(the cottage across its pond and from four sides among them).
+
+### How it is built (summary)
+
+- **The sun each place sees** (render/sun.ts and sun.glsl), shared by the
+  CPU and the GPU: cloud and bird shadows, the cottage, its ground shadow and
+  the layout's choice of the cottage's front all use it.
+- **Shadows and reflections from orbit:** two cube maps of optical depth in
+  direction space (R16F): where the clouds' shadows reach the ground (1536² a
+  face on high, 768² on low) and the cover seen from below (768², drawn only
+  from orbit). Each puff is projected onto a face from the planet's centre;
+  only faces holding ground in sight are drawn.
+- **Birds and butterflies:** closed-form in time and tied to the planet;
+  butterflies from a lattice fixed in direction space.
+- **The cottage:** procedural faces and courses (about 26k triangles), painted
+  per pixel; its reflection is traced against three solids in the water's
+  shader, only for water pixels whose mirrored ray passes near it.
+- **The layout** turns each world's cottage to face its sun, so the
+  homestead view, the lakes and the default stand differ from iteration 4.
+- **Frame budget:** the build queue takes what the frame's JS has left (to
+  3.6 ms) and never starts a step that would not fit; tile builds yield every
+  1/256 of a tile (the same points, finer steps).
+
+### Squint test (the vista against the still, mean ΔE76 per cell)
+
+| | Overall | Far meadow and clouds | Lake and islands | Near meadow |
+|---|---|---|---|---|
+| Iteration 3 | 24.5 | 15.5 | 34.2 | 23.8 |
+| Iteration 4 | 22.3 | 16.0 | 23.6 | 27.2 |
+| Iteration 5 | 23.5 | 16.6 | 24.4 | 29.5 |
+
+Slightly worse than iteration 4, all in the near-meadow third: the brighter
+wind crests (note 4) lighten the grass there (#71907c against the still's
+#68874d). The guard (fails above 26) passes.
+
+## Measured (iteration 5)
+
+Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
+waiting for the GPU; runs vary by about ±1 ms. Iteration 4 in brackets. The
+default Wander stand and the cottage view are new places (the layout changed).
+
+| Viewport | ms / frame | Grass in visible pages | Flowers in visible pages |
+|---|---|---|---|
+| 1440×900 at DPR 2, Overview | 7.8 (8.0) | – | – |
+| 1440×900 at DPR 2, Wander, R 128 m | 6.6 (8.7) | 164k | 18k |
+| 1440×900 at DPR 2, Wander, R 400 m | 7.2 (6.7) | 131k | 23k |
+| 1440×900 at DPR 2, Vista | 18.0 (16.1) | 152k | 36k |
+| 1440×900 at DPR 2, lakes view | 19.9 (16.1) | 163k | 13k |
+| 1440×900 at DPR 2, cottage view | 18.3 (16.5) | 151k | 22k |
+| 390×844 @1.5 (phone, low tier), Overview | 1.9 (2.0) | – | – |
+| 390×844 @1.5 (phone, low tier), Wander | 2.3 (2.2) | 41k | 6k |
+| 390×844 @1.5 (phone, low tier), Vista | 4.7 (4.2) | 40k | 15k |
+
+- **Where the water views' extra time goes:** the lakes' cloud mirror at full
+  resolution again (about 3 ms of it), the cloud cube maps, and the cottage
+  traced in the mirror near it.
+- **GPU memory:** 175 MB on high at 2560×1440 (151 MB before), 208 MB at
+  2880×1800; 51 MB on a phone (low tier). The budget is 256 MB.
+- **Growth scrub:** JS p95 under 4 ms (the invariant passes 8 runs out of 8).
+
+## Trades (iteration 5)
+
+None new. Still standing from earlier iterations: cloud self-shadowing one
+value per puff; lumps from a baked cube map; bird shadows as soft discs; the
+13-step bank march; quick bake while growing; 256² field maps; MSAA only below
+DPR 1.75. The eaves' shadow is drawn a little shallower than the geometry
+would cast it, as the painters do (a choice of look, not of speed).
+
+## Known issues
+
+- **Water views cost more** (19.9 ms for the lakes view at 2880×1800 on an M1
+  Pro); a slower machine would lower its render scale there (the quality
+  controller from iteration 1, unchanged).
+- **The cottage's reflection** is three plain solids: no chimney, stair or
+  bench in the water, and its edges are hard where the ruffle is calm.
+- **Birds** are on screen nearly all the time in Wander and by the cottage,
+  less often over open lakes (about one moment in ten).
+- **Squint 23.5**, against a goal of 14: the vista's foreground and its cloud
+  (iteration 4's notes) still stand.
+- **Carried over:** the warp's flat band on the way down; triangle figure,
+  pools after a scrub, tier probe, LOD-ring test.
+
+## Next
+
+1. Composition of the vista (flowers in front, the cloud upper right).
+2. The cottage's reflection with its chimney and stair, softer edges.
+3. Then dawn and golden hour, graded the same way.
 
 ## Iteration 4: the six review notes
 
@@ -57,7 +174,7 @@ still's is thick with mixed flowers. The vista search now treats clouds as a
 bonus rather than a penalty (there are many more of them) and refines 28
 stands instead of 16.
 
-## Measured (iteration 4)
+### Measured (iteration 4)
 
 Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
 waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
@@ -86,7 +203,7 @@ waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
   twirls make each field sample dearer, and more stands are refined); 0.5 s
   after.
 
-## Trades (quality for performance)
+### Trades (iteration 4)
 
 - **Cloud reflections** come from a third-resolution render from the
   mirrored camera, treating the lakes as one level plane under the focus:
@@ -107,7 +224,7 @@ waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
 - Carried over: the 13-step bank march; quick bake while growing; 256² field
   maps; MSAA only below DPR 1.75; grass 180 blades/m² within 22 m.
 
-## Known issues
+### Known issues (iteration 4)
 
 - **Composition:** the vista finds water across the middle, but its
   foreground is often plain grass, and its cloud seldom sits where the
@@ -127,7 +244,7 @@ waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
 - **Carried over:** the warp's flat band on the way down; triangle figure,
   pools after a scrub, tier probe, LOD-ring test.
 
-## Next
+### Next (iteration 4)
 
 1. Composition: a vista whose foreground is thick with flowers and whose cloud
    sits upper right (or a few vistas to choose from).
@@ -365,7 +482,7 @@ render scale to roughly 0.75. iPhones are not available here.
 
 ## Interactions (all wired and testable)
 
-1. Drag orbits (Overview) or glides and turns (Wander); wheel or pinch dollies between them. Double-click glides to the point.
+1. Drag orbits (Overview) or glides and turns (Wander); wheel or pinch dollies between them. Double-click glides to the point. Keys: W A S D walk, Q rises and E descends, the arrows turn and walk, Shift runs.
 2. Grow: slider plus a play button that runs growth to the far end in about 8 s, or back.
 3. Bloom: slider plus a play button for the bloom front.
 4. Click on the meadow: a gust ring bursts outward; grass and flowers bend and recover.
@@ -388,4 +505,4 @@ Every state lives in the URL hash, including the camera pose (`pose=`) and froze
 | `npm run test:gpu` | Playwright browser invariants (determinism, parity, scrub, budgets) |
 | `npm run shots` | 15 screenshots into `/shots` (`MEADOW_GL=swiftshader` for the CPU rasterizer) |
 | `npm run squint` | the vista against `reference/howls-lake.webp` (kept out of git), shrunk and blurred: mean ΔE, and `shots/squint.png` |
-| `npm run build` / `npm run build:single` | `dist/`, or one self-contained `dist-single/index.html` (774 kB) |
+| `npm run build` / `npm run build:single` | `dist/`, or one self-contained `dist-single/index.html` |

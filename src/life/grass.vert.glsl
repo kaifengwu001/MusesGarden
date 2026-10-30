@@ -93,7 +93,7 @@ void main() {
   float crest = max(wind.w, 0.0) * uMeadowLook.x;
   float trough = max(-wind.w, 0.0) * uMeadowLook.x;
   col = mix(col, uGrassPal[9] * uSunTint, crest * (0.4 + 0.6 * (1.0 - meadow.z)) * (0.4 + 0.6 * y));
-  col *= mix(vec3(1.0), vec3(0.5, 0.6, 0.66), trough * 0.85 * (0.45 + 0.55 * y));
+  col *= mix(vec3(1.0), vec3(0.56, 0.66, 0.58), trough * 0.85 * (0.45 + 0.55 * y));
   // sun-side rim on the tips
   vec3 v = normalize(toCam);
   col += uGrassPal[8] * pow(y, 3.0) * clamp(dot(-v, uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.18 * uToon.z * (1.0 - shadow);

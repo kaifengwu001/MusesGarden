@@ -186,7 +186,7 @@ vec3 meadowPaint(Meadow m) {
   // dark trough where the grass springs back up into its own shade
   float crest = max(m.sheen, 0.0) * uMeadowLook.x;
   float trough = max(-m.sheen, 0.0) * uMeadowLook.x;
-  col = mix(col, col * vec3(0.5, 0.6, 0.66), trough * 0.85);
+  col = mix(col, col * vec3(0.56, 0.66, 0.58), trough * 0.85);
   col = mix(col, pal(ROW_GRASS, 8) * uSunTint, crest * mix(0.4, 1.0, m.sunlit) * (0.75 + 0.25 * smoothstep(-0.2, 0.6, s)));
 
   // flowers: dabs where the clumps are, coloured by species and colony

@@ -78,7 +78,8 @@ describe('everything stays attached', () => {
     for (const radius of [40, 128, 400]) {
       const t = terrainAt(radius);
       const heights: number[] = [];
-      for (const [x, z] of [[-2.5, -2], [2.5, -2], [2.5, 2], [-2.5, 2], [0, 0]] as const) {
+      // the house's corners (props.ts COTTAGE: 9 × 5 m) and its middle
+      for (const [x, z] of [[-4.4, -2.4], [4.4, -2.4], [4.4, 2.4], [-4.4, 2.4], [0, 0]] as const) {
         const p = travel(layout.cottage, across, x / radius, new Vector3());
         travel(p, layout.homeBearing, z / radius, p);
         heights.push(t.sample(p, s).height);
