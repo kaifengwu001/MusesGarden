@@ -104,6 +104,78 @@ test.describe('growth', () => {
   });
 });
 
+test.describe('frames', () => {
+  test('walking never drops a strip of grass from a frame, and a resize never blanks one', async ({ page }) => {
+    // the frame each rAF callback belongs to (all callbacks of one frame share its timestamp)
+    await page.addInitScript(() => {
+      const raf = window.requestAnimationFrame.bind(window);
+      const w = window as unknown as { __frameT: number };
+      w.__frameT = -1;
+      window.requestAnimationFrame = (cb) => raf((t) => { w.__frameT = t; cb(t); });
+    });
+    await open(page, 'cam=wander&q=high&hud=0&pose=-0.426,0.3515,0.2406,0.7982,0.83');
+    await page.evaluate(() => {
+      type Tile = { count: number; pages: number[][] };
+      type Layer = { tiles: Map<string, Tile>; update: (view: unknown) => void };
+      const g = window as unknown as {
+        __frameT: number;
+        __frames: { frames: number; drops: number; blank: number; resizes: number };
+        __world: { grass: { layer: Layer }; flowers: { layer: Layer }; scene: { onBeforeRender: () => void; onAfterRender: () => void }; renderer: { setSize: (...a: unknown[]) => unknown } };
+      };
+      const w = g.__world;
+      const stats = { frames: 0, drops: 0, blank: 0, resizes: 0 };
+      g.__frames = stats;
+      const key = (t: Tile): string => t.pages.map((p) => p.join(',')).join('|');
+      const layers = [w.grass.layer, w.flowers.layer];
+      const atUpdate = new Map<Layer, Map<Tile, string>>();
+      for (const layer of layers) {
+        const update = layer.update.bind(layer);
+        layer.update = (view) => {
+          update(view);
+          atUpdate.set(layer, new Map([...layer.tiles.values()].map((t) => [t, key(t)])));
+        };
+      }
+      // a tile already showing blades whose pages move between the update (which decides what is drawn) and the draw
+      let drawnT = -2;
+      w.scene.onBeforeRender = () => {
+        if (g.__frameT === drawnT) return;
+        drawnT = g.__frameT;
+        stats.frames++;
+        for (const layer of layers) {
+          for (const [t, before] of atUpdate.get(layer) ?? []) if (before.replace(/[|,]/g, '') !== '' && t.count > 0 && key(t) !== before) stats.drops++;
+        }
+      };
+      // a resize in a frame after the scene was drawn throws the drawn frame away
+      const setSize = w.renderer.setSize.bind(w.renderer);
+      w.renderer.setSize = (...a) => {
+        stats.resizes++;
+        if (g.__frameT === drawnT) stats.blank++;
+        return setSize(...a);
+      };
+      // and change the tier from inside a frame, after its draw, as the quality controller can
+      let asked = false;
+      w.scene.onAfterRender = () => {
+        if (asked || stats.frames < 60) return;
+        asked = true;
+        queueMicrotask(() => window.__meadow?.set('quality.tier', 'medium'));
+      };
+    });
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(3000);
+    await page.keyboard.down('ArrowLeft');
+    await page.waitForTimeout(2000);
+    await page.keyboard.up('ArrowLeft');
+    await page.keyboard.up('KeyW');
+    await page.waitForTimeout(1000);
+    const s = await page.evaluate(() => (window as unknown as { __frames: { frames: number; drops: number; blank: number; resizes: number } }).__frames);
+    test.info().annotations.push({ type: 'frames', description: `${s.frames} frames, ${s.resizes} resizes, ${s.blank} blank, ${s.drops} tile drops` });
+    expect(s.frames).toBeGreaterThan(60);
+    expect(s.resizes).toBeGreaterThan(0);
+    expect(s.blank).toBe(0);
+    expect(s.drops).toBe(0);
+  });
+});
+
 test.describe('budgets', () => {
   test('first frame within 2 s', async ({ page }) => {
     await open(page, 'q=high');

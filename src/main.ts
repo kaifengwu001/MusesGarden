@@ -203,12 +203,15 @@ async function boot(): Promise<void> {
 
   // The Overview/Wander param follows the zoom, and the toggle drives it.
   let syncingMode = false;
+  // A resize clears the canvas: inside a frame it waits for the next frame's start, so the
+  // resized canvas is drawn before it is shown (resized after a draw, the frame shows blank).
+  let resizePending = false;
   store.subscribe((changed) => {
     if (changed.has('quality.tier')) {
       chooseTier(store.values.quality.tier);
       world.applyTier(quality.tier);
       post.bloomEnabled = quality.tier.bloom;
-      resize();
+      resizePending = true;
     }
     if (changed.has('view.mode') && !syncingMode) world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0);
     world.onParams(changed);
@@ -279,15 +282,26 @@ async function boot(): Promise<void> {
     return Array.from({ length: n }, (_, k) => ({ ...frameLog[(logHead - n + k + LOG) % LOG] }));
   };
   let renderMs = 1;
+  let updateMs = 1;
   const frame = (now: number): void => {
     clock.tick(now);
+    if (resizePending) {
+      resizePending = false;
+      resize();
+    }
     const t0 = performance.now();
     gpuTimer.begin();
+    // Finish the tiles first: the update then decides what to draw from every tile's pages as
+    // they are. (Built between the update and the draw, a tile's blades moved to pages the
+    // update had not marked visible, so a strip of it went missing for a frame.) The budget is
+    // what the update and the render leave of the frame's JS, the update as long as the
+    // slowest of the last frames' (it can jump from one frame to the next while the world grows).
+    const catchUp = world.queue.size > BACKLOG && !quality.device.mobile;
+    world.queue.run(Math.min(catchUp ? BACKLOG_BUILD_BUDGET_MS : BUILD_BUDGET_MS, Math.max(BUILD_MIN_MS, (catchUp ? BACKLOG_FRAME_JS_MS : FRAME_JS_MS) - updateMs - renderMs)));
+    const u0 = performance.now();
     controls.tick(clock.realDt);
     update();
-    const spent = performance.now() - t0;
-    const catchUp = world.queue.size > BACKLOG && !quality.device.mobile;
-    world.queue.run(Math.min(catchUp ? BACKLOG_BUILD_BUDGET_MS : BUILD_BUDGET_MS, Math.max(BUILD_MIN_MS, (catchUp ? BACKLOG_FRAME_JS_MS : FRAME_JS_MS) - spent - renderMs)));
+    updateMs = Math.max(performance.now() - u0, updateMs * 0.95);
     const r0 = performance.now();
     render();
     renderMs += (performance.now() - r0 - renderMs) * 0.25;
@@ -308,7 +322,7 @@ async function boot(): Promise<void> {
       world.applyTier(quality.tier);
       post.bloomEnabled = quality.tier.bloom;
     }
-    if (change) resize();
+    if (change) resizePending = true;
     hud.frame(stats, quality.tier.budgets, now);
   };
 

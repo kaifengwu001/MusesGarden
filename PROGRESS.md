@@ -8,6 +8,7 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
+| 12 | https://muses-garden-iteration-12.vercel.app | the commit with this table |
 | 11 | https://muses-garden-iteration-11.vercel.app | 15b7dbb |
 | 10 | https://muses-garden-iteration-10.vercel.app | aadae30 |
 | 9 | https://muses-garden-iteration-9.vercel.app | 8bfde67 |
@@ -22,14 +23,38 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 12: the review notes (in progress)
+## Iteration 12: the review notes
 
-Started from iteration 11 (a1f357f). This table fills in as the notes are done.
+Started from iteration 11 (a1f357f), the notes committed first (26bec09).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | A whole-screen flash: everything on screen disappears for a split frame (video) | |
-| 2 | A patch of grass disappears, then pops back | |
+| 1 | A whole-screen flash: everything disappears for a split frame (video) | The video's first frame is the empty canvas under the interface. When the quality controller changed the render scale, the canvas was resized after the frame had been drawn, which clears it, so that frame was shown blank. With High chosen (as in the video) the controller trims the scale and now and then tries a step back up, so it happened every so often. A resize now waits for the start of the next frame and is drawn before it is shown. On a live walk on High: 10 resizes, 10 blank frames before, 0 after. |
+| 2 | A patch of grass disappears, then pops back | Each frame decided which grass and flower pages to draw (the update), then finished building tiles, then drew. A tile finished in between had moved its blades to pages the update had not marked visible, so a strip of it (a page holds a strip of a tile) was missing for that frame, and sometimes another tile's blades showed in its old pages. While walking that happened in 489 of 1,321 frames (753 tiles). Tiles are now built at the start of the frame, before the update: 0 in 1,351 frames. |
+
+A new browser test walks the meadow on High, changes the tier from inside a
+frame as the controller can, and checks that no resize lands after a draw
+and no tile's pages move between the update and the draw; it fails on
+iteration 11's code and passes now.
+
+### Measured (iteration 12)
+
+The same Auto walk as iteration 11's (Apple M1 Pro, 1440×900 at DPR 2;
+median frame time and frames over 25 ms):
+
+| | Walk | Turn while walking | Strafe | Stand |
+|---|---|---|---|---|
+| Iteration 11 | 17.8 / 1 | 18.4 / 13 | 18.7 / 2 | 17.3 / 0 |
+| Iteration 12 | 16.9 / 1 | 17.2 / 2 | 16.6 / 0 | 16.6 / 0 |
+
+Medium throughout; the scale went to 0.73 while walking and back up to
+0.81 standing.
+
+### Known issues
+
+- Carried over: the distant grass finer than a pixel sparkles a little as
+  you move; the cottage's reflection without its rail, chair, bench or
+  window frames.
 
 ## Iteration 11: the review notes
 

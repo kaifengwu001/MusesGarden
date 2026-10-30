@@ -485,10 +485,20 @@ grass → flowers → birds → butterflies → clouds → particles. Before it,
 frame, the clouds render their shadow cube map (with the birds' discs, on the
 faces holding ground in sight) and its sharper window about the focus, their cover-from-below cube map (from orbit
 only) and their mirror (the billboards from the camera mirrored in the
-water, at full resolution). Post then draws to the screen. The build queue
-gets what is left of 3.6 ms of JS after the update and the render (at least
-0.5 ms, at most 2 ms; on a desktop with more than four jobs waiting, of 5 ms
-and at most 3.6 ms), and never starts a step that would not fit. Tiles in
+water, at full resolution). Post then draws to the screen.
+
+A frame runs in this order: a resize the last frame asked for (the quality
+controller's render scale, a change of tier), then the build queue, then the
+update, then the render. A canvas resize clears the canvas, so it is never
+done after the draw (the drawn frame would be shown blank). Tiles are built
+before the update, which decides from every tile's pages which are drawn
+(built between the two, a tile's blades moved to pages not marked visible,
+and a strip of it was missing for a frame). Both are tested on a live walk
+(invariants.spec.ts, "frames"). The build queue gets what is left of 3.6 ms
+of JS after the update (as long as the slowest of the last frames') and the
+render (at least 0.5 ms, at most 2 ms; on a desktop with more than four jobs
+waiting, of 5 ms and at most 3.6 ms), and never starts a step that would not
+fit. Tiles in
 view are built before those out of it, nearest first, and spawn straight in
 (a grow-in, tried in iteration 7, made the change of detail more visible).
 Blades and flowers never change size as you move: they are there or not
