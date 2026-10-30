@@ -49,10 +49,12 @@ const NOON: Rows = {
   [ROW.ROCK]: ['#6F7C8E', '#4E5D78', '#8F99AA', '#77739D'],
   // snow, blue-lilac shade, mid, highlight
   [ROW.SNOW]: ['#F1F3F7', '#C4C8E4', '#DCE1EF', '#FFFFFF'],
-  // limewash light, limewash, -, stone, stone dark, mortar, damp, ochre stain, flagstone, quoin
-  [ROW.STONE]: ['#F3E9D2', '#E4D7BA', '#ABA7B8', '#CDBC98', '#A69676', '#8F8674', '#9DA48C', '#D9C08E', '#D5C8AA', '#E2D5B8'],
-  // roof, roof shade, wood, wood shade, iron, roof light, moss, moss shade, lichen, ivy, ivy light, ivy dark
-  [ROW.ROOF]: ['#6E655A', '#4D463D', '#7D6248', '#57402B', '#3E3A36', '#8A8172', '#8C985A', '#667345', '#AAA88C', '#4D7A35', '#7AA24C', '#2E5128'],
+  // wall light (butter cream), wall, -, stone, stone dark, joint, damp, warm patch, landing top, landing side,
+  // eave shadow (as a tint on the wall colour), plaster, brick, brick dark
+  [ROW.STONE]: ['#F3E3B6', '#E6D2A0', '#B9AC86', '#CDBA92', '#A69472', '#9C8C6E', '#98A07A', '#E3BE96', '#ECE2C6', '#D8C9A2', '#A7A0A8', '#EFE6CE', '#A65B3E', '#7E4330'],
+  // tile, tile shade, door wood, door wood shade, iron, tile light, moss light, moss dark, capping tiles,
+  // window frames, glass: the meadow, glass: the sky
+  [ROW.ROOF]: ['#5E5347', '#3F3832', '#A86B3C', '#6E4426', '#3A3632', '#8F826E', '#A9B054', '#6D7A35', '#9E9480', '#5A4030', '#A9C8A2', '#CFE3EA'],
   // sun light, sky ambient, ground bounce, rim, shadow tint
   [ROW.LIGHT]: ['#FFF3DE', '#BFD8F0', '#A7C27B', '#FFF5DA', '#7E92B8'],
   // buds and pale meadow ahead of the bloom: bud green, bud tip, dry grass

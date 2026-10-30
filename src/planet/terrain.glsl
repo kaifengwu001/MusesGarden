@@ -114,14 +114,18 @@ float boxDistance(vec2 p, vec2 halfSize) {
   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
 }
 
-// Soft shadow of the cottage on the ground: the footprint swept toward the sun.
+// Soft shadow of the cottage on the ground: its walls, then its hipped roof
+// narrowing to the ridge (props.ts COTTAGE), swept away from the sun.
 float cottageShadow(vec3 dir) {
   vec2 c = cottageLocal(dir);
-  if (dot(c, c) > 400.0) return 0.0;
+  if (dot(c, c) > 900.0) return 0.0;
   float best = 1e3;
-  for (int k = 1; k <= 4; k++) {
-    float h = 0.85 * float(k);
-    best = min(best, boxDistance(c + uCottageSun.xy * h, vec2(2.75, 2.3)));
+  for (int k = 0; k <= 8; k++) {
+    float h = 0.55 * float(k);
+    // walls (to 2.1 m), then the roof from its eaves (1.8 m, 4.23 × 2.73 m) to the ridge (4.15 m, 2.0 × 0)
+    float roof = clamp((h - 1.8) / 2.35, 0.0, 1.0);
+    vec2 half_ = h < 1.8 ? vec2(3.78, 2.28) : mix(vec2(4.23, 2.73), vec2(2.0, 0.05), roof);
+    best = min(best, boxDistance(c + uCottageSun.xy * h, half_));
   }
-  return smoothstep(0.45, -0.25, best);
+  return smoothstep(0.4, -0.3, best);
 }

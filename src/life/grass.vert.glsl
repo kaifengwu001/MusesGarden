@@ -78,7 +78,7 @@ void main() {
   vec3 p = base + up * (h * y * (1.0 - 0.32 * min(bl * bl, 1.2) * y)) + side * (w * position.x) + tip * (h * y * y);
 
   // colour per vertex: dark roots, lit tips, paler ahead of the bloom front
-  float shadow = max(meadow.z, 0.5 * cottageShadow(dir));
+  float shadow = max(meadow.z, 0.85 * cottageShadow(dir));
   float b = toonLight(dot(up, uSunDir)) * (1.0 - 0.9 * shadow);
   vec3 lit = mix(uGrassPal[0], uGrassPal[1], smoothstep(0.55, 1.0, y) * 0.7);
   vec3 mid = mix(uGrassPal[2], uGrassPal[3], rnd(seed, 7.0) * 0.5);
@@ -87,7 +87,7 @@ void main() {
   mid = mix(mix(mid, uGrassPal[7], 0.4), mid, bloom);
   float light = mix(0.12, 1.0, smoothstep(0.0, 0.9, y)) * b;
   vec3 col = tone3(lit, mid, shade, light);
-  col *= (0.92 + 0.16 * rnd(seed, 8.0)) * cloudTint(meadow.z);
+  col *= (0.92 + 0.16 * rnd(seed, 8.0)) * cloudTint(shadow);
   // wind sheen: blades laid over by a gust show their pale length to the
   // light; behind the crest they spring back up into their own shade
   float crest = max(wind.w, 0.0) * uMeadowLook.x;

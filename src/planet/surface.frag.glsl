@@ -54,8 +54,9 @@ void main() {
 
   // light: toon bands, the cottage's shadow, cloud shadows with brushed edges
   float stroke = strokeAt(dir, pixelMeters);
-  float cloud = cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2);
-  float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir)) * (1.0 - 0.9 * cloud);
+  // (the cottage's shadow is painted like a cloud's: deep and cool)
+  float cloud = max(cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2), 0.85 * cottageShadow(dir));
+  float b = toonLight(dot(n, uSunDir)) * (1.0 - 0.9 * cloud);
 
   // wind on the grass (and the water)
   vec2 waves = gustWaves(dir);
