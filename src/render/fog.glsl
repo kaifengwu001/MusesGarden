@@ -16,6 +16,12 @@ vec3 aerialColor() {
   return mix(pal(ROW_SKY, 1), pal(ROW_SKY, 2), 0.45);
 }
 
+// Distance pales the meadow toward a grey-green haze; the limb of the planet
+// (seen from orbit) dissolves into the sky's.
 vec3 applyAerial(vec3 col, float viewDist, vec3 dir) {
-  return mix(col, aerialColor(), aerialAmount(viewDist, dir));
+  float beyond = max(0.0, viewDist - uFog.z);
+  float dist = 1.0 - exp(-beyond * uFog.x);
+  float around = smoothstep(0.6, 1.62, acos(clamp(dot(dir, uFogUp), -1.0, 1.0))) * uFog.y;
+  col = mix(col, pal(ROW_SKY, 5), min(dist, uFog.w));
+  return mix(col, aerialColor(), min(around, uFog.w));
 }

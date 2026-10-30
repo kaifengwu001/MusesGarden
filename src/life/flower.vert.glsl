@@ -50,7 +50,7 @@ void main() {
   vec4 wind;
   float inside;
   vec4 f = fieldSample(dir, meadow, wind, inside);
-  float mask = smoothstep(0.25, 0.8, f.y) * (1.0 - smoothstep(0.2, 0.6, f.z)) * inside;
+  float mask = smoothstep(0.1, 0.45, f.y) * (1.0 - smoothstep(0.2, 0.6, f.z)) * inside;
   float edge = 1.0 - smoothstep(uFlowers.x * 0.8, uFlowers.x, d);
   float vis = grow * mask * edge;
   if (vis <= 0.002) {

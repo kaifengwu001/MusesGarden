@@ -8,7 +8,8 @@ uniform float uRadius;
 #include <meadow_fog>
 #include <meadow_paint>
 #include <meadow_wind>
-#include <meadow_clouds_shadow>
+#include <meadow_warp>
+#include <meadow_clouds>
 #include <meadow_water>
 
 uniform float uPixelAngle;
@@ -52,7 +53,7 @@ void main() {
 
   // light: toon bands, the cottage's shadow, cloud shadows with brushed edges
   float stroke = strokeAt(dir, pixelMeters);
-  float cloud = cloudShadowAt(dir, stroke * 2.2);
+  float cloud = cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2);
   float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir)) * (1.0 - 0.85 * cloud);
 
   // wind on the grass (and the water)
@@ -79,13 +80,15 @@ void main() {
     m.pixelMeters = pixelMeters;
     m.nearFade = nearFade;
     land = meadowPaint(m);
-    // damp, darker grass right at the water's edge
-    land = mix(land, tone3(pal(ROW_GRASS, 1), pal(ROW_GRASS, 2), pal(ROW_GRASS, 5), b), smoothstep(0.7, 0.0, shore) * 0.4);
+    // the bank's face: where the turf drops to the water it is steep, and in its own shade
+    float steep = 1.0 - dot(n, warpNormal(dir * (uRadius + h), dir));
+    land = mix(land, tone3(pal(ROW_GRASS, 2), pal(ROW_GRASS, 5), pal(ROW_WATER, 8), b * 0.7), smoothstep(0.06, 0.3, steep + 0.06 * stroke) * smoothstep(1.2, 0.2, shore) * 0.75);
     land *= cloudTint(cloud);
   }
 
   vec3 col = land;
-  if (wet > 0.0) col = mix(land, waterColour(dir, shore, depth, b, cloud, gust, stroke, n, v, pixelMeters), wet);
+  // the water is level whatever the mesh under the shoreline does
+  if (wet > 0.0) col = mix(land, waterColour(dir, vWarped, shore, depth, b, cloud, gust, stroke, warpNormal(dir * uRadius, dir), v, pixelMeters), wet);
   col += pal(ROW_LIGHT, 3) * sunRim(n, v) * 0.12 * (1.0 - wet);
   col = applyAerial(col, viewDist, dir);
 

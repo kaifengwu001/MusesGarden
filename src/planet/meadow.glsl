@@ -8,11 +8,12 @@ uniform vec4 uBloom;      // front angle (rad), front softness, -, -
 uniform vec4 uWindVec;    // rotation axis of the wind field (xyz), strength
 uniform vec4 uMeadowLook; // wind sheen, flower dabs, colour variation, -
 uniform vec3 uFloraWash[4]; // each species' middle colour in sun (far drifts blend these)
+uniform vec4 uClumps;       // octave level, blend, threshold, patchiness (Fields.clumps)
 #define MAX_USER_BLOOMS 8
 uniform vec4 uUserBloom[MAX_USER_BLOOMS]; // press-and-hold discs: centre direction, angular radius
 
 // Flowers per m² at which every dab cell of the far paint holds a flower.
-const float DAB_SATURATION = 20.0;
+const float DAB_SATURATION = 12.0;
 
 // Wind direction at a point: a solid-body rotation field around uWindVec.xyz.
 vec3 windDir(vec3 dir) {
@@ -69,6 +70,22 @@ float dab(vec3 dir, float freq, float fill, uint seed, out vec2 r) {
   float d = length(p - centre);
   float rad = 0.19 + 0.09 * jitter.y;
   return keep < fill ? smoothstep(rad, rad * 0.55, d) : 0.0;
+}
+
+// The clumps: a factor per species on the baked drifts and colonies (1 on
+// average). Mirrors Fields.clumps in fields.ts; change both together.
+const float CLUMP_COVER = 0.4;
+const float CLUMP_FLOOR = 0.12;
+const float CLUMP_EDGE = 0.05;
+vec4 clumpsAt(vec3 dir) {
+  float f0 = exp2(uClumps.x);
+  float t = uClumps.y;
+  uint s = uTerrainSeed + 400u + uint(int(uClumps.x) + 16);
+  float norm = 1.0 / sqrt((1.0 - t) * (1.0 - t) + t * t);
+  float a = (gnoise(dir * f0, s) * (1.0 - t) + gnoise(dir * 2.0 * f0, s + 1u) * t) * norm;
+  float b = (gnoise(dir * f0, s + 64u) * (1.0 - t) + gnoise(dir * 2.0 * f0, s + 65u) * t) * norm;
+  vec4 c = smoothstep(vec4(uClumps.z - CLUMP_EDGE), vec4(uClumps.z + CLUMP_EDGE), vec4(a, b, -a, -b));
+  return 1.0 + uClumps.w * (CLUMP_FLOOR + (1.0 - CLUMP_FLOOR) * c / CLUMP_COVER - 1.0);
 }
 
 // Which species a random pick lands on, weighted by the local densities.
@@ -171,7 +188,8 @@ vec3 meadowPaint(Meadow m) {
   col *= 1.0 - 0.13 * uMeadowLook.x * (1.0 - m.sheen);
   col = mix(col, pal(ROW_GRASS, 8) * uSunTint, sheen * (0.5 + 0.4 * smoothstep(-0.2, 0.6, s)));
 
-  // flowers: dabs where the colonies are, coloured by species and colony
+  // flowers: dabs where the clumps are, coloured by species and colony
+  if (dot(m.flora, vec4(1.0)) > 0.02) m.flora *= clumpsAt(m.dir);
   float total = dot(m.flora, vec4(1.0));
   float land = smoothstep(0.15, 0.7, m.shore);
   float fill = clamp(total / DAB_SATURATION, 0.0, 1.0) * m.bloom * land * uMeadowLook.y;
@@ -183,7 +201,7 @@ vec3 meadowPaint(Meadow m) {
   float d1 = dab(m.dir, f1, fill * (1.0 - 0.75 * m.nearFade), uTerrainSeed + 101u + lv, r1) * t;
   float lightness = clamp(m.light * 1.1, 0.0, 1.0);
   // far away the dabs merge: the colonies read as washes of their colour
-  float far = fill * smoothstep(0.05, 0.6, m.pixelMeters) * 0.3;
+  float far = fill * smoothstep(0.05, 0.6, m.pixelMeters) * 0.55;
   if (far > 0.002) {
     vec3 wash = (m.flora.x * uFloraWash[0] + m.flora.y * uFloraWash[1] + m.flora.z * uFloraWash[2] + m.flora.w * uFloraWash[3]) / total;
     col = mix(col, wash * mix(0.72, 1.0, lightness), far);

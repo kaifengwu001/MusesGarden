@@ -7,7 +7,7 @@ import type {} from './harnessApi';
 
 const FROZEN_T = 12;
 
-type Preset = 'homestead' | 'lakes' | 'meadow';
+type Preset = 'homestead' | 'lakes' | 'meadow' | 'vista';
 interface Shot {
   name: string;
   hash: string;
@@ -19,12 +19,12 @@ const DESKTOP: Shot[] = [
   { name: 'wander', hash: 'cam=wander' },
   { name: 'homestead', hash: '', preset: 'homestead' },
   { name: 'lakes', hash: '', preset: 'lakes' },
+  { name: 'vista', hash: '', preset: 'vista' },
   { name: 'meadow-from-above', hash: '', preset: 'meadow' },
   { name: 'seedling-R40', hash: 'g=0&b=0.35' },
   { name: 'wide-R400', hash: 'g=1&b=1' },
   { name: 'wide-R400-wander', hash: 'g=1&b=1&cam=wander' },
-  { name: 'golden-hour', hash: 'tod=18.4', preset: 'homestead' },
-  { name: 'dawn', hash: 'tod=6.3&cc=0.62' },
+  { name: 'cloudy', hash: 'cc=0.8&csh=0.85', preset: 'vista' },
   { name: 'bloom-front', hash: 'b=0.18', preset: 'meadow' },
   { name: 'postcard', hash: 'pc=1', preset: 'homestead' },
 ];

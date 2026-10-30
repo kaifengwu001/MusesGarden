@@ -23,6 +23,13 @@ vec3 warpPosition(vec3 p) {
   return p - uWarpK * dot(t, t) * uWarpUp;
 }
 
+// View space → planet space (exact: the warp moves points only along U, which
+// leaves the tangent offset unchanged; unwarpPoint in warp.ts).
+vec3 unwarpPosition(vec3 q) {
+  vec3 t = warpTangent(q);
+  return q + uWarpK * dot(t, t) * uWarpUp;
+}
+
 // Normals follow the bent surface: N' = N + 2k (U·N) t (inverse-transpose of
 // the warp's Jacobian), so lighting and rims match the curvature you see.
 vec3 warpNormal(vec3 p, vec3 n) {

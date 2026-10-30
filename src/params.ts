@@ -90,10 +90,10 @@ export const schema = {
   },
   terrain: {
     roll: num('roll', 'Rolling hills', 1.25, 0, 4, 0.01, 'terrain', { unit: 'm' }),
-    hummocks: num('hum', 'Hummocks', 0.35, 0, 1.5, 0.01, 'terrain', { unit: 'm' }),
+    hummocks: num('hum', 'Hummocks', 0.8, 0, 1.5, 0.01, 'terrain', { unit: 'm' }),
     wetlands: num('wet', 'Wetlands', 0.45, 0, 0.9, 0.01, 'terrain'),
     waterLevel: num('lvl', 'Water level', 0, -1, 1, 0.01, 'terrain', { unit: 'm' }),
-    grain: num('grn', 'Grain', 0.75, 0, 1, 0.01, 'terrain'),
+    grain: num('grn', 'Grain', 0.9, 0, 1, 0.01, 'terrain'),
   },
   grass: {
     density: num('gd', 'Density', 180, 20, 1200, 1, 'life', { unit: '/m²' }),
@@ -101,8 +101,8 @@ export const schema = {
     nearRadius: num('gr', 'Blade radius', 22, 6, 60, 0.5, 'life', { unit: 'm' }),
   },
   flowers: {
-    density: num('fd', 'Density', 8, 0, 40, 0.1, 'life', { unit: '/m²' }),
-    patchiness: num('fpt', 'Patchiness', 0.7, 0, 1, 0.01, 'life'),
+    density: num('fd', 'Density', 12, 0, 40, 0.1, 'life', { unit: '/m²' }),
+    patchiness: num('fpt', 'Patchiness', 0.95, 0, 1, 0.01, 'life'),
     patchSize: num('fps', 'Patch size', 13, 3, 40, 0.5, 'life', { unit: 'm' }),
     sizeVariation: num('fsv', 'Size variation', 0.6, 0, 1, 0.01, 'life'),
     colourVariation: num('fcv', 'Colour variation', 0.65, 0, 1, 0.01, 'life'),
@@ -112,11 +112,10 @@ export const schema = {
     blue: num('fb', 'Blue clusters', 0.18, 0, 1, 0.01, 'life'),
   },
   water: {
-    shoreWidth: num('sw', 'Bank shadow', 0.6, 0, 2, 0.01, 'live', { unit: 'm' }),
     depthTint: num('dt', 'Depth tint', 0.65, 0, 1, 0.01, 'live'),
     reflection: num('wr', 'Sky reflection', 0.8, 0, 1, 0.01, 'live'),
     glints: num('wgl', 'Glints', 0.7, 0, 1, 0.01, 'live'),
-    lilyPads: num('wlp', 'Lily pads', 0.6, 0, 1, 0.01, 'live'),
+    lilyPads: num('wlp', 'Lily pads', 0, 0, 1, 0.01, 'live'),
   },
   wind: {
     strength: num('ws', 'Strength', 0.45, 0, 1, 0.01, 'live'),
@@ -126,12 +125,13 @@ export const schema = {
   },
   clouds: {
     coverage: num('cc', 'Coverage', 0.45, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 0.32, 0.08, 1, 0.01, 'live', { unit: '× R' }),
+    altitude: num('ca', 'Altitude', 5, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.72, 0, 1, 0.01, 'live'),
   },
   light: {
-    timeOfDay: num('tod', 'Time of day', 11.5, 5.5, 19, 0.05, 'live', { unit: 'h' }),
+    // one light for now (late morning); dawn and golden hour are kept in the palette for later
+    timeOfDay: num('tod', 'Time of day', 11.5, 5.5, 19, 0.05, 'live', { unit: 'h', hidden: true }),
   },
   style: {
     toonBands: int('tb', 'Toon bands', 3, 2, 5, 'live'),
@@ -230,10 +230,9 @@ const AREA_GAP = 1.05;
 
 export const presets = {
   'Spring meadow': {},
-  Seedling: { world: { growth: 0, bloom: 0.2 }, light: { timeOfDay: 7.2 } },
-  'Wide world': { world: { growth: 1, bloom: 1 }, light: { timeOfDay: 16.8 } },
-  'Golden hour': { light: { timeOfDay: 18.4 }, wind: { strength: 0.3 } },
-  Dawn: { light: { timeOfDay: 6.1 }, clouds: { coverage: 0.62 } },
+  Seedling: { world: { growth: 0, bloom: 0.2 } },
+  'Wide world': { world: { growth: 1, bloom: 1 } },
+  Cloudy: { clouds: { coverage: 0.8, shadow: 0.85 } },
   Gusty: { wind: { strength: 0.85, gustiness: 0.9 }, clouds: { speed: 0.7, coverage: 0.55 } },
 } satisfies Record<string, ParamPatch>;
 

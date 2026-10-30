@@ -270,6 +270,8 @@ export class Terrain {
     u.uHomeShape.value.set(a1, a2, a3, 0);
     u.uHomePhase.value.set(p1, p2, p3, 0);
     u.uHomeIslet.value.set(L.pond.islet[0], L.pond.islet[1], L.pond.islet[2], 0);
+    const f = this.fields;
+    u.uClumps.value.set(f.clumpPair.level, f.clumpPair.t, f.clumpThreshold, f.patchiness);
   }
 }
 
@@ -294,6 +296,8 @@ export interface TerrainUniforms {
   uHomeIslet: { value: Vector4 };
   /** Shadow sweep per meter of height in cottage-local x, z (sun direction / its elevation). */
   uCottageSun: { value: Vector4 };
+  /** Flower clumps (Fields.clumps): octave level, blend, threshold, patchiness. */
+  uClumps: { value: Vector4 };
 }
 
 export function createTerrainUniforms(): TerrainUniforms {
@@ -309,5 +313,6 @@ export function createTerrainUniforms(): TerrainUniforms {
     uHomePhase: { value: new Vector4() },
     uHomeIslet: { value: new Vector4() },
     uCottageSun: { value: new Vector4(0, 0, 0, 0) },
+    uClumps: { value: new Vector4(0, 0, 0, 0) },
   };
 }

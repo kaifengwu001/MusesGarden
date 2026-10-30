@@ -1,5 +1,5 @@
 import { ShaderChunk } from 'three';
-import cloudShadow from '../life/cloudShadow.glsl?raw';
+import clouds from '../life/clouds.glsl?raw';
 import field from '../life/field.glsl?raw';
 import wind from '../life/wind.glsl?raw';
 import cubesphere from '../planet/cubesphere.glsl?raw';
@@ -28,7 +28,7 @@ const chunks: Record<string, string> = {
   meadow_fog: fog,
   meadow_paint: meadow,
   meadow_water: water,
-  meadow_clouds_shadow: cloudShadow,
+  meadow_clouds: clouds,
   meadow_field: field,
   meadow_wind: wind,
 };

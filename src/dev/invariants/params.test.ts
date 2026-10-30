@@ -139,10 +139,10 @@ describe('presets', () => {
     const store = new ParamStore();
     store.set('world.seed', 1234);
     store.set('wind.strength', 0.95);
-    store.applyPreset('Golden hour');
+    store.applyPreset('Gusty');
     expect(store.values.world.seed).toBe(1234);
-    expect(store.values.wind.strength).toBe(0.3);
-    expect(store.values.light.timeOfDay).toBe(18.4);
+    expect(store.values.wind.strength).toBe(0.85);
+    expect(store.values.clouds.coverage).toBe(0.55);
     store.applyPreset('Spring meadow');
     expect(store.toQuery()).toBe('seed=1234');
   });

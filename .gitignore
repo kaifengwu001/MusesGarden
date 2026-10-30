@@ -8,6 +8,9 @@ shots/
 .DS_Store
 *.log
 
+# film stills for the squint test, kept out of git
+reference/howls-lake.webp
+
 # local probe scripts
 .*.mjs
 .*.py

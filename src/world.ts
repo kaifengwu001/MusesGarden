@@ -23,8 +23,9 @@ import { createGroundSample, createTerrainUniforms, generateLayout, gradientFram
 import { createLookUniforms } from './render/look';
 import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
-import { effectiveVisualRadius, warpK } from './render/warp';
+import { warpForZoom } from './render/warp';
 import { CameraRig } from './view/camera';
+import { findVista, type Vista } from './view/vista';
 
 const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3 } as const;
 const NOON_SUN = new Palette().get(ROW.LIGHT, 0);
@@ -47,7 +48,7 @@ const FIELD_PATHS: ReadonlySet<string> = new Set([
   'flowers.blue',
 ]);
 
-export type CameraPreset = 'homestead' | 'lakes' | 'meadow';
+export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista';
 
 /**
  * The scene and every system in it. Each frame: growth → fade band → fields
@@ -132,14 +133,14 @@ export class World {
       uUserBloom: { value: this.userBlooms },
       uOutline: { value: new Vector4(1.25, 0, 0, 0) },
     };
-    this.sky = new Sky(this.shared);
+    this.sky = new Sky();
     this.field = new FieldMap(this.shared, tier.name === 'high' ? 256 : 192);
     Object.assign(this.shared, this.field.uniforms);
     this.surface = new Surface(this.shared, tier.terrainGrid);
-    this.grass = new Grass(this.shared, tier.name === 'high' ? 520 : 200);
-    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 320 : 160);
+    this.grass = new Grass(this.shared, tier.name === 'high' ? 760 : 260);
+    this.flowers = new Flowers(this.shared, tier.name === 'high' ? 420 : 180);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
-    this.clouds = new Clouds(this.shared, this.cloudUniforms);
+    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 1024 : 512);
     this.petals = new Petals(this.shared);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.clouds.mesh);
     this.applyTier(tier);
@@ -178,8 +179,12 @@ export class World {
     this.posed = true;
   }
 
-  /** Named views for shots and tests: across the pond at the cottage, across the lakes, over the meadow. */
-  cameraPreset(name: CameraPreset): void {
+  /**
+   * Named views: across the pond at the cottage, across the lakes, over the
+   * meadow, and the vista (the reference framing). Shots and tests cut to
+   * them; `immediate = false` moves the camera there smoothly.
+   */
+  cameraPreset(name: CameraPreset, immediate = true): void {
     const L = this.terrain.layout;
     const R = this.growth.radius;
     if (name === 'homestead') {
@@ -188,6 +193,10 @@ export class World {
       const target = L.cottage.clone().multiplyScalar(Math.cos(14 / R)).addScaledVector(bearing, -Math.sin(14 / R)).normalize();
       this.rig.lookAlong(target, bearing.addScaledVector(target, -bearing.dot(target)).normalize());
       this.rig.setZoom(0.8, true);
+    } else if (name === 'vista') {
+      const vista = this.findVista();
+      this.rig.lookAlong(vista.focus, vista.forward, immediate);
+      this.rig.setZoom(vista.zoom, immediate);
     } else if (name === 'lakes') {
       // the nearest wetland margin (where land and water interlace), from a little above
       this.defaultPose();
@@ -199,6 +208,21 @@ export class World {
       this.rig.setZoom(0.6, true);
     }
     this.posed = true;
+  }
+
+  /** The stand and heading that frame the meadow like the reference still (view/vista.ts). */
+  findVista(): Vista {
+    const R = this.growth.radius;
+    const rv = this.store.values.view.visualRadius;
+    const framing = (z: number): { altitude: number; tilt: number; fov: number; k: number } => {
+      const f = this.rig.framing(z);
+      return { altitude: f.altitude, tilt: f.tilt, fov: f.fov, k: warpForZoom(z, R, rv) };
+    };
+    // stand where the meadow is in flower: well behind the bloom front (meadow.glsl bloomAt)
+    const front = this.look.uBloom.value.x - 40 / R;
+    const cottage = this.terrain.layout.cottage;
+    const bloomed = (dir: Vector3): boolean => Math.acos(Math.min(1, dir.dot(cottage))) < front;
+    return findVista(this.terrain, framing, this.rig.camera.aspect, this.clouds.bounds(), bloomed, `${this.terrain.layout.seed}/${R}/${rv}/${this.fieldKey}/${front.toFixed(3)}`);
   }
 
   /** A point near the cottage where the wetland is half land, half water. */
@@ -306,7 +330,7 @@ export class World {
     // Warp: the meadow around the focus curves like a world of visualRadius.
     this.warp.focus.copy(rig.focus);
     this.warp.up.copy(rig.up);
-    this.warp.k = warpK(rig.warpWeight, R, p.view.visualRadius);
+    this.warp.k = warpForZoom(rig.zoom, R, p.view.visualRadius);
     const g = this.globals;
     g.uTime.value = clock.time;
     g.uRadius.value = R;
@@ -326,8 +350,7 @@ export class World {
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
     (this.shared.uOutline.value as Vector4).x = p.style.outlineWidth;
-    // the puffs belong to the view from afar; down in the meadow the painted deck is the sky
-    this.clouds.update(L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, 1 - smoothstep(0.3, 0.75, this.rig.warpWeight));
+    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -339,12 +362,12 @@ export class World {
         heightBelow: 3,
         frustum: this.frustum,
         warp: this.warp,
-        horizonCull: rig.warpWeight < 0.05,
+        horizonCull: Math.abs(this.warp.k) * R < 0.01,
         warpHorizon:
-          rig.warpWeight >= 0.05
+          Math.abs(this.warp.k) * R >= 0.01
             ? {
                 focusDir: rig.up,
-                radiusEff: 1 / (rig.warpWeight / effectiveVisualRadius(p.view.visualRadius, R) + (1 - rig.warpWeight) / R),
+                radiusEff: 1 / (1 / R + 2 * this.warp.k),
                 eyeHeight: rig.altitude + 0.5,
                 heightAt: this.heightBound,
               }
@@ -430,7 +453,8 @@ export class World {
     const p = this.store.values;
     const L = this.look;
     L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 0);
-    L.uFog.value.set(p.style.fogDensity * 0.0028, 0.06 + 0.34 * p.style.fogDensity, this.rig.altitude * 0.95, 0.8);
+    // haze thickens as you come down into the meadow, so the far meadow pales like a painted distance
+    L.uFog.value.set(p.style.fogDensity * 0.0028 * (1 + 10 * this.rig.tilt), 0.06 + 0.34 * p.style.fogDensity, this.rig.altitude * 0.95, 0.8);
     L.uFogUp.value.copy(this.rig.up);
     L.uBloom.value.set(p.world.bloom * (Math.PI + 0.45) - 0.25, 0.07, 0, 0);
     // Wind: a rotation field fixed to the world, aimed by the direction param at the cottage.
@@ -453,8 +477,9 @@ export class World {
     this.palette.get(ROW.STAR, 0, wash[1]).lerp(this.palette.get(ROW.STAR, 4, this.washTmp), 0.35);
     this.palette.get(ROW.SCATTER, 0, wash[2]);
     this.palette.get(ROW.SCATTER, 2, wash[3]).lerp(this.palette.get(ROW.SCATTER, 8, this.washTmp), 0.2);
-    L.uWaterLook.value.set(p.water.shoreWidth, p.water.depthTint, p.water.glints, clock.time);
-    L.uWaterSky.value.set(p.water.reflection, p.water.lilyPads, 0, 0);
+    L.uWaterLook.value.set(0, p.water.depthTint, p.water.glints, clock.time);
+    // the mirror marches the banks up to the meadow's highest ground, grass included
+    L.uWaterSky.value.set(p.water.reflection, p.water.lilyPads, p.grass.height * 0.8, this.terrain.maxHeight + p.grass.height);
     L.uDebug.value = DEBUG_VIEWS[p.ui.debug];
   }
 

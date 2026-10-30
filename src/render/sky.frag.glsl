@@ -1,15 +1,7 @@
 // Painted sky: deep clear blue overhead, paling to a soft haze at the horizon.
 // Two framings, blended by uDome: the backdrop behind the whole planet
-// (Overview) and the dome around a viewer standing in the meadow (Wander),
-// where the high cloud deck drifts over (the clouds whose shadows cross the
-// meadow and whose shapes the lakes mirror).
-#include <meadow_noise>
-uniform float uRadius;
-uniform uint uTerrainSeed;
-uniform vec4 uWindVec;
-#include <meadow_clouds_shadow>
-uniform vec3 uCloudLit;
-uniform vec3 uCloudShade;
+// (Overview) and the dome around a viewer standing in the meadow (Wander).
+// The clouds are their own billboards (clouds.ts), drawn over it.
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
 uniform vec3 uHaze;
@@ -36,13 +28,6 @@ void main() {
   // Dome: elevation of the view ray above the local horizon.
   float e = dot(dir, uSkyUp);
   vec3 dome = mix(skyGradient(e * 1.35), uHaze, smoothstep(0.08, -0.1, e));
-
-  // the deck, seen from the meadow: bright rims, greyer middles, lost in the haze low down
-  if (uDome > 0.01 && e > -0.05) {
-    float c = deckSeen(cameraPosition, dir);
-    vec3 cloud = mix(uCloudLit, mix(uCloudLit, uCloudShade, 0.55), smoothstep(0.35, 1.0, c));
-    dome = mix(dome, cloud, c * smoothstep(-0.02, 0.25, e) * 0.94);
-  }
 
   vec3 col = mix(backdrop, dome, uDome);
   float s = max(dot(dir, uSun), 0.0);

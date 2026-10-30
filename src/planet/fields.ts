@@ -17,13 +17,20 @@ import { gnoise } from './noise';
 //              water table is h = 0: lakes are wherever the ground dips under
 //              it, so every shore follows a contour of the hills. The sink is
 //              small and hummocks grow in the wetlands, so a wetland is lace:
-//              islands, spits and inlets rather than open water
+//              islands, spits and inlets rather than open water. In the
+//              wetlands the ground also flattens toward a plateau a little
+//              above the water, so islands are flat turf with a short bank
 //   patterns   lushness, colour variant and richness: meter-sized noise,
 //              sampled at the two direction-space octaves that bracket their
 //              size (seeded by octave, so a pattern never jumps as R grows)
-//   flora      flowers per m² for each species: colonies (thresholded noise
-//              covering a share of the ground set by the species' weight),
-//              bare and rich ground, and damp ground the pink cups favour
+//   flora      flowers per m² for each species, in three scales: drifts
+//              (where the meadow flowers at all: about half the ground, long
+//              along the grain), colonies (which species hold a stretch of a
+//              drift, by their weights) and clumps a couple of meters wide
+//              (dense knots, and the gaps between them). Damp ground suits the
+//              pink cups. Drifts and colonies are baked (bake.frag.glsl);
+//              clumps are too fine for the bake, so the paint and the near
+//              flowers evaluate them where they stand (clumps(), clumpsAt())
 
 export const RELIEF_OCTAVES = 9;
 export const RELIEF_BASE_FREQ = 1.6;
@@ -31,12 +38,24 @@ export const RELIEF_BASE_FREQ = 1.6;
 export const NOISE_STD = 0.27;
 /** Hummocks are this much taller (× (1 + k·wetness)) out in the wetlands. */
 export const WET_HUMMOCKS = 1.4;
+/** Wetland ground flattens toward this height above (and depth below) the water (m), keeping this much of its slope. */
+export const WET_PLATEAU = { height: 0.55, keep: 0.12 } as const;
+/** Grain compression at grain = 1 (hills and islands run ≈ 3× longer than wide). */
+const GRAIN_MAX = 0.7;
 /** Pattern sizes (m). */
-export const PATTERN = { lush: 22, variant: 16, richness: 40 } as const;
+export const PATTERN = { lush: 22, variant: 16, richness: 40, drift: 18 } as const;
+/** Share of the ground in flower drifts, and of a drift's ground in clumps. */
+export const DRIFT_COVER = 0.6;
+export const CLUMP_COVER = 0.4;
+/** Clump size × the patch size; what is left between the clumps of a drift (× a clump's density there). */
+export const CLUMP_SCALE = 0.17;
+export const CLUMP_FLOOR = 0.12;
+const DRIFT_EDGE = 0.07;
+const CLUMP_EDGE = 0.05;
 /** Colony size per species, × the patch-size parameter: pink drifts are broad, blue clusters small. */
 export const COLONY_SCALE = [1.3, 0.95, 0.8, 0.55] as const;
 /** Seeds (added to the world's noise seed). */
-const SEED = { relief: 0, warp: 31, wet: 34, lush: 170, rich: 180, variant: 190, colony: 200, detail: 300 } as const;
+const SEED = { relief: 0, warp: 31, wet: 34, lush: 170, rich: 180, variant: 190, colony: 200, drift: 230, detail: 300, clump: 400 } as const;
 const COLONY_EDGE = 0.06;
 const DETAIL = 0.3;
 
@@ -94,9 +113,9 @@ export interface FieldParams {
   grain: number;
   /** Flowers per m² on average. */
   density: number;
-  /** 0 = flowers evenly scattered; 1 = all in colonies over bare and rich ground. */
+  /** 0 = flowers evenly scattered; 1 = all in drifts, colonies and clumps over bare ground. */
   patchiness: number;
-  /** Colony size (m). */
+  /** Colony size (m); clumps are a sixth of it. */
   patchSize: number;
   /** Species weights: pink, star, yellow, blue (normalised here). */
   weights: readonly [number, number, number, number];
@@ -137,8 +156,12 @@ export interface FieldUniforms {
   uLevel: { value: Vector4 };
   /** Octave pairs (level, t): lush, variant. */
   uPatternA: { value: Vector4 };
-  /** Octave pair (level, t): richness; richness contrast; patchiness. */
+  /** Octave pair (level, t): richness; -; patchiness. */
   uPatternB: { value: Vector4 };
+  /** Octave pair (level, t): drifts; drift threshold; -. */
+  uDrift: { value: Vector4 };
+  /** Per species: density normalisation (the mean stays the density setting). */
+  uSpeciesNorm: { value: Vector4 };
   uColonyLevel: { value: Vector4 };
   uColonyT: { value: Vector4 };
   uDetailLevel: { value: Vector4 };
@@ -159,6 +182,8 @@ export function createFieldUniforms(): FieldUniforms {
     uLevel: { value: new Vector4() },
     uPatternA: { value: new Vector4() },
     uPatternB: { value: new Vector4() },
+    uDrift: { value: new Vector4() },
+    uSpeciesNorm: { value: new Vector4(1, 1, 1, 1) },
     uColonyLevel: { value: new Vector4() },
     uColonyT: { value: new Vector4() },
     uDetailLevel: { value: new Vector4() },
@@ -185,6 +210,11 @@ export class Fields {
   readonly lushPair: OctavePair = { level: 0, t: 0 };
   readonly variantPair: OctavePair = { level: 0, t: 0 };
   readonly richPair: OctavePair = { level: 0, t: 0 };
+  readonly driftPair: OctavePair = { level: 0, t: 0 };
+  readonly clumpPair: OctavePair = { level: 0, t: 0 };
+  driftThreshold = 0;
+  clumpThreshold = 0;
+  readonly speciesNorm = new Float32Array(4);
   readonly colonyPairs: OctavePair[] = COLONY_SCALE.map(() => ({ level: 0, t: 0 }));
   readonly detailPairs: OctavePair[] = COLONY_SCALE.map(() => ({ level: 0, t: 0 }));
   readonly colonyThreshold = new Float32Array(4);
@@ -210,7 +240,7 @@ export class Fields {
       var2 += this.relief[k] ** 2 + this.hummock[k] ** 2;
     }
     this.reliefStd = NOISE_STD * Math.sqrt(var2);
-    this.grainK = 0.55 * p.grain;
+    this.grainK = GRAIN_MAX * p.grain;
     const sorted = wetDistribution(this.seed, this);
     this.wetThreshold = sorted[Math.min(sorted.length - 1, Math.floor(clamp(1 - p.wetlands, 0, 1) * sorted.length))];
     if (p.wetlands <= 0) this.wetThreshold = 9;
@@ -222,6 +252,10 @@ export class Fields {
     octavePair(radius, PATTERN.lush, this.lushPair);
     octavePair(radius, PATTERN.variant, this.variantPair);
     octavePair(radius, PATTERN.richness, this.richPair);
+    octavePair(radius, PATTERN.drift, this.driftPair);
+    octavePair(radius, p.patchSize * CLUMP_SCALE, this.clumpPair);
+    this.driftThreshold = NOISE_STD * Math.hypot(1, 0.5) * normalQuantile(1 - DRIFT_COVER);
+    this.clumpThreshold = NOISE_STD * normalQuantile(1 - CLUMP_COVER);
     const wsum = Math.max(p.weights[0] + p.weights[1] + p.weights[2] + p.weights[3], 1e-6);
     this.patchiness = p.patchiness;
     for (let s = 0; s < 4; s++) {
@@ -232,6 +266,8 @@ export class Fields {
       this.colonyCover[s] = cover;
       this.colonyThreshold[s] = NOISE_STD * Math.sqrt(1 + DETAIL * DETAIL) * normalQuantile(1 - cover);
       this.speciesDensity[s] = p.density * share;
+      const bare = 1 - p.patchiness;
+      this.speciesNorm[s] = 1 / (bare + (1 - bare) * DRIFT_COVER * cover);
     }
   }
 
@@ -283,7 +319,8 @@ export class Fields {
   /** Ground height above the water table before the homestead and the banks (m). */
   natural(dir: Vector3): number {
     const wet = this.wetness(dir);
-    return this.reliefAt(dir, wet) + this.lift - this.drop * wet - this.level;
+    const h = this.reliefAt(dir, wet) + this.lift - this.drop * wet - this.level;
+    return plateau(h, wet);
   }
 
   lush(dir: Vector3): number {
@@ -295,17 +332,28 @@ export class Fields {
     return 0.5 + 0.5 * clamp(this.pair(dir, this.variantPair, SEED.variant) * 2.8, -1, 1);
   }
 
-  /** Flowers per m² for each species at dir (wetness passed in, it is needed alongside). */
+  /**
+   * Flowers per m² for each species at dir, from the drifts and colonies (the
+   * baked part; clumps() multiplies in the clumps). Wetness is passed in, as
+   * it is needed alongside.
+   */
   flora(dir: Vector3, wet: number, out: Float32Array): Float32Array {
-    const p = this.patchiness;
-    const rich = 1 + 0.75 * p * clamp(this.pair(dir, this.richPair, SEED.rich) * 3.2, -1, 1);
+    const bare = 1 - this.patchiness;
+    const d = this.pair(dir, this.driftPair, SEED.drift) + 0.5 * this.pair(dir, this.richPair, SEED.rich);
+    const drift = smoothstep(this.driftThreshold - DRIFT_EDGE, this.driftThreshold + DRIFT_EDGE, d);
     for (let s = 0; s < 4; s++) {
       const c = this.pair(dir, this.colonyPairs[s], SEED.colony + s * 32) + DETAIL * this.pair(dir, this.detailPairs[s], SEED.detail + s * 32);
       const thr = this.colonyThreshold[s];
       const colony = smoothstep(thr - COLONY_EDGE, thr + COLONY_EDGE, c);
-      out[s] = this.speciesDensity[s] * rich * (1 - p + (p * colony) / this.colonyCover[s]) * damp(s, wet);
+      out[s] = this.speciesDensity[s] * this.speciesNorm[s] * (bare + (1 - bare) * drift * colony) * damp(s, wet);
     }
     return out;
+  }
+
+  /** What clumps() needs, frozen (a tile built over several frames keeps the clumps it started with). */
+  clumpSettings(): ClumpSettings {
+    const p = this.patchiness;
+    return { seed: this.seed, level: this.clumpPair.level, t: this.clumpPair.t, threshold: this.clumpThreshold, patchiness: p, peak: 1 + p * (CLUMP_FLOOR + (1 - CLUMP_FLOOR) / CLUMP_COVER - 1) };
   }
 
   writeUniforms(u: FieldUniforms): void {
@@ -317,6 +365,8 @@ export class Fields {
     u.uLevel.value.set(this.level, 0, 0, 0);
     u.uPatternA.value.set(this.lushPair.level, this.lushPair.t, this.variantPair.level, this.variantPair.t);
     u.uPatternB.value.set(this.richPair.level, this.richPair.t, 0, this.patchiness);
+    u.uDrift.value.set(this.driftPair.level, this.driftPair.t, this.driftThreshold, 0);
+    u.uSpeciesNorm.value.fromArray(this.speciesNorm);
     const cp = this.colonyPairs;
     const dp = this.detailPairs;
     u.uColonyLevel.value.set(cp[0].level, cp[1].level, cp[2].level, cp[3].level);
@@ -327,6 +377,45 @@ export class Fields {
     u.uColonyCover.value.fromArray(this.colonyCover);
     u.uSpeciesDensity.value.fromArray(this.speciesDensity);
   }
+}
+
+export interface ClumpSettings {
+  seed: number;
+  level: number;
+  t: number;
+  threshold: number;
+  patchiness: number;
+  /** The most clumps() can multiply by. */
+  peak: number;
+}
+
+/**
+ * The clumps at dir: a factor per species on Fields.flora (1 on average).
+ * Two noises a couple of meters across; pink clumps where the first is high,
+ * stars where the second is, buttons and blues where they are low, so pink
+ * and stars mix, pink and buttons never share a clump. Mirrors clumpsAt() in
+ * meadow.glsl (unstretched noise: the surface shader has no grain axis).
+ */
+export function clumps(c: ClumpSettings, dir: Vector3, out: Float32Array): Float32Array {
+  const f0 = 2 ** c.level;
+  const s = (c.seed + SEED.clump + c.level + 16) >>> 0;
+  const norm = 1 / Math.sqrt((1 - c.t) ** 2 + c.t ** 2);
+  const at = (seed: number, f: number): number => gnoise(dir.x * f, dir.y * f, dir.z * f, seed >>> 0);
+  const a = (at(s, f0) * (1 - c.t) + at(s + 1, 2 * f0) * c.t) * norm;
+  const b = (at(s + 64, f0) * (1 - c.t) + at(s + 65, 2 * f0) * c.t) * norm;
+  const thr = c.threshold;
+  const k = (n: number): number => 1 + c.patchiness * (CLUMP_FLOOR + ((1 - CLUMP_FLOOR) * smoothstep(thr - CLUMP_EDGE, thr + CLUMP_EDGE, n)) / CLUMP_COVER - 1);
+  out[0] = k(a);
+  out[1] = k(b);
+  out[2] = k(-a);
+  out[3] = k(-b);
+  return out;
+}
+
+/** Wetland ground flattened toward a plateau just above the water (mirrors bake.frag.glsl). */
+export function plateau(h: number, wet: number): number {
+  const s = WET_PLATEAU.height;
+  return h + (s * Math.tanh(h / s) + WET_PLATEAU.keep * h - h) * wet;
 }
 
 /** How much each species likes damp ground (wetness 0..1); about 1 on average. */

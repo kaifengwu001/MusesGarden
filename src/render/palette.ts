@@ -29,21 +29,22 @@ type Rows = Partial<Record<number, readonly string[]>>;
 // Noon. Column meanings per row are noted; shaders reference them by index.
 const NOON: Rows = {
   // light, mid, shade, sunlit tips, pale (ahead of bloom), deep shade, far blue-green, pale light, wind sheen
-  [ROW.GRASS]: ['#AFD663', '#7DBF4A', '#448C37', '#D2E07C', '#9DBF6A', '#2F6E33', '#6FAF7A', '#C2DD86', '#E4ECA6'],
+  [ROW.GRASS]: ['#8BA44A', '#629237', '#346A28', '#A7AC5E', '#7C9250', '#235325', '#57855C', '#9AA965', '#CFD49A'],
   // painted far meadow: brush light, brush mid, brush dark, dry highlight, cool strokes, warm strokes
-  [ROW.BRUSH]: ['#A3D163', '#86C150', '#62A443', '#D3E39A', '#6FB47E', '#B9D66C'],
-  // shallow, deep, shore band, highlight, sky-tinted, mid, lily pad, lily pad shade, under the banks, ruffle
-  [ROW.WATER]: ['#4A9AC6', '#2356A4', '#D7EEE8', '#F6FCFF', '#78B9DA', '#3473B6', '#6FA548', '#4A7F35', '#183C74', '#A4CDEA'],
+  [ROW.BRUSH]: ['#81A04A', '#6A933B', '#4D7D31', '#A8AE75', '#57895F', '#93A451'],
+  // the mirror's cobalt, the navy body, -, highlight, pale sky low in the mirror, deep cobalt high in it,
+  // lily pad, lily pad shade, a bank in the mirror, ruffle
+  [ROW.WATER]: ['#2E78C0', '#0D4A84', '#D7EEE8', '#F6FCFF', '#6FA6D8', '#1C5FAA', '#6FA548', '#4A7F35', '#16404A', '#8CBBE6'],
   // cup light, cup mid, inner, cup shade, stem, stem shade, blush, rose, coral, rose shade
   [ROW.PINK]: ['#F7B4AA', '#E98A8F', '#F7C9B8', '#D06F7A', '#6E9E4A', '#4D7A36', '#FAD2D2', '#E5638C', '#F49A7C', '#B9497A'],
   // petal, petal shade, centre, centre bright, cream, pale lilac
   [ROW.STAR]: ['#FBF8EE', '#E1DCD0', '#E9D9A6', '#F2D45C', '#F5EACB', '#E3DCF2'],
   // yellow, yellow shade, blue, blue shade, red, red shade, orange, orange shade, violet, violet shade, lemon
   [ROW.SCATTER]: ['#F2D45C', '#D7AE3A', '#6E8FD8', '#4E6BB3', '#E05A4F', '#B6433B', '#F2A03C', '#C77A24', '#9B7BD8', '#6E55AE', '#F8EA8C'],
-  // zenith, horizon, haze, sun glow, mid sky
-  [ROW.SKY]: ['#2F7CC4', '#A9D3EE', '#D6EAF1', '#FFF4D8', '#5E9BD5'],
-  // lit, shadowed, mid, rim, base dark
-  [ROW.CLOUD]: ['#F6F4EE', '#C9CFDA', '#E2E5EB', '#FFFFFF', '#AFB8C8'],
+  // zenith, horizon, haze, sun glow, mid sky, haze over the far meadow
+  [ROW.SKY]: ['#2F7CC4', '#A9D3EE', '#D6EAF1', '#FFF4D8', '#5E9BD5', '#AFC6BE'],
+  // lit, shadowed, mid, rim, base (the meadow's green through it)
+  [ROW.CLOUD]: ['#F4F8FA', '#C4D3DA', '#E0E9ED', '#FFFFFF', '#A3B8B5'],
   // rock, shadow, light, lilac shade
   [ROW.ROCK]: ['#6F7C8E', '#4E5D78', '#8F99AA', '#77739D'],
   // snow, blue-lilac shade, mid, highlight
@@ -55,7 +56,7 @@ const NOON: Rows = {
   // sun light, sky ambient, ground bounce, rim, shadow tint
   [ROW.LIGHT]: ['#FFF3DE', '#BFD8F0', '#A7C27B', '#FFF5DA', '#7E92B8'],
   // buds and pale meadow ahead of the bloom: bud green, bud tip, dry grass
-  [ROW.BUD]: ['#93B85F', '#C9C27A', '#B2BE7A'],
+  [ROW.BUD]: ['#748C47', '#A0945C', '#8D915C'],
 };
 
 const DAWN: Rows = {

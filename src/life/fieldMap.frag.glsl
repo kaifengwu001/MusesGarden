@@ -8,7 +8,8 @@ uniform float uRadius;
 #include <meadow_paint>
 #include <meadow_field>
 #include <meadow_wind>
-#include <meadow_clouds_shadow>
+#include <meadow_warp>
+#include <meadow_clouds>
 
 uniform float uFieldSize;
 uniform int uFieldPass;
@@ -21,7 +22,7 @@ void main() {
     gl_FragColor = vec4(g.height, g.water, g.clearing, bloomAt(dir));
   } else if (uFieldPass == 1) {
     vec4 f = textureLod(uTerrainBake, dir, 0.0);
-    gl_FragColor = vec4(f.g, f.b, cloudShadow(dir), f.a);
+    gl_FragColor = vec4(f.g, f.b, cloudShadowAt(dir * (uRadius + max(homestead(dir, f.r), 0.0)), 0.0), f.a);
   } else {
     float gust = gustAt(dir);
     float ripple = rippleAt(dir);

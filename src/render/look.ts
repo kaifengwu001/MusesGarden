@@ -21,9 +21,9 @@ export interface LookUniforms {
   uMeadowLook: { value: Vector4 };
   /** Each flower species' middle colour in sun: far drifts blend these. */
   uFloraWash: { value: Color[] };
-  /** Dark band under the banks (m), depth tint, glints, time (s). */
+  /** -, depth tint, glints, time (s). */
   uWaterLook: { value: Vector4 };
-  /** Reflection strength, lily pads, -, -. */
+  /** Reflection strength, lily pads, height of the grass the banks show in the water (m), highest meadow (m). */
   uWaterSky: { value: Vector4 };
   uRipples: { value: Vector4[] };
   /** Radians per pixel, vertical (pattern level of detail). */
@@ -47,8 +47,8 @@ export function createLookUniforms(): LookUniforms {
     uGust: { value: new Vector4(0, 0, 0.5, 0.45) },
     uMeadowLook: { value: new Vector4(0.6, 1, 0.6, 0) },
     uFloraWash: { value: Array.from({ length: 4 }, () => new Color()) },
-    uWaterLook: { value: new Vector4(0.6, 0.6, 0.7, 0) },
-    uWaterSky: { value: new Vector4(0.8, 0.6, 0, 0) },
+    uWaterLook: { value: new Vector4(0, 0.6, 0.7, 0) },
+    uWaterSky: { value: new Vector4(0.8, 0, 0.35, 6) },
     uRipples: { value: Array.from({ length: MAX_RIPPLES }, () => new Vector4(0, 1, 0, -1)) },
     uPixelAngle: { value: 0.001 },
     uDebug: { value: 0 },

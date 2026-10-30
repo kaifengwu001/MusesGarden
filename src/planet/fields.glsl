@@ -4,8 +4,11 @@
 #define RELIEF_OCTAVES 9
 const float RELIEF_BASE_FREQ = 1.6;
 const float COLONY_EDGE = 0.06;
+const float DRIFT_EDGE = 0.07;
 const float DETAIL = 0.3;
 const float WET_HUMMOCKS = 1.4;
+const float WET_PLATEAU = 0.55;
+const float WET_PLATEAU_KEEP = 0.12;
 
 uniform uint uFieldSeed;
 uniform float uRelief[RELIEF_OCTAVES];
@@ -15,6 +18,8 @@ uniform vec4 uWet;             // wetness threshold, softness, lift (m), drop (m
 uniform vec4 uLevel;           // water level (m)
 uniform vec4 uPatternA;        // octave pairs (level, t): lushness, variant
 uniform vec4 uPatternB;        // octave pair (level, t): richness; -; patchiness
+uniform vec4 uDrift;           // octave pair (level, t): drifts; drift threshold; -
+uniform vec4 uSpeciesNorm;     // per species: density normalisation
 uniform vec4 uColonyLevel;     // per species
 uniform vec4 uColonyT;
 uniform vec4 uDetailLevel;
@@ -77,17 +82,18 @@ float dampFactor(int s, float wet) {
   return 0.9 + 0.25 * wet;
 }
 
-// Flowers per m²: pink, star, yellow, blue.
+// Flowers per m² from the drifts and colonies (Fields.flora): pink, star, yellow, blue.
 vec4 floraAt(vec3 dir, float wet) {
-  float p = uPatternB.w;
-  float rich = 1.0 + 0.75 * p * clamp(pairNoise(dir, uPatternB.x, uPatternB.y, 180u) * 3.2, -1.0, 1.0);
+  float bare = 1.0 - uPatternB.w;
+  float n = pairNoise(dir, uDrift.x, uDrift.y, 230u) + 0.5 * pairNoise(dir, uPatternB.x, uPatternB.y, 180u);
+  float drift = smoothstep(uDrift.z - DRIFT_EDGE, uDrift.z + DRIFT_EDGE, n);
   vec4 d;
   for (int s = 0; s < 4; s++) {
     float c = pairNoise(dir, uColonyLevel[s], uColonyT[s], 200u + uint(s) * 32u)
             + DETAIL * pairNoise(dir, uDetailLevel[s], uDetailT[s], 300u + uint(s) * 32u);
     float thr = uColonyThreshold[s];
     float colony = smoothstep(thr - COLONY_EDGE, thr + COLONY_EDGE, c);
-    d[s] = uSpeciesDensity[s] * rich * (1.0 - p + p * colony / uColonyCover[s]) * dampFactor(s, wet);
+    d[s] = uSpeciesDensity[s] * uSpeciesNorm[s] * (bare + (1.0 - bare) * drift * colony) * dampFactor(s, wet);
   }
   return d;
 }

@@ -23,6 +23,30 @@ export function warpK(w: number, radius: number, visualRadius: number): number {
   return w * (1 / (2 * rv) - 1 / (2 * radius));
 }
 
+/** Radius the ground curves like on the way down: nearly flat, so the meadow reaches a far horizon. */
+export function vistaRadius(radius: number): number {
+  return radius / 0.08;
+}
+
+/**
+ * Warp strength k at camera zoom z (0 Overview … 1 Wander): the true sphere
+ * from orbit; on the way down the ground flattens into a broad vista (the
+ * meadow reaching to a far horizon, as in the reference still); at eye level
+ * it rolls away like a small world of the visual radius. In curvatures:
+ * 1/R_eff = 1/R + 2k, blended between 1/R, 1/vistaRadius and 1/R_v.
+ */
+export function warpForZoom(z: number, radius: number, visualRadius: number): number {
+  const s = (a: number, b: number, x: number): number => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  const roll = s(0.8, 0.97, z);
+  const flat = s(0.42, 0.62, z) * (1 - roll);
+  const c = 1 / radius;
+  const curvature = c + flat * (1 / vistaRadius(radius) - c) + roll * (1 / effectiveVisualRadius(visualRadius, radius) - c);
+  return (curvature - c) / 2;
+}
+
 /** |t|² for planet-space point (x, y, z): squared tangent distance from F. */
 function tangentLengthSq(f: WarpFrame, x: number, y: number, z: number): number {
   const rx = x - f.focus.x;

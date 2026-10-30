@@ -48,6 +48,13 @@ export class CameraRig {
   /** True when the pose changed since the last `consumeChange`. */
   private changed = false;
 
+  /** Altitude (m), tilt from straight down (rad) and vertical field of view (°) at zoom z. */
+  framing(z: number): { altitude: number; tilt: number; fov: number } {
+    const top = this.overviewAltitude * this.radius;
+    const t = smoothstep(0.3, 1, z);
+    return { altitude: top * Math.pow(EYE_HEIGHT / top, z), tilt: MAX_TILT * t, fov: lerp(35, 55, t) };
+  }
+
   get altitude(): number {
     const top = this.overviewAltitude * this.radius;
     return top * Math.pow(EYE_HEIGHT / top, this.zoom);
@@ -56,11 +63,6 @@ export class CameraRig {
   /** 0 in Overview → 1 in Wander: tilt toward the horizon and the FOV ramp. */
   get tilt(): number {
     return smoothstep(0.3, 1, this.zoom);
-  }
-
-  /** Tiny-planet warp weight w: 0 in Overview → 1 in Wander. */
-  get warpWeight(): number {
-    return smoothstep(0.42, 0.95, this.zoom);
   }
 
   get mode(): 'overview' | 'wander' {
@@ -102,16 +104,18 @@ export class CameraRig {
     this.changed = true;
   }
 
-  /** Place the focus at `dir` immediately, facing along tangent `forward`. */
-  lookAlong(dir: Vector3, forward: Vector3): void {
+  /** Place the focus at `dir`, facing along tangent `forward`: at once, or by gliding there. */
+  lookAlong(dir: Vector3, forward: Vector3, immediate = true): void {
     const up = tmpV.copy(dir).normalize();
     const right = new Vector3().crossVectors(forward, up).normalize();
     const fwd = new Vector3().crossVectors(up, right);
     // columns: right (x), up (y), back (z = -forward)
     const m = new Matrix4().makeBasis(right, up, fwd.negate());
     this.frameTarget.setFromRotationMatrix(m);
-    this.frame.copy(this.frameTarget);
-    this.axes(this.frame);
+    if (immediate) {
+      this.frame.copy(this.frameTarget);
+      this.axes(this.frame);
+    }
     this.glideT = 1;
     this.changed = true;
   }

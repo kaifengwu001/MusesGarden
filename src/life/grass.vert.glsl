@@ -41,7 +41,8 @@ void main() {
   vec4 wind;
   float inside;
   vec4 f = fieldSample(dir, meadow, wind, inside);
-  float mask = smoothstep(0.2, 0.7, f.y) * (1.0 - smoothstep(0.25, 0.65, f.z)) * inside;
+  // right to the water's edge: the blades along a shore fringe the bank
+  float mask = smoothstep(-0.03, 0.15, f.y) * (1.0 - smoothstep(0.25, 0.65, f.z)) * inside;
   float edge = 1.0 - smoothstep(uGrass.z * 0.78, uGrass.z, d);
   float vis = grow * mask * edge;
   if (vis <= 0.002) {

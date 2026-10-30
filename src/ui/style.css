@@ -381,11 +381,6 @@ body {
   border: 1px solid rgba(62, 58, 54, 0.45);
 }
 
-.cb-slider.cb-time::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, #f2c7ae, #a9d3ee 40%, #a9d3ee 62%, #f4d09e);
-  height: 3px;
-}
-
 /* the bar takes the bottom centre; hints and HUD make room */
 @media (min-width: 641px) {
   .hints {

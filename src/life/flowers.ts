@@ -2,7 +2,7 @@ import { DoubleSide, Mesh, ShaderMaterial, Vector3, Vector4, type IUniform, type
 import { hash32, salt, unit } from '../core/hash';
 import { clamp, smoothstep } from '../core/math';
 import { uvToSphere } from '../planet/cubesphere';
-import { Fields, type FieldParams } from '../planet/fields';
+import { clumps, Fields, type ClumpSettings, type FieldParams } from '../planet/fields';
 import type { RestPoint } from '../planet/rest';
 import type { Layout } from '../planet/terrain';
 import { SPECIES_MESH } from './flowerMeshes';
@@ -12,11 +12,11 @@ import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterView 
 
 // Flowers near the camera. One rest-space point set (so the total follows the
 // mean density per m² exactly), sorted on the CPU into four pools, one per
-// species mesh, by the same colony fields the far paint is baked from
-// (fields.ts): colonies of one species, bare and rich ground, damp ground for
-// the pink cups. Each flower also gets a size (lusher ground grows bigger
-// flowers) and a colour variant (set per colony, with a little spread of its
-// own), so the near flowers and the far paint tell the same story.
+// species mesh, by the same fields the far paint reads (fields.ts): drifts
+// and colonies from a grid per tile, clumps exactly where each flower stands.
+// Each flower also gets a size (lusher ground grows bigger flowers) and a
+// colour variant (set per colony, with a little spread of its own), so the
+// near flowers and the far paint tell the same story.
 
 /** Stem top (m) and resting nod (rad) per species. */
 const HEADS: ReadonlyArray<readonly [number, number]> = [
@@ -42,6 +42,7 @@ interface TileFlora {
   flora: Float32Array;
   lush: Float32Array;
   variant: Float32Array;
+  clumps: ClumpSettings;
 }
 
 export interface FlowerLook {
@@ -66,6 +67,7 @@ export class FlowerClassifier implements ScatterClassifier<TileFlora> {
   private look: FlowerLook = { sizeVariation: 0.5, colourVariation: 0.5 };
   private readonly dir = new Vector3();
   private readonly tmp = new Float32Array(4);
+  private readonly clumps = new Float32Array(4);
 
   private lnR = Number.NaN;
   private paramsKey = '';
@@ -103,7 +105,7 @@ export class FlowerClassifier implements ScatterClassifier<TileFlora> {
   prepare(face: number, level: number, i: number, j: number): { state: TileFlora; boost: number } {
     const fields = this.fields!;
     const n = 2 ** level;
-    const st: TileFlora = { level, i, j, flora: new Float32Array(GRID * GRID * 4), lush: new Float32Array(GRID * GRID), variant: new Float32Array(GRID * GRID) };
+    const st: TileFlora = { level, i, j, flora: new Float32Array(GRID * GRID * 4), lush: new Float32Array(GRID * GRID), variant: new Float32Array(GRID * GRID), clumps: fields.clumpSettings() };
     let max = 0;
     for (let gy = 0; gy < GRID; gy++) {
       for (let gx = 0; gx < GRID; gx++) {
@@ -120,7 +122,7 @@ export class FlowerClassifier implements ScatterClassifier<TileFlora> {
         max = Math.max(max, total);
       }
     }
-    return { state: st, boost: max / Math.max(this.density, 1e-6) };
+    return { state: st, boost: (max * st.clumps.peak) / Math.max(this.density, 1e-6) };
   }
 
   classify(st: TileFlora, p: RestPoint, sigma: number, record: Float32Array, o: number): number {
@@ -138,10 +140,16 @@ export class FlowerClassifier implements ScatterClassifier<TileFlora> {
     const w11 = fx * fy;
     const f = st.flora;
     const at = (s: number): number => f[k00 * 4 + s] * w00 + f[(k00 + 1) * 4 + s] * w10 + f[(k00 + GRID) * 4 + s] * w01 + f[(k00 + GRID + 1) * 4 + s] * w11;
-    const d0 = at(0);
-    const d1 = at(1);
-    const d2 = at(2);
-    const d3 = at(3);
+    // a point that would not be born even in the densest clump is done with
+    // before the clumps are evaluated (most of them, outside the clumps)
+    const near = at(0) + at(1) + at(2) + at(3);
+    if (near <= 1e-6 || (p.threshold * this.density) / (near * st.clumps.peak) > sigma) return -1;
+    // the clumps, exactly where this flower stands
+    const k = clumps(st.clumps, this.dir.set(record[o], record[o + 1], record[o + 2]), this.clumps);
+    const d0 = at(0) * k[0];
+    const d1 = at(1) * k[1];
+    const d2 = at(2) * k[2];
+    const d3 = at(3) * k[3];
     const total = d0 + d1 + d2 + d3;
     if (total <= 1e-6) return -1;
     // born when the local density, not the mean, reaches its threshold

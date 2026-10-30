@@ -6,12 +6,9 @@ import vertexShader from './sky.vert.glsl?raw';
 
 /**
  * Gradient sky drawn first on a fullscreen triangle: a backdrop behind the
- * planet in Overview, a dome with the sun and the high cloud deck in Wander
- * (the deck whose shadows cross the meadow; cloudShadow.glsl). Colours come
- * from the palette, so the sky moves with the time of day.
+ * planet in Overview, a dome with the sun in Wander. Colours come from the
+ * palette; the clouds are drawn over it (clouds.ts).
  */
-/** World uniforms the sky reads (the cloud deck and what it depends on). */
-const SHARED = ['uRadius', 'uTerrainSeed', 'uWindVec', 'uCloudShadows', 'uCloudAxes', 'uCloudTops', 'uCloudLook', 'uCloudDeck', 'uCloudDrift'] as const;
 export class Sky {
   readonly mesh: Mesh;
   private readonly uniforms = {
@@ -23,15 +20,12 @@ export class Sky {
     uSunGlow: { value: new Color() },
     uSkyUp: { value: new Vector3(0, 1, 0) },
     uSun: { value: new Vector3(0, 1, 0) },
-    uCloudLit: { value: new Color() },
-    uCloudShade: { value: new Color() },
     /** 0: backdrop behind the planet (Overview), 1: dome around the viewer (Wander). */
     uDome: { value: 0 },
   };
 
-  constructor(shared: Record<string, IUniform>) {
+  constructor() {
     const uniforms: Record<string, IUniform> = { ...this.uniforms };
-    for (const key of SHARED) uniforms[key] = shared[key];
     const material = new ShaderMaterial({
       name: 'sky',
       vertexShader,
@@ -52,8 +46,6 @@ export class Sky {
     palette.get(ROW.SKY, 1, u.uHorizon.value);
     palette.get(ROW.SKY, 2, u.uHaze.value);
     palette.get(ROW.SKY, 3, u.uSunGlow.value);
-    palette.get(ROW.CLOUD, 0, u.uCloudLit.value);
-    palette.get(ROW.CLOUD, 1, u.uCloudShade.value);
     u.uSkyUp.value.copy(skyUp);
     u.uSun.value.copy(sun);
     u.uDome.value = dome;

@@ -123,6 +123,10 @@ async function boot(): Promise<void> {
       world.rig.setZoom(0);
     },
     reroll: () => store.set('world.seed', Math.floor(Math.random() * 10000)),
+    vista: () => {
+      world.cameraPreset('vista', false);
+      userPosed = true;
+    },
   });
 
   attachInput(canvas, {

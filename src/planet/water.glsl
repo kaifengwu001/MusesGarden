@@ -1,13 +1,20 @@
-// Painted water: clear teal shallows deepening to ultramarine, a dark band
-// under the banks, the sky and the passing clouds mirrored in it (天光云影共徘徊),
-// wind ruffles that break the mirror into streaks, glints that swell and fade
-// smoothly (never pop), sparse lily pads in the calm shallows, and click
-// ripples. No refraction.
-// Requires: toon, meadow (windDir, strokes, patternOctaves), clouds (cloudSeen).
+// Painted water as a mirror (天光云影共徘徊). Along the view ray mirrored off
+// the surface, three things can show, nearest first:
+//   the banks   the meadow's edge and the ground behind it, marched over the
+//               terrain (with its bank lip and its grass). This is the dark
+//               band under every shore: as tall as the bank and the meadow
+//               behind it, so it widens and narrows along the shore
+//   the clouds  the same puffs the sky shows (cloudsAlong, clouds.glsl)
+//   the sky     painted as the deep cobalt of the lakes, paler toward the horizon
+// Looking down into the water you see more of its navy body, looking across
+// it more of the mirror. Gusts ruffle the mirror into streaks; a few glints
+// swell and fade (never pop); clicks ripple. No refraction.
+// Requires: toon, meadow (windDir, patternOctaves), terrain (height0, uBank),
+// warp (unwarpPosition), clouds (cloudsAlong).
 
 #define MAX_RIPPLES 6
-uniform vec4 uWaterLook;             // dark band under the banks (m), depth tint, glints, time (s)
-uniform vec4 uWaterSky;              // reflection strength, lily pads, -, -
+uniform vec4 uWaterLook;             // -, depth tint, glints, time (s)
+uniform vec4 uWaterSky;              // reflection strength, lily pads, grass height in the mirror (m), highest meadow (m)
 uniform vec4 uRipples[MAX_RIPPLES];  // centre direction, start time (s); w < 0 = unused
 
 float rippleRing(vec3 dir) {
@@ -25,9 +32,58 @@ float rippleRing(vec3 dir) {
   return acc;
 }
 
-// Sky colour along a ray at elevation e (0 horizon … 1 zenith).
-vec3 skyAlong(float e) {
-  return mix(pal(ROW_SKY, 1), pal(ROW_SKY, 0), pow(clamp(e, 0.0, 1.0), 0.62));
+// The open sky as the lakes paint it, by the mirrored ray's elevation (0 horizon … 1 zenith).
+vec3 waterSky(float e) {
+  vec3 c = mix(pal(ROW_WATER, 4), pal(ROW_WATER, 0), smoothstep(0.0, 0.35, e));
+  return mix(c, pal(ROW_WATER, 5), smoothstep(0.35, 0.9, e));
+}
+
+// Height of the meadow's top at a direction for the mirror: ground, plus the
+// bank lip and the grass wherever it is land (rising over the first few cm).
+float bankTop(vec3 d) {
+  float h = height0(d);
+  return h + (uBank.x + uWaterSky.z) * smoothstep(0.0, 0.06, h);
+}
+
+// The meadow along a mirrored ray (view space), from the water outward: the
+// direction it meets the meadow and how high above the water (m), or w < 0.
+vec4 bankAlong(vec3 wp, vec3 r) {
+  float t = 0.0;
+  float dt = 0.07;
+  float lo = 0.0;
+  for (int i = 0; i < 17; i++) {
+    float tn = t + dt;
+    vec3 q = unwarpPosition(wp + r * tn);
+    float len = length(q);
+    if (len - uRadius > uWaterSky.w) break; // above anything the meadow reaches
+    if (len - uRadius < bankTop(q / len)) {
+      // refine the crossing between t and tn
+      lo = t;
+      float hi = tn;
+      for (int k = 0; k < 4; k++) {
+        float mid = 0.5 * (lo + hi);
+        vec3 m = unwarpPosition(wp + r * mid);
+        float ml = length(m);
+        if (ml - uRadius < bankTop(m / ml)) hi = mid;
+        else lo = mid;
+      }
+      vec3 hit = unwarpPosition(wp + r * hi);
+      float hl = length(hit);
+      return vec4(hit / hl, hl - uRadius);
+    }
+    t = tn;
+    dt *= 1.33;
+  }
+  return vec4(0.0, 0.0, 0.0, -1.0);
+}
+
+// The meadow seen in the water: the bank's face and the grass above it,
+// mostly the shaded undersides, deeper toward the water line.
+vec3 bankColour(vec3 d, float y) {
+  float lush = textureLod(uTerrainBake, d, 0.0).g;
+  vec3 face = mix(pal(ROW_GRASS, 5), pal(ROW_WATER, 8), 0.45);
+  vec3 grass = mix(pal(ROW_GRASS, 2), pal(ROW_GRASS, 1), 0.3 + 0.2 * lush);
+  return mix(face, grass, smoothstep(uBank.x * 0.5, uBank.x + uWaterSky.z, y) * 0.75);
 }
 
 // One octave of glints: a third of the lattice cells hold a short dash along
@@ -61,30 +117,33 @@ float lilyPad(vec3 dir, float freq, uint seed, out float shade) {
   return smoothstep(0.17, 0.13, r) * (1.0 - notch);
 }
 
-// shore: signed distance to the shore (m, negative here); depth: m; b: toon
-// light; cloud: cloud shadow 0..1; gust: wind on the water 0..1; stroke: the
-// brushstroke noise along the wind (meadow strokeAt), here the ruffles.
-vec3 waterColour(vec3 dir, float shore, float depth, float b, float cloud, float gust, float stroke, vec3 n, vec3 v, float pixelMeters) {
+// dir: planet direction; wp: the surface point in view space; shore: signed
+// distance to the shore (m, negative here); depth: m; b: toon light; cloud:
+// cloud shadow 0..1; gust: wind on the water 0..1; stroke: brushstroke noise
+// along the wind (meadow strokeAt), here the ruffles; n, v: normal and
+// direction to the eye (view space).
+vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float cloud, float gust, float stroke, vec3 n, vec3 v, float pixelMeters) {
   vec3 along = windDir(dir);
-  // body: shallows → depths, and a dark band under the banks
-  float dt = smoothstep(0.05, 1.3, depth) * (0.35 + 0.65 * uWaterLook.y);
-  vec3 body = mix(pal(ROW_WATER, 0), pal(ROW_WATER, 1), dt);
-  float under = 1.0 - smoothstep(0.0, max(uWaterLook.x, 0.01), -shore);
-  body = mix(body, pal(ROW_WATER, 8), under * 0.7);
+  float facing = clamp(dot(n, v), 0.0, 1.0);
+  // the body: navy looking down into it, a touch lighter over the shallows
+  vec3 body = mix(pal(ROW_WATER, 1), pal(ROW_WATER, 5), smoothstep(0.5, 0.05, depth) * 0.3 * uWaterLook.y);
 
-  // the mirror: sky and clouds along the reflected ray (n: the water's normal as you see it)
-  vec3 up = n;
-  vec3 r = reflect(-v, up);
-  vec3 sky = skyAlong(dot(r, up));
-  float c = cloudSeen(dir * uRadius, r);
-  vec3 mirror = mix(sky, mix(pal(ROW_CLOUD, 2), pal(ROW_CLOUD, 0), 0.6), c * 0.92);
-  float fresnel = 0.08 + 0.92 * pow(1.0 - clamp(dot(up, v), 0.0, 1.0), 4.0);
-  float calm = 1.0 - 0.5 * gust;
-  float reflect_ = clamp((fresnel + 0.22 * c) * calm * uWaterSky.x, 0.0, 1.0);
-  vec3 col = mix(body, mirror, reflect_ * (1.0 - under * 0.6));
+  // the mirror, ruffled along the wind where it gusts
+  vec3 r = reflect(-v, n);
+  r = normalize(r + along * stroke * 0.06 * (0.2 + gust) * uWindVec.w);
+  vec3 mirror = waterSky(dot(r, n));
+  vec4 bank = bankAlong(wp, r);
+  vec4 cl = vec4(0.0);
+  if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
+  else cl = cloudsAlong(wp, r);
+  float reflectance = mix(0.45, 0.95, pow(1.0 - facing, 1.6)) * (1.0 - 0.25 * gust) * uWaterSky.x;
+  vec3 col = mix(body, mirror, reflectance);
+  // banks stay dark and clouds stay bright in the mirror even looking down into the water
+  if (bank.w >= 0.0) col = mix(col, mirror, 0.5 * uWaterSky.x);
+  col = mix(col, cl.rgb / max(cl.a, 1e-3) * vec3(0.92, 0.96, 1.0), cl.a * 0.9 * uWaterSky.x);
 
   // wind ruffles: pale streaks along the wind, stronger in the gusts
-  col = mix(col, pal(ROW_WATER, 9), smoothstep(0.25, 0.8, stroke) * (0.12 + 0.4 * gust) * (1.0 - under));
+  col = mix(col, pal(ROW_WATER, 9), smoothstep(0.3, 0.85, stroke) * (0.04 + 0.22 * gust) * uWindVec.w);
 
   // lily pads in calm shallows near the shore
   float shade;
@@ -92,18 +151,18 @@ vec3 waterColour(vec3 dir, float shore, float depth, float b, float cloud, float
             * smoothstep(-6.0, -1.0, shore) * uWaterSky.y * smoothstep(0.25, 0.05, pixelMeters);
   col = mix(col, tone3(pal(ROW_WATER, 6), mix(pal(ROW_WATER, 6), pal(ROW_WATER, 7), 0.5), pal(ROW_WATER, 7), b * (0.85 + 0.3 * shade)), pad);
 
-  // glints: dashes catching the sun, never smaller than a couple of pixels
+  // glints: small dashes catching the sun, never smaller than a couple of pixels
   float f0, f1;
   uint lv;
   float t = patternOctaves(0.7, pixelMeters, 9.0, f0, f1, lv);
   float glint = mix(glintOctave(dir, f0, along, uTerrainSeed + 130u + lv), glintOctave(dir, f1, along, uTerrainSeed + 131u + lv), t);
   vec3 hv = normalize(uSunDir + v);
   float toward = pow(clamp(dot(n, hv), 0.0, 1.0), 20.0);
-  col += pal(ROW_WATER, 3) * glint * (0.3 + 1.8 * toward) * (0.4 + 0.6 * gust) * uWaterLook.z * (1.0 - cloud) * (1.0 - pad) * (1.0 - under);
+  col += pal(ROW_WATER, 3) * glint * (0.25 + 1.6 * toward) * (0.4 + 0.6 * gust) * uWaterLook.z * (1.0 - cloud) * (1.0 - pad) * step(bank.w, 0.0);
 
   // clicks ripple out
   col = mix(col, pal(ROW_WATER, 3), clamp(rippleRing(dir), 0.0, 1.0) * 0.5);
-  // passing cloud shadows dim the water a little
-  col *= 1.0 - 0.22 * cloud;
+  // passing cloud shadows dim what you see into the water
+  col *= 1.0 - 0.18 * cloud * (1.0 - reflectance);
   return col;
 }
