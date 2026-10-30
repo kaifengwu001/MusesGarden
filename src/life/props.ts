@@ -1,4 +1,5 @@
-import { BufferGeometry, DoubleSide, Float32BufferAttribute, FrontSide, Matrix4, Mesh, Object3D, ShaderMaterial, Vector3, type IUniform } from 'three';
+import { BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, Mesh, Object3D, ShaderMaterial, Vector3, type IUniform } from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash32, unit } from '../core/hash';
 import { gnoise } from '../planet/noise';
 import fragmentShader from './props.frag.glsl?raw';
@@ -148,12 +149,14 @@ class Builder {
     }
   }
 
-  build(): BufferGeometry {
+  /** The geometry, every vertex tagged with the material it is painted as. */
+  build(kind: Kind): BufferGeometry {
     const g = new BufferGeometry();
     g.setAttribute('position', new Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new Float32BufferAttribute(this.nrm, 3));
     g.setAttribute('uv', new Float32BufferAttribute(this.uv, 2));
     g.setAttribute('aPaint', new Float32BufferAttribute(this.paint, 4));
+    g.setAttribute('aKind', new Float32BufferAttribute(new Float32Array(this.pos.length / 3).fill(KIND_ID[kind]), 1));
     return g;
   }
 }
@@ -432,7 +435,6 @@ const axisZ = new Vector3();
 
 export class Homestead {
   readonly group = new Object3D();
-  private readonly materials: ShaderMaterial[] = [];
 
   constructor(shared: Record<string, IUniform>, seed: number) {
     const rand = new Rand(seed ^ 0xc0ffee);
@@ -451,32 +453,13 @@ export class Homestead {
     const glassB = new Builder();
     const ironB = new Builder();
     fittings(woodB, frameB, glassB, ironB, faces);
-    for (const [builder, kind] of [
-      [wallB, 'wall'],
-      [roofB, 'roof'],
-      [stoneB, 'landing'],
-      [woodB, 'wood'],
-      [frameB, 'frame'],
-      [glassB, 'glass'],
-      [ironB, 'iron'],
-    ] as const) {
-      const mesh = new Mesh(builder.build(), this.material(shared, kind));
-      mesh.frustumCulled = false;
-      this.group.add(mesh);
-    }
+    // one mesh, one draw: each vertex carries its material
+    const geometry = mergeGeometries([wallB.build('wall'), roofB.build('roof'), stoneB.build('landing'), woodB.build('wood'), frameB.build('frame'), glassB.build('glass'), ironB.build('iron')]);
+    // double-sided for the roof's underside (seen under the eaves); the rest is closed or seen from outside
+    const mesh = new Mesh(geometry, new ShaderMaterial({ name: 'homestead', vertexShader, fragmentShader, uniforms: { ...shared }, side: DoubleSide }));
+    mesh.frustumCulled = false;
+    this.group.add(mesh);
     this.group.matrixAutoUpdate = false;
-  }
-
-  private material(shared: Record<string, IUniform>, kind: Kind): ShaderMaterial {
-    const mat = new ShaderMaterial({
-      name: kind,
-      vertexShader,
-      fragmentShader,
-      uniforms: { ...shared, uKind: { value: KIND_ID[kind] } },
-      side: kind === 'roof' ? DoubleSide : FrontSide,
-    });
-    this.materials.push(mat);
-    return mat;
   }
 
   /** Seat the homestead: origin on the cottage clearing, up = local vertical, +z toward the pond. */

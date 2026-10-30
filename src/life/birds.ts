@@ -42,6 +42,8 @@ const HALF_SPAN = 0.48;
 const DT = 0.12;
 /** Gravity (m/s²), for the bank of a turn. */
 const G = 9.8;
+/** The birds' heights are over this much above the water table (m) on an R = 128 m planet, about the tops of its hills (they grow as R^0.4). */
+const HILLS = 2.4;
 
 interface Bird {
   /** Place in the flock (m): ahead, to the side, up. */
@@ -225,7 +227,7 @@ export class Birds {
       swingPeriod: 70 + 30 * rand(),
       speed: 6 + rand(),
       phase: rand() * Math.PI * 2,
-      height: 7.5 + rand(),
+      height: 5.5 + rand(),
       centre: pond,
       ax: 24 + 6 * rand(),
       ay: 14 + 4 * rand(),
@@ -251,7 +253,7 @@ export class Birds {
         swingPeriod: 80 + 60 * rand(),
         speed: 7.5 + 2.5 * rand(),
         phase: rand() * Math.PI * 2,
-        height: 4 + 5 * rand(),
+        height: 2.5 + 4.5 * rand(),
         centre: new Vector3(),
         ax: 0,
         ay: 0,
@@ -306,10 +308,10 @@ export class Birds {
       // sideways acceleration (m/s²) → the bank of a coordinated turn
       const lateral = this.p.copy(this.next).add(this.prev).addScaledVector(this.centre, -2).dot(this.side) * (R / (DT * DT));
       const bank = clamp(Math.atan(lateral / G) * 1.5, -0.7, 0.7);
-      // a few meters over the meadow, rising over the cottage
-      const ground = Math.max(terrain.height0(this.centre), 0);
+      // level flight a few meters over the meadow (heights over the water
+      // table, clear of the hills), rising over the cottage
       const nearHome = smoothstep(32 / R, 10 / R, this.centre.distanceTo(cottage));
-      const lift = R + ground + f.height + 6 * nearHome * (f.route ? 1 : 0) + 0.6 * Math.sin(time * 0.55 + f.phase);
+      const lift = R + HILLS * Math.pow(R / 128, 0.4) + f.height + 6 * nearHome * (f.route ? 1 : 0) + 0.6 * Math.sin(time * 0.55 + f.phase);
       for (const b of f.birds) {
         if (n >= MAX_BIRDS) break;
         // places in the flock drift a little, slowly

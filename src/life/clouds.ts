@@ -5,6 +5,7 @@ import {
   DoubleSide,
   FrontSide,
   PerspectiveCamera,
+  Quaternion,
   Vector2,
   BufferAttribute,
   CustomBlending,
@@ -174,6 +175,10 @@ interface Slot {
   /** Size factor: each streak has its own girth, and swells and thins along its length. */
   girth: number;
   seed: number;
+  /** From the seed, once: base height (× the altitude setting), size jitter, and whether it can hold a fringe cloudlet. */
+  alt: number;
+  jitter: number;
+  fringe: boolean;
 }
 
 function rng(seed: number): () => number {
@@ -447,6 +452,7 @@ export class Clouds {
   private readonly all: Array<{ centre: Vector3; radius: number }> = [];
   private readonly p = new Vector3();
   private readonly q = new Vector3();
+  private readonly drift = new Quaternion();
   private readonly across = new Vector3();
   private readonly centre = new Vector3();
   private readonly axisA = new Vector3();
@@ -623,12 +629,15 @@ export class Clouds {
         const i = Math.min(Math.floor(at), pts.length - 2);
         const f = at - i;
         // slots are reused frame to frame (R changes every frame while the planet grows)
-        const slot = (this.slots[count++] ??= { dir: new Vector3(), along: new Vector3(), cloudiness: 0, girth: 1, seed: 0 });
+        const slot = (this.slots[count++] ??= { dir: new Vector3(), along: new Vector3(), cloudiness: 0, girth: 1, seed: 0, alt: 1, jitter: 1, fringe: false });
         const dir = slot.dir.lerpVectors(pts[i], pts[i + 1], f).normalize();
         const along = slot.along.subVectors(pts[i + 1], pts[i]);
         along.addScaledVector(dir, -along.dot(dir)).normalize();
         // a little off the line, to either side, so neighbouring streaks do not run in step
         slot.seed = hash32(line.seed + j * 131);
+        slot.alt = 0.75 + 0.5 * unit(hash32(slot.seed + 1));
+        slot.jitter = 0.9 + 0.2 * unit(hash32(slot.seed + 2));
+        slot.fringe = unit(hash32(slot.seed + 9)) <= FRINGE.share;
         const side = this.across.crossVectors(dir, along);
         dir.addScaledVector(side, (unit(hash32(slot.seed + 5)) - 0.5) * 0.4 * STREAM.sep).normalize();
         along.addScaledVector(dir, -along.dot(dir)).normalize();
@@ -699,10 +708,12 @@ export class Clouds {
     const sizeScale = Math.sqrt(scale);
     // drift: about a meter and a half a second at the default speed
     const speed = 0.4 + 3.2 * p.speed;
+    // drift: every cloud turns with the wind about the same axis, at the angular speed of the clouds' middle height
+    const lift = Math.pow(scale, 0.35);
+    this.drift.setFromAxisAngle(windAxis, (time * speed) / (radius + p.altitude * lift));
     this.order.length = 0;
     for (const slot of this.slots) {
       if (this.order.length >= MAX_CLOUDS) break;
-      const h = slot.seed;
       const c = slot.cloudiness;
       // in a cloudy stretch, a heap; in its fringe, now and then a small cloudlet
       // (a fixed choice of slots, growing and shrinking with the fringe, so none pops)
@@ -713,17 +724,16 @@ export class Clouds {
         girth = slot.girth * (0.7 + 0.55 * smoothstep(this.threshold, this.threshold + 0.3, c));
       } else {
         fade = smoothstep(this.threshold - FRINGE.reach, this.threshold, c);
-        if (fade <= 0 || unit(hash32(h + 9)) > FRINGE.share) continue;
+        if (fade <= 0 || !slot.fringe) continue;
         girth = 0.38 + 0.2 * fade;
       }
       const at = this.placed[this.order.length];
       at.slot = slot;
       at.fade = fade;
-      at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32(h + 1))) * Math.pow(scale, 0.35);
-      at.size = SIZE * sizeScale * girth * (0.9 + 0.2 * unit(hash32(h + 2))) * (0.35 + 0.65 * fade);
-      const angle = (time * speed) / at.base;
-      at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
-      at.along.copy(slot.along).applyAxisAngle(windAxis, angle);
+      at.base = radius + p.altitude * slot.alt * lift;
+      at.size = SIZE * sizeScale * girth * slot.jitter * (0.35 + 0.65 * fade);
+      at.up.copy(slot.dir).applyQuaternion(this.drift);
+      at.along.copy(slot.along).applyQuaternion(this.drift);
       at.along.addScaledVector(at.up, -at.along.dot(at.up)).normalize();
       at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
       this.order.push(at);
@@ -768,8 +778,9 @@ export class Clouds {
         reach = Math.max(reach, this.p.distanceTo(this.centre) + r);
       });
       // how much of the heap stands between each puff and the sun (from the
-      // upper, sunward part of the puff): 0 lit … 1 in the shade of the others
-      for (let k = 0; k < PUFFS; k++) {
+      // upper, sunward part of the puff): 0 lit … 1 in the shade of the others.
+      // Only drawn clouds need it; the hidden ones only cast shadows
+      for (let k = 0; k < PUFFS && row < n; k++) {
         const qk = o + (HEADER + k) * 4;
         const rk = data[qk + 3];
         this.q.set(data[qk], data[qk + 1], data[qk + 2]).addScaledVector(sunDir, 0.35 * rk);

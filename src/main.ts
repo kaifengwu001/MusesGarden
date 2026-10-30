@@ -46,6 +46,9 @@ function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
 
 /** Budget for background work (tile builds) per frame, ms. */
 const BUILD_BUDGET_MS = 2;
+/** The frame's whole JS budget (ms), and what render submission takes of it (about). */
+const JS_BUDGET_MS = 4;
+const RENDER_MS = 0.6;
 
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -266,7 +269,8 @@ async function boot(): Promise<void> {
     gpuTimer.begin();
     controls.tick(clock.realDt);
     update();
-    world.queue.run(BUILD_BUDGET_MS);
+    // background building gets what the frame's JS budget has left, between 1 and 2 ms
+    world.queue.run(Math.min(Math.max(JS_BUDGET_MS - RENDER_MS - (performance.now() - t0), 1), BUILD_BUDGET_MS));
     render();
     gpuTimer.end();
     gpuTimer.poll();

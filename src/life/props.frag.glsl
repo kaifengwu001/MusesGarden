@@ -14,7 +14,7 @@
 #include <meadow_toon>
 #include <meadow_fog>
 #include <meadow_clouds>
-uniform int uKind; // 0 wall, 1 roof, 2 wood, 3 iron, 4 glass, 5 landing, 6 window frames
+flat varying int vKind; // 0 wall, 1 roof, 2 wood, 3 iron, 4 glass, 5 landing, 6 window frames
 
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -99,7 +99,7 @@ void main() {
   vec2 uv = vUv;
   float height = vPaint.z;
   vec3 col;
-  if (uKind == 0) {
+  if (vKind == 0) {
     vec3 base = plaster(uv, height, vec2(0.15, 0.99), 950u);
     // rain: streaks running down from under the eaves
     float streak = strokes(uv, vec2(0.0, 1.0), 0.045, 956u);
@@ -118,7 +118,7 @@ void main() {
     float ao = mix(0.86, 1.0, smoothstep(0.0, 0.7, height));
     col = painted(base, n, ao, max(cloud, eave));
     col = mix(col, col * vec3(0.8, 0.81, 0.97), eave * 0.75);
-  } else if (uKind == 1) {
+  } else if (vKind == 1) {
     float m1 = gnoise(vec3(uv * 0.7, 3.3), 971u);
     if (vPaint.y < 2.0) {
       // ridge and hip tiles: short rounded caps, end to end, mossy
@@ -161,7 +161,7 @@ void main() {
       base = mix(base, pal(ROW_ROOF, 11), gap * 0.6 * (1.0 - lip));
       col = painted(base, n, 1.0, cloud);
     }
-  } else if (uKind == 2) {
+  } else if (vKind == 2) {
     // planks: warm, weathered, darker toward the top and at the seams
     float plank = floor(uv.x / 0.13 + 0.5);
     float seam = smoothstep(0.0, 0.06 + fwidth(uv.x / 0.13), abs(fract(uv.x / 0.13 + 0.5) - 0.5) * 2.0);
@@ -170,9 +170,9 @@ void main() {
     vec3 base = mix(pal(ROW_ROOF, 3), pal(ROW_ROOF, 2), clamp(0.62 + 0.2 * t + 0.25 * grain, 0.0, 1.0));
     base *= mix(1.0, 0.8, smoothstep(1.1, 1.85, height));
     col = painted(base * mix(0.7, 1.0, seam), n, 1.0, cloud);
-  } else if (uKind == 3) {
+  } else if (vKind == 3) {
     col = painted(pal(ROW_ROOF, 4) * 1.3, n, 1.0, cloud);
-  } else if (uKind == 4) {
+  } else if (vKind == 4) {
     // glass: the meadow and the sky in it, darker where the frame shades it
     vec3 r = reflect(-v, n);
     float rise = dot(r, normalize(vPlanet));
@@ -180,7 +180,7 @@ void main() {
     vec3 meadow = mix(pal(ROW_ROOF, 14), pal(ROW_ROOF, 13), smoothstep(-0.2, 0.8, s) * 0.5);
     vec3 glassCol = mix(meadow, pal(ROW_ROOF, 13), smoothstep(-0.25, 0.2, rise + 0.15 * s));
     col = glassCol * mix(0.78, 1.0, smoothstep(-0.6, 0.4, dot(n, uSunDir))) * (1.0 - 0.3 * cloud);
-  } else if (uKind == 6) {
+  } else if (vKind == 6) {
     // window frames and glazing bars: painted wood, grey-brown
     float s = strokes(uv, vec2(1.0, 0.0), 0.02, 984u);
     col = painted(pal(ROW_ROOF, 12) * (0.92 + 0.12 * s), n, 1.0, cloud);
