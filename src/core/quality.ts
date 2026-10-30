@@ -33,8 +33,12 @@ export interface Tier {
   readonly budgets: Budgets;
 }
 
-/** The frame budget on every tier (ms): about 40 frames a second. */
-export const FRAME_BUDGET_MS = 24;
+/**
+ * The frame time Auto aims at (ms): a steady 60 frames a second. A 60 Hz
+ * screen shows anything slower as 30, so a looser budget (24 ms, tried in
+ * iteration 6) reads as a stutter even while every frame is in time.
+ */
+export const FRAME_BUDGET_MS = 1000 / 60;
 
 export const TIERS: Readonly<Record<TierName, Tier>> = {
   high: {
@@ -139,7 +143,7 @@ export function runBenchmark(renderer: WebGLRenderer): number {
 export type QualityChange = 'scale' | 'tier' | null;
 
 /**
- * Picks the tier and steps quality live against the frame budget (24 ms).
+ * Picks the tier and steps quality live against the frame budget (60 fps).
  * When frames stay slow for 2 s, the render scale drops first (×0.85 a
  * step, to 0.72), then an Auto tier steps down one level (high → medium →
  * low), its scale back at full. After 8 s of comfortable frames the scale

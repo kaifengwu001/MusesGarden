@@ -23,7 +23,9 @@ import { warpPoint, type WarpFrame } from '../render/warp';
 // of about `tileMeters`; each tile's points are enumerated by a time-sliced
 // job and copied into pages of a fixed instance pool, drawn in a single call.
 // A tiny page-visibility texture lets the vertex shader skip whole tiles
-// outside the frustum.
+// outside the frustum; its value is also each tile's grow-in (a tile that
+// opens new ground grows up from it over FADE_IN_MS, rather than popping in).
+// Tiles in view are built before those out of it, nearest first.
 //
 // Density falls off with distance (blades and flowers thin out toward the
 // edge of the near field). Thinning keeps points in rank order, so a far
@@ -43,6 +45,10 @@ export const SCATTER_STRIDE = 5;
 const PAGE_ROWS = 256;
 /** ln threshold that is never reached: unused slots. */
 export const NEVER = 1e30;
+/** A tile that opens new ground grows in over this long (ms); one that replaces another shows at once. */
+const FADE_IN_MS = 350;
+/** Build order: tiles out of view wait behind those in view as if this much farther away (m). */
+const OUT_OF_VIEW_M = 60;
 
 export interface ScatterSpec {
   readonly name: string;
@@ -110,6 +116,9 @@ interface Tile {
   version: string;
   buildingVersion: string;
   wanted: boolean;
+  /** In the frustum at the last update (build order), and when its first pages came in (ms; -Infinity: grown in already). */
+  inView: boolean;
+  grownAt: number;
 }
 
 interface Pool {
@@ -217,17 +226,23 @@ export class ScatterLayer {
       let tile = this.tiles.get(key);
       if (!tile) {
         const pages = Array.from({ length: this.channels }, () => [] as number[]);
-        tile = { key, face, level: l, i, j, centre, alpha, pages, count: 0, sigma: 0, building: 0, version: '', buildingVersion: '', wanted: true };
+        tile = { key, face, level: l, i, j, centre, alpha, pages, count: 0, sigma: 0, building: 0, version: '', buildingVersion: '', wanted: true, inView: false, grownAt: Number.NaN };
         this.tiles.set(key, tile);
       }
       tile.wanted = true;
       const nearest = Math.max(0, gap) * R;
+      const inView = this.inFrustum(tile, view);
+      if (inView !== tile.inView) {
+        tile.inView = inView;
+        if (tile.building > 0) view.queue.reprioritise(`${this.spec.name}:${tile.key}`, nearest + (inView ? 0 : OUT_OF_VIEW_M));
+      }
+      const priority = nearest + (inView ? 0 : OUT_OF_VIEW_M);
       const need = view.density * view.radiusHi * view.radiusHi * view.falloff(nearest);
       if (!(need > 0)) return; // an empty near field (or a degenerate falloff) needs nothing built
       const grow = need > tile.sigma && tile.building < need;
       const stale = tile.version !== version && tile.buildingVersion !== version;
-      if (grow) this.schedule(tile, need * this.spec.headroom, nearest, view);
-      else if (stale) this.schedule(tile, Math.max(need * this.spec.headroom, tile.sigma), nearest, view);
+      if (grow) this.schedule(tile, need * this.spec.headroom, priority, view);
+      else if (stale) this.schedule(tile, Math.max(need * this.spec.headroom, tile.sigma), priority, view);
     };
     for (let face = 0; face < 6; face++) visit(face, 0, 0, 0);
 
@@ -257,29 +272,22 @@ export class ScatterLayer {
       }
       for (const n of this.tiles.values()) if (n.wanted && overlaps(t, n)) hidden.add(n);
     }
+    // (a tile taking over from an old one replaces grass that is already there: no grow-in)
+    for (const n of hidden) n.grownAt = Number.NEGATIVE_INFINITY;
 
-    // 3. Page visibility: whole tiles against the (warped) frustum.
+    // 3. Page visibility: whole tiles against the (warped) frustum, each at its grow-in.
     for (const p of this.pools) p.visible.fill(0);
     const maxPage = this.maxPage.fill(-1);
+    const now = performance.now();
     let visible = 0;
     for (const t of this.tiles.values()) {
       if (t.count === 0) continue;
-      sphere.center.copy(t.centre).multiplyScalar(R);
-      sphere.radius = 2 * R * Math.sin(t.alpha / 2) + 3;
-      const w = view.warp;
-      if (w.k !== 0) {
-        const tx = sphere.center.x - w.focus.x;
-        const ty = sphere.center.y - w.focus.y;
-        const tz = sphere.center.z - w.focus.z;
-        const along = tx * w.up.x + ty * w.up.y + tz * w.up.z;
-        const tLen = Math.hypot(tx - along * w.up.x, ty - along * w.up.y, tz - along * w.up.z);
-        warpPoint(w, sphere.center, sphere.center);
-        sphere.radius += 2 * Math.abs(w.k) * tLen * sphere.radius;
-      }
-      const show = view.frustum.intersectsSphere(sphere) && !hidden.has(t);
+      const show = this.inFrustum(t, view) && !hidden.has(t);
+      const grown = clamp((now - t.grownAt) / FADE_IN_MS, 0, 1);
+      const value = show ? Math.max(1, Math.round(255 * grown)) : 0;
       for (let c = 0; c < this.channels; c++) {
         for (const p of t.pages[c]) {
-          this.pools[c].visible[p] = show ? 255 : 0;
+          this.pools[c].visible[p] = value;
           maxPage[c] = Math.max(maxPage[c], p);
         }
       }
@@ -290,6 +298,29 @@ export class ScatterLayer {
       this.instanceCounts[c] = (maxPage[c] + 1) * this.spec.pageSize;
     }
     this.visibleInstances = visible;
+  }
+
+  /** A tile against the (warped) frustum, by its bounding sphere. */
+  private inFrustum(t: Tile, view: ScatterView): boolean {
+    const R = view.radius;
+    sphere.center.copy(t.centre).multiplyScalar(R);
+    sphere.radius = 2 * R * Math.sin(t.alpha / 2) + 3;
+    const w = view.warp;
+    if (w.k !== 0) {
+      const tx = sphere.center.x - w.focus.x;
+      const ty = sphere.center.y - w.focus.y;
+      const tz = sphere.center.z - w.focus.z;
+      const along = tx * w.up.x + ty * w.up.y + tz * w.up.z;
+      const tLen = Math.hypot(tx - along * w.up.x, ty - along * w.up.y, tz - along * w.up.z);
+      warpPoint(w, sphere.center, sphere.center);
+      sphere.radius += 2 * Math.abs(w.k) * tLen * sphere.radius;
+    }
+    return view.frustum.intersectsSphere(sphere);
+  }
+
+  /** Every tile fully grown in (deterministic captures). */
+  finishFades(): void {
+    for (const t of this.tiles.values()) t.grownAt = Number.NEGATIVE_INFINITY;
   }
 
   private schedule(tile: Tile, sigma: number, distance: number, view: ScatterView): void {
@@ -384,6 +415,8 @@ export class ScatterLayer {
       total += Math.min(count, needed * size);
     }
     if (truncated) this.saturated++;
+    // the tile's first pages: new ground, grown in from now (unless it already took over from an old tile)
+    if (tile.count === 0 && total > 0 && Number.isNaN(tile.grownAt)) tile.grownAt = performance.now();
     tile.count = total;
     // A truncated tile is not complete: leave it eligible for a rebuild once
     // pages free up, so the settled state never depends on history.

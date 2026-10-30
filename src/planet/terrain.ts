@@ -34,6 +34,8 @@ export const HOUSE_FOOTPRINT = { halfX: 4.45, halfZ: 2.75 } as const;
 export const TERRACE_AREA = [-4.5, 4.2, -0.2, 4.8] as const;
 export const STEPS_AREA = [1.9, 3.9, 4.6, 5.85] as const;
 export const PIER_AREA = [-8.3, -3.3, 1.75, 5.7] as const;
+/** The channel cut under the pier's arch (props.ts ARCH), so the water runs in under its vault: centre x, z and half sizes (m). */
+export const CULVERT = { x: -7.2, z: 4.6, halfX: 0.5, halfZ: 1.3 } as const;
 /** Dry plateau around the homestead (m): full inside, none outside. */
 export const PLATEAU = { inner: 10, outer: 26 } as const;
 /** The homestead pond's bed: slope from its edge (m/m) and deepest point (m); its banks: a steep cut turf slope (m/m). */
@@ -230,7 +232,13 @@ export class Terrain {
     const flat = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
     h += (this.cottageLevel - h) * flat;
     const d = this.homePond(dir);
-    return Math.min(h, Math.max(d * (d > 0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
+    h = Math.min(h, Math.max(d * (d > 0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
+    // the channel under the pier's arch
+    const c = this.cottageLocal(dir, localTmp);
+    const qx = Math.abs(c.x - CULVERT.x) - CULVERT.halfX;
+    const qz = Math.abs(c.z - CULVERT.z) - CULVERT.halfZ;
+    const box = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
+    return Math.min(h, Math.max(box * 4 - 0.3, -0.5));
   }
 
   /** Ground height before the bank lip (m above the water table). */

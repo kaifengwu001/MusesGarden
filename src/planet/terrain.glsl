@@ -12,6 +12,7 @@ const vec2 HOUSE_FOOTPRINT = vec2(4.45, 2.75); // half sizes (m), terrain.ts
 const vec4 TERRACE_AREA = vec4(-4.5, 4.2, -0.2, 4.8); // x0, x1, z0, z1 (m)
 const vec4 STEPS_AREA = vec4(1.9, 3.9, 4.6, 5.85);
 const vec4 PIER_AREA = vec4(-8.3, -3.3, 1.75, 5.7);
+const vec4 CULVERT = vec4(-7.2, 4.6, 0.5, 1.3); // the channel under the pier's arch: centre x, z, half sizes (m)
 
 uniform uint uTerrainSeed;
 uniform samplerCube uTerrainBake; // natural height (m), lushness, wetness, colour variant
@@ -63,7 +64,11 @@ float homestead(vec3 dir, float h) {
   float flat_ = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
   h += (uCottage.w - h) * flat_;
   float d = homePond(dir);
-  return min(h, max(d * (d > 0.0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
+  h = min(h, max(d * (d > 0.0 ? POND_BANK : POND_SLOPE), -POND_DEPTH));
+  // the channel under the pier's arch
+  vec2 q = abs(cottageLocal(dir) - CULVERT.xy) - CULVERT.zw;
+  float box = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  return min(h, max(box * 4.0 - 0.3, -0.5));
 }
 
 // Ground height before the bank lip (m above the water table).
@@ -129,7 +134,8 @@ float boxDistance(vec2 p, vec2 halfSize) {
 // from the sun.
 float cottageShadow(vec3 dir) {
   vec2 c = cottageLocal(dir);
-  if (dot(c, c) > 1600.0) return 0.0;
+  // nowhere farther from the eaves than the shadow of the ridge can reach (most of the ground: no steps)
+  if (boxDistance(c, vec2(4.75, 3.08)) > 6.2 * length(uCottageSun.xy) + 0.5) return 0.0;
   float best = 1e3;
   for (int k = 0; k <= 13; k++) {
     float h = 0.48 * float(k);

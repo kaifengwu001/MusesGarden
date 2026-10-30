@@ -14,6 +14,8 @@ uniform vec4 uUserBloom[MAX_USER_BLOOMS]; // press-and-hold discs: centre direct
 
 // Flowers per m² at which every dab cell of the far paint holds a flower.
 const float DAB_SATURATION = 12.0;
+// How strongly the paint's flowers (dabs and wash) lie over the grass.
+const float FLOWER_PAINT = 0.8;
 // The dabs: never smaller than a flower (m) or than DAB_PIXELS on screen, so
 // from orbit down to the meadow they read as the same brushed marks, only
 // finer in meters as you come down, until each is a flower's size where the
@@ -208,9 +210,12 @@ vec3 meadowPaint(Meadow m) {
   float f0, f1;
   uint lv;
   float t = patternOctaves(DAB_METERS, m.pixelMeters, DAB_PIXELS, f0, f1, lv);
-  // the brush's way: along the wind, turned slowly from place to place
-  float turn = 0.7 * gnoise(m.dir * (uRadius / 9.0), uTerrainSeed + 102u);
-  vec3 brush = along * cos(turn) + cross(m.dir, along) * sin(turn);
+  // the brush's way: along the wind, turned slowly from place to place (only where there are flowers to paint)
+  vec3 brush = along;
+  if (fill > 0.0) {
+    float turn = 0.7 * gnoise(m.dir * (uRadius / 9.0), uTerrainSeed + 102u);
+    brush = along * cos(turn) + cross(m.dir, along) * sin(turn);
+  }
   vec2 r0, r1;
   float paintFill = fill * (1.0 - 0.9 * m.nearFade);
   float d0 = dab(m.dir, f0, paintFill, brush, uTerrainSeed + 100u + lv, r0) * (1.0 - t);
@@ -220,14 +225,14 @@ vec3 meadowPaint(Meadow m) {
   vec3 dim = mix(vec3(1.0), vec3(0.68, 0.7, 0.8) / vec3(0.62, 0.84, 1.02), 1.0 - m.sunlit);
   // the colonies read as washes of their colour under the dabs, strongest far
   // away where the dabs merge, held all the way down to the flowers
-  float far = fill * (0.28 + 0.27 * smoothstep(0.05, 0.6, m.pixelMeters)) * (1.0 - m.nearFade);
+  float far = fill * (0.28 + 0.27 * smoothstep(0.05, 0.6, m.pixelMeters)) * (1.0 - m.nearFade) * FLOWER_PAINT;
   if (far > 0.002) {
     vec3 wash = (m.flora.x * uFloraWash[0] + m.flora.y * uFloraWash[1] + m.flora.z * uFloraWash[2] + m.flora.w * uFloraWash[3]) / total;
     col = mix(col, wash * mix(0.72, 1.0, lightness), far);
   }
   float variant = colonyVariant(m.variant);
   float spread = 0.3 * uMeadowLook.z;
-  if (d0 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r0.x), clamp(variant + (r0.y - 0.5) * spread, 0.0, 1.0), lightness) * dim, d0);
-  if (d1 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r1.x), clamp(variant + (r1.y - 0.5) * spread, 0.0, 1.0), lightness) * dim, d1);
+  if (d0 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r0.x), clamp(variant + (r0.y - 0.5) * spread, 0.0, 1.0), lightness) * dim, d0 * FLOWER_PAINT);
+  if (d1 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r1.x), clamp(variant + (r1.y - 0.5) * spread, 0.0, 1.0), lightness) * dim, d1 * FLOWER_PAINT);
   return col;
 }

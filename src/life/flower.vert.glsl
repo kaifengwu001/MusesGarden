@@ -35,11 +35,14 @@ vec3 rotateAxis(vec3 v, vec3 axis, float angle) {
 }
 
 void main() {
+  // the tile's page: 0 out of view, else how far it has grown in (scatter.ts)
   int page = gl_InstanceID / int(uPageSize);
-  if (texelFetch(uPages, ivec2(page % 256, page / 256), 0).r < 0.5) {
+  float grownIn = texelFetch(uPages, ivec2(page % 256, page / 256), 0).r;
+  if (grownIn < 0.002) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
+  grownIn = smoothstep(0.0, 1.0, grownIn);
   vec3 dir = aDir;
   float seed = aBirth.y;
   int species = int(uFlowers.z + 0.5);
@@ -60,7 +63,7 @@ void main() {
 
   // Bloom: buds ahead of the front, opening behind it with a per-flower delay.
   float open = clamp((f.w - 0.35 * rnd(seed, 2.0)) * 2.4, 0.0, 1.0);
-  float scale = uFlowers.w * aLook.x * (0.85 + 0.3 * rnd(seed, 3.0)) * (0.3 + 0.7 * vis);
+  float scale = uFlowers.w * aLook.x * (0.85 + 0.3 * rnd(seed, 3.0)) * (0.3 + 0.7 * vis) * grownIn;
   float stemScale = scale * mix(0.6, 1.0, open);
 
   // local frame: up = surface normal, random yaw

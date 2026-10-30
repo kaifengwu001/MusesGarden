@@ -54,6 +54,16 @@ const BUILD_BUDGET_MS = 2;
  */
 const FRAME_JS_MS = 3.6;
 const BUILD_MIN_MS = 0.5;
+/**
+ * While a backlog of tiles waits (more than BACKLOG jobs: you zoomed in or
+ * jumped), a desktop lets the frame's JS run to this and the build to its
+ * larger slice, so the grass catches up about twice as fast; the GPU's share
+ * of the frame is far longer, so the frame rate holds. Phones keep the
+ * plain budget.
+ */
+const BACKLOG = 4;
+const BACKLOG_FRAME_JS_MS = 5;
+const BACKLOG_BUILD_BUDGET_MS = 3.6;
 
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -276,7 +286,8 @@ async function boot(): Promise<void> {
     controls.tick(clock.realDt);
     update();
     const spent = performance.now() - t0;
-    world.queue.run(Math.min(BUILD_BUDGET_MS, Math.max(BUILD_MIN_MS, FRAME_JS_MS - spent - renderMs)));
+    const catchUp = world.queue.size > BACKLOG && !quality.device.mobile;
+    world.queue.run(Math.min(catchUp ? BACKLOG_BUILD_BUDGET_MS : BUILD_BUDGET_MS, Math.max(BUILD_MIN_MS, (catchUp ? BACKLOG_FRAME_JS_MS : FRAME_JS_MS) - spent - renderMs)));
     const r0 = performance.now();
     render();
     renderMs += (performance.now() - r0 - renderMs) * 0.25;

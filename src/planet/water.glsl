@@ -115,6 +115,19 @@ vec2 boxEntry(vec3 ro, vec3 rd, vec3 lo, vec3 hi, out vec3 nrm) {
 // the dark door and windows, the pier's arch, the olive roof striped by its
 // courses and mossy low down. Colour, and the distance along the ray (w < 0:
 // it misses).
+// The cottage's frame (props.ts): a point in planet space to cottage-local meters.
+vec3 cottageFrame(vec3 p) {
+  vec3 U = uCottage.xyz;
+  vec3 Z = uCottageB.xyz;
+  vec3 o = p - U * (uRadius + uCottage.w + uBank.x);
+  return vec3(dot(o, cross(U, Z)), dot(o, U), dot(o, Z));
+}
+
+// 1 under the pier (cottage-local x, z: props.ts PIER), where the tunnel's water lies in the dark.
+float underPier(vec3 local) {
+  return step(-8.2, local.x) * step(local.x, -3.4) * step(1.83, local.z) * step(local.z, 5.63);
+}
+
 vec4 cottageInMirror(vec3 p, vec3 r) {
   vec3 U = uCottage.xyz;
   vec3 Z = uCottageB.xyz;
@@ -122,6 +135,8 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
   vec3 o = p - U * (uRadius + uCottage.w + uBank.x);
   vec3 ro = vec3(dot(o, X), dot(o, U), dot(o, Z));
   vec3 rd = vec3(dot(r, X), dot(r, U), dot(r, Z));
+  // the water under the pier (seen through its arch) mirrors the dark of the tunnel's vault
+  if (underPier(ro) > 0.5) return vec4(vec3(0.04, 0.07, 0.07), 0.3);
   // most of the water's rays pass nowhere near it (the house, its terrace and its pier)
   vec3 oc = vec3(-2.0, 1.8, 1.5) - ro;
   float tc = dot(oc, rd);
@@ -133,23 +148,23 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
   vec3 nrm = vec3(0.0);
   vec3 n;
   // the terrace along the front, and the pier with its arch at the waterline
-  vec2 t = boxEntry(ro, rd, vec3(-4.4, -1.3, 2.33), vec3(4.1, 0.72, 4.73), n);
+  vec2 t = boxEntry(ro, rd, vec3(-4.4, -3.0, 2.33), vec3(4.1, 0.72, 4.73), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
     col = mix(pal(ROW_STONE, 9), pal(ROW_STONE, 6), smoothstep(-0.8, -1.1, (ro + rd * t.x).y));
   }
-  t = boxEntry(ro, rd, vec3(-8.2, -1.3, 1.83), vec3(-3.4, 0.72, 5.63), n);
+  t = boxEntry(ro, rd, vec3(-8.2, -3.0, 1.83), vec3(-3.4, 0.72, 5.63), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
     vec3 h = ro + rd * t.x;
     col = mix(pal(ROW_STONE, 9), pal(ROW_STONE, 6), smoothstep(-0.8, -1.1, h.y));
-    vec2 q = (h.xy - vec2(-7.2, -0.78)) / vec2(0.55, 0.5);
+    vec2 q = (h.xy - vec2(-7.2, -0.78)) / vec2(0.55, 0.55);
     if (n.z > 0.5 && abs(q.x) < 1.0 && (q.y < 0.0 || length(q) < 1.0)) col = vec3(0.06, 0.09, 0.09);
   }
   // the walls (the door and the tall window on the front, the small window on the right end)
-  t = boxEntry(ro, rd, vec3(-4.3, -0.12, -2.63), vec3(4.3, 3.45, 2.63), n);
+  t = boxEntry(ro, rd, vec3(-4.3, -0.7, -2.63), vec3(4.3, 3.45, 2.63), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
@@ -163,7 +178,7 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
     if (n.x > 0.5 && abs(h.z + 0.95) < 0.28 && h.y > 2.07 && h.y < 2.77) col = pane;
   }
   // the chimney on the ridge
-  t = boxEntry(ro, rd, vec3(-0.17, 5.75, -0.25), vec3(0.37, 7.3, 0.29), n);
+  t = boxEntry(ro, rd, vec3(-0.19, 5.55, -0.29), vec3(0.39, 7.3, 0.29), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
@@ -309,6 +324,8 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
 
   // clicks ripple out
   col = mix(col, pal(ROW_WATER, 3), clamp(rippleRing(dir), 0.0, 1.0) * 0.5);
+  // in the tunnel under the pier the water lies in the dark, a little light off its mouth
+  col *= mix(1.0, 0.3, underPier(cottageFrame(pw)));
   // passing cloud shadows dim what you see into the water
   col *= 1.0 - 0.18 * cloud * (1.0 - reflectance);
   return col;

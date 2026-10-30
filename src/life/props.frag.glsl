@@ -44,10 +44,11 @@ varying vec3 vUp;
 // props.ts: tile courses a slope; the eaves' edge (its foot's height over the clearing, how far it reaches out from the wall, m)
 const float COURSES = 14.0;
 const vec2 EAVE = vec2(3.05, 0.45);
-// the bench (centre x, half length, seat height, m), the pier's arch (centre x, springing y, half width, rise) and the pier's face (z)
+// the bench (centre x, half length, seat height, m), the pier's arch (centre x, springing y, half width, rise), the pier's face (z) and the tunnel's depth (m) (props.ts ARCH)
 const vec3 BENCH = vec3(-0.86, 0.76, 1.17);
-const vec4 ARCH = vec4(-7.2, -0.78, 0.55, 0.5);
+const vec4 ARCH = vec4(-7.2, -0.78, 0.55, 0.55);
 const float PIER_FRONT = 5.63;
+const float TUNNEL_DEPTH = 1.6;
 
 // Lit and shaded tones of a colour: warm where the sun falls; turned away,
 // the colour times `shade` (each material's own), the sky's tint in it.
@@ -70,12 +71,12 @@ float slopeLight(vec3 n, vec3 sun, float shadow) {
 
 // The eaves' shadow on a wall at a height (m), facing n: the overhang's
 // edge hides the sun from the top of the wall, down from the edge by how
-// steeply the sun falls on the wall (drawn a little shallower than the
-// geometry would, as the painters do), never less than a narrow band of
-// the eaves' own shade. brush: noise in [-1, 1] for a brushed edge.
+// steeply the sun falls on the wall (nearly as far as the geometry casts
+// it), never less than a band of the eaves' own shade. brush: noise in
+// [-1, 1] for a brushed edge.
 float eaveShadow(float height, vec3 n, vec3 sun, float brush) {
   float s = dot(sun, n);
-  float drop = s > 0.03 ? clamp(0.3 * EAVE.y * dot(sun, vUp) / s, 0.26, 1.2) : 0.3;
+  float drop = s > 0.03 ? clamp(0.85 * EAVE.y * dot(sun, vUp) / s, 0.45, 1.6) : 0.45;
   float line = EAVE.x - drop + 0.05 * brush;
   return smoothstep(line - 0.05, line + 0.05, height);
 }
@@ -265,14 +266,11 @@ void main() {
     base = mix(base, pal(ROW_STONE, 5), st.x * (top ? 0.12 : 0.18) * smoothstep(-0.4, 0.4, brush));
     if (!top) base = mix(base, pal(ROW_STONE, 6) * 0.85, (1.0 - smoothstep(-1.15, -0.75, vLocal.y + 0.12 * brush)) * 0.65);
     if (!top && vLocalNormal.z > 0.7 && abs(vLocal.z - PIER_FRONT) < 0.05) {
+      // the ring of stones round the tunnel's mouth
       vec2 q = (vLocal.xy - ARCH.xy) / ARCH.zw;
       float r = length(vec2(q.x, max(q.y, 0.0)));
-      bool open = abs(q.x) < 1.0 && (q.y < 0.0 || r < 1.0);
       float ring = (1.0 - step(1.3, r)) * step(1.0, r) * step(-0.05, q.y);
-      if (open) {
-        // into the dark under the pier, the water's light at its foot
-        base = mix(vec3(0.05, 0.08, 0.08), vec3(0.12, 0.18, 0.18), smoothstep(-1.2, -0.9, vLocal.y));
-      } else if (ring > 0.0) {
+      if (ring > 0.0) {
         // the arch's stones, a shade darker than the face, their joints brushed in
         float a = atan(q.y, q.x) / 3.14159 * 9.0;
         float fa = fract(a);
@@ -284,6 +282,13 @@ void main() {
     // the house's shadow falls on the terrace as on the meadow
     float house = top ? 0.85 * cottageShadow(dir) : 0.0;
     col = painted(base, sunlight(n, sun, max(cloud, house)), vec3(0.78, 0.8, 0.84));
+    if (vPaint.w > 0.5) {
+      // inside the tunnel: damp stone in its own shade, darker the deeper in, the water's teal light low down
+      float deep = clamp((PIER_FRONT - vLocal.z) / TUNNEL_DEPTH, 0.0, 1.0);
+      vec3 damp = mix(base * vec3(0.5, 0.56, 0.52), pal(ROW_STONE, 6) * 0.45, 0.4);
+      col = damp * mix(0.8, 0.28, deep) * mix(vec3(1.0), uShadeTint, 0.5);
+      col += vec3(0.02, 0.07, 0.08) * (1.0 - smoothstep(-1.25, -0.7, vLocal.y)) * (1.0 - 0.6 * deep);
+    }
   }
   gl_FragColor = vec4(applyAerial(col, length(toCam), dir), 1.0);
 }
