@@ -10,7 +10,7 @@
 // it more of the mirror. Gusts ruffle the mirror into streaks; a few glints
 // swell and fade (never pop); clicks ripple. No refraction.
 // Requires: toon, meadow (windDir, patternOctaves), terrain (height0, uBank),
-// warp (unwarpPosition), clouds (cloudsAlong).
+// warp (unwarpPosition), clouds (cloudsAlong), uPixelAngle.
 
 #define MAX_RIPPLES 6
 uniform vec4 uWaterLook;             // -, depth tint, glints, time (s)
@@ -140,7 +140,7 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec4 bank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec4 cl = vec4(0.0);
   if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
-  else cl = cloudsAlong(wp, r);
+  else cl = cloudsAlong(wp, r, uPixelAngle);
   float reflectance = mix(0.45, 0.95, pow(1.0 - facing, 1.6)) * (1.0 - 0.25 * gust) * uWaterSky.x;
   vec3 col = mix(body, mirror, reflectance);
   // banks stay dark and clouds stay bright in the mirror even looking down into the water

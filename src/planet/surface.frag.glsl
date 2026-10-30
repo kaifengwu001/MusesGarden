@@ -3,6 +3,7 @@
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
+uniform float uPixelAngle;
 #include <meadow_terrain>
 #include <meadow_toon>
 #include <meadow_fog>
@@ -12,7 +13,6 @@ uniform float uRadius;
 #include <meadow_clouds>
 #include <meadow_water>
 
-uniform float uPixelAngle;
 uniform int uDebug;
 uniform vec4 uNearField; // focus direction xyz, blade radius (m): where real grass takes over
 
@@ -54,7 +54,7 @@ void main() {
   // light: toon bands, the cottage's shadow, cloud shadows with brushed edges
   float stroke = strokeAt(dir, pixelMeters);
   float cloud = cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2);
-  float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir)) * (1.0 - 0.85 * cloud);
+  float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir)) * (1.0 - 0.9 * cloud);
 
   // wind on the grass (and the water)
   float gust = gustAt(dir);

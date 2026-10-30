@@ -140,7 +140,7 @@ export class World {
     this.grass = new Grass(this.shared, tier.name === 'high' ? 760 : 260);
     this.flowers = new Flowers(this.shared, tier.name === 'high' ? 420 : 180);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
-    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 1024 : 512);
+    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 2048 : 1024);
     this.petals = new Petals(this.shared);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.clouds.mesh);
     this.applyTier(tier);
@@ -350,7 +350,7 @@ export class World {
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
     (this.shared.uOutline.value as Vector4).x = p.style.outlineWidth;
-    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera);
+    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));

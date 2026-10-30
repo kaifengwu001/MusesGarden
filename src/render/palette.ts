@@ -44,7 +44,7 @@ const NOON: Rows = {
   // zenith, horizon, haze, sun glow, mid sky, haze over the far meadow
   [ROW.SKY]: ['#2F7CC4', '#A9D3EE', '#D6EAF1', '#FFF4D8', '#5E9BD5', '#AFC6BE'],
   // lit, shadowed, mid, rim, base (the meadow's green through it)
-  [ROW.CLOUD]: ['#F4F8FA', '#C4D3DA', '#E0E9ED', '#FFFFFF', '#A3B8B5'],
+  [ROW.CLOUD]: ['#F7FAFB', '#CAD7DF', '#E3EBEF', '#FFFFFF', '#B2C6C1'],
   // rock, shadow, light, lilac shade
   [ROW.ROCK]: ['#6F7C8E', '#4E5D78', '#8F99AA', '#77739D'],
   // snow, blue-lilac shade, mid, highlight

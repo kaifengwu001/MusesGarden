@@ -127,7 +127,7 @@ export const schema = {
     coverage: num('cc', 'Coverage', 0.45, 0, 1, 0.01, 'life'),
     altitude: num('ca', 'Altitude', 5, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
-    shadow: num('csh', 'Shadow', 0.72, 0, 1, 0.01, 'live'),
+    shadow: num('csh', 'Shadow', 0.88, 0, 1, 0.01, 'live'),
   },
   light: {
     // one light for now (late morning); dawn and golden hour are kept in the palette for later
@@ -232,7 +232,7 @@ export const presets = {
   'Spring meadow': {},
   Seedling: { world: { growth: 0, bloom: 0.2 } },
   'Wide world': { world: { growth: 1, bloom: 1 } },
-  Cloudy: { clouds: { coverage: 0.8, shadow: 0.85 } },
+  Cloudy: { clouds: { coverage: 0.8 } },
   Gusty: { wind: { strength: 0.85, gustiness: 0.9 }, clouds: { speed: 0.7, coverage: 0.55 } },
 } satisfies Record<string, ParamPatch>;
 

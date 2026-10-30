@@ -200,6 +200,8 @@ vec3 meadowPaint(Meadow m) {
   float d0 = dab(m.dir, f0, fill * (1.0 - 0.75 * m.nearFade), uTerrainSeed + 100u + lv, r0) * (1.0 - t);
   float d1 = dab(m.dir, f1, fill * (1.0 - 0.75 * m.nearFade), uTerrainSeed + 101u + lv, r1) * t;
   float lightness = clamp(m.light * 1.1, 0.0, 1.0);
+  // under a cloud the dabs sink into the shade with the grass (as the near flowers do)
+  float dim = 1.0 - 0.32 * (1.0 - m.sunlit);
   // far away the dabs merge: the colonies read as washes of their colour
   float far = fill * smoothstep(0.05, 0.6, m.pixelMeters) * 0.55;
   if (far > 0.002) {
@@ -208,7 +210,7 @@ vec3 meadowPaint(Meadow m) {
   }
   float variant = colonyVariant(m.variant);
   float spread = 0.3 * uMeadowLook.z;
-  if (d0 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r0.x), clamp(variant + (r0.y - 0.5) * spread, 0.0, 1.0), lightness), d0);
-  if (d1 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r1.x), clamp(variant + (r1.y - 0.5) * spread, 0.0, 1.0), lightness), d1);
+  if (d0 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r0.x), clamp(variant + (r0.y - 0.5) * spread, 0.0, 1.0), lightness) * dim, d0);
+  if (d1 > 0.0) col = mix(col, floraColour(pickSpecies(m.flora, r1.x), clamp(variant + (r1.y - 0.5) * spread, 0.0, 1.0), lightness) * dim, d1);
   return col;
 }

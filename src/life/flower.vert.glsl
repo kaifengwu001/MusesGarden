@@ -96,7 +96,7 @@ void main() {
 
   // colour by species, colony variant and part; cloud and cottage shadows
   float shadow = max(meadow.z, 0.5 * cottageShadow(dir));
-  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.85 * shadow);
+  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.9 * shadow);
   float v = aLook.y;
   vec3 col;
   if (aPart < 0.5) {
@@ -116,7 +116,8 @@ void main() {
   }
   // buds: green, tinted toward the bloom colour as they open
   if (aPart > 0.5) col = mix(tone3(pal(ROW_BUD, 0), pal(ROW_BUD, 0), pal(ROW_GRASS, 2), b), col, smoothstep(0.15, 0.85, open));
-  col *= cloudTint(meadow.z);
+  // under a cloud the petals sink into the shade with the grass (whites go blue-grey)
+  col *= cloudTint(meadow.z) * (1.0 - 0.32 * meadow.z);
   vec3 toCam = cameraPosition - world;
   col += pal(ROW_LIGHT, 3) * aT * clamp(dot(-normalize(toCam), uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.12 * uToon.z * (1.0 - shadow);
 

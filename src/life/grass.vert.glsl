@@ -79,7 +79,7 @@ void main() {
 
   // colour per vertex: dark roots, lit tips, paler ahead of the bloom front
   float shadow = max(meadow.z, 0.5 * cottageShadow(dir));
-  float b = toonLight(dot(up, uSunDir)) * (1.0 - 0.85 * shadow);
+  float b = toonLight(dot(up, uSunDir)) * (1.0 - 0.9 * shadow);
   vec3 lit = mix(uGrassPal[0], uGrassPal[1], smoothstep(0.55, 1.0, y) * 0.7);
   vec3 mid = mix(uGrassPal[2], uGrassPal[3], rnd(seed, 7.0) * 0.5);
   vec3 shade = mix(uGrassPal[4], uGrassPal[5], y);

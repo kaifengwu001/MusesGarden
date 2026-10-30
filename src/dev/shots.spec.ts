@@ -24,7 +24,7 @@ const DESKTOP: Shot[] = [
   { name: 'seedling-R40', hash: 'g=0&b=0.35' },
   { name: 'wide-R400', hash: 'g=1&b=1' },
   { name: 'wide-R400-wander', hash: 'g=1&b=1&cam=wander' },
-  { name: 'cloudy', hash: 'cc=0.8&csh=0.85', preset: 'vista' },
+  { name: 'cloudy', hash: 'cc=0.8', preset: 'vista' },
   { name: 'bloom-front', hash: 'b=0.18', preset: 'meadow' },
   { name: 'postcard', hash: 'pc=1', preset: 'homestead' },
 ];

@@ -1,8 +1,7 @@
-// One billboard per cloud (clouds.ts), drawn farthest first: a quad in front
-// of the cloud, fitted to its puffs as seen from the camera (or covering the
-// whole view when the camera is inside it). The cloud's frame and its puffs
-// go to the fragment shader as flat varyings, read and warped once here, and
-// the fragment shader traces them (clouds.glsl).
+// One billboard per cloud (clouds.ts), drawn farthest first: a quad just in
+// front of the camera, fitted to the cloud's puffs on screen. The cloud's
+// frame and its puffs go to the fragment shader as flat varyings, read and
+// warped once here, and the fragment shader traces them (clouds.glsl).
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -12,8 +11,32 @@
 varying vec3 vPoint; // on the billboard, view space
 flat varying vec4 vCloudA; // centre (view space), bounding radius
 flat varying vec4 vCloudB; // base point (view space), noise seed
-flat varying vec3 vCloudC; // base normal (view space)
+flat varying vec4 vCloudC; // base normal (view space), size (m)
 flat varying vec4 vPuffs[PUFFS];
+flat varying vec4 vShadowA; // puffShadows()
+flat varying vec4 vShadowB;
+
+// The extent along one screen axis (a / -z) of a sphere in camera space,
+// centre c = (a, z), clipped to z < nearZ (after Mara and McGuire, 2D
+// polyhedral bounds of a clipped, perspective-projected 3D sphere, 2013).
+vec2 sphereBounds(vec2 c, float r, float nearZ) {
+  float t2 = dot(c, c) - r * r;
+  bool inside = t2 <= 0.0;
+  vec2 v = inside ? vec2(0.0) : vec2(sqrt(t2), r) / length(c);
+  bool clipSphere = c.y + r >= nearZ;
+  float k = sqrt(max(r * r - (c.y - nearZ) * (c.y - nearZ), 0.0));
+  vec2 b[2];
+  for (int i = 0; i < 2; i++) {
+    if (!inside) b[i] = mat2(v.x, -v.y, v.y, v.x) * c * v.x;
+    else b[i] = vec2(0.0, nearZ);
+    if (clipSphere && (inside || b[i].y > nearZ)) b[i] = vec2(c.x + k, nearZ);
+    v.y = -v.y;
+    k = -k;
+  }
+  float p0 = b[0].x / -b[0].y;
+  float p1 = b[1].x / -b[1].y;
+  return vec2(min(p0, p1), max(p0, p1));
+}
 
 void main() {
   int row = int(uCloudLook.z) - 1 - gl_InstanceID;
@@ -23,54 +46,44 @@ void main() {
     return;
   }
   Cloud cl = loadCloud(row);
+  // a cloud the camera is in has thinned away (cloudFade): nothing to draw
+  if (cloudFade(cl) < 0.02) {
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
   vCloudA = vec4(cl.centre, cl.radius);
   vCloudB = vec4(cl.basePoint, float(cl.seed));
-  vCloudC = cl.baseNormal;
+  vCloudC = vec4(cl.baseNormal, cl.size);
   loadPuffs(row, vPuffs);
+  puffShadows(vPuffs, cl.size, vShadowA, vShadowB);
 
-  vec3 toCam = cameraPosition - cl.centre;
-  float dist = length(toCam);
-  float r = cl.radius;
+  // the puffs' extent on screen: each puff's exact projected bounds, clipped
+  // to the near plane (sphereBounds), clamped to the view, so a cloud above
+  // or beside the frame costs nothing however close it is
+  mat3 rot = mat3(viewMatrix);
   float near = projectionMatrix[3][2] / (projectionMatrix[2][2] - 1.0);
-  vec3 camUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-  vec3 camBack = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
-  vec3 back = dist > r * 1.02 ? toCam / dist : camBack;
-  vec3 right = normalize(cross(camUp, back));
-  vec3 up = cross(back, right);
-  vec2 lo = vec2(-1.0);
-  vec2 hi = vec2(1.0);
-  float d;
-  if (dist > r * 1.02) {
-    // the puffs' extent on a plane in front of the cloud
-    d = max(dist - r, 2.0 * near);
-    lo = vec2(1e9);
-    hi = vec2(-1e9);
-    bool behind = false;
-    for (int k = 0; k < PUFFS; k++) {
-      vec4 puff = vPuffs[k];
-      if (puff.w <= 0.0) continue;
-      vec3 rel = puff.xyz - cameraPosition;
-      float depth = -dot(rel, back);
-      if (depth < puff.w + near) {
-        behind = true;
-        break;
-      }
-      vec2 at = vec2(dot(rel, right), dot(rel, up)) * (d / depth);
-      float rad = puff.w * d / sqrt(max(depth * depth - puff.w * puff.w, 1e-4)) * 1.08;
-      lo = min(lo, at - rad);
-      hi = max(hi, at + rad);
-    }
-    if (behind) {
-      float half_ = d * r / sqrt(dist * dist - r * r) * 1.02;
-      lo = vec2(-half_);
-      hi = vec2(half_);
-    }
-  } else {
-    d = 2.0 * near;
-    lo = vec2(-d * 8.0);
-    hi = vec2(d * 8.0);
+  vec2 view = vec2(1.0 / projectionMatrix[0][0], 1.0 / projectionMatrix[1][1]) * 1.02;
+  vec2 lo = vec2(1e9);
+  vec2 hi = vec2(-1e9);
+  for (int k = 0; k < PUFFS; k++) {
+    vec4 puff = vPuffs[k];
+    if (puff.w <= 0.0) continue;
+    float r = puff.w * (1.0 + 1.5 * CLOUD_LUMPS);
+    vec3 c = rot * (puff.xyz - cameraPosition);
+    if (c.z - r > -near) continue;
+    vec2 bx = sphereBounds(vec2(c.x, c.z), r, -near);
+    vec2 by = sphereBounds(vec2(c.y, c.z), r, -near);
+    lo = min(lo, vec2(bx.x, by.x));
+    hi = max(hi, vec2(bx.y, by.y));
   }
-  vec2 xy = mix(lo, hi, position.xy * 0.5 + 0.5);
-  vPoint = cameraPosition - back * d + right * xy.x + up * xy.y;
-  gl_Position = projectionMatrix * viewMatrix * vec4(vPoint, 1.0);
+  lo = max(lo, -view);
+  hi = min(hi, view);
+  if (lo.x >= hi.x || lo.y >= hi.y) {
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
+  float d = 2.0 * near;
+  vec3 onPlane = vec3(mix(lo, hi, position.xy * 0.5 + 0.5) * d, -d);
+  vPoint = cameraPosition + transpose(rot) * onPlane;
+  gl_Position = projectionMatrix * vec4(onPlane, 1.0);
 }

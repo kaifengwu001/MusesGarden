@@ -45,10 +45,11 @@ vec3 tone3(vec3 lit, vec3 mid, vec3 shade, float b) {
   return c;
 }
 
-// Colour of the light itself: warm where the sun falls, cool and deep under a
-// passing cloud (cloud 0..1, its shadow strength applied).
+// Colour of the light itself: warm where the sun falls, a deep cool green
+// under a passing cloud (cloud 0..1, its shadow strength applied): the reds
+// go first, the greens and blues hold, as in the painted meadows.
 vec3 cloudTint(float cloud) {
-  return mix(vec3(1.03, 1.015, 0.95), vec3(0.78, 0.89, 1.06), clamp(cloud, 0.0, 1.0));
+  return mix(vec3(1.03, 1.015, 0.95), vec3(0.62, 0.84, 1.02), clamp(cloud, 0.0, 1.0));
 }
 
 // A subtle sun-side rim on silhouettes (grass, flower heads, clouds).
