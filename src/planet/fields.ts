@@ -52,11 +52,11 @@ const GRAIN_MAX = 0.7;
 /** Pattern sizes (m). */
 export const PATTERN = { lush: 22, variant: 16, richness: 40, drift: 18 } as const;
 /** Share of the ground in flower drifts, and of a drift's ground in clumps. */
-export const DRIFT_COVER = 0.6;
-export const CLUMP_COVER = 0.4;
+export const DRIFT_COVER = 0.55;
+export const CLUMP_COVER = 0.3;
 /** Clump size × the patch size; what is left between the clumps of a drift (× a clump's density there). */
 export const CLUMP_SCALE = 0.17;
-export const CLUMP_FLOOR = 0.12;
+export const CLUMP_FLOOR = 0.06;
 const DRIFT_EDGE = 0.07;
 const CLUMP_EDGE = 0.05;
 /** Colony size per species, × the patch-size parameter: pink drifts are broad, blue clusters small. */

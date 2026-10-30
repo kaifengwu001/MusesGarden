@@ -36,7 +36,7 @@ const NOON: Rows = {
   // lily pad, lily pad shade, a bank in the mirror, ruffle
   [ROW.WATER]: ['#2E78C0', '#0D4A84', '#D7EEE8', '#F6FCFF', '#6FA6D8', '#1C5FAA', '#6FA548', '#4A7F35', '#16404A', '#8CBBE6'],
   // cup light, cup mid, inner, cup shade, stem, stem shade, blush, rose, coral, rose shade
-  [ROW.PINK]: ['#F7B4AA', '#E98A8F', '#F7C9B8', '#D06F7A', '#6E9E4A', '#4D7A36', '#FAD2D2', '#E5638C', '#F49A7C', '#B9497A'],
+  [ROW.PINK]: ['#F09AA2', '#DE6F80', '#F7C2B8', '#C2566E', '#6E9E4A', '#4D7A36', '#F5BCC2', '#DA4C74', '#EE7A66', '#A63A63'],
   // petal, petal shade, centre, centre bright, cream, pale lilac
   [ROW.STAR]: ['#FBF8EE', '#E1DCD0', '#E9D9A6', '#F2D45C', '#F5EACB', '#E3DCF2'],
   // yellow, yellow shade, blue, blue shade, red, red shade, orange, orange shade, violet, violet shade, lemon

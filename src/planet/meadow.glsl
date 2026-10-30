@@ -74,8 +74,8 @@ float dab(vec3 dir, float freq, float fill, uint seed, out vec2 r) {
 
 // The clumps: a factor per species on the baked drifts and colonies (1 on
 // average). Mirrors Fields.clumps in fields.ts; change both together.
-const float CLUMP_COVER = 0.4;
-const float CLUMP_FLOOR = 0.12;
+const float CLUMP_COVER = 0.3;
+const float CLUMP_FLOOR = 0.06;
 const float CLUMP_EDGE = 0.05;
 vec4 clumpsAt(vec3 dir) {
   float f0 = exp2(uClumps.x);
