@@ -22,13 +22,14 @@ vec3 faceDirection(int face, vec2 st) {
 void main() {
   vec2 st = gl_FragCoord.xy / uSize * 2.0 - 1.0;
   vec3 dir = normalize(faceDirection(uFace, st));
+  vec3 t = twirl(dir);
   if (uPass == 0) {
-    float wet = wetnessAt(dir);
-    float h = reliefAt(dir, wet) + uWet.z - uWet.w * wet - uLevel.x;
+    float wet = wetnessAt(t);
+    float h = reliefAt(t, wet) + uWet.z - uWet.w * wet - uLevel.x;
     // wetlands flatten toward a plateau just above the water (plateau() in fields.ts)
     h += (WET_PLATEAU * tanh(h / WET_PLATEAU) + WET_PLATEAU_KEEP * h - h) * wet;
-    gl_FragColor = vec4(h, lushAt(dir), wet, variantAt(dir));
+    gl_FragColor = vec4(h, lushAt(t), wet, variantAt(t));
   } else {
-    gl_FragColor = floraAt(dir, textureLod(uBakedTerrain, dir, 0.0).b);
+    gl_FragColor = floraAt(t, textureLod(uBakedTerrain, dir, 0.0).b);
   }
 }

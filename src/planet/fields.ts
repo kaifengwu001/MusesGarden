@@ -1,4 +1,5 @@
 import { Vector3, Vector4 } from 'three';
+import { hash32, unit } from '../core/hash';
 import { clamp, smoothstep } from '../core/math';
 import { gnoise } from './noise';
 
@@ -6,6 +7,12 @@ import { gnoise } from './noise';
 // them on the GPU into two cube maps; `Fields` evaluates the same math on the
 // CPU (picking, placement, flower assignment, tests). Change both together.
 //
+//   twirls     every field below is sampled through a few twirls: the
+//              direction turned about a centre by an angle that fades with the
+//              distance from it, like a marbler's comb. Hills, lakes, islands
+//              and the flower drifts curve and swirl instead of lying about
+//              as plain noise. Direction space only, so they too stay put as
+//              R grows
 //   relief     direction-space octaves weighted by their size in meters, so
 //              the meadow keeps a constant spectrum as R grows (hills rise and
 //              subside in place, never slide); compressed along a grain axis
@@ -55,7 +62,55 @@ const CLUMP_EDGE = 0.05;
 /** Colony size per species, × the patch-size parameter: pink drifts are broad, blue clusters small. */
 export const COLONY_SCALE = [1.3, 0.95, 0.8, 0.55] as const;
 /** Seeds (added to the world's noise seed). */
-const SEED = { relief: 0, warp: 31, wet: 34, lush: 170, rich: 180, variant: 190, colony: 200, drift: 230, detail: 300, clump: 400 } as const;
+const SEED = { relief: 0, warp: 31, wet: 34, lush: 170, rich: 180, variant: 190, colony: 200, drift: 230, detail: 300, clump: 400, twirl: 500 } as const;
+/** Twirls: how many, and the range of their angular radii (rad) and turns (rad at the centre). */
+export const TWIRLS = 4;
+const TWIRL = { radius: [0.42, 0.95], turn: [1.2, 2.3] } as const;
+
+export interface Twirl {
+  readonly centre: Vector3;
+  /** Angular radius (rad): the turn has fallen to 1/e here. */
+  readonly radius: number;
+  /** Turn at the centre (rad), either way. */
+  readonly turn: number;
+}
+
+/** The world's twirls: centres spread over the sphere, two broad ones and two tighter. */
+export function makeTwirls(seed: number): Twirl[] {
+  let state = hash32((seed + SEED.twirl) >>> 0);
+  const rand = (): number => unit((state = hash32((state + 0x9e3779b9) >>> 0)));
+  const twirls: Twirl[] = [];
+  while (twirls.length < TWIRLS) {
+    const z = rand() * 2 - 1;
+    const a = rand() * Math.PI * 2;
+    const r = Math.sqrt(1 - z * z);
+    const centre = new Vector3(r * Math.cos(a), r * Math.sin(a), z);
+    if (twirls.some((t) => t.centre.dot(centre) > 0.2)) continue;
+    const broad = twirls.length < 2;
+    const radius = broad ? TWIRL.radius[0] + 0.55 * (TWIRL.radius[1] - TWIRL.radius[0]) + 0.45 * (TWIRL.radius[1] - TWIRL.radius[0]) * rand() : TWIRL.radius[0] + 0.4 * (TWIRL.radius[1] - TWIRL.radius[0]) * rand();
+    const turn = (TWIRL.turn[0] + (TWIRL.turn[1] - TWIRL.turn[0]) * rand()) * (rand() < 0.5 ? -1 : 1);
+    twirls.push({ centre, radius, turn });
+  }
+  return twirls;
+}
+
+const tw = new Vector3();
+
+/** A direction turned through the twirls (mirrors twirl() in fields.glsl). `out` may alias `dir`. */
+export function twirl(twirls: readonly Twirl[], dir: Vector3, out: Vector3): Vector3 {
+  out.copy(dir);
+  for (const t of twirls) {
+    const c = t.centre;
+    const cos = clamp(out.dot(c), -1, 1);
+    const th = Math.acos(cos) / t.radius;
+    const a = t.turn * Math.exp(-th * th);
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    tw.crossVectors(c, out);
+    out.multiplyScalar(ca).addScaledVector(tw, sa).addScaledVector(c, cos * (1 - ca));
+  }
+  return out;
+}
 const COLONY_EDGE = 0.06;
 const DETAIL = 0.3;
 
@@ -170,6 +225,9 @@ export interface FieldUniforms {
   uColonyCover: { value: Vector4 };
   /** Mean density per species (per m²). */
   uSpeciesDensity: { value: Vector4 };
+  /** Twirls: centre xyz, turn (rad); and their angular radii. */
+  uTwirl: { value: Vector4[] };
+  uTwirlRadius: { value: Vector4 };
 }
 
 export function createFieldUniforms(): FieldUniforms {
@@ -191,6 +249,8 @@ export function createFieldUniforms(): FieldUniforms {
     uColonyThreshold: { value: new Vector4() },
     uColonyCover: { value: new Vector4(0.25, 0.25, 0.25, 0.25) },
     uSpeciesDensity: { value: new Vector4() },
+    uTwirl: { value: Array.from({ length: TWIRLS }, () => new Vector4(0, 1, 0, 0)) },
+    uTwirlRadius: { value: new Vector4(1, 1, 1, 1) },
   };
 }
 
@@ -221,13 +281,17 @@ export class Fields {
   readonly colonyCover = new Float32Array(4);
   readonly speciesDensity = new Float32Array(4);
   patchiness = 0;
+  readonly twirls: readonly Twirl[];
   private readonly st = new Vector3();
+  private readonly td = new Vector3();
 
   constructor(
     readonly seed: number,
     /** Unit axis the hills and colonies run along (where it lies in the surface). */
     readonly grain: Vector3,
-  ) {}
+  ) {
+    this.twirls = makeTwirls(seed);
+  }
 
   /** Refresh everything that depends on R and the parameters (cheap). */
   update(radius: number, p: FieldParams): void {
@@ -289,6 +353,10 @@ export class Fields {
 
   /** Rolling hills plus hummocks, the hummocks raised by `wet` (m). */
   reliefAt(dir: Vector3, wet: number): number {
+    return this.reliefTwirled(twirl(this.twirls, dir, this.td), wet);
+  }
+
+  private reliefTwirled(dir: Vector3, wet: number): number {
     let h = 0;
     const lift = 1 + WET_HUMMOCKS * wet;
     for (let k = 0; k < RELIEF_OCTAVES; k++) {
@@ -299,8 +367,12 @@ export class Fields {
     return h;
   }
 
-  /** The raw macro wetness noise (direction space, domain warped). */
+  /** The raw macro wetness noise (direction space, twirled and domain warped). */
   wetNoise(dir: Vector3): number {
+    return this.wetTwirled(twirl(this.twirls, dir, this.td));
+  }
+
+  private wetTwirled(dir: Vector3): number {
     const s = this.seed;
     const wx = gnoise(dir.x * 2.4, dir.y * 2.4, dir.z * 2.4, (s + SEED.warp) >>> 0);
     const wy = gnoise(dir.x * 2.4, dir.y * 2.4, dir.z * 2.4, (s + SEED.warp + 1) >>> 0);
@@ -313,23 +385,28 @@ export class Fields {
 
   /** 0 on dry upland, 1 deep in a wetland. */
   wetness(dir: Vector3): number {
-    return smoothstep(this.wetThreshold - this.wetSoftness, this.wetThreshold + this.wetSoftness, this.wetNoise(dir));
+    return this.wetnessTwirled(twirl(this.twirls, dir, this.td));
+  }
+
+  private wetnessTwirled(dir: Vector3): number {
+    return smoothstep(this.wetThreshold - this.wetSoftness, this.wetThreshold + this.wetSoftness, this.wetTwirled(dir));
   }
 
   /** Ground height above the water table before the homestead and the banks (m). */
   natural(dir: Vector3): number {
-    const wet = this.wetness(dir);
-    const h = this.reliefAt(dir, wet) + this.lift - this.drop * wet - this.level;
+    const t = twirl(this.twirls, dir, this.td);
+    const wet = this.wetnessTwirled(t);
+    const h = this.reliefTwirled(t, wet) + this.lift - this.drop * wet - this.level;
     return plateau(h, wet);
   }
 
   lush(dir: Vector3): number {
-    return clamp(this.pair(dir, this.lushPair, SEED.lush) * 2.6, -1, 1);
+    return clamp(this.pair(twirl(this.twirls, dir, this.td), this.lushPair, SEED.lush) * 2.6, -1, 1);
   }
 
   /** Colony colour/size variant, 0..1. */
   variant(dir: Vector3): number {
-    return 0.5 + 0.5 * clamp(this.pair(dir, this.variantPair, SEED.variant) * 2.8, -1, 1);
+    return 0.5 + 0.5 * clamp(this.pair(twirl(this.twirls, dir, this.td), this.variantPair, SEED.variant) * 2.8, -1, 1);
   }
 
   /**
@@ -338,6 +415,7 @@ export class Fields {
    * it is needed alongside.
    */
   flora(dir: Vector3, wet: number, out: Float32Array): Float32Array {
+    dir = twirl(this.twirls, dir, this.td);
     const bare = 1 - this.patchiness;
     const d = this.pair(dir, this.driftPair, SEED.drift) + 0.5 * this.pair(dir, this.richPair, SEED.rich);
     const drift = smoothstep(this.driftThreshold - DRIFT_EDGE, this.driftThreshold + DRIFT_EDGE, d);
@@ -376,6 +454,10 @@ export class Fields {
     u.uColonyThreshold.value.fromArray(this.colonyThreshold);
     u.uColonyCover.value.fromArray(this.colonyCover);
     u.uSpeciesDensity.value.fromArray(this.speciesDensity);
+    this.twirls.forEach((t, i) => {
+      u.uTwirl.value[i].set(t.centre.x, t.centre.y, t.centre.z, t.turn);
+      u.uTwirlRadius.value.setComponent(i, t.radius);
+    });
   }
 }
 

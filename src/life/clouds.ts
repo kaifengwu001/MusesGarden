@@ -585,7 +585,7 @@ export class Clouds {
     this.order.length = kept;
   }
 
-  /** Every cloud's bounding sphere now (planet space; those behind the planet too), nearest the camera first. */
+  /** Every cloud's heap now, as a sphere about its middle (planet space; those behind the planet too), nearest the camera first. */
   bounds(): Array<{ centre: Vector3; radius: number }> {
     return this.all;
   }
@@ -648,7 +648,7 @@ export class Clouds {
     this.order.forEach((at, i) => {
       const b = (this.all[i] ??= { centre: new Vector3(), radius: 0 });
       b.centre.copy(at.up).multiplyScalar(at.base + 0.45 * at.size);
-      b.radius = 2.2 * at.size;
+      b.radius = 1.45 * at.size;
     });
     this.all.length = this.order.length;
     // clouds the ground hides are left out (they would still be shaded: the cloud shader writes its depth)

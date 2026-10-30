@@ -212,7 +212,7 @@ function cloudScore(table: RayTable, radius: number, ground: number, clouds: rea
     p.set(cloud.centre.dot(right), cloud.centre.dot(focus), -cloud.centre.dot(forward));
     p.y -= k * (p.x * p.x + p.z * p.z);
     p.y -= radius + ground + altitude;
-    // a cloud around the camera thins away (clouds.glsl): it neither helps nor should crowd the stand
+    // a cloud around the camera dissolves (clouds.glsl): it does not help, and a crowd of them is not wanted
     if (p.length() - 0.6 * cloud.radius < 16) {
       near += 1;
       continue;
@@ -235,10 +235,10 @@ function cloudScore(table: RayTable, radius: number, ground: number, clouds: rea
     for (let i = 0; i < GW; i++) {
       if (!covered[j * GW + i]) continue;
       const wanted = j >= CLOUD_CELLS.rows[0] && j <= CLOUD_CELLS.rows[1] && i >= CLOUD_CELLS.cols[0] && i <= CLOUD_CELLS.cols[1];
-      score += wanted ? -1 : j >= 3 ? 0.6 : 0.2;
+      score += wanted ? -0.6 : j >= 3 ? 0.35 : 0.05;
     }
   }
-  return score / (GW * GH) + 0.03 * near;
+  return score / (GW * GH) + 0.008 * near;
 }
 
 /** Evenly spread directions (Fibonacci sphere). */
@@ -313,7 +313,7 @@ function refine(terrain: Terrain, framing: (z: number) => Framing, aspect: numbe
   for (const cand of ranked) {
     if (seen.has(cand.focus)) continue;
     seen.add(cand.focus);
-    if (seen.size > 16) break;
+    if (seen.size > 28) break;
     headingAt(cand.focus, cand.angle, heading);
     side.crossVectors(heading, cand.focus);
     for (const [ahead, across] of [[0, 0], [4, 0], [-4, 0], [0, 4], [0, -4]]) {

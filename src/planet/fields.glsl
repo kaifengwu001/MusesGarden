@@ -1,5 +1,6 @@
 // GPU mirror of fields.ts, used by the terrain bake only (bake.frag.glsl).
-// Change both together. Requires: meadow_noise.
+// Change both together. Every field takes the twirled direction (twirl()).
+// Requires: meadow_noise.
 
 #define RELIEF_OCTAVES 9
 const float RELIEF_BASE_FREQ = 1.6;
@@ -27,6 +28,22 @@ uniform vec4 uDetailT;
 uniform vec4 uColonyThreshold;
 uniform vec4 uColonyCover;
 uniform vec4 uSpeciesDensity;  // mean flowers per m², per species
+uniform vec4 uTwirl[4];        // twirls: centre xyz, turn at the centre (rad)
+uniform vec4 uTwirlRadius;     // their angular radii (rad)
+
+// A direction turned through the twirls (twirl() in fields.ts): every field
+// here is sampled at it, so hills, lakes and drifts swirl.
+vec3 twirl(vec3 d) {
+  for (int i = 0; i < 4; i++) {
+    vec3 c = uTwirl[i].xyz;
+    float cs = clamp(dot(d, c), -1.0, 1.0);
+    float th = acos(cs) / uTwirlRadius[i];
+    float a = uTwirl[i].w * exp(-th * th);
+    float ca = cos(a);
+    d = d * ca + cross(c, d) * sin(a) + c * (cs * (1.0 - ca));
+  }
+  return d;
+}
 
 // Noise at dir·f, compressed along the grain.
 float stretched(vec3 dir, float f, uint seed) {
