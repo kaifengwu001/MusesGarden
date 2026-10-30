@@ -352,7 +352,7 @@ export class World {
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
-    this.birds.update(clock.time, this.terrain, rig.up, rig.forward);
+    this.birds.update(clock.time, this.terrain);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp);
 
     const cam = rig.camera;
