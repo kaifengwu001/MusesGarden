@@ -1,7 +1,7 @@
 // Field map lookups (fieldMap.ts): the ground around the focus.
 //   uFieldMap:    height (m), distance to the shore (m), clearing, bloom
 //   uFieldMeadow: lushness, wetness, cloud shadow, colour variant
-//   uFieldWind:   shared bend (xyz), wind sheen
+//   uFieldWind:   shared bend (xyz), wind sheen (-1 trough … 1 crest)
 uniform sampler2D uFieldMap;
 uniform sampler2D uFieldMeadow;
 uniform sampler2D uFieldWind;

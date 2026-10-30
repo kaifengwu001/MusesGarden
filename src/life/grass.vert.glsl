@@ -88,9 +88,12 @@ void main() {
   float light = mix(0.12, 1.0, smoothstep(0.0, 0.9, y)) * b;
   vec3 col = tone3(lit, mid, shade, light);
   col *= (0.92 + 0.16 * rnd(seed, 8.0)) * cloudTint(meadow.z);
-  // wind sheen: blades laid over by a gust show their pale length to the light
-  col = mix(col, uGrassPal[9] * uSunTint, wind.w * uMeadowLook.x * (0.3 + 0.7 * (1.0 - meadow.z)) * (0.3 + 0.7 * y) * 0.8);
-  col *= 1.0 - 0.1 * uMeadowLook.x * (1.0 - wind.w);
+  // wind sheen: blades laid over by a gust show their pale length to the
+  // light; behind the crest they spring back up into their own shade
+  float crest = max(wind.w, 0.0) * uMeadowLook.x;
+  float trough = max(-wind.w, 0.0) * uMeadowLook.x;
+  col = mix(col, uGrassPal[9] * uSunTint, crest * (0.4 + 0.6 * (1.0 - meadow.z)) * (0.4 + 0.6 * y));
+  col *= mix(vec3(1.0), vec3(0.5, 0.6, 0.66), trough * 0.85 * (0.45 + 0.55 * y));
   // sun-side rim on the tips
   vec3 v = normalize(toCam);
   col += uGrassPal[8] * pow(y, 3.0) * clamp(dot(-v, uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.18 * uToon.z * (1.0 - shadow);

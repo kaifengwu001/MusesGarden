@@ -58,9 +58,10 @@ void main() {
   float b = toonLight(dot(n, uSunDir)) * mix(1.0, 0.5, cottageShadow(dir)) * (1.0 - 0.9 * cloud);
 
   // wind on the grass (and the water)
-  float gust = gustAt(dir);
+  vec2 waves = gustWaves(dir);
+  float gust = waves.x;
   float ripple = pixelMeters < 0.6 && wet < 1.0 ? rippleAt(dir) : 0.5;
-  float sheen = windSheen(gust, ripple);
+  float sheen = windSheen(waves, ripple);
 
   // the meadow, wherever any of it shows
   vec3 land = vec3(0.0);

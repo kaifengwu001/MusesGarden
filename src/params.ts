@@ -121,7 +121,7 @@ export const schema = {
     strength: num('ws', 'Strength', 0.45, 0, 1, 0.01, 'live'),
     direction: num('wd', 'Direction', 64, 0, 360, 1, 'live', { unit: '°' }),
     gustiness: num('wg', 'Gustiness', 0.55, 0, 1, 0.01, 'live'),
-    sheen: num('wsh', 'Sheen', 0.65, 0, 1, 0.01, 'live'),
+    sheen: num('wsh', 'Sheen', 0.85, 0, 1, 0.01, 'live'),
   },
   clouds: {
     coverage: num('cc', 'Coverage', 0.45, 0, 1, 0.01, 'life'),

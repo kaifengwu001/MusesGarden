@@ -24,8 +24,8 @@ void main() {
     vec4 f = textureLod(uTerrainBake, dir, 0.0);
     gl_FragColor = vec4(f.g, f.b, cloudShadowAt(dir * (uRadius + max(homestead(dir, f.r), 0.0)), 0.0), f.a);
   } else {
-    float gust = gustAt(dir);
+    vec2 waves = gustWaves(dir);
     float ripple = rippleAt(dir);
-    gl_FragColor = vec4(windBase(dir, gust, ripple), windSheen(gust, ripple));
+    gl_FragColor = vec4(windBase(dir, waves.x, waves.y, ripple), windSheen(waves, ripple));
   }
 }

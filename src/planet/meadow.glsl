@@ -143,7 +143,7 @@ struct Meadow {
   float shore;    // signed distance to the water (m)
   float light;    // toon light band, shadows applied
   float sunlit;   // 1 in sun, 0 under cloud
-  float sheen;    // wind sheen 0..1
+  float sheen;    // wind sheen: -1 in a trough … 1 on a crest (windSheen)
   float stroke;   // brushstroke noise, -1..1 (strokeAt)
   float pixelMeters;
   float nearFade; // 1 where real grass and flowers take over
@@ -181,12 +181,13 @@ vec3 meadowPaint(Meadow m) {
   col = mix(col, pal(ROW_GRASS, 3) * uSunTint, smoothstep(0.35, 0.8, s) * 0.32 * m.light);
   col = mix(col, pal(ROW_BRUSH, 4), smoothstep(-0.35, -0.8, s) * 0.22);
 
-  // wind on the grass: pale bands where the gusts lay it over, the strokes
-  // catching the light inside them, brightest in sun; between the bands the
-  // grass stands up and reads deeper
-  float sheen = m.sheen * uMeadowLook.x * mix(0.3, 1.0, m.sunlit);
-  col *= 1.0 - 0.13 * uMeadowLook.x * (1.0 - m.sheen);
-  col = mix(col, pal(ROW_GRASS, 8) * uSunTint, sheen * (0.5 + 0.4 * smoothstep(-0.2, 0.6, s)));
+  // wind on the grass: pale crests where the gusts lay it over, the strokes
+  // catching the light inside them, brightest in sun; behind each crest a
+  // dark trough where the grass springs back up into its own shade
+  float crest = max(m.sheen, 0.0) * uMeadowLook.x;
+  float trough = max(-m.sheen, 0.0) * uMeadowLook.x;
+  col = mix(col, col * vec3(0.5, 0.6, 0.66), trough * 0.85);
+  col = mix(col, pal(ROW_GRASS, 8) * uSunTint, crest * mix(0.4, 1.0, m.sunlit) * (0.75 + 0.25 * smoothstep(-0.2, 0.6, s)));
 
   // flowers: dabs where the clumps are, coloured by species and colony
   if (dot(m.flora, vec4(1.0)) > 0.02) m.flora *= clumpsAt(m.dir);

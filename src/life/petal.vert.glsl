@@ -35,7 +35,7 @@ void main() {
   float inside;
   vec4 f = fieldSample(spawn, meadow, wind, inside);
   float front = 1.0 - abs(f.w - 0.5) * 2.0; // 1 on the front's edge
-  float gust = wind.w * uGust.z * uWindVec.w;
+  float gust = max(wind.w, 0.0) * uGust.z * uWindVec.w;
   float lift = max(smoothstep(0.25, 0.75, front), smoothstep(0.25, 0.6, gust)) * inside * step(0.4, f.y);
   float life = smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.75, 1.0, age));
   if (lift * life < 0.02) {
