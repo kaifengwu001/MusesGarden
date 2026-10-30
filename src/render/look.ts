@@ -8,6 +8,8 @@ import { Color, Vector3, Vector4, type Texture } from 'three';
 export interface LookUniforms {
   uPalette: { value: Texture | null };
   uSunDir: { value: Vector3 };
+  /** sin, cos of the sun's elevation; cos, sin of its bearing from north (sun.glsl: the sun each place sees). */
+  uSunAngles: { value: Vector4 };
   uSunTint: { value: Color };
   uShadeTint: { value: Color };
   uToon: { value: Vector4 };
@@ -37,6 +39,7 @@ export function createLookUniforms(): LookUniforms {
   return {
     uPalette: { value: null },
     uSunDir: { value: new Vector3(0.3, 0.8, 0.5).normalize() },
+    uSunAngles: { value: new Vector4(0.77, 0.64, 1, 0) },
     uSunTint: { value: new Color(1, 1, 1) },
     uShadeTint: { value: new Color(1, 1, 1) },
     uToon: { value: new Vector4(3, 0.08, 0.6, 0) },

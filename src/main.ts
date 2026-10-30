@@ -19,6 +19,7 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from './view/input';
+import { Keys } from './view/keys';
 import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
@@ -92,6 +93,8 @@ async function boot(): Promise<void> {
   ui.setHints([
     ['drag', 'orbit · glide'],
     ['scroll', 'down to the meadow'],
+    ['W A S D', 'walk'],
+    ['Q E', 'up · down'],
     ['click', 'gust · ripple'],
     ['double-click', 'glide there'],
     ['hold', 'bloom'],
@@ -194,7 +197,9 @@ async function boot(): Promise<void> {
     applyUi();
   });
 
+  const keys = new Keys();
   const update = (): void => {
+    if (keys.update(world.rig, clock.realDt)) userPosed = true;
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), bufferSize.y);
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;

@@ -5,7 +5,8 @@
 //               band under every shore: as tall as the bank and the meadow
 //               behind it, so it widens and narrows along the shore
 //   the clouds  the same puffs the sky shows, drawn from the mirrored camera
-//               (cloudsInMirror, clouds.glsl)
+//               (cloudsInMirror, clouds.glsl); from orbit, the cloud cover
+//               seen from below (cloudsFromOrbit)
 //   the sky     painted as the deep cobalt of the lakes, paler toward the horizon
 // Looking down into the water you see more of its navy body, looking across
 // it more of the mirror. Gusts ruffle the mirror into streaks; a few glints
@@ -141,7 +142,11 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec4 bank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec4 cl = vec4(0.0);
   if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
-  else cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution);
+  else {
+    // from near the ground the mirror pass; from far above the cloud cover; cross-faded on the way
+    if (uCloudOrbit.x < 1.0) cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution);
+    if (uCloudOrbit.x > 0.0) cl = mix(cl, cloudsFromOrbit(wp, r), uCloudOrbit.x);
+  }
   float reflectance = mix(0.45, 0.95, pow(1.0 - facing, 1.6)) * (1.0 - 0.25 * gust) * uWaterSky.x;
   vec3 col = mix(body, mirror, reflectance);
   // banks stay dark and clouds stay bright in the mirror even looking down into the water

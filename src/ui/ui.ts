@@ -12,7 +12,7 @@ export class Ui {
   constructor(root: HTMLElement) {
     const masthead = element('header', 'masthead');
     const title = element('h1');
-    title.textContent = 'The Meadow.';
+    title.textContent = 'Garden of Muse';
     this.line = element('p', 'world-line');
     masthead.append(title, this.line);
     this.hints = element('ul', 'hints');
@@ -39,7 +39,7 @@ export class Ui {
   static fallback(root: HTMLElement, message: string): void {
     const box = element('div', 'fallback');
     const title = element('h1');
-    title.textContent = 'The Meadow.';
+    title.textContent = 'Garden of Muse';
     const text = element('p');
     text.textContent = message;
     box.append(title, text);

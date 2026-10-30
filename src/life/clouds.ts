@@ -12,6 +12,7 @@ import {
   HalfFloatType,
   InstancedBufferGeometry,
   LinearFilter,
+  Matrix3,
   Matrix4,
   Mesh,
   NearestFilter,
@@ -45,11 +46,14 @@ import shadowVertex from './cloudShadow.vert.glsl?raw';
 // Low cumulus drifting with the wind a few meters above the meadow. Each
 // cloud is a heap of PUFFS lumpy spheres over a flat base, written once a
 // frame into one data texture (clouds.glsl reads it). The same puffs draw the
-// cloud (a billboard each, traced per pixel), cast its shadow (splatted into
-// a sun-space map of optical depth) and show in the lakes (the billboards
-// drawn again, at a third of the resolution, from the camera mirrored in the water's
-// level plane under the focus), so a cloud, its shadow and its reflection
-// always agree.
+// cloud (a billboard each, traced per pixel), cast its shadow (splatted
+// into a cube map of optical depth where the shadows reach the ground, down
+// the sun each place sees, so shadows stay fixed to the planet) and show in
+// the lakes (the billboards drawn again from the camera mirrored in the
+// water's level plane under the focus; from orbit, a cube map of the cloud
+// cover seen from below), so a cloud, its shadow and its reflection always
+// agree. Every cloud casts its shadow and shows in the water; only those
+// the ground does not hide from the camera are drawn.
 //
 // Where the clouds are is weather, not scatter. A flow over the sphere (a few
 // vortices spiralling in or out, and bands of wind east and west) is traced
@@ -80,8 +84,22 @@ const SIZE = 15;
 const STREAM = { sep: 0.17, test: 0.55, step: 0.25, minLength: 0.45, maxLength: 3.4 } as const;
 /** Share of the streamline slots that hold a cloud at coverage 0 and 1. */
 const SHARE = [0.1, 0.78] as const;
-/** The lakes' mirror is drawn at 1/MIRROR_SCALE of the resolution (the ripples soften it anyway). */
-const MIRROR_SCALE = 3;
+/** The lakes' mirror is drawn at 1/MIRROR_SCALE of the resolution. */
+const MIRROR_SCALE = 1;
+/** The lakes read the clouds from orbit between these camera altitudes (× R): none below, fully above. */
+const ORBIT_REFLECTION = [0.35, 0.8] as const;
+/**
+ * Each face of the cube maps (the GL cube-map convention, as bake.frag.glsl):
+ * a direction's coordinates on it are (across, up) / out.
+ */
+const FACES = [
+  [new Vector3(0, 0, -1), new Vector3(0, -1, 0), new Vector3(1, 0, 0)],
+  [new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector3(-1, 0, 0)],
+  [new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0)],
+  [new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, -1, 0)],
+  [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, 1)],
+  [new Vector3(-1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)],
+].map(([u, v, m]) => new Matrix3().set(u.x, v.x, m.x, u.y, v.y, m.y, u.z, v.z, m.z));
 /** Cloudiness over the threshold at which a cloud is fully grown. */
 const FADE = 0.07;
 /**
@@ -103,12 +121,16 @@ export interface CloudParams {
 /** Cloud uniforms shared by every material that shows clouds or their shadows. */
 export interface CloudUniforms {
   uCloudData: IUniform<DataTexture>;
-  uCloudShadowMap: IUniform<Texture | null>;
-  /** Sun-space axis A, 1 / half-extent of the shadow map (1/m). */
-  uCloudSunA: IUniform<Vector4>;
-  uCloudSunB: IUniform<Vector4>;
-  /** Shadow strength, optical density (1/m), clouds, clouds that reflect. */
+  /** Optical depth where the shadows reach the water table (direction space). */
+  uCloudShadowCube: IUniform<Texture | null>;
+  /** The cloud cover seen from below (direction space). */
+  uCloudLayerCube: IUniform<Texture | null>;
+  /** Shadow strength, optical density (1/m), clouds, -. */
   uCloudLook: IUniform<Vector4>;
+  /** Weight of the view from orbit in the lakes, mean height of the clouds (m), -, -. */
+  uCloudOrbit: IUniform<Vector4>;
+  /** The cube face being drawn (the maps above, a face at a time). */
+  uCubeFace: IUniform<Matrix3>;
   /** The puffs' lumps, baked once (cloudLumps.glsl). */
   uCloudLumps: IUniform<Texture | null>;
   /** The camera (clouds dissolve around it, in the mirror too). */
@@ -370,10 +392,11 @@ export function createCloudUniforms(): CloudUniforms {
   data.needsUpdate = true;
   return {
     uCloudData: { value: data },
-    uCloudShadowMap: { value: null },
-    uCloudSunA: { value: new Vector4(1, 0, 0, 1 / 200) },
-    uCloudSunB: { value: new Vector4(0, 0, 1, 0) },
+    uCloudShadowCube: { value: null },
+    uCloudLayerCube: { value: null },
     uCloudLook: { value: new Vector4(0.7, 0.12, 0, 0) },
+    uCloudOrbit: { value: new Vector4(0, 12, 0, 0) },
+    uCubeFace: { value: new Matrix3() },
     uCloudLumps: { value: null },
     uCloudEye: { value: new Vector3() },
     uCloudMirror: { value: null },
@@ -403,8 +426,10 @@ interface Placed {
 export class Clouds {
   /** The billboards; add to the scene. */
   readonly mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
-  private readonly shadowTarget: WebGLRenderTarget;
+  private readonly shadowCube: WebGLCubeRenderTarget;
+  private readonly layerCube: WebGLCubeRenderTarget;
   private readonly shadowScene: Scene;
+  private readonly layerScene: Scene;
   private readonly shadowGeometry: InstancedBufferGeometry;
   private readonly shadowCamera = new OrthographicCamera();
   private readonly lumps = new WebGLCubeRenderTarget(64, { generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false });
@@ -427,30 +452,31 @@ export class Clouds {
   private thresholdKey = '';
   private readonly placed: Placed[] = Array.from({ length: MAX_CLOUDS }, () => ({ slot: null as unknown as Slot, fade: 1, base: 0, size: 0, up: new Vector3(), along: new Vector3(), distance: 0 }));
   private readonly order: Placed[] = [];
+  /** Per row: 1 when the ground does not hide the cloud from the camera. */
+  private readonly inSight = new Uint8Array(MAX_CLOUDS);
   private readonly all: Array<{ centre: Vector3; radius: number }> = [];
   private readonly p = new Vector3();
   private readonly q = new Vector3();
   private readonly across = new Vector3();
   private readonly centre = new Vector3();
-  private readonly axisA = new Vector3();
-  private readonly axisB = new Vector3();
   private readonly projection = { value: new Matrix4() };
   /** Clouds shown (perf stat). */
   count = 0;
 
-  /** `uniforms` must already be in `shared` (materials copy it when they are made). */
-  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number) {
-    this.shadowTarget = new WebGLRenderTarget(shadowSize, shadowSize, {
-      type: HalfFloatType,
-      format: RedFormat,
-      depthBuffer: false,
-      generateMipmaps: false,
-      minFilter: LinearFilter,
-      magFilter: LinearFilter,
-    });
-    gpuMemory.set('cloud shadow map', shadowSize * shadowSize * 2);
+  /**
+   * `uniforms` must already be in `shared` (materials copy it when they are
+   * made). Sizes: a face of the shadow cube and of the cover-from-below cube.
+   */
+  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number) {
+    const cube = (size: number): WebGLCubeRenderTarget =>
+      new WebGLCubeRenderTarget(size, { type: HalfFloatType, format: RedFormat, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
+    this.shadowCube = cube(shadowSize);
+    this.layerCube = cube(layerSize);
+    gpuMemory.set('cloud shadow map', 6 * shadowSize * shadowSize * 2);
+    gpuMemory.set('cloud cover map', 6 * layerSize * layerSize * 2);
     gpuMemory.set('cloud lumps', 6 * 64 * 64 * 4);
-    uniforms.uCloudShadowMap.value = this.shadowTarget.texture;
+    uniforms.uCloudShadowCube.value = this.shadowCube.texture;
+    uniforms.uCloudLayerCube.value = this.layerCube.texture;
     uniforms.uCloudLumps.value = this.lumps.texture;
 
     const cloudMaterial = (mirror: boolean): ShaderMaterial =>
@@ -484,24 +510,40 @@ export class Clouds {
     this.mirrorCamera.matrixWorldAutoUpdate = false;
     uniforms.uCloudMirror.value = this.mirrorTarget.texture;
 
+    // the puffs splatted into the cube maps: the shadows, and the cover from below
     this.shadowGeometry = quad();
     this.shadowGeometry.instanceCount = 0;
-    const shadowMaterial = new ShaderMaterial({
-      name: 'cloud shadows',
-      vertexShader: shadowVertex,
-      fragmentShader: shadowFragment,
-      uniforms: { uCloudData: uniforms.uCloudData, uCloudSunA: uniforms.uCloudSunA, uCloudSunB: uniforms.uCloudSunB, uCloudLook: uniforms.uCloudLook, uCloudLumps: uniforms.uCloudLumps, uTime: shared.uTime },
-      blending: AdditiveBlending,
-      depthTest: false,
-      depthWrite: false,
-      transparent: true,
-    });
-    const shadowMesh = new Mesh(this.shadowGeometry, shadowMaterial);
-    shadowMesh.frustumCulled = false;
-    this.shadowScene = new Scene().add(shadowMesh);
+    const splats = (radial: boolean): Mesh => {
+      const material = new ShaderMaterial({
+        name: radial ? 'cloud cover' : 'cloud shadows',
+        vertexShader: shadowVertex,
+        fragmentShader: shadowFragment,
+        defines: radial ? { RADIAL: 1 } : {},
+        uniforms: {
+          uCloudData: uniforms.uCloudData,
+          uCloudLook: uniforms.uCloudLook,
+          uCloudLumps: uniforms.uCloudLumps,
+          uCubeFace: uniforms.uCubeFace,
+          uTime: shared.uTime,
+          uRadius: shared.uRadius,
+          uSunAngles: shared.uSunAngles,
+        },
+        // the cube faces' projections turn some splats over
+        side: DoubleSide,
+        blending: AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+      });
+      const mesh = new Mesh(this.shadowGeometry, material);
+      mesh.frustumCulled = false;
+      return mesh;
+    };
+    this.shadowScene = new Scene().add(splats(false));
+    this.layerScene = new Scene().add(splats(true));
   }
 
-  /** Something else that casts its shadow into the clouds' map (the birds): drawn after the puffs, additively. */
+  /** Something else that casts its shadow into the clouds' map (the birds): drawn after the puffs, additively, with uCubeFace. */
   addShadowCaster(mesh: Mesh): void {
     this.shadowScene.add(mesh);
     this.casters++;
@@ -604,25 +646,19 @@ export class Clouds {
   }
 
   /**
-   * Drop the clouds the ground hides. A sightline from the eye to a cloud is
-   * blocked where it passes under the water table (nothing stands lower), in
-   * the warped world the camera sees: behind the planet from orbit, or under
-   * the bent meadow at the tiny-planet zooms. A cloud goes when the line to
-   * the top of its bound is blocked (lower points are hidden sooner).
+   * Whether the ground hides a cloud from the camera. A sightline from the
+   * eye to a cloud is blocked where it passes under the water table (nothing
+   * stands lower), in the warped world the camera sees: behind the planet
+   * from orbit, or under the bent meadow at the tiny-planet zooms. Judged by
+   * the line to the top of its bound (lower points are hidden sooner).
    */
-  private cullHidden(eye: Vector3, radius: number, warp: WarpFrame): void {
-    const blocked = (target: Vector3): boolean => {
-      for (let i = 1; i < 16; i++) {
-        this.q.lerpVectors(eye, target, i / 16);
-        if (unwarpPoint(warp, this.q, this.q).length() < radius) return true;
-      }
-      return false;
-    };
-    let kept = 0;
-    for (const at of this.order) {
-      if (!blocked(warpPoint(warp, this.p.copy(at.up).multiplyScalar(at.base + 2.65 * at.size), this.p))) this.order[kept++] = at;
+  private hidden(at: Placed, eye: Vector3, radius: number, warp: WarpFrame): boolean {
+    const target = warpPoint(warp, this.p.copy(at.up).multiplyScalar(at.base + 2.65 * at.size), this.p);
+    for (let i = 1; i < 16; i++) {
+      this.q.lerpVectors(eye, target, i / 16);
+      if (unwarpPoint(warp, this.q, this.q).length() < radius) return true;
     }
-    this.order.length = kept;
+    return false;
   }
 
   /** Every cloud's heap now, as a sphere about its middle (planet space; those behind the planet too), nearest the camera first. */
@@ -689,14 +725,14 @@ export class Clouds {
       const b = (this.all[i] ??= { centre: new Vector3(), radius: 0 });
       b.centre.copy(at.up).multiplyScalar(at.base + 0.45 * at.size);
       b.radius = 1.45 * at.size;
+      // the ground hides some from the camera: they still cast shadows and show in the water, but are not drawn
+      this.inSight[i] = this.hidden(at, camera.position, radius, warp) ? 0 : 1;
     });
     this.all.length = this.order.length;
-    // clouds the ground hides are left out (they would still be shaded: the cloud shader writes its depth)
-    this.cullHidden(camera.position, radius, warp);
     const n = this.order.length;
 
     const data = this.uniforms.uCloudData.value.image.data as Float32Array;
-    let top = 0;
+    let heights = 0;
     this.order.forEach((at, row) => {
       const h = at.slot.seed;
       const { size, base } = at;
@@ -749,40 +785,47 @@ export class Clouds {
       data[o + 7] = base;
       data[o + 8] = (h % 9973) + 7;
       data[o + 9] = size;
-      top = Math.max(top, base + 1.3 * size - radius);
+      data[o + 10] = this.inSight[row];
+      heights += base + 0.45 * size - radius;
     });
     this.uniforms.uCloudData.value.needsUpdate = true;
     this.projection.value.copy(camera.projectionMatrix);
     this.uniforms.uCloudEye.value.copy(camera.position);
-    this.count = n;
+    this.count = this.inSight.subarray(0, n).reduce((a, v) => a + v, 0);
 
-    // the shadow map: an orthographic view down the sun over the whole planet
-    const ref = Math.abs(sunDir.y) < 0.9 ? this.p.set(0, 1, 0) : this.p.set(1, 0, 0);
-    this.axisA.crossVectors(sunDir, ref).normalize();
-    this.axisB.crossVectors(sunDir, this.axisA);
-    const extent = radius + top + 2;
-    this.uniforms.uCloudSunA.value.set(this.axisA.x, this.axisA.y, this.axisA.z, 1 / extent);
-    this.uniforms.uCloudSunB.value.set(this.axisB.x, this.axisB.y, this.axisB.z, 0);
+    // the lakes mirror the clouds through the mirror pass near the ground and read the cover from below from orbit
+    const orbit = smoothstep(ORBIT_REFLECTION[0] * radius, ORBIT_REFLECTION[1] * radius, camera.position.length() - radius);
     this.uniforms.uCloudLook.value.set(p.shadow, 0.22, n, 0);
+    this.uniforms.uCloudOrbit.value.set(orbit, n > 0 ? heights / n : 12, 0, 0);
     this.mesh.geometry.instanceCount = n;
-    this.mesh.visible = n > 0;
+    this.mesh.visible = this.count > 0;
     this.shadowGeometry.instanceCount = n * PUFFS;
     const previous = renderer.getRenderTarget();
+    renderer.getClearColor(this.clearColour);
     const clearAlpha = renderer.getClearAlpha();
-    renderer.setRenderTarget(this.shadowTarget);
-    renderer.setClearAlpha(0);
-    renderer.clear(true, false, false);
-    if (n > 0 || this.casters > 0) renderer.render(this.shadowScene, this.shadowCamera);
-    this.renderMirror(renderer, camera, radius, warp, n);
-    renderer.setClearAlpha(clearAlpha);
+    renderer.setClearColor(0x000000, 0);
+    if (n > 0 || this.casters > 0) this.renderCube(renderer, this.shadowCube, this.shadowScene);
+    if (orbit > 0) this.renderCube(renderer, this.layerCube, this.layerScene);
+    if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
+    renderer.setClearColor(this.clearColour, clearAlpha);
     renderer.setRenderTarget(previous);
+  }
+
+  /** Clear each face of a cube map and splat into it. */
+  private renderCube(renderer: WebGLRenderer, target: WebGLCubeRenderTarget, scene: Scene): void {
+    FACES.forEach((face, f) => {
+      this.uniforms.uCubeFace.value.copy(face);
+      renderer.setRenderTarget(target, f);
+      renderer.clear(true, false, false);
+      renderer.render(scene, this.shadowCamera);
+    });
   }
 
   /**
    * The clouds as the lakes mirror them: the camera reflected in the water's
    * level plane under the focus (the warp leaves the focus where it is),
-   * drawn at a third of the resolution. A point of that plane lands on the same pixel
-   * from either camera, so the water looks its reflection up where it is.
+   * at full resolution. A point of that plane lands on the same pixel from
+   * either camera, so the water looks its reflection up where it is.
    */
   private renderMirror(renderer: WebGLRenderer, camera: PerspectiveCamera, radius: number, warp: WarpFrame, n: number): void {
     renderer.getDrawingBufferSize(this.bufferSize);
@@ -808,13 +851,8 @@ export class Clouds {
     mc.matrixWorldInverse.copy(mc.matrixWorld).invert();
     this.uniforms.uCloudMirrorVP.value.multiplyMatrices(mc.projectionMatrix, mc.matrixWorldInverse);
     // cleared to transparent black: the water reads it as premultiplied colour
-    renderer.getClearColor(this.clearColour);
     renderer.setRenderTarget(this.mirrorTarget);
-    renderer.setClearColor(0x000000, 0);
     renderer.clear(true, false, false);
-    // from orbit the lakes are too small (and too curved) to mirror anything
-    const orbit = camera.position.length() - radius > 0.75 * radius;
-    if (n > 0 && !orbit) renderer.render(this.mirrorScene, mc);
-    renderer.setClearColor(this.clearColour, 0);
+    if (n > 0) renderer.render(this.mirrorScene, mc);
   }
 }

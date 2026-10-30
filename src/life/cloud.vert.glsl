@@ -4,6 +4,7 @@
 // a dozen flat varyings per pixel) and traces it (clouds.glsl).
 #include <meadow_common>
 #include <meadow_noise>
+uniform float uRadius;
 #include <meadow_warp>
 #include <meadow_toon>
 #include <meadow_clouds>
@@ -40,6 +41,13 @@ void main() {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
+#ifndef MIRROR_PASS
+  // a cloud the ground hides from the camera (clouds.ts) casts its shadow and shows in the water, but is not drawn
+  if (texelFetch(uCloudData, ivec2(2, row), 0).z < 0.5) {
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
+#endif
   Cloud cl = loadCloud(row);
   // a cloud the camera is in has thinned away (cloudFade): nothing to draw
   if (cloudFade(cl) < 0.02) {

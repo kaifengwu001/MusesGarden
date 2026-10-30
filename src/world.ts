@@ -24,6 +24,7 @@ import { createGroundSample, createTerrainUniforms, generateLayout, gradientFram
 import { createLookUniforms } from './render/look';
 import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
+import { localSun } from './render/sun';
 import { warpForZoom } from './render/warp';
 import { CameraRig } from './view/camera';
 import { findVista, type Vista } from './view/vista';
@@ -103,7 +104,6 @@ export class World {
   private readonly frustum = new Frustum();
   private readonly projView = new Matrix4();
   private readonly ground = createGroundSample();
-  private readonly north = new Vector3();
   private readonly east = new Vector3();
   private readonly tmp = new Vector3();
   private readonly windAxis = new Vector3();
@@ -141,7 +141,7 @@ export class World {
     this.grass = new Grass(this.shared, tier.name === 'high' ? 760 : 260);
     this.flowers = new Flowers(this.shared, tier.name === 'high' ? 420 : 180);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
-    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 2048 : 1024);
+    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 1536 : 768, tier.name === 'high' ? 768 : 384);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
@@ -429,19 +429,11 @@ export class World {
 
   private updateLight(hours: number): void {
     this.palette.update(hours);
-    // Local north at the focus (world +Y projected), east = north × up.
-    const up = this.rig.up;
-    tangentToward(up, Math.abs(up.y) > 0.98 ? WORLD_X : WORLD_UP, this.north);
-    this.east.crossVectors(this.north, up).normalize();
+    // the scene is lit by the sun the focus sees; every place sees its own (render/sun.ts)
     const sun = sunAt(hours);
-    const ce = Math.cos(sun.elevation);
-    this.sunDir
-      .copy(up)
-      .multiplyScalar(Math.sin(sun.elevation))
-      .addScaledVector(this.north, Math.cos(sun.azimuth) * ce)
-      .addScaledVector(this.east, Math.sin(sun.azimuth) * ce)
-      .normalize();
+    localSun(this.rig.up, sun.elevation, sun.azimuth, this.sunDir);
     this.look.uSunDir.value.copy(this.sunDir);
+    this.look.uSunAngles.value.set(Math.sin(sun.elevation), Math.cos(sun.elevation), Math.cos(sun.azimuth), Math.sin(sun.azimuth));
     const sunC = this.palette.get(ROW.LIGHT, 0, this.look.uSunTint.value);
     sunC.r /= NOON_SUN.r;
     sunC.g /= NOON_SUN.g;

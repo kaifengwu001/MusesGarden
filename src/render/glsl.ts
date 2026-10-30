@@ -12,6 +12,7 @@ import terrain from '../planet/terrain.glsl?raw';
 import water from '../planet/water.glsl?raw';
 import common from './common.glsl?raw';
 import fog from './fog.glsl?raw';
+import sun from './sun.glsl?raw';
 import toon from './toon.glsl?raw';
 import warp from './warp.glsl?raw';
 
@@ -27,6 +28,7 @@ const chunks: Record<string, string> = {
   meadow_fields: fields,
   meadow_toon: toon,
   meadow_fog: fog,
+  meadow_sun: sun,
   meadow_paint: meadow,
   meadow_water: water,
   meadow_cloud_lumps: cloudLumps,

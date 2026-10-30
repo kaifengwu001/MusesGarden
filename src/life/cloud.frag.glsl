@@ -4,6 +4,7 @@
 // the water, shaded as the lakes paint their reflections.
 #include <meadow_common>
 #include <meadow_noise>
+uniform float uRadius;
 #include <meadow_warp>
 #include <meadow_toon>
 #include <meadow_fog>

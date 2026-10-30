@@ -3,33 +3,37 @@
 // uCloudData per cloud, nearest the camera first:
 //   texel 0      bounding sphere: centre (planet space, m), radius (m)
 //   texel 1      base: cloud up (unit), distance of the base from the planet centre (m)
-//   texel 2      noise seed, size (m: the heap is about this tall), -, -
+//   texel 2      noise seed, size (m: the heap is about this tall), in sight (0 or 1), -
 //   texels 3..10 puffs: centre (planet space, m), radius (m; 0 = unused)
 //   texels 11–12 the puffs' self-shadow toward the sun, 0..1, four a texel
 // Everything that shows a cloud reads these same puffs, so a cloud, its
 // shadow and its reflection always agree:
 //   the cloud itself     cloud.frag.glsl, one billboard per cloud
-//   its shadow           a sun-space map of optical depth (cloudShadow.*.glsl)
-//   its reflection       the same billboards drawn again from the camera
-//                        mirrored in the water, at a third of the resolution
-//                        (clouds.ts); the lakes look it up (cloudsInMirror)
+//   its shadow           a cube map of optical depth where the shadows reach
+//                        the ground, down the sun each place sees
+//                        (cloudShadow.*.glsl), fixed to the planet
+//   its reflection       near the ground, the same billboards drawn again
+//                        from the camera mirrored in the water (clouds.ts;
+//                        cloudsInMirror); from orbit, a cube map of the cloud
+//                        cover seen from below (cloudsFromOrbit)
 // A cloud is sculpted, not a fog: the puffs are solid, their outlines lumpy
 // like a cauliflower (the same lumps in the cloud, its shadow and its
 // mirror), lit lobe by lobe with soft creases where lobes meet and shadowed
 // by the puffs between them and the sun. Rays are traced in view space (the
 // tiny-planet warp moves each puff with the ground under it).
-// Requires: noise, toon (palette), warp.
+// Requires: noise, toon (palette), warp, uRadius.
 #define MAX_CLOUDS 512
 #define PUFFS 8
 uniform highp sampler2D uCloudData;
-uniform sampler2D uCloudShadowMap;
-uniform vec4 uCloudSunA;  // sun-space axis A (xyz), 1 / half-extent of the shadow map (1/m)
-uniform vec4 uCloudSunB;  // sun-space axis B (xyz), -
+uniform samplerCube uCloudShadowCube; // optical depth where the shadows reach the water table
+uniform samplerCube uCloudLayerCube;  // the cloud cover seen from below (optical depth)
 uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, -
+uniform vec4 uCloudOrbit; // weight of the view from orbit in the lakes (0..1), mean height of the clouds (m), -, -
 uniform vec3 uCloudEye;   // the camera (not the mirrored one): clouds dissolve around it
 uniform sampler2D uCloudMirror; // the clouds seen from the camera mirrored in the water, premultiplied
 uniform mat4 uCloudMirrorVP;    // that camera's view-projection
 #include <meadow_cloud_lumps>
+#include <meadow_sun>
 
 // One cloud's frame in view space: bounding sphere, base plane (point, normal).
 struct Cloud {
@@ -250,12 +254,33 @@ vec4 cloudsInMirror(vec3 wp, vec3 r, vec3 r0, vec2 screen) {
   return textureLod(uCloudMirror, uv, 0.0);
 }
 
-// 0..1 cloud shadow at a point (planet space, m): the optical depth toward
-// the sun from the shadow map. edge: noise in [-1, 1] that roughens the
-// outline (the paint passes its brushstrokes, so shadow edges look brushed).
+// The clouds a lake mirrors when seen from far above, where the one mirror
+// plane of the mirror pass cannot follow the planet's curve: the cloud cover
+// from below, looked up where the mirrored ray r (from the water point wp,
+// view space) meets the clouds' mean height. Premultiplied colour and
+// coverage, lit as the lakes paint their clouds.
+vec4 cloudsFromOrbit(vec3 wp, vec3 r) {
+  vec3 p = unwarpPosition(wp);
+  float top = uRadius + uCloudOrbit.y;
+  float b = dot(p, r);
+  float t = -b + sqrt(max(b * b - dot(p, p) + top * top, 0.0));
+  float tau = textureLod(uCloudLayerCube, normalize(p + r * t), 0.0).r;
+  float a = smoothstep(0.08, 0.6, 1.0 - exp(-tau * uCloudLook.y));
+  return vec4(mix(pal(ROW_CLOUD, 2), pal(ROW_CLOUD, 0), 0.65) * a, a);
+}
+
+// 0..1 cloud shadow at a point (planet space, m). The map holds where the
+// shadows reach the water table, so a point above it looks up where its own
+// sun ray, carried on down, would reach it. edge: noise in [-1, 1] that
+// roughens the outline (the paint passes its brushstrokes, so shadow edges
+// look brushed).
 float cloudShadowAt(vec3 p, float edge) {
-  vec2 uv = vec2(dot(p, uCloudSunA.xyz), dot(p, uCloudSunB.xyz)) * uCloudSunA.w * 0.5 + 0.5;
-  float tau = textureLod(uCloudShadowMap, uv, 0.0).r;
+  float r = length(p);
+  vec3 d = p / r;
+  vec3 sun = localSun(d);
+  float sinE = max(dot(sun, d), 0.2);
+  vec3 q = normalize(d + (d * sinE - sun) * ((r - uRadius) / (sinE * uRadius)));
+  float tau = textureLod(uCloudShadowCube, q, 0.0).r;
   float s = 1.0 - exp(-tau * uCloudLook.y * (1.0 + 0.45 * edge));
   return smoothstep(0.1, 0.5, s) * uCloudLook.x;
 }

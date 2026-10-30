@@ -69,16 +69,44 @@ export class CameraRig {
     return this.zoomTarget >= 0.5 ? 'wander' : 'overview';
   }
 
-  /** Drag by (dx, dy) pixels in a viewport of the given size. */
+  /**
+   * Drag by (dx, dy) pixels in a viewport of the given size. Both axes hold
+   * the scene: drag down and the meadow comes toward you (you glide forward),
+   * drag right and it swings right (you turn left), as in a street-view panorama.
+   */
   drag(dx: number, dy: number, width: number, height: number): void {
     const t = this.tilt;
     const perPixel = (0.75 * (this.altitude + 8)) / (this.radius * height);
     this.axes(this.frameTarget);
-    // vertical: roll the planet about the right axis (glide forward / back)
-    this.rotate(this.right, -dy * perPixel);
+    // vertical: roll the planet about the right axis (glide forward / back), quicker down in the meadow
+    this.rotate(this.right, -dy * perPixel * (1 + 0.7 * t));
     // horizontal: spin the globe (Overview) blending into turning on the spot (Wander)
     if (t < 1) this.rotate(this.forward, -dx * perPixel * (1 - t));
-    if (t > 0) this.rotate(this.up, (-dx * Math.PI * 0.9 * t) / width);
+    if (t > 0) this.rotate(this.up, (dx * Math.PI * 0.9 * t) / width);
+    this.glideT = 1;
+    this.changed = true;
+  }
+
+  /** Walking speed for the keys (m/s): a brisk pace in the meadow, faster higher up. */
+  get walkSpeed(): number {
+    return 4 + 0.35 * this.altitude;
+  }
+
+  /** Move over the surface by `ahead` and `across` meters along the current heading (keys). */
+  walk(ahead: number, across: number): void {
+    if (ahead === 0 && across === 0) return;
+    this.axes(this.frameTarget);
+    this.rotate(this.right, -ahead / this.radius);
+    this.rotate(this.forward, across / this.radius);
+    this.glideT = 1;
+    this.changed = true;
+  }
+
+  /** Turn on the spot by `angle` (rad; positive turns left). */
+  turn(angle: number): void {
+    if (angle === 0) return;
+    this.axes(this.frameTarget);
+    this.rotate(this.up, angle);
     this.glideT = 1;
     this.changed = true;
   }

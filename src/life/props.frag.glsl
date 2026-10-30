@@ -7,6 +7,7 @@
 // the clouds' shadows pass over it as over the meadow. No outlines.
 #include <meadow_common>
 #include <meadow_noise>
+uniform float uRadius;
 #include <meadow_warp>
 #include <meadow_toon>
 #include <meadow_fog>
