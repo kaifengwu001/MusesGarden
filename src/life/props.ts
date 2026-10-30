@@ -10,23 +10,24 @@ import vertexShader from './props.vert.glsl?raw';
 // here depends on R; the frame is placed on the planet each frame, so the
 // cottage keeps its size and stays seated on its clearing.
 //
-//   walls    solid, limewashed a warm white. Every face carries how far it
-//            is from an edge (corner, foot, top, an opening) and from a
-//            corner, so the shader can let the stones show where the wash
-//            has worn: quoins at the corners, jambs, the plinth, a few
-//            flaked patches; damp at the foot, ivy up one corner
+//   walls    solid, limewashed a warm butter cream and painted in strokes.
+//            Every face carries how far it is from an edge (corner, foot,
+//            top, an opening) and from a corner, so the shader can hint at
+//            the stones under the wash near the edges only, stain the wash
+//            where rain runs and damp rises, and shade it under the eaves
 //   roof     hipped, a little crooked: the ridge sags, the eaves wander and
-//            droop at one end, the slopes dip; mossy slates painted on
-//   chimney  washed stone like the walls, leaning a touch
-//   landing  a stone platform stepping down into the pond, a low arch at the
-//            waterline (painted), an iron rail, and a bench by the door
+//            droop at one end, the slopes dip. Tiles painted in courses,
+//            mossy, with ridge and hip tiles along the ridge and the hips
+//   chimney  a small plastered stack by the ridge, leaning a touch
+//   landing  a plastered platform stepping down into the pond, a low arch
+//            at the waterline (painted), an iron rail, and a bench by the door
 
-export const COTTAGE = { halfX: 2.5, halfZ: 2.0, wall: 2.3, thickness: 0.36, ridgeRise: 2.0, overhang: 0.32 } as const;
+export const COTTAGE = { halfX: 2.5, halfZ: 2.0, wall: 2.1, thickness: 0.36, ridgeRise: 2.25, overhang: 0.42 } as const;
 /** Landing extent in local meters (x from, x to, z from, z to). */
 export const LANDING = { x0: -2.3, x1: 1.0, z0: 2.0, z1: 5.3, top: 0.02, base: -0.75 } as const;
 
-type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
-const KIND_ID: Record<Kind, number> = { wall: 0, roof: 1, wood: 2, iron: 3, glass: 4, landing: 5 };
+type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing' | 'frame';
+const KIND_ID: Record<Kind, number> = { wall: 0, roof: 1, wood: 2, iron: 3, glass: 4, landing: 5, frame: 6 };
 
 /** Grid step (m) of the painted faces: fine enough that the edge distances interpolate. */
 const STEP = 0.2;
@@ -47,8 +48,9 @@ class Rand {
 
 /**
  * Paint data per vertex: distance to the nearest edge of its face (m),
- * distance to the nearest corner of the building (m), height above the
- * ground (m), and how much ivy may grow there (0..1).
+ * distance to the nearest corner of the building (m; on the roof, which part
+ * it is: 1 ridge and hip tiles, 5 the eaves' edge, 9 the slopes), height
+ * above the ground (m), and how much the stones may show near its edges (0..1).
  */
 type Paint = [number, number, number, number];
 
@@ -116,7 +118,7 @@ class Builder {
   }
 
   /** A box (centre, half sizes), turned by `turn`, every face painted by distance to its own edges. */
-  box(centre: Vector3, half: Vector3, turn: Matrix4 | null, groundY: number, ivy = 0, faces = 'xXyYzZ'): void {
+  box(centre: Vector3, half: Vector3, turn: Matrix4 | null, groundY: number, stones = 0, faces = 'xXyYzZ'): void {
     const axes: Array<[string, Vector3, Vector3, Vector3, number, number]> = [
       ['X', new Vector3(0, 0, -1), new Vector3(0, 1, 0), new Vector3(half.x, -half.y, half.z), 2 * half.z, 2 * half.y],
       ['x', new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector3(-half.x, -half.y, -half.z), 2 * half.z, 2 * half.y],
@@ -141,7 +143,7 @@ class Builder {
       };
       this.face(ut, vt, lu, lv, at, (u, v) => {
         at(u, v, p);
-        return [Math.min(u, lu - u, v, lv - v), Math.min(u, lu - u), p.y - groundY, ivy];
+        return [Math.min(u, lu - u, v, lv - v), Math.min(u, lu - u), p.y - groundY, stones];
       });
     }
   }
@@ -172,8 +174,6 @@ interface WallFace {
   out: Vector3;
   length: number;
   openings: Opening[];
-  /** How far from its left and right ends ivy reaches (m; 0 = none). */
-  ivy: [number, number];
 }
 
 /** Distance from (u, v) to a rectangle's outline (0 inside it). */
@@ -189,26 +189,25 @@ function walls(b: Builder, rand: Rand): WallFace[] {
   const ex = halfX + thickness / 2;
   const ez = halfZ + thickness / 2;
   const foot = -0.12;
-  const W = (sx: number, sz: number, ax: number, az: number, ox: number, oz: number, length: number, openings: Opening[], ivy: [number, number]): WallFace => ({
+  const W = (sx: number, sz: number, ax: number, az: number, ox: number, oz: number, length: number, openings: Opening[]): WallFace => ({
     start: new Vector3(sx, foot, sz),
     along: new Vector3(ax, 0, az),
     out: new Vector3(ox, 0, oz),
     length,
     openings,
-    ivy,
   });
   const faces = [
     // front (toward the pond): the door, a window
     W(-ex, ez, 1, 0, 0, 1, 2 * ex, [
-      { from: ex - 1.05, to: ex - 0.15, bottom: 0, top: 1.85, door: true },
-      { from: ex + 0.95, to: ex + 1.65, bottom: 0.95, top: 1.65, door: false },
-    ], [1.6, 0]),
-    // right side: a window
-    W(ex, ez, 0, -1, 1, 0, 2 * ez, [{ from: ez - 0.65, to: ez + 0.05, bottom: 0.95, top: 1.6, door: false }], [0, 1.2]),
-    // back: a small window
-    W(ex, -ez, -1, 0, 0, -1, 2 * ex, [{ from: ex - 0.3, to: ex + 0.3, bottom: 1.0, top: 1.55, door: false }], [0, 0]),
-    // left side: blind, the ivy's wall
-    W(-ex, -ez, 0, 1, -1, 0, 2 * ez, [], [0, 2.6]),
+      { from: ex - 1.05, to: ex - 0.15, bottom: 0, top: 1.78, door: true },
+      { from: ex + 0.9, to: ex + 1.7, bottom: 0.92, top: 1.6, door: false },
+    ]),
+    // right side: a small window
+    W(ex, ez, 0, -1, 1, 0, 2 * ez, [{ from: ez - 0.45, to: ez + 0.05, bottom: 1.05, top: 1.55, door: false }]),
+    // back: a window
+    W(ex, -ez, -1, 0, 0, -1, 2 * ex, [{ from: ex - 0.35, to: ex + 0.35, bottom: 0.95, top: 1.6, door: false }]),
+    // left side: blind
+    W(-ex, -ez, 0, 1, -1, 0, 2 * ez, []),
   ];
   const height = wall - foot;
   const p = new Vector3();
@@ -230,8 +229,7 @@ function walls(b: Builder, rand: Rand): WallFace[] {
     const paint = (u: number, v: number): Paint => {
       let edge = Math.min(u, f.length - u, Math.max(v + foot, 0), height - v);
       for (const o of f.openings) edge = Math.min(edge, rectDistance(u, v + foot, o));
-      const ivy = Math.max(f.ivy[0] > 0 ? 1 - u / f.ivy[0] : 0, f.ivy[1] > 0 ? 1 - (f.length - u) / f.ivy[1] : 0);
-      return [Math.max(edge, 0), Math.min(u, f.length - u), v + foot, Math.max(ivy, 0)];
+      return [Math.max(edge, 0), Math.min(u, f.length - u), v + foot, 1];
     };
     const breaksU = f.openings.flatMap((o) => [o.from, o.to]);
     const breaksV = f.openings.flatMap((o) => [o.bottom - foot, o.top - foot]);
@@ -243,7 +241,7 @@ function walls(b: Builder, rand: Rand): WallFace[] {
       const inward = f.out.clone().negate();
       const corner = (u: number, y: number): Vector3 => f.start.clone().addScaledVector(f.along, u).setY(y);
       const reveal = (origin: Vector3, ua: Vector3, va: Vector3, lu: number, lv: number): void => {
-        b.face(ua, va, lu, lv, (u, v, out) => out.copy(origin).addScaledVector(ua, u).addScaledVector(va, v), (_u, v) => [0, 1, origin.y + va.y * v, 0]);
+        b.face(ua, va, lu, lv, (u, v, out) => out.copy(origin).addScaledVector(ua, u).addScaledVector(va, v), (_u, v) => [0, 1, origin.y + va.y * v, 0.6]);
       };
       // jambs facing into the opening, the head facing down, the sill up
       reveal(corner(o.from, o.bottom), inward, new Vector3(0, 1, 0), depth, o.top - o.bottom);
@@ -302,7 +300,7 @@ function roof(b: Builder, rand: Rand): void {
       1,
       1,
       (s, t, out) => bend(out.lerpVectors(tmpA.lerpVectors(a, bb, s), tmpB.lerpVectors(top0, top1, s), t)),
-      (_s, t) => [Math.min(t, 1 - t) * lenV, 9, 3, 0],
+      (_s, t) => [t * lenV, 9, 3, 0],
       Array.from({ length: 14 }, (_, k) => (k + 1) / 15),
       Array.from({ length: rows - 1 }, (_, k) => (k + 1) / rows),
     );
@@ -311,10 +309,46 @@ function roof(b: Builder, rand: Rand): void {
       b.uv[i + 1] *= lenV;
     }
   };
+  // ridge and hip tiles: a low rounded cap along the ridge and each hip, bent with the roof
+  const capFace = (from: Vector3, to: Vector3): void => {
+    const len = from.distanceTo(to);
+    const along = new Vector3().subVectors(to, from).normalize();
+    const side = new Vector3().crossVectors(along, new Vector3(0, 1, 0)).normalize();
+    const up = new Vector3().crossVectors(side, along);
+    const width = 0.075;
+    const lift = 0.075;
+    for (const s of [-1, 1]) {
+      const start = b.uv.length;
+      // one slope of the cap: from its foot on the roof (v = 0) to its crown (v = 1)
+      const at = (u: number, v: number, out: Vector3): Vector3 => {
+        const base = bend(tmpA.lerpVectors(from, to, Math.min(Math.max(u / len, 0), 1)));
+        const a = (1 - v) * (Math.PI / 2);
+        return out.copy(base).addScaledVector(side, s * width * Math.sin(a)).addScaledVector(up, lift * (0.35 + 0.65 * Math.cos(a)));
+      };
+      const va = up.clone().addScaledVector(side, -s).normalize();
+      const ua = s > 0 ? along.clone() : along.clone().negate();
+      b.face(
+        ua,
+        va,
+        len,
+        1,
+        (u, v, out) => at(s > 0 ? u : len - u, v, out),
+        () => [0.5, 1, 3, 0],
+        Array.from({ length: Math.ceil(len / 0.2) }, (_, k) => (k + 1) * 0.2),
+        [0.5],
+      );
+      if (s < 0) for (let i = start; i < b.uv.length; i += 2) b.uv[i] = len - b.uv[i];
+    }
+  };
   slopeFace(A, B, Q, P, 2 * ex, slope);
   slopeFace(C, D, P, Q, 2 * ex, slope);
   slopeFace(B, C, P, P, 2 * ez, hip);
   slopeFace(D, A, Q, Q, 2 * ez, hip);
+  capFace(Q, P);
+  capFace(A, Q);
+  capFace(D, Q);
+  capFace(B, P);
+  capFace(C, P);
   // the roof's thickness at the eaves: a band all round, under the slates' edge
   const band = 0.09;
   for (const [a, bb, len] of [
@@ -333,27 +367,27 @@ function roof(b: Builder, rand: Rand): void {
         const y = bend(tmpA.lerpVectors(a, bb, s)).y;
         return out.copy(tmpA).setY(y - band + t);
       },
-      () => [0, 9, 3, 0],
+      () => [0, 5, 3, 0],
       Array.from({ length: 14 }, (_, k) => (k + 1) / 15),
     );
     for (let i = start; i < b.uv.length; i += 2) b.uv[i] *= len;
   }
 }
 
-/** The landing, its steps and the doorstep: stone all over, painted per face. */
+/** The landing, its steps and the doorstep: plastered stone, painted per face. */
 function landing(b: Builder, rand: Rand): void {
   const L = LANDING;
   const top = L.top - 0.02;
-  b.box(new Vector3((L.x0 + L.x1) / 2, (L.base + top) / 2, (L.z0 + L.z1) / 2), new Vector3((L.x1 - L.x0) / 2, (top - L.base) / 2, (L.z1 - L.z0) / 2), null, L.top, 0, 'xXYZ');
+  b.box(new Vector3((L.x0 + L.x1) / 2, (L.base + top) / 2, (L.z0 + L.z1) / 2), new Vector3((L.x1 - L.x0) / 2, (top - L.base) / 2, (L.z1 - L.z0) / 2), null, L.top, 0.5, 'xXYZ');
   for (let k = 0; k < 3; k++) {
-    b.box(new Vector3(L.x1 - 0.55, L.top - 0.2 * (k + 1) - 0.04, L.z1 + 0.16 + 0.3 * k), new Vector3(0.46, 0.1, 0.17), new Matrix4().makeRotationY(rand.range(-0.04, 0.04)), L.top - 0.6, 0, 'xXYZz');
+    b.box(new Vector3(L.x1 - 0.55, L.top - 0.2 * (k + 1) - 0.04, L.z1 + 0.16 + 0.3 * k), new Vector3(0.46, 0.1, 0.17), new Matrix4().makeRotationY(rand.range(-0.04, 0.04)), L.top - 0.6, 0.5, 'xXYZz');
   }
-  b.box(new Vector3(-0.6, 0.04, COTTAGE.halfZ + 0.4), new Vector3(0.58, 0.07, 0.22), null, 0, 0, 'xXYZz');
+  b.box(new Vector3(-0.6, 0.04, COTTAGE.halfZ + 0.4), new Vector3(0.58, 0.07, 0.22), null, 0, 0.5, 'xXYZz');
 }
 
-/** Wood (door, window frames, bench, eave boards), glass and iron, from boxes. */
-function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[]): void {
-  const { thickness, overhang, halfX, halfZ, wall } = COTTAGE;
+/** Wood (the door, the bench, eave boards), window frames, glass and iron, from boxes. */
+function fittings(wood: Builder, frame: Builder, glass: Builder, iron: Builder, faces: WallFace[]): void {
+  const { thickness, halfZ } = COTTAGE;
   const L = LANDING;
   for (const f of faces) {
     const inward = f.out.clone().negate();
@@ -364,27 +398,29 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
       const h = o.top - o.bottom;
       const mid = (o.from + o.to) / 2;
       if (o.door) {
-        wood.box(along(mid, o.bottom + h / 2, thickness * 0.55), new Vector3(w / 2, h / 2, 0.03), turn, 0);
+        // planks set back in the wall, two iron straps across them
+        const depth = thickness * 0.55;
+        wood.box(along(mid, o.bottom + h / 2, depth), new Vector3(w / 2, h / 2, 0.03), turn, 0);
+        for (const y of [0.3, 1.42]) iron.box(along(mid - 0.06, o.bottom + y, depth - 0.035), new Vector3(w * 0.36, 0.022, 0.008), turn, 0);
         continue;
       }
-      // frame, a cross of glazing bars, the glass set back
+      // a frame, glazing bars in a grid of small panes, the glass set back
       const fy = o.bottom + h / 2;
-      wood.box(along(mid, o.bottom + 0.035, 0.1), new Vector3(w / 2, 0.035, 0.05), turn, 0);
-      wood.box(along(mid, o.top - 0.035, 0.1), new Vector3(w / 2, 0.035, 0.05), turn, 0);
-      wood.box(along(o.from + 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, 0);
-      wood.box(along(o.to - 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, 0);
-      wood.box(along(mid, fy, 0.11), new Vector3(0.02, h / 2, 0.03), turn, 0);
-      wood.box(along(mid, fy, 0.11), new Vector3(w / 2, 0.02, 0.03), turn, 0);
-      glass.box(along(mid, fy, 0.14), new Vector3(w / 2, h / 2, 0.01), turn, 0);
+      frame.box(along(mid, o.bottom + 0.03, 0.1), new Vector3(w / 2, 0.03, 0.05), turn, 0);
+      frame.box(along(mid, o.top - 0.03, 0.1), new Vector3(w / 2, 0.03, 0.05), turn, 0);
+      frame.box(along(o.from + 0.03, fy, 0.1), new Vector3(0.03, h / 2, 0.05), turn, 0);
+      frame.box(along(o.to - 0.03, fy, 0.1), new Vector3(0.03, h / 2, 0.05), turn, 0);
+      const cols = w > 0.6 ? 3 : 2;
+      const rows = h > 0.6 ? 3 : 2;
+      for (let k = 1; k < cols; k++) frame.box(along(o.from + (w * k) / cols, fy, 0.11), new Vector3(0.012, h / 2, 0.02), turn, 0);
+      for (let k = 1; k < rows; k++) frame.box(along(mid, o.bottom + (h * k) / rows, 0.11), new Vector3(w / 2, 0.012, 0.02), turn, 0);
+      glass.box(along(mid, fy, 0.13), new Vector3(w / 2, h / 2, 0.01), turn, 0);
     }
   }
-  // bench by the door, and boards under the eaves of the long sides
+  // a bench by the door
   wood.box(new Vector3(1.15, 0.47, halfZ + 0.36), new Vector3(0.65, 0.035, 0.2), null, 0);
   wood.box(new Vector3(0.6, 0.22, halfZ + 0.36), new Vector3(0.05, 0.22, 0.17), null, 0);
   wood.box(new Vector3(1.7, 0.22, halfZ + 0.36), new Vector3(0.05, 0.22, 0.17), null, 0);
-  for (const z of [halfZ + overhang - 0.05, -halfZ - overhang + 0.05]) {
-    wood.box(new Vector3(0, wall - 0.12, z), new Vector3(halfX + overhang - 0.04, 0.05, 0.03), null, 0);
-  }
   // the rail along the landing's open side
   for (const z of [2.4, 3.6, 4.8]) iron.box(new Vector3(L.x0 + 0.12, L.top + 0.45, z), new Vector3(0.022, 0.45, 0.022), null, 0);
   iron.box(new Vector3(L.x0 + 0.12, L.top + 0.9, 3.6), new Vector3(0.02, 0.022, 1.25), null, 0);
@@ -402,23 +438,25 @@ export class Homestead {
     const rand = new Rand(seed ^ 0xc0ffee);
     const wallB = new Builder();
     const faces = walls(wallB, rand);
-    // the chimney, through the back slope, leaning a touch
+    // a small plastered chimney through the back slope by the ridge's end, leaning a touch, with a cap
     const lean = new Matrix4().makeRotationZ(rand.range(-0.03, -0.012)).multiply(new Matrix4().makeRotationX(rand.range(-0.015, 0.015)));
-    wallB.box(new Vector3(1.33, 3.72, -0.95), new Vector3(0.33, 1.25, 0.31), lean, 2.3, 0, 'xXYzZ');
-    wallB.box(new Vector3(1.33, 4.98, -0.95).sub(new Vector3(0.03, 0, 0)), new Vector3(0.39, 0.06, 0.37), lean, 2.3, 0);
+    wallB.box(new Vector3(0.62, 4.12, -0.48), new Vector3(0.2, 0.62, 0.18), lean, 4.3, 0.15, 'xXYzZ');
+    wallB.box(new Vector3(0.6, 4.76, -0.48), new Vector3(0.25, 0.045, 0.23), lean, 4.3, 0);
     const roofB = new Builder();
     roof(roofB, rand);
     const stoneB = new Builder();
     landing(stoneB, rand);
     const woodB = new Builder();
+    const frameB = new Builder();
     const glassB = new Builder();
     const ironB = new Builder();
-    fittings(woodB, glassB, ironB, faces);
+    fittings(woodB, frameB, glassB, ironB, faces);
     for (const [builder, kind] of [
       [wallB, 'wall'],
       [roofB, 'roof'],
       [stoneB, 'landing'],
       [woodB, 'wood'],
+      [frameB, 'frame'],
       [glassB, 'glass'],
       [ironB, 'iron'],
     ] as const) {

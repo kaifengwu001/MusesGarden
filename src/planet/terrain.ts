@@ -249,13 +249,17 @@ export class Terrain {
     return this.fields.lift + 4 * this.fields.reliefStd + BANK.height + 0.5;
   }
 
-  /** No grass, flowers or stones: right around the house and on the landing. */
+  /** No grass or flowers: under the house and the landing; the meadow grows right up to their walls. */
   clearingAt(dir: Vector3, dc: number): number {
-    const disc = smoothstep(3.6, 2.9, dc);
-    if (dc > 9) return disc;
+    if (dc > 9) return 0;
     const c = this.cottageLocal(dir, localTmp);
-    const rect = smoothstep(0.35, 0, Math.max(-2.6 - c.x, c.x - 1.3, -0.2 - c.z, c.z - 5.9));
-    return Math.max(disc, rect);
+    // the house's footprint (its walls' outer faces are at x ±2.68, z ±2.18)
+    const dx = Math.abs(c.x) - 2.78;
+    const dz = Math.abs(c.z) - 2.28;
+    const box = Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dz), 0);
+    const house = smoothstep(0.3, 0, box);
+    const landing = smoothstep(0.25, 0, Math.max(-2.4 - c.x, c.x - 1.1, -0.2 - c.z, c.z - 5.9));
+    return Math.max(house, landing);
   }
 
   /** Uniform values for terrain.glsl (shared by every material that samples the ground). */
