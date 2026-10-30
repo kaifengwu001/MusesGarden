@@ -14,13 +14,12 @@
 #define ROW_ROOF 11
 #define ROW_LIGHT 12
 #define ROW_BUD 13
-#define ROW_WING 14
 
 uniform sampler2D uPalette;
 uniform vec3 uSunDir;    // toward the sun, planet space
 uniform vec3 uSunTint;   // sun colour relative to noon (1 at noon)
 uniform vec3 uShadeTint; // sky-light colour relative to noon
-uniform vec4 uToon;      // bands, band softness, rim strength, hill shading (how much the ground's slope lightens and darkens it)
+uniform vec4 uToon;      // bands, band softness, rim strength, -
 
 vec3 pal(int row, int col) {
   return texelFetch(uPalette, ivec2(col, row), 0).rgb;

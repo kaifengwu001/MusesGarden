@@ -59,10 +59,8 @@ test.describe('CPU and GPU agree', () => {
     // m: the GPU reads the meadow from a half-float cube bake (texels ~0.5 m at
     // R 128, bilinear) where the CPU evaluates the noise exactly
     expect(p?.heightError).toBeLessThan(0.02);
-    // m, near shores: distance to the shore is height over slope on both sides,
-    // so the bake's height error is divided by gentle slopes; it scales with the
-    // hills' height (0.11 m at iteration 4's hills, 0.15 m at the 30 % taller ones)
-    expect(p?.waterError).toBeLessThan(0.16);
+    // m, near shores: distance to the shore is height over slope on both sides
+    expect(p?.waterError).toBeLessThan(0.12);
     expect(p?.warpError).toBeLessThan(0.005); // m
   });
 

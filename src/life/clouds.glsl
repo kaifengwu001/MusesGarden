@@ -25,12 +25,10 @@ uniform highp sampler2D uCloudData;
 uniform sampler2D uCloudShadowMap;
 uniform vec4 uCloudSunA;  // sun-space axis A (xyz), 1 / half-extent of the shadow map (1/m)
 uniform vec4 uCloudSunB;  // sun-space axis B (xyz), -
-uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds in sight (drawn first), all clouds (they all cast shadows)
+uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, -
 uniform vec3 uCloudEye;   // the camera (not the mirrored one): clouds dissolve around it
 uniform sampler2D uCloudMirror; // the clouds seen from the camera mirrored in the water, premultiplied
 uniform mat4 uCloudMirrorVP;    // that camera's view-projection
-uniform samplerCube uCloudRadial; // the clouds' optical depth seen from the planet's centre
-uniform vec4 uCloudOrbit;       // 0 down in the meadow (mirror pass) … 1 in orbit (radial map), the clouds' middle height (m), -, -
 #include <meadow_cloud_lumps>
 
 // One cloud's frame in view space: bounding sphere, base plane (point, normal).
@@ -252,35 +250,12 @@ vec4 cloudsInMirror(vec3 wp, vec3 r, vec3 r0, vec2 screen) {
   return textureLod(uCloudMirror, uv, 0.0);
 }
 
-// Toward the sun (the shadow map's axes are A = sun × ref, B = sun × A).
-vec3 cloudSun() {
-  return cross(uCloudSunA.xyz, uCloudSunB.xyz);
-}
-
-// The clouds a lake mirrors, seen from orbit (premultiplied colour and
-// coverage): where the mirrored ray r from the water at wp (view space)
-// reaches the height of the clouds' middles, the radial map gives the cloud
-// cover there. The lit side of a heap is what the lake shows, a little
-// softened by the ripples. n: the water's level normal.
-vec4 cloudsFromOrbit(vec3 wp, vec3 r, vec3 n) {
-  float rise = max(dot(r, n), 0.08);
-  vec3 q = unwarpPosition(wp + r * (uCloudOrbit.y / rise));
-  float tau = textureLod(uCloudRadial, normalize(q), 0.0).r;
-  float a = smoothstep(0.12, 0.6, 1.0 - exp(-tau * uCloudLook.y));
-  vec3 col = mix(pal(ROW_CLOUD, 2), pal(ROW_CLOUD, 0), 0.6);
-  return vec4(col * a, a);
-}
-
 // 0..1 cloud shadow at a point (planet space, m): the optical depth toward
 // the sun from the shadow map. edge: noise in [-1, 1] that roughens the
 // outline (the paint passes its brushstrokes, so shadow edges look brushed).
-// The map has no depth: only clouds on the sunlit half of the planet are in
-// it (cloudShadow.vert.glsl), and only the sunlit half reads it. Any cloud
-// that can shade a sunlit point is itself sunlit; on the night side the
-// planet's own shadow is all there is.
 float cloudShadowAt(vec3 p, float edge) {
   vec2 uv = vec2(dot(p, uCloudSunA.xyz), dot(p, uCloudSunB.xyz)) * uCloudSunA.w * 0.5 + 0.5;
   float tau = textureLod(uCloudShadowMap, uv, 0.0).r;
   float s = 1.0 - exp(-tau * uCloudLook.y * (1.0 + 0.45 * edge));
-  return smoothstep(0.1, 0.5, s) * uCloudLook.x * smoothstep(-0.03, 0.03, dot(normalize(p), cloudSun()));
+  return smoothstep(0.1, 0.5, s) * uCloudLook.x;
 }

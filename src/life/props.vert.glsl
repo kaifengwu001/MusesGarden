@@ -2,8 +2,7 @@
 #include <meadow_common>
 #include <meadow_warp>
 
-attribute vec4 aPaint; // edge distance (m), corner distance (m; on the roof, which part), height above the ground (m), stones 0..1
-attribute float aKind; // the material (props.frag.glsl)
+attribute vec4 aPaint; // edge distance (m), corner distance (m), height above the ground (m), ivy 0..1
 
 varying vec3 vNormal;      // warped world
 varying vec3 vWorld;
@@ -11,7 +10,6 @@ varying vec2 vUv;          // meters on the face
 varying vec3 vLocal;       // the homestead's frame (m)
 varying vec3 vLocalNormal;
 varying vec4 vPaint;
-flat varying int vKind;
 varying vec3 vPlanet;     // planet space, unwarped (for the clouds' shadows)
 
 void main() {
@@ -24,7 +22,6 @@ void main() {
   vLocal = position;
   vLocalNormal = normal;
   vPaint = aPaint;
-  vKind = int(aKind + 0.5);
   vPlanet = world.xyz;
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }

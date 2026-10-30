@@ -6,7 +6,6 @@ import type { Tier } from './core/quality';
 import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
-import { Butterflies } from './life/butterflies';
 import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
@@ -77,7 +76,6 @@ export class World {
   homestead: Homestead;
   readonly clouds: Clouds;
   readonly birds: Birds;
-  readonly butterflies: Butterflies;
   readonly petals: Petals;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
@@ -146,9 +144,8 @@ export class World {
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 2048 : 1024);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
-    this.butterflies = new Butterflies(this.shared);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -355,9 +352,8 @@ export class World {
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
-    this.birds.update(clock.time, this.terrain);
-    // the lakes mirror the clouds by a mirror pass down in the meadow and a radial map from orbit
-    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, 1 - smoothstep(0.2, 0.34, rig.zoom));
+    this.birds.update(clock.time, this.terrain, rig.up, rig.forward);
+    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -423,8 +419,6 @@ export class World {
     );
     this.surface.uniforms.uNearField.value.set(rig.up.x, rig.up.y, rig.up.z, Math.max(flowerNear, 0.001));
     this.petals.update(grassNear);
-    // butterflies once you are down among the flowers
-    this.butterflies.update(rig.focus, smoothstep(14, 6, rig.altitude));
     if (this.growingBloom >= 0) {
       const disc = this.userBlooms[this.growingBloom];
       disc.w = Math.min(disc.w + (clock.realDt * 1.6) / R, 0.6);
@@ -461,8 +455,7 @@ export class World {
   private updateLook(clock: FrameClock): void {
     const p = this.store.values;
     const L = this.look;
-    // hill shading: gentle at eye level, strong from orbit
-    L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 1.2 + 4 * (1 - smoothstep(0.15, 0.6, this.rig.zoom)));
+    L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 0);
     // haze thickens as you come down into the meadow, so the far meadow pales like a painted distance
     L.uFog.value.set(p.style.fogDensity * 0.0028 * (1 + 10 * this.rig.tilt), 0.06 + 0.34 * p.style.fogDensity, this.rig.altitude * 0.95, 0.8);
     L.uFogUp.value.copy(this.rig.up);

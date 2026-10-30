@@ -22,7 +22,6 @@ export const ROW = {
   ROOF: 11,
   LIGHT: 12,
   BUD: 13,
-  WING: 14,
 } as const;
 
 type Rows = Partial<Record<number, readonly string[]>>;
@@ -50,17 +49,14 @@ const NOON: Rows = {
   [ROW.ROCK]: ['#6F7C8E', '#4E5D78', '#8F99AA', '#77739D'],
   // snow, blue-lilac shade, mid, highlight
   [ROW.SNOW]: ['#F1F3F7', '#C4C8E4', '#DCE1EF', '#FFFFFF'],
-  // limewash light, limewash, the eaves' shadow, stone, stone dark, mortar, damp, ochre stain, plaster top, quoin, rain streak, brick, brick dark
-  [ROW.STONE]: ['#F3E3AE', '#E0C98F', '#A7A0AE', '#D9C690', '#B7A276', '#9C8F72', '#A3A57E', '#D3A35C', '#E9E1CC', '#E8D7A8', '#B9AE99', '#B8704E', '#8F5238', '#E9C6A6'],
-  // tile, tile shade, wood, wood shade, iron, tile light, moss, moss shade, lichen, ridge tile, moss bright, tile gap, window frame, glass sky, glass meadow
-  [ROW.ROOF]: ['#7E6F57', '#4A4136', '#B0743F', '#74472A', '#3E3A36', '#A0927A', '#A9B35A', '#6E7A42', '#D9D2A6', '#9A8E74', '#D0D070', '#2F2922', '#46433F', '#E3EEE8', '#B5D08A'],
+  // limewash light, limewash, -, stone, stone dark, mortar, damp, ochre stain, flagstone, quoin
+  [ROW.STONE]: ['#F3E9D2', '#E4D7BA', '#ABA7B8', '#CDBC98', '#A69676', '#8F8674', '#9DA48C', '#D9C08E', '#D5C8AA', '#E2D5B8'],
+  // roof, roof shade, wood, wood shade, iron, roof light, moss, moss shade, lichen, ivy, ivy light, ivy dark
+  [ROW.ROOF]: ['#6E655A', '#4D463D', '#7D6248', '#57402B', '#3E3A36', '#8A8172', '#8C985A', '#667345', '#AAA88C', '#4D7A35', '#7AA24C', '#2E5128'],
   // sun light, sky ambient, ground bounce, rim, shadow tint
   [ROW.LIGHT]: ['#FFF3DE', '#BFD8F0', '#A7C27B', '#FFF5DA', '#7E92B8'],
   // buds and pale meadow ahead of the bloom: bud green, bud tip, dry grass
   [ROW.BUD]: ['#748C47', '#A0945C', '#8D915C'],
-  // butterfly wings, a ground colour and its mark each: white (dark tips), sulphur (orange dot),
-  // fritillary (dark spots), blue (white fringe), red admiral-ish (cream bar), orange tip (orange tips); body
-  [ROW.WING]: ['#F7F4EA', '#3B3A3C', '#F3E07A', '#E98A2E', '#E8893A', '#5B3720', '#86A9EC', '#F6F4EE', '#B4452E', '#F4E3B4', '#F6F2E6', '#F09A3A', '#3A332C'],
 };
 
 const DAWN: Rows = {

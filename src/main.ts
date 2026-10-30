@@ -19,7 +19,6 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from './view/input';
-import { KeyMovement } from './view/keys';
 import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
@@ -46,9 +45,6 @@ function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
 
 /** Budget for background work (tile builds) per frame, ms. */
 const BUILD_BUDGET_MS = 2;
-/** The frame's whole JS budget (ms), and what render submission takes of it (about). */
-const JS_BUDGET_MS = 4;
-const RENDER_MS = 0.6;
 
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -96,8 +92,6 @@ async function boot(): Promise<void> {
   ui.setHints([
     ['drag', 'orbit · glide'],
     ['scroll', 'down to the meadow'],
-    ['W A S D', 'move'],
-    ['Q / E', 'up · down'],
     ['click', 'gust · ripple'],
     ['double-click', 'glide there'],
     ['hold', 'bloom'],
@@ -135,7 +129,6 @@ async function boot(): Promise<void> {
     },
   });
 
-  const keys = new KeyMovement(window);
   attachInput(canvas, {
     drag: (dx, dy) => {
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
@@ -202,7 +195,6 @@ async function boot(): Promise<void> {
   });
 
   const update = (): void => {
-    if (keys.apply(world.rig, clock.realDt)) userPosed = true;
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), bufferSize.y);
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
@@ -269,8 +261,7 @@ async function boot(): Promise<void> {
     gpuTimer.begin();
     controls.tick(clock.realDt);
     update();
-    // background building gets what the frame's JS budget has left, between 1 and 2 ms
-    world.queue.run(Math.min(Math.max(JS_BUDGET_MS - RENDER_MS - (performance.now() - t0), 1), BUILD_BUDGET_MS));
+    world.queue.run(BUILD_BUDGET_MS);
     render();
     gpuTimer.end();
     gpuTimer.poll();

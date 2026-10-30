@@ -77,18 +77,12 @@ float bankedAt(float h, float shore, float dist) {
   return h + uBank.x * tanh(shore / max(uBank.y * 1.6, 0.035 * dist));
 }
 
-float boxDistance(vec2 p, vec2 halfSize) {
-  vec2 d = abs(p) - halfSize;
-  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
-}
-
-// No grass or flowers under the house and the landing (mirrors Terrain.clearingAt).
 float clearingAt(vec3 dir, float dc) {
-  if (dc > 9.0) return 0.0;
+  float disc = smoothstep(3.6, 2.9, dc);
+  if (dc > 9.0) return disc;
   vec2 c = cottageLocal(dir);
-  float house = smoothstep(0.3, 0.0, boxDistance(c, vec2(2.78, 2.28)));
-  float landing = smoothstep(0.25, 0.0, max(max(-2.4 - c.x, c.x - 1.1), max(-0.2 - c.y, c.y - 5.9)));
-  return max(house, landing);
+  float rect = smoothstep(0.35, 0.0, max(max(-2.6 - c.x, c.x - 1.3), max(-0.2 - c.y, c.y - 5.9)));
+  return max(disc, rect);
 }
 
 void gradientFrame(vec3 dir, out vec3 a, out vec3 b) {
@@ -113,6 +107,11 @@ Ground sampleGround(vec3 dir) {
   g.depth = max(-hb, 0.0);
   g.clearing = clearingAt(dir, chordAngle(dir, uCottage.xyz) * uRadius);
   return g;
+}
+
+float boxDistance(vec2 p, vec2 halfSize) {
+  vec2 d = abs(p) - halfSize;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
 }
 
 // Soft shadow of the cottage on the ground: the footprint swept toward the sun.

@@ -81,13 +81,8 @@ void main() {
     m.pixelMeters = pixelMeters;
     m.nearFade = nearFade;
     land = meadowPaint(m);
-    // hills: a soft light and shade across the bands, by how a slope turns to
-    // the sun (a meter or two of hill on a planet of hundreds would otherwise
-    // vanish from orbit, so it grows as you rise)
-    vec3 level = warpNormal(dir * (uRadius + h), dir);
-    land *= 1.0 + clamp(dot(n - level, uSunDir) * uToon.w, -0.32, 0.22);
     // the bank's face: where the turf drops to the water it is steep, and in its own shade
-    float steep = 1.0 - dot(n, level);
+    float steep = 1.0 - dot(n, warpNormal(dir * (uRadius + h), dir));
     land = mix(land, tone3(pal(ROW_GRASS, 2), pal(ROW_GRASS, 5), pal(ROW_WATER, 8), b * 0.7), smoothstep(0.06, 0.3, steep + 0.06 * stroke) * smoothstep(1.2, 0.2, shore) * 0.75);
     land *= cloudTint(cloud);
   }

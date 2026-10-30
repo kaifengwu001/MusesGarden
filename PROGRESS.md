@@ -2,117 +2,7 @@
 
 The plan and the growth model are in [ARCHITECTURE.md](ARCHITECTURE.md). This
 file tracks what is done, what is known to be wrong or missing, and what comes
-next. Each iteration has its own page for comparison (see Versions).
-
-## Versions
-
-| Iteration | Page | Commit |
-|---|---|---|
-| 5 | https://garden-of-muse-iteration-5.vercel.app | 6ddf1d6 |
-| 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
-
-The latest is also at https://the-meadow-omega.vercel.app. Each iteration is
-its own Vercel project, so its production address is public and stays put.
-`scripts/publish.sh N --latest` publishes the checkout as iteration N and as
-the latest; `scripts/publish.sh N <commit>` publishes an older commit.
-
-## Iteration 5: the review notes
-
-| # | Note | What changed |
-|---|---|---|
-| 1 | Some cloud shadows move the wrong way when the globe spins | The shadow map has no depth: clouds on the night side shaded the sunlit ground on the far side of the planet, and those phantom shadows slid against the turn. Only clouds on the sunlit half go into the map now, and only the sunlit half reads it. Clouds hidden from the camera (behind the planet or a hill) are still not drawn, but they now cast their shadows. |
-| 2 | Some birds stay in place while the globe rotates | One flock was tied to the view (to keep birds in sight) and so stood still on screen. Gone: every bird now belongs to the planet. |
-| 3 | Hills present from orbit? 30 % more pronounced | Rolling hills 1.25 → 1.63 m, hummocks 0.8 → 1.04 m. A couple of meters on a 128 m planet barely moved the toon bands, so the ground now also takes a soft light and shade by how its slope faces the sun: gentle at eye level, strong from orbit, where the hills now read. |
-| 4 | No cloud reflections from orbit: a performance choice? | It was (the mirror pass treats the lakes as one plane under you, which cannot work for a hemisphere). Now the clouds are also splatted into a small cube map seen from the planet's centre, and from orbit each lake looks up the cloud cover where its mirrored ray meets the clouds. The two cross-fade on the way down. About 0.1 ms. |
-| 5 | Wind sheen on the grass can be more pronounced | Sheen 0.65 → 0.9 by default, broader gust bands, brighter crests and deeper troughs in the paint and on the blades. |
-| 6 | Birds feel like butterflies: speed and paths | Most flocks now travel: each follows a great circle round the planet at 7.5–10 m/s, the circle slowly swinging so its route meanders over the whole meadow (one runs over the cottage); one flock circles the cottage's pond in a wide, lazy loop. Loose V and cluster formations, steady wingbeats with the odd glide, banking from the path's real turn rate, lifting over the cottage, level flight a few meters up. |
-| 7 | Butterflies of various colours when zoomed in close | Six kinds (whites with dark tips, sulphurs, fritillaries, blues, a red-and-cream admiral, orange tips), about 18 cm across, over the flowers wherever the meadow is in bloom, once you are below about 14 m. They wander and bob, and now and then settle on a flower with their wings fanning. |
-| 8 | The cottage: no vines; match the detail and the strokes of the reference | Compared side by side with your reference at its two angles. Lower walls and a taller roof with wider eaves; brown-grey tiles in courses, each lit along its foot and dark under the next, with moss in patches and lighter ridge and hip tiles; butter-cream walls laid on in brush strokes, mottled ochre, pink and grey, rain streaks under the eaves, damp at the foot, a darker stroke down each corner and a cool shadow band under the eaves; small-paned windows that mirror the meadow; a warm plank door with iron straps; a small plastered chimney; the landing plastered like the walls with a brick arch. No ivy. The meadow grows right up to the walls. |
-| 9 | Navigation in Wander: turning and moving feel backwards | Dragging sideways in Wander now turns the other way (you hold the scene: drag right, look left), and dragging toward you glides forward 70 % faster. New keys: W A S D walk (about 6.7 m/s in the meadow, faster higher up), Q rises and E descends as the wheel does. |
-| 10 | A new page for each iteration, keeping the old ones | Iteration 4 kept at its own address, iteration 5 at another (Versions, above). |
-| 11 | The headline should say Garden of Muse | The headline, the browser tab, the postcard and the fallback screen. |
-
-Checkpoint images: [docs/checkpoints/iteration-5](docs/checkpoints/iteration-5/).
-
-### How it is built (summary)
-
-- **Cloud shadows:** the puffs of every cloud on the sunlit half (in sight
-  or not) are splatted into the sun-space map; the night side is skipped on
-  both sides, since nothing there can shade a sunlit point.
-- **Reflections from orbit:** a 256² cube map of the puffs' optical depth
-  seen from the planet's centre (R16F, 0.8 MB), drawn only while it shows.
-- **Birds:** closed-form in time and tied to the planet; flight heights are
-  set above the water table, clear of the hills (which grow as R^0.4), so no
-  terrain is sampled per frame.
-- **Butterflies:** a block of 3 m cells about the focus, drawn as instances;
-  each cell's candidate is kept with a chance that follows the flowers and
-  the bloom, and its whole flight is worked out in the vertex shader.
-- **The cottage:** one mesh and one draw call (each vertex carries its
-  material); painted in the shader with stroke noise stepped into tones.
-- **Frame budget:** the build queue now gets what is left of the frame's 4 ms
-  of JS (1–2 ms) and never starts a step that would overrun it.
-
-### Squint test (the vista against the still, mean ΔE76 per cell)
-
-| | Overall | Far meadow and clouds | Lake and islands | Near meadow |
-|---|---|---|---|---|
-| Iteration 3 | 24.5 | 15.5 | 34.2 | 23.8 |
-| Iteration 4 | 22.3 | 16.0 | 23.6 | 27.2 |
-| Iteration 5 | 23.4 | 15.6 | 24.4 | 30.3 |
-
-A little worse: the taller hills moved the vista to another pond, with plain
-grass in front. The composition was not worked on this round.
-
-## Measured (iteration 5)
-
-Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
-waiting for the GPU; runs vary by about ±1 ms. Iteration 4 in brackets.
-
-| Viewport | ms / frame | Draw calls |
-|---|---|---|
-| 1440×900 at DPR 2, Overview | 7.2 (8.0) | 13 |
-| 1440×900 at DPR 2, Wander, R 128 m | 8.0 (8.7) | 20 (24) |
-| 1440×900 at DPR 2, Wander, R 400 m | 6.6 (6.7) | 20 |
-| 1440×900 at DPR 2, Vista | 15.7 (16.1) | 20 |
-| 1440×900 at DPR 2, lakes view | 16.2 (16.1) | 20 |
-| 1440×900 at DPR 2, cottage view | 17.1 (16.5) | 20 |
-| 390×844 @1.5 (phone, low tier), Overview | 2.0 (2.0) | 6 |
-| 390×844 @1.5 (phone, low tier), Wander | 2.2 (2.2) | 13 |
-| 390×844 @1.5 (phone, low tier), Vista | 3.6 (4.2) | 13 |
-
-- **JS while scrubbing growth:** p95 3.5–3.6 ms (4.1–4.2 before the fixes),
-  build slices ≤ 2.0 ms.
-- **GPU memory:** 150 MB on high at 2560×1440 (151 before); 46 MB on a phone.
-- **Vista search:** about 1 s the first time on a world, 0.5 s after.
-
-## Trades (quality for performance)
-
-- **Reflections from orbit** show the clouds' cover, lit and softened, not
-  their sculpted lobes; the mirror pass takes over below about zoom 0.3.
-- **Shadows** are cast only by clouds on the sunlit half (exact: nothing on
-  the night side can shade a sunlit point).
-- **Birds** fly level over the water table rather than following the
-  ground's rise and fall.
-- **Butterflies** live within about 20 m of you and fade at that edge.
-- Carried over from iteration 4: cloud reflections from a third-resolution
-  mirror pass; self-shadowing per puff; lumps from a small cube map; bird
-  shadows as soft discs; the 13-step bank march.
-
-## Known issues
-
-- **Composition:** squint 23.4 against a goal of 14 (the vista's foreground
-  is often plain grass).
-- **Mirror approximations** (as in iteration 4).
-- **The vista** still flattens the world on the way down, then rolls it up
-  again at eye level.
-- **Keys** follow the wheel's convention (Q rises, E descends); they do
-  nothing while a text field has focus.
-
-## Next
-
-1. Composition: a vista with flowers in front and its cloud upper right.
-2. Butterflies that rise from the flowers as you walk through them.
-3. Then dawn and golden hour, graded the same way.
+next.
 
 ## Iteration 4: the six review notes
 
@@ -167,7 +57,7 @@ still's is thick with mixed flowers. The vista search now treats clouds as a
 bonus rather than a penalty (there are many more of them) and refines 28
 stands instead of 16.
 
-### Measured (iteration 4)
+## Measured (iteration 4)
 
 Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
 waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
@@ -196,7 +86,7 @@ waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
   twirls make each field sample dearer, and more stands are refined); 0.5 s
   after.
 
-### Trades (iteration 4)
+## Trades (quality for performance)
 
 - **Cloud reflections** come from a third-resolution render from the
   mirrored camera, treating the lakes as one level plane under the focus:
@@ -217,7 +107,7 @@ waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
 - Carried over: the 13-step bank march; quick bake while growing; 256² field
   maps; MSAA only below DPR 1.75; grass 180 blades/m² within 22 m.
 
-### Known issues (iteration 4)
+## Known issues
 
 - **Composition:** the vista finds water across the middle, but its
   foreground is often plain grass, and its cloud seldom sits where the
@@ -237,7 +127,7 @@ waiting for the GPU; runs vary by about ±1 ms. Iteration 3 in brackets
 - **Carried over:** the warp's flat band on the way down; triangle figure,
   pools after a scrub, tier probe, LOD-ring test.
 
-### Next (iteration 4)
+## Next
 
 1. Composition: a vista whose foreground is thick with flowers and whose cloud
    sits upper right (or a few vistas to choose from).
@@ -475,7 +365,7 @@ render scale to roughly 0.75. iPhones are not available here.
 
 ## Interactions (all wired and testable)
 
-1. Drag orbits (Overview) or glides and turns (Wander: drag right to look left, drag down to glide forward); wheel or pinch dollies between them. Double-click glides to the point. W A S D walk; Q rises and E descends.
+1. Drag orbits (Overview) or glides and turns (Wander); wheel or pinch dollies between them. Double-click glides to the point.
 2. Grow: slider plus a play button that runs growth to the far end in about 8 s, or back.
 3. Bloom: slider plus a play button for the bloom front.
 4. Click on the meadow: a gust ring bursts outward; grass and flowers bend and recover.

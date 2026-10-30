@@ -1,4 +1,4 @@
-# Garden of Muse: architecture and growth model
+# The Meadow: architecture and growth model
 
 This is my restatement of the brief, plus the engineering decisions that make it
 hold together. The code follows this file. When a stage changes a decision, this
@@ -308,22 +308,15 @@ click is what you see.
   transitions, a warm sun, a cool sky ambient from above, and a sun-side rim on
   grass and flower heads.
 - **No outlines:** everything keeps soft, painted edges, the cottage too.
-- **The cottage** is painted in the shader, never textured, in brush strokes
-  (noise stretched along a stroke direction and stepped into a few tones):
-  butter-cream plaster mottled ochre, pink and grey, rain streaks under the
-  eaves, damp at the foot, a darker stroke down each corner, the stones only
-  hinted near the corners and openings (each face vertex carries its
-  distance to the nearest edge and corner), a cool shadow band under the
-  eaves; a hipped roof bent out of true (sagging ridge, a drooping eave,
-  dipping slopes) of tiles in courses, each lit along its foot and dark under
-  the next, mossy in patches, with ridge and hip tiles; small-paned windows
-  that mirror the meadow; a plastered landing with a brick arch at the
-  waterline. Soft light (warm sun, cool lavender shade), and the clouds'
-  shadows pass over it. One mesh, one draw call. The building is an
-  original design.
-- **Hills from orbit:** besides the toon bands, the ground takes a soft light
-  and shade by how its slope faces the sun, gentle at eye level and strong
-  from orbit, so hills a couple of meters high still read on the globe.
+- **The cottage** is painted in the shader, never textured: limewashed walls
+  a warm white whose stones show only where the wash has worn (each face
+  vertex carries its distance to the nearest edge and corner, so quoins,
+  jambs, the plinth and a few flaked patches show stone), damp at the foot,
+  ivy up one corner, the eaves' shadow painted along the top; a hipped roof
+  bent out of true (sagging ridge, a drooping eave, dipping slopes) with
+  mossy slates in wandering courses; a flagstone landing with a painted arch
+  at the waterline. Soft light (warm sun, cool lavender shade), and the
+  clouds' shadows pass over it. The building is an original design.
 - **Aerial perspective:** distance pales the meadow toward a grey-green haze,
   thicker as the camera comes down into the meadow (the far meadow reads like
   a painted distance); the planet's limb from orbit dissolves into the sky's
@@ -354,13 +347,8 @@ click is what you see.
   puffs draw the cloud (a billboard each, fitted to the puffs' clipped screen
   bounds, traced per pixel, its front's depth written so hills hide it), cast
   its shadow (puffs splatted with the same lumpy outline into a 2048² sun-
-  space map of optical depth; the map has no depth, so only clouds on the
-  sunlit half go in and only the sunlit half reads it, and clouds hidden from
-  the camera still cast theirs) and show in the lakes (down in the meadow,
-  the billboards drawn again from the camera mirrored in the water; from
-  orbit, the cloud cover where each lake's mirrored ray meets the clouds, from
-  a small cube map of the puffs seen from the planet's centre; the two
-  cross-fade on the way down), so a cloud, its shadow and its reflection
+  space map of optical depth) and show in the lakes (the billboards drawn
+  again from the mirrored camera), so a cloud, its shadow and its reflection
   always agree. **Where** they are is weather: a flow over the sphere (four
   or five vortices spiralling in or out, and banded east–west winds) traced
   into streamlines about a cloud's width apart (Jobard and Lefer, the spacing
@@ -371,19 +359,11 @@ click is what you see.
   grows with √R and the clouds along a line slide closer, so streaks stay
   whole. A cloud near the camera erodes from its edges. Shadows are a deep,
   cool green with brushed edges.
-- **Birds:** small flocks of white birds. Most travel along great circles
-  round the planet at 7.5–10 m/s, the circles slowly swinging so the routes
-  meander over the whole meadow (one passes over the cottage); one circles
-  the cottage's pond. Loose V and cluster formations, level flight a few
-  meters over the water table (clear of the hills), banking from the path's
-  turn rate, steady two-panel wingbeats with the odd glide, lifting over the
-  cottage. Every pose is closed-form in time and tied to the planet. Each
-  casts a small soft shadow through the clouds' shadow map.
-- **Butterflies:** six kinds over the flowers when you are down in the
-  meadow: instances over a block of 3 m cells about the focus, each cell's
-  candidate kept with a chance that follows the flowers and the bloom; the
-  flight (a wandering flutter, and rests on flowers with the wings fanning)
-  is closed-form in the vertex shader.
+- **Birds:** small flocks of white birds fly loose figure-of-eight circuits a
+  few meters up (one over the cottage's pond, a few over the wetlands, one
+  just ahead of the view), banking into turns and beating two-panel wings in
+  bursts between glides. Every pose is closed-form in time. Each casts a
+  small soft shadow through the clouds' shadow map.
 - **Wind:** broad gust bands and quicker ripples travel with the flow (both
   advected exactly by rotating about the wind axis). Where they lay the grass
   over, blades and paint take on a pale sheen, brightest in sun; between the
@@ -430,10 +410,6 @@ so any view can be shared.
 | JS per frame | ≤ 4 ms | ≤ 4 ms |
 | First frame | < 2 s | |
 
-- **JS per frame:** the build queue (tile builds in the background) gets
-  what is left of the 4 ms after the frame's own work, between 1 and 2 ms,
-  and never starts a job step it expects to overrun (it keeps a slowly
-  forgotten maximum of its step times).
 - **Tier selection:** `auto` picks a tier from a short startup benchmark. A
   live controller lowers render scale, then the tier, if frame time stays high.
 - **MSAA:** a 4× HalfFloat MSAA target costs about 56 B per pixel, about
@@ -484,9 +460,8 @@ so any view can be shared.
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
         clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow map, mirror pass
         cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
-        birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
-        butterflies.ts/.glsl butterflies over the flowers near the focus, flight in the vertex shader
-        props.ts/.glsl     cottage, landing, rail, bench: painted faces (edge and corner distances per vertex), one mesh
+        birds.ts/.glsl     flocks of white birds, wing hinges, shadow discs
+        props.ts/.glsl     cottage, landing, rail, bench, built as painted faces (edge and corner distances per vertex)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
@@ -495,6 +470,6 @@ so any view can be shared.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q / E), CPU picking
+      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

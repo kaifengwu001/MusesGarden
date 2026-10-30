@@ -23,7 +23,7 @@ float gustAt(vec3 dir) {
   vec3 p = q * uGustFreq.x;
   p += along * dot(p, along) * 2.8; // crests long across the wind
   float g = 0.5 + 0.5 * gnoise(p, uTerrainSeed + 150u);
-  return smoothstep(0.46, 0.76, g);
+  return smoothstep(0.5, 0.74, g);
 }
 
 // 0..1 ripples: narrower crests, quicker than the gusts.

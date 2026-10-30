@@ -20,61 +20,44 @@ import shadowFragment from './birdShadow.frag.glsl?raw';
 import shadowVertex from './birdShadow.vert.glsl?raw';
 
 // Small flocks of white birds over the meadow, like the egrets and doves that
-// cross painted fields. Most flocks travel: each follows a great circle round
-// the planet at eight or nine meters a second, the circle swinging slowly
-// about another axis so the route meanders and, lap after lap, crosses the
-// whole meadow (one route runs over the cottage). One flock stays home,
-// circling the cottage's pond in a wide, lazy loop. A flock keeps a loose V
-// or cluster that drifts slowly; its birds bank into the turns, beat their
-// wings steadily with the odd glide, and lift over the cottage. Every pose
-// is a closed-form function of time, so a frozen frame is a pure function of
-// state, and everything is tied to the planet, never to the view. Each bird
-// drops a small disc into the clouds' sun-space shadow map, so its shadow
-// falls on the meadow as theirs do.
+// cross painted fields. Each flock flies a loose figure of eight about its
+// home a few meters up: one over the cottage's pond, a few over the
+// wetlands, and one about a point a little ahead of wherever you are looking,
+// so there are usually birds in view. Its birds keep loose places in it, each with its own wobble,
+// bank into the turns and beat their wings in bursts between glides. Every
+// pose is a closed-form function of time, so a frozen frame is a pure
+// function of state. Each bird drops a small disc into the clouds' sun-space
+// shadow map, so its shadow falls on the meadow as theirs do.
 
-const MAX_BIRDS = 160;
-/** Travelling flocks on an R = 128 m planet; more as it grows (∝ R^0.75), so they pass as often. */
-const ROUTES = 5;
-const MAX_ROUTES = 14;
+const MAX_BIRDS = 96;
+/** Flocks on an R = 128 m planet; more as it grows (with √R). */
+const FLOCKS = 4;
 /** Half wingspan (m) of the bird mesh below. */
 const HALF_SPAN = 0.48;
-/** Time step (s) of the finite differences that give a flock its heading and turn. */
-const DT = 0.12;
-/** Gravity (m/s²), for the bank of a turn. */
-const G = 9.8;
-/** The birds' heights are over this much above the water table (m) on an R = 128 m planet, about the tops of its hills (they grow as R^0.4). */
-const HILLS = 2.4;
 
 interface Bird {
   /** Place in the flock (m): ahead, to the side, up. */
   ahead: number;
   side: number;
   up: number;
-  /** Drift phases, wingbeat phase, glide phase. */
+  /** Wobble phases, wingbeat frequency (Hz), burst rhythm (rad/s), half wingspan (m). */
   phase: [number, number, number, number];
-  /** Wingbeats per second, and how often it glides (rad/s). */
   beat: number;
-  glide: number;
-  /** Size (× the mesh). */
-  size: number;
+  burst: number;
+  span: number;
 }
 
 interface Flock {
-  /** A travelling flock: its great circle (e1 → e2), the axis it swings about, swing amplitude (rad), period (s) and phase. */
-  route: boolean;
+  home: Vector3;
+  /** Tangent frame at home. */
   e1: Vector3;
   e2: Vector3;
-  swing: Vector3;
-  swingAmp: number;
-  swingPeriod: number;
-  /** Speed (m/s), phase (rad), height above the ground (m). */
-  speed: number;
-  phase: number;
-  height: number;
-  /** The home flock: the loop's centre (unit) and half extents (m). */
-  centre: Vector3;
+  /** Figure-of-eight half extents (m), period (s), phase, height above the ground (m). */
   ax: number;
   ay: number;
+  period: number;
+  phase: number;
+  height: number;
   birds: Bird[];
 }
 
@@ -151,13 +134,11 @@ export class Birds {
   count = 0;
   private flocks: Flock[] = [];
   private layoutSeed = Number.NaN;
-  private routeCount = 0;
+  private flockCount = 0;
   private readonly pos = new InstancedBufferAttribute(new Float32Array(MAX_BIRDS * 3), 3);
   private readonly frame = new InstancedBufferAttribute(new Float32Array(MAX_BIRDS * 4), 4);
   private readonly wing = new InstancedBufferAttribute(new Float32Array(MAX_BIRDS * 4), 4);
   private readonly centre = new Vector3();
-  private readonly next = new Vector3();
-  private readonly prev = new Vector3();
   private readonly ahead = new Vector3();
   private readonly side = new Vector3();
   private readonly p = new Vector3();
@@ -194,139 +175,107 @@ export class Birds {
     this.shadowMesh.frustumCulled = false;
   }
 
-  /** The flocks for a world: one at home over the cottage's pond, the others on routes round the planet. */
-  private build(terrain: Terrain, routes: number): void {
+  /** Flocks for a world: homes over the cottage's pond and the wettest of a few spots each. */
+  private build(terrain: Terrain, count: number): void {
     const L = terrain.layout;
     const R = terrain.radius;
     const rand = rng(L.seed ^ 0xb12d5);
-    const birds = (count: number, v: boolean): Bird[] =>
-      Array.from({ length: count }, (_, k): Bird => {
-        // a loose V (the leader first, the others back along two arms) or a cluster
-        const arm = k === 0 ? 0 : k % 2 === 0 ? 1 : -1;
-        const rank = Math.ceil(k / 2);
-        return {
-          ahead: v ? -rank * (1.1 + 0.3 * rand()) : (rand() - 0.5) * 4.5,
-          side: v ? arm * rank * (1.0 + 0.35 * rand()) : (rand() - 0.5) * 4.5,
-          up: (rand() - 0.5) * 0.8,
-          phase: [rand() * 6.28, rand() * 6.28, rand() * 6.28, rand() * 6.28],
-          beat: 2.7 + 0.8 * rand(),
-          glide: 0.22 + 0.16 * rand(),
-          size: 0.85 + 0.3 * rand(),
-        };
-      });
-    const flocks: Flock[] = [];
-    // at home: a wide loop round the pond, high enough to clear the chimney
-    const pond = travel(L.cottage, L.homeBearing, terrain.pondCentre / R, new Vector3());
-    const e1 = L.homeBearing.clone();
-    flocks.push({
-      route: false,
-      e1,
-      e2: new Vector3().crossVectors(pond, e1).normalize(),
-      swing: new Vector3(),
-      swingAmp: 0.25,
-      swingPeriod: 70 + 30 * rand(),
-      speed: 6 + rand(),
-      phase: rand() * Math.PI * 2,
-      height: 5.5 + rand(),
-      centre: pond,
-      ax: 24 + 6 * rand(),
-      ay: 14 + 4 * rand(),
-      birds: birds(5 + Math.floor(rand() * 4), false),
-    });
-    for (let f = 0; f < routes; f++) {
-      // the first route runs over the cottage; the others anywhere
-      let a = L.cottage.clone();
-      if (f > 0) {
+    const homes: Vector3[] = [travel(L.cottage, L.homeBearing, terrain.pondCentre / R, new Vector3())];
+    const d = new Vector3();
+    // (the last flock's home follows the view: set every frame in update)
+    while (homes.length < count + 1) {
+      let best = new Vector3(0, 1, 0);
+      let wettest = -Infinity;
+      for (let k = 0; k < 10; k++) {
         const z = rand() * 2 - 1;
-        const t = rand() * Math.PI * 2;
-        const r = Math.sqrt(1 - z * z);
-        a = new Vector3(r * Math.cos(t), r * Math.sin(t), z);
+        const a = rand() * Math.PI * 2;
+        const s = Math.sqrt(1 - z * z);
+        d.set(s * Math.cos(a), s * Math.sin(a), z);
+        // wet, and away from the other flocks
+        const score = terrain.fields.wetness(d) - 0.6 * Math.max(...homes.map((h) => h.dot(d)));
+        if (score > wettest) {
+          wettest = score;
+          best = d.clone();
+        }
       }
-      const b = tangentToward(a, new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize(), new Vector3());
-      const swing = new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize();
-      flocks.push({
-        route: true,
-        e1: a,
-        e2: b,
-        swing,
-        swingAmp: 0.25 + 0.2 * rand(),
-        swingPeriod: 80 + 60 * rand(),
-        speed: 7.5 + 2.5 * rand(),
+      homes.push(best);
+    }
+    this.flocks = homes.map((home, f): Flock => {
+      const e1 = tangentToward(home, Math.abs(home.y) < 0.9 ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0), new Vector3()).applyAxisAngle(home, rand() * Math.PI * 2);
+      const n = 5 + Math.floor(rand() * 7);
+      // the flock that keeps you company stays in a tighter loop, low over the meadow
+      const company = f === count;
+      return {
+        home,
+        e1,
+        e2: new Vector3().crossVectors(home, e1),
+        ax: company ? 9 + 3 * rand() : 18 + 12 * rand(),
+        ay: company ? 5 + 2 * rand() : 11 + 9 * rand(),
+        period: 34 + 20 * rand(),
         phase: rand() * Math.PI * 2,
-        height: 2.5 + 4.5 * rand(),
-        centre: new Vector3(),
-        ax: 0,
-        ay: 0,
-        birds: birds(4 + Math.floor(rand() * 6), rand() < 0.6),
-      });
-    }
-    this.flocks = flocks;
+        // the cottage flock clears its chimney
+        height: f === 0 ? 6.2 + rand() : company ? 2.6 + rand() : 3.2 + 2.5 * rand(),
+        birds: Array.from({ length: n }, (): Bird => ({
+          ahead: (rand() - 0.5) * 6,
+          side: (rand() - 0.5) * 6,
+          up: (rand() - 0.5) * 1.4,
+          phase: [rand() * 6.28, rand() * 6.28, rand() * 6.28, rand() * 6.28],
+          beat: 2.6 + 1.1 * rand(),
+          burst: 0.35 + 0.3 * rand(),
+          span: (0.85 + 0.35 * rand()) * HALF_SPAN,
+        })),
+      };
+    });
     this.layoutSeed = L.seed;
-    this.routeCount = routes;
+    this.flockCount = count;
   }
 
-  /** Where a flock is at time t (unit direction). */
-  private flockAt(f: Flock, t: number, radius: number, out: Vector3): Vector3 {
-    const swing = f.swingAmp * Math.sin((2 * Math.PI * t) / f.swingPeriod + f.phase * 1.7);
-    if (f.route) {
-      const phi = f.phase + (f.speed * t) / (radius + f.height);
-      out.copy(f.e1).multiplyScalar(Math.cos(phi)).addScaledVector(f.e2, Math.sin(phi));
-      return out.applyAxisAngle(f.swing, swing).normalize();
-    }
-    // the home loop: an ellipse whose axes turn a little with the swing
-    const perimeter = Math.PI * (3 * (f.ax + f.ay) - Math.sqrt((3 * f.ax + f.ay) * (f.ax + 3 * f.ay)));
-    const tau = f.phase + (2 * Math.PI * f.speed * t) / perimeter;
-    const c = Math.cos(swing);
-    const sn = Math.sin(swing);
-    const x = f.ax * Math.cos(tau);
-    const y = f.ay * Math.sin(tau);
-    return out
-      .copy(f.centre)
-      .addScaledVector(f.e1, (c * x - sn * y) / radius)
-      .addScaledVector(f.e2, (sn * x + c * y) / radius)
-      .normalize();
-  }
-
-  /** Fly every bird to where it is at `time` (s). */
-  update(time: number, terrain: Terrain): void {
+  /** Fly every bird to where it is at `time` (s); `focus` and `forward` place the flock that keeps you company. */
+  update(time: number, terrain: Terrain, focus: Vector3, forward: Vector3): void {
     const R = terrain.radius;
-    const routes = clamp(Math.round(ROUTES * Math.pow(R / 128, 0.75)), 3, MAX_ROUTES);
-    if (terrain.layout.seed !== this.layoutSeed || routes !== this.routeCount) this.build(terrain, routes);
-    const cottage = terrain.layout.cottage;
+    const count = Math.max(2, Math.round(FLOCKS * Math.sqrt(R / 128)));
+    if (terrain.layout.seed !== this.layoutSeed || count !== this.flockCount) this.build(terrain, count);
+    const company = this.flocks[this.flocks.length - 1];
+    travel(focus, forward, 24 / R, company.home);
+    tangentToward(company.home, forward, company.e1);
+    company.e2.crossVectors(company.home, company.e1);
     const pos = this.pos.array as Float32Array;
     const frame = this.frame.array as Float32Array;
     const wing = this.wing.array as Float32Array;
     let n = 0;
     for (const f of this.flocks) {
-      // heading and turn from the path a moment before and after
-      this.flockAt(f, time, R, this.centre);
-      this.flockAt(f, time + DT, R, this.next);
-      this.flockAt(f, time - DT, R, this.prev);
-      this.ahead.subVectors(this.next, this.prev);
+      // the figure of eight in the home's tangent plane, and its heading and turn
+      const tau = (time / f.period) * Math.PI * 2 + f.phase;
+      const w = (Math.PI * 2) / f.period;
+      const x = f.ax * Math.sin(tau);
+      const y = f.ay * Math.sin(2 * tau);
+      const vx = f.ax * Math.cos(tau) * w;
+      const vy = 2 * f.ay * Math.cos(2 * tau) * w;
+      const axx = -f.ax * Math.sin(tau) * w * w;
+      const ayy = -4 * f.ay * Math.sin(2 * tau) * w * w;
+      const speed2 = vx * vx + vy * vy;
+      const bank = clamp(((vx * ayy - vy * axx) / Math.max(speed2, 1e-6)) * 1.4, -0.65, 0.65);
+      this.centre.copy(f.home).addScaledVector(f.e1, x / R).addScaledVector(f.e2, y / R).normalize();
+      this.ahead.copy(f.e1).multiplyScalar(vx).addScaledVector(f.e2, vy);
       this.ahead.addScaledVector(this.centre, -this.ahead.dot(this.centre)).normalize();
       this.side.crossVectors(this.centre, this.ahead);
-      // sideways acceleration (m/s²) → the bank of a coordinated turn
-      const lateral = this.p.copy(this.next).add(this.prev).addScaledVector(this.centre, -2).dot(this.side) * (R / (DT * DT));
-      const bank = clamp(Math.atan(lateral / G) * 1.5, -0.7, 0.7);
-      // level flight a few meters over the meadow (heights over the water
-      // table, clear of the hills), rising over the cottage
-      const nearHome = smoothstep(32 / R, 10 / R, this.centre.distanceTo(cottage));
-      const lift = R + HILLS * Math.pow(R / 128, 0.4) + f.height + 6 * nearHome * (f.route ? 1 : 0) + 0.6 * Math.sin(time * 0.55 + f.phase);
+      const ground = Math.max(terrain.height0(this.centre), 0);
+      const lift = R + ground + f.height + 0.8 * Math.sin(tau * 1.7 + f.phase);
       for (const b of f.birds) {
         if (n >= MAX_BIRDS) break;
-        // places in the flock drift a little, slowly
-        const wa = b.ahead + 0.3 * Math.sin(time * 0.31 + b.phase[0]);
-        const ws = b.side + 0.3 * Math.sin(time * 0.23 + b.phase[1]);
-        const wu = b.up + 0.18 * Math.sin(time * 0.37 + b.phase[2]);
+        const wa = b.ahead + 0.6 * Math.sin(time * 0.53 + b.phase[0]);
+        const ws = b.side + 0.7 * Math.sin(time * 0.41 + b.phase[1]);
+        const wu = b.up + 0.3 * Math.sin(time * 0.87 + b.phase[2]);
         this.p.copy(this.centre).multiplyScalar(lift + wu).addScaledVector(this.ahead, wa).addScaledVector(this.side, ws);
-        this.fwd.copy(this.ahead).addScaledVector(this.side, 0.04 * Math.cos(time * 0.23 + b.phase[1]));
+        // heading: the flock's, turned a little by the wobble across
+        this.fwd.copy(this.ahead).addScaledVector(this.side, 0.12 * Math.cos(time * 0.41 + b.phase[1]));
         const up = this.p.length();
         this.fwd.addScaledVector(this.p, -this.fwd.dot(this.p) / (up * up)).normalize();
-        // steady wingbeats, now and then a short glide on raised wings
-        const flap = 1 - smoothstep(0.6, 0.85, Math.sin(time * b.glide + b.phase[3]));
+        // wingbeats in bursts, glides between
+        const flap = smoothstep(-0.25, 0.35, Math.sin(time * b.burst + b.phase[3]));
         pos.set([this.p.x, this.p.y, this.p.z], n * 3);
-        frame.set([this.fwd.x, this.fwd.y, this.fwd.z, bank + 0.04 * Math.sin(time * 0.5 + b.phase[2])], n * 4);
-        wing.set([(time * b.beat + b.phase[3]) * Math.PI * 2, 0.62 * flap, 0.16 - 0.08 * flap, b.size], n * 4);
+        frame.set([this.fwd.x, this.fwd.y, this.fwd.z, bank + 0.15 * Math.sin(time * 0.9 + b.phase[2])], n * 4);
+        wing.set([(time * b.beat + b.phase[3]) * Math.PI * 2, 0.78 * flap, 0.2 - 0.12 * flap, b.span / HALF_SPAN], n * 4);
         n++;
       }
     }
