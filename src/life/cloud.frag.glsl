@@ -10,12 +10,21 @@
 uniform mat4 uProjection; // projectionMatrix is not declared in fragment shaders
 
 varying vec3 vPoint;
-flat varying int vRow;
+flat varying vec4 vCloudA;
+flat varying vec4 vCloudB;
+flat varying vec3 vCloudC;
+flat varying vec4 vPuffs[PUFFS];
 
 void main() {
   vec3 rd = normalize(vPoint - cameraPosition);
+  Cloud cl;
+  cl.centre = vCloudA.xyz;
+  cl.radius = vCloudA.w;
+  cl.basePoint = vCloudB.xyz;
+  cl.seed = uint(vCloudB.w);
+  cl.baseNormal = vCloudC;
   float t;
-  vec4 c = shadeCloud(vRow, cameraPosition, rd, t);
+  vec4 c = shadeCloud(cl, vPuffs, cameraPosition, rd, 1.0, t);
   if (c.a < 0.004) discard;
   vec3 p = cameraPosition + rd * t;
   // clouds pale toward the sky's haze, not the meadow's, and only half as fast

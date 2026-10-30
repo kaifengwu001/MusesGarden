@@ -120,7 +120,10 @@ them, and the hilltops stand out of it as islands.
 - **Height:** relief + lift − (lift + sink)·wetness − water level. Uplands
   stand clear (a kettle pond in the deepest hollows); deep in a wetland the
   table sits near the middle of the relief, so a wetland is lace: islands,
-  spits and inlets rather than open water. Hummocks grow there too.
+  spits and inlets rather than open water. Hummocks grow there too, and the
+  wetland ground flattens toward a plateau 0.55 m above (and below) the water
+  (s·tanh(h/s), keeping 12 % of its slope), so islands are flat turf plates
+  with a short bank, as in the reference.
 - **Banks:** a lip, tanh(distance to shore / 0.3 m) × 0.2 m, lifts the land at
   the waterline and drops the water off, like a cut turf bank. The distance is
   height over slope (a finite difference one bake texel wide).
@@ -201,18 +204,29 @@ tests still read the same fields from the CPU side.
   spent on another species' flowers. R is quantised to 4 % steps for this,
   so a settled world never depends on its history.
 
-### Flower colonies
+### Flower drifts, colonies and clumps
 
-Flowers per m² for each species come from `fields.ts`: colonies of one species
-(thresholded noise whose area share follows the species' weight), bare and
-rich ground (a slower field), and damp ground the pink cups favour. With
-patchiness p, a species' density is ρ·w·(1 − p + p·colony/cover), so the mean
-stays ρ·w whatever the patchiness. Each flower also gets a size (lusher ground
-grows bigger flowers, plus its own spread) and a colour variant, set per colony
-(blush → rose → coral pinks, cream and lilac whites, lemon → golden → a few
-orange and red buttons, cornflower → violet blues) with a little per-flower
-spread. The far paint reads the same fields from the bake: dabs by species,
-and far away a wash of the colonies' colours, so near and far agree.
+Flowers per m² for each species come from `fields.ts`, in three scales:
+
+- **Drifts** (18 m, long along the grain): where the meadow flowers at all,
+  60 % of the ground. Between drifts the meadow is nearly bare.
+- **Colonies** (13 m × the species' scale): which species hold a stretch of a
+  drift, each covering a share set by its weight. Damp ground suits the pink cups.
+- **Clumps** (about 2 m): dense knots and the gaps between them. Two noises:
+  pink clumps where the first is high, stars where the second is, buttons and
+  blues where they are low, so pink and stars mix but pink and buttons never
+  share a clump.
+
+With patchiness p (default 0.95), a species' density is
+ρ·w·N·(1 − p + p·drift·colony)·clumps, with N chosen so the mean stays ρ·w.
+Drifts and colonies are baked; clumps are too fine for the bake, so the paint
+evaluates them per pixel and the classifier per flower (with the clump
+settings frozen per tile, so a tile built over several frames is built from
+one state). Each flower also gets a size (lusher ground grows bigger flowers,
+plus its own spread) and a colour variant, set per colony (blush → rose →
+coral pinks, cream and lilac whites, lemon → golden → a few orange and red
+buttons, cornflower → violet blues). The far paint reads the same fields:
+dabs by species, and far away a wash of the clumps' colours.
 
 The original plan, kept for reference:
 
@@ -242,11 +256,16 @@ flowers, props, outlines, clouds and the shadow pass. `warp.ts` mirrors it
 exactly on the CPU.
 
     t  = (P − F) − ((P − F)·U) U                  tangent offset from the focus F
-    P′ = P − k |t|² U,   k = w · (1/(2 R_v) − 1/(2 R)),   R_v = max(visualRadius, 0.15 R)
+    P′ = P − k |t|² U,   k = (1/R_eff − 1/R) / 2
     N′ = normalize(N + 2k (U·N) t)                 normals follow the bent surface
 
-w is the camera-mode blend: 0 in Overview, 1 in Wander. The orbit view shows the
-true sphere, and the low view rolls away like a 60 m world even at R = 400 m.
+The ground near the focus curves like a sphere of R_eff, which follows the
+camera's zoom z (warpForZoom in warp.ts): the true sphere from orbit; on the
+way down (z ≈ 0.6–0.8) a nearly flat plain, R_eff = 12.5 R, so the meadow
+reaches a far horizon like the reference painting (this is where the vista
+sits); at eye level it rolls away like a small world, R_eff = R_v =
+max(visualRadius, 0.15 R), 60 m by default even at R = 400 m. The blend is
+in curvature (1/R_eff).
 
 P′ moves only along U, so the inverse is exact: `P = P′ + k |t|² U`. CPU
 picking marches the ray in warped space and unwarps each sample, so what you
@@ -258,36 +277,63 @@ click is what you see.
 - One zoom parameter dollies smoothly down to **Wander**, a third-person glide
   about 1.6 m above the grass at FOV 55°.
 - Double-click glides the focus along a great circle.
+- **Vista** (`view/vista.ts`, the Vista button): a stand and heading framed
+  like the reference still: meadow to the top of the frame, a band of lake
+  across the middle, meadow in front, a cloud over the far meadow. The planet
+  is searched for it: stands about 8 m apart inside the bloom, 12 headings,
+  each scored by casting a grid of view rays to the water table through the
+  warp and comparing the water's share per row (and per cell) with the still's
+  layout (16 × 9, measured once), then the best few refined in place, heading
+  and zoom, with the clouds and the flowers in view counted. The terrain
+  stage is cached per world; a search takes about 0.7 s the first time.
 
 ## Look
 
 - **Palette:** `palette.ts` generates a 16×16 sRGB texture. Rows are material
   families (grass, water, the flower species, sky, cloud, rock, snow, stone,
   roof, wood). Columns run light → shadow, then hue variations. Every colour in
-  the world samples it. Time of day lerps between palettes keyed at dawn, noon
-  and golden hour, then rewrites the texture.
+  the world samples it. The grass, brush, bud, cloud and water rows are graded
+  against the reference still (measured per region and squint-tested, see
+  Invariants). One light for now: late morning. The time of day is hidden; its
+  dawn and golden-hour keys stay in the palette for later.
 - **Toon lighting:** `toon.glsl` has three bands with 0.08-wide soft
   transitions, a warm sun, a cool sky ambient from above, and a sun-side rim on
   grass and flower heads.
 - **Outlines:** on the cottage and props only (inverted hull, #3E3A36,
   1 to 1.5 px equivalent). Terrain, grass, flowers, water and clouds keep soft
   edges.
-- **Aerial perspective:** blends toward the horizon sky colour by view distance
-  and by how far around the planet a point sits.
+- **Aerial perspective:** distance pales the meadow toward a grey-green haze,
+  thicker as the camera comes down into the meadow (the far meadow reads like
+  a painted distance); the planet's limb from orbit dissolves into the sky's
+  haze. Clouds take half as much, toward the sky's.
 - **Far meadow:** painted brushstroke noise with flower-coloured dabs in the
   terrain shader. Near blades cross-fade into it with a dithered fade, never a
   ring.
-- **Water:** painted, not simulated. Flat surface; teal shallows deepening to
-  ultramarine; a dark band under the banks; the sky and the clouds mirrored
-  along the reflected ray (天光云影共徘徊), broken by wind ruffles; glints that
-  swell and fade on their own slow sine and never shrink below a couple of
-  pixels (no popping); sparse lily pads in calm shallows. No refraction.
-- **Clouds and their light:** drifting puff clusters (seen from afar; they
-  shrink away as you descend) and a high broken deck: one noise field on a
-  shell above the meadow, advected with the wind. The deck is painted into the
-  Wander sky, mirrored in the lakes, and casts the shadows that sweep across
-  the meadow. Shadows have brushed edges (the paint's stroke noise), darken
-  the light band and cool the colour; sunlit ground warms a little.
+- **Water:** painted, not simulated: a mirror over a navy body. Along the view
+  ray mirrored off the level surface, nearest first: the banks (marched over
+  the terrain plus its bank lip and grass; this is the dark band under every
+  shore, as tall as the bank and the meadow behind it, so it widens and
+  narrows along the shore), the clouds (the same puffs, cloudsAlong), and the
+  sky painted as the lakes' cobalt. Looking down into the water shows more of
+  the navy body, looking across it more of the mirror (Fresnel-like). Wind
+  ruffles streak the mirror; glints swell and fade on their own slow sine and
+  never shrink below a couple of pixels; lily pads are off by default. The
+  march starts near the shore distance and is skipped where the mirrored ray
+  would climb above the highest meadow before reaching land. No refraction.
+- **Clouds and their light (天光云影):** low cumulus, bases about 5 m above the
+  meadow, gathered in banks of one to four, drifting with the wind. Each cloud
+  is eight soft spheres heaped over a flat base, written once a frame into a
+  data texture (clouds.ts, clouds.glsl). The same puffs draw the cloud (one
+  billboard each, fitted to its puffs, traced per pixel: optical depth with
+  soft rims and a soft base, billowy edges, normals blended by each puff's
+  share, a silver rim against the sun, and the depth of its front written so
+  hills hide it), cast its shadow (puffs splatted into a sun-space map of
+  optical depth over the whole planet, one fetch per ground pixel and per
+  field-map texel) and show in the lakes (traced along the mirrored ray). So a
+  cloud, its shadow and its reflection always agree. Clouds keep a human scale
+  as the planet grows: count ∝ R, size ∝ √R, the next cloud fading in. A cloud
+  the camera is in thins away. Shadows have brushed edges (the paint's stroke
+  noise), darken the light band and cool the colour.
 - **Wind:** broad gust bands and quicker ripples travel with the flow (both
   advected exactly by rotating about the wind axis). Where they lay the grass
   over, blades and paint take on a pale sheen, brightest in sun; between the
@@ -350,6 +396,7 @@ so any view can be shared.
 | Attached | Vitest and Playwright: every prop, stone and flower base lies within ε of the warped terrain at 5 growth values |
 | No LOD rings or pops | Playwright: a 10 s dolly from Overview to Wander; morph factors stay continuous and per-frame image deltas show no ring-shaped spikes |
 | Picking | Playwright: CPU pick vs GPU position readback at 64 random pixels, error < 2 cm |
+| Looks like the reference when you squint | Playwright (`npm run squint`): the vista and the reference still, each shrunk to 48 × 27 and blurred, compared per cell in CIE Lab (mean ΔE76; the still stays out of git, so the test skips without it) |
 
 ## Module map
 
@@ -365,29 +412,29 @@ so any view can be shared.
         chunks.ts          face quadtrees, CDLOD selection, symmetric morph (CPU mirror), culling
         surface.ts/.glsl   the instanced CDLOD ground: terrain, paint, cloud light, water
         noise.ts/.glsl     integer-hash gradient noise, identical on both sides
-        fields.ts/.glsl    meadow fields: relief, wetlands, patterns, flower colonies
+        fields.ts/.glsl    meadow fields: relief, wetlands, plateaus, patterns, flower drifts, colonies, clumps
         bake.ts            the fields baked into cube maps (quick while changing, full when still)
         terrain.ts/.glsl   layout from the seed, water table and banks, homestead
-        water.glsl         painted water: depth, mirror, ruffles, glints, lily pads
+        water.glsl         painted water: the mirror (banks, clouds, sky) over a navy body, ruffles, glints
         meadow.glsl        painted far meadow, flower dabs and colours, bloom front, wind direction
         geo.ts             spherical arcs and travel
       life/
         fieldMap.ts/.glsl  ground, meadow and wind maps around the focus
         scatter.ts         tiles, paged pools (one per channel), classifier hook, page culling, re-tiling
         grass.ts/.glsl     5-vertex blades in the wind, sheen
-        flowers.ts/.glsl   colony classifier, four species pools (meshes in flowerMeshes.ts), bloom, flutter
+        flowers.ts/.glsl   drift, colony and clump classifier, four species pools (meshes in flowerMeshes.ts), bloom, flutter
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
-        clouds.ts/.glsl    drifting puffs; cloudShadow.glsl: shadows, the deck, reflections
+        clouds.ts/.glsl    low cumulus: puffs in a data texture, billboards, sun-space shadow map, mirror tracing
         props.ts/.glsl     cottage, landing, rail, bench; outlines (inverted hull)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
         fog.glsl           aerial perspective
-        warp.glsl / .ts    tiny-planet warp (GPU and its exact CPU mirror)
-        sky.ts/.glsl       backdrop and dome, sun glow, the cloud deck from below
+        warp.glsl / .ts    tiny-planet warp (GPU and its exact CPU mirror), its curvature by zoom
+        sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      view/                camera rig (Overview ↔ Wander), input gestures, CPU picking
+      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

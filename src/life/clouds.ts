@@ -49,7 +49,7 @@ const PUFFS = 8;
 const HEADER = 3;
 const COLUMNS = HEADER + PUFFS;
 /** Clouds the water traces for its mirror (the nearest to the camera). */
-const REFLECTED = 16;
+const REFLECTED = 10;
 /** Clouds per R = 128 m planet at coverage 0 and 1. */
 const COUNT = [16, 110] as const;
 

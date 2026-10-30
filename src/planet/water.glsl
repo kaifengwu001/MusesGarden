@@ -47,11 +47,15 @@ float bankTop(vec3 d) {
 
 // The meadow along a mirrored ray (view space), from the water outward: the
 // direction it meets the meadow and how high above the water (m), or w < 0.
-vec4 bankAlong(vec3 wp, vec3 r) {
-  float t = 0.0;
-  float dt = 0.07;
+// shore: distance to the nearest shore (m): no land is nearer, so the march
+// starts most of the way there, and is skipped when the ray will have
+// climbed above the highest meadow by the time it gets there.
+vec4 bankAlong(vec3 wp, vec3 r, float shore, float rise) {
+  float t = 0.7 * shore;
+  if (t * rise > uWaterSky.w) return vec4(0.0, 0.0, 0.0, -1.0);
+  float dt = 0.08 + 0.05 * t;
   float lo = 0.0;
-  for (int i = 0; i < 17; i++) {
+  for (int i = 0; i < 13; i++) {
     float tn = t + dt;
     vec3 q = unwarpPosition(wp + r * tn);
     float len = length(q);
@@ -60,7 +64,7 @@ vec4 bankAlong(vec3 wp, vec3 r) {
       // refine the crossing between t and tn
       lo = t;
       float hi = tn;
-      for (int k = 0; k < 4; k++) {
+      for (int k = 0; k < 3; k++) {
         float mid = 0.5 * (lo + hi);
         vec3 m = unwarpPosition(wp + r * mid);
         float ml = length(m);
@@ -72,7 +76,7 @@ vec4 bankAlong(vec3 wp, vec3 r) {
       return vec4(hit / hl, hl - uRadius);
     }
     t = tn;
-    dt *= 1.33;
+    dt *= 1.4;
   }
   return vec4(0.0, 0.0, 0.0, -1.0);
 }
@@ -131,8 +135,9 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   // the mirror, ruffled along the wind where it gusts
   vec3 r = reflect(-v, n);
   r = normalize(r + along * stroke * 0.06 * (0.2 + gust) * uWindVec.w);
-  vec3 mirror = waterSky(dot(r, n));
-  vec4 bank = bankAlong(wp, r);
+  float rise = dot(r, n);
+  vec3 mirror = waterSky(rise);
+  vec4 bank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec4 cl = vec4(0.0);
   if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
   else cl = cloudsAlong(wp, r);
@@ -145,11 +150,14 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   // wind ruffles: pale streaks along the wind, stronger in the gusts
   col = mix(col, pal(ROW_WATER, 9), smoothstep(0.3, 0.85, stroke) * (0.04 + 0.22 * gust) * uWindVec.w);
 
-  // lily pads in calm shallows near the shore
-  float shade;
-  float pad = lilyPad(dir, uRadius / 0.9, uTerrainSeed + 140u, shade) * smoothstep(0.08, 0.2, depth) * smoothstep(0.9, 0.5, depth)
-            * smoothstep(-6.0, -1.0, shore) * uWaterSky.y * smoothstep(0.25, 0.05, pixelMeters);
-  col = mix(col, tone3(pal(ROW_WATER, 6), mix(pal(ROW_WATER, 6), pal(ROW_WATER, 7), 0.5), pal(ROW_WATER, 7), b * (0.85 + 0.3 * shade)), pad);
+  // lily pads in calm shallows near the shore (when there are any)
+  float pad = 0.0;
+  if (uWaterSky.y > 0.0) {
+    float shade;
+    pad = lilyPad(dir, uRadius / 0.9, uTerrainSeed + 140u, shade) * smoothstep(0.08, 0.2, depth) * smoothstep(0.9, 0.5, depth)
+        * smoothstep(-6.0, -1.0, shore) * uWaterSky.y * smoothstep(0.25, 0.05, pixelMeters);
+    col = mix(col, tone3(pal(ROW_WATER, 6), mix(pal(ROW_WATER, 6), pal(ROW_WATER, 7), 0.5), pal(ROW_WATER, 7), b * (0.85 + 0.3 * shade)), pad);
+  }
 
   // glints: small dashes catching the sun, never smaller than a couple of pixels
   float f0, f1;

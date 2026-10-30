@@ -4,6 +4,115 @@ The plan and the growth model are in [ARCHITECTURE.md](ARCHITECTURE.md). This
 file tracks what is done, what is known to be wrong or missing, and what comes
 next.
 
+## Iteration 3: the six review notes
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Clouds disconnected from their shadows and reflections; lower; more of them | One cloud system. Low cumulus (bases about 5 m up) in banks of one to four, several times as many. The same puffs draw each cloud, cast its shadow (a sun-space map) and show in the lakes (traced along the mirrored ray), so the three always agree. The high deck and the clouds painted into the sky are gone. |
+| 2 | The dark pond edges are reflections of the meadow; water too cartoony; no clean constant-width line; more natural, 3D edges | The water is a mirror over a navy body. The banks' reflection, marched over the terrain with its lip and grass, is the dark band under every shore, and it widens and narrows with the bank. The fixed-width band, the teal shallows and the lily pads (now off by default) are gone. Wetland islands are flat turf plates with a short, darker bank face; grass grows to the water's edge. |
+| 3 | Colours should follow the reference | Grass, brush, bud, cloud and water rows re-measured from the still (median colours per region) and regraded in linear light; a grey-green haze that thickens toward the meadow pales the distance like the still's far meadow. |
+| 4 | Flowers still evenly spread | Three scales: drifts (60 % of the ground, nearly bare between), species colonies within them, and dense two-meter clumps. Pink and stars share clumps; pink and buttons never do. Near flowers and the far paint read the same fields. |
+| 5 | One time of day first | The time slider and the dawn and golden-hour presets are gone (the palette keys stay for later). Late-morning light, graded against the still. |
+| 6 | The test: a match to the still when you squint | `npm run squint` renders the new **Vista** view (also a button) and compares it with the still, both shrunk and blurred, per cell in CIE Lab. Mean ΔE went from 30.8 (iteration 2's best view) to 24.5. The vista is found by searching the planet for the still's layout. |
+
+Checkpoint images: [docs/checkpoints/iteration-3](docs/checkpoints/iteration-3/).
+
+### How it is built (summary)
+
+- **Clouds:** eight puffs per cloud in one data texture a frame. Billboards
+  fitted to the puffs, traced per pixel (soft rims and base, billows, depth
+  written so hills hide them); puffs splatted into a sun-space optical-depth
+  map that the ground and the field map read once; the lakes trace the ten
+  nearest along the mirrored ray. Count ∝ R and size ∝ √R, so they keep their
+  scale; a cloud the camera is in thins away.
+- **Water:** the mirrored ray, nearest first: banks (a 13-step march over the
+  terrain, starting near the shore distance and skipped where it cannot reach
+  land), clouds, then the sky painted as cobalt. Mirror against navy body by
+  viewing angle.
+- **Vista and the warp:** the warp's curvature now follows the zoom: true
+  sphere from orbit, a nearly flat plain on the way down (where the vista
+  sits, so the meadow runs to a far horizon), the 60 m roll at eye level. The
+  vista search ranks stands inside the bloom by casting view rays to the water
+  table and comparing water per row and cell with the still, then refines the
+  best for clouds and flowers in view.
+- **Flower clumps:** baked drifts and colonies × clumps evaluated per pixel
+  and per flower (tiles freeze their clump settings).
+
+### Squint test (the vista against the still, mean ΔE76 per cell)
+
+| | Overall | Far meadow and clouds | Lake and islands | Near meadow |
+|---|---|---|---|---|
+| Iteration 2 (lakes view) | 30.8 | 35.4 | 32.7 | 24.2 |
+| Iteration 3 (vista) | 24.5 | 15.5 | 34.2 | 23.8 |
+
+The goal is 14; the test fails above 26, as a regression guard. Colour per
+material is now close (far meadow #94af97 against #9db7a7, near meadow
+#708f5b against #68874d). Most of the remaining gap is composition: the
+still's lake runs the full width of the frame with islands, and this
+planet's wetlands give ponds and channels at that scale; the still's big
+cloud sits in frame, while the vista's clouds mostly show as reflections.
+
+## Measured (iteration 3)
+
+Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
+waiting for the GPU. Iteration 2 in brackets.
+
+| Viewport | ms / frame | Grass in visible pages | Flowers in visible pages |
+|---|---|---|---|
+| 2560×1440 (1440p, DPR 2), Overview | 4.3 (4.1) | – | – |
+| 2560×1440, Wander, R 128 m | 5.2 (10.0) | 165k | 19k |
+| 2560×1440, Wander, R 400 m | 10.8 (12.1) | 145k | 39k |
+| 2560×1440, Vista | 12.6 (–) | 161k | 28k |
+| 2560×1440, lakes view | 17.9 (13.2) | 180k | 47k |
+| 390×844 @1.5 (phone, low tier), Overview | 1.6 (1.3) | – | – |
+| 390×844 @1.5 (phone, low tier), Wander | 1.8 (6.6) | 41k | 4k |
+| 390×844 @1.5 (phone, low tier), Vista | 3.8 (–) | 35k | 14k |
+
+- **GPU memory:** 149 MB on high at 1440p (cloud shadow map 8 MB, larger
+  grass and flower pools); 45 MB on a phone (low tier).
+- **Where the lakes view goes:** the water is about 7 ms of it (bank march
+  about 2 ms, cloud mirror about 2.8 ms); the clouds' billboards 0.7 ms.
+- **Vista search:** about 0.7 s the first time on a world (cached after).
+- Wander got cheaper mostly because the default stand sees less water.
+
+## Trades (quality for performance)
+
+- **Cloud mirror:** only the ten clouds nearest the camera reflect, without
+  their billows (the ripples soften them anyway).
+- **Bank reflections:** a 13-step march with three refinements, so very
+  distant hills behind a far shore are missed; it starts near the shore
+  distance (an estimate from the local slope), so a sliver of a nearer island
+  in another direction can be skipped.
+- **Cloud shadows:** from a 1024² map over the whole planet (512² on low):
+  about 0.4 m per texel at R 128, softer at R 400. Their shapes follow the
+  puffs but not the billows.
+- **Clumps in the paint:** evaluated only where flowers grow; the billows of
+  the clouds are one noise octave.
+- Carried over: quick bake while growing; 256² field maps; MSAA only below
+  DPR 1.75; grass 180 blades/m² within 22 m; no shadow-map pass for the cottage.
+
+## Known issues
+
+- **Water-heavy views cost more:** the lakes view is 17.9 ms at 1440p on an
+  M1 Pro (13.2 ms before); an M1 Air would need the render scale lowered.
+- **Composition:** the vista's lakes are ponds and channels, not the still's
+  broad lake with islands; its clouds rarely sit in frame.
+- **Clouds** are soft rather than sculpted; from the meadow they read as
+  hazy heaps on the horizon.
+- **The warp's flat band** makes the descent from orbit flatten the world
+  before it rolls up again at eye level; it reads as a landing, but it is a
+  visible change of curvature.
+- **Triangle figure, pools after a scrub, tier probe, LOD-ring test:** as in
+  iteration 2.
+
+## Next
+
+1. Composition: wider lakes with islands at vista scale (or a vista that
+   frames from higher up), and clouds that sit in frame.
+2. Sculpt the clouds (sharper billows on the sunlit side).
+3. Trim the water's cost (mirror at lower resolution, or fewer clouds traced).
+4. Then dawn and golden hour, graded the same way.
+
 ## Iteration 2: the six review notes
 
 | # | Note | What changed |
@@ -131,7 +240,7 @@ render scale to roughly 0.75. iPhones are not available here.
 4. Click on the meadow: a gust ring bursts outward; grass and flowers bend and recover.
 5. Click on water: a ripple ring spreads.
 6. Press and hold on the meadow: flowers bloom in a growing disc stored in rest space.
-7. Time of day: dawn → noon → golden hour; sun, sky, haze and palette move together.
+7. Vista: the button glides to the view framed like the reference still (time of day is set aside for now; the `tod` URL key still works).
 8. Wind strength and direction.
 9. Seed: re-roll; the same seed always gives the same world.
 10. Reset: defaults and the default camera.
@@ -147,4 +256,5 @@ Every state lives in the URL hash, including the camera pose (`pose=`) and froze
 | `npm test` | Vitest CPU invariants (50 tests) |
 | `npm run test:gpu` | Playwright browser invariants (determinism, parity, scrub, budgets) |
 | `npm run shots` | 15 screenshots into `/shots` (`MEADOW_GL=swiftshader` for the CPU rasterizer) |
+| `npm run squint` | the vista against `reference/howls-lake.webp` (kept out of git), shrunk and blurred: mean ΔE, and `shots/squint.png` |
 | `npm run build` / `npm run build:single` | `dist/`, or one self-contained `dist-single/index.html` (729 kB) |
