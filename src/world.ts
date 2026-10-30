@@ -133,7 +133,6 @@ export class World {
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
       uUserBloom: { value: this.userBlooms },
-      uOutline: { value: new Vector4(1.25, 0, 0, 0) },
     };
     this.sky = new Sky();
     this.field = new FieldMap(this.shared, tier.name === 'high' ? 256 : 192);
@@ -353,7 +352,6 @@ export class World {
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
-    (this.shared.uOutline.value as Vector4).x = p.style.outlineWidth;
     this.birds.update(clock.time, this.terrain, rig.up, rig.forward);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp);
 

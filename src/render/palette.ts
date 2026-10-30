@@ -49,10 +49,10 @@ const NOON: Rows = {
   [ROW.ROCK]: ['#6F7C8E', '#4E5D78', '#8F99AA', '#77739D'],
   // snow, blue-lilac shade, mid, highlight
   [ROW.SNOW]: ['#F1F3F7', '#C4C8E4', '#DCE1EF', '#FFFFFF'],
-  // stone light, stone, stone shade, highlight, mortar
-  [ROW.STONE]: ['#D8C7A3', '#B9A47F', '#97845F', '#E8DCBE', '#8D8370'],
-  // roof, roof shade, wood, wood shade, iron/outline, roof light
-  [ROW.ROOF]: ['#6B6255', '#4D463D', '#7A5A3C', '#57402B', '#3E3A36', '#857B6C'],
+  // limewash light, limewash, -, stone, stone dark, mortar, damp, ochre stain, flagstone, quoin
+  [ROW.STONE]: ['#F3E9D2', '#E4D7BA', '#ABA7B8', '#CDBC98', '#A69676', '#8F8674', '#9DA48C', '#D9C08E', '#D5C8AA', '#E2D5B8'],
+  // roof, roof shade, wood, wood shade, iron, roof light, moss, moss shade, lichen, ivy, ivy light, ivy dark
+  [ROW.ROOF]: ['#6E655A', '#4D463D', '#7D6248', '#57402B', '#3E3A36', '#8A8172', '#8C985A', '#667345', '#AAA88C', '#4D7A35', '#7AA24C', '#2E5128'],
   // sun light, sky ambient, ground bounce, rim, shadow tint
   [ROW.LIGHT]: ['#FFF3DE', '#BFD8F0', '#A7C27B', '#FFF5DA', '#7E92B8'],
   // buds and pale meadow ahead of the bloom: bud green, bud tip, dry grass

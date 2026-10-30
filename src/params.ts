@@ -136,7 +136,6 @@ export const schema = {
   style: {
     toonBands: int('tb', 'Toon bands', 3, 2, 5, 'live'),
     bandSoftness: num('bs', 'Band softness', 0.08, 0, 0.3, 0.005, 'live'),
-    outlineWidth: num('ow', 'Outline width', 1.25, 0, 3, 0.05, 'live', { unit: 'px' }),
     fogDensity: num('fog', 'Aerial haze', 0.5, 0, 1, 0.01, 'live'),
     grain: num('gn', 'Paper grain', 0.02, 0, 0.1, 0.001, 'live'),
   },

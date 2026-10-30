@@ -1,40 +1,27 @@
-// Cottage and props: placed in a local frame, warped like everything else.
-// With OUTLINE, the same mesh is drawn back-faces-only and pushed out along
-// its normals by a constant number of screen pixels (inverted hull).
+// The homestead (props.ts): placed in its local frame, warped like everything else.
 #include <meadow_common>
 #include <meadow_warp>
-uniform float uPixelAngle;
-uniform vec4 uOutline; // width (px), -, -, -
 
-#ifdef USE_INSTANCING
-attribute float aTint;
-#endif
+attribute vec4 aPaint; // edge distance (m), corner distance (m), height above the ground (m), ivy 0..1
 
-varying vec3 vNormal;
+varying vec3 vNormal;      // warped world
 varying vec3 vWorld;
-varying vec2 vUv;
-varying vec3 vLocal;
-varying float vTint;
+varying vec2 vUv;          // meters on the face
+varying vec3 vLocal;       // the homestead's frame (m)
+varying vec3 vLocalNormal;
+varying vec4 vPaint;
+varying vec3 vPlanet;     // planet space, unwarped (for the clouds' shadows)
 
 void main() {
-  mat4 m = modelMatrix;
-  float tint = 0.5;
-#ifdef USE_INSTANCING
-  m = modelMatrix * instanceMatrix;
-  tint = aTint;
-#endif
-  vec4 world = m * vec4(position, 1.0);
-  vec3 n = normalize(mat3(m) * normal);
+  vec4 world = modelMatrix * vec4(position, 1.0);
+  vec3 n = normalize(mat3(modelMatrix) * normal);
   vec3 w = warpPosition(world.xyz);
-  vec3 wn = warpNormal(world.xyz, n);
-#ifdef OUTLINE
-  float dist = length(cameraPosition - w);
-  w += wn * uOutline.x * dist * uPixelAngle;
-#endif
-  vNormal = wn;
+  vNormal = warpNormal(world.xyz, n);
   vWorld = w;
   vUv = uv;
   vLocal = position;
-  vTint = tint;
+  vLocalNormal = normal;
+  vPaint = aPaint;
+  vPlanet = world.xyz;
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }
