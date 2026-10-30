@@ -319,41 +319,62 @@ click is what you see.
   The view is lit by the sun at the focus; cloud and bird shadows, the
   cottage and its ground shadow each use their own place's sun.
 - **No outlines:** everything keeps soft, painted edges, the cottage too.
-- **The cottage** is built and painted after the reference's proportions and
-  brushwork (an original design: our own layout of door, windows, bench and
-  landing). A long, low house, 9 × 5 m, the walls under the eaves about 4.4
-  times as long as they are tall, under a hipped roof of one 38° pitch all
-  round with deep eaves just above the door and the windows, on a terrace
-  over its pond with a stair down to the water. The roof is nine courses of
-  tiles a side, each course's foot standing 5.5 cm proud (a real step: a lit
-  lip, and a painted line of shadow under it), beaded capping tiles along the
-  hips and the ridge, the tiles' ends along the eaves, bent a little out of
-  true. Painted in the shader, never textured: the plaster in broad ochre
-  blooms with darker dried rims, pink-lavender patches, horizontal streaks
-  and dabs, stones only where it has fallen away (each face vertex carries
-  its distance to the nearest edge and corner), damp at the foot; moss
-  settling olive and yellow in the lower courses; a plank door with iron
-  straps; small panes with the meadow below and the sky above. The shadows
-  are painted from the cottage's own sun: a blue-lavender band down the top
-  of each wall as deep as the sun is steep on it, cooler shaded walls with
-  the meadow's green bounced in, blue-grey shaded slopes, the bench's shadow
-  on the wall, the house's shadow (walls and hipped roof) deep and cool on
-  its landing and the meadow, the clouds' passing over. The cottage also
-  stands in the water's mirror (water.glsl, cottageInMirror).
+- **The cottage** is built after the meadow cottage of the reference
+  painting, its design matched one to one at Kai's request after iteration 5
+  (the first brief asked for an original building; that rule was lifted
+  for the cottage). Measured from the painting (the ridge a third of the
+  eaves' length, so the plan and the 45° pitch follow): a house 8.6 × 5.3 m,
+  its floor 0.72 m over the meadow, the eaves 2.4 m over the floor and half
+  a meter out, under a hipped roof of fourteen courses of tiles a side (each
+  course's foot standing 3.5 cm proud: a lit lip and a painted line of
+  shadow under it), beaded capping along the hips and the ridge, bent a
+  little out of true. On the front a tall window toward the left end and the
+  door right of the middle, a bench between them; a small window high on the
+  right end toward the back; a chimney on the middle of the ridge. A terrace
+  along the front at the floor's height with three steps down to the meadow
+  at its right end, and at its left end a stone pier out over the pond, an
+  arch at the waterline in its face, an iron rail along its back and a
+  wooden chair by the house's corner. The pond lies in front and to the left,
+  under the pier, and the layout keeps the cottage's sun ahead and to the
+  left (the front lit, the right end in shade), as in the painting. Painted
+  in the shader, never textured, in colours sampled from the painting: warm
+  beige plaster in broad ochre blooms, faint stones showing through it and
+  stones where it has fallen away near the corners and the foot (each face
+  vertex carries its distance to the nearest edge and corner), damp at the
+  foot; a warm grey-brown roof with a little olive moss low down; a plank
+  door with iron straps; dark frames and small panes. The shadows are painted
+  from the cottage's own sun: an olive-grey band down the top of each wall
+  as deep as the sun is steep on it, olive-grey shaded walls with the
+  meadow's green bounced in, every roof slope turned from the sun darkened
+  even under a high sun, the bench's shadow on the wall, the house's shadow
+  (walls and hipped roof) deep and cool on its terrace and the meadow, the
+  clouds' passing over. The cottage, its terrace, its pier and its chimney
+  stand in the water's mirror (water.glsl, cottageInMirror). The homestead
+  view frames it as the painting does (from above the meadow in front and to
+  the right, 26 m out): a named view may look up from the zoom's own tilt
+  (`CameraRig.lookUp`), which eases away as soon as you drag, zoom or walk.
 - **Aerial perspective:** distance pales the meadow toward a grey-green haze,
   thicker as the camera comes down into the meadow (the far meadow reads like
   a painted distance); the planet's limb from orbit dissolves into the sky's
   haze. Clouds take half as much, toward the sky's.
 - **Far meadow:** painted brushstroke noise with flower-coloured dabs in the
-  terrain shader. Near blades cross-fade into it with a dithered fade, never a
-  ring.
+  terrain shader. The dabs come from the same density map the flowers are
+  scattered by (the flora bake and its clumps), coloured by species and
+  colony, each drawn out a little along the brush's way. They keep about
+  5 px from orbit down to a flower's size (0.16 m), so the flowerbeds read as
+  the same brushed marks at every height, only finer in meters as you come
+  down; the colonies' wash of colour under them holds all the way down too.
+  Both give way to the flowers themselves in the near field, but only where
+  those are big enough on screen to carry the flowerbeds. Near blades
+  cross-fade into the paint with a dithered fade, never a ring.
 - **Water:** painted, not simulated: a mirror over a navy body. Along the view
   ray mirrored off the level surface, nearest first: the banks (marched over
   the terrain plus its bank lip and grass; this is the dark band under every
   shore, as tall as the bank and the meadow behind it, so it widens and
-  narrows along the shore), the cottage (its landing, walls and roof as plain
-  solids in its own frame, painted in a few broad strokes), the clouds (read
-  from the clouds' mirror pass at the pixel itself, nudged by the wind's
+  narrows along the shore), the cottage (its terrace, pier, walls, chimney and
+  roof as plain solids in its own frame, painted in a few broad strokes),
+  the clouds, only where the ray clears the land (a bank or hill the ray
+  meets stands in front of every cloud; read from the clouds' mirror pass at the pixel itself, nudged by the wind's
   ruffle; from far above, from the cloud cover seen from below, where the
   mirrored ray meets the clouds' mean height, cross-fading between 0.35 R and
   0.8 R of altitude), and the sky painted as the lakes' cobalt. Looking down into the water shows more of
@@ -374,9 +395,14 @@ click is what you see.
   bounds, traced per pixel, its front's depth written so hills hide it), cast
   its shadow (every cloud, in sight or not: puffs splatted with the same
   lumpy outline, each down the sun its place sees, into a cube map of where
-  the shadows reach the water table, 1536² a face; the ground looks itself
-  up corrected for its height; only the faces holding ground in sight are
-  drawn) and show in the lakes (the billboards drawn again from the mirrored
+  the shadows reach the water table, 1536² a face, and again into a sharper
+  window of one face about the focus (2048², 70–320 m across by the
+  camera's height, moved in whole texels and sized in steps so its texels
+  stay fixed to the planet; drawn while narrower than 0.6 R); each splat's
+  outline is antialiased over a texel and a half of its map, so a drifting
+  shadow slides smoothly through the texels instead of stepping; the ground
+  looks itself up corrected for its height, in the window where it covers
+  the point; only the faces holding ground in sight are drawn) and show in the lakes (the billboards drawn again from the mirrored
   camera; from orbit, a second cube map of the cover seen from below), so a
   cloud, its shadow and its reflection always agree. **Where** they are is weather: a flow over the sphere (four
   or five vortices spiralling in or out, and banded east–west winds) traced
@@ -389,11 +415,13 @@ click is what you see.
   whole. A cloud near the camera erodes from its edges. Shadows are a deep,
   cool green with brushed edges.
 - **Birds:** small flocks of white birds, all tied to the planet. Most
-  travel great circles round it at 6–8 m/s, the circle swinging slowly so
+  travel great circles round it at 5–6 m/s, the circle swinging slowly so
   the routes cross the whole meadow, with a gentle meander; two wheel in
   steady loops near the cottage (behind it, and over the nearest wetland).
-  Level flight a few meters over the hilltops, rising over the cottage; loose
-  V's and clusters with a slight drift; steady beats with short glides;
+  Level flight a few meters over the hilltops (half the terrain's height
+  bound, then 2.4–3.8 m), rising over the cottage; loose V's and clusters
+  with a slight drift; slow, deep beats like an egret's (1.7–2.1 a second)
+  and long glides on raised wings, about a third of the time;
   banking by the path's real turn rate. Every pose is closed-form in time.
   Each casts a small soft shadow through the clouds' shadow map.
 - **Butterflies** (`butterflies.ts`): six kinds, wings painted per kind, about
@@ -401,17 +429,25 @@ click is what you see.
   5 m cells fixed to the planet in direction space (one lattice per octave of
   R; each home keeps its butterfly by rank as the density per m² changes),
   kept more often among flowers and never on the water; those within 20 m of
-  the focus fly. Flight is closed-form: a wandering loop from the flower tops
-  to eye level with a flutter, now and then a settle on a flower, wings
-  fanning.
+  the focus fly. Flight is closed-form: a slow wandering loop from the flower
+  tops to eye level, in bursts of a few slow, full wingbeats (2.8–4 a
+  second by kind; the body bobbing up on each downstroke and climbing
+  through the burst) and glides on wings held in a shallow V, sinking a
+  little; now and then a settle on a flower, wings fanning.
 - **Wind:** broad gust bands and quicker ripples travel with the flow (both
   advected exactly by rotating about the wind axis). Where a gust lays the
   grass over, blades and paint take on a pale sheen (the crest), brightest in
   sun; just upwind of it the grass springs back up into its own shade (the
   trough, dark and cool), so the meadow reads like a swell running across it.
   The sheen is signed (-1 trough … 1 crest); the same field bends the blades
-  and flowers, which lean back a little in the troughs.
-- **Post:** tone curve, gentle highlight bloom, and about 2% static paper grain.
+  and flowers: a crest lays them well over (about 35° more at the defaults),
+  a trough springs them back a little past upright, and their flutter grows
+  with the wind and with the gust pressing on them. Sheen 0.5 by default.
+  **Petals** lift off wherever flowers grow as a crest passes over them (and
+  on the bloom front's edge), coloured as the flowers there.
+- **Post:** tone curve, gentle highlight bloom, the grade in display space
+  (contrast 1.1 about mid grey, brightness 0.95: style params), and about 2%
+  static paper grain.
 
 ## Frame
 
@@ -419,7 +455,7 @@ The main pass renders into a linear HDR target, with MSAA only where it is
 affordable (see Budgets), in this order: sky → terrain and water → props →
 grass → flowers → birds → butterflies → clouds → particles. Before it, each
 frame, the clouds render their shadow cube map (with the birds' discs, on the
-faces holding ground in sight), their cover-from-below cube map (from orbit
+faces holding ground in sight) and its sharper window about the focus, their cover-from-below cube map (from orbit
 only) and their mirror (the billboards from the camera mirrored in the
 water, at full resolution). Post then draws to the screen. The build queue
 gets what is left of 3.6 ms of JS after the update and the render (at least
@@ -448,20 +484,29 @@ so any view can be shared.
 
 | | Desktop (M1 Air, 1440p, DPR ≤ 2) | Mobile (iPhone 15, DPR ≤ 1.5) |
 |---|---|---|
-| Frame rate | 60 fps | 60 fps (30 fps floor on iPhone 12) |
+| Frame time | ≤ 24 ms (Kai's budget, about 40 fps) | ≤ 24 ms |
 | Draw calls | ≤ 120 | ≤ 120 |
-| Triangles | ≤ 1.5 M | ≤ 500 k |
-| Visible grass instances | ≤ 250 k | ≤ 60 k |
+| Triangles | ≤ 4 M on high, 1.8 M on medium | ≤ 500 k |
+| Visible grass instances | ≤ 600 k on high, 250 k on medium | ≤ 60 k |
 | GPU memory | < 256 MB | < 256 MB |
 | JS per frame | ≤ 4 ms | ≤ 4 ms |
 | First frame | < 2 s | |
 
-- **Tier selection:** `auto` picks a tier from a short startup benchmark. A
-  live controller lowers render scale, then the tier, if frame time stays high.
+- **Tiers:** low (phones), medium (iteration 5's high) and high: grass to
+  35 m and thicker toward its edge, flowers to 45 m, a 512² field map. The
+  grass and flower pools are sized for high on every tier, so a tier chosen
+  later fills in completely; the map sizes are chosen when the world is
+  built.
+- **Tier selection:** `auto` picks a tier from a short startup benchmark
+  (phones low; desktops high, medium or low by the benchmark). A live
+  controller aims at 24 ms: when frames stay slow for 2 s it lowers the
+  render scale (to 0.72), then steps the tier down one level; it climbs back
+  after easy frames, never above where it started and not within a minute of
+  stepping down.
 - **MSAA:** a 4× HalfFloat MSAA target costs about 56 B per pixel, about
   200 MB at 1440p with DPR 2, which would break the memory budget on its own.
-  So MSAA is used only when the drawing buffer is small (DPR < 1.75). At DPR 2
-  the pixel density does the anti-aliasing.
+  So MSAA is used only on displays of DPR < 1.75 (whatever the render scale).
+  At DPR 2 the pixel density does the anti-aliasing.
 - **Trade-offs:** every trade of quality for speed is listed in `PROGRESS.md`.
 
 ## Invariants and how they are tested

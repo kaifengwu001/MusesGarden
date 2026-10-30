@@ -8,7 +8,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 5 | https://garden-of-muse-iteration-5.vercel.app | the commit with this table |
+| 6 | https://muses-garden-iteration-6.vercel.app | the commit with this table |
+| 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
 The latest is also at https://the-meadow-omega.vercel.app. Each iteration is
@@ -16,25 +17,111 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 6: the review notes (in progress)
+## Iteration 6: the review notes
 
-Started from iteration 5 (b1209d0). This table fills in as the notes are done.
+Started from iteration 5 (b1209d0), the notes committed first (f65e137).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Commit before each iteration starts | This commit records the notes before any work. |
-| 2 | Butterflies and birds beat their wings too fast; butterflies look like flies and should move elegantly | |
-| 3 | Birds a little slower and lower | |
-| 4 | Sheen 0.5 by default | |
-| 5 | The grass's small, gentle sway doesn't match the wind speed and seems unrelated to the sheen | |
-| 6 | The budget is 24 ms: Auto culls grass too eagerly, and High doesn't go very high | |
-| 7 | Cloud shadows stutter across the ground (their map's resolution), most of all in a large world | |
-| 8 | The cottage: match the design 1 to 1 | |
-| 9 | Grade: about 10 % more contrast, 5 % less brightness | |
-| 10 | Petals blown off by the wind are hard to find in places | |
-| 11 | The painted flower strokes seen from far out should follow the flower map and turn straight into the flowers on the way down | |
-| 12 | (added during the iteration) Cloud reflections are layered over the reflections of the grass and the ground | |
-| 13 | (added during the iteration) The name: Muse's Garden | |
+| 1 | Commit before each iteration starts | The notes were committed before any work (f65e137); from now on every iteration starts that way. |
+| 2 | Butterflies and birds beat their wings too fast; butterflies look like flies and should move elegantly | Butterflies fly in bursts of a few slow, full beats (2.8–4 a second by kind, from 9–12), the body bobbing up on each downstroke and climbing through the burst, then glide on wings held in a shallow V, sinking a little; their loops are slower and smoother. The whites flutter on longest, the tortoiseshells and peacocks glide most. Birds beat like egrets, 1.7–2.1 a second (from 2.7–3.1), deeper, and glide about a third of the time. |
+| 3 | Birds a little slower and lower | 5–6 m/s (from 6–8); over the ground beneath them 4.6 m on the median (from 6.1), never under 1.7 m. |
+| 4 | Sheen 0.5 by default | Done (from 0.85). |
+| 5 | The grass's sway is too small for the wind and seems unrelated to the sheen | The blades now bow with the same waves the light shows: a gust's crest lays them well over (about 35° more at the default wind, from about 10°), its trough springs them back a little past upright, and their flutter is quicker and wider in a stronger wind and where a gust is pressing. |
+| 6 | The budget is 24 ms: Auto culls grass too eagerly, and High doesn't go very high | Three tiers: low, medium (iteration 5's high) and a higher high: grass to 35 m (from 22) and thicker toward its edge, flowers to 45 m (from 30). Auto aims at 24 ms instead of 16.7, first lowers the render scale (to 0.72, not 0.6), then steps down one tier at a time instead of dropping straight to low, and climbs back when frames are easy. The pools are sized for high on every tier, so choosing High after Auto started lower now fills in completely (before, the grass ran short). MSAA no longer switches on when Auto lowers the render scale. The answer on the budget is under Measured. |
+| 7 | Cloud shadows stutter across the ground, most of all in a large world | The cause: each puff's shadow had a hard outline in its map, so a drifting cloud flipped whole texels (half a meter at R 400) from sun to shadow. The outline is now antialiased over a texel and a half, and a second, sharper map (2048²) covers the ground about you, its texels fixed to the planet. Seen 5 m up at R 400, the shadow edge's per-frame motion went from 0.76 to 0.21 in unevenness (sd over mean), and the edge is crisper ([the clip](docs/checkpoints/iteration-6/cloud-shadow-edge-r400.gif)). |
+| 8 | The cottage: match the design 1 to 1 | Rebuilt after the painting. The original brief's rule (an original building, not the film's) is lifted for the cottage at your request. The painting's layout: a tall window toward the left of the front and the door right of the middle with the bench between them, a small window high on the right end, the chimney mid-ridge. The floor is raised over the meadow with three steps at the terrace's right end. A stone pier runs out over the pond at its left end, with an arch at the waterline, an iron rail along its back and a wooden chair by the corner. Proportions come from the painting: the ridge is a third of the eaves' length, giving 8.6 × 5.3 m under a 45° roof of fourteen finer courses, with eaves half a meter out. Colours are sampled from it: warm beige walls, olive-grey in shade, a warm grey-brown roof with less moss, an olive-grey eave shadow. The pond now lies in front and to the left, under the pier, and the sun ahead and to the left, as in the painting. The homestead view frames the cottage as the painting does. The mirror in the pond has the pier and the chimney too. |
+| 9 | Grade: about 10 % more contrast, 5 % less brightness | Contrast 1.1 about mid grey, brightness 0.95, in display space after the tone curve; both are sliders under Style. |
+| 10 | Petals blown off by the wind are hard to find in places | They were held back by a threshold that the default wind never reached, so they only lifted at the bloom front's edge or in a strong wind. Now they lift wherever flowers grow as each gust crest passes, in the colours of those flowers, 720 of them (from 480), more of them near you. |
+| 11 | The flower strokes from far out should follow the flower map and turn straight into the flowers | The strokes come from the same density map the flowers are scattered by. They used to stop shrinking at 0.55 m, so from mid heights they became sparse dots and the colour wash switched off. Now they keep about 5 px from orbit down to a single flower's size, drawn out a little along the brush's way, and the wash holds all the way down. Both give way to the flowers only where those are big enough on screen to carry the flowerbeds ([120 m down to 3 m](docs/checkpoints/iteration-6/flowers-from-120m-to-3m.jpg)). |
+| 12 | (added during the iteration) Cloud reflections are layered over the reflections of the grass and the ground | The water now shows the clouds' reflection only where the mirrored ray clears the land: a bank or hill it meets stands in front of every cloud. |
+| 13 | (added during the iteration) The name: Muse's Garden | The headline, the tab, the postcard and the fallback screen; new iteration pages are muses-garden-iteration-N. |
+
+Checkpoint images: [docs/checkpoints/iteration-6](docs/checkpoints/iteration-6/).
+
+### How it is built (summary)
+
+- **Cloud shadows:** splats antialiased at their outline; a window of one
+  cube face about the focus at 2048² (70–320 m across by camera height,
+  moved in whole texels, sized in steps), read where it covers a point and
+  blended into the cube map at its rim.
+- **Tiers:** `TIERS` in core/quality.ts (low, medium, high) with their map
+  sizes; `POOL_PAGES` sized for high; the controller aims at
+  `FRAME_BUDGET_MS` (24).
+- **The cottage:** props.ts (`FLOOR`, `COTTAGE`, `TERRACE`, `PIER`,
+  `STEPS`, `CHIMNEY`), mirrored in terrain (the clearing's areas, the
+  ground shadow, `POND_SHIFT`) and in water.glsl (the mirror's solids).
+  Change them together.
+- **Named views** can look up from the zoom's tilt (`CameraRig.lookUp`),
+  which eases away on the next move.
+
+### Squint test (the vista against the still, mean ΔE76 per cell)
+
+| | Overall | Far meadow and clouds | Lake and islands | Near meadow |
+|---|---|---|---|---|
+| Iteration 4 | 22.3 | 16.0 | 23.6 | 27.2 |
+| Iteration 5 | 23.5 | 16.6 | 24.4 | 29.5 |
+| Iteration 6 | 23.7 | 16.9 | 26.2 | 27.8 |
+
+The near meadow is closer (the darker grade and the calmer sheen); the lake
+is further off: darker than the still's (#5f856f against #71969d), from the
+grade and the far banks now reflected in front of the clouds. The guard
+(fails above 26) passes.
+
+## Measured (iteration 6)
+
+Apple **M1 Pro**, headless Chromium on Metal, frames back to back waiting
+for the GPU, at 1440×900 and DPR 2 (2880×1800). The GPU was shared with a
+Chrome window during this iteration, so both builds were measured back to
+back. On a quiet machine iteration 5's views were about a quarter faster than
+the "iteration 5" column below (vista 18.0 ms then against 23.9 here).
+
+| View | Iteration 5 | Iteration 6, medium | Iteration 6, high |
+|---|---|---|---|
+| Overview | 10.3 | – | 10.2 |
+| Wander, R 128 m | 7.7 | 7.8 | 12.3 |
+| Wander, R 400 m | 9.3 | – | 14.4 |
+| Vista | 23.9 | 23.9 | 26.1 |
+| Lakes | 23.2 | 24.1 | 26.0 |
+| Cottage view (the new framing takes in the whole pond) | 24.2 | 27.8 | 29.4 |
+| Phone overview / Wander / Vista (low) | 2.5 / 2.3 / 5.6 | | 2.7 / 2.1 / 5.7 |
+
+- **The budget:** on a quiet M1 Pro at 2880×1800, High should run at about
+  9 ms in Wander and 19–22 ms in the vista, lakes and cottage views, inside
+  24 ms. Medium costs what iteration 5's High did. On a slower GPU or a
+  bigger canvas, Auto first trims the render scale in the heavy views and
+  only then steps to medium.
+- **High's extra cost** is the grass and flowers it adds (320k blades in
+  sight from 164k in Wander): 4–5 ms in Wander, 2–3 ms in the heavy views.
+- **The shadow window** costs about 0.2 ms.
+- **Growth scrub, first frame, draw calls:** the invariants pass.
+
+## Trades (iteration 6)
+
+None. Still standing from earlier iterations: cloud self-shadowing one value
+per puff; lumps from a baked cube map; bird shadows as soft discs; the
+13-step bank march; quick bake while growing; 256² field maps on medium;
+MSAA only below DPR 1.75. The eaves' shadow is drawn a little shallower than
+the geometry would cast it (a choice of look).
+
+## Known issues
+
+- **The cottage view is the heaviest** (29.4 ms on High here with the GPU
+  shared; about 22 ms quietly).
+- **The lake in the squint test** reads darker than the still's.
+- **The cottage's mirror** is plain solids: no steps, bench or rail in the
+  water.
+- **The layout changed again** (the pond moved to the cottage's front left,
+  the sun to its left): the cottage view, the lakes view and the default
+  stand differ from iteration 5.
+- **Carried over:** the warp's flat band on the way down; triangle figure,
+  pools after a scrub, tier probe, LOD-ring test.
+
+## Next
+
+1. Composition of the vista (flowers in front, the cloud upper right).
+2. The lake's colour against the still.
+3. Then dawn and golden hour, graded the same way.
 
 ## Iteration 5: the review notes
 
@@ -88,7 +175,7 @@ Slightly worse than iteration 4, all in the near-meadow third: the brighter
 wind crests (note 4) lighten the grass there (#71907c against the still's
 #68874d). The guard (fails above 26) passes.
 
-## Measured (iteration 5)
+### Measured (iteration 5)
 
 Apple **M1 Pro**, headless Chromium through ANGLE on Metal, frames back to back
 waiting for the GPU; runs vary by about ±1 ms. Iteration 4 in brackets. The
@@ -113,7 +200,7 @@ default Wander stand and the cottage view are new places (the layout changed).
   2880×1800; 51 MB on a phone (low tier). The budget is 256 MB.
 - **Growth scrub:** JS p95 under 4 ms (the invariant passes 8 runs out of 8).
 
-## Trades (iteration 5)
+### Trades (iteration 5)
 
 None new. Still standing from earlier iterations: cloud self-shadowing one
 value per puff; lumps from a baked cube map; bird shadows as soft discs; the
@@ -121,7 +208,7 @@ value per puff; lumps from a baked cube map; bird shadows as soft discs; the
 DPR 1.75. The eaves' shadow is drawn a little shallower than the geometry
 would cast it, as the painters do (a choice of look, not of speed).
 
-## Known issues
+### Known issues (iteration 5)
 
 - **Water views cost more** (19.9 ms for the lakes view at 2880×1800 on an M1
   Pro); a slower machine would lower its render scale there (the quality
@@ -135,7 +222,7 @@ would cast it, as the painters do (a choice of look, not of speed).
 - **Carried over:** the warp's flat band on the way down; triangle figure,
   pools after a scrub, tier probe, LOD-ring test.
 
-## Next
+### Next (iteration 5)
 
 1. Composition of the vista (flowers in front, the cloud upper right).
 2. The cottage's reflection with its chimney and stair, softer edges.
