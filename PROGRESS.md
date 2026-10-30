@@ -19,6 +19,17 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 9: the review notes (in progress)
+
+Started from iteration 8 (a76417f). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | The cottage's reflection is still wrong: the reflection's stand-in model? | |
+| 2 | Why does the left side of the building arch up? | |
+| 3 | On a small planet buildings should curve with it, their walls always perpendicular to the surface (like Messenger's) | |
+| 4 | The roof and the foundation a bit more mossy | |
+
 ## Iteration 8: the review notes
 
 Started from iteration 7 (1ca0327), the notes committed first (9030555).
