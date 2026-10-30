@@ -5,6 +5,7 @@ import type { Globals } from './core/globals';
 import type { Tier } from './core/quality';
 import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
+import { Birds } from './life/birds';
 import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
@@ -74,6 +75,7 @@ export class World {
   readonly flowers: Flowers;
   homestead: Homestead;
   readonly clouds: Clouds;
+  readonly birds: Birds;
   readonly petals: Petals;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
@@ -142,7 +144,9 @@ export class World {
     this.homestead = new Homestead(this.shared, store.values.world.seed);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.name === 'high' ? 2048 : 1024);
     this.petals = new Petals(this.shared);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.clouds.mesh);
+    this.birds = new Birds(this.shared);
+    this.clouds.addShadowCaster(this.birds.shadowMesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -350,6 +354,7 @@ export class World {
     const sy = Math.max(this.sunDir.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(this.sunDir.dot(across) / sy, this.sunDir.dot(L.homeBearing) / sy, 0, 0);
     (this.shared.uOutline.value as Vector4).x = p.style.outlineWidth;
+    this.birds.update(clock.time, this.terrain, rig.up, rig.forward);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp);
 
     const cam = rig.camera;

@@ -394,6 +394,7 @@ export class Clouds {
   private readonly shadowCamera = new OrthographicCamera();
   private readonly lumps = new WebGLCubeRenderTarget(64, { generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false });
   private lumpsBaked = false;
+  private casters = 0;
   private lines: Line[] = [];
   private templates: Puff[][] = [];
   private seed = Number.NaN;
@@ -465,6 +466,12 @@ export class Clouds {
     const shadowMesh = new Mesh(this.shadowGeometry, shadowMaterial);
     shadowMesh.frustumCulled = false;
     this.shadowScene = new Scene().add(shadowMesh);
+  }
+
+  /** Something else that casts its shadow into the clouds' map (the birds): drawn after the puffs, additively. */
+  addShadowCaster(mesh: Mesh): void {
+    this.shadowScene.add(mesh);
+    this.casters++;
   }
 
   /** Bake the lumps into their cube map (once). */
@@ -713,7 +720,7 @@ export class Clouds {
     renderer.setRenderTarget(this.shadowTarget);
     renderer.setClearAlpha(0);
     renderer.clear(true, false, false);
-    if (n > 0) renderer.render(this.shadowScene, this.shadowCamera);
+    if (n > 0 || this.casters > 0) renderer.render(this.shadowScene, this.shadowCamera);
     renderer.setClearAlpha(clearAlpha);
     renderer.setRenderTarget(previous);
   }

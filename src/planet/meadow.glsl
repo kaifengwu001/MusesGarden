@@ -201,7 +201,7 @@ vec3 meadowPaint(Meadow m) {
   float d1 = dab(m.dir, f1, fill * (1.0 - 0.75 * m.nearFade), uTerrainSeed + 101u + lv, r1) * t;
   float lightness = clamp(m.light * 1.1, 0.0, 1.0);
   // under a cloud the dabs sink into the shade with the grass (as the near flowers do)
-  float dim = 1.0 - 0.32 * (1.0 - m.sunlit);
+  vec3 dim = mix(vec3(1.0), vec3(0.68, 0.7, 0.8) / vec3(0.62, 0.84, 1.02), 1.0 - m.sunlit);
   // far away the dabs merge: the colonies read as washes of their colour
   float far = fill * smoothstep(0.05, 0.6, m.pixelMeters) * 0.55;
   if (far > 0.002) {

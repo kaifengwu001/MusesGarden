@@ -116,8 +116,9 @@ void main() {
   }
   // buds: green, tinted toward the bloom colour as they open
   if (aPart > 0.5) col = mix(tone3(pal(ROW_BUD, 0), pal(ROW_BUD, 0), pal(ROW_GRASS, 2), b), col, smoothstep(0.15, 0.85, open));
-  // under a cloud the petals sink into the shade with the grass (whites go blue-grey)
-  col *= cloudTint(meadow.z) * (1.0 - 0.32 * meadow.z);
+  // under a cloud the petals sink into the shade with the grass, keeping their
+  // hue (a cooler tint than the grass's, which would turn the pinks purple)
+  col *= mix(vec3(1.0), vec3(0.68, 0.7, 0.8), clamp(meadow.z, 0.0, 1.0));
   vec3 toCam = cameraPosition - world;
   col += pal(ROW_LIGHT, 3) * aT * clamp(dot(-normalize(toCam), uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.12 * uToon.z * (1.0 - shadow);
 

@@ -131,6 +131,13 @@ CloudHit traceCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec
   float entry[PUFFS];
   float reach[PUFFS];
   float erode = 0.5 + 0.5 * cloudFade(cl);
+  // where the ray is inside two puffs it is inside the heap, whatever their
+  // lumps do (crease against crease would leave pinholes): kept as a fallback front
+  int inner = 0;
+  float tFill = 1e9;
+  int fill = -1;
+  vec3 fillCentre = vec3(0.0);
+  float fillShadow = 0.0;
   for (int k = 0; k < PUFFS; k++) {
     entry[k] = 1e9;
     reach[k] = 0.0;
@@ -143,6 +150,17 @@ CloudHit traceCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec
     float rOut = puff.w * (1.0 + 1.5 * CLOUD_LUMPS);
     if (d2 >= rOut * rOut || tc < -puff.w) continue;
     float d = sqrt(d2);
+    float shadow = k < 4 ? shadowA[k] : shadowB[k - 4];
+    if (d < puff.w) {
+      inner++;
+      float tb = max(tc - sqrt(puff.w * puff.w - d2), 0.0);
+      if (tb < tFill) {
+        tFill = tb;
+        fill = k;
+        fillCentre = puff.xyz;
+        fillShadow = shadow;
+      }
+    }
     // the lumps only matter where the ray passes near the outline
     float rl = puff.w;
     if (d > puff.w * (1.0 - CLOUD_LUMPS)) {
@@ -161,7 +179,17 @@ CloudHit traceCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec
       h.t = t0;
       h.front = k;
       h.frontCentre = puff.xyz;
-      h.shadow = k < 4 ? shadowA[k] : shadowB[k - 4];
+      h.shadow = shadow;
+    }
+  }
+  if (inner >= 2) {
+    h.cover = 1.0;
+    h.thick = max(h.thick, cl.size);
+    if (h.front < 0) {
+      h.t = tFill;
+      h.front = fill;
+      h.frontCentre = fillCentre;
+      h.shadow = fillShadow;
     }
   }
   if (h.front < 0) return h;
@@ -177,6 +205,7 @@ CloudHit traceCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec
     vec4 puff = puffs[k];
     if (puff.w <= 0.0) continue;
     if (entry[k] < 1e8) normal += normalize(p + rd * (entry[k] - h.t) - puff.xyz) * exp(-(entry[k] - h.t) / (0.12 * reach[k]));
+    else if (k == h.front) normal += normalize(p - puff.xyz);
     if (k != h.front) h.crease += smoothstep(1.45, 0.95, length(p - puff.xyz) / puff.w);
   }
   h.normal = normalize(normal);
