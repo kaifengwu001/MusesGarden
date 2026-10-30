@@ -17,6 +17,17 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 7: the review notes (in progress)
+
+Started from iteration 6 (3dbb552). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Grass loads in late when zooming in, completing in chunks: jarring | |
+| 2 | Perceived performance is much worse: what changed? | |
+| 3 | The painterly flower pattern is a little too strong: about 20 % softer | |
+| 4 | The cottage: the ridge floats above the roof; the windows should sit deeper in the walls; the eaves' shadow should reach further down; the chimney sits behind the ridge, not on it; at high curvature the building's foot lifts above the water | |
+
 ## Iteration 6: the review notes
 
 Started from iteration 5 (b1209d0), the notes committed first (f65e137).
