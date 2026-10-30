@@ -5,10 +5,12 @@ import vertexShader from './petal.vert.glsl?raw';
 
 // Petals lifting off: a fixed pool whose every state is a closed-form
 // function of time (cycle index and age from a per-petal phase), so frozen
-// frames are deterministic. A petal only shows where it spawns on the bloom
-// front's edge or in a strong gust, within the near field.
+// frames are deterministic. A petal only shows where it spawns among
+// flowers, as a gust's crest passes over them (at any wind that has gusts)
+// or on the bloom front's edge, within the near field; it takes the colour
+// of the flowers there.
 
-const COUNT = 480;
+const COUNT = 720;
 
 export class Petals {
   readonly mesh: Mesh;

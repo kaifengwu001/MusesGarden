@@ -67,7 +67,8 @@ void main() {
   // the meadow, wherever any of it shows
   vec3 land = vec3(0.0);
   if (wet < 1.0) {
-    float nearFade = uNearField.w > 0.01 ? 1.0 - smoothstep(uNearField.w * 0.55, uNearField.w, chordAngle(dir, uNearField.xyz) * uRadius) : 0.0;
+    // the paint's flowers give way to the flowers themselves in the near field, where those are big enough on screen to carry it
+    float nearFade = uNearField.w > 0.01 ? (1.0 - smoothstep(uNearField.w * 0.55, uNearField.w, chordAngle(dir, uNearField.xyz) * uRadius)) * (1.0 - smoothstep(0.03, 0.07, pixelMeters)) : 0.0;
     Meadow m;
     m.dir = dir;
     m.lush = fields.g;

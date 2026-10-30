@@ -14,6 +14,12 @@ uniform vec4 uUserBloom[MAX_USER_BLOOMS]; // press-and-hold discs: centre direct
 
 // Flowers per m² at which every dab cell of the far paint holds a flower.
 const float DAB_SATURATION = 12.0;
+// The dabs: never smaller than a flower (m) or than DAB_PIXELS on screen, so
+// from orbit down to the meadow they read as the same brushed marks, only
+// finer in meters as you come down, until each is a flower's size where the
+// flowers themselves take over (meadowPaint).
+const float DAB_METERS = 0.16;
+const float DAB_PIXELS = 5.0;
 
 // Wind direction at a point: a solid-body rotation field around uWindVec.xyz.
 vec3 windDir(vec3 dir) {
@@ -57,18 +63,21 @@ float strokes(vec3 dir, float freq, vec3 along, uint seed) {
   return gnoise(p, seed);
 }
 
-// A dab per occupied lattice cell, kept inside the cell's core so it is never
-// cut by a cell border. Returns coverage; r: two randoms (species, colour).
-float dab(vec3 dir, float freq, float fill, uint seed, out vec2 r) {
+// A dab per occupied lattice cell: a short brushed mark drawn out a little
+// along `along` (the brush's way), kept inside the cell's core so it is
+// never cut by a cell border. Returns coverage; r: two randoms (species,
+// colour).
+float dab(vec3 dir, float freq, float fill, vec3 along, uint seed, out vec2 r) {
   vec3 p = dir * freq;
   vec3 cell = floor(p);
   uint h = meadowHash(ivec3(cell), seed);
   vec3 jitter = vec3(float(h & 255u), float((h >> 8) & 255u), float((h >> 16) & 255u)) / 255.0;
-  vec3 centre = cell + 0.3 + 0.4 * jitter;
+  vec3 centre = cell + 0.33 + 0.34 * jitter;
   float keep = float((h >> 24) & 255u) / 255.0;
   r = vec2(fract(keep * 7.31 + jitter.x * 3.7), fract(jitter.z * 5.3 + keep * 1.7));
-  float d = length(p - centre);
-  float rad = 0.19 + 0.09 * jitter.y;
+  vec3 q = p - centre;
+  float d = length(q - along * dot(q, along) * 0.3);
+  float rad = 0.17 + 0.07 * jitter.y;
   return keep < fill ? smoothstep(rad, rad * 0.55, d) : 0.0;
 }
 
@@ -189,22 +198,29 @@ vec3 meadowPaint(Meadow m) {
   col = mix(col, col * vec3(0.56, 0.66, 0.58), trough * 0.85);
   col = mix(col, pal(ROW_GRASS, 8) * uSunTint, crest * mix(0.4, 1.0, m.sunlit) * (0.75 + 0.25 * smoothstep(-0.2, 0.6, s)));
 
-  // flowers: dabs where the clumps are, coloured by species and colony
+  // flowers: dabs where the clumps are (the same density map the flowers are
+  // scattered by), coloured by species and colony; where the flowers
+  // themselves stand (the near field) the paint gives way to them
   if (dot(m.flora, vec4(1.0)) > 0.02) m.flora *= clumpsAt(m.dir);
   float total = dot(m.flora, vec4(1.0));
   float land = smoothstep(0.15, 0.7, m.shore);
   float fill = clamp(total / DAB_SATURATION, 0.0, 1.0) * m.bloom * land * uMeadowLook.y;
   float f0, f1;
   uint lv;
-  float t = patternOctaves(0.55, m.pixelMeters, 5.0, f0, f1, lv);
+  float t = patternOctaves(DAB_METERS, m.pixelMeters, DAB_PIXELS, f0, f1, lv);
+  // the brush's way: along the wind, turned slowly from place to place
+  float turn = 0.7 * gnoise(m.dir * (uRadius / 9.0), uTerrainSeed + 102u);
+  vec3 brush = along * cos(turn) + cross(m.dir, along) * sin(turn);
   vec2 r0, r1;
-  float d0 = dab(m.dir, f0, fill * (1.0 - 0.75 * m.nearFade), uTerrainSeed + 100u + lv, r0) * (1.0 - t);
-  float d1 = dab(m.dir, f1, fill * (1.0 - 0.75 * m.nearFade), uTerrainSeed + 101u + lv, r1) * t;
+  float paintFill = fill * (1.0 - 0.9 * m.nearFade);
+  float d0 = dab(m.dir, f0, paintFill, brush, uTerrainSeed + 100u + lv, r0) * (1.0 - t);
+  float d1 = dab(m.dir, f1, paintFill, brush, uTerrainSeed + 101u + lv, r1) * t;
   float lightness = clamp(m.light * 1.1, 0.0, 1.0);
   // under a cloud the dabs sink into the shade with the grass (as the near flowers do)
   vec3 dim = mix(vec3(1.0), vec3(0.68, 0.7, 0.8) / vec3(0.62, 0.84, 1.02), 1.0 - m.sunlit);
-  // far away the dabs merge: the colonies read as washes of their colour
-  float far = fill * smoothstep(0.05, 0.6, m.pixelMeters) * 0.55;
+  // the colonies read as washes of their colour under the dabs, strongest far
+  // away where the dabs merge, held all the way down to the flowers
+  float far = fill * (0.28 + 0.27 * smoothstep(0.05, 0.6, m.pixelMeters)) * (1.0 - m.nearFade);
   if (far > 0.002) {
     vec3 wash = (m.flora.x * uFloraWash[0] + m.flora.y * uFloraWash[1] + m.flora.z * uFloraWash[2] + m.flora.w * uFloraWash[3]) / total;
     col = mix(col, wash * mix(0.72, 1.0, lightness), far);
