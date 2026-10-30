@@ -8,11 +8,13 @@ next. Each iteration has its own page for comparison (see Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 5 | https://garden-of-muse-iteration-5.vercel.app | (this iteration) |
+| 5 | https://garden-of-muse-iteration-5.vercel.app | 6ddf1d6 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
-The latest is also at https://the-meadow-omega.vercel.app. `scripts/publish.sh N`
-builds the current checkout and publishes it as iteration N.
+The latest is also at https://the-meadow-omega.vercel.app. Each iteration is
+its own Vercel project, so its production address is public and stays put.
+`scripts/publish.sh N --latest` publishes the checkout as iteration N and as
+the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
 ## Iteration 5: the review notes
 
