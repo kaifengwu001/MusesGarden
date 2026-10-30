@@ -5,32 +5,43 @@ import { BANK, HOME_LEVEL } from '../planet/terrain';
 import fragmentShader from './props.frag.glsl?raw';
 import vertexShader from './props.vert.glsl?raw';
 
-// The cottage, its landing and their furniture: an original design, built
-// from procedural geometry in a local frame in meters (y up, +z toward the
-// pond) and painted in the shader (props.frag.glsl), never textured. Nothing
-// here depends on R; the frame is placed on the planet each frame, so the
-// cottage keeps its size and stays seated on its clearing. A long, low
-// house under a big roof, as the painted meadow cottages are (proportions
-// measured from the reference: the walls below the eaves about 4.4 times
-// as long as they are tall, the roof a little taller than them):
+// The cottage, its terrace and their furniture, built after the meadow
+// cottage of the reference painting (its layout matched one to one, at
+// Kai's request after iteration 5), from procedural geometry in a local
+// frame in meters (y up on the clearing, +z toward the pond, +x to the right
+// seen from the front) and painted in the shader (props.frag.glsl), never
+// textured. Nothing here depends on R; the frame is placed on the planet each
+// frame, so the cottage keeps its size and stays seated on its clearing.
+// Proportions measured from the painting (the ridge a third of the eaves'
+// length, so the roof's pitch and the plan follow): a house 8.6 × 5.3 m under
+// a steep roof a little taller than its walls:
 //
-//   walls    solid, plastered, 9 × 5 m, 2.5 m to the roof (2.1 m below the
-//            eaves). Every face carries how far it is from an edge (corner,
-//            foot, top, an opening) and from a corner, for the paint
-//   roof     hipped, the same 38° pitch all round (so the ridge is the eaves'
-//            length less their depth), deep eaves just above the door and
-//            the windows, a little crooked: the ridge sags, one end droops,
-//            the slopes dip. Built of nine courses of tiles a side, each
-//            course's foot standing proud of the one below (a real step that
-//            catches the light and throws a line of shadow), with beaded
-//            capping tiles along the hips and the ridge
-//   chimney  small and plastered, on the ridge
-//   landing  a plastered stone terrace over the pond, as high as the
-//            cottage's ground stands above the water, a stair down to the
-//            water along its face, a low brick arch at the waterline
-//            (painted), an iron rail, a bench under a window, a doorstep
+//   walls    solid, plastered, standing on the clearing, the floor raised
+//            FLOOR above it; the eaves 2.4 m over the floor. On the front a
+//            tall window toward the left end and the door right of the
+//            middle, a bench between them; a small window high on the right
+//            end toward the back; a small one at the back. Every face carries
+//            how far it is from an edge (corner, foot, top, an opening) and
+//            from a corner, for the paint
+//   roof     hipped, the same 45° pitch all round (so the ridge is the eaves'
+//            length less their depth), the eaves standing out half a meter,
+//            a little crooked: the ridge sags, one end droops, the slopes
+//            dip. Built of fourteen courses of tiles a side, each course's foot standing proud of
+//            the one below (a real step that catches the light and throws a
+//            line of shadow), with beaded capping tiles along the hips and
+//            the ridge
+//   chimney  plastered stone with a cap, on the middle of the ridge
+//   terrace  a plastered stone terrace along the front at the floor's
+//            height, three steps down to the meadow at its right end; at its
+//            left end a pier out over the pond, an arch at the waterline in
+//            its face (painted) and an iron rail along its back; a wooden
+//            chair by the house's corner, a doorstep
 
-export const COTTAGE = { halfX: 4.32, halfZ: 2.32, wall: 2.5, thickness: 0.36, overhang: 0.62, pitch: (38 * Math.PI) / 180 } as const;
+/** The floor and the terrace stand this high over the clearing (m): three steps down to the meadow. */
+export const FLOOR = 0.72;
+export const COTTAGE = { halfX: 4.12, halfZ: 2.45, wall: 3.45, thickness: 0.36, overhang: 0.45, pitch: Math.PI / 4 } as const;
+/** The walls' outer faces (half sizes, m). */
+const OUTER = { x: COTTAGE.halfX + COTTAGE.thickness / 2, z: COTTAGE.halfZ + COTTAGE.thickness / 2 } as const;
 
 /** The roof as built: eave half sizes, eave line height, rise, half ridge, slope length, ridge height (m). */
 export const ROOF = (() => {
@@ -44,15 +55,27 @@ export const ROOF = (() => {
 })();
 
 /** Tile courses up each slope, how far each course's foot stands proud (m), the eave's edge (m), capping tiles' radius (m). */
-const COURSES = 9;
-const STEP_OUT = 0.055;
+const COURSES = 14;
+const STEP_OUT = 0.035;
 const EAVE_BAND = 0.11;
 const CAP = 0.085;
 
-/** Landing extent in local meters (x from, x to, z from, z to); its foot is just under the water. */
-export const LANDING = { x0: -3.3, x1: 3.0, z0: COTTAGE.halfZ + COTTAGE.thickness / 2, z1: 5.4, top: 0.02, base: -(HOME_LEVEL + BANK.height + 0.07) } as const;
+/**
+ * The terrace along the front, the pier out over the pond at its left end
+ * and the steps down to the meadow at its right (local meters: x from, x to,
+ * z from, z to); their tops are the floor, their feet just under the water.
+ */
+export const TERRACE = { x0: -OUTER.x - 0.1, x1: OUTER.x - 0.2, z0: OUTER.z - 0.3, z1: OUTER.z + 2.1 } as const;
+export const PIER = { x0: -OUTER.x - 3.9, x1: -OUTER.x + 0.9, z0: OUTER.z - 0.8, z1: OUTER.z + 3.0 } as const;
+export const STEPS = { x0: OUTER.x - 2.3, x1: OUTER.x - 0.5, count: 3, rise: FLOOR / 3, tread: 0.33 } as const;
+const BASE = -(HOME_LEVEL + BANK.height + 0.07);
 
 type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
+/** Where the front's openings are, along it from its left end (m), the end window along the right end from its front corner. */
+const FRONT = { window: [1.32, 2.52], door: [4.6, 5.7] } as const;
+const END_WINDOW = [3.3, 3.85] as const;
+/** The chimney on the ridge: x (m) and half width. */
+export const CHIMNEY = { x: 0.1, half: 0.27 } as const;
 const KIND_ID: Record<Kind, number> = { wall: 0, roof: 1, wood: 2, iron: 3, glass: 4, landing: 5 };
 
 /** Grid step (m) of the painted faces: fine enough that the edge distances interpolate. */
@@ -240,9 +263,9 @@ function rectDistance(u: number, v: number, o: Opening): number {
 
 /** The house's walls: plastered faces with their openings, and the reveals inside the openings. */
 function walls(b: Builder, rand: Rand): WallFace[] {
-  const { halfX, halfZ, wall, thickness } = COTTAGE;
-  const ex = halfX + thickness / 2;
-  const ez = halfZ + thickness / 2;
+  const { wall, thickness } = COTTAGE;
+  const ex = OUTER.x;
+  const ez = OUTER.z;
   const foot = -0.12;
   const W = (sx: number, sz: number, ax: number, az: number, ox: number, oz: number, length: number, openings: Opening[]): WallFace => ({
     start: new Vector3(sx, foot, sz),
@@ -251,18 +274,18 @@ function walls(b: Builder, rand: Rand): WallFace[] {
     length,
     openings,
   });
-  // doors and windows reach up to just under the eaves, as in the paintings
+  // the door and the tall window reach up to just under the eaves, as in the painting
+  const top = FLOOR + 2.15;
   const faces = [
-    // front (toward the pond): a window, the door left of the middle, a window over the bench
+    // front (toward the pond): the tall window toward the left end, the door right of the middle
     W(-ex, ez, 1, 0, 0, 1, 2 * ex, [
-      { from: 1.15, to: 2.6, bottom: 0.92, top: 1.92, door: false },
-      { from: 3.65, to: 4.65, bottom: 0, top: 1.95, door: true },
-      { from: 5.8, to: 7.25, bottom: 0.92, top: 1.92, door: false },
+      { from: FRONT.window[0], to: FRONT.window[1], bottom: FLOOR + 0.85, top, door: false },
+      { from: FRONT.door[0], to: FRONT.door[1], bottom: FLOOR, top, door: true },
     ]),
-    // right end: a small window
-    W(ex, ez, 0, -1, 1, 0, 2 * ez, [{ from: 2.1, to: 2.9, bottom: 1.1, top: 1.85, door: false }]),
+    // right end: a small window high up, toward the back
+    W(ex, ez, 0, -1, 1, 0, 2 * ez, [{ from: END_WINDOW[0], to: END_WINDOW[1], bottom: FLOOR + 1.35, top: FLOOR + 2.05, door: false }]),
     // back: a small window
-    W(ex, -ez, -1, 0, 0, -1, 2 * ex, [{ from: ex - 0.4, to: ex + 0.4, bottom: 1.05, top: 1.85, door: false }]),
+    W(ex, -ez, -1, 0, 0, -1, 2 * ex, [{ from: ex - 0.35, to: ex + 0.35, bottom: FLOOR + 1.3, top: FLOOR + 2.05, door: false }]),
     // left end: blind
     W(-ex, -ez, 0, 1, -1, 0, 2 * ez, []),
   ];
@@ -433,28 +456,28 @@ function roof(b: Builder, rand: Rand): void {
   capLine(Q, P, capUp(0, 1), Math.max(2, Math.round((2 * ridge) / course)));
 }
 
-/** The landing, its stair down to the water and the doorstep: plastered stone, painted per face. */
+/** The terrace, the pier, the steps and the doorstep: plastered stone, painted per face. */
 function landing(b: Builder, rand: Rand): void {
-  const L = LANDING;
-  const top = L.top - 0.02;
-  b.box(new Vector3((L.x0 + L.x1) / 2, (L.base + top) / 2, (L.z0 + L.z1) / 2), new Vector3((L.x1 - L.x0) / 2, (top - L.base) / 2, (L.z1 - L.z0) / 2), null, L.top, 0, 'xXYZ');
-  // a stair along the landing's face, from its right end down into the water
-  const rise = 0.2;
-  const tread = 0.34;
-  const steps = Math.ceil((L.top - L.base - 0.1) / rise);
-  for (let k = 0; k < steps; k++) {
-    const stepTop = L.top - rise * (k + 1);
-    const x = L.x1 - tread * (k + 0.5);
-    b.box(new Vector3(x, (stepTop + L.base) / 2, L.z1 + 0.25), new Vector3(tread / 2, (stepTop - L.base) / 2, 0.25), new Matrix4().makeRotationY(rand.range(-0.01, 0.01)), L.base, 0, 'xXYZ');
+  const top = FLOOR - 0.02;
+  const slab = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, faces: string, turn: Matrix4 | null = null): void =>
+    b.box(new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), new Vector3((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2), turn, FLOOR, 0, faces);
+  slab(TERRACE.x0, TERRACE.x1, TERRACE.z0, TERRACE.z1, BASE, top, 'xXYZ');
+  slab(PIER.x0, PIER.x1, PIER.z0, PIER.z1, BASE, top, 'xXYzZ');
+  // three steps down to the meadow from the terrace's right end, each a little out of true
+  const { rise, tread } = STEPS;
+  for (let k = 0; k < STEPS.count; k++) {
+    const stepTop = FLOOR - rise * (k + 1);
+    const z0 = TERRACE.z1 + tread * k;
+    slab(STEPS.x0, STEPS.x1, z0, z0 + tread + 0.02, BASE, stepTop, 'xXYZ', new Matrix4().makeRotationY(rand.range(-0.012, 0.012)));
   }
   // the doorstep, under the door
-  b.box(new Vector3(-0.35, 0.05, L.z0 + 0.18), new Vector3(0.58, 0.06, 0.18), null, 0, 0, 'xXYZz');
+  const door = -OUTER.x + (FRONT.door[0] + FRONT.door[1]) / 2;
+  b.box(new Vector3(door, FLOOR + 0.04, OUTER.z + 0.17), new Vector3(0.68, 0.05, 0.17), null, FLOOR, 0, 'xXYZz');
 }
 
-/** Wood (door, window frames, bench), glass and iron, from boxes (flags: 1 the door, 2 the bench). */
+/** Wood (door, window frames, bench, chair), glass and iron, from boxes (flags: 1 the door, 2 the bench and the chair). */
 function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[]): void {
-  const { thickness, halfZ } = COTTAGE;
-  const L = LANDING;
+  const { thickness } = COTTAGE;
   for (const f of faces) {
     const inward = f.out.clone().negate();
     const along = (u: number, y: number, depth: number): Vector3 => f.start.clone().addScaledVector(f.along, u).setY(y).addScaledVector(inward, depth);
@@ -465,32 +488,47 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
       const mid = (o.from + o.to) / 2;
       if (o.door) {
         // planks, painted with their iron straps (flag 1), set back in the wall
-        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, 0.03), turn, 0, 1);
+        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, 0.03), turn, FLOOR, 1);
         continue;
       }
-      // frame, small panes (four across the big windows, two the small), the glass set back
+      // a dark frame and small panes (two across and three up in the tall window, two by two in the small), the glass set back
       const fy = o.bottom + h / 2;
-      const across = w > 1 ? 4 : 2;
-      const up = w > 1 ? 3 : 2;
-      wood.box(along(mid, o.bottom + 0.035, 0.1), new Vector3(w / 2 + 0.02, 0.035, 0.05), turn, 0);
-      wood.box(along(mid, o.top - 0.035, 0.1), new Vector3(w / 2 + 0.02, 0.035, 0.05), turn, 0);
-      wood.box(along(o.from + 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, 0);
-      wood.box(along(o.to - 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, 0);
-      for (let k = 1; k < across; k++) wood.box(along(o.from + (w * k) / across, fy, 0.11), new Vector3(0.016, h / 2, 0.025), turn, 0);
-      for (let k = 1; k < up; k++) wood.box(along(mid, o.bottom + (h * k) / up, 0.11), new Vector3(w / 2, 0.016, 0.025), turn, 0);
-      glass.box(along(mid, fy, 0.14), new Vector3(w / 2, h / 2, 0.01), turn, 0);
+      const across = 2;
+      const up = h > 1 ? 3 : 2;
+      wood.box(along(mid, o.bottom + 0.035, 0.1), new Vector3(w / 2 + 0.02, 0.035, 0.05), turn, FLOOR);
+      wood.box(along(mid, o.top - 0.035, 0.1), new Vector3(w / 2 + 0.02, 0.035, 0.05), turn, FLOOR);
+      wood.box(along(o.from + 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, FLOOR);
+      wood.box(along(o.to - 0.035, fy, 0.1), new Vector3(0.035, h / 2, 0.05), turn, FLOOR);
+      for (let k = 1; k < across; k++) wood.box(along(o.from + (w * k) / across, fy, 0.11), new Vector3(0.02, h / 2, 0.025), turn, FLOOR);
+      for (let k = 1; k < up; k++) wood.box(along(mid, o.bottom + (h * k) / up, 0.11), new Vector3(w / 2, 0.018, 0.025), turn, FLOOR);
+      glass.box(along(mid, fy, 0.14), new Vector3(w / 2, h / 2, 0.01), turn, FLOOR);
     }
   }
-  // a bench under the window right of the door
-  const face = halfZ + thickness / 2;
-  wood.box(new Vector3(2.0, 0.45, face + 0.22), new Vector3(0.72, 0.035, 0.19), null, 0, 2);
-  wood.box(new Vector3(1.38, 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, 0, 2);
-  wood.box(new Vector3(2.62, 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, 0, 2);
-  wood.box(new Vector3(2.0, 0.14, face + 0.22), new Vector3(0.62, 0.025, 0.02), null, 0, 2);
-  // the rail along the landing's open side
-  for (const z of [L.z0 + 0.4, (L.z0 + L.z1) / 2 + 0.2, L.z1 - 0.12]) iron.box(new Vector3(L.x0 + 0.12, L.top + 0.45, z), new Vector3(0.022, 0.45, 0.022), null, 0);
-  iron.box(new Vector3(L.x0 + 0.12, L.top + 0.9, (L.z0 + L.z1) / 2 + 0.14), new Vector3(0.02, 0.022, (L.z1 - L.z0) / 2 - 0.24), null, 0);
-  iron.box(new Vector3(L.x0 + 0.12, L.top + 0.48, (L.z0 + L.z1) / 2 + 0.14), new Vector3(0.015, 0.015, (L.z1 - L.z0) / 2 - 0.26), null, 0);
+  // the bench against the front, between the window and the door
+  const face = OUTER.z;
+  const bx = -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12;
+  wood.box(new Vector3(bx, FLOOR + 0.45, face + 0.22), new Vector3(0.74, 0.035, 0.19), null, FLOOR, 2);
+  wood.box(new Vector3(bx - 0.62, FLOOR + 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, FLOOR, 2);
+  wood.box(new Vector3(bx + 0.62, FLOOR + 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, FLOOR, 2);
+  wood.box(new Vector3(bx, FLOOR + 0.14, face + 0.22), new Vector3(0.62, 0.025, 0.02), null, FLOOR, 2);
+  // a wooden chair by the house's left corner, turned a little toward the pond
+  const chair = new Matrix4().makeRotationY(0.5).setPosition(-OUTER.x - 0.55, 0, OUTER.z + 0.45);
+  const part = (x: number, y: number, z: number, hx: number, hy: number, hz: number): void => {
+    const c = new Vector3(x, y, z).applyMatrix4(chair);
+    wood.box(c, new Vector3(hx, hy, hz), new Matrix4().extractRotation(chair), FLOOR, 2);
+  };
+  part(0, FLOOR + 0.44, 0, 0.22, 0.025, 0.21);
+  for (const [x, z] of [[-0.18, -0.17], [0.18, -0.17], [-0.18, 0.17], [0.18, 0.17]]) part(x, FLOOR + 0.21, z, 0.025, 0.21, 0.025);
+  for (const x of [-0.18, 0.18]) part(x, FLOOR + 0.72, -0.19, 0.025, 0.28, 0.025);
+  part(0, FLOOR + 0.86, -0.19, 0.2, 0.09, 0.02);
+  // the iron rail along the pier's back, its posts set into the stone
+  const railZ = PIER.z0 + 0.12;
+  const rx0 = PIER.x0 + 0.15;
+  const rx1 = -OUTER.x - 0.2;
+  const posts = 6;
+  for (let k = 0; k < posts; k++) iron.box(new Vector3(rx0 + ((rx1 - rx0) * k) / (posts - 1), FLOOR + 0.47, railZ), new Vector3(0.022, 0.47, 0.022), null, FLOOR);
+  iron.box(new Vector3((rx0 + rx1) / 2, FLOOR + 0.94, railZ), new Vector3((rx1 - rx0) / 2 + 0.03, 0.022, 0.024), null, FLOOR);
+  iron.box(new Vector3((rx0 + rx1) / 2, FLOOR + 0.5, railZ), new Vector3((rx1 - rx0) / 2, 0.015, 0.015), null, FLOOR);
 }
 
 const axisX = new Vector3();
@@ -504,10 +542,10 @@ export class Homestead {
     const rand = new Rand(seed ^ 0xc0ffee);
     const wallB = new Builder();
     const faces = walls(wallB, rand);
-    // a small plastered chimney on the ridge, left of the middle, leaning a touch
+    // the chimney: plastered stone on the middle of the ridge, a cap on it, leaning a touch
     const lean = new Matrix4().makeRotationZ(rand.range(-0.025, -0.01)).multiply(new Matrix4().makeRotationX(rand.range(-0.012, 0.012)));
-    wallB.box(new Vector3(-1.25, ROOF.top + 0.18, 0.04), new Vector3(0.25, 0.62, 0.25), lean, ROOF.top - 0.45, 1, 'xXYzZ');
-    wallB.box(new Vector3(-1.25, ROOF.top + 0.83, 0.04), new Vector3(0.31, 0.05, 0.31), lean, ROOF.top - 0.45, 1);
+    wallB.box(new Vector3(CHIMNEY.x, ROOF.top + 0.3, 0.02), new Vector3(CHIMNEY.half, 0.75, CHIMNEY.half), lean, ROOF.top - 0.45, 1, 'xXYzZ');
+    wallB.box(new Vector3(CHIMNEY.x, ROOF.top + 1.08, 0.02), new Vector3(CHIMNEY.half + 0.06, 0.05, CHIMNEY.half + 0.06), lean, ROOF.top - 0.45, 1);
     const roofB = new Builder();
     roof(roofB, rand);
     const stoneB = new Builder();

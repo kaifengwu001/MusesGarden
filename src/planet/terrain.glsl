@@ -2,14 +2,16 @@
 // meters around the cottage. GPU mirror of Terrain.sample (terrain.ts).
 // Change both together. Requires: uRadius (globals).
 
-const float COTTAGE_FLAT = 6.0;
+const float COTTAGE_FLAT = 7.5;
 const float PLATEAU_INNER = 10.0;
 const float PLATEAU_OUTER = 26.0;
 const float POND_SLOPE = 0.3;
 const float POND_DEPTH = 1.4;
 const float POND_BANK = 0.9;
-const vec2 HOUSE_FOOTPRINT = vec2(4.5, 2.5);   // half sizes (m), terrain.ts
-const vec3 LANDING_AREA = vec3(-3.4, 3.1, 6.0); // x0, x1, z1 (m)
+const vec2 HOUSE_FOOTPRINT = vec2(4.45, 2.75); // half sizes (m), terrain.ts
+const vec4 TERRACE_AREA = vec4(-4.5, 4.2, -0.2, 4.8); // x0, x1, z0, z1 (m)
+const vec4 STEPS_AREA = vec4(1.9, 3.9, 4.6, 5.85);
+const vec4 PIER_AREA = vec4(-8.3, -3.3, 1.75, 5.7);
 
 uniform uint uTerrainSeed;
 uniform samplerCube uTerrainBake; // natural height (m), lushness, wetness, colour variant
@@ -17,7 +19,7 @@ uniform samplerCube uFloraBake;   // flowers per m²: pink, star, yellow, blue
 uniform vec4 uBank;               // bank height (m), bank width (m), gradient step (m), minimum slope
 uniform vec4 uCottage;            // direction, clearing level (m)
 uniform vec4 uCottageB;           // toward the pond
-uniform vec4 uHomePond;           // radius (m), centre along the bearing (m), reach (m)
+uniform vec4 uHomePond;           // radius (m), centre along the bearing (m), reach (m), how far left of the middle (m)
 uniform vec4 uHomeShape;          // outline amplitudes 1–3
 uniform vec4 uHomePhase;          // outline phases 1–3
 uniform vec4 uHomeIslet;          // pond-normalised x, y, radius
@@ -46,7 +48,7 @@ vec2 cottageLocal(vec3 dir) {
 float homePond(vec3 dir) {
   float r = uHomePond.x;
   vec2 c = cottageLocal(dir);
-  vec2 q = vec2(-(c.y - uHomePond.y), c.x) / r; // x toward the cottage
+  vec2 q = vec2(-(c.y - uHomePond.y), c.x + uHomePond.w) / r; // x toward the cottage
   float th = atan(q.y, q.x);
   float sdf = (length(q) - (1.0 + uHomeShape.x * cos(th - uHomePhase.x) + uHomeShape.y * cos(2.0 * th - uHomePhase.y) + uHomeShape.z * cos(3.0 * th - uHomePhase.z))) * r;
   return max(sdf, -(length(q - uHomeIslet.xy) - uHomeIslet.z) * r);
@@ -81,13 +83,16 @@ float bankedAt(float h, float shore, float dist) {
   return h + uBank.x * tanh(shore / max(uBank.y * 1.6, 0.035 * dist));
 }
 
+float areaClear(vec2 c, vec4 a) {
+  return smoothstep(0.35, 0.0, max(max(a.x - c.x, c.x - a.y), max(a.z - c.y, c.y - a.w)));
+}
+
 float clearingAt(vec3 dir, float dc) {
   if (dc > 9.0) return 0.0;
   vec2 c = cottageLocal(dir);
   vec2 d = abs(c) - HOUSE_FOOTPRINT;
   float house = smoothstep(0.3, 0.0, length(max(d, 0.0)) + min(max(d.x, d.y), 0.0));
-  float landing = smoothstep(0.35, 0.0, max(max(LANDING_AREA.x - c.x, c.x - LANDING_AREA.y), max(-0.2 - c.y, c.y - LANDING_AREA.z)));
-  return max(house, landing);
+  return max(max(house, areaClear(c, TERRACE_AREA)), max(areaClear(c, STEPS_AREA), areaClear(c, PIER_AREA)));
 }
 
 void gradientFrame(vec3 dir, out vec3 a, out vec3 b) {
@@ -126,11 +131,11 @@ float cottageShadow(vec3 dir) {
   vec2 c = cottageLocal(dir);
   if (dot(c, c) > 1600.0) return 0.0;
   float best = 1e3;
-  for (int k = 0; k <= 9; k++) {
-    float h = 0.5 * float(k);
-    // walls to the eaves (2.1 m), then the roof from its eaves (5.12 × 3.12 m) to the ridge (4.57 m, 2.0 × 0)
-    float roof = clamp((h - 2.1) / 2.47, 0.0, 1.0);
-    vec2 half_ = h < 2.1 ? vec2(4.5, 2.5) : mix(vec2(5.12, 3.12), vec2(2.0, 0.05), roof);
+  for (int k = 0; k <= 13; k++) {
+    float h = 0.48 * float(k);
+    // walls to the eaves (3.12 m), then the roof from its eaves (4.75 × 3.08 m) to the ridge (6.2 m, 1.67 × 0)
+    float roof = clamp((h - 3.12) / 3.08, 0.0, 1.0);
+    vec2 half_ = h < 3.12 ? vec2(4.3, 2.63) : mix(vec2(4.75, 3.08), vec2(1.67, 0.05), roof);
     best = min(best, boxDistance(c + uCottageSun.xy * h, half_));
   }
   return smoothstep(0.4, -0.3, best);

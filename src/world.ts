@@ -54,6 +54,13 @@ const FIELD_PATHS: ReadonlySet<string> = new Set([
 export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista';
 
 /**
+ * The homestead view, after the painting: the camera's height (m) and
+ * distance (m) from the point it looks at (cottage-local x, y, z, m), its
+ * bearing from the front toward the right end (rad).
+ */
+const HOMESTEAD_VIEW = { height: 11, distance: 26, azimuth: 0.92, at: [-1.8, 2.6, 1.4] } as const;
+
+/**
  * The scene and every system in it. Each frame: growth → fade band → fields
  * (re-baked only when they change) → camera → light, wind and look uniforms
  * → warp → LOD → near field → sky → build queue. main.ts owns the renderer
@@ -195,11 +202,19 @@ export class World {
     const L = this.terrain.layout;
     const R = this.growth.radius;
     if (name === 'homestead') {
-      // stand across the pond, looking back at the cottage and its landing
-      const bearing = L.homeBearing.clone().applyAxisAngle(L.cottage, Math.PI + 0.3);
-      const target = L.cottage.clone().multiplyScalar(Math.cos(19 / R)).addScaledVector(bearing, -Math.sin(19 / R)).normalize();
-      this.rig.lookAlong(target, bearing.addScaledVector(target, -bearing.dot(target)).normalize());
-      this.rig.setZoom(0.88, true);
+      // the painting's view of the cottage: from above the meadow in front and to the right, the end wall nearest, the pier off to the left
+      const V = HOMESTEAD_VIEW;
+      const zoom = this.rig.zoomForAltitude(V.height);
+      const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
+      const target = travel(travel(L.cottage, across, V.at[0] / R, new Vector3()), L.homeBearing, V.at[2] / R, new Vector3());
+      const toCamera = L.homeBearing.clone().applyAxisAngle(L.cottage, V.azimuth);
+      const focus = travel(target, tangentToward(target, toCamera.add(target), new Vector3()), V.distance / R, new Vector3());
+      this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));
+      this.rig.setZoom(zoom, true);
+      // and look up from the zoom's tilt to the point: down by the camera's height over it, and the planet's curve between
+      const { tilt } = this.rig.framing(zoom);
+      const drop = V.height + this.terrain.height(focus) - this.terrain.cottageGround - V.at[1] + (V.distance * V.distance) / (2 * R);
+      this.rig.lookUp(Math.atan2(V.distance, drop) - tilt);
     } else if (name === 'vista') {
       const vista = this.findVista();
       this.rig.lookAlong(vista.focus, vista.forward, immediate);

@@ -1,9 +1,11 @@
 // Final grade: painterly tone curve and highlight bloom, then the output
-// transform, then paper grain.
+// transform, the grade in display space (contrast about mid grey, then
+// brightness), then paper grain.
 uniform sampler2D tScene;
 uniform sampler2D tBloom;
 uniform float uBloom;
 uniform float uGrain;
+uniform vec2 uGrade; // contrast, brightness
 
 varying vec2 vUv;
 
@@ -26,6 +28,7 @@ void main() {
   color = toneCurve(color);
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>
+  gl_FragColor.rgb = clamp((gl_FragColor.rgb - 0.5) * uGrade.x + 0.5, 0.0, 1.0) * uGrade.y;
 
   // Paper grain in display space: fine fibre noise plus a coarser tooth,
   // fixed to the screen like the sheet under a painting, so it never shimmers.

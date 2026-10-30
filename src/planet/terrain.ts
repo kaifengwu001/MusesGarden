@@ -16,20 +16,24 @@ import { angleBetween, tangentToward, travel } from './geo';
 //              (tanh of the distance to the shore) lifts the land a little
 //              at the edge and drops the water off, like a cut turf bank
 //   homestead  the cottage keeps its direction; a dry plateau, its clearing,
-//              its pond and landing are laid out in meters from it, so it
-//              always sits by its pond whatever the size of the planet
+//              its pond (in front and to the left, under its pier, as in
+//              the painting) and terrace are laid out in meters from it, so
+//              it always sits by its pond whatever the size of the planet
 
 export const R_REF = 128;
 /** The hour the cottage is turned to face (the one light for now, params light.timeOfDay). */
 const LAYOUT_SUN_HOURS = 11.5;
-/** Distances (m) from the cottage centre: clearing flattened, and the pond's near edge. */
-export const COTTAGE_FLAT = 6;
-export const COTTAGE_TO_POND = 4.6;
+/** Distances (m) from the cottage centre: clearing flattened, the pond's near edge in front, and how far left of the middle the pond lies. */
+export const COTTAGE_FLAT = 7.5;
+export const COTTAGE_TO_POND = 4.3;
+export const POND_SHIFT = 5;
 /** The cottage clearing stands this high above the water (m): its landing is a terrace over the pond. */
 export const HOME_LEVEL = 1;
-/** The house's footprint (half sizes, m) and the landing's area with its stair (props.ts COTTAGE, LANDING): cleared of plants. */
-export const HOUSE_FOOTPRINT = { halfX: 4.5, halfZ: 2.5 } as const;
-export const LANDING_AREA = { x0: -3.4, x1: 3.1, z1: 6.0 } as const;
+/** The house's footprint (half sizes, m), and its terrace with the steps and its pier (props.ts COTTAGE, TERRACE, STEPS, PIER: x0, x1, z0, z1): cleared of plants. */
+export const HOUSE_FOOTPRINT = { halfX: 4.45, halfZ: 2.75 } as const;
+export const TERRACE_AREA = [-4.5, 4.2, -0.2, 4.8] as const;
+export const STEPS_AREA = [1.9, 3.9, 4.6, 5.85] as const;
+export const PIER_AREA = [-8.3, -3.3, 1.75, 5.7] as const;
 /** Dry plateau around the homestead (m): full inside, none outside. */
 export const PLATEAU = { inner: 10, outer: 26 } as const;
 /** The homestead pond's bed: slope from its edge (m/m) and deepest point (m); its banks: a steep cut turf slope (m/m). */
@@ -73,7 +77,8 @@ function randomDirection(rand: () => number, out = new Vector3()): Vector3 {
 /**
  * The world's layout from its seed. The cottage goes on dry ground near the
  * edge of a wetland (so lakes are in view), facing the wettest way within
- * 70° of the sun (the late-morning sun that place sees, render/sun.ts), so
+ * 70° of the sun with the sun to the left of ahead (the late-morning sun
+ * that place sees, render/sun.ts; the painting's light), so
  * its front and its pond are in the light, seen from across the water.
  */
 export function generateLayout(seed: number): Layout {
@@ -102,7 +107,8 @@ export function generateLayout(seed: number): Layout {
   for (let k = 0; k < 16; k++) {
     const a = (k / 16) * Math.PI * 2;
     t.copy(north).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
-    if (t.dot(towardSun) < Math.cos((70 * Math.PI) / 180)) continue;
+    // the sun ahead and to the left (as in the painting: the front lit, the right end in shade)
+    if (t.dot(towardSun) < Math.cos((70 * Math.PI) / 180) || p.crossVectors(cottage, t).dot(towardSun) > -Math.sin((15 * Math.PI) / 180)) continue;
     const w = probe.wetNoise(travel(cottage, t, 0.35, p));
     if (w > wettest) {
       wettest = w;
@@ -187,7 +193,7 @@ export class Terrain {
     const edge = r * (1 + a1 * Math.cos(p1) + a2 * Math.cos(p2) + a3 * Math.cos(p3));
     this.pondRadius = r;
     this.pondCentre = edge + COTTAGE_TO_POND;
-    this.pondReach = this.pondCentre + r * 1.45 + 1;
+    this.pondReach = Math.hypot(this.pondCentre, POND_SHIFT) + r * 1.45 + 1;
     this.gradStep = Math.max(0.6, bakeTexelMeters);
   }
 
@@ -207,7 +213,7 @@ export class Terrain {
     const c = this.cottageLocal(dir, localTmp);
     // pond-normalised, x toward the cottage
     const x = -(c.z - this.pondCentre) / r;
-    const y = c.x / r;
+    const y = (c.x + POND_SHIFT) / r;
     const th = Math.atan2(y, x);
     const [a1, a2, a3, p1, p2, p3] = this.layout.pond.shape;
     const sdf = (Math.hypot(x, y) - (1 + a1 * Math.cos(th - p1) + a2 * Math.cos(2 * th - p2) + a3 * Math.cos(3 * th - p3))) * r;
@@ -271,9 +277,8 @@ export class Terrain {
     const dx = Math.abs(c.x) - H.halfX;
     const dz = Math.abs(c.z) - H.halfZ;
     const house = smoothstep(0.3, 0, Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dz), 0));
-    const A = LANDING_AREA;
-    const landing = smoothstep(0.35, 0, Math.max(A.x0 - c.x, c.x - A.x1, -0.2 - c.z, c.z - A.z1));
-    return Math.max(house, landing);
+    const area = (a: readonly [number, number, number, number]): number => smoothstep(0.35, 0, Math.max(a[0] - c.x, c.x - a[1], a[2] - c.z, c.z - a[3]));
+    return Math.max(house, area(TERRACE_AREA), area(STEPS_AREA), area(PIER_AREA));
   }
 
   /** Uniform values for terrain.glsl (shared by every material that samples the ground). */
@@ -283,7 +288,7 @@ export class Terrain {
     u.uBank.value.set(BANK.height, BANK.width, this.gradStep, BANK.minSlope);
     u.uCottage.value.set(L.cottage.x, L.cottage.y, L.cottage.z, this.cottageLevel);
     u.uCottageB.value.set(L.homeBearing.x, L.homeBearing.y, L.homeBearing.z, 0);
-    u.uHomePond.value.set(this.pondRadius, this.pondCentre, this.pondReach, 0);
+    u.uHomePond.value.set(this.pondRadius, this.pondCentre, this.pondReach, POND_SHIFT);
     const [a1, a2, a3, p1, p2, p3] = L.pond.shape;
     u.uHomeShape.value.set(a1, a2, a3, 0);
     u.uHomePhase.value.set(p1, p2, p3, 0);

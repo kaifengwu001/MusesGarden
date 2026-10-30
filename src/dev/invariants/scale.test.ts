@@ -2,7 +2,7 @@ import { Box3, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { FieldParams } from '../../planet/fields';
 import { travel } from '../../planet/geo';
-import { COTTAGE_TO_POND, createGroundSample, generateLayout, Terrain } from '../../planet/terrain';
+import { COTTAGE_TO_POND, createGroundSample, generateLayout, POND_SHIFT, Terrain } from '../../planet/terrain';
 
 // Constant scale and attachment: things on the planet stay human-sized and
 // seated at every size. (The cottage geometry itself is built in meters
@@ -42,8 +42,9 @@ describe('constant scale', () => {
     const s = createGroundSample();
     for (const radius of [40, 90, 128, 250, 400]) {
       const t = terrainAt(radius);
-      // just past the landing's end is water, just inside the house front is dry land
-      const pondSide = travel(layout.cottage, layout.homeBearing, (COTTAGE_TO_POND + 1.2) / radius, new Vector3());
+      // just past the pond's near edge (in front and to the left, under the pier) is water, just inside the house front is dry land
+      const across = new Vector3().crossVectors(layout.cottage, layout.homeBearing).normalize();
+      const pondSide = travel(travel(layout.cottage, across, -POND_SHIFT / radius, new Vector3()), layout.homeBearing, (COTTAGE_TO_POND + 1.2) / radius, new Vector3());
       const houseSide = travel(layout.cottage, layout.homeBearing, 1.5 / radius, new Vector3());
       expect(t.sample(pondSide, s).water, `R ${radius} pond`).toBeLessThan(0);
       expect(t.sample(houseSide, s).water, `R ${radius} house`).toBeGreaterThan(0.5);
@@ -78,8 +79,8 @@ describe('everything stays attached', () => {
     for (const radius of [40, 128, 400]) {
       const t = terrainAt(radius);
       const heights: number[] = [];
-      // the house's corners (props.ts COTTAGE: 9 × 5 m) and its middle
-      for (const [x, z] of [[-4.4, -2.4], [4.4, -2.4], [4.4, 2.4], [-4.4, 2.4], [0, 0]] as const) {
+      // the house's corners (props.ts COTTAGE: 8.6 × 5.3 m) and its middle
+      for (const [x, z] of [[-4.25, -2.6], [4.25, -2.6], [4.25, 2.6], [-4.25, 2.6], [0, 0]] as const) {
         const p = travel(layout.cottage, across, x / radius, new Vector3());
         travel(p, layout.homeBearing, z / radius, p);
         heights.push(t.sample(p, s).height);

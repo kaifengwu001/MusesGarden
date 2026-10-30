@@ -35,7 +35,7 @@ export class Post {
   private readonly bytesPerPixel: number;
   private readonly scene: Scene;
   private readonly camera = new OrthographicCamera();
-  private readonly uniforms: { tScene: { value: Texture }; tBloom: { value: Texture }; uBloom: { value: number }; uGrain: { value: number } };
+  private readonly uniforms: { tScene: { value: Texture }; tBloom: { value: Texture }; uBloom: { value: number }; uGrain: { value: number }; uGrade: { value: Vector2 } };
   private readonly levels: WebGLRenderTarget[] = [];
   private readonly bloomScene: Scene;
   private readonly bloomMaterial: ShaderMaterial;
@@ -54,6 +54,7 @@ export class Post {
       tBloom: { value: this.levels[0].texture },
       uBloom: { value: 0 },
       uGrain: { value: 0.02 },
+      uGrade: { value: new Vector2(1, 1) },
     };
     const material = new ShaderMaterial({ name: 'post', vertexShader: fullscreenVertex, fragmentShader, uniforms: this.uniforms, depthTest: false, depthWrite: false });
     this.scene = new Scene().add(fullscreenMesh(material));
@@ -85,13 +86,15 @@ export class Post {
     gpuMemory.set('bloom chain', bloomBytes);
   }
 
-  render(scene: Object3D, camera: Camera, grain: number): void {
+  /** Render the scene and grade it to the canvas: paper grain, and contrast and brightness in display space. */
+  render(scene: Object3D, camera: Camera, grain: number, contrast = 1, brightness = 1): void {
     const r = this.renderer;
     r.setRenderTarget(this.target);
     r.render(scene, camera);
     if (this.bloomEnabled) this.renderBloom();
     r.setRenderTarget(null);
     this.uniforms.uGrain.value = grain;
+    this.uniforms.uGrade.value.set(contrast, brightness);
     this.uniforms.uBloom.value = this.bloomEnabled ? this.bloomStrength : 0;
     r.render(this.scene, this.camera);
   }

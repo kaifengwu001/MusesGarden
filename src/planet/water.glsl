@@ -107,13 +107,14 @@ vec2 boxEntry(vec3 ro, vec3 rd, vec3 lo, vec3 hi, out vec3 nrm) {
   return vec2(near, far);
 }
 
-// The cottage seen in the water (props.ts COTTAGE, ROOF, LANDING): the
-// mirrored ray from p (planet space) traced in the cottage's own frame
-// against its landing, its walls and its hipped roof (a convex solid: four
-// slopes at 38° above the eaves), and painted in a few broad strokes: cream
-// plaster with the eaves' blue band, the dark door and windows, the olive
-// roof striped by its courses and mossy low down. Colour, and the distance
-// along the ray (w < 0: it misses).
+// The cottage seen in the water (props.ts COTTAGE, ROOF, TERRACE, PIER,
+// CHIMNEY): the mirrored ray from p (planet space) traced in the cottage's
+// own frame against its terrace, its pier, its walls, its chimney and its
+// hipped roof (a convex solid: four slopes at 45° above the eaves), and
+// painted in a few broad strokes: cream plaster with the eaves' blue band,
+// the dark door and windows, the pier's arch, the olive roof striped by its
+// courses and mossy low down. Colour, and the distance along the ray (w < 0:
+// it misses).
 vec4 cottageInMirror(vec3 p, vec3 r) {
   vec3 U = uCottage.xyz;
   vec3 Z = uCottageB.xyz;
@@ -121,37 +122,52 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
   vec3 o = p - U * (uRadius + uCottage.w + uBank.x);
   vec3 ro = vec3(dot(o, X), dot(o, U), dot(o, Z));
   vec3 rd = vec3(dot(r, X), dot(r, U), dot(r, Z));
-  // most of the water's rays pass nowhere near it
-  vec3 oc = vec3(0.0, 1.6, 1.0) - ro;
+  // most of the water's rays pass nowhere near it (the house, its terrace and its pier)
+  vec3 oc = vec3(-2.0, 1.8, 1.5) - ro;
   float tc = dot(oc, rd);
-  if (tc < 0.0 || dot(oc, oc) - tc * tc > 64.0) return vec4(0.0, 0.0, 0.0, -1.0);
-  const float TAN = 0.7813; // tan 38°
-  const vec4 EAVES = vec4(5.12, 3.12, 2.136, 4.573); // half x, half z, eave height, ridge height
+  if (tc < 0.0 || dot(oc, oc) - tc * tc > 100.0) return vec4(0.0, 0.0, 0.0, -1.0);
+  const float TAN = 1.0; // tan 45°
+  const vec4 EAVES = vec4(4.75, 3.08, 3.12, 6.2); // half x, half z, eave height, ridge height
   float best = 1e9;
   vec3 col = vec3(0.0);
   vec3 nrm = vec3(0.0);
   vec3 n;
-  // the landing (with its arch at the waterline)
-  vec2 t = boxEntry(ro, rd, vec3(-3.3, -1.3, 2.5), vec3(3.0, 0.02, 5.4), n);
+  // the terrace along the front, and the pier with its arch at the waterline
+  vec2 t = boxEntry(ro, rd, vec3(-4.4, -1.3, 2.33), vec3(4.1, 0.72, 4.73), n);
+  if (t.x < t.y && t.x > 0.0 && t.x < best) {
+    best = t.x;
+    nrm = n;
+    col = mix(pal(ROW_STONE, 9), pal(ROW_STONE, 6), smoothstep(-0.8, -1.1, (ro + rd * t.x).y));
+  }
+  t = boxEntry(ro, rd, vec3(-8.2, -1.3, 1.83), vec3(-3.4, 0.72, 5.63), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
     vec3 h = ro + rd * t.x;
     col = mix(pal(ROW_STONE, 9), pal(ROW_STONE, 6), smoothstep(-0.8, -1.1, h.y));
-    vec2 q = (h.xy - vec2(-1.9, -0.85)) / vec2(0.42, 0.32);
+    vec2 q = (h.xy - vec2(-7.2, -0.78)) / vec2(0.55, 0.5);
     if (n.z > 0.5 && abs(q.x) < 1.0 && (q.y < 0.0 || length(q) < 1.0)) col = vec3(0.06, 0.09, 0.09);
   }
-  // the walls (the door and the windows on the front)
-  t = boxEntry(ro, rd, vec3(-4.5, -0.12, -2.5), vec3(4.5, 2.5, 2.5), n);
+  // the walls (the door and the tall window on the front, the small window on the right end)
+  t = boxEntry(ro, rd, vec3(-4.3, -0.12, -2.63), vec3(4.3, 3.45, 2.63), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
     vec3 h = ro + rd * t.x;
-    col = mix(pal(ROW_STONE, 1), pal(ROW_STONE, 10), smoothstep(1.7, 1.85, h.y));
+    col = mix(pal(ROW_STONE, 1), pal(ROW_STONE, 10), smoothstep(2.75, 2.95, h.y));
+    vec3 pane = mix(pal(ROW_ROOF, 9), pal(ROW_ROOF, 10), 0.45);
     if (n.z > 0.5) {
-      if (abs(h.x + 0.35) < 0.5 && h.y < 1.95) col = mix(pal(ROW_ROOF, 3), pal(ROW_ROOF, 2), 0.4);
-      if ((abs(h.x + 2.62) < 0.72 || abs(h.x - 2.02) < 0.72) && abs(h.y - 1.42) < 0.5) col = mix(pal(ROW_ROOF, 9), pal(ROW_ROOF, 10), 0.45);
+      if (abs(h.x - 0.85) < 0.55 && h.y > 0.72 && h.y < 2.87) col = mix(pal(ROW_ROOF, 3), pal(ROW_ROOF, 2), 0.4);
+      if (abs(h.x + 2.38) < 0.6 && h.y > 1.57 && h.y < 2.87) col = pane;
     }
+    if (n.x > 0.5 && abs(h.z + 0.95) < 0.28 && h.y > 2.07 && h.y < 2.77) col = pane;
+  }
+  // the chimney on the ridge
+  t = boxEntry(ro, rd, vec3(-0.17, 5.75, -0.25), vec3(0.37, 7.3, 0.29), n);
+  if (t.x < t.y && t.x > 0.0 && t.x < best) {
+    best = t.x;
+    nrm = n;
+    col = pal(ROW_STONE, 1) * 0.95;
   }
   // the roof: inside every slope's plane and above the eaves
   vec3 planes[4] = vec3[4](vec3(0.0, 1.0, TAN), vec3(0.0, 1.0, -TAN), vec3(TAN, 1.0, 0.0), vec3(-TAN, 1.0, 0.0));
@@ -185,7 +201,7 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
     nrm = nearN;
     vec3 h = ro + rd * near;
     float up = clamp((h.y - EAVES.z) / (EAVES.w - EAVES.z), 0.0, 1.0);
-    float course = fract(up * 9.0);
+    float course = fract(up * 14.0);
     vec3 tile = mix(pal(ROW_ROOF, 0), pal(ROW_ROOF, 6), (1.0 - smoothstep(0.1, 0.55, up)) * 0.75);
     tile *= 1.0 - 0.45 * smoothstep(0.65, 0.9, course);
     col = mix(tile, pal(ROW_ROOF, 14), (1.0 - smoothstep(0.0, 0.14, course)) * 0.6);

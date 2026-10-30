@@ -47,12 +47,31 @@ export class CameraRig {
   readonly focus = new Vector3();
   /** True when the pose changed since the last `consumeChange`. */
   private changed = false;
+  /**
+   * A look up toward the horizon on top of the zoom's tilt (rad), which a
+   * named view sets to frame what it shows; it eases away as soon as you
+   * drag, zoom, walk or glide, back to the zoom's own tilt.
+   */
+  private pitch = 0;
+  private pitchTarget = 0;
 
   /** Altitude (m), tilt from straight down (rad) and vertical field of view (°) at zoom z. */
   framing(z: number): { altitude: number; tilt: number; fov: number } {
     const top = this.overviewAltitude * this.radius;
     const t = smoothstep(0.3, 1, z);
     return { altitude: top * Math.pow(EYE_HEIGHT / top, z), tilt: MAX_TILT * t, fov: lerp(35, 55, t) };
+  }
+
+  /** The zoom at which the camera stands `altitude` m over the ground. */
+  zoomForAltitude(altitude: number): number {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 40; i++) {
+      const z = (lo + hi) / 2;
+      if (this.framing(z).altitude > altitude) lo = z;
+      else hi = z;
+    }
+    return (lo + hi) / 2;
   }
 
   get altitude(): number {
@@ -75,6 +94,7 @@ export class CameraRig {
    * drag right and it swings right (you turn left), as in a street-view panorama.
    */
   drag(dx: number, dy: number, width: number, height: number): void {
+    this.pitchTarget = 0;
     const t = this.tilt;
     const perPixel = (0.75 * (this.altitude + 8)) / (this.radius * height);
     this.axes(this.frameTarget);
@@ -95,6 +115,7 @@ export class CameraRig {
   /** Move over the surface by `ahead` and `across` meters along the current heading (keys). */
   walk(ahead: number, across: number): void {
     if (ahead === 0 && across === 0) return;
+    this.pitchTarget = 0;
     this.axes(this.frameTarget);
     this.rotate(this.right, -ahead / this.radius);
     this.rotate(this.forward, across / this.radius);
@@ -105,6 +126,7 @@ export class CameraRig {
   /** Turn on the spot by `angle` (rad; positive turns left). */
   turn(angle: number): void {
     if (angle === 0) return;
+    this.pitchTarget = 0;
     this.axes(this.frameTarget);
     this.rotate(this.up, angle);
     this.glideT = 1;
@@ -112,6 +134,7 @@ export class CameraRig {
   }
 
   zoomBy(delta: number): void {
+    this.pitchTarget = 0;
     this.zoomTarget = clamp(this.zoomTarget + delta, 0, 1);
     this.changed = true;
   }
@@ -123,7 +146,15 @@ export class CameraRig {
   }
 
   /** Glide the focus to a direction on the planet over ~1.6 s. */
+  /** Look up by `angle` (rad) from the zoom's tilt until the next move (named views). */
+  lookUp(angle: number, immediate = true): void {
+    this.pitchTarget = angle;
+    if (immediate) this.pitch = angle;
+    this.changed = true;
+  }
+
   glideTo(dir: Vector3): void {
+    this.pitchTarget = 0;
     this.axes(this.frameTarget);
     tmpQ.setFromUnitVectors(this.up, tmpV.copy(dir).normalize());
     this.glideStart.copy(this.frameTarget);
@@ -168,7 +199,8 @@ export class CameraRig {
     this.ground = Number.isFinite(this.ground) ? this.ground + (g - this.ground) * damp(realDt, 0.12) : g;
     this.focus.copy(this.up).multiplyScalar(radius + this.ground);
 
-    const tilt = MAX_TILT * this.tilt;
+    this.pitch += (this.pitchTarget - this.pitch) * damp(realDt, 0.25);
+    const tilt = Math.min(MAX_TILT * this.tilt + this.pitch, Math.PI / 2 - 0.02);
     const alt = this.altitude;
     const cam = this.camera;
     cam.position.copy(this.up).multiplyScalar(radius + this.ground + alt);

@@ -221,7 +221,7 @@ async function boot(): Promise<void> {
 
   const render = (): void => {
     renderer.info.reset();
-    post.render(world.scene, camera, store.values.style.grain);
+    post.render(world.scene, camera, store.values.style.grain, store.values.style.contrast, store.values.style.brightness);
   };
 
   const collectStats = (jsMs: number): void => {

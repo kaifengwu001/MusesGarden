@@ -11,15 +11,16 @@
 //            courses and in patches higher up; pale beaded capping tiles on
 //            the hips and the ridge; the tiles' ends along the eaves
 //   wood     a warm plank door with iron straps, dark frames, a tan bench
+//            and chair
 //   glass    small panes: the meadow's yellow-green below, the sky above
-//   landing  plastered like the walls, its top pale; damp at the waterline,
-//            a brick arch
+//   landing  the terrace, pier and steps plastered like the walls, their
+//            tops pale; damp at the waterline, a stone arch in the pier
 // The shadows are painted too, each from the sun the cottage sees: the
 // eaves' shadow down the top of each wall (as deep as the sun is steep on
-// that wall, a cool blue-lavender), walls turned from the sun a cooler
-// cream with a little of the meadow's green bounced into them, the shaded
+// that wall, an olive grey), walls turned from the sun an olive grey with
+// the meadow's green bounced into them, the shaded
 // slopes of the roof a blue-grey, the bench's shadow on the wall, the
-// house's on its landing, and the clouds' passing over. No outlines.
+// house's on its terrace, and the clouds' passing over. No outlines.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
@@ -40,13 +41,13 @@ varying vec3 vPlanet;
 varying vec3 vPlanetNormal;
 varying vec3 vUp;
 
-// props.ts: tile courses a slope; the eaves' edge (its foot's height, how far it reaches out from the wall, m)
-const float COURSES = 9.0;
-const vec2 EAVE = vec2(2.07, 0.62);
-// the bench (centre x, half length, seat height, m) and the landing's arch (centre x, springing y, half width, rise) and face (z)
-const vec3 BENCH = vec3(2.0, 0.74, 0.47);
-const vec4 ARCH = vec4(-1.9, -0.85, 0.42, 0.32);
-const float LANDING_FRONT = 5.4;
+// props.ts: tile courses a slope; the eaves' edge (its foot's height over the clearing, how far it reaches out from the wall, m)
+const float COURSES = 14.0;
+const vec2 EAVE = vec2(3.05, 0.45);
+// the bench (centre x, half length, seat height, m), the pier's arch (centre x, springing y, half width, rise) and the pier's face (z)
+const vec3 BENCH = vec3(-0.86, 0.76, 1.17);
+const vec4 ARCH = vec4(-7.2, -0.78, 0.55, 0.5);
+const float PIER_FRONT = 5.63;
 
 // Lit and shaded tones of a colour: warm where the sun falls; turned away,
 // the colour times `shade` (each material's own), the sky's tint in it.
@@ -59,6 +60,12 @@ vec3 painted(vec3 base, float light, vec3 shade) {
 // How much sun a face gets (0..1): turned toward it, softly, less any shadow.
 float sunlight(vec3 n, vec3 sun, float shadow) {
   return smoothstep(-0.3, 0.6, dot(n, sun)) * (1.0 - shadow);
+}
+
+// The same for a slope of the roof: the painting darkens every slope turned
+// from the sun, even under a high sun that still grazes it.
+float slopeLight(vec3 n, vec3 sun, float shadow) {
+  return smoothstep(0.05, 0.8, dot(n, sun)) * (1.0 - shadow);
 }
 
 // The eaves' shadow on a wall at a height (m), facing n: the overhang's
@@ -128,6 +135,8 @@ void main() {
       vec3 stone = mix(pal(ROW_STONE, 14), pal(ROW_STONE, 3), st.y);
       stone = mix(stone, pal(ROW_STONE, 5), st.x * 0.8);
       base = mix(base, stone, fallen * 0.85);
+      // and faintly everywhere, the stones' shapes showing through the thin plaster
+      base *= 1.0 - 0.045 * st.x * smoothstep(-0.2, 0.4, brush + 0.2) - 0.035 * (st.y - 0.5);
       // damp at the foot, a darker stroke down each corner
       base = mix(base, pal(ROW_STONE, 15), (1.0 - smoothstep(0.05, 0.42, height + 0.12 * brush)) * 0.6);
       base *= 1.0 - 0.09 * (1.0 - smoothstep(0.0, 0.16, vPaint.y + 0.03 * brush));
@@ -137,9 +146,10 @@ void main() {
     float bench = vLocalNormal.z > 0.7 ? (1.0 - smoothstep(-0.02, 0.06, abs(vLocal.x - BENCH.x) - BENCH.y)) * (1.0 - smoothstep(BENCH.z - 0.04, BENCH.z + 0.02, vLocal.y)) * 0.7 : 0.0;
     float shadow = max(max(cloud, eave), bench);
     if (reveal) shadow = max(shadow, 0.6);
-    vec3 shade = vec3(0.74, 0.76, 0.7) + pal(ROW_LIGHT, 2) * 0.08 * clamp(0.6 - dot(n, vUp), 0.0, 1.0);
+    // in shade the plaster goes an olive grey, the meadow's green bounced into it (as the painting's shaded end)
+    vec3 shade = vec3(0.62, 0.68, 0.54) + pal(ROW_LIGHT, 2) * 0.08 * clamp(0.6 - dot(n, vUp), 0.0, 1.0);
     col = painted(base, sunlight(n, sun, shadow), shade);
-    // the eaves' band a cool blue-lavender, deepest right under the roof, brushed along its lower edge
+    // the eaves' band an olive grey, deepest right under the roof, brushed along its lower edge
     float band = eave * (0.62 + 0.25 * smoothstep(EAVE.x - 0.35, EAVE.x + 0.1, height)) * (0.9 + 0.1 * gnoise(vec3(uv.x * 3.0, uv.y * 9.0, 2.2), 958u));
     col = mix(col, pal(ROW_STONE, 10) * (0.86 + 0.22 * luma(base)), band);
   } else if (uKind == 1) {
@@ -157,7 +167,7 @@ void main() {
     float mn = gnoise(vec3(uv.x * 0.9, k * 0.55 + f * 0.25, 3.3), 971u);
     float mf = gnoise(vec3(uv.x * 3.1, (k + f) * 1.9, 5.1), 972u);
     float mx = gnoise(vec3(uv.x * 7.0, (k + f) * 4.5, 6.4), 973u);
-    float moss = smoothstep(0.3, 0.62, (1.0 - smoothstep(0.5, 6.0, k)) * 0.62 + 0.5 * mn + 0.22 * mf + 0.14 * mx - 0.06);
+    float moss = smoothstep(0.3, 0.62, (1.0 - smoothstep(0.8, 7.0, k)) * 0.45 + 0.42 * mn + 0.2 * mf + 0.12 * mx - 0.12);
     // moss: olive, flecked yellow where it catches the light
     vec3 mossCol = mix(pal(ROW_ROOF, 7), pal(ROW_ROOF, 6), smoothstep(-0.2, 0.6, mf + 0.4 * (1.0 - f)) * 0.75);
     mossCol = mix(mossCol, pal(ROW_ROOF, 6) * 1.12, smoothstep(0.35, 0.55, mx) * 0.5);
@@ -173,13 +183,13 @@ void main() {
       c *= mix(1.05, 0.88, f);
       float joint = 1.0 - smoothstep(0.0, 0.04 + fwidth(tx), min(fract(tx), 1.0 - fract(tx)));
       c *= 1.0 - 0.18 * joint * (1.0 - moss * 0.7);
-      base = mix(c, mossCol, moss * (0.7 + 0.2 * smoothstep(-0.2, 0.4, mx)));
+      base = mix(c, mossCol, moss * (0.55 + 0.2 * smoothstep(-0.2, 0.4, mx)));
       float under = smoothstep(0.6, 0.88, f);
       base *= 1.0 - 0.62 * under;
       // small pale dabs along the course's foot
       float dab = step(0.8, hash12(vec2(floor(uv.x / 0.07), k + 0.5))) * (1.0 - smoothstep(0.0, 0.14, f));
       base = mix(base, pal(ROW_ROOF, 14), dab * 0.6);
-      col = painted(base, sunlight(nl, sun, cloud), vec3(0.66, 0.7, 0.8));
+      col = painted(base, slopeLight(nl, sun, cloud), vec3(0.66, 0.7, 0.8));
     } else if (flag < 1.5) {
       // the eave's edge: the lowest tiles' ends, rounded, dark between and under
       float te = fract(tx);
@@ -200,14 +210,14 @@ void main() {
       float lapped = smoothstep(0.7, 1.0, uv.x) * step(-0.5, vPaint.x);
       float side = 1.0 - smoothstep(0.0, 0.3, min(around, 1.0 - around));
       base = mix(pal(ROW_ROOF, 8), pal(ROW_ROOF, 14), smoothstep(0.3, 0.6, 1.0 - abs(around - 0.5) * 2.0) * 0.6);
-      base = mix(base, mossCol, smoothstep(0.35, 0.6, mn + 0.3 * (1.0 - smoothstep(0.0, 4.0, k))) * 0.55);
+      base = mix(base, mossCol, smoothstep(0.35, 0.6, mn + 0.3 * (1.0 - smoothstep(0.0, 6.0, k))) * 0.55);
       base *= (1.0 - 0.45 * lapped) * (1.0 - 0.25 * side);
       if (vPaint.x < -0.5) base = pal(ROW_ROOF, 14) * 0.95;
       col = painted(base, sunlight(n, sun, cloud), vec3(0.66, 0.7, 0.8));
     }
   } else if (uKind == 2) {
     float brush = gnoise(vec3(uv * vec2(2.4, 1.2), 8.1), 955u);
-    float eave = upright ? eaveShadow(height, n, sun, brush) : 0.0;
+    float eave = upright ? eaveShadow(vLocal.y, n, sun, brush) : 0.0;
     if (vPaint.w > 0.5 && vPaint.w < 1.5) {
       // the door: warm planks with lighter streaks and dark seams, two iron straps; its top in the eaves' shade
       float px = uv.x / 0.13 + 0.5;
@@ -225,7 +235,7 @@ void main() {
       col = painted(base, sunlight(n, sun, max(cloud, eave)), vec3(0.72, 0.72, 0.76));
       col *= 1.0 - 0.35 * eave;
     } else if (vPaint.w > 1.5) {
-      // the bench: weathered tan
+      // the bench and the chair: weathered tan
       float grain = gnoise(vec3(uv.x * 22.0, uv.y * 3.0, 4.4), 981u);
       col = painted(pal(ROW_ROOF, 12) * (0.92 + 0.1 * grain), sunlight(n, sun, cloud), vec3(0.72, 0.72, 0.76));
     } else {
@@ -235,7 +245,7 @@ void main() {
     col = painted(pal(ROW_ROOF, 4) * 1.4, sunlight(n, sun, cloud), vec3(0.7));
   } else if (uKind == 4) {
     // glass: the meadow's light in the lower panes, the sky in the upper, each pane its own, a glint
-    float up = clamp((vLocal.y - 0.95) / 0.97, 0.0, 1.0);
+    float up = clamp((vLocal.y - 1.57) / 1.3, 0.0, 1.0);
     vec2 pane = floor(uv / vec2(0.325, 0.32));
     float own = hash12(pane + 2.0);
     vec3 refl = mix(pal(ROW_ROOF, 10), pal(ROW_ROOF, 11), smoothstep(0.35, 0.75, up + 0.25 * (own - 0.5) + 0.12 * gnoise(vec3(uv * 4.0, 2.0), 982u)));
@@ -245,7 +255,7 @@ void main() {
     float eave = eaveShadow(vLocal.y, n, sun, 0.0);
     col = mix(refl, pal(ROW_LIGHT, 3), glint * 0.4) * (1.0 - 0.3 * cloud) * (1.0 - 0.4 * eave);
   } else {
-    // the landing: plastered like the walls, its top pale; damp at the waterline, a brick arch
+    // the terrace, pier and steps: plastered like the walls, their tops pale; damp at the waterline, the pier's stone arch
     bool top = vLocalNormal.y > 0.7;
     vec2 p = top ? vLocal.xz : uv;
     float bloom;
@@ -254,22 +264,24 @@ void main() {
     vec2 st = courses(p, top ? 0.9 : 0.3, top ? 1.1 : 0.6);
     base = mix(base, pal(ROW_STONE, 5), st.x * (top ? 0.12 : 0.18) * smoothstep(-0.4, 0.4, brush));
     if (!top) base = mix(base, pal(ROW_STONE, 6) * 0.85, (1.0 - smoothstep(-1.15, -0.75, vLocal.y + 0.12 * brush)) * 0.65);
-    if (!top && vLocalNormal.z > 0.7 && abs(vLocal.z - LANDING_FRONT) < 0.05) {
+    if (!top && vLocalNormal.z > 0.7 && abs(vLocal.z - PIER_FRONT) < 0.05) {
       vec2 q = (vLocal.xy - ARCH.xy) / ARCH.zw;
       float r = length(vec2(q.x, max(q.y, 0.0)));
       bool open = abs(q.x) < 1.0 && (q.y < 0.0 || r < 1.0);
-      float ring = (1.0 - step(1.38, r)) * step(1.0, r) * step(-0.05, q.y);
+      float ring = (1.0 - step(1.3, r)) * step(1.0, r) * step(-0.05, q.y);
       if (open) {
+        // into the dark under the pier, the water's light at its foot
         base = mix(vec3(0.05, 0.08, 0.08), vec3(0.12, 0.18, 0.18), smoothstep(-1.2, -0.9, vLocal.y));
       } else if (ring > 0.0) {
+        // the arch's stones, a shade darker than the face, their joints brushed in
         float a = atan(q.y, q.x) / 3.14159 * 9.0;
         float fa = fract(a);
         float joint = 1.0 - smoothstep(0.0, 0.1 + fwidth(a), min(fa, 1.0 - fa));
-        joint = max(joint, 1.0 - smoothstep(0.0, 0.05 + fwidth(r), min(r - 1.0, 1.38 - r)));
-        base = mix(mix(pal(ROW_STONE, 12), pal(ROW_STONE, 13), hash12(vec2(floor(a), 4.0)) * 0.6), pal(ROW_STONE, 5), joint * 0.6);
+        joint = max(joint, 1.0 - smoothstep(0.0, 0.05 + fwidth(r), min(r - 1.0, 1.3 - r)));
+        base = mix(base * mix(0.82, 0.9, hash12(vec2(floor(a), 4.0))), pal(ROW_STONE, 5), joint * 0.5);
       }
     }
-    // the house's shadow falls on the landing as on the meadow
+    // the house's shadow falls on the terrace as on the meadow
     float house = top ? 0.85 * cottageShadow(dir) : 0.0;
     col = painted(base, sunlight(n, sun, max(cloud, house)), vec3(0.78, 0.8, 0.84));
   }
