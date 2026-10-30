@@ -8,7 +8,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 8 | https://muses-garden-iteration-8.vercel.app | the commit with this table |
+| 9 | https://muses-garden-iteration-9.vercel.app | the commit with this table |
+| 8 | https://muses-garden-iteration-8.vercel.app | a76417f |
 | 7 | https://muses-garden-iteration-7.vercel.app | 1ca0327 |
 | 6 | https://muses-garden-iteration-6.vercel.app | 3dbb552 |
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
@@ -19,16 +20,52 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 9: the review notes (in progress)
+## Iteration 9: the review notes
 
-Started from iteration 8 (a76417f). This table fills in as the notes are done.
+Started from iteration 8 (a76417f), the notes committed first (c95587b).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | The cottage's reflection is still wrong: the reflection's stand-in model? | |
-| 2 | Why does the left side of the building arch up? | |
-| 3 | On a small planet buildings should curve with it, their walls always perpendicular to the surface (like Messenger's) | |
-| 4 | The roof and the foundation a bit more mossy | |
+| 1 | The cottage's reflection is still wrong: the stand-in model? (and, added during the iteration: it should just not leave a gap; "really no gap? why is the grass reflection showing in front?") | The stand-in boxes were fine; the way the water traced them wasn't. The water found the bank by stepping along the reflected ray through the warped view, and the cottage by a straight line in a flat frame that ignored both the planet's curve and the view's warp, then compared the two distances. Near the pier they disagreed: the ground under the pier could win in front of it (the grass showing in front), and the darkening of the tunnel's water, worked out in the flat frame, spilled onto open water in front of the pier (the dark strip under it on the small planet: [debug colours](docs/checkpoints/iteration-9/before-debug-which-reflection-wins.jpg)). Now the cottage is found along the same steps as the bank, in the same map from meters to the planet as the bent cottage, tested exactly on the segment between two steps so no edge is skipped, and only up to where the bank was met: whichever is nearer shows. The pier meets its reflection with no gap at R 40 and R 215 ([waterline](docs/checkpoints/iteration-9/pier-waterline-R40-R215.jpg), [your two angles](docs/checkpoints/iteration-9/pier-reflection-two-angles.jpg)). |
+| 2 | Why does the left side of the building arch up? | The cottage was a flat object on a curved, warped planet: its long left end (the pier) stood level while the ground curved away under it, so its top edge rose against the ground and, on the smallest planet, its foot lifted off. Fixed with note 3. |
+| 3 | On a small planet buildings should curve with it, their walls perpendicular to the surface (like Messenger's) | Every vertex of the cottage is now placed by the terrain's own cottage-local meters (the sine map round the cottage) and straight up from there, so each wall stands square to the ground under it and the house sits exactly on its clearing and its pond at every size ([R 40](docs/checkpoints/iteration-9/small-planet-R40.jpg)). |
+| 4 | The roof and the foundation a bit more mossy | Moss over much of the roof (thickest in the lower courses), at the walls' foot, and on the foundation from the water up, in patches and along the joints. |
+| 5 | (added) Grass reflections: the geometry and colours look off; they should take on more of the lake's colour and be darker | Bank reflections are now the lake's deep blue darkened, a dark navy band under every shore as in the reference still (its bands sample #0A3C63 to #0C243F). |
+| 6 | (added) Two more zoom stops: eye level, and a bird's-eye about 10 m up; tilt toward the ground later so the bird's-eye sees further | The wheel and the keys settle on four stops when you stop zooming near one: orbit, 10 m, eye level at 2.8 m (above the 1.6 m meadow stop, which you called super close), and the meadow. The camera reaches the horizon earlier on the way down: at 10 m it looks 24° below the horizon (43° before), so the bird's-eye view sees across the meadow ([the stops](docs/checkpoints/iteration-9/zoom-stops-10m-2.8m-1.6m.jpg)). The vista finder, which uses the same camera, now picks a wider lake view with islands and a cloud upper right; squint 23.4 (from 23.7). |
+| 7 | (added) Grass and flowers still grow in and shrink out when wandering | They shrank toward the edge of the area around you where they're drawn, and faded in by rank as you came near, so walking made them grow ahead and shrink behind. Now they are there or not: they thin out toward that edge one by one at full size, and only the planet's growth fades them in. |
+
+Checkpoint images: [docs/checkpoints/iteration-9](docs/checkpoints/iteration-9/).
+
+### Measured (iteration 9)
+
+Apple M1 Pro, 2880×1800, High, alternating with iteration 8's build three
+times per view (best of each; the GPU was shared):
+
+| View | Iteration 8 | Iteration 9 |
+|---|---|---|
+| Lakes | 22.9 | 24.1 |
+| Cottage view | 26.4 | 26.9 |
+
+The first version of the new mirror (one loop testing the cottage at every
+step of the bank's march) cost about 2.5 ms on every ground pixel, even far
+from the cottage, because the GPU sizes a shader by its heaviest path. The
+version shipped runs the cottage's steps after the bank's, only for rays
+near it. Part of the lakes view's remaining 1.2 ms is the new tilt: it now
+looks higher and shows more far water.
+
+### Trades (iteration 9)
+
+None.
+
+### Known issues
+
+- The cottage's reflection is still its stand-ins: no rail, chair, bench or
+  window frames in the water.
+- Eye level (2.8 m) is a guess at what you meant; it is one number
+  (`STOPS_M` in view/camera.ts).
+- Carried over: the heavy views don't hold 60 fps at full resolution on an
+  M1 Pro at 2880×1800 (Auto trims them); the far meadow and clouds third of
+  the squint test is now the worst (more sky in the new vista).
 
 ## Iteration 8: the review notes
 

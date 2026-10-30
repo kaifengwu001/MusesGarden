@@ -319,7 +319,11 @@ click is what you see.
   The view is lit by the sun at the focus; cloud and bird shadows, the
   cottage and its ground shadow each use their own place's sun.
 - **No outlines:** everything keeps soft, painted edges, the cottage too.
-- **The cottage** is built after the meadow cottage of the reference
+- **The cottage** is bent round the planet: each vertex is placed by the
+  terrain's cottage-local meters (the sine map round the cottage) and
+  straight up from there (props.vert.glsl), so every wall stands square to
+  the ground under it and the house sits exactly on its clearing and pond
+  at every size. It is built after the meadow cottage of the reference
   painting, its design matched one to one at Kai's request after iteration 5
   (the first brief asked for an original building; that rule was lifted
   for the cottage). Measured from the painting (the ridge a third of the
@@ -379,10 +383,13 @@ click is what you see.
   ray mirrored off the level surface, nearest first: the banks (marched over
   the terrain plus its bank lip and grass; this is the dark band under every
   shore, as tall as the bank and the meadow behind it, so it widens and
-  narrows along the shore), the cottage (its terrace, pier, walls, chimney and
-  roof as plain solids in its own frame, each stopping at the ground or the
-  water, painted in a few broad strokes; a hit counts only if the meadow
-  along the same ray doesn't stand in front of it),
+  narrows along the shore), the cottage (its terrace, pier, steps, walls,
+  chimney and hipped roof as plain solids in its local meters, painted in a
+  few broad strokes; for rays that come near it, stepped along the same
+  ray after the banks' march and only up to where the meadow was met, each
+  step's segment tested exactly against the solids, so whichever is nearer
+  shows and no edge is skipped; the banks themselves in the lake's deep
+  blue, darkened, as the reference's navy bands),
   the clouds, only where the ray clears the land (a bank or hill the ray
   meets stands in front of every cloud; read from the clouds' mirror pass at the pixel itself, nudged by the wind's
   ruffle; from far above, from the cloud cover seen from below, where the
@@ -473,6 +480,9 @@ gets what is left of 3.6 ms of JS after the update and the render (at least
 and at most 3.6 ms), and never starts a step that would not fit. Tiles in
 view are built before those out of it, nearest first, and spawn straight in
 (a grow-in, tried in iteration 7, made the change of detail more visible).
+Blades and flowers never change size as you move: they are there or not
+(rest.glsl presence()), thinning out toward the near field's edge one by
+one at full size; only the planet's growth fades them in.
 
 One shared set of uniform objects (time, wind, warp, R, R_lag, sun, palette) is
 referenced by every material, so each frame writes each value once.
@@ -510,6 +520,11 @@ so any view can be shared.
   grass and flower pools are sized for high on every tier, so a tier chosen
   later fills in completely; the map sizes are chosen when the world is
   built.
+- **Zoom stops:** the wheel and the keys settle on orbit, a bird's-eye view
+  10 m up, eye level (2.8 m) and the meadow (1.6 m) when you stop zooming
+  near one (CameraRig STOPS_M, SNAP). The camera tilts from straight down to
+  the horizon over zoom 0.15–0.9 (TILT_RAMP), so the bird's-eye view sees
+  across the meadow.
 - **Tier selection:** `auto` picks a tier from a short startup benchmark
   (phones low; desktops high, medium or low by the benchmark). A live
   controller aims at a steady 60 fps (16.7 ms; 24 ms, tried in iteration 6,
