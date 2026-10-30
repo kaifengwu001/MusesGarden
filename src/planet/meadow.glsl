@@ -99,6 +99,24 @@ vec4 clumpsAt(vec3 dir) {
   return 1.0 + uClumps.w * (CLUMP_FLOOR + (1.0 - CLUMP_FLOOR) * c / CLUMP_COVER - 1.0);
 }
 
+// The clumps as the paint lays them, `close` (0 far … 1 near) softening and
+// fraying their edges: far away the drifts keep crisp edges (they read as
+// flowerbeds); up close a bed thins out over a meter or so along a ragged
+// line instead of stopping at a hard one. (The flowers themselves keep
+// clumpsAt's edges: Fields.clumps.)
+vec4 paintClumps(vec3 dir, float close) {
+  float f0 = exp2(uClumps.x);
+  float t = uClumps.y;
+  uint s = uTerrainSeed + 400u + uint(int(uClumps.x) + 16);
+  float norm = 1.0 / sqrt((1.0 - t) * (1.0 - t) + t * t);
+  float a = (gnoise(dir * f0, s) * (1.0 - t) + gnoise(dir * 2.0 * f0, s + 1u) * t) * norm;
+  float b = (gnoise(dir * f0, s + 64u) * (1.0 - t) + gnoise(dir * 2.0 * f0, s + 65u) * t) * norm;
+  float edge = CLUMP_EDGE + 0.12 * close;
+  float fray = close > 0.0 ? 0.07 * close * gnoise(dir * (uRadius / 1.4), uTerrainSeed + 405u) : 0.0;
+  vec4 c = smoothstep(vec4(uClumps.z - edge), vec4(uClumps.z + edge), vec4(a, b, -a, -b) + fray);
+  return 1.0 + uClumps.w * (CLUMP_FLOOR + (1.0 - CLUMP_FLOOR) * c / CLUMP_COVER - 1.0);
+}
+
 // Which species a random pick lands on, weighted by the local densities.
 int pickSpecies(vec4 flora, float r) {
   float x = r * dot(flora, vec4(1.0));
@@ -203,10 +221,13 @@ vec3 meadowPaint(Meadow m) {
   // flowers: dabs where the clumps are (the same density map the flowers are
   // scattered by), coloured by species and colony; where the flowers
   // themselves stand (the near field) the paint gives way to them
-  if (dot(m.flora, vec4(1.0)) > 0.02) m.flora *= clumpsAt(m.dir);
+  // (up close: soft, frayed bed edges, and an uneven fill inside them; far away as it was)
+  float close = 1.0 - smoothstep(0.03, 0.35, m.pixelMeters);
+  if (dot(m.flora, vec4(1.0)) > 0.02) m.flora *= paintClumps(m.dir, close);
   float total = dot(m.flora, vec4(1.0));
   float land = smoothstep(0.15, 0.7, m.shore);
   float fill = clamp(total / DAB_SATURATION, 0.0, 1.0) * m.bloom * land * uMeadowLook.y;
+  if (close > 0.0 && fill > 0.0) fill *= mix(1.0, 0.3 + 0.95 * (0.5 + 0.5 * gnoise(m.dir * (uRadius / 2.4), uTerrainSeed + 406u)), close);
   float f0, f1;
   uint lv;
   float t = patternOctaves(DAB_METERS, m.pixelMeters, DAB_PIXELS, f0, f1, lv);

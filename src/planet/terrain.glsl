@@ -133,6 +133,8 @@ float boxDistance(vec2 p, vec2 halfSize) {
 // narrowing from the eaves to the ridge (props.ts COTTAGE, ROOF), swept away
 // from the sun.
 float cottageShadow(vec3 dir) {
+  // (cottageLocal folds the far side of the planet onto the cottage: measure the true distance first)
+  if (chordAngle(dir, uCottage.xyz) * uRadius > 60.0) return 0.0;
   vec2 c = cottageLocal(dir);
   // nowhere farther from the eaves than the shadow of the ridge can reach (most of the ground: no steps)
   if (boxDistance(c, vec2(4.75, 3.08)) > 6.2 * length(uCottageSun.xy) + 0.5) return 0.0;

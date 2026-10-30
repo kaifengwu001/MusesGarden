@@ -82,7 +82,7 @@ export const schema = {
     growth: num('g', 'Growth', DEFAULT_GROWTH, 0, 1, 0.0001, 'live'),
     areaMin: num('amin', 'Area at g = 0', AREA_MIN, 5_000, 400_000, 1, 'live', { unit: 'm²' }),
     areaMax: num('amax', 'Area at g = 1', AREA_MAX, 50_000, 5_000_000, 1, 'live', { unit: 'm²' }),
-    bloom: num('b', 'Bloom', 0.78, 0, 1, 0.001, 'live'),
+    bloom: num('b', 'Bloom', 1, 0, 1, 0.001, 'live'),
   },
   view: {
     mode: choice('cam', 'Camera', ['overview', 'wander'], 'overview', 'live'),

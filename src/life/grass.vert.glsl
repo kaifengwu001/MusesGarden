@@ -26,14 +26,11 @@ float rnd(float s, float k) {
 }
 
 void main() {
-  // the tile's page: 0 out of view, else how far it has grown in (scatter.ts)
   int page = gl_InstanceID / int(uPageSize);
-  float grownIn = texelFetch(uPages, ivec2(page % 256, page / 256), 0).r;
-  if (grownIn < 0.002) {
+  if (texelFetch(uPages, ivec2(page % 256, page / 256), 0).r < 0.5) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
-  grownIn = smoothstep(0.0, 1.0, grownIn);
   vec3 dir = aDir;
   float d = chordAngle(dir, uFieldCentre.xyz) * uRadius;
   // Thinning by rank toward the edge: a point stays only while it would be
@@ -56,7 +53,7 @@ void main() {
   float seed = aBirth.y;
   float bloom = f.w;
   float lush = meadow.x;
-  float h = uGrass.x * (0.55 + 0.9 * rnd(seed, 1.0)) * mix(0.55, 1.15, bloom) * (0.85 + 0.3 * lush) * (0.25 + 0.75 * vis) * grownIn;
+  float h = uGrass.x * (0.55 + 0.9 * rnd(seed, 1.0)) * mix(0.55, 1.15, bloom) * (0.85 + 0.3 * lush) * (0.25 + 0.75 * vis);
   float w = uGrass.y * (0.7 + 0.6 * rnd(seed, 2.0)) * (0.5 + 0.5 * vis);
 
   // blade frame: up along the surface normal, turned partly toward the camera

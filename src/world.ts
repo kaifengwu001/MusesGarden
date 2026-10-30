@@ -568,8 +568,6 @@ export class World {
   settle(): void {
     this.band.settle();
     this.queue.drain();
-    this.grass.layer.finishFades();
-    this.flowers.layer.finishFades();
     this.rig.settle();
     growthState(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax, this.growth);
     this.refreshFields(true);

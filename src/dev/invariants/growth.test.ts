@@ -45,6 +45,6 @@ describe('growth model', () => {
     const s = growthState(p.world.growth, areaMin, areaMax);
     expect(Math.round(s.radius)).toBe(128);
     expect(formatArea(s.area)).toBe('206,000');
-    expect(worldLine(p, s)).toBe('Spring · R 128 m · 206,000 m² · seed 0412');
+    expect(worldLine(p, s)).toBe('Late spring · R 128 m · 206,000 m² · seed 0412');
   });
 });

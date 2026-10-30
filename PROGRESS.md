@@ -8,7 +8,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 7 | https://muses-garden-iteration-7.vercel.app | the commit with this table |
+| 8 | https://muses-garden-iteration-8.vercel.app | the commit with this table |
+| 7 | https://muses-garden-iteration-7.vercel.app | 1ca0327 |
 | 6 | https://muses-garden-iteration-6.vercel.app | 3dbb552 |
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
@@ -18,15 +19,18 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 8: the review notes (in progress)
+## Iteration 8: the review notes
 
-Started from iteration 7 (1ca0327). This table fills in as the notes are done.
+Started from iteration 7 (1ca0327), the notes committed first (9030555).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | A corner in the pier's reflection: geometry, or the reflections' draw order? | |
-| 2 | The flower paint: a very hard edge and a very even fill inside it, fine far away, unnatural up close | |
-| 3 | The grow-in of new grass and flowers makes the level-of-detail change more noticeable than just spawning in | |
+| 1 | A corner in the pier's reflection: geometry, or the reflections' draw order? | Geometry. The water traces simple stand-ins for the cottage, and iteration 7 had deepened the terrace's stand-in to 3 m under the ground, so where a reflected ray passed under the bank the water showed the buried terrace (the corner, and its dark foot). The stand-ins now stop at the ground (the pier's at the water), and a cottage hit counts only if the meadow along the same ray doesn't stand in front of it. |
+| 2 | The flower paint: a very hard edge and a very even fill inside it, fine far away, unnatural up close | Up close (where a pixel covers less than about a third of a meter) the paint's flowerbeds fade out over a meter or so along a ragged edge, and their fill is uneven: denser and sparser by turns. From far away they are as they were. The flowers themselves keep their beds. |
+| 3 | The grow-in of new grass and flowers makes the level-of-detail change more noticeable | Removed: tiles spawn straight in again. Tiles in view are still built first and faster (zooming in on High fills in 2.3 s). |
+| 4 | (added during the iteration) The flowers on the side of the planet opposite the hut are green, and the hut's base casts a shadow there | Two things. The green: the bloom spreads out from the hut, and at the default Bloom (0.78) the far 8 % of the planet was still in bud; the default is now full bloom (1), so the whole planet flowers (the slider still spreads it). The shadow: a real bug since iteration 1. The cottage's shadow test projects a place onto the cottage's ground plane, which folds the far side of the planet onto the cottage's own footprint; it now checks the true distance first (and so does the tunnel's dark water, which would have darkened a patch there too). |
+
+Checkpoint images: [docs/checkpoints/iteration-8](docs/checkpoints/iteration-8/).
 
 ## Iteration 7: the review notes
 

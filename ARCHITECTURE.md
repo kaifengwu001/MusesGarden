@@ -371,14 +371,18 @@ click is what you see.
   down; the colonies' wash of colour under them holds all the way down too.
   Both give way to the flowers themselves in the near field, but only where
   those are big enough on screen to carry the flowerbeds. They lie at 80 %
-  over the grass (`FLOWER_PAINT`). Near blades
+  over the grass (`FLOWER_PAINT`). Up close the paint's beds fade out over a
+  meter or so along a ragged edge and fill unevenly (`paintClumps`); far
+  away they keep the drifts' crisp edges. Near blades
   cross-fade into the paint with a dithered fade, never a ring.
 - **Water:** painted, not simulated: a mirror over a navy body. Along the view
   ray mirrored off the level surface, nearest first: the banks (marched over
   the terrain plus its bank lip and grass; this is the dark band under every
   shore, as tall as the bank and the meadow behind it, so it widens and
   narrows along the shore), the cottage (its terrace, pier, walls, chimney and
-  roof as plain solids in its own frame, painted in a few broad strokes),
+  roof as plain solids in its own frame, each stopping at the ground or the
+  water, painted in a few broad strokes; a hit counts only if the meadow
+  along the same ray doesn't stand in front of it),
   the clouds, only where the ray clears the land (a bank or hill the ray
   meets stands in front of every cloud; read from the clouds' mirror pass at the pixel itself, nudged by the wind's
   ruffle; from far above, from the cloud cover seen from below, where the
@@ -467,9 +471,8 @@ water, at full resolution). Post then draws to the screen. The build queue
 gets what is left of 3.6 ms of JS after the update and the render (at least
 0.5 ms, at most 2 ms; on a desktop with more than four jobs waiting, of 5 ms
 and at most 3.6 ms), and never starts a step that would not fit. Tiles in
-view are built before those out of it, nearest first, and a tile that opens
-new ground grows up from it over 0.35 s (its page's value in the
-visibility texture); one that replaces an old tile shows at once.
+view are built before those out of it, nearest first, and spawn straight in
+(a grow-in, tried in iteration 7, made the change of detail more visible).
 
 One shared set of uniform objects (time, wind, warp, R, R_lag, sun, palette) is
 referenced by every material, so each frame writes each value once.

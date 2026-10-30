@@ -123,9 +123,10 @@ vec3 cottageFrame(vec3 p) {
   return vec3(dot(o, cross(U, Z)), dot(o, U), dot(o, Z));
 }
 
-// 1 under the pier (cottage-local x, z: props.ts PIER), where the tunnel's water lies in the dark.
+// 1 under the pier (cottage-local x, z: props.ts PIER), where the tunnel's water lies in the dark
+// (and near the cottage's level: the frame folds the far side of the planet onto it).
 float underPier(vec3 local) {
-  return step(-8.2, local.x) * step(local.x, -3.4) * step(1.83, local.z) * step(local.z, 5.63);
+  return step(-8.2, local.x) * step(local.x, -3.4) * step(1.83, local.z) * step(local.z, 5.63) * step(abs(local.y), 6.0);
 }
 
 vec4 cottageInMirror(vec3 p, vec3 r) {
@@ -147,14 +148,15 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
   vec3 col = vec3(0.0);
   vec3 nrm = vec3(0.0);
   vec3 n;
-  // the terrace along the front, and the pier with its arch at the waterline
-  vec2 t = boxEntry(ro, rd, vec3(-4.4, -3.0, 2.33), vec3(4.1, 0.72, 4.73), n);
+  // the terrace along the front, and the pier with its arch at the waterline; each solid
+  // stops at the ground (the pier at the water), so the mirror never shows what is buried
+  vec2 t = boxEntry(ro, rd, vec3(-4.4, -0.05, 2.33), vec3(4.1, 0.72, 4.73), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
     col = mix(pal(ROW_STONE, 9), pal(ROW_STONE, 6), smoothstep(-0.8, -1.1, (ro + rd * t.x).y));
   }
-  t = boxEntry(ro, rd, vec3(-8.2, -3.0, 1.83), vec3(-3.4, 0.72, 5.63), n);
+  t = boxEntry(ro, rd, vec3(-8.2, -1.3, 1.83), vec3(-3.4, 0.72, 5.63), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
@@ -164,7 +166,7 @@ vec4 cottageInMirror(vec3 p, vec3 r) {
     if (n.z > 0.5 && abs(q.x) < 1.0 && (q.y < 0.0 || length(q) < 1.0)) col = vec3(0.06, 0.09, 0.09);
   }
   // the walls (the door and the tall window on the front, the small window on the right end)
-  t = boxEntry(ro, rd, vec3(-4.3, -0.7, -2.63), vec3(4.3, 3.45, 2.63), n);
+  t = boxEntry(ro, rd, vec3(-4.3, -0.05, -2.63), vec3(4.3, 3.45, 2.63), n);
   if (t.x < t.y && t.x > 0.0 && t.x < best) {
     best = t.x;
     nrm = n;
@@ -282,6 +284,17 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   // the cottage stands over its pond: in front of whatever bank is behind it
   vec3 pw = unwarpPosition(wp);
   vec4 house = cottageInMirror(pw, r);
+  // the cottage is traced along a straight ray: the meadow along that same ray hides what lies behind it
+  if (house.w > 0.0) {
+    for (int k = 1; k <= 6; k++) {
+      vec3 q = pw + r * (house.w * float(k) / 7.0);
+      float ql = length(q);
+      if (ql - uRadius < bankTop(q / ql)) {
+        house.w = -1.0;
+        break;
+      }
+    }
+  }
   if (house.w >= 0.0 && (bank.w < 0.0 || house.w < distance(pw, bank.xyz * (uRadius + bank.w)))) {
     mirror = house.rgb;
     bank.w = max(bank.w, 0.0);
