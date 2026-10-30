@@ -1,6 +1,7 @@
 import {
   AdditiveBlending,
   Color,
+  CubeCamera,
   DoubleSide,
   FrontSide,
   PerspectiveCamera,
@@ -37,6 +38,8 @@ import { gnoise } from '../planet/noise';
 import { unwarpPoint, warpPoint, type WarpFrame } from '../render/warp';
 import { fullscreenMesh } from '../render/fullscreen';
 import fragmentShader from './cloud.frag.glsl?raw';
+import radialFragment from './cloudRadial.frag.glsl?raw';
+import radialVertex from './cloudRadial.vert.glsl?raw';
 import lumpsFragment from './cloudLumpsBake.frag.glsl?raw';
 import vertexShader from './cloud.vert.glsl?raw';
 import shadowFragment from './cloudShadow.frag.glsl?raw';
@@ -46,10 +49,13 @@ import shadowVertex from './cloudShadow.vert.glsl?raw';
 // cloud is a heap of PUFFS lumpy spheres over a flat base, written once a
 // frame into one data texture (clouds.glsl reads it). The same puffs draw the
 // cloud (a billboard each, traced per pixel), cast its shadow (splatted into
-// a sun-space map of optical depth) and show in the lakes (the billboards
-// drawn again, at a third of the resolution, from the camera mirrored in the water's
-// level plane under the focus), so a cloud, its shadow and its reflection
-// always agree.
+// a sun-space map of optical depth) and show in the lakes (down in the
+// meadow, the billboards drawn again, at a third of the resolution, from the
+// camera mirrored in the water's level plane under the focus; from orbit,
+// where one plane cannot stand for the lakes of a whole hemisphere, the
+// puffs' optical depth seen from the planet's centre, which each lake reads
+// where its mirrored ray meets the clouds), so a cloud, its shadow and its
+// reflection always agree.
 //
 // Where the clouds are is weather, not scatter. A flow over the sphere (a few
 // vortices spiralling in or out, and bands of wind east and west) is traced
@@ -116,6 +122,10 @@ export interface CloudUniforms {
   /** The clouds from the mirrored camera, and its view-projection. */
   uCloudMirror: IUniform<Texture | null>;
   uCloudMirrorVP: IUniform<Matrix4>;
+  /** The clouds' optical depth seen from the planet's centre (for reflections from orbit). */
+  uCloudRadial: IUniform<Texture | null>;
+  /** How far the view is from the meadow (0 down in it, mirror pass … 1 in orbit, radial map), the clouds' middle height (m), -, -. */
+  uCloudOrbit: IUniform<Vector4>;
 }
 
 interface Puff {
@@ -378,6 +388,8 @@ export function createCloudUniforms(): CloudUniforms {
     uCloudEye: { value: new Vector3() },
     uCloudMirror: { value: null },
     uCloudMirrorVP: { value: new Matrix4() },
+    uCloudRadial: { value: null },
+    uCloudOrbit: { value: new Vector4(0, 10, 0, 0) },
   };
 }
 
@@ -410,6 +422,10 @@ export class Clouds {
   private readonly lumps = new WebGLCubeRenderTarget(64, { generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false });
   private readonly mirrorTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
   private readonly mirrorScene: Scene;
+  private readonly radialTarget = new WebGLCubeRenderTarget(256, { type: HalfFloatType, format: RedFormat, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false });
+  private readonly radialCamera = new CubeCamera(1, 1e5, this.radialTarget);
+  private readonly radialScene: Scene;
+  private readonly radialGeometry: InstancedBufferGeometry;
   private readonly mirrorCamera = new PerspectiveCamera();
   private readonly mirror = new Matrix4();
   private readonly bufferSize = new Vector2();
@@ -484,6 +500,27 @@ export class Clouds {
     this.mirrorCamera.matrixAutoUpdate = false;
     this.mirrorCamera.matrixWorldAutoUpdate = false;
     uniforms.uCloudMirror.value = this.mirrorTarget.texture;
+    // the radial cover, for reflections from orbit: the puffs splatted into a cube map about the centre
+    gpuMemory.set('cloud radial map', 6 * 256 * 256 * 2);
+    uniforms.uCloudRadial.value = this.radialTarget.texture;
+    this.radialGeometry = quad();
+    this.radialGeometry.instanceCount = 0;
+    const radialMesh = new Mesh(
+      this.radialGeometry,
+      new ShaderMaterial({
+        name: 'cloud radial cover',
+        vertexShader: radialVertex,
+        fragmentShader: radialFragment,
+        uniforms: { uCloudData: uniforms.uCloudData, uCloudLook: uniforms.uCloudLook, uCloudLumps: uniforms.uCloudLumps, uTime: shared.uTime },
+        blending: AdditiveBlending,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        side: DoubleSide,
+      }),
+    );
+    radialMesh.frustumCulled = false;
+    this.radialScene = new Scene().add(radialMesh);
 
     this.shadowGeometry = quad();
     this.shadowGeometry.instanceCount = 0;
@@ -641,7 +678,7 @@ export class Clouds {
    * Place the clouds for this frame, write them for the shaders (nearest the
    * camera first) and render their shadow map.
    */
-  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame): void {
+  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, orbit: number): void {
     if (!this.lumpsBaked) this.bakeLumps(renderer);
     if (seed !== this.seed) this.build(seed);
     if (radius !== this.slotsR) this.layoutSlots(radius);
@@ -782,9 +819,26 @@ export class Clouds {
     renderer.setClearAlpha(0);
     renderer.clear(true, false, false);
     if (total > 0 || this.casters > 0) renderer.render(this.shadowScene, this.shadowCamera);
-    this.renderMirror(renderer, camera, radius, warp, n);
+    // reflections: the mirror pass down in the meadow, the radial map from orbit, both on the way between
+    const middle = p.altitude * Math.pow(scale, 0.35) + 0.5 * SIZE * sizeScale;
+    this.uniforms.uCloudOrbit.value.set(orbit, middle, 0, 0);
+    if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
+    if (orbit > 0) this.renderRadial(renderer, total);
     renderer.setClearAlpha(clearAlpha);
     renderer.setRenderTarget(previous);
+  }
+
+  /** The puffs' optical depth seen from the planet's centre, into the radial cube map. */
+  private renderRadial(renderer: WebGLRenderer, total: number): void {
+    this.radialGeometry.instanceCount = total * PUFFS;
+    renderer.getClearColor(this.clearColour);
+    const clearAlpha = renderer.getClearAlpha();
+    const autoClear = renderer.autoClear;
+    renderer.autoClear = true;
+    renderer.setClearColor(0x000000, 0);
+    this.radialCamera.update(renderer, this.radialScene);
+    renderer.setClearColor(this.clearColour, clearAlpha);
+    renderer.autoClear = autoClear;
   }
 
   /**
@@ -821,9 +875,7 @@ export class Clouds {
     renderer.setRenderTarget(this.mirrorTarget);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, false, false);
-    // from orbit the lakes are too small (and too curved) to mirror anything
-    const orbit = camera.position.length() - radius > 0.75 * radius;
-    if (n > 0 && !orbit) renderer.render(this.mirrorScene, mc);
+    if (n > 0) renderer.render(this.mirrorScene, mc);
     renderer.setClearColor(this.clearColour, 0);
   }
 }

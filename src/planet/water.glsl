@@ -141,7 +141,11 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec4 bank = bankAlong(wp, r, -shore, rise / sqrt(max(1.0 - rise * rise, 1e-4)));
   vec4 cl = vec4(0.0);
   if (bank.w >= 0.0) mirror = bankColour(bank.xyz, bank.w);
-  else cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution);
+  else {
+    // down in the meadow the mirror pass, from orbit the radial map, both on the way between
+    if (uCloudOrbit.x < 1.0) cl = cloudsInMirror(wp, r, r0, gl_FragCoord.xy / uResolution) * (1.0 - uCloudOrbit.x);
+    if (uCloudOrbit.x > 0.0) cl += cloudsFromOrbit(wp, r, n) * uCloudOrbit.x;
+  }
   float reflectance = mix(0.45, 0.95, pow(1.0 - facing, 1.6)) * (1.0 - 0.25 * gust) * uWaterSky.x;
   vec3 col = mix(body, mirror, reflectance);
   // banks stay dark and clouds stay bright in the mirror even looking down into the water
