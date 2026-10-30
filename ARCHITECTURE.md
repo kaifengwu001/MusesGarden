@@ -521,8 +521,9 @@ so any view can be shared.
   later fills in completely; the map sizes are chosen when the world is
   built.
 - **Zoom stops:** the wheel and the keys settle on orbit, a bird's-eye view
-  10 m up, eye level (2.8 m) and the meadow (1.6 m) when you stop zooming
-  near one (CameraRig STOPS_M, SNAP). The camera tilts from straight down to
+  (zoom 0.4, about 52 m up at R 128), a standing view (zoom 0.8, about
+  5.1 m) and the meadow (1.6 m) when you stop zooming within half a wheel
+  notch of one (CameraRig STOPS_Z, SNAP; Kai's values). The camera tilts from straight down to
   the horizon over zoom 0.15–0.9 (TILT_RAMP), so the bird's-eye view sees
   across the meadow.
 - **Tier selection:** `auto` picks a tier from a short startup benchmark

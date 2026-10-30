@@ -31,7 +31,7 @@ Started from iteration 8 (a76417f), the notes committed first (c95587b).
 | 3 | On a small planet buildings should curve with it, their walls perpendicular to the surface (like Messenger's) | Every vertex of the cottage is now placed by the terrain's own cottage-local meters (the sine map round the cottage) and straight up from there, so each wall stands square to the ground under it and the house sits exactly on its clearing and its pond at every size ([R 40](docs/checkpoints/iteration-9/small-planet-R40.jpg)). |
 | 4 | The roof and the foundation a bit more mossy | Moss over much of the roof (thickest in the lower courses), at the walls' foot, and on the foundation from the water up, in patches and along the joints. |
 | 5 | (added) Grass reflections: the geometry and colours look off; they should take on more of the lake's colour and be darker | Bank reflections are now the lake's deep blue darkened, a dark navy band under every shore as in the reference still (its bands sample #0A3C63 to #0C243F). |
-| 6 | (added) Two more zoom stops: eye level, and a bird's-eye about 10 m up; tilt toward the ground later so the bird's-eye sees further | The wheel and the keys settle on four stops when you stop zooming near one: orbit, 10 m, eye level at 2.8 m (above the 1.6 m meadow stop, which you called super close), and the meadow. The camera reaches the horizon earlier on the way down: at 10 m it looks 24° below the horizon (43° before), so the bird's-eye view sees across the meadow ([the stops](docs/checkpoints/iteration-9/zoom-stops-10m-2.8m-1.6m.jpg)). The vista finder, which uses the same camera, now picks a wider lake view with islands and a cloud upper right; squint 23.4 (from 23.7). |
+| 6 | (added) Two more zoom stops: eye level, and a bird's-eye about 10 m up; tilt toward the ground later so the bird's-eye sees further; then the stops at zoom 0.4000 (bird's-eye) and 0.8000 (standing) | The wheel and the keys settle on four stops when you stop within half a wheel notch of one: orbit, the bird's-eye view at zoom 0.4 (about 52 m up at R 128, looking down over the meadow), the standing view at zoom 0.8 (about 5.1 m up, looking out across it), and the meadow at 1.6 m. The stops are zoom values, so each keeps its framing at every planet size. The camera reaches the horizon earlier on the way down: 10 m up it looks 24° below the horizon (43° before) ([first stops, at 10 m and 2.8 m](docs/checkpoints/iteration-9/zoom-stops-10m-2.8m-1.6m.jpg)). The vista finder, which uses the same camera, now picks a wider lake view with islands and a cloud upper right; squint 23.4 (from 23.7). |
 | 7 | (added) Grass and flowers still grow in and shrink out when wandering | They shrank toward the edge of the area around you where they're drawn, and faded in by rank as you came near, so walking made them grow ahead and shrink behind. Now they are there or not: they thin out toward that edge one by one at full size, and only the planet's growth fades them in. |
 
 Checkpoint images: [docs/checkpoints/iteration-9](docs/checkpoints/iteration-9/).
@@ -61,8 +61,6 @@ None.
 
 - The cottage's reflection is still its stand-ins: no rail, chair, bench or
   window frames in the water.
-- Eye level (2.8 m) is a guess at what you meant; it is one number
-  (`STOPS_M` in view/camera.ts).
 - Carried over: the heavy views don't hold 60 fps at full resolution on an
   M1 Pro at 2880×1800 (Auto trims them); the far meadow and clouds third of
   the squint test is now the worst (more sky in the new vista).

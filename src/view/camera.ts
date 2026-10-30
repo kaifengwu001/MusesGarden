@@ -7,7 +7,8 @@ import { clamp, damp, lerp, smoothstep } from '../core/math';
 //   z = 1  Wander:   a glide 1.6 m above the grass, looking at the horizon, FOV 55°
 //
 // The wheel and the keys settle on four stops: the two ends, a bird's-eye
-// view 10 m up and eye level (STOPS_M), when you stop zooming near one.
+// view and a standing view (STOPS_Z, chosen by Kai), when you stop zooming
+// near one.
 //
 // The camera rides a surface frame (up = local vertical at the focus F,
 // forward, right) stored as a quaternion, so there are no poles. Altitude is
@@ -19,10 +20,15 @@ const OVERVIEW_ALTITUDE = 4.2; // × R
 const MAX_TILT = (82 * Math.PI) / 180;
 /** The zoom (z) over which the camera tilts from looking straight down to the horizon: early, so a bird's-eye view still sees far. */
 const TILT_RAMP = [0.15, 0.9] as const;
-/** Stops between the ends (altitude over the ground, m): a bird's-eye view, and eye level. */
-const STOPS_M = [10, 2.8] as const;
-/** Zoom settles on a stop when it is left this near one (in z), after this long without zooming (s). */
-const SNAP = { reach: 0.045, after: 0.18 } as const;
+/**
+ * Stops between the ends (zoom z, so each keeps its tilt, field of view and
+ * warp at every planet size): a bird's-eye view (about 52 m up at R 128,
+ * looking down over the meadow) and a standing view (about 5.1 m up,
+ * looking out across it).
+ */
+const STOPS_Z = [0.4, 0.8] as const;
+/** Zoom settles on a stop when it is left this near one (in z: half a wheel notch), after this long without zooming (s). */
+const SNAP = { reach: 0.06, after: 0.18 } as const;
 
 const X = new Vector3(1, 0, 0);
 const Y = new Vector3(0, 1, 0);
@@ -155,7 +161,7 @@ export class CameraRig {
   private snapZoom(): void {
     let best = this.zoomTarget;
     let gap: number = SNAP.reach;
-    for (const stop of [0, 1, ...STOPS_M.map((m) => this.zoomForAltitude(m))]) {
+    for (const stop of [0, ...STOPS_Z, 1]) {
       const g = Math.abs(stop - this.zoomTarget);
       if (g < gap) {
         gap = g;
