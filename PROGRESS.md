@@ -21,6 +21,15 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 11: the review notes (in progress)
+
+Started from iteration 10 (aadae30). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | The performance degradation is real, not just a change of scene | |
+| 2 | Grass loads in much more slowly, with a new flicker when moving around | |
+
 ## Iteration 10: the review notes
 
 Started from iteration 9 (8bfde67), the notes committed first (3d62413).
