@@ -8,7 +8,7 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 11 | https://muses-garden-iteration-11.vercel.app | the commit with this table |
+| 11 | https://muses-garden-iteration-11.vercel.app | 15b7dbb |
 | 10 | https://muses-garden-iteration-10.vercel.app | aadae30 |
 | 9 | https://muses-garden-iteration-9.vercel.app | 8bfde67 |
 | 8 | https://muses-garden-iteration-8.vercel.app | a76417f |
@@ -47,7 +47,8 @@ median frame time and frames over 25 ms per phase (the GPU was shared):
 
 - **Auto's starting tier:** Medium on desktops (grass to 22 m), not High
   (35 m). On this machine High holds about 55 fps at 0.6 resolution; Medium
-  holds 60 at 0.73.
+  holds 60 at 0.73. Kai chose Medium for Auto (2026-10-30); High stays a
+  choice in the panel.
 
 ### Known issues
 
