@@ -9,6 +9,7 @@ uniform vec4 uCloudSunB; // axis B
 varying vec2 vOff;
 flat varying float vRadius;
 flat varying uint vSeed;
+flat varying float vLit;
 
 void main() {
   float q = length(vOff);
@@ -16,5 +17,5 @@ void main() {
   float rl = 1.0;
   if (q > 1.0 - CLOUD_LUMPS) rl += CLOUD_LUMPS * puffLumps(normalize(vOff.x * uCloudSunA.xyz + vOff.y * uCloudSunB.xyz), vSeed);
   if (q >= rl) discard;
-  gl_FragColor = vec4(2.0 * vRadius * sqrt(rl * rl - q * q), 0.0, 0.0, 1.0);
+  gl_FragColor = vec4(2.0 * vRadius * sqrt(rl * rl - q * q) * vLit, 0.0, 0.0, 1.0);
 }

@@ -22,6 +22,7 @@ export const ROW = {
   ROOF: 11,
   LIGHT: 12,
   BUD: 13,
+  WING: 14,
 } as const;
 
 type Rows = Partial<Record<number, readonly string[]>>;
@@ -57,6 +58,9 @@ const NOON: Rows = {
   [ROW.LIGHT]: ['#FFF3DE', '#BFD8F0', '#A7C27B', '#FFF5DA', '#7E92B8'],
   // buds and pale meadow ahead of the bloom: bud green, bud tip, dry grass
   [ROW.BUD]: ['#748C47', '#A0945C', '#8D915C'],
+  // butterfly wings, a ground colour and its mark each: white (dark tips), sulphur (orange dot),
+  // fritillary (dark spots), blue (white fringe), red admiral-ish (cream bar), orange tip (orange tips); body
+  [ROW.WING]: ['#F7F4EA', '#3B3A3C', '#F3E07A', '#E98A2E', '#E8893A', '#5B3720', '#86A9EC', '#F6F4EE', '#B4452E', '#F4E3B4', '#F6F2E6', '#F09A3A', '#3A332C'],
 };
 
 const DAWN: Rows = {

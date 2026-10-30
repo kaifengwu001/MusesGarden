@@ -14,6 +14,7 @@
 #define ROW_ROOF 11
 #define ROW_LIGHT 12
 #define ROW_BUD 13
+#define ROW_WING 14
 
 uniform sampler2D uPalette;
 uniform vec3 uSunDir;    // toward the sun, planet space

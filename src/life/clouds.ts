@@ -427,6 +427,7 @@ export class Clouds {
   private thresholdKey = '';
   private readonly placed: Placed[] = Array.from({ length: MAX_CLOUDS }, () => ({ slot: null as unknown as Slot, fade: 1, base: 0, size: 0, up: new Vector3(), along: new Vector3(), distance: 0 }));
   private readonly order: Placed[] = [];
+  private readonly hidden: Placed[] = [];
   private readonly all: Array<{ centre: Vector3; radius: number }> = [];
   private readonly p = new Vector3();
   private readonly q = new Vector3();
@@ -604,13 +605,16 @@ export class Clouds {
   }
 
   /**
-   * Drop the clouds the ground hides. A sightline from the eye to a cloud is
-   * blocked where it passes under the water table (nothing stands lower), in
-   * the warped world the camera sees: behind the planet from orbit, or under
-   * the bent meadow at the tiny-planet zooms. A cloud goes when the line to
-   * the top of its bound is blocked (lower points are hidden sooner).
+   * Put the clouds the ground hides last, and return how many are in sight.
+   * A sightline from the eye to a cloud is blocked where it passes under the
+   * water table (nothing stands lower), in the warped world the camera sees:
+   * behind the planet from orbit, or under the bent meadow at the tiny-planet
+   * zooms. A cloud is hidden when the line to the top of its bound is blocked
+   * (lower points are hidden sooner). Hidden clouds are not drawn, but they
+   * still cast their shadows: a cloud behind a hill can shade the slope in
+   * front of it.
    */
-  private cullHidden(eye: Vector3, radius: number, warp: WarpFrame): void {
+  private sortHidden(eye: Vector3, radius: number, warp: WarpFrame): number {
     const blocked = (target: Vector3): boolean => {
       for (let i = 1; i < 16; i++) {
         this.q.lerpVectors(eye, target, i / 16);
@@ -618,11 +622,14 @@ export class Clouds {
       }
       return false;
     };
+    this.hidden.length = 0;
     let kept = 0;
     for (const at of this.order) {
-      if (!blocked(warpPoint(warp, this.p.copy(at.up).multiplyScalar(at.base + 2.65 * at.size), this.p))) this.order[kept++] = at;
+      if (blocked(warpPoint(warp, this.p.copy(at.up).multiplyScalar(at.base + 2.65 * at.size), this.p))) this.hidden.push(at);
+      else this.order[kept++] = at;
     }
-    this.order.length = kept;
+    for (let i = 0; i < this.hidden.length; i++) this.order[kept + i] = this.hidden[i];
+    return kept;
   }
 
   /** Every cloud's heap now, as a sphere about its middle (planet space; those behind the planet too), nearest the camera first. */
@@ -691,9 +698,11 @@ export class Clouds {
       b.radius = 1.45 * at.size;
     });
     this.all.length = this.order.length;
-    // clouds the ground hides are left out (they would still be shaded: the cloud shader writes its depth)
-    this.cullHidden(camera.position, radius, warp);
-    const n = this.order.length;
+    // the clouds in sight first (nearest first), then those the ground hides:
+    // only the first are drawn (they would still be shaded: the cloud shader
+    // writes its depth), all of them cast shadows
+    const n = this.sortHidden(camera.position, radius, warp);
+    const total = this.order.length;
 
     const data = this.uniforms.uCloudData.value.image.data as Float32Array;
     let top = 0;
@@ -763,16 +772,16 @@ export class Clouds {
     const extent = radius + top + 2;
     this.uniforms.uCloudSunA.value.set(this.axisA.x, this.axisA.y, this.axisA.z, 1 / extent);
     this.uniforms.uCloudSunB.value.set(this.axisB.x, this.axisB.y, this.axisB.z, 0);
-    this.uniforms.uCloudLook.value.set(p.shadow, 0.22, n, 0);
+    this.uniforms.uCloudLook.value.set(p.shadow, 0.22, n, total);
     this.mesh.geometry.instanceCount = n;
     this.mesh.visible = n > 0;
-    this.shadowGeometry.instanceCount = n * PUFFS;
+    this.shadowGeometry.instanceCount = total * PUFFS;
     const previous = renderer.getRenderTarget();
     const clearAlpha = renderer.getClearAlpha();
     renderer.setRenderTarget(this.shadowTarget);
     renderer.setClearAlpha(0);
     renderer.clear(true, false, false);
-    if (n > 0 || this.casters > 0) renderer.render(this.shadowScene, this.shadowCamera);
+    if (total > 0 || this.casters > 0) renderer.render(this.shadowScene, this.shadowCamera);
     this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearAlpha(clearAlpha);
     renderer.setRenderTarget(previous);

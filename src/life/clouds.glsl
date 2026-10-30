@@ -25,7 +25,7 @@ uniform highp sampler2D uCloudData;
 uniform sampler2D uCloudShadowMap;
 uniform vec4 uCloudSunA;  // sun-space axis A (xyz), 1 / half-extent of the shadow map (1/m)
 uniform vec4 uCloudSunB;  // sun-space axis B (xyz), -
-uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds, -
+uniform vec4 uCloudLook;  // shadow strength, optical density (1/m), clouds in sight (drawn first), all clouds (they all cast shadows)
 uniform vec3 uCloudEye;   // the camera (not the mirrored one): clouds dissolve around it
 uniform sampler2D uCloudMirror; // the clouds seen from the camera mirrored in the water, premultiplied
 uniform mat4 uCloudMirrorVP;    // that camera's view-projection
@@ -250,12 +250,21 @@ vec4 cloudsInMirror(vec3 wp, vec3 r, vec3 r0, vec2 screen) {
   return textureLod(uCloudMirror, uv, 0.0);
 }
 
+// Toward the sun (the shadow map's axes are A = sun × ref, B = sun × A).
+vec3 cloudSun() {
+  return cross(uCloudSunA.xyz, uCloudSunB.xyz);
+}
+
 // 0..1 cloud shadow at a point (planet space, m): the optical depth toward
 // the sun from the shadow map. edge: noise in [-1, 1] that roughens the
 // outline (the paint passes its brushstrokes, so shadow edges look brushed).
+// The map has no depth: only clouds on the sunlit half of the planet are in
+// it (cloudShadow.vert.glsl), and only the sunlit half reads it. Any cloud
+// that can shade a sunlit point is itself sunlit; on the night side the
+// planet's own shadow is all there is.
 float cloudShadowAt(vec3 p, float edge) {
   vec2 uv = vec2(dot(p, uCloudSunA.xyz), dot(p, uCloudSunB.xyz)) * uCloudSunA.w * 0.5 + 0.5;
   float tau = textureLod(uCloudShadowMap, uv, 0.0).r;
   float s = 1.0 - exp(-tau * uCloudLook.y * (1.0 + 0.45 * edge));
-  return smoothstep(0.1, 0.5, s) * uCloudLook.x;
+  return smoothstep(0.1, 0.5, s) * uCloudLook.x * smoothstep(-0.03, 0.03, dot(normalize(p), cloudSun()));
 }
