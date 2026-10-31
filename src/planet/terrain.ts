@@ -204,6 +204,26 @@ export class Terrain {
     this.gradStep = Math.max(0.6, bakeTexelMeters);
   }
 
+  /**
+   * Where the homestead shapes or shades the ground, as discs (direction,
+   * radius in m) for the surface's two draws (chunks.ts LodView.home): its
+   * plateau, or as far as the cottage's shadow reaches if farther (the sweep
+   * per meter of height: uCottageSun; terrain.glsl's cottageShadow, from its
+   * eaves at 4.75 × 3.08 m to its ridge at 6.2 m), and its pond (homePond).
+   * The GPU measures them in cottage-local meters, a little shorter than
+   * these arcs: a couple of meters to spare.
+   */
+  homeAreas(sweepX: number, sweepZ: number, out: Array<{ dir: Vector3; reach: number }>): void {
+    const L = this.layout;
+    const R = this.radius;
+    const shadow = Math.min(60, Math.hypot(4.75, 3.08) + 6.2 * Math.hypot(sweepX, sweepZ) + 0.5);
+    out[0].dir.copy(L.cottage);
+    out[0].reach = Math.max(PLATEAU.outer, shadow) + 2;
+    tmpB.crossVectors(L.cottage, L.homeBearing);
+    out[1].dir.copy(L.cottage).addScaledVector(tmpB, -POND_SHIFT / R).addScaledVector(L.homeBearing, this.pondCentre / R).normalize();
+    out[1].reach = this.pondShapeReach + 2;
+  }
+
   /** Cottage local coordinates (m): x across, z toward the pond. Mirrors cottageLocal() in GLSL. */
   cottageLocal(dir: Vector3, out: { x: number; z: number }): { x: number; z: number } {
     const L = this.layout;

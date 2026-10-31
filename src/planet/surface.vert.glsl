@@ -1,4 +1,8 @@
 // CDLOD surface: one shared grid mesh, instanced per selected node.
+// AWAY_FROM_HOME: nodes the homestead reaches none of (surface.ts) read the baked ground alone.
+#ifdef AWAY_FROM_HOME
+#define BAKED_GROUND
+#endif
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_cubesphere>

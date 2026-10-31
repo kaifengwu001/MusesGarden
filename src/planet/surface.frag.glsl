@@ -44,9 +44,14 @@ void main() {
   vec3 v = toCam / viewDist;
   float pixelMeters = viewDist * uPixelAngle / max(dot(n, v), 0.3);
 
-  // the ground here: per pixel from the bake, so shores are crisp at any mesh density
+  // the ground here: per pixel from the bake, so shores are crisp at any mesh density (AWAY_FROM_HOME:
+  // a node the homestead shapes and shades none of, surface.ts, drawn without its code)
   vec4 fields = textureLod(uTerrainBake, dir, 0.0);
+#ifdef AWAY_FROM_HOME
+  float h = fields.r;
+#else
   float h = homestead(dir, fields.r);
+#endif
   float shore = h / max(vSlope, uBank.w);
   float aa = max(fwidth(h), 1e-4);
   float wet = smoothstep(aa, -aa, h);
@@ -55,7 +60,11 @@ void main() {
   // light: toon bands, the cottage's shadow, cloud shadows with brushed edges
   float stroke = strokeAt(dir, pixelMeters);
   // (the cottage's shadow is painted like a cloud's: deep and cool)
+#ifdef AWAY_FROM_HOME
+  float cloud = cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2);
+#else
   float cloud = max(cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2), 0.85 * cottageShadow(dir));
+#endif
   float b = toonLight(dot(n, uSunDir)) * (1.0 - 0.9 * cloud);
 
   // wind on the grass (and the water)

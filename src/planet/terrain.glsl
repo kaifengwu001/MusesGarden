@@ -87,9 +87,19 @@ float homestead(vec3 dir, float h) {
   return min(h, max(box * 4.0 - 0.3, -0.5));
 }
 
+// The homestead applied to a natural height h, or not at all where it reaches
+// none of the ground (BAKED_GROUND: the vertices of terrain far from it, surface.ts).
+float homeGround(vec3 dir, float h) {
+#ifdef BAKED_GROUND
+  return h;
+#else
+  return homestead(dir, h);
+#endif
+}
+
 // Ground height before the bank lip (m above the water table).
 float height0(vec3 dir) {
-  return homestead(dir, textureLod(uTerrainBake, dir, 0.0).r);
+  return homeGround(dir, textureLod(uTerrainBake, dir, 0.0).r);
 }
 
 // Land lifts a little at the shore, the water drops off: h plus a lip.
@@ -124,7 +134,7 @@ void gradientFrame(vec3 dir, out vec3 a, out vec3 b) {
 Ground sampleGround(vec3 dir) {
   Ground g;
   g.fields = textureLod(uTerrainBake, dir, 0.0);
-  float h0 = homestead(dir, g.fields.r);
+  float h0 = homeGround(dir, g.fields.r);
   vec3 a, b;
   gradientFrame(dir, a, b);
   float e = uBank.z / uRadius;
@@ -136,7 +146,11 @@ Ground sampleGround(vec3 dir) {
   float hb = banked(h0, g.water);
   g.height = max(hb, 0.0);
   g.depth = max(-hb, 0.0);
+#ifdef BAKED_GROUND
+  g.clearing = 0.0;
+#else
   g.clearing = clearingAt(dir, chordAngle(dir, uCottage.xyz) * uRadius);
+#endif
   return g;
 }
 

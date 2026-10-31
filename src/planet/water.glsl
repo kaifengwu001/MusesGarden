@@ -381,7 +381,9 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   // clicks ripple out
   col = mix(col, pal(ROW_WATER, 3), clamp(rippleRing(dir), 0.0, 1.0) * 0.5);
   // in the tunnel under the pier the water lies in the dark, a little light off its mouth
+#ifndef AWAY_FROM_HOME
   col *= mix(1.0, 0.3, underPier(homeLocal(unwarpPosition(wp))));
+#endif
   // passing cloud shadows dim what you see into the water
   col *= 1.0 - 0.18 * cloud * (1.0 - reflectance);
   return col;

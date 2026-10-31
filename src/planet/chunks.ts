@@ -62,6 +62,13 @@ export interface LodView {
    * `heightAt(cap)` bounds the ground height over a node.
    */
   readonly warpHorizon?: { focusDir: Vector3; radiusEff: number; eyeHeight: number; heightAt: (centre: Vector3, alpha: number) => number } | null;
+  /**
+   * Where the homestead shapes or shades the ground: discs (centre direction,
+   * radius in m). A node reaching into any is flagged in its last float and
+   * drawn with the homestead's code, the rest without it (surface.ts). Null:
+   * every node is flagged.
+   */
+  readonly home?: ReadonlyArray<{ readonly dir: Vector3; readonly reach: number }> | null;
 }
 
 const corner = new Vector3();
@@ -183,9 +190,20 @@ export class ChunkSelection {
     d[o + 4] = level === 0 ? 1e30 : MORPH_START * range;
     d[o + 5] = level === 0 ? 2e30 : range;
     d[o + 6] = level;
-    d[o + 7] = 0;
+    d[o + 7] = this.nearHome(alpha, n) ? 1 : 0;
     this.minLevel = Math.min(this.minLevel, level);
     this.maxLevel = Math.max(this.maxLevel, level);
+  }
+
+  /** Whether the node about `centre` (angular radius alpha, 1/n of a face across) reaches into the homestead's ground. */
+  private nearHome(alpha: number, n: number): boolean {
+    const home = this.view!.home;
+    if (!home) return true;
+    const R = this.view!.radius;
+    // the vertex shader reads the ground up to a parent grid step past a vertex (and a gradient step past that)
+    const margin = alpha + (3 * Math.PI) / (2 * n * (this.cfg.grid - 1)) + 2 / R;
+    for (const a of home) if (Math.acos(clamp(centre.dot(a.dir), -1, 1)) - margin < a.reach / R) return true;
+    return false;
   }
 }
 

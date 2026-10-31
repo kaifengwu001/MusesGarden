@@ -4,6 +4,7 @@ import {
   DynamicDrawUsage,
   InstancedBufferGeometry,
   InstancedInterleavedBuffer,
+  Group,
   InterleavedBufferAttribute,
   Mesh,
   ShaderMaterial,
@@ -42,54 +43,87 @@ export function createGrid(grid: number): BufferGeometry {
   return g;
 }
 
+/** Selected nodes drawn with one material: their own copy of the node data, instanced over the shared grid. */
+class SurfacePart {
+  readonly data: Float32Array;
+  readonly instances: InstancedInterleavedBuffer;
+  readonly geometry = new InstancedBufferGeometry();
+  readonly mesh: Mesh;
+  count = 0;
+
+  constructor(capacity: number, material: ShaderMaterial) {
+    this.data = new Float32Array(capacity * NODE_FLOATS);
+    this.instances = new InstancedInterleavedBuffer(this.data, NODE_FLOATS, 1);
+    this.instances.setUsage(DynamicDrawUsage);
+    this.geometry.setAttribute('aNode', new InterleavedBufferAttribute(this.instances, 4, 0));
+    this.geometry.setAttribute('aLod', new InterleavedBufferAttribute(this.instances, 4, 4));
+    this.geometry.instanceCount = 0;
+    this.mesh = new Mesh(this.geometry, material);
+    this.mesh.frustumCulled = false;
+  }
+
+  /** Upload the nodes gathered into `data` since the last call. */
+  commit(): void {
+    this.instances.clearUpdateRanges();
+    this.instances.addUpdateRange(0, this.count * NODE_FLOATS);
+    this.instances.needsUpdate = true;
+    this.geometry.instanceCount = this.count;
+  }
+}
+
 /**
- * The planet's ground: every selected CDLOD node in one instanced draw.
+ * The planet's ground: every selected CDLOD node, instanced in two draws.
  * Terrain is evaluated in the vertex shader from rest-space directions
- * (terrain.glsl), so a node needs no CPU data beyond where it is.
+ * (terrain.glsl), so a node needs no CPU data beyond where it is. Nodes the
+ * homestead shapes or shades (flagged by the selection) are drawn with its
+ * code; the rest, most of the planet, with a build of the same shaders
+ * without it (AWAY_FROM_HOME): the same pixels, but a smaller shader runs
+ * faster everywhere, even where the code it drops would never have run.
  */
 export class Surface {
-  readonly mesh: Mesh;
+  /** Add to the scene. */
+  readonly mesh = new Group();
   readonly selection = new ChunkSelection();
-  private readonly geometry: InstancedBufferGeometry;
-  private readonly instances: InstancedInterleavedBuffer;
+  private readonly near: SurfacePart;
+  private readonly away: SurfacePart;
   private grid = 0;
   readonly uniforms: { uGridSteps: IUniform<number>; uNearField: IUniform<Vector4> };
 
   constructor(shared: Record<string, IUniform>, grid: number) {
-    this.instances = new InstancedInterleavedBuffer(this.selection.data, NODE_FLOATS, 1);
-    this.instances.setUsage(DynamicDrawUsage);
-    this.geometry = new InstancedBufferGeometry();
     this.uniforms = { uGridSteps: { value: grid - 1 }, uNearField: { value: new Vector4(0, 1, 0, 0.001) } };
+    const uniforms = { ...shared, ...this.uniforms };
+    const material = (away: boolean): ShaderMaterial =>
+      new ShaderMaterial({ name: away ? 'surface (away from home)' : 'surface', vertexShader, fragmentShader, uniforms, defines: away ? { AWAY_FROM_HOME: 1 } : {} });
+    this.near = new SurfacePart(this.selection.capacity, material(false));
+    this.away = new SurfacePart(this.selection.capacity, material(true));
     this.setGrid(grid);
-    this.geometry.setAttribute('aNode', new InterleavedBufferAttribute(this.instances, 4, 0));
-    this.geometry.setAttribute('aLod', new InterleavedBufferAttribute(this.instances, 4, 4));
-    this.geometry.instanceCount = 0;
-    const material = new ShaderMaterial({
-      name: 'surface',
-      vertexShader,
-      fragmentShader,
-      uniforms: { ...shared, ...this.uniforms },
-    });
-    this.mesh = new Mesh(this.geometry, material);
-    this.mesh.frustumCulled = false;
+    this.mesh.add(this.near.mesh, this.away.mesh);
   }
 
   setGrid(grid: number): void {
     if (grid === this.grid) return;
     this.grid = grid;
     const patch = createGrid(grid);
-    this.geometry.setAttribute('position', patch.getAttribute('position'));
-    this.geometry.setIndex(patch.getIndex());
+    for (const part of [this.near, this.away]) {
+      part.geometry.setAttribute('position', patch.getAttribute('position'));
+      part.geometry.setIndex(patch.getIndex());
+    }
     this.uniforms.uGridSteps.value = grid - 1;
   }
 
   update(view: LodView, cfg: LodConfig): void {
     this.setGrid(cfg.grid);
-    this.selection.select(view, cfg);
-    this.instances.clearUpdateRanges();
-    this.instances.addUpdateRange(0, this.selection.count * NODE_FLOATS);
-    this.instances.needsUpdate = true;
-    this.geometry.instanceCount = this.selection.count;
+    const sel = this.selection;
+    sel.select(view, cfg);
+    this.near.count = 0;
+    this.away.count = 0;
+    for (let k = 0; k < sel.count; k++) {
+      const o = k * NODE_FLOATS;
+      const part = sel.data[o + 7] > 0.5 ? this.near : this.away;
+      part.data.set(sel.data.subarray(o, o + NODE_FLOATS), part.count++ * NODE_FLOATS);
+    }
+    this.near.commit();
+    this.away.commit();
   }
 
   get triangles(): number {

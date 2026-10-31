@@ -116,6 +116,11 @@ export class World {
   private readonly east = new Vector3();
   private readonly tmp = new Vector3();
   private readonly tmp2 = new Vector3();
+  /** Where the homestead shapes or shades the ground (Terrain.homeAreas): the terrain there is drawn with its code. */
+  private readonly homeAreas = [
+    { dir: new Vector3(), reach: 0 },
+    { dir: new Vector3(), reach: 0 },
+  ];
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
@@ -392,6 +397,8 @@ export class World {
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    const sweep = this.terrainUniforms.uCottageSun.value;
+    this.terrain.homeAreas(sweep.x, sweep.y, this.homeAreas);
     this.surface.update(
       {
         camera: cam.position,
@@ -410,6 +417,7 @@ export class World {
                 heightAt: this.heightBound,
               }
             : null,
+        home: this.homeAreas,
       },
       this.lod,
     );
