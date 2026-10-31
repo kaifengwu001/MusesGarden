@@ -147,6 +147,7 @@ export const social: SocialPolicy = {
   invitationStep: () => ({ ok: false, error: 'stub' }),
   invitationTimers: () => [],
   canVisit: () => false,
+  photoSlotsLeft: () => 5,
   publicProfile: (s) => ({ museId: s.seed.id, name: s.seed.name, worldSeed: s.seed.worldSeed, interests: [], discoveries: [] }),
   ownerLink: (a, b, op) => {
     const to = op === 'introduce' ? 'friends' : 'ended';

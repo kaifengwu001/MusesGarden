@@ -1,6 +1,6 @@
 import type { Draw, Instant, MuseEventBody, MuseState, PairOutcome } from '../../../src/muse/contract';
 import { SOCIAL } from './constants';
-import { photoTogether, hashedDir } from './photos';
+import { hashedDir, photoSlotsLeft, photoTogether } from './photos';
 import { compare } from './profile';
 import { befriendChance, befriended, chemistry, familiarityNeeded, relationshipWith } from './relationships';
 
@@ -21,7 +21,11 @@ export function encounter(a: MuseState, b: MuseState, now: Instant, draw: Draw):
   if (!canMeet(a, b)) return outcome;
 
   const familiarity = relationshipWith(a, b.seed.id)?.familiarity ?? 0;
-  const ready = familiarity >= familiarityNeeded(a.temperament) && familiarity >= familiarityNeeded(b.temperament);
+  const ready =
+    familiarity >= familiarityNeeded(a.temperament) &&
+    familiarity >= familiarityNeeded(b.temperament) &&
+    photoSlotsLeft(a, now) > 0 &&
+    photoSlotsLeft(b, now) > 0;
   const yes = ready && draw('befriend', 0) < befriendChance(similarity, a.temperament) && draw('befriend', 1) < befriendChance(similarity, b.temperament);
   if (!yes) return outcome;
 

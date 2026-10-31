@@ -12,7 +12,7 @@ import type {
 import { localClock } from './clock';
 import { SOCIAL } from './constants';
 import { propose } from './invitations';
-import { photoTogether, whereIs } from './photos';
+import { photoSlotsLeft, photoTogether, whereIs } from './photos';
 import { compare, findOverlap, publicProfile, similarity, stretch } from './profile';
 import { areFriends, chemistry, ending, isUnpleasant, relationshipWith, toleratedStreak } from './relationships';
 
@@ -40,10 +40,10 @@ function visitMs(draw: Draw): number {
 
 export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant, draw: Draw): Visit {
   const left = socialLeftMs(s, now);
-  if (left <= 0) return null;
+  if (left <= 0 || photoSlotsLeft(s, now) <= 0) return null;
   const friends = free
     .map((f) => f.state)
-    .filter((f) => areFriends(s, f) && socialLeftMs(f, now) > 0)
+    .filter((f) => areFriends(s, f) && socialLeftMs(f, now) > 0 && photoSlotsLeft(f, now) > 0)
     .sort((x, y) => compare(x.seed.id, y.seed.id));
   if (friends.length === 0) return null;
 

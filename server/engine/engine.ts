@@ -572,7 +572,9 @@ export class Engine {
     if (action === 'window-start') {
       const host = tx.state(inv.host);
       const guest = tx.state(inv.guest);
-      if (!host.working && !guest.working) this.startVisit(tx, inv.guest, inv.host, 'guest', inv.window.end, inv.id);
+      const social = this.deps.social;
+      const canPhoto = social.photoSlotsLeft(host, tx.now) > 0 && social.photoSlotsLeft(guest, tx.now) > 0;
+      if (!host.working && !guest.working && canPhoto) this.startVisit(tx, inv.guest, inv.host, 'guest', inv.window.end, inv.id);
     }
     return { ok: true };
   }

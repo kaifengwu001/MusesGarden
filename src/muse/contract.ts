@@ -557,6 +557,8 @@ export interface SocialPolicy {
   invitationTimers(inv: Invitation): readonly { readonly at: Instant; readonly action: 'deadline' | 'window-start' | 'window-end' }[];
   /** True only for the invited owner, while the invitation is open and inside its window. */
   canVisit(inv: Invitation | undefined, requester: MuseId, now: Instant): boolean;
+  /** Photo slots left on today's delivery day. Every hangout brings a photo, so none starts without a slot. */
+  photoSlotsLeft(s: MuseState, now: Instant): number;
   /** The only view of a Muse that crosses to other Muses or owners. */
   publicProfile(s: MuseState): PublicProfile;
   /** Owners introduced or unshared their Muses. */

@@ -1,5 +1,7 @@
 import { hash32, salt, unit } from '../../../src/core/hash';
 import type { Dir, Draw, Instant, MuseEventBody, MuseId, MuseState, PhotoId, PhotoSpec } from '../../../src/muse/contract';
+import { PHOTO_DAILY_CAP } from '../policy/constants';
+import { localClock } from './clock';
 import { compare } from './profile';
 
 function normalize(x: number, y: number, z: number): Dir {
@@ -49,4 +51,13 @@ export function photoTogether(
   const base = { id, at: now, subject, planetOf: where.planetOf, dir: where.dir, forward: tangentAt(where.dir, draw), zoom: where.zoom };
   const taken = (companion: MuseId): MuseEventBody => ({ kind: 'photo.taken', photo: { ...base, companions: [companion] } satisfies PhotoSpec });
   return { id, a: taken(b), b: taken(a) };
+}
+
+/**
+ * Photo slots left on today's delivery day. A hangout or a new friendship always comes with a photo, and Muse sends
+ * at most PHOTO_DAILY_CAP a day, so neither starts without a slot for its photo.
+ */
+export function photoSlotsLeft(s: MuseState, now: Instant): number {
+  const sent = s.day.day === localClock(now, s.seed.timezone).day ? s.day.photos : 0;
+  return PHOTO_DAILY_CAP - sent;
 }
