@@ -41,6 +41,7 @@ import { warpPoint, type WarpFrame } from '../render/warp';
 
 /** Floats per instance without extras: direction xyz, ln(birth threshold), seed in [0, 1). */
 export const SCATTER_STRIDE = 5;
+/** Pages a row of the page-visibility texture holds (the vertex shaders index it page % 256, page / 256); it has as many rows as the pool needs. */
 const PAGE_ROWS = 256;
 /** ln threshold that is never reached: unused slots. */
 export const NEVER = 1e30;
@@ -170,8 +171,10 @@ export class ScatterLayer {
       for (let k = spec.pages - 1; k >= 0; k--) free.push(k);
       const buffer = new InstancedInterleavedBuffer(data, this.stride, 1);
       buffer.setUsage(DynamicDrawUsage);
-      const visible = new Uint8Array(PAGE_ROWS * PAGE_ROWS);
-      const texture = new DataTexture(visible, PAGE_ROWS, PAGE_ROWS, RedFormat, UnsignedByteType);
+      // (sized to the pool, so each frame uploads its few rows, not a 256² texture)
+      const rows = Math.ceil(spec.pages / PAGE_ROWS);
+      const visible = new Uint8Array(PAGE_ROWS * rows);
+      const texture = new DataTexture(visible, PAGE_ROWS, rows, RedFormat, UnsignedByteType);
       texture.minFilter = NearestFilter;
       texture.magFilter = NearestFilter;
       this.pools.push({ data, buffer, visible, texture, free });

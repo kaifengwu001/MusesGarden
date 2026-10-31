@@ -19,7 +19,7 @@ export interface Globals {
   uWarpUp: { value: Vector3 };
   /** Tiny-planet warp: k = w (1/(2 R_v) − 1/(2 R)), 1/m. */
   uWarpK: { value: number };
-  /** Drawing-buffer size, px. */
+  /** The pixels drawn this frame: the render scale's part of the canvas-sized targets (post.ts), px. */
   uResolution: { value: Vector2 };
 }
 

@@ -73,6 +73,8 @@ export interface MeadowHarness {
   preset(name: 'homestead' | 'lakes' | 'meadow' | 'vista'): void;
   /** Render `frames` frames back to back (GPU-synchronised); returns ms per frame. */
   benchmark(frames: number): number;
+  /** Draw at this render scale (0.5–1) from the next frame, as Auto would. */
+  setScale(scale: number): void;
 }
 
 declare global {

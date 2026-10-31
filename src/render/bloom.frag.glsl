@@ -2,13 +2,14 @@
 // (13-tap), 2: upsample (tent) added onto the larger level.
 uniform sampler2D tSource;
 uniform vec2 uTexel; // 1 / source size
+uniform vec4 uExtent; // the part of the source drawn (uv, the render scale's), and the farthest a tap may reach
 uniform int uMode;
 uniform float uThreshold;
 
 varying vec2 vUv;
 
 vec3 tap(vec2 o) {
-  return texture2D(tSource, vUv + o * uTexel).rgb;
+  return texture2D(tSource, min(vUv * uExtent.xy + o * uTexel, uExtent.zw)).rgb;
 }
 
 void main() {

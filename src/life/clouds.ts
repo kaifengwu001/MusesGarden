@@ -156,6 +156,8 @@ export interface CloudUniforms {
   /** The clouds from the mirrored camera, and its view-projection. */
   uCloudMirror: IUniform<Texture | null>;
   uCloudMirrorVP: IUniform<Matrix4>;
+  /** The part of the mirror drawn this frame (uv, the render scale's), and the farthest a lookup may reach in it. */
+  uCloudMirrorExtent: IUniform<Vector4>;
 }
 
 interface Puff {
@@ -423,6 +425,7 @@ export function createCloudUniforms(): CloudUniforms {
     uCloudEye: { value: new Vector3() },
     uCloudMirror: { value: null },
     uCloudMirrorVP: { value: new Matrix4() },
+    uCloudMirrorExtent: { value: new Vector4(1, 1, 1, 1) },
   };
 }
 
@@ -467,6 +470,8 @@ export class Clouds {
   /** Where the lakes can read the mirror: the mirror pass shades only there. */
   private readonly waterMask: WaterMask;
   private readonly wind: IUniform<Vector4>;
+  /** The pixels drawn this frame (globals: the render scale's part of the screen-sized targets). */
+  private readonly view: IUniform<Vector2>;
   private readonly bufferSize = new Vector2();
   private readonly clearColour = new Color();
   private lumpsBaked = false;
@@ -516,6 +521,7 @@ export class Clouds {
 
     this.waterMask = new WaterMask(shared);
     this.wind = shared.uWindVec as IUniform<Vector4>;
+    this.view = shared.uResolution as IUniform<Vector2>;
     const cloudMaterial = (mirror: boolean): ShaderMaterial =>
       new ShaderMaterial({
         name: mirror ? 'clouds (mirror)' : 'clouds',
@@ -931,6 +937,7 @@ export class Clouds {
    * pass shades only the pixels some lake can read (the water mask).
    */
   private renderMirror(renderer: WebGLRenderer, camera: PerspectiveCamera, radius: number, warp: WarpFrame, n: number): void {
+    // the canvas's size, drawn in the part the render scale draws (as the scene is)
     renderer.getDrawingBufferSize(this.bufferSize);
     const w = Math.max(1, this.bufferSize.x);
     const h = Math.max(1, this.bufferSize.y);
@@ -938,6 +945,11 @@ export class Clouds {
       this.mirrorTarget.setSize(w, h);
       gpuMemory.set('cloud mirror', w * h * 4);
     }
+    const view = this.view.value;
+    const vw = Math.min(w, view.x);
+    const vh = Math.min(h, view.y);
+    this.mirrorTarget.viewport.set(0, 0, vw, vh);
+    this.uniforms.uCloudMirrorExtent.value.set(vw / w, vh / h, (vw - 0.5) / w, (vh - 0.5) / h);
     // X' = X − 2((X − P)·U)U with P = U·R: the water table under the focus
     const u = warp.up;
     const d = 2 * radius;
@@ -958,8 +970,8 @@ export class Clouds {
     if (n > 0) {
       const tanY = Math.tan((camera.fov * Math.PI) / 360);
       const tanX = tanY * camera.aspect;
-      const spread = ((RUFFLE * this.wind.value.w * h) / (2 * tanY)) * (1 + tanX * tanX + tanY * tanY);
-      this.waterMask.render(renderer, camera, this.bufferSize, this.bufferSize, spread);
+      const spread = ((RUFFLE * this.wind.value.w * vh) / (2 * tanY)) * (1 + tanX * tanX + tanY * tanY);
+      this.waterMask.render(renderer, camera, this.bufferSize, view, spread);
     }
     // cleared to transparent black: the water reads it as premultiplied colour
     renderer.setRenderTarget(this.mirrorTarget);

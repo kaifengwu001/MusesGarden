@@ -144,12 +144,17 @@ export type QualityChange = 'scale' | 'tier' | null;
 
 /** How the render scale follows the frame rate (see QualityController). */
 const SCALE = {
-  /** Smallest scale, and the factor of one step. */
-  floor: 0.6,
-  step: 0.9,
+  /** Smallest scale: half the pixels each way (Kai would rather keep High and lose resolution). */
+  floor: 0.5,
   /** Frames slower than budget × this, for this long (ms), step it down. */
   slow: 1.12,
-  slowFor: 1500,
+  slowFor: 750,
+  /** A step down scales the pixels by what would bring the frame to budget × aim, by between least and most of a step. */
+  aim: 0.92,
+  least: 0.92,
+  most: 0.75,
+  /** One step up. */
+  up: 1 / 0.9,
   /** Frames at budget × this or better, for this long (ms; doubled after each step up that proved too much, up to the most), step it up. */
   steady: 1.06,
   upAfter: 6000,
@@ -162,19 +167,21 @@ const DESPERATE = { slow: 1.5, for: 5000 } as const;
 
 /**
  * Picks the tier and keeps the frame rate by the render scale.
- * Auto starts desktops on medium (phones, and desktops that fail the
- * startup probe, on low) and does not change the tier as you go: a tier
- * change rebuilds every blade and flower in sight, which reads as the
- * meadow reloading and flickering (iterations 6–10 did it, and dropped the
- * scale back to full each time, so frames got slower before they got
- * faster). High is there to choose. Frames slow for 1.5 s step the render
- * scale down (×0.9, to 0.6); steady frames step it back up, first after
- * 6 s and, each time a step up proves too much, after twice as long (to
- * 2 min), so it does not hunt. A 60 Hz display never shows a frame faster
- * than 16.7 ms, so "steady" there is at the refresh rate, and only a step
- * up can tell whether there is room. Only a machine still far too slow at
- * the smallest scale steps an Auto tier down, keeping its scale, and never
- * back up. Locked during deterministic captures.
+ * Auto starts desktops on High (phones, and desktops that fail the startup
+ * probe, on Low) and keeps it: the render scale does the work, down to half
+ * the pixels each way (Kai's choice after iteration 12: resolution is not
+ * the look, and a little upscaling blur is welcome). A change of scale is
+ * free (the targets keep their size and the frame is drawn into part of
+ * them, main.ts), so frames slow for 0.75 s step the scale down at once by
+ * as much as their time asks (between ×0.92 and ×0.75); steady frames step
+ * it back up by one step, first after 6 s and, each time a step up proves
+ * too much, after twice as long (to 2 min), so it does not hunt. A 60 Hz
+ * display never shows a frame faster than 16.7 ms, so "steady" there is at
+ * the refresh rate, and only a step up can tell whether there is room. A
+ * tier change rebuilds every blade and flower in sight, which reads as the
+ * meadow reloading (iterations 6–10 did it as you went), so only a machine
+ * still far too slow at the smallest scale steps an Auto tier down, keeping
+ * its scale, and never back up. Locked during deterministic captures.
  */
 export class QualityController {
   tier: Tier = TIERS.high;
@@ -202,8 +209,9 @@ export class QualityController {
     this.sinceUp = Number.POSITIVE_INFINITY;
   }
 
+  /** The canvas's pixel ratio (the render scale draws part of it: main.ts). */
   pixelRatio(devicePixelRatio: number): number {
-    return Math.min(devicePixelRatio, this.device.dprCap) * this.renderScale;
+    return Math.min(devicePixelRatio, this.device.dprCap);
   }
 
   /** MSAA only on displays of low pixel ratio; at DPR ≥ 1.75 density does the AA (whatever the render scale). */
@@ -225,7 +233,8 @@ export class QualityController {
       // a step up that did not last: wait twice as long before the next
       if (this.sinceUp < SCALE.proof) this.upAfter = Math.min(this.upAfter * 2, SCALE.upAfterMost);
       this.sinceUp = Number.POSITIVE_INFINITY;
-      this.renderScale = Math.max(SCALE.floor, this.renderScale * SCALE.step);
+      const step = Math.min(SCALE.least, Math.max(SCALE.most, Math.sqrt((budget * SCALE.aim) / this.emaMs)));
+      this.renderScale = Math.max(SCALE.floor, this.renderScale * step);
       return 'scale';
     }
     if (this.desperateMs > DESPERATE.for && this.choice === 'auto') {
@@ -239,7 +248,7 @@ export class QualityController {
     if (this.steadyMs > this.upAfter && this.renderScale < 1) {
       this.steadyMs = 0;
       this.sinceUp = 0;
-      this.renderScale = Math.min(1, this.renderScale / SCALE.step);
+      this.renderScale = Math.min(1, this.renderScale * SCALE.up);
       return 'scale';
     }
     return null;
@@ -247,6 +256,6 @@ export class QualityController {
 
   private autoTier(): TierName {
     if (this.device.mobile || this.benchMs > 2.5) return 'low';
-    return 'medium';
+    return 'high';
   }
 }

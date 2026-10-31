@@ -117,10 +117,12 @@ export class Surface {
     sel.select(view, cfg);
     this.near.count = 0;
     this.away.count = 0;
+    const d = sel.data;
     for (let k = 0; k < sel.count; k++) {
       const o = k * NODE_FLOATS;
-      const part = sel.data[o + 7] > 0.5 ? this.near : this.away;
-      part.data.set(sel.data.subarray(o, o + NODE_FLOATS), part.count++ * NODE_FLOATS);
+      const part = d[o + 7] > 0.5 ? this.near : this.away;
+      const to = part.count++ * NODE_FLOATS;
+      for (let f = 0; f < NODE_FLOATS; f++) part.data[to + f] = d[o + f];
     }
     this.near.commit();
     this.away.commit();

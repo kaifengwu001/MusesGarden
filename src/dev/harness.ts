@@ -16,6 +16,7 @@ export interface HarnessHost {
   pick(ndcX: number, ndcY: number): ReturnType<MeadowHarness['pick']>;
   frameLog(count: number): ReturnType<MeadowHarness['frameLog']>;
   preset(name: 'homestead' | 'lakes' | 'meadow' | 'vista'): void;
+  setScale(scale: number): void;
 }
 
 export const HARNESS_VERSION = 'S0';
@@ -67,6 +68,9 @@ export function installHarness(host: HarnessHost, ready: Promise<void>): MeadowH
     },
     preset(name) {
       host.preset(name);
+    },
+    setScale(scale) {
+      host.setScale(scale);
     },
     benchmark(frames) {
       const gl = host.gl;

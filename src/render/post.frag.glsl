@@ -6,6 +6,9 @@ uniform sampler2D tBloom;
 uniform float uBloom;
 uniform float uGrain;
 uniform vec2 uGrade; // contrast, brightness
+// the part of each target the frame was drawn into (uv, the render scale's), and the farthest a lookup may reach
+uniform vec4 uSceneExtent;
+uniform vec4 uBloomExtent;
 
 varying vec2 vUv;
 
@@ -23,8 +26,8 @@ vec3 toneCurve(vec3 c) {
 }
 
 void main() {
-  vec3 color = texture2D(tScene, vUv).rgb;
-  color += texture2D(tBloom, vUv).rgb * uBloom;
+  vec3 color = texture2D(tScene, min(vUv * uSceneExtent.xy, uSceneExtent.zw)).rgb;
+  color += texture2D(tBloom, min(vUv * uBloomExtent.xy, uBloomExtent.zw)).rgb * uBloom;
   color = toneCurve(color);
   gl_FragColor = vec4(color, 1.0);
   #include <colorspace_fragment>

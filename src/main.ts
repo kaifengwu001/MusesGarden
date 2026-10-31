@@ -180,19 +180,28 @@ async function boot(): Promise<void> {
     holdEnd: () => world.bloomEnd(),
   });
 
+  // The canvas and the targets sized with it (bufferSize), and the part of them drawn (viewSize):
+  // the render scale draws a smaller part of the same targets and the grade spreads it over the
+  // canvas, so a change of scale reallocates nothing and does not clear the canvas (a resize did:
+  // a frame of 60 to 90 ms each time, iteration 12).
   const bufferSize = new Vector2();
+  const viewSize = new Vector2(1, 1);
+  const applyScale = (): void => {
+    viewSize.set(Math.max(1, Math.round(bufferSize.x * quality.renderScale)), Math.max(1, Math.round(bufferSize.y * quality.renderScale)));
+    post.setView(viewSize.x, viewSize.y);
+    globals.uResolution.value.copy(viewSize);
+  };
   const resize = (): void => {
     // A hidden or collapsed host (iframe, side pane) reports 0×0; zero-size
     // render targets are incomplete framebuffers, so never go below 1×1.
     const width = Math.max(1, window.innerWidth);
     const height = Math.max(1, window.innerHeight);
-    const pixelRatio = quality.pixelRatio(window.devicePixelRatio || 1);
-    renderer.setPixelRatio(pixelRatio);
+    renderer.setPixelRatio(quality.pixelRatio(window.devicePixelRatio || 1));
     renderer.setSize(width, height);
     renderer.getDrawingBufferSize(bufferSize);
     post.setSize(bufferSize.x, bufferSize.y, quality.samples(window.devicePixelRatio || 1));
-    globals.uResolution.value.copy(bufferSize);
     gpuMemory.set('canvas', bufferSize.x * bufferSize.y * 4 * 2); // front + back buffer
+    applyScale();
   };
 
   const applyUi = (): void => {
@@ -205,6 +214,7 @@ async function boot(): Promise<void> {
   let syncingMode = false;
   // A resize clears the canvas: inside a frame it waits for the next frame's start, so the
   // resized canvas is drawn before it is shown (resized after a draw, the frame shows blank).
+  // (A change of render scale is not a resize: applyScale.)
   let resizePending = false;
   store.subscribe((changed) => {
     if (changed.has('quality.tier')) {
@@ -221,7 +231,7 @@ async function boot(): Promise<void> {
   const keys = new Keys();
   const update = (): void => {
     if (keys.update(world.rig, clock.realDt)) userPosed = true;
-    world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), bufferSize.y);
+    world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);
@@ -250,8 +260,8 @@ async function boot(): Promise<void> {
     stats.geometries = info.memory.geometries;
     stats.programs = info.programs?.length ?? 0;
     stats.gpuBytes = gpuMemory.total();
-    stats.width = bufferSize.x;
-    stats.height = bufferSize.y;
+    stats.width = viewSize.x;
+    stats.height = viewSize.y;
     stats.pixelRatio = renderer.getPixelRatio();
     stats.samples = post.samples;
     stats.tier = quality.tier.name;
@@ -321,8 +331,8 @@ async function boot(): Promise<void> {
     if (change === 'tier') {
       world.applyTier(quality.tier);
       post.bloomEnabled = quality.tier.bloom;
-    }
-    if (change) resizePending = true;
+      resizePending = true;
+    } else if (change === 'scale') applyScale();
     hud.frame(stats, quality.tier.budgets, now);
   };
 
@@ -365,6 +375,10 @@ async function boot(): Promise<void> {
       preset: (name) => {
         world.cameraPreset(name);
         userPosed = true;
+      },
+      setScale: (scale) => {
+        quality.renderScale = Math.min(1, Math.max(0.5, scale));
+        applyScale();
       },
     },
     ready,

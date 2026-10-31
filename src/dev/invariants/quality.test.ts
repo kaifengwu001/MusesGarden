@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { FRAME_BUDGET_MS, QualityController, type QualityChange } from '../../core/quality';
 
-// The quality controller (core/quality.ts): Auto keeps the frame rate by the
-// render scale and does not rebuild the meadow by changing tiers as you go
-// (iterations 6–10 did, and it read as the grass reloading and flickering).
+// The quality controller (core/quality.ts): Auto holds High on a desktop and
+// keeps the frame rate by the render scale, down to half the pixels each way;
+// it does not rebuild the meadow by changing tiers as you go (iterations 6–10
+// did, and it read as the grass reloading and flickering).
 
 const desktop = { mobile: false, dprCap: 2, gpu: 'test' };
 
@@ -23,12 +24,12 @@ beforeAll(() => {
 });
 
 describe('quality controller', () => {
-  it('starts a desktop on medium under Auto, and on what was chosen otherwise', () => {
+  it('starts a desktop on high under Auto, and on what was chosen otherwise', () => {
     const q = new QualityController(desktop);
     q.choose('auto', 0.4);
-    expect(q.tier.name).toBe('medium');
-    q.choose('high', 0.4);
     expect(q.tier.name).toBe('high');
+    q.choose('medium', 0.4);
+    expect(q.tier.name).toBe('medium');
     q.choose('auto', 3);
     expect(q.tier.name).toBe('low');
   });
@@ -38,8 +39,8 @@ describe('quality controller', () => {
     q.choose('auto', 0.4);
     const changes = run(q, 24, 30000);
     expect(changes.every((c) => c === 'scale')).toBe(true);
-    expect(q.tier.name).toBe('medium');
-    expect(q.renderScale).toBeCloseTo(0.6, 2);
+    expect(q.tier.name).toBe('high');
+    expect(q.renderScale).toBeCloseTo(0.5, 2);
   });
 
   it('never puts the scale back up when it steps down', () => {
@@ -59,9 +60,22 @@ describe('quality controller', () => {
     q.choose('auto', 0.4);
     run(q, 40, 60000);
     expect(q.tier.name).toBe('low');
-    expect(q.renderScale).toBeCloseTo(0.6, 2);
+    expect(q.renderScale).toBeCloseTo(0.5, 2);
     run(q, FRAME_BUDGET_MS, 120000);
     expect(q.tier.name).toBe('low');
+  });
+
+  it('steps down by as much as the frames ask, at once', () => {
+    const q = new QualityController(desktop);
+    q.choose('auto', 0.4);
+    // a little slow: a small step (about what brings 19.5 ms back to budget), within a second
+    expect(run(q, 19.5, 1200)).toEqual(['scale']);
+    expect(q.renderScale).toBeGreaterThan(0.85);
+    expect(q.renderScale).toBeLessThanOrEqual(0.92);
+    // far too slow: the largest step
+    q.choose('auto', 0.4);
+    expect(run(q, 40, 1200)).toEqual(['scale']);
+    expect(q.renderScale).toBeCloseTo(0.75, 2);
   });
 
   it('steps the scale back up on steady frames, waiting twice as long after a step up that did not hold', () => {
@@ -74,7 +88,7 @@ describe('quality controller', () => {
     expect(run(q, FRAME_BUDGET_MS, 5500)).toEqual([]);
     expect(run(q, FRAME_BUDGET_MS, 2000)).toEqual(['scale']);
     // too much: slow again at once, so it steps down, and the next try waits about 12 s
-    expect(run(q, 24, 2500)).toEqual(['scale']);
+    expect(run(q, 24, 1000)).toEqual(['scale']);
     expect(run(q, FRAME_BUDGET_MS, 11000)).toEqual([]);
     expect(run(q, FRAME_BUDGET_MS, 2000)).toEqual(['scale']);
   });

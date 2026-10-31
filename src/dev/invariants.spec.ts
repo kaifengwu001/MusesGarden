@@ -98,8 +98,10 @@ test.describe('growth', () => {
     const build = Math.max(...log.map((f) => f.buildMs));
     const p95 = js[Math.floor(js.length * 0.95)];
     test.info().annotations.push({ type: 'scrub', description: `JS p95 ${p95.toFixed(2)} ms, max ${js.at(-1)!.toFixed(2)} ms, build slice max ${build.toFixed(2)} ms` });
-    // a desktop catching up on a backlog of tiles lets the frame's JS run to 5 ms (main.ts BACKLOG_FRAME_JS_MS)
-    expect(p95).toBeLessThan(5.5);
+    // a desktop catching up on a backlog of tiles lets the frame's JS run to 5 ms (main.ts BACKLOG_FRAME_JS_MS);
+    // the rest is submission (since iteration 13 the water mask's passes and the terrain's second draw:
+    // about 0.05 ms, p95 5.3–5.5 ms on the M1 Pro, timed in 0.1 ms steps)
+    expect(p95).toBeLessThan(5.6);
     expect(build).toBeLessThan(4.2); // the queue keeps to its 3.6 ms backlog slice (+ at most one short job step)
   });
 });

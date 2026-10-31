@@ -35,6 +35,7 @@ uniform vec4 uCloudOrbit; // weight of the view from orbit in the lakes (0..1), 
 uniform vec3 uCloudEye;   // the camera (not the mirrored one): clouds dissolve around it
 uniform sampler2D uCloudMirror; // the clouds seen from the camera mirrored in the water, premultiplied
 uniform mat4 uCloudMirrorVP;    // that camera's view-projection
+uniform vec4 uCloudMirrorExtent; // the part of it drawn this frame (uv, the render scale's), and the farthest a lookup may reach
 #include <meadow_cloud_lumps>
 #include <meadow_sun>
 
@@ -254,7 +255,7 @@ vec4 cloudsInMirror(vec3 wp, vec3 r, vec3 r0, vec2 screen) {
   vec4 b = uCloudMirrorVP * vec4(wp + r0 * 30.0, 1.0);
   vec2 shift = a.w > 0.0 && b.w > 0.0 ? (a.xy / a.w - b.xy / b.w) * 0.5 : vec2(0.0);
   vec2 uv = clamp(screen + shift, vec2(0.0), vec2(1.0));
-  return textureLod(uCloudMirror, uv, 0.0);
+  return textureLod(uCloudMirror, min(uv * uCloudMirrorExtent.xy, uCloudMirrorExtent.zw), 0.0);
 }
 
 // The clouds a lake mirrors when seen from far above, where the one mirror
