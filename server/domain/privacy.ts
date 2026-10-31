@@ -53,7 +53,7 @@ const HEALTH = words(`
   alzheimer alzheimer's parkinson parkinson's rehab addiction addicted sober sobriety alcoholism alcoholic anorexia
   bulimia diet dieting cholesterol stroke disability disabled wheelchair deaf blind symptoms symptom treatment
   chemo chemotherapy radiation transplant vaccine vaccinated std sti hypertension obesity overweight insomnia
-  mental psychiatric takes taking prescribed dose dosage mg
+  mental psychiatric takes taking prescribed dose dosage mg health medical glucose tablets pills inhaler
 `);
 
 /** Common drug-name endings: medications are too many to list. */
@@ -102,11 +102,13 @@ function looksProper(label: string): boolean {
   return ws.length >= 2 && ws.every((w) => /^[A-Z]/.test(w));
 }
 
+const sensitiveWord = (w: string): boolean =>
+  FIRST_NAMES.has(w) || SURNAMES.has(w) || PEOPLE.has(w) || HEALTH.has(w) || MONEY.has(w) || PLACES.has(w) || FIRST_PERSON.has(w);
+
 function sensitive(label: string): boolean {
   if (IDENTIFIER.test(label) || POSSESSIVE.test(label) || DRUG.test(label) || looksProper(label)) return true;
   const ts = tokens(label);
-  if (ts.length === 0 || ts.length > MAX_WORDS) return true;
-  return ts.some((w) => FIRST_NAMES.has(w) || SURNAMES.has(w) || PEOPLE.has(w) || HEALTH.has(w) || MONEY.has(w) || PLACES.has(w) || FIRST_PERSON.has(w));
+  return ts.length === 0 || ts.length > MAX_WORDS || ts.some(sensitiveWord);
 }
 
 /** Allow-listed MEMORY.md/SOUL.md labels: drops anything that looks like a person, health, money, place or identifier. */
@@ -117,4 +119,41 @@ export function privacyFilter(labels: readonly string[]): readonly string[] {
     if (!sensitive(label) && !out.includes(label)) out.push(label);
   }
   return out;
+}
+
+const STOPWORDS = words('a an the of and or to in on at by for with from is are was were be been this that these those it its as into who while during');
+
+/** Content words cut to five letters, so "tablet" finds "tablets". */
+const stems = (text: string): string[] => tokens(text).filter((w) => !STOPWORDS.has(w)).map((w) => w.slice(0, 5));
+
+/**
+ * A line that names someone or something (a capital word after a sentence's first), or that has an identifier
+ * or a sensitive word. A lone "Dana" or "Springfield" looks just like "Jazz" as a label; only its line gives it away.
+ */
+function sensitiveLine(line: string): boolean {
+  const body = line.replace(/^\s*(?:[-*+]|\d+[.)]|#+)\s*/, '');
+  if (IDENTIFIER.test(body) || POSSESSIVE.test(body) || DRUG.test(body) || tokens(body).some(sensitiveWord)) return true;
+  return body.split(/[.!?;:]\s+/).some((sentence) =>
+    sentence
+      .trim()
+      .split(/\s+/)
+      .slice(1)
+      .some((w) => /^[A-Z]/.test(w) && w !== 'I'),
+  );
+}
+
+/**
+ * privacyFilter, plus the document the labels came from: a label is also dropped when every one of its words
+ * appears on a line that names a person or place or carries a private fact.
+ */
+export function privacyFilterIn(labels: readonly string[], text: string): readonly string[] {
+  const flagged = text
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split(/\r?\n/)
+    .filter(sensitiveLine)
+    .map((line) => new Set(stems(line)));
+  return privacyFilter(labels).filter((label) => {
+    const st = stems(label);
+    return st.length > 0 && !flagged.some((line) => st.every((x) => line.has(x)));
+  });
 }
