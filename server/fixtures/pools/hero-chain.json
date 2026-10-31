@@ -1,0 +1,51 @@
+[
+  {
+    "origin": "wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Botanical_illustration",
+    "canonicalUrl": "https://en.wikipedia.org/wiki/Botanical_illustration",
+    "title": "Botanical illustration",
+    "summary": "Botanical illustration is the art of depicting the form, color, and details of plant species. They are generally meant to be scientifically descriptive about subjects depicted and are often found printed alongside a botanical description in books, magazines, and other media. Some are sold as artworks.",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/a/af/Botanical_illustration_of_Lilium_superbum.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
+    "topics": [
+      "Botanical illustration",
+      "Botanical art",
+      "Botany",
+      "Florae (publication)",
+      "Illustration",
+      "Scientific illustrators"
+    ]
+  },
+  {
+    "origin": "wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Watercolor_painting",
+    "canonicalUrl": "https://en.wikipedia.org/wiki/Watercolor_painting",
+    "title": "Watercolor painting",
+    "summary": "Watercolor (American English) or watercolour (Commonwealth English; see spelling differences), also aquarelle (French: [akwaʁɛl]; from Italian diminutive of Latin aqua 'water'), is a painting method in which the paints are made of pigments suspended in a water-based solution. Watercolor refers to both the medium and the resulting artwork.",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Dolceacqua43_-_Artista_locale_mentre_dipinge_un_acquarello.jpg/330px-Dolceacqua43_-_Artista_locale_mentre_dipinge_un_acquarello.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+    "topics": [
+      "Watercolor painting",
+      "Painting",
+      "Painting techniques",
+      "Paints",
+      "Watercolor painting",
+      "Watermedia"
+    ]
+  },
+  {
+    "origin": "wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Ultramarine",
+    "canonicalUrl": "https://en.wikipedia.org/wiki/Ultramarine",
+    "title": "Ultramarine",
+    "summary": "Ultramarine is a deep blue pigment historically derived from lazurite, the principal component of the metamorphic rock lapis lazuli. The pigment was produced by grinding the stone and undergoing a complex washing process to isolate the blue mineral, which made it exceptionally valuable.",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/Ultramarinepigment.jpg/330px-Ultramarinepigment.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+    "topics": [
+      "Ultramarine",
+      "Aluminosilicates",
+      "Inorganic pigments",
+      "Quaternary colors",
+      "Shades of blue",
+      "Shades of indigo",
+      "Sulfides"
+    ]
+  }
+]
