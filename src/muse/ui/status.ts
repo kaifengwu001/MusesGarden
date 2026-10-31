@@ -28,6 +28,8 @@ export class Status {
   private readonly pinName = el('span', 'mu-muse-name');
   private readonly pin: Pin;
   private view: NowView | null = null;
+  /** Where the drawn Muse stands while it walks out on the planet; the name tag sits there rather than on the route. */
+  private drawnAt: Dir | null = null;
   private following = false;
   private sentTo: Dir | null = null;
   private sentAt = 0;
@@ -50,6 +52,16 @@ export class Status {
     this.pin = pins.add(pinEl, null);
     window.setInterval(() => this.tick(), 1000);
     this.watchRoaming();
+  }
+
+  get current(): NowView | null {
+    return this.view;
+  }
+
+  /** The 3D Muse's spot while it is out, so the name tag stays on it; null puts the tag back on the route. */
+  placeTag(dir: Dir | null): void {
+    this.drawnAt = dir;
+    if (dir) this.pin.dir = dir;
   }
 
   get museName(): string {
@@ -95,7 +107,7 @@ export class Status {
   private tick(): void {
     const path = this.view?.path;
     const dir = path ? dirAlong(path, this.clock.now()) : null;
-    this.pin.dir = dir;
+    this.pin.dir = this.drawnAt ?? dir;
     if (!this.following || !dir) return;
     const now = performance.now();
     if (this.sentTo && (now - this.sentAt < FOLLOW.everyMs || angle(dir, this.sentTo) < FOLLOW.drift)) return;
