@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 import type { World } from '../../world';
 import type { MuseId, PlantCard } from '../contract';
 import { Anchors } from './anchors';
+import { Body } from './body';
 import { MuseApi } from './api';
 import { DevTools } from './dev';
 import { button, el, SimClock } from './dom';
@@ -23,7 +24,7 @@ interface Panel {
 /** Status, mailbox and the backstage refresh this often (ms). */
 const REFRESH_MS = 30_000;
 /** Toggles the dev tools (free: view/keys.ts and main.ts use W A S D Q E, arrows, H, ` and P). */
-const DEV_KEY = 'm';
+const DEV_KEY = 'b';
 
 const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
@@ -43,6 +44,7 @@ export function mountMuse(root: HTMLElement, world: World): void {
   root.append(overlay);
   const pins = new Pins(world, layer);
   const status = new Status(api, world, clock, pins);
+  const body = new Body(world, clock, () => status.current, (dir) => status.placeTag(dir));
   const anchors = new Anchors(pins, () => setOpen(null));
   const toast = el('p', 'mu-toast');
   toast.setAttribute('role', 'status');
@@ -54,6 +56,7 @@ export function mountMuse(root: HTMLElement, world: World): void {
   };
   const visit = new Visit(api, world, anchors, clock, (visiting, note) => {
     status.setAway(visiting);
+    body.setVisiting(visiting);
     overlay.classList.toggle('visiting', visiting);
     if (note) say(note);
     if (visiting) setOpen(null);

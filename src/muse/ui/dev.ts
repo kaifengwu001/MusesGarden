@@ -44,7 +44,7 @@ export class DevTools {
   ) {
     this.el.setAttribute('aria-label', 'Muse dev tools');
     const head = el('header', 'mu-dev-head');
-    head.append(el('h2', 'mu-panel-title', 'Muse, backstage'), el('span', 'mu-hint', 'M hides'));
+    head.append(el('h2', 'mu-panel-title', 'Muse, backstage'), el('span', 'mu-hint', 'B hides'));
     this.note.setAttribute('role', 'status');
     this.el.append(
       head,
