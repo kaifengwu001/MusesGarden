@@ -347,8 +347,9 @@ export type MuseEventBody =
       readonly other: MuseId;
       readonly role: 'host' | 'guest';
       readonly pleasantness: number;
-      readonly gave: DiscoveryId;
-      readonly received: PublicDiscovery;
+      /** Absent when this Muse had nothing public to give. */
+      readonly gave?: DiscoveryId;
+      readonly received?: PublicDiscovery;
       readonly photo: PhotoId;
     }
   | {

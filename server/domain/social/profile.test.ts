@@ -50,6 +50,6 @@ describe('what a Muse shares', () => {
     const bo = muse('bo', { interests: topics('Tide') });
     const [a, b] = apply(ada, bo, policy.ownerLink(ada, bo, 'introduce', T0), T0);
     const [received] = ofKind(policy.hangout(a, b, at(T0 + HOUR), draws(1)).guest, 'hangout');
-    expect(['Lichen dyes', 'Sail knots']).toContain(received.received.title);
+    expect(['Lichen dyes', 'Sail knots']).toContain(received.received?.title);
   });
 });

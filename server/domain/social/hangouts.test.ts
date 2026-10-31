@@ -38,21 +38,21 @@ describe('every hangout', () => {
     expect(guestSide).toMatchObject({ other: a.seed.id, role: 'guest', photo: hostPhoto.photo.id, pleasantness: hostSide.pleasantness });
     expect(policy.publicProfile(a).discoveries).toContainEqual(guestSide.received);
     expect(policy.publicProfile(b).discoveries).toContainEqual(hostSide.received);
-    expect(hostSide.gave).toBe(guestSide.received.id);
-    expect(guestSide.gave).toBe(hostSide.received.id);
+    expect(hostSide.gave).toBe(guestSide.received?.id);
+    expect(guestSide.gave).toBe(hostSide.received?.id);
   });
 
   it('gives the find that best stretches the other: some overlap with what it shares, not total', () => {
     const [a, b] = introduce(host, muse('bo', guestSpec));
     const out = policy.hangout(a, b, at(T0 + HOUR), draws(2));
-    expect(ofKind(out.guest, 'hangout')[0].received.title).toBe('Lichen and moss');
-    expect(ofKind(out.host, 'hangout')[0].received.title).toBe('Lichen in jazz');
+    expect(ofKind(out.guest, 'hangout')[0].received?.title).toBe('Lichen and moss');
+    expect(ofKind(out.host, 'hangout')[0].received?.title).toBe('Lichen in jazz');
   });
 
   it('skips a find the other already has', () => {
     const [a, b] = introduce(host, muse('bo', { ...guestSpec, collected: ['Lichen and moss'] }));
     const out = policy.hangout(a, b, at(T0 + HOUR), draws(3));
-    expect(ofKind(out.guest, 'hangout')[0].received.title).toBe('Lichen, moss and fern');
+    expect(ofKind(out.guest, 'hangout')[0].received?.title).toBe('Lichen, moss and fern');
   });
 
   it('still takes the photo when a Muse has nothing public to give', () => {
@@ -62,7 +62,7 @@ describe('every hangout', () => {
     expect(ofKind(out.guest, 'photo.taken')).toHaveLength(1);
     const [hostSide] = ofKind(out.host, 'hangout');
     const [guestSide] = ofKind(out.guest, 'hangout');
-    expect(guestSide.received.id).toBe(hostSide.gave);
+    expect(guestSide.received?.id).toBe(hostSide.gave);
     expect(guestSide.gave).toBeUndefined();
     expect(hostSide.received).toBeUndefined();
   });

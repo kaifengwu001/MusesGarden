@@ -1,5 +1,4 @@
 import type {
-  DiscoveryId,
   Draw,
   Instant,
   MuseEventBody,
@@ -73,10 +72,6 @@ export function chooseGift(giver: PublicProfile, receiver: MuseState, receiverPr
   return best ? best.find : null;
 }
 
-type Hangout = Extract<MuseEventBody, { kind: 'hangout' }>;
-
-// The contract requires `gave` and `received`, but a Muse with nothing public has nothing to give: cast until it
-// makes them optional.
 function hangoutEvent(
   other: MuseId,
   role: 'host' | 'guest',
@@ -85,7 +80,7 @@ function hangoutEvent(
   gave: PublicDiscovery | null,
   received: PublicDiscovery | null,
 ): MuseEventBody {
-  const event: Omit<Hangout, 'gave' | 'received'> & { gave?: DiscoveryId; received?: PublicDiscovery } = {
+  return {
     kind: 'hangout',
     other,
     role,
@@ -94,7 +89,6 @@ function hangoutEvent(
     ...(gave ? { gave: gave.id } : {}),
     ...(received ? { received } : {}),
   };
-  return event as Hangout;
 }
 
 export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] } {
