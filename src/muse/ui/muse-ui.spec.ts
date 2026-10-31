@@ -15,6 +15,11 @@ async function open(page: Page, url: string): Promise<void> {
 const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${name}.png` });
 const shotOf = (target: Locator, name: string) => target.screenshot({ path: `${SHOTS}/${name}.png` });
 const focusedText = (page: Page) => page.evaluate(() => document.activeElement?.textContent ?? '');
+const centreOffset = async (page: Page, target: Locator): Promise<number> => {
+  const box = await target.boundingBox();
+  const vp = page.viewportSize() ?? { width: 0, height: 0 };
+  return box ? Math.hypot(box.x + box.width / 2 - vp.width / 2, box.y + box.height / 2 - vp.height / 2) : Number.POSITIVE_INFINITY;
+};
 
 test('stays out of automated runs without ?muse', async ({ page }) => {
   await open(page, '/#hud=0');
@@ -54,8 +59,8 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await expect(mailbox).toBeVisible();
     await expect(mailbox.locator('.mu-basket')).toHaveCount(1);
     await expect(mailbox.locator('.mu-card')).toHaveCount(3);
-    await expect(mailbox.locator('.mu-card').first()).toHaveAttribute('href', 'https://en.wikipedia.org/wiki/Botanical_illustration');
-    await expect(mailbox.locator('.mu-card').first()).toHaveAttribute('target', '_blank');
+    await expect(mailbox.locator('.mu-card-link').first()).toHaveAttribute('href', 'https://en.wikipedia.org/wiki/Botanical_illustration');
+    await expect(mailbox.locator('.mu-card-link').first()).toHaveAttribute('target', '_blank');
     expect(await focusedText(page)).toContain('Botanical illustration');
     await page.keyboard.press('ArrowRight');
     expect(await focusedText(page)).toContain('Every colour in those plates');
@@ -73,7 +78,61 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     expect(await inBasket()).toBe(1);
   });
 
+  const glints = page.locator('.mu-pins button.mu-plant');
+  const pigment = page.locator('.mu-pins button.mu-plant[aria-label="Pigment"]');
+
+  await test.step('every collected object has a glint; Show on planet glides to it and stops Follow', async () => {
+    await expect(glints).toHaveCount(3);
+    await mailbox.getByRole('button', { name: 'Show Pigment on the planet' }).first().click();
+    await expect(status.locator('.mu-follow')).toHaveAttribute('aria-pressed', 'false');
+    await expect(pigment).toHaveClass(/mu-glow/);
+    await page.waitForTimeout(2500);
+    expect(await centreOffset(page, pigment)).toBeLessThan(40);
+  });
+
+  await test.step('hovering or focusing an object previews it; clicking opens its card, never touching the canvas', async () => {
+    await page.keyboard.press('Escape');
+    await expect(mailbox).toBeHidden();
+    const vp = page.viewportSize() ?? { width: 0, height: 0 };
+    await page.mouse.move(vp.width / 2 + 180, vp.height / 2 - 120);
+    await page.mouse.wheel(0, -170);
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => {
+      const w = window as unknown as { __canvasDowns: number };
+      w.__canvasDowns = 0;
+      document.querySelector('#scene')?.addEventListener('pointerdown', () => w.__canvasDowns++);
+    });
+    await pigment.hover();
+    const preview = page.locator('.mu-preview');
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('Pigment');
+    await expect(preview).toContainText('Every colour in those plates came from something ground up.');
+    await shot(page, '03-object-hover');
+    await page.mouse.move(vp.width - 40, 120);
+    await expect(preview).toBeHidden();
+    await page.locator('.mu-pins button.mu-plant[aria-label="Ultramarine"]').focus();
+    await expect(preview).toContainText('The blue cost more than gold.');
+
+    await pigment.click();
+    const card = page.locator('.mu-object');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.mu-title')).toHaveText('Pigment');
+    await expect(card).toContainText('A pigment is a powder used to add or alter color');
+    const openLink = card.getByRole('link', { name: 'Open ↗' });
+    await expect(openLink).toHaveAttribute('href', 'https://en.wikipedia.org/wiki/Pigment');
+    await expect(openLink).toHaveAttribute('target', '_blank');
+    expect(await page.evaluate(() => (window as unknown as { __canvasDowns: number }).__canvasDowns)).toBe(0);
+    await shot(page, '04-object-card');
+    await page.keyboard.press('Escape');
+    await expect(card).toBeHidden();
+    await expect(pigment).toBeFocused();
+    await page.mouse.move(vp.width / 2 + 180, vp.height / 2 - 120);
+    await page.mouse.wheel(0, 170);
+    await page.waitForTimeout(1500);
+  });
+
   await test.step('mailbox: photos reopen their exact view as a postcard', async () => {
+    await dock.getByRole('button', { name: /Mailbox/ }).click();
     await mailbox.getByRole('tab', { name: 'Photos' }).click();
     const photos = mailbox.locator('.mu-photo');
     await expect(photos).toHaveCount(1);
@@ -83,7 +142,7 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     expect(href).toMatch(/^\/\?muse&dev#seed=2207&g=0\.3&pose=-?[\d.]+,-?[\d.]+,-?[\d.]+,-?[\d.]+,0\.8&pc=1$/);
     await mailbox.getByRole('button', { name: 'Earlier photos' }).click();
     await expect(photos).toHaveCount(2);
-    await shot(page, '03-mailbox-photos');
+    await shot(page, '05-mailbox-photos');
   });
 
   await test.step('mailbox: invitations answer per their actions, no Visit before the window', async () => {
@@ -96,7 +155,7 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await expect(wren.getByRole('button')).toHaveText(['Accept', 'Decline']);
     await expect(juniper.getByRole('button')).toHaveText(['Approve', 'Decline']);
     await expect(mailbox.getByRole('button', { name: 'Visit' })).toHaveCount(0);
-    await shot(page, '04-mailbox-invitations');
+    await shot(page, '06-mailbox-invitations');
     await wren.getByRole('button', { name: 'Accept' }).click();
     await expect(wren).toContainText('Accepted. Come by during the window if you like.');
     await expect(dock.locator('.mu-badge')).toHaveText('1');
@@ -109,7 +168,7 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     const shelf = page.locator('.mu-shelf');
     await expect(shelf.locator('.mu-shelf-item')).toHaveCount(3);
     await expect(shelf.locator('.mu-shelf-item .mu-title')).toHaveText(['Botanical illustration', 'Pigment', 'Ultramarine']);
-    await shot(page, '05-shelf');
+    await shot(page, '07-shelf');
     await page.keyboard.press('Escape');
     await expect(shelf).toBeHidden();
     await expect(dock.getByRole('button', { name: 'Shelf' })).toBeFocused();
@@ -125,12 +184,12 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await expect(settings.getByRole('button', { name: 'Share Tide' })).toBeFocused();
     await expect(settings.locator('.mu-code')).toHaveText('MOSS-7Q2K');
     await expect(settings.getByLabel('Whenever it’s ready')).toBeChecked();
-    await shot(page, '06-settings');
+    await shot(page, '08-settings');
     await page.keyboard.press('Escape');
   });
 
   await test.step('dev: the mind inspector, and MEMORY.md never stays in the page', async () => {
-    await shotOf(dev, '07-dev-mind');
+    await shotOf(dev, '09-dev-mind');
     const memory = dev.getByLabel('MEMORY.md');
     await memory.fill('I love jazz standards and pressed flowers.');
     await dev.getByRole('button', { name: 'Send MEMORY.md' }).click();
@@ -154,24 +213,31 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await expect(banner).toContainText('min left');
     await expect(status).toBeHidden();
     await expect.poll(() => page.evaluate(() => location.hash)).toContain('seed=2207');
-    await expect(page.locator('button.mu-plant')).toHaveCount(1);
-    await expect(page.locator('.mu-plant.mu-private')).toHaveCount(1);
+    await expect(glints).toHaveCount(1);
+    const privateFind = page.locator('.mu-plant.mu-private');
+    await expect(privateFind).toHaveCount(1);
+    await expect(privateFind).not.toHaveAttribute('tabindex');
     await page.waitForTimeout(3000);
-    const leaf = page.locator('button.mu-plant');
-    await expect(leaf).not.toHaveClass(/mu-off/);
-    const box = await leaf.boundingBox();
-    const vp = page.viewportSize() ?? { width: 0, height: 0 };
-    expect(Math.hypot((box?.x ?? 0) + (box?.width ?? 0) / 2 - vp.width / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2 - vp.height / 2)).toBeLessThan(40);
-    await page.locator('button.mu-plant').click();
-    await expect(page.locator('.mu-visit-card')).toContainText('Lichen');
-    await shot(page, '08-visit');
+    await expect(glints).not.toHaveClass(/mu-off/);
+    expect(await centreOffset(page, glints)).toBeLessThan(40);
+    await dock.getByRole('button', { name: /Mailbox/ }).click();
+    await mailbox.getByRole('tab', { name: 'Baskets' }).click();
+    await expect(mailbox.locator('.mu-basket .mu-card')).toHaveCount(3);
+    await expect(mailbox.locator('.mu-show').first()).toBeHidden();
+    await glints.click();
+    await expect(mailbox).toBeHidden();
+    await expect(page.locator('.mu-object')).toContainText('Lichen');
+    await expect(page.locator('.mu-object')).toContainText('Two living things sharing one body.');
+    await shot(page, '10-visit');
 
     await hours.fill('2');
     await dev.getByRole('button', { name: 'Advance' }).click();
     await expect(banner).toBeHidden();
     await expect(page.locator('.mu-toast')).toContainText('The window closed');
     await expect.poll(() => page.evaluate(() => location.hash)).not.toContain('seed=2207');
-    await expect(page.locator('.mu-plant')).toHaveCount(0);
+    await expect(page.locator('.mu-object')).toBeHidden();
+    await expect(page.locator('.mu-plant.mu-private')).toHaveCount(0);
+    await expect(glints).toHaveCount(3);
     await expect(status).toBeVisible();
   });
 });
@@ -190,7 +256,7 @@ test('Follow waits, with a reason, while Muse is beyond the planet', async ({ pa
   await expect(status.locator('.mu-reason')).toHaveText('Follow is back when Moss returns.');
   await expect(page.locator('.mu-muse')).toHaveClass(/mu-off/);
   await expect(status.locator('.mu-tag')).toBeHidden();
-  await shot(page, '09-beyond');
+  await shot(page, '11-beyond');
 });
 
 test('fits a phone', async ({ browser }) => {
@@ -208,6 +274,6 @@ test('fits a phone', async ({ browser }) => {
       .map(({ cls, r }) => `${cls}: ${Math.round(r.left)}..${Math.round(r.right)}`),
   );
   expect(outside).toEqual([]);
-  await shot(page, '10-phone-mailbox');
+  await shot(page, '12-phone-mailbox');
   await context.close();
 });
