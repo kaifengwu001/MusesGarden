@@ -620,7 +620,7 @@ export class Engine {
       whimsy: known.whimsy ?? estimated?.whimsy ?? 0.5,
       novelty: known.novelty ?? estimated?.novelty ?? 0.5,
     };
-    const labels = life.privacyFilter(await mind.extractInterests(parsed.body, 'soul'));
+    const labels = life.privacyFilter(await mind.extractInterests(parsed.body, 'soul'), parsed.body);
     const topics = await resolveAll(source, labels);
     this.deps.store.setSoulText(m, text);
     tx.emit(m, { kind: 'soul.updated', version: tx.state(m).soulVersion + 1, topics, temperament });
@@ -628,7 +628,7 @@ export class Engine {
 
   /** The raw text stops here: only allow-listed, resolvable topics and a hash go into the log. */
   private async applyMemory(tx: Tx, m: MuseId, text: string): Promise<void> {
-    const labels = this.deps.life.privacyFilter(await this.deps.mindFor(m).extractInterests(text, 'memory'));
+    const labels = this.deps.life.privacyFilter(await this.deps.mindFor(m).extractInterests(text, 'memory'), text);
     const topics = await resolveAll(this.deps.source, labels);
     const textHash = createHash('sha256').update(text).digest('hex');
     tx.emit(m, { kind: 'memory.updated', textHash, topics });

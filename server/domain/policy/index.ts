@@ -1,7 +1,7 @@
 // The life policy the engine calls: pure, seeded, and a function of each Muse's own temperament.
 import type { LifePolicy } from '../../../src/muse/contract';
 import { hopPlace } from '../atlas';
-import { privacyFilter } from '../privacy';
+import { privacyFilterIn } from '../privacy';
 import { experiences, reflectionDue, validateReflection } from '../reflection';
 import { parseSoul } from '../soul';
 import { basket, nextBasketCheck } from './basket';
@@ -25,6 +25,6 @@ export const lifePolicy: LifePolicy = {
   reflectionDue,
   experiences,
   validateReflection,
-  privacyFilter,
+  privacyFilter: privacyFilterIn,
   parseSoul,
 };
