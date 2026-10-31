@@ -29,7 +29,6 @@ export function oneOf(values: readonly string[]): JsonSchema {
   return values.length > 0 ? { type: 'string', enum: [...new Set(values)] } : string;
 }
 
-/** Who Muse is, for every call that speaks in its voice. */
 export function persona(ctx: MindContext): string {
   const t = ctx.temperament;
   const interests =
