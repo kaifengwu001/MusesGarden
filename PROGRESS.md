@@ -28,6 +28,80 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The garden's interfaces (alongside iteration 16)
+
+Started from 73de432, on the branch `garden-interfaces` in a worktree of its
+own (iteration 16's work on Muse shares the main checkout, and its
+half-made changes broke the shared dev server mid-capture). Kai's brief
+(2026-10-31), with the ideas doc (MG1, the brainstorm with Tracy) and the
+backend plan as references. Two corrections to the backend plan: what grows
+on the planet is only what Muse chose to keep or gave you in a basket; and
+finds are not only Instagram reels, but posts, news articles and the like
+too. (The backend plan itself, a Messages attachment, could not be read:
+macOS keeps that folder from the tools.)
+
+The look: the clean, elegant interface the meadow already has; the post
+box, the postcards and the invitations very skeuomorphic (拟物), physical
+models even; in the meadow's painted style, with Travel Frog as the main
+reference. Placeholders for the media and posts, used over and over, and
+for Muse's postcards screenshots taken in the world of two Muses, one
+waving.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Finds (reels, posts, news articles) in cards above their flower patches. Planted: a small patch blossoms from its centre, then the card pops up | Each find grows as a small bed of the meadow's own flowers (findBeds.ts): its topic's species, bunched, a little taller, with a few companions of the other species, shaded by the meadow's palette, wind and cloud shadows (from the near field's maps, as the flowers'). A basket's beds form its patch; the patches wind outward from the cottage, the oldest day nearest home (placement.ts: on dry ground, clear of the clearing and of each other). A basket you have not seen is planted as you arrive: the camera lands framing its first find, the beds blossom from the middle out one after another (each stem rising with a little overshoot, then its head opening), then a line rises from the first bed and its card pops up on it. The card is drawn from the find's fields, never an embed: a reel or a video with its picture and length, a post with its caption, an article with its site, headline and reading time. |
+| 2 | Browsing: tap a plant or a bed and a line rises, the card pops up; swipe left or right (or the arrow buttons) to the next find, flying round the world; a like button; an example gallery; the hook a backend fills (placeholders for now) | Tap a bed: the camera flies to it and its card rises. Swipe the card, press its arrows or ← →: it leaves to that side, the camera flies to the next find (view/flight.ts: skimming the meadow under the clouds; a hop most of the way round the planet climbs over them) and the next card rises. Newest basket first, each in Muse's order. The heart sends the like back to Muse and pins the find. The gallery: ten interests, six baskets of finds over the last ten days (reels, posts, articles, a video), the pictures flat illustrations drawn as SVG (garden/art.ts). **The hook** (garden/source.ts): a `GardenSource` with `load()` (everything as of now), `subscribe()` (a new basket, a postcard, Muse coming home) and `react()` (a like, an interest shared or kept, an invitation used). `?garden=<url>` reads a backend over HTTP (GET /garden, server-sent events from /garden/events, POST /garden/reactions); without it, the placeholders. The shapes are in garden/types.ts. |
+| 3 | Pins in the world: liked finds and Muse; toggle them on and off; only in orbit and in view (no off-screen pins) | Pins stuck in the globe (pins.ts): a heart-headed pin for each liked find, a round one with Muse's face for Muse (at the cottage, or where it is when out). Only from orbit (the planet hides those round the back), a steady size on screen, their heads turned to you, popping up with a bounce. Tap one to fly there. The rail's pin button turns them on and off. |
+| 4 | Postcards, after Travel Frog: the card's design; an on-screen post box (preferred to Muse's hut for now): tap it, it pops open, a stack of cards, a gallery; one card flies forward to like or put away; a new card on login raises the box's flag, with a notification | The post box, bottom right, is a model in a canvas of its own (ui/garden/postbox.ts): a painted rural mailbox on a wooden post, grass and three flowers at its foot, drawn only while something moves. New post raises its red flag (with a little waggle now and then) and shows the count on a tag. Tap it: the door drops open, the cards rise to its mouth and fly out into a loose stack, the newest on top; the meadow's chrome steps back. Tap a card: it flies forward; tap again (or Space): it turns over to its back (POST CARD, the place and the day, with whom, a stamp of the planet, a postmark, a mitten print). Like it, or put it away: it shrinks into the album, where every card is held at its corners. Opening the box collects the post: the flag comes down. The postcards are five photos taken in the world: Muse (waving) with a friend in an apricot coat (src/assets/postcards, .postcards.mjs). |
+| 5 | Invitations to other worlds, in the postcard system with a special notification; a button near the post box to travel | An invitation arrives as a postcard carrying one; the box gets a wax seal besides its count. In the stack it is a sealed envelope; up close its flap lifts, the card is drawn up and out and the envelope drops away: You're invited, the world (an illustration), from whom, good for one visit, Travel now or Keep for later. Above the post box, a paper ticket (a seal on it while an invitation waits) opens Travel: the worlds you are invited to. Boarding stamps the ticket and the visit begins: other worlds are not built yet, so the meadow is re-seeded and re-planted as a stand-in (its own hills, wetter ground, white and blue flowers), your beds, pins and Muse left at home, until Return home. |
+| 6 | A button to go to Muse's house, showing when Muse is not home | The cottage button flies to the homestead view. When Muse is out, a little wooden sign saying "out" hangs on the button, Muse's portrait says out exploring, Muse is not on its terrace, and arriving at the cottage says the door is shut. (The status comes from the source; Muse's page has a preview switch until the backend sends it.) |
+| 7 | Baskets: the history as a timeline; tap one to go to its place on the planet | The baskets sheet: a timeline, newest first, each day with Muse's name for it, its finds as small pictures with their flowers' colours, how many and which topics; one not yet visited is marked new (and the rail's basket shows a dot). Tap a day: the camera flies to its patch (planting it, the first time) and its first card rises. |
+| 8 | A button to find Muse and jump to it | Find Muse flies to Muse where it is on its day, from in front of the terrace. When it is out, to where it is, at a bird's height, with a line saying so. |
+| 9 | Muse's page: its interests (with sharing and privacy), its friends, tagged when a friend's human is a friend of yours on Instagram or Facebook | Muse's portrait opens its page: its soul.md line (all it carries into the garden), where it is, and three tabs. Interests, each with its flower's colour, since when, and a switch: shared with other Muses, or private (never leaves the planet). Friends: Muses it has met, by their own names only, their coats, when they met, the interests they share, and "You're friends on Instagram" (or Facebook) where their human is your friend there. Privacy: what Muse brings into the garden, in plain words, and three preferences kept in this browser for now. |
+
+Checkpoint images: [docs/checkpoints/garden-interfaces](docs/checkpoints/garden-interfaces/) (a [contact sheet](docs/checkpoints/garden-interfaces/contact-sheet.jpg) of the whole flow).
+
+### Checked
+
+- In the browser (headless Chromium on Metal, 1440×900 and an iPhone-sized 390×844), every step driven through `window.__garden`: the first visit's toast, planting, browsing (three cards), a like, the pins from orbit, the post box open, the stack, a card up close and turned over, the invitation, the album, the three sheets, the cottage, find Muse, Muse out, a visit and the way home. No console errors.
+- `npm run check`; `npm test`: 118 tests, 14 of them new (garden.test.ts: the beds on dry ground, clear of each other and of the cottage, in their patches, the first in the middle, the oldest patch nearest home, the same every time, on the real terrain at three sizes; the gallery; the state; the hook's requests).
+- `npm run test:gpu`: 11 pass. Its "scrubbing growth" frame budget failed twice in a row on the branch, then also failed once on a clean checkout of main; alternating the two after that, both passed three times out of three (the machine was busy).
+- `npm run shots`: 15 pass. Postcard mode hides the garden's interface.
+
+### Cost
+
+The beds over a planted patch, frames back to back (High, 1440×900): 0.4–1.6 ms a frame at 1×, 0.6–1.3 ms at 2×, with the numbers noisy because another session was using the GPU. It does not scale with the plants: a sixth of them, or one of the four draws alone, costs the same, so it is a cost paid once by the first draw, not per vertex; not yet found. The pins draw only from orbit; the post box draws in its own small canvas only while it moves.
+
+### Known issues
+
+- The beds' fixed cost (above) is not explained yet.
+- A visit is a stand-in (the meadow re-seeded), until other worlds exist.
+- The post box's model and the cards are first drafts for Kai's eye: colours, proportions, the stamp and the mitten print.
+- Muse's whereabouts and the privacy preferences are placeholders until the backend sends them.
+- The interface is in English only, and the backend plan is still unread (above).
+
+## Iteration 16: Muse's interactions (in progress)
+
+Started from iteration 15 (74926b7). Since then Muse has come to the meadow
+(e2de5cf, 02a9840, 2fb02be, a7f6349): Tripo3D's sculpt rigged on a
+thirteen-joint skeleton, walking the cottage's terrace and waving on a 44 s
+day, with a lab (src/dev/museLab.html) that plays it live. Kai's notes for
+its interactions, to be built in the lab first ("make it cute!"); this table
+fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Idle: walk around | |
+| 2 | Idle: sit on the bench (port the meadow's bench to the lab) | |
+| 3 | Idle: fall asleep in the grass (belly up, a snore bubble, a Zzz sign; push the grass away) | |
+| 4 | Idle: fishing (a fishing rod) | |
+| 5 | Idle: gardening (garden tools) | |
+| 6 | Idle: cooking (a stretch goal; props) | |
+| 7 | Click: wave | |
+| 8 | Click: a happy bounce up and down, arms flapping | |
+| 9 | Long hold: petting; the head tilts, the eyes squint | |
+| 10 | The fur stands up in a wave while it squints, the neck tucks in (it has no neck, so maybe the whole body gets shorter) (a stretch goal) | |
+
 ## Iteration 15: specks on the blue flowers on 1× screens
 
 Started from iteration 14 (89b493a). The fix below was made after iteration

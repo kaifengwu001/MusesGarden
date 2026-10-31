@@ -16,6 +16,7 @@ import { ParamStore } from './params';
 import { registerShaderChunks } from './render/glsl';
 import { Post } from './render/post';
 import { ControlBar } from './ui/controlBar';
+import { GardenUi } from './ui/garden/gardenUi';
 import { worldLine } from './ui/format';
 import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
@@ -105,6 +106,7 @@ async function boot(): Promise<void> {
     ['W A S D', 'walk'],
     ['Q E', 'up · down'],
     ['click', 'gust · ripple'],
+    ['click a bed', 'what Muse found'],
     ['double-click', 'glide there'],
     ['hold', 'bloom'],
   ]);
@@ -141,16 +143,25 @@ async function boot(): Promise<void> {
     },
   });
 
+  // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden): it sees taps first
+  const garden = new GardenUi(uiRoot, world, store);
+
   attachInput(canvas, {
     drag: (dx, dy) => {
+      garden.interrupt();
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
       userPosed = true;
     },
     zoom: (delta) => {
+      garden.interrupt();
       world.rig.zoomBy(delta);
       userPosed = true;
     },
     tap: (x, y) => {
+      if (garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
+        userPosed = true;
+        return;
+      }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (!hit) return;
       if (hit.water < 0) world.ripple(hit.dir, clock.time);
@@ -159,6 +170,7 @@ async function boot(): Promise<void> {
     doubleTap: (x, y) => {
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) {
+        garden.interrupt();
         world.rig.glideTo(hit.dir);
         userPosed = true;
       }
@@ -221,8 +233,13 @@ async function boot(): Promise<void> {
 
   const keys = new Keys();
   const update = (): void => {
-    if (keys.update(world.rig, clock.realDt)) userPosed = true;
+    if (keys.update(world.rig, clock.realDt)) {
+      userPosed = true;
+      garden.interrupt();
+    }
+    garden.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
+    garden.frame(clock.realDt);
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);
