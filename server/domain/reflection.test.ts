@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { InterestDelta, MuseEventBody, ReflectionProposal, RegionKey, StoredEvent } from '../../src/muse/contract';
 import { regionForNewTopic } from './atlas';
-import { eventRef, museId } from './ids';
+import { eventRef, instant, museId } from './ids';
 import { drawFor } from './rng';
+import { next } from './policy/life';
+import { startTrip } from './policy/travel';
 import { experiences, reflectionDue, validateReflection } from './reflection';
 import { foldLog, Life, MOSS, t, TEMPERAMENTS, topic, topicsOf } from './testing';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from './time';
@@ -84,6 +86,14 @@ describe('the evidence-gated reducer', () => {
     expect(stripped.reflections).toEqual([]);
     expect(stripped.interests).toEqual(seedOnly.interests);
     expect(full.interests).not.toEqual(seedOnly.interests);
+  });
+
+  it('decides the same as the seed-only Muse once the experiences are removed', () => {
+    const now = instant(D2 + 2 * DAY_MS);
+    for (let n = 0; n < 50; n++) {
+      expect(startTrip(stripped, now, drawFor(MOSS.id, n))).toEqual(startTrip(seedOnly, now, drawFor(MOSS.id, n)));
+      expect(next(stripped, now, drawFor(MOSS.id, n), true)).toBe(next(seedOnly, now, drawFor(MOSS.id, n), true));
+    }
   });
 
   it('re-gates a committed reflection against the fold it lands in', () => {
