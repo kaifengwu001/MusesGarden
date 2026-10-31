@@ -1,8 +1,10 @@
 // The finds' flower beds (findBeds.ts): the meadow's own flowers, bunched
 // into a small bed per find, a little taller than the meadow's and of one
 // species (the find's topic) with a few companions. Shaded as the meadow's
-// flowers are (flower.vert.glsl), but each plant reads its wind and its
-// cloud shadow itself: the beds can stand outside the near field's maps.
+// flowers are (flower.vert.glsl). Inside the near field a plant reads its
+// wind and its cloud shadow from the field maps, as the meadow's flowers do;
+// a bed beyond them (a few pixels across) sways in the steady wind alone and
+// looks its cloud shadow up in the cube map.
 // A bed planted while you watch blossoms from its middle outward: each
 // flower's stem rises with a little overshoot, then its head opens.
 #include <meadow_common>
@@ -69,9 +71,14 @@ void main() {
   vec3 side = t1 * cos(yaw) + t2 * sin(yaw);
   vec3 fwd = cross(side, up);
 
-  // the wind here: the meadow's own field (wind.glsl), read per plant
-  vec2 waves = gustWaves(dir);
-  vec3 bend = windPlant(dir, windBase(dir, waves.x, waves.y, rippleAt(dir)), rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
+  // the wind and the cloud shadow here: from the near field's maps, or (beyond them) the steady flow
+  vec4 meadow;
+  vec4 wind;
+  float inside;
+  fieldSample(dir, meadow, wind, inside);
+  float strength = uWindVec.w;
+  vec3 shared = inside > 0.5 ? wind.xyz : windDir(dir) * strength * (0.18 + 0.42 * strength);
+  vec3 bend = windPlant(dir, shared, rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
   float stemTop = uBedLook.x;
   vec3 base = dir * (uRadius + aPlace.w - 0.02);
   vec3 local = position;
@@ -92,7 +99,8 @@ void main() {
   }
 
   // colour by species, variant and part, as the meadow's flowers; cloud and cottage shadows
-  float shadow = max(cloudShadowAt(base, 0.0), 0.85 * cottageShadow(dir));
+  float cloud = inside > 0.5 ? meadow.z : cloudShadowAt(base, 0.0);
+  float shadow = max(cloud, 0.85 * cottageShadow(dir));
   float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.9 * shadow);
   float v = aLook.z;
   vec3 col;

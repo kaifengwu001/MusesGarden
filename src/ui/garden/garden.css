@@ -2657,3 +2657,8 @@ body.g-away .masthead {
   pointer-events: none !important;
   transition: opacity 0.25s ease;
 }
+
+/* postcard mode frames the view as a photograph: nothing of the interface on it */
+body.postcard .garden {
+  display: none;
+}

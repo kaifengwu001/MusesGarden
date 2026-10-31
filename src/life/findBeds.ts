@@ -27,8 +27,8 @@ export const MAX_BEDS = 64;
 /** A bed planted long ago: fully grown. A bed not planted yet: hidden. */
 const LONG_AGO = -1e6;
 const NOT_YET = 1e9;
-/** Higher than this (m) the beds are under a pixel and are not drawn. */
-const SEEN_BELOW = 180;
+/** Higher than this (m) the beds are a pixel or two, and the near field's maps they read are not drawn (world.ts): they are not drawn either. */
+const SEEN_BELOW = 88;
 
 export interface BedLook {
   readonly bed: Bed;
@@ -120,10 +120,21 @@ export class FindBeds {
     this.meshes.forEach((mesh, s) => {
       const g = mesh.geometry;
       const slot = per[s];
-      g.setAttribute('aPlace', new InstancedBufferAttribute(new Float32Array(slot.place), 4));
-      g.setAttribute('aLook', new InstancedBufferAttribute(new Float32Array(slot.look), 4));
-      g.setAttribute('aDelay', new InstancedBufferAttribute(new Float32Array(slot.delay), 1));
-      g.instanceCount = slot.delay.length;
+      const count = slot.delay.length;
+      const old = g.getAttribute('aDelay') as InstancedBufferAttribute | undefined;
+      if (old && old.count === count) {
+        // the same garden re-laid (the planet grew): write over the buffers in place
+        (g.getAttribute('aPlace') as InstancedBufferAttribute).copyArray(slot.place).needsUpdate = true;
+        (g.getAttribute('aLook') as InstancedBufferAttribute).copyArray(slot.look).needsUpdate = true;
+        old.copyArray(slot.delay).needsUpdate = true;
+      } else {
+        // a different number of plants: the old buffers are let go before the new ones are made
+        if (old) g.dispose();
+        g.setAttribute('aPlace', new InstancedBufferAttribute(new Float32Array(slot.place), 4));
+        g.setAttribute('aLook', new InstancedBufferAttribute(new Float32Array(slot.look), 4));
+        g.setAttribute('aDelay', new InstancedBufferAttribute(new Float32Array(slot.delay), 1));
+      }
+      g.instanceCount = count;
     });
   }
 
