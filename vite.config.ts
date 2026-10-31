@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       // three.js alone is ~550 kB minified; one chunk is the point of this app.
       chunkSizeWarningLimit: 1024,
     },
-    // The Muse server (npm run serve) answers /api during development.
-    server: { port: 5173, proxy: { '/api': 'http://localhost:8787' } },
+    // The Muse server (npm run serve) answers /api during development; MUSE_API points at another port.
+    server: { port: 5173, proxy: { '/api': process.env.MUSE_API ?? 'http://localhost:8787' } },
   };
 });

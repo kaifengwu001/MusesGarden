@@ -20,3 +20,4 @@ reference/howls-lake.webp
 
 # the Muse server's local garden (npm run serve)
 .muse/
+.muse-live-e2e/

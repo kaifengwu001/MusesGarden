@@ -26,11 +26,11 @@ export default defineConfig(
   },
   {
     files: ['src/**/*.ts'],
-    ignores: ['src/dev/**/*.spec.ts', 'src/muse/ui/**/*.spec.ts'],
+    ignores: ['src/dev/**/*.spec.ts', 'src/muse/ui/**/*.spec.ts', 'src/muse/ui/**/*.e2e.ts'],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['*.config.ts', 'src/dev/**/*.spec.ts', 'src/muse/ui/**/*.spec.ts', 'server/**/*.ts'],
+    files: ['*.config.ts', 'src/dev/**/*.spec.ts', 'src/muse/ui/**/*.spec.ts', 'src/muse/ui/**/*.e2e.ts', 'server/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 );
