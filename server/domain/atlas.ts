@@ -221,18 +221,22 @@ export function farRegion(s: MuseState, draw: Draw): RegionKey {
   return pool[Math.floor(draw('area.far') * pool.length)];
 }
 
-/** Where Muse stands now on its own planet; null while beyond or a guest on a friend's planet (no follow). */
-export function placeNow(s: MuseState): Place | null {
+/**
+ * Where Muse stands now on its own planet; null while beyond or a guest on a friend's planet (no follow).
+ * `draw` is the episode's draw, the one its hops were placed with.
+ */
+export function placeNow(s: MuseState, draw?: Draw): Place | null {
   const ep = s.episode;
   if (!ep) return homePlace(s.seed.worldSeed);
+  const d = draw ?? drawFor(s.seed.id, ep.n);
   switch (ep.plan.activity) {
     case 'beyond':
       return null;
     case 'visit':
       return ep.plan.role === 'guest' ? null : homePlace(s.seed.worldSeed);
     case 'rest':
-      return nearHome(s.seed.worldSeed, drawFor(s.seed.id, ep.n));
+      return nearHome(s.seed.worldSeed, d);
     case 'travel':
-      return hopPlace(s.seed.worldSeed, ep.plan.trip.region, Math.max(0, ep.hops - 1), drawFor(s.seed.id, ep.n));
+      return hopPlace(s.seed.worldSeed, ep.plan.trip.region, Math.max(0, ep.hops - 1), d);
   }
 }
