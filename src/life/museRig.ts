@@ -76,13 +76,20 @@ export const COOK = { period: 12, rate: 0.7, lift: [6.8, 7.6], blow: [7.6, 8.5],
  * (held out over the pot, the arm drawn out a little) and the ladle's bowl
  * goes round in the pot.
  */
-export const POT = [-0.06, 0.4, 0.58] as const;
-export const FLOWER = [-0.12, 0.0, 0.52] as const;
-export const STIR = { x: -0.13, y: 0.48, z: 0.32, hand: 0.03, bowl: 0.07, reach: 0.03 } as const;
-/** Reaching into its belly pocket (s): the mitten in by `in`, rummaging until `out` (where a tool appears in it), back out by `time`. */
-export const POCKET = { in: 0.3, out: 0.85, time: 1.4 } as const;
-/** Where the rod is held (H, rest, carried by the chest): before the belly, to the right. */
-const ROD = { y: 0.36, z: 0.3 } as const;
+export const POT = [-0.16, 0.4, 0.58] as const;
+export const FLOWER = [-0.26, 0.0, 0.5] as const;
+export const STIR = { x: -0.27, y: 0.46, z: 0.3, hand: 0.03, bowl: 0.07, reach: 0.03 } as const;
+/** Reaching into its belly pocket (s): the mitten in by `in`, a moment there until `out` (where a tool appears in it), back out by `time`. */
+export const POCKET = { in: 0.22, out: 0.38, time: 0.75 } as const;
+/**
+ * Where the tools are held (H): the rod (rest, carried by the chest), the can
+ * (Muse's frame), the ladle at its mouth (rest, carried by the head). Each
+ * with the arm held out to the side and forward, as it hangs when idle, not
+ * drawn in across the body.
+ */
+const ROD = { x: -0.3, y: 0.36, z: 0.27 } as const;
+const CAN = { x: -0.3, y: 0.37, z: 0.27 } as const;
+const TASTE = { x: -0.19, y: 0.56, z: 0.3 } as const;
 /** How long a tap's stirring lasts while it sleeps (s). */
 export const ROUSE = 1.8;
 
@@ -318,6 +325,8 @@ export class MuseRig {
   raisedRight = 0;
   hung = 1;
   hungRight = 1;
+  /** How far it is lying on its back (0 up … 1 flat): only then does it press the grass down round it. */
+  lying = 0;
   /** Where the hands are wanted this pose. */
   private readonly reaches: Reach[] = [];
   /** Each mitten's middle in its forearm's own frame. */
@@ -462,6 +471,7 @@ export class MuseRig {
     this.squint = 0;
     this.squeeze = 0;
     this.blush = 0;
+    this.lying = 0;
     this.reach();
     this.idle(a.time, a.walk);
     if (a.walk > 0) this.walkPose(a.gait, a.walk, a.stride);
@@ -513,7 +523,7 @@ export class MuseRig {
       case 'stir':
         return this.stir(t, e);
       case 'pocket':
-        return this.pocket(t, k);
+        return this.pocket(k);
     }
   }
 
@@ -779,6 +789,7 @@ export class MuseRig {
     const tip = SIT.lean + (LIE.tip - SIT.lean) * lying;
     const sat = 1 - smoothstep(0, 0.6, lying);
     const flat = smoothstep(0.5, 1, lying);
+    this.lying = Math.max(this.lying, Math.min(1, lying) * k);
     // (the hips' roll lowered its bottom: as they straighten it rolls onto its back; flattened, it settles lower)
     this.addShift(J.root, 0, (groundLift(tip) - 0.024 * flat) * k, 0);
     this.addTurn(J.root, -tip * k, 0, 0);
@@ -939,7 +950,7 @@ export class MuseRig {
     // the rod held out before it, up and back for the cast and the yank, dipping to the nibbles
     const lift = 0.14 * back - 0.03 * throwIt + 0.11 * yank - 0.03 * nib;
     const out = -0.12 * back + 0.06 * throwIt - 0.08 * yank + 0.03 * nib;
-    this.reachFor(-1, -0.2, ROD.y + lift, ROD.z + out, J.chest, e);
+    this.reachFor(-1, ROD.x, ROD.y + lift, ROD.z + out, J.chest, e);
     // leaning in to the nibbles, back with the yank, bouncing for the catch
     this.addTurn(J.spine, (0.1 * nib - 0.08 * yank) * e, 0, 0);
     this.addShift(J.root, 0, 0.03 * Math.abs(Math.sin(TAU * 2.2 * (u - FISH.cheer[0]))) * cheer * e, 0);
@@ -961,7 +972,7 @@ export class MuseRig {
     const smell = during(GARDEN.smell[0], GARDEN.smell[0] + 0.6, GARDEN.smell[1] - 0.6, GARDEN.smell[1], u);
     const gasp = hump(GARDEN.bloom[0], GARDEN.bloom[1] + 0.3, u);
     // the can held out over the flower, lifted a little as it pours
-    this.reachFor(-1, -0.2, 0.4 + 0.05 * tip, 0.32 + 0.03 * tip, -1, e * (1 - 0.6 * smell));
+    this.reachFor(-1, CAN.x, CAN.y + 0.04 * tip, CAN.z + 0.03 * tip, -1, e * (1 - 0.6 * smell));
     this.addTurn(J.spine, (0.06 * tip + 0.16 * smell) * e, 0, 0);
     this.addTurn(J.chest, (0.04 * tip + 0.14 * smell) * e, 0, 0);
     this.addTurn(J.head, (0.06 * tip + 0.1 * smell - 0.12 * gasp) * e, 0, 0.05 * Math.sin(TAU * 2.5 * u) * smell * e);
@@ -984,8 +995,8 @@ export class MuseRig {
     // the mitten held out over the pot going round (the arm drawn out a little), the ladle's bowl round in the pot
     this.reachFor(-1, STIR.x + STIR.hand * Math.cos(turn), STIR.y, STIR.z + STIR.hand * Math.sin(turn), -1, e * stirring);
     this.lengthen(J.upperArmR, J.foreArmR, STIR.reach * e * stirring);
-    // the ladle to its mouth (its bowl before the mouth: the mitten a little below and to the side)
-    this.reachFor(-1, -0.07, 0.6, 0.3, J.head, e * taste);
+    // the ladle up to its mouth (its bowl before the mouth, the mitten below and out to the side)
+    this.reachFor(-1, TASTE.x, TASTE.y, TASTE.z, J.head, e * taste);
     this.addTurn(J.pelvis, 0, 0.05 * Math.sin(turn) * stirring * e, 0.02 * Math.cos(turn) * stirring * e);
     this.addTurn(J.head, 0.12 * stirring * e, -0.05 * Math.sin(turn) * stirring * e, 0);
     this.addTurn(J.chest, 0.04 * stirring * e, 0, 0);
@@ -1002,16 +1013,12 @@ export class MuseRig {
     this.express(stirring * e, { smile: 0.35 });
   }
 
-  /** A mitten into its belly pocket (and the other at its edge), rummaging, the head bent to look: for a tool, or to put one away. */
-  private pocket(t: number, k: number): void {
+  /** A mitten dipped into its belly pocket and out again, quickly, with a glance down: for a tool, or to put one away. */
+  private pocket(k: number): void {
     const J = JOINT;
-    const r = 0.012;
-    const a = TAU * 5 * t;
     // (the pocket low on the belly's front, a little to the right: as far in as its short arm goes, the mitten half into it)
-    this.reachFor(-1, -0.1 + r * Math.cos(a), 0.31 + r * Math.sin(a), 0.21, J.spine, k);
-    this.reachFor(1, 0.12, 0.32, 0.21, J.spine, 0.55 * k);
-    this.addTurn(J.head, 0.2 * k, -0.08 * k, 0);
-    this.addTurn(J.chest, 0.05 * k, 0, 0);
+    this.reachFor(-1, -0.1, 0.31, 0.21, J.spine, k);
+    this.addTurn(J.head, 0.07 * k, 0, 0);
   }
 
   /** The arms hung as the fit hangs them, nothing else moved: a sculpt's roots are measured so (museMesh.ts). */

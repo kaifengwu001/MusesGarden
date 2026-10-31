@@ -87,7 +87,13 @@ Kai's review of the first pass (2026-10-31), done:
 - On the bench: no legs through the seat; hips in contact, the body upright instead of leaning back as if to fall.
 - Asleep: flattened a little by its weight, the legs bent back.
 - The watering can no longer through the mitten; cooking: the bent wrist gone (the forearm's twist limited), the pot further off and the arm and ladle reaching out, so the fur clears the pot.
-- Tools come out of a belly pocket (a reach in, a rummage; the tool appears in the mitten as it comes out) and go back into it after, instead of flying in from the ground.
+- Tools come out of a belly pocket (the tool appears in the mitten as it comes out) and go back into it after, instead of flying in from the ground.
+
+Kai's second review (2026-10-31), done:
+
+- Walking about leaves the grass standing; only lying down presses a hollow into it (as in his reference of a white creature asleep in long grass). The grass shader's push is scaled by how far Muse is lying (`MuseRig.lying`).
+- The can, the rod and the ladle are held with the arm out to the side and forward, as it hangs when idle, not drawn in across the body. The pot and the flowers moved out to match.
+- The pocket is a quick dip in and out (0.75 s, the tool there by 0.38 s) with a glance down: no rummaging back and forth, no second paw.
 
 How it is built:
 

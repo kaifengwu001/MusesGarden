@@ -243,6 +243,8 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
   scene.add(ground);
 
   // ---- the grass ----
+  /** How far Muse is lying in it (0 … 1): it presses the grass down round it only then. */
+  const press = { value: 0 };
   {
     const blade = new InstancedBufferGeometry();
     const levels = [0, 0.36, 0.7];
@@ -281,10 +283,11 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
       blade,
       new ShaderMaterial({
         side: DoubleSide,
-        uniforms: { ...shared },
+        uniforms: { ...shared, uPress: press },
         vertexShader: /* glsl */ `
           ${SHADOW_GLSL}
           uniform float uTime;
+          uniform float uPress;
           attribute vec4 aBlade;
           varying vec3 vColour;
           void main() {
@@ -300,7 +303,8 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
             // the breeze, and a lean of its own
             vec3 lean = vec3(sin(uTime * 1.3 + base.x * 0.9 + seed * 5.0), 0.0, 0.6 * cos(uTime * 1.05 + base.z * 0.7 + seed * 3.0)) * 0.1;
             lean += vec3(seed - 0.5, 0.0, fract(seed * 7.31) - 0.5) * 0.5;
-            // pushed aside by Muse: away from each of its spheres it is near, and pressed down under them
+            // pushed aside by Muse as it lies in the grass (uPress: how far it is lying): away from each of its spheres it is
+            // near, and pressed down under them, a hollow round it; walking, sitting, it leaves the grass standing
             vec3 push = vec3(0.0);
             float pressed = 0.0;
             for (int i = 0; i < ${CASTERS_MUSE}; i++) {
@@ -313,6 +317,8 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
               push += vec3(away.x, 0.0, away.y) * k * 1.6;
               pressed = max(pressed, k * (1.0 - smoothstep(0.0, 0.6 * c.w, c.xyz.y - c.w)));
             }
+            push *= uPress;
+            pressed *= uPress;
             vec3 bend = lean + push;
             float tall = h * (1.0 - 0.55 * pressed);
             float l = length(bend);
@@ -824,6 +830,7 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
       spheres[k].set(held.elements[12], held.elements[13], held.elements[14], 0.07);
     }
     for (let i = 0; i < CASTERS_MUSE; i++) casters[i].copy(spheres[i]);
+    press.value = rig.lying;
 
     // the watering can: out of its pocket into the right mitten while it waters (hung by its handle, tipped to pour), back after
     const cues = l.cues;
