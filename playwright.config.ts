@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const PORT = 5199;
+// MEADOW_PORT: a checkout of its own, so a server from another checkout on 5199 is never reused by mistake.
+const PORT = Number(process.env.MEADOW_PORT ?? 5199);
 
 // Headless Chromium on macOS can render through the real GPU (ANGLE on Metal),
 // which gives honest perf numbers and timer queries. MEADOW_GL=swiftshader

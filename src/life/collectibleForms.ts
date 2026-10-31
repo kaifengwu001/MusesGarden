@@ -79,10 +79,13 @@ export const BUDGET = { vertices: 160, bytesFor400: 1_000_000 } as const;
  * frame: metres, y up from the ground, x and z along the ground (the shader
  * lays that frame on the planet at the find's direction), already turned and
  * leaned. `shape` packs, per vertex, the part and the height along the stem
- * (packShape), then the find's index in the list given to buildMesh.
+ * (packShape), then the find's index in the list given to buildMesh. `normal`
+ * is the surface's facing in the same frame, ×127, four to a vertex (the
+ * fourth 0, so each vertex's bytes stay aligned).
  */
 export interface CollectibleMesh {
   readonly position: Float32Array;
+  readonly normal: Int8Array;
   readonly shape: Uint16Array;
   readonly index: Uint16Array | Uint32Array;
 }
@@ -97,7 +100,7 @@ export function unpackShape(v: number): { part: Part; t: number } {
 }
 
 export function meshBytes(m: CollectibleMesh): number {
-  return m.position.byteLength + m.shape.byteLength + m.index.byteLength;
+  return m.position.byteLength + m.normal.byteLength + m.shape.byteLength + m.index.byteLength;
 }
 
 const KIN = salt('collectible kin');
@@ -140,6 +143,7 @@ export function formOf(c: Collectible, g: Ground): Form {
 // placeholder until lane F: a plain stem ribbon per find
 export function buildMesh(forms: readonly Form[]): CollectibleMesh {
   const position: number[] = [];
+  const normal: number[] = [];
   const shape: number[] = [];
   const index: number[] = [];
   forms.forEach((f, anchor) => {
@@ -149,6 +153,7 @@ export function buildMesh(forms: readonly Form[]): CollectibleMesh {
       const t = s / segments;
       for (const side of [-1, 1]) {
         position.push(side * 0.012 * Math.cos(f.yaw), t * f.height, side * 0.012 * Math.sin(f.yaw));
+        normal.push(Math.round(-127 * Math.sin(f.yaw)), 0, Math.round(127 * Math.cos(f.yaw)), 0);
         shape.push(packShape(PART.stem, t), anchor);
       }
       if (s > 0) {
@@ -158,5 +163,5 @@ export function buildMesh(forms: readonly Form[]): CollectibleMesh {
     }
   });
   const big = position.length / 3 > 0xffff;
-  return { position: new Float32Array(position), shape: new Uint16Array(shape), index: big ? new Uint32Array(index) : new Uint16Array(index) };
+  return { position: new Float32Array(position), normal: new Int8Array(normal), shape: new Uint16Array(shape), index: big ? new Uint32Array(index) : new Uint16Array(index) };
 }
