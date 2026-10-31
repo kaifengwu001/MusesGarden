@@ -4,13 +4,15 @@ import base from './playwright.config';
 // `npx playwright test -c playwright.live.config.ts`: the overlay against the real engine on a fresh garden.
 // The Muse server starts on :8787 (Vite proxies /api there) with a throwaway data folder and the fast-forward clock.
 const DATA = '.muse-live-e2e';
+const APP_PORT = 5298;
 
 export default defineConfig({
   ...base,
   testDir: './src/muse/ui',
   testMatch: /live\.e2e\.ts/,
   projects: [{ name: 'muse-live' }],
-  use: { ...base.use, actionTimeout: 30_000 },
+  // Its own app port, never reused: another checkout's dev server on a shared port would be tested instead.
+  use: { ...base.use, baseURL: `http://localhost:${APP_PORT}`, actionTimeout: 30_000 },
   expect: { timeout: 30_000 },
   timeout: 600_000,
   webServer: [
@@ -21,9 +23,9 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'npx vite --port 5199 --strictPort',
-      url: 'http://localhost:5199',
-      reuseExistingServer: true,
+      command: `npx vite --port ${APP_PORT} --strictPort`,
+      url: `http://localhost:${APP_PORT}`,
+      reuseExistingServer: false,
       timeout: 60_000,
     },
   ],
