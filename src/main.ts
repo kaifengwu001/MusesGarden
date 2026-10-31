@@ -9,6 +9,7 @@ import { QualityController, detectDevice, runBenchmark, type TierChoice } from '
 import { GpuTimer } from './dev/gpuTimer';
 import { installHarness } from './dev/harness';
 import { measureParity } from './dev/parity';
+import { mountMuse } from './muse/ui/overlay';
 import type { ParamPath } from './params';
 import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
@@ -417,6 +418,7 @@ async function boot(): Promise<void> {
       markReady();
     }
   });
+  mountMuse(uiRoot, world);
 }
 
 boot().catch((error: unknown) => console.error(error));
