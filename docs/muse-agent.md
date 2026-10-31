@@ -74,7 +74,7 @@ The behavior rules below take these traits as input. Two Muses with different te
 
 ## A life is one unbroken timeline
 
-Muse's life is a single timeline of episodes, each with a real start and end time. When an episode ends, the policy draws the next activity from Muse's current state, then draws how long it lasts. The plan models this as a semi-Markov process. The next activity depends on the present state, and each episode's length comes from its own distribution, which need not be memoryless.
+Muse's life is a single timeline of episodes, each with a real start and end time. When an episode ends, the policy draws the next activity from Muse's current state, then draws how long it lasts. The plan models the timeline as a semi-Markov process. The next activity depends on the present state, and each episode's length comes from its own distribution, which need not be memoryless.
 
 There is no fixed bedtime. Muse can travel at any hour, and sleep is a long rest.
 
@@ -190,7 +190,7 @@ A revisit picks among known topics. Each topic gets a score:
 
 Then P = softmax(score / 0.15). Scores of 0.55, 0.45, and 0.10 give chances of 64%, 33%, and 3%. The low temperature lets the best topic win most trips, and the runner-up still gets a third of them. w_owner is the fading owner weight described in [The owner's pull fades](#the-owners-pull-fades).
 
-Revisits look only at pages Muse has not collected yet. The planet's seasons and growth also change what Muse sees, which gives it new things to photograph. Old places keep turning up something new.
+Revisits look only at pages Muse has not collected yet. The planet's seasons and growth also change what Muse sees there, so a revisit has new things to photograph. Old places keep turning up something new.
 
 ### Hops follow rabbit holes
 
@@ -213,7 +213,7 @@ A test walks this chain through real pages from the fixtures. The steps show how
 5. Hop 2 follows the kept page's links to `Pigment`. Hop 3 follows a pigment page's links to `Ultramarine`. The owner's status pill reads "Exploring: Pigment → Ultramarine".
 6. The owner never mentioned pigment. If later trips bring independent sources on it, a reflection can make it an interest of Muse's own, with `seededBy: 'muse'`.
 
-This is the arc the design exists for. The owner's interest starts the trail. Muse's own draws and judgments take it to topics the owner never mentioned.
+The chain shows the arc the design exists for. The owner's interest starts the trail. Muse's own draws and judgments take it to topics the owner never mentioned.
 
 ## Growth is slow and needs evidence
 
@@ -224,7 +224,7 @@ Each interest carries two numbers that move at different speeds.
 | `salience` | Fast | Decays as exp(−Δt / 3 days). It is the passing pull of a topic. |
 | `affinity` | Slow | Changes only through a committed reflection, by at most 0.2 per reflection. It is a lasting tendency. |
 
-Salience lets Muse chase a fresh topic for a few days without that chase rewriting who Muse is. Affinity moves only when a reflection finds evidence. This split follows a research lead on temporary adaptation versus lasting personality change. See [References](#references).
+Salience lets Muse chase a fresh topic for a few days without that chase rewriting who Muse is. Affinity moves only when a reflection finds evidence. The split between salience and affinity follows a research lead on temporary adaptation versus lasting personality change. See [References](#references).
 
 Each interest also records where it came from, in `seededBy`. The values are `owner-memory`, `soul`, and `muse`.
 
@@ -282,7 +282,7 @@ Muse meets strangers beyond its planet, keeps friends on a fixed daily budget, a
 
 ### Friendship needs familiarity on both sides
 
-- Muse i needs familiarity F_i = 1 + 3 × (1 − sociability_i) before it considers friendship. Familiarity is the summed pleasantness of its encounters with the other Muse. F runs from 1 for the most sociable Muse to 4 for the least sociable. An extrovert needs about one good meeting, and an introvert needs three or four.
+- Muse i needs familiarity F_i = 1 + 3 × (1 − sociability_i) before it considers friendship. Familiarity is the summed pleasantness of its encounters with the other Muse. F runs from 1 for the most sociable Muse to 4 for the least sociable. If each meeting is close to fully pleasant, an extrovert needs about one good meeting and an introvert needs three or four. See [Open questions](#open-questions), item 5.
 - Once both thresholds are met, each Muse decides at their next encounter. It says yes with P_i = similarity × (0.5 + 0.5 × sociability_i).
 - If both say yes, they become friends with origin `met-beyond`, and a photo of the two goes to both owners.
 - Owners can also introduce their Muses with a share code. Introduced Muses are friends at once, with origin `introduced`.
@@ -410,7 +410,7 @@ The first rule exists because an interest can itself be private. An owner's inte
 - `/world` returns every region, but a fogged region carries no contents. Plants appear only in unfogged regions.
 - `/now` returns no path while Muse is beyond or a guest elsewhere.
 - `/visits/:id/world` follows the rules in [Visit access is checked on every request](#visit-access-is-checked-on-every-request).
-- The owner never learns which friend influenced which interest.
+- The owner never sees who influenced which interest.
 - The Muse app receives only the garden-owned section of `SOUL.md`. It learns nothing about friends or strangers.
 
 ### Owners decide what Muse shares
@@ -568,7 +568,7 @@ These come from the team's personality research notes of 2026-10-31. The notes d
 - [Emergi-PersonaOS](https://arxiv.org/abs/2609.27417), arXiv 2609.27417. The notes describe enduring traits, goals and values, narrative identity, and evidence-backed revisions, shown in a limited fictional-character demonstration. This design takes evidence-backed, versioned revisions, in reflection and the versioned `SOUL.md` section.
 - [Structured Personality Control and Adaptation for LLM Agents](https://arxiv.org/abs/2601.10025), arXiv 2601.10025. The notes describe temporary adaptation versus lasting personality change. This design takes the split between salience and affinity.
 - [Spontaneous Emergence of Agent Individuality](https://arxiv.org/abs/2411.03252), Takata et al., arXiv 2411.03252. The notes describe agents that come to differ through their interaction histories in a small simulation, evaluated partly with MBTI. This design takes individuality from interaction history, and checks it with the divergence test.
-- Semi-Markov activity models. This is the model class behind the timeline. This doc cites no single paper for it.
+- Semi-Markov activity models. The timeline uses this model class. This doc cites no single paper for it.
 
 ### Design rules from the research notes
 
