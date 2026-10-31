@@ -19,7 +19,7 @@ import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterLook,
 // near flowers and the far paint tell the same story.
 
 /** Stem top (m) and resting nod (rad) per species. */
-const HEADS: ReadonlyArray<readonly [number, number]> = [
+export const HEADS: ReadonlyArray<readonly [number, number]> = [
   [0.5, 0.35], // pink cup
   [0.44, 0.08], // white star
   [0.34, 0.05], // button
