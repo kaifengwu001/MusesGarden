@@ -130,6 +130,7 @@ export const life: LifePolicy = {
   serendipityRegion: () => '5:3:3' as RegionKey,
   hopMs: () => 20 * MIN,
   hopPlace: (_s, region) => ({ dir: [0, 1, 0], region }),
+  findPlace: (_s, hop) => hop,
   keep: (js) => [...js].filter((j) => j.score >= 0.75).sort((a, b) => b.score - a.score).slice(0, 2),
   continueTrip: (_s, k) => k < 2,
   photosDuring: () => [],

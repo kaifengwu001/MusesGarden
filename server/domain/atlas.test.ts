@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { angularDistance, homePlace, hopPlace, isDry, nearHome, neighbours, REGIONS, regionCentre, regionOf } from './atlas';
+import { angularDistance, besidePlace, homePlace, hopPlace, isDry, nearHome, neighbours, REGIONS, regionCentre, regionOf } from './atlas';
 import { museId, regionKey } from './ids';
 import { drawFor } from './rng';
 
@@ -49,3 +49,22 @@ describe('the ground', () => {
     expect(hopPlace(WORLD, r, 2, drawFor(museId('moss'), 9))).toEqual(hopPlace(WORLD, r, 2, drawFor(museId('moss'), 9)));
   });
 });
+
+describe('finds kept on the same hop', () => {
+  it('never share an anchor: the second is planted beside the first, close by and on dry ground', () => {
+    for (const region of REGIONS.slice(0, 24)) {
+      const hop = hopPlace(412, region, 1, drawFor(museId('moss'), 7));
+      const second = besidePlace(412, hop, 1);
+      const third = besidePlace(412, hop, 2);
+      expect(besidePlace(412, hop, 0)).toEqual(hop);
+      for (const p of [second, third]) {
+        const d = angularDistance(hop.dir, p.dir);
+        expect(d).toBeGreaterThan(0.008);
+        expect(d).toBeLessThan(0.06);
+      }
+      expect(angularDistance(second.dir, third.dir)).toBeGreaterThan(0.008);
+      if (isDry(412, hop.dir)) expect(isDry(412, second.dir)).toBe(true);
+    }
+  });
+});
+

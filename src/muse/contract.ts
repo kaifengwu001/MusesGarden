@@ -516,6 +516,8 @@ export interface LifePolicy {
   hopMs(s: MuseState, draw: Draw): number;
   /** Where hop k of this trip stands: a spot inside `region`, off water. */
   hopPlace(s: MuseState, region: RegionKey, k: number, draw: Draw): Place;
+  /** The i-th find kept on one hop: the first stands where Muse stood, the rest are planted beside it, never on top. */
+  findPlace(s: MuseState, hop: Place, i: number): Place;
   /** ≤ 2 with score ≥ KEEP_THRESHOLD, best first. */
   keep(judgments: readonly Judgment[]): readonly Judgment[];
   continueTrip(s: MuseState, k: number, bestScore: number, draw: Draw): boolean;

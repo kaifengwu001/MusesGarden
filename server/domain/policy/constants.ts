@@ -114,6 +114,8 @@ export const HOP_WATER_TRIES = 12;
 export const PLACEMENT_RADIUS = 400;
 /** A spot is dry when it is at least this far (m) from the shore. */
 export const DRY_MARGIN_M = 1;
+/** How far apart two finds kept on the same hop are planted (radians on the unit sphere). */
+export const FIND_SPACING_RAD = 0.02;
 
 // ── Photos ─────────────────────────────────────────────────────────────────
 /** Photos per hour while doing each activity, times whimsy. Hangout photos come from the social policy. */

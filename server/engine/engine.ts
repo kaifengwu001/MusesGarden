@@ -373,7 +373,7 @@ export class Engine {
         reason: j.reason,
         keepScore: j.score,
         provenance: 'own',
-        place,
+        place: this.deps.life.findPlace(s, place, i),
         at: tx.now,
       };
       tx.emit(m, { kind: 'discovery.collected', discovery });

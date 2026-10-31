@@ -9,6 +9,7 @@ import { createGroundSample, generateLayout, Terrain } from '../../src/planet/te
 import { parseRegion, regionKey } from './ids';
 import {
   DRY_MARGIN_M,
+  FIND_SPACING_RAD,
   FAR_MIN_ANGLE,
   HOP_MARGIN,
   HOP_STEP,
@@ -190,6 +191,33 @@ export function hopPlace(worldSeed: number, region: RegionKey, k: number, draw: 
     pos = next;
   }
   return { dir: at(pos.u, pos.v), region };
+}
+
+/**
+ * The i-th find kept on one hop. The first stands where Muse stood; each later one is planted a short way off at
+ * golden-angle turns, so two objects never share an anchor, turning further round if that spot is under water.
+ */
+export function besidePlace(worldSeed: number, hop: Place, i: number): Place {
+  if (i === 0) return hop;
+  const [x, y, z] = hop.dir;
+  const ref: Dir = Math.abs(y) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const t1 = normalize([y * ref[2] - z * ref[1], z * ref[0] - x * ref[2], x * ref[1] - y * ref[0]]);
+  const t2: Dir = [y * t1[2] - z * t1[1], z * t1[0] - x * t1[2], x * t1[1] - y * t1[0]];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  let fallback: Dir | null = null;
+  for (let t = 0; t < 12; t++) {
+    const a = (i + t) * golden;
+    const r = FIND_SPACING_RAD * Math.sqrt(i);
+    const dir = normalize([x + r * (Math.cos(a) * t1[0] + Math.sin(a) * t2[0]), y + r * (Math.cos(a) * t1[1] + Math.sin(a) * t2[1]), z + r * (Math.cos(a) * t1[2] + Math.sin(a) * t2[2])]);
+    fallback ??= dir;
+    if (shoreDistance(worldSeed, dir) >= DRY_MARGIN_M) return { dir, region: regionOf(dir) };
+  }
+  return { dir: fallback ?? hop.dir, region: regionOf(fallback ?? hop.dir) };
+}
+
+function normalize(v: Dir): Dir {
+  const n = Math.hypot(v[0], v[1], v[2]);
+  return [v[0] / n, v[1] / n, v[2] / n];
 }
 
 // ── Fog and new areas ──────────────────────────────────────────────────────
