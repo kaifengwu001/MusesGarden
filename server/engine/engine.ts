@@ -280,11 +280,6 @@ export class Engine {
     this.commit(tx);
   }
 
-  private draw(tx: Tx, m: MuseId, salt: number): Draw {
-    const s = tx.state(m);
-    return this.deps.drawFor(m, s.episodes * 64 + salt);
-  }
-
   private async onEpisodeEnd(tx: Tx, m: MuseId, n: number): Promise<void> {
     const s = tx.state(m);
     const ep = s.episode;
@@ -437,9 +432,26 @@ export class Engine {
     const bs = tx.state(b);
     const beyond = (s: MuseState) => s.episode?.plan.activity === 'beyond' && s.episode.pausedAt === null;
     if (!beyond(as) || !beyond(bs)) return;
-    const out = this.deps.social.encounter(as, bs, tx.now, this.draw(tx, a, 1));
+    const k = as.social.relationships.get(b)?.encounters ?? 0;
+    const out = this.deps.social.encounter(as, bs, tx.now, this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 1 + k));
     tx.emitAll(a, out.self);
     tx.emitAll(b, out.other);
+    this.scheduleNextEncounter(tx, a, b, k + 1);
+  }
+
+  /** Encounters are a Poisson process while both Muses stay beyond: each one schedules the next arrival. */
+  private scheduleNextEncounter(tx: Tx, a: MuseId, b: MuseId, k: number): void {
+    const as = tx.state(a);
+    const bs = tx.state(b);
+    const pa = as.episode?.plan;
+    const pb = bs.episode?.plan;
+    if (pa?.activity !== 'beyond' || pb?.activity !== 'beyond') return;
+    const rate = this.deps.social.encounterRate(as, bs);
+    if (rate <= 0) return;
+    const u = this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 2)('encounter.next', k);
+    const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
+    if (at >= Math.min(pa.until, pb.until)) return;
+    tx.schedule({ id: `enc:${a}:${b}:${as.episodes}:${k}`, at: at as Instant, museId: a, kind: 'encounter', payload: { other: b } });
   }
 
   /** Picks and starts Muse's next episode. Does nothing while Muse works or is mid-episode. */
