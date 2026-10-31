@@ -69,8 +69,8 @@ export interface MeadowHarness {
   parity(): { heightError: number; waterError: number; warpError: number; samples: number };
   /** Pick the planet at normalised device coordinates. */
   pick(ndcX: number, ndcY: number): { dir: [number, number, number]; water: number } | null;
-  /** Jump to a named view: 'homestead', 'lakes', 'meadow' or 'vista' (the reference composition). */
-  preset(name: 'homestead' | 'lakes' | 'meadow' | 'vista'): void;
+  /** Jump to a named view: 'homestead', 'lakes', 'meadow', 'vista' (the reference composition) or 'muse' (Muse up close, where it is on its day). */
+  preset(name: 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse'): void;
   /** Render `frames` frames back to back (GPU-synchronised); returns ms per frame. */
   benchmark(frames: number): number;
   /** Draw at this render scale (0.5–1) from the next frame, as Auto would. */

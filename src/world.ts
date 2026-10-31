@@ -11,7 +11,8 @@ import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
-import { Homestead } from './life/props';
+import { Muse, MUSE_HEIGHT } from './life/muse';
+import { FLOOR, Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
 import { TerrainBake } from './planet/bake';
@@ -51,7 +52,7 @@ const FIELD_PATHS: ReadonlySet<string> = new Set([
   'flowers.blue',
 ]);
 
-export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista';
+export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse';
 
 /**
  * The homestead view, after the painting: the camera's height (m) and
@@ -59,6 +60,8 @@ export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista';
  * bearing from the front toward the right end (rad).
  */
 const HOMESTEAD_VIEW = { height: 11, distance: 26, azimuth: 0.92, at: [-1.8, 2.6, 1.4] } as const;
+/** Muse's view: the camera's height over the floor Muse stands on (m), its distance (m), its bearing from straight out in front of the terrace (rad, + toward the steps), and the height it looks at (× Muse's). */
+const MUSE_VIEW = { height: 1.35, distance: 4.4, azimuth: 0.3, at: 0.55 } as const;
 
 /**
  * The scene and every system in it. Each frame: growth → fade band → fields
@@ -86,6 +89,7 @@ export class World {
   readonly clouds: Clouds;
   readonly birds: Birds;
   readonly butterflies: Butterflies;
+  readonly muse: Muse;
   readonly petals: Petals;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
@@ -129,6 +133,8 @@ export class World {
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
+  /** The world's clock, as of the last update (a named view of Muse reads the time it is now, frozen or not). */
+  private clock: FrameClock | null = null;
   /** Whether the last update drew the near field (grass or flowers around the focus). */
   nearFieldDrawn = false;
   private readonly heightBound = (): number => this.terrain.maxHeight;
@@ -167,8 +173,11 @@ export class World {
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.butterflies = new Butterflies(this.shared);
+    this.muse = new Muse(this.shared);
+    this.muse.useModel(store.values.muse.model);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
+    this.clouds.addShadowCaster(this.muse.shadowMesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -231,6 +240,22 @@ export class World {
       const { tilt } = this.rig.framing(zoom);
       const drop = V.height + this.terrain.height(focus) - this.terrain.cottageGround - V.at[1] + (V.distance * V.distance) / (2 * R);
       this.rig.lookUp(Math.atan2(V.distance, drop) - tilt);
+    } else if (name === 'muse') {
+      // out in front of the terrace, a little toward the steps, looking at Muse's middle (where it is now on its day)
+      this.muse.update(this.clock?.time ?? 0, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, true);
+      const V = MUSE_VIEW;
+      const { x, z } = this.muse.spot;
+      const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
+      const target = travel(travel(L.cottage, across, x / R, new Vector3()), L.homeBearing, z / R, new Vector3());
+      const toCamera = L.homeBearing.clone().applyAxisAngle(L.cottage, V.azimuth);
+      const focus = travel(target, tangentToward(target, toCamera.add(target), new Vector3()), V.distance / R, new Vector3());
+      this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));
+      // (the camera's height is over Muse's floor, whatever the ground under the camera: the meadow, the bank or the pond)
+      const curve = (V.distance * V.distance) / (2 * R);
+      const zoom = this.rig.zoomForAltitude(Math.max(0.6, this.terrain.cottageGround + FLOOR + V.height + curve - this.terrain.height(focus)));
+      this.rig.setZoom(zoom, true);
+      const { tilt } = this.rig.framing(zoom);
+      this.rig.lookUp(Math.atan2(V.distance, V.height - V.at * MUSE_HEIGHT + curve) - tilt);
     } else if (name === 'vista') {
       const vista = this.findVista();
       this.rig.lookAlong(vista.focus, vista.forward, immediate);
@@ -303,6 +328,7 @@ export class World {
   }
 
   onParams(changed: ReadonlySet<ParamPath>): void {
+    if (changed.has('muse.model')) this.muse.useModel(this.store.values.muse.model);
     if (changed.has('world.seed')) {
       this.terrain.setLayout(generateLayout(this.store.values.world.seed));
       this.scene.remove(this.homestead.group);
@@ -348,6 +374,7 @@ export class World {
   }
 
   update(clock: FrameClock, aspect: number, viewportHeight: number): void {
+    this.clock = clock;
     const p = this.store.values;
     growthState(p.world.growth, p.world.areaMin, p.world.areaMax, this.growth);
     const R = this.growth.radius;
@@ -402,10 +429,12 @@ export class World {
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
+    this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    this.muse.cull(this.frustum, this.warp);
     const sweep = this.terrainUniforms.uCottageSun.value;
     this.terrain.homeAreas(sweep.x, sweep.y, this.homeAreas);
     this.surface.update(

@@ -15,7 +15,7 @@ export interface HarnessHost {
   parity(): ReturnType<MeadowHarness['parity']>;
   pick(ndcX: number, ndcY: number): ReturnType<MeadowHarness['pick']>;
   frameLog(count: number): ReturnType<MeadowHarness['frameLog']>;
-  preset(name: 'homestead' | 'lakes' | 'meadow' | 'vista'): void;
+  preset(name: 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse'): void;
   setScale(scale: number): void;
 }
 
