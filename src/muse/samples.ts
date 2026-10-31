@@ -153,7 +153,14 @@ export const sampleWorld: WorldView = {
     { key: region('2:2:1'), fogged: true },
     { key: region('5:0:3'), fogged: false, topics: [{ topic: topic('Tide'), label: 'Tide' }] },
   ],
-  plants: sampleCards.map((c) => ({ id: c.id, dir: c.place.dir, title: c.title, topic: topic(c.title) })),
+  plants: sampleCards.map((c, i) => ({
+    id: c.id,
+    dir: c.place.dir,
+    topic: topic(c.title),
+    foundAt: c.foundAt,
+    sent: i < 2,
+    preview: { title: c.title, ...(c.thumb ? { thumb: c.thumb } : {}), reason: c.reason },
+  })),
 };
 
 export const sampleBaskets: Page<BasketView, BasketId> = {
@@ -234,8 +241,13 @@ export const sampleVisit: VisitWorldView = {
     { key: region('0:2:3'), fogged: true },
   ],
   plants: [
-    { id: plant('w-lichen'), dir: dir(0.9, 0.2, 0.38), title: 'Lichen', topic: topic('Lichen'), card: { ...sampleCards[0], id: plant('w-lichen'), title: 'Lichen', url: wiki('Lichen') } },
-    { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), title: 'A plant', topic: topic('Lichen'), card: null },
+    {
+      id: plant('w-lichen'),
+      dir: dir(0.9, 0.2, 0.38),
+      preview: { title: 'Lichen', reason: 'Two living things sharing one body.' },
+      card: { ...sampleCards[0], id: plant('w-lichen'), title: 'Lichen', url: wiki('Lichen'), reason: 'Two living things sharing one body.' },
+    },
+    { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), preview: null, card: null },
   ],
   until: at('2026-11-05T17:00:00-08:00'),
 };

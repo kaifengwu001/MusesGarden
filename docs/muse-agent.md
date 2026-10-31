@@ -372,6 +372,9 @@ Inside the window, the visitor sees the host planet with its fog. Public finds s
 
 ## What the owner sees and does
 
+Every collected object has one physical anchor on Muse's planet: the spot where Muse found it. On the planet it is a unique flower, plant or stone that blends into its surroundings. Hovering it shows a preview (title, thumbnail and Muse's one-line reason). Clicking it opens a small panel that links to the page Muse collected. A basket card and the object on the planet are the same object.
+
+
 The owner watches and receives. None of these actions changes Muse's interests.
 
 | Feature | Rule | API |
@@ -498,7 +501,7 @@ docs/muse-agent.md          this doc
 
 Everything under `server/domain/` is pure. Tuning happens in `server/domain/policy/constants.ts`.
 
-### Storage is SQLite with six tables
+### Storage is SQLite with five tables
 
 The server runs on `node:sqlite` under Node 22.13, through `tsx`, with no web framework and no schema library. The tables are:
 
@@ -506,8 +509,9 @@ The server runs on `node:sqlite` under Node 22.13, through `tsx`, with no web fr
 - `events`, append-only
 - `schedule`
 - `host_docs`, which holds `SOUL.md` only
-- `candidates`
 - `llm_cache`
+
+Pages for offline runs come from a recorded corpus file, so no table caches them.
 
 ### Two Minds sit behind one port
 

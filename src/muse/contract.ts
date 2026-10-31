@@ -642,11 +642,35 @@ export interface RegionView {
   readonly topics?: readonly { readonly topic: TopicKey; readonly label: string }[];
 }
 
+/** What hovering a collected object on the planet shows. */
+export interface PlantPreview {
+  readonly title: string;
+  readonly thumb?: string;
+  /** "Why I kept this", one line. */
+  readonly reason: string;
+}
+
+/**
+ * One collected object's physical anchor on its Muse's planet. Every find has exactly one, where Muse found it, and
+ * the same object appears in baskets by the same id. The renderer picks its organic form (a flower, a plant, a stone)
+ * from `id`, `topic` and the terrain at `dir`. Hover shows `preview`; click opens the PlantCard (GET /plants/:id).
+ */
 export interface PlantPin {
   readonly id: DiscoveryId;
   readonly dir: Dir;
-  readonly title: string;
   readonly topic: TopicKey;
+  readonly foundAt: Instant;
+  /** Delivered to the owner in a basket. */
+  readonly sent: boolean;
+  readonly preview: PlantPreview;
+}
+
+/** An object on a friend's planet during a visit. Private finds show only where they stand: no preview, no card. */
+export interface VisitPlant {
+  readonly id: DiscoveryId;
+  readonly dir: Dir;
+  readonly preview: PlantPreview | null;
+  readonly card: PlantCard | null;
 }
 
 export interface WorldView {
@@ -709,8 +733,8 @@ export interface VisitWorldView {
   readonly worldSeed: number;
   readonly g: number;
   readonly regions: readonly RegionView[];
-  /** Private finds have no card. The house is never included. */
-  readonly plants: readonly (PlantPin & { readonly card: PlantCard | null })[];
+  /** The house is never included. */
+  readonly plants: readonly VisitPlant[];
   readonly until: Instant;
 }
 
