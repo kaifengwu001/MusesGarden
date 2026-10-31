@@ -59,6 +59,8 @@ waving.
 | 8 | A button to find Muse and jump to it | Find Muse flies to Muse where it is on its day, from in front of the terrace. When it is out, to where it is, at a bird's height, with a line saying so. |
 | 9 | Muse's page: its interests (with sharing and privacy), its friends, tagged when a friend's human is a friend of yours on Instagram or Facebook | Muse's portrait opens its page: its soul.md line (all it carries into the garden), where it is, and three tabs. Interests, each with its flower's colour, since when, and a switch: shared with other Muses, or private (never leaves the planet). Friends: Muses it has met, by their own names only, their coats, when they met, the interests they share, and "You're friends on Instagram" (or Facebook) where their human is your friend there. Privacy: what Muse brings into the garden, in plain words, and three preferences kept in this browser for now. |
 
+Checkpoint images: [docs/checkpoints/garden-interfaces](docs/checkpoints/garden-interfaces/) (a [contact sheet](docs/checkpoints/garden-interfaces/contact-sheet.jpg) of the whole flow).
+
 ### Checked
 
 - In the browser (headless Chromium on Metal, 1440×900 and an iPhone-sized 390×844), every step driven through `window.__garden`: the first visit's toast, planting, browsing (three cards), a like, the pins from orbit, the post box open, the stack, a card up close and turned over, the invitation, the album, the three sheets, the cottage, find Muse, Muse out, a visit and the way home. No console errors.
