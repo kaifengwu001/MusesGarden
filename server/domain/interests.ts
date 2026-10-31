@@ -84,10 +84,24 @@ export function gateDelta(s: MuseState, d: InterestDelta, now: number): Interest
   return { ...rest, dAffinity, ...(moves ? { stage: d.stage } : {}) };
 }
 
-export function applyDelta(i: Interest, d: InterestDelta): Interest {
-  return {
-    ...i,
-    affinity: Math.max(AFFINITY_MIN, Math.min(AFFINITY_MAX, i.affinity + d.dAffinity)),
-    stage: d.stage ?? i.stage,
-  };
+/** Gates and applies deltas in order, each against the interests the ones before it left. */
+export function gateAll(
+  s: MuseState,
+  deltas: readonly InterestDelta[],
+  now: number,
+): { readonly interests: ReadonlyMap<TopicKey, Interest>; readonly applied: readonly InterestDelta[] } {
+  const interests = new Map(s.interests);
+  const applied: InterestDelta[] = [];
+  for (const d of deltas) {
+    const gated = gateDelta({ ...s, interests }, d, now);
+    const i = interests.get(d.topic);
+    if (!gated || !i) continue;
+    interests.set(d.topic, {
+      ...i,
+      affinity: Math.max(AFFINITY_MIN, Math.min(AFFINITY_MAX, i.affinity + gated.dAffinity)),
+      stage: gated.stage ?? i.stage,
+    });
+    applied.push(gated);
+  }
+  return { interests, applied };
 }

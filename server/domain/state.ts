@@ -18,7 +18,7 @@ import type {
 } from '../../src/muse/contract';
 import { homeRegion, nearHome } from './atlas';
 import { eventRef, giftId, instant } from './ids';
-import { applyDelta, boost, gateDelta, newInterest, wOwner, withSource } from './interests';
+import { boost, gateAll, newInterest, wOwner, withSource } from './interests';
 import {
   BOOST_GIFT,
   BOOST_KEPT,
@@ -339,15 +339,7 @@ function gift(s: CoreState, stored: StoredEvent, e: Extract<MuseEventBody, { kin
  */
 function reflect(s: CoreState, stored: StoredEvent, deltas: readonly InterestDelta[], narrative: string): CoreState {
   const at = stored.event.at;
-  const interests = new Map(s.interests);
-  const applied: InterestDelta[] = [];
-  for (const d of deltas) {
-    const gated = gateDelta({ ...s, interests }, d, at);
-    const i = interests.get(d.topic);
-    if (!gated || !i) continue;
-    interests.set(d.topic, applyDelta(i, gated));
-    applied.push(gated);
-  }
+  const { interests, applied } = gateAll(s, deltas, at);
   const base: CoreState = { ...s, experiencesSinceReflection: 0, lastReflectionAt: at };
   if (applied.length === 0) return base;
   const record = { ref: eventRef(s.seed.id, stored.seq), version: s.reflections.length + 1, at, narrative, deltas: applied };
