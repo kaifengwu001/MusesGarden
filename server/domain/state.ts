@@ -306,6 +306,7 @@ function gift(s: CoreState, stored: StoredEvent, e: Extract<MuseEventBody, { kin
   const at = stored.event.at;
   const g = e.received;
   const met = { ...s, experiencesSinceReflection: s.experiencesSinceReflection + 1 };
+  if (!g) return met;
   if (s.collected.has(g.canonicalUrl)) {
     const interests = new Map(s.interests);
     for (const t of g.topics) {

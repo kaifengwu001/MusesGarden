@@ -38,7 +38,7 @@ function sentence(e: MuseEvent): string | null {
     case 'discovery.collected':
       return e.discovery.provenance === 'own' ? `Kept *${e.discovery.title}*.` : null;
     case 'hangout':
-      return `Spent time with a friend and came away with *${e.received.title}*.`;
+      return e.received ? `Spent time with a friend and came away with *${e.received.title}*.` : 'Spent time with a friend.';
     case 'encounter':
       return 'Met another Muse out beyond the planet.';
     case 'relationship.changed':

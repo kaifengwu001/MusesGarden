@@ -52,7 +52,7 @@ export function experiences(s: MuseState, log: readonly StoredEvent[]): Experien
       }
       case 'hangout':
         others.push({ ref, at: e.at, kind: 'hangout', topics: [], note: e.pleasantness >= 0.3 ? 'Spent a good while with a friend.' : 'A hangout with a friend that felt off.' });
-        offer({ ref, at: e.at, kind: 'gift', topics: e.received.topics, canonicalUrl: e.received.canonicalUrl, note: `A friend gave me "${e.received.title}".` });
+        if (e.received) offer({ ref, at: e.at, kind: 'gift', topics: e.received.topics, canonicalUrl: e.received.canonicalUrl, note: `A friend gave me "${e.received.title}".` });
         break;
       case 'encounter':
         others.push({ ref, at: e.at, kind: 'encounter', topics: [], note: 'Met another Muse out beyond the planet.' });
