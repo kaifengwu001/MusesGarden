@@ -8,6 +8,7 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
+| 15 | https://muses-garden-iteration-15.vercel.app | 74926b7 |
 | 14 | https://muses-garden-iteration-14.vercel.app | 89b493a |
 | 13 | https://muses-garden-iteration-13.vercel.app | d5107a0 |
 | 12 | https://muses-garden-iteration-12.vercel.app | 9ad20e4 |
@@ -20,9 +21,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
-The latest is also at https://the-meadow-omega.vercel.app. Since 2026-10-31
-it carries the fix after iteration 14 (2499967), which iteration 14's page
-does not. Each iteration is its own Vercel project, so its production address
+The latest is also at https://the-meadow-omega.vercel.app (iteration 15).
+Each iteration is its own Vercel project, so its production address
 is public and stays put. `scripts/publish.sh N --latest` publishes the
 checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
@@ -74,6 +74,17 @@ progress stays out.
 
 - **Tests:** `npm run check`, 68 CPU invariants, 12 browser invariants (the
   speck guard among them) and 15 shots, all passing.
+- **The pages:** iteration 15's page and the latest serve that build byte
+  for byte (`index-pSBoEYqB.js`); iteration 14's page still serves its own
+  (`index-6gNr6kW8.js`). Both load at 1× (4× MSAA, High) without errors.
+- **Before and after, on the live pages:** the standing view at 1440×900,
+  1×, the render scale held at 1, at 8 frozen times. 198–243 pixels a frame
+  differ between iteration 14's page and iteration 15's by more than 64
+  levels: the specks, single saturated blue, purple, red or yellow pixels,
+  most along the far edge of the meadow, where the flowers are smallest
+  ([a crop, ×4](docs/checkpoints/iteration-15/specks-before-after.png)).
+  2.6–3.2k pixels differ by 5–64 levels, on the plants' edges. Either page
+  against itself: no pixel differs by more than 4 levels.
 - **Known issues:** as iteration 14's.
 
 ## Iteration 14: the review notes
