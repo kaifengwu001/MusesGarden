@@ -27,10 +27,31 @@ const DETAILS = {
 };
 
 /**
- * Non-hidden categories that say little about what a page is about. The API lists categories alphabetically, so
- * date-led ones ("1926 births", "20th-century American male actors") would otherwise crowd out the subject ones.
+ * Biographical and maintenance categories: reflection must never grow an interest in "People from Zurich" or
+ * "Typography stubs". Date-led ones ("1926 births", "20th-century American male actors") go too, since the API
+ * lists categories alphabetically and they would crowd out the subject ones. Hidden maintenance categories are
+ * already excluded by `clshow=!hidden`; this also catches the visible ones and anything recorded without it.
  */
-const NOISE_CATEGORY = /^(?:\d|(?:Possibly )?Living people$)/;
+const NOT_A_TOPIC = new RegExp(
+  [
+    String.raw`^\d`,
+    String.raw`^(?:Possibly )?Living people$`,
+    String.raw`^(?:Year|Date|Place) of (?:birth|death)`,
+    String.raw`^Burials (?:at|in) `,
+    String.raw`^People (?:from|educated at) `,
+    String.raw` alumni$`,
+    String.raw`^(?:Articles|Pages|Wikipedia|CS1|Webarchive|Short description|Commons category) `,
+    String.raw`^Use (?:dmy|mdy) dates|^Use [A-Z]\w* English`,
+    String.raw`^All stub articles$`,
+    String.raw` stubs$`,
+    String.raw`^Coordinates on Wikidata$`,
+  ].join('|'),
+);
+
+/** The categories that can be a page's topics, in order, at most six. */
+export function topicCategories<T extends string>(categories: readonly T[]): T[] {
+  return categories.filter((c) => !NOT_A_TOPIC.test(c)).slice(0, MAX_CATEGORIES);
+}
 
 /** Link targets outside the article namespace. Prefixes of 1–3 letters cover language codes and shortcuts (wp:, s:). */
 const NOT_ARTICLE =
@@ -143,8 +164,7 @@ function mergePage(into: Map<string, RawPage>, p: RawPage): void {
 
 /** The parse boundary for topic identity: titles and category names the API returned are canonical. */
 function topicsOf(page: RawPage): TopicKey[] {
-  const categories = page.categories.filter((c) => !NOISE_CATEGORY.test(c)).slice(0, MAX_CATEGORIES);
-  return [page.title, ...categories] as TopicKey[];
+  return [page.title, ...topicCategories(page.categories)] as TopicKey[];
 }
 
 function toCandidate(page: RawPage): Candidate | null {

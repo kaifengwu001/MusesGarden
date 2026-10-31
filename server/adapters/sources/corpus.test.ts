@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Candidate, CanonicalUrl, TopicKey } from '../../../src/muse/contract';
-import { FixtureSource, loadCorpus, loadHeroChain, loadUnseenPool, type CorpusPage } from './corpus';
+import { FixtureSource, loadCorpus, loadHeroChain, loadUnseenPool, parseCandidate, type CorpusPage } from './corpus';
 
 const corpus = loadCorpus();
 const none = new Set<CanonicalUrl>();
@@ -41,6 +41,26 @@ describe('the recorded corpus', () => {
       expect(candidate.summary.length).toBeGreaterThan(0);
       expect(candidate.summary.length).toBeLessThanOrEqual(400);
     }
+  });
+});
+
+describe('recorded topics', () => {
+  const notTopics = [
+    /^\d{4} (?:births|deaths)$/, /^Living people$/, /^People from /, / alumni$/, /^Articles /, /^Pages /, /^Wikipedia /,
+    /^CS1 /, /^Webarchive /, /^All stub articles$/, / stubs$/, /^Use dmy dates/, /^Short description/, /^Commons category/,
+    /^Coordinates on Wikidata$/, /^Burials at /,
+  ];
+
+  it('hold no biographical or maintenance category, in the corpus or the pools', () => {
+    const pool = loadUnseenPool();
+    const recorded = [...corpus.pages.map((p) => p.candidate), ...loadHeroChain(), ...pool.botany, ...pool.jazz, ...pool.neutral];
+    const offenders = recorded.flatMap((c) => c.topics.slice(1).filter((t) => notTopics.some((re) => re.test(t))).map((t) => `${c.title}: ${t}`));
+    expect(offenders).toEqual([]);
+  });
+
+  it('are checked when a recorded page is loaded', () => {
+    const ultramarine = page('Ultramarine').candidate;
+    expect(() => parseCandidate({ ...ultramarine, topics: [...ultramarine.topics.slice(0, 2), 'People from Zurich'] })).toThrow(/maintenance/);
   });
 });
 

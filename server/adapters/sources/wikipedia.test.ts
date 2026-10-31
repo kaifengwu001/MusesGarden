@@ -125,6 +125,37 @@ describe('WikipediaSource on recorded responses', () => {
     expect(await source.resolveTopic('   ')).toBeNull();
   });
 
+  it('keeps biographical and maintenance categories out of topics, filtering before the cap of six', async () => {
+    const categories = [
+      '1926 births', '1991 deaths', 'African-American jazz musicians', 'All stub articles', 'American jazz bandleaders',
+      'American jazz trumpeter stubs', 'Articles with short description', 'Burials at Woodlawn Cemetery (Bronx, New York)',
+      'CS1 maint: archived copy as title', 'Commons category link is on Wikidata', 'Cool jazz trumpeters',
+      'Coordinates on Wikidata', 'Hard bop trumpeters', 'Juilliard School alumni', 'Living people', 'Modal jazz trumpeters',
+      'Pages using infobox musical artist', 'People from Alton, Illinois', 'Post-bop trumpeters',
+      'Short description is different from Wikidata', 'Use mdy dates from May 2024', 'Webarchive template wayback links',
+      'Wikipedia indefinitely semi-protected pages', 'Jazz fusion trumpeters',
+    ];
+    const page = {
+      pageid: 50350,
+      ns: 0,
+      title: 'Miles Davis',
+      canonicalurl: 'https://en.wikipedia.org/wiki/Miles_Davis',
+      extract: 'Miles Dewey Davis III was an American trumpeter, bandleader, and composer.',
+      categories: categories.map((c) => ({ ns: 14, title: `Category:${c}` })),
+    };
+    const source = new WikipediaSource({ minIntervalMs: 0, fetch: () => Promise.resolve(Response.json({ batchcomplete: true, query: { pages: [page] } })) });
+    const [miles] = await source.candidates(['Miles Davis']);
+    expect(miles.topics).toEqual([
+      'Miles Davis',
+      'African-American jazz musicians',
+      'American jazz bandleaders',
+      'Cool jazz trumpeters',
+      'Hard bop trumpeters',
+      'Modal jazz trumpeters',
+      'Post-bop trumpeters',
+    ]);
+  });
+
   it('serendipity returns random real pages', async () => {
     const { source } = replayed();
     const random = await source.serendipity(4, 1, none);

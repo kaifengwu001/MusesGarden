@@ -1,7 +1,8 @@
 // Records Muse's offline internet from live Wikipedia: the corpus, the hero chain, the unseen pool, and the HTTP
-// samples the source tests replay. With no step it re-records everything; `pools` and `samples` reuse corpus.json.
-//   npx tsx server/adapters/sources/record.ts [all|pools|samples]
-import { mkdirSync, writeFileSync } from 'node:fs';
+// samples the source tests replay. With no step it re-records everything; `pools` and `samples` reuse corpus.json,
+// and `topics` re-filters the recorded topics offline.
+//   npx tsx server/adapters/sources/record.ts [all|pools|samples|topics]
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Candidate, CanonicalUrl, TopicKey } from '../../../src/muse/contract';
@@ -11,6 +12,8 @@ import {
   FixtureSource,
   HERO_CHAIN_PATH,
   loadCorpus,
+  loadHeroChain,
+  loadUnseenPool,
   parseCorpus,
   UNSEEN_PATH,
   type Corpus,
@@ -18,8 +21,9 @@ import {
   type Lean,
 } from './corpus';
 import { FEEDS } from './rss';
+import { arr, obj, strs } from './json';
 import { recordingFetch, SAMPLE_BATCH, type Samples } from './samples';
-import { normalizeTitle, USER_AGENT, WikipediaSource } from './wikipedia';
+import { normalizeTitle, topicCategories, USER_AGENT, WikipediaSource } from './wikipedia';
 
 interface Area {
   readonly name: string;
@@ -237,7 +241,27 @@ async function samples(): Promise<void> {
   }
 }
 
+/**
+ * Re-applies topicCategories to the recorded files without the network. Raw categories weren't recorded, so a page
+ * keeps the categories that survive and may carry fewer than six. Safe to rerun.
+ */
+function refilterRecordedTopics(): void {
+  const refilter = (v: unknown, what: string) => {
+    const page = obj(v, what);
+    const [title, ...categories] = strs(page.topics, `${what}.topics`);
+    return { ...page, topics: [title, ...topicCategories(categories)] };
+  };
+  const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
+  const corpus = obj(readJson(CORPUS_PATH), 'corpus');
+  writeJson(CORPUS_PATH, { ...corpus, pages: arr(corpus.pages, 'pages').map((p, i) => refilter(p, `pages[${i}]`)) });
+  writeJson(HERO_CHAIN_PATH, arr(readJson(HERO_CHAIN_PATH), 'hero').map((c, i) => refilter(c, `hero[${i}]`)));
+  const unseen = Object.entries(obj(readJson(UNSEEN_PATH), 'unseen'));
+  writeJson(UNSEEN_PATH, Object.fromEntries(unseen.map(([lean, list]) => [lean, arr(list, lean).map((c, i) => refilter(c, `${lean}[${i}]`))])));
+  console.info(`topics re-filtered: ${loadCorpus().pages.length} pages, ${loadHeroChain().length} in the hero chain, ${Object.values(loadUnseenPool()).flat().length} unseen`);
+}
+
 async function main(step: string): Promise<void> {
+  if (step === 'topics') return refilterRecordedTopics();
   const wiki = new WikipediaSource();
   if (step === 'all') {
     const corpus = parseCorpus(corpusJson(await crawl(wiki)));

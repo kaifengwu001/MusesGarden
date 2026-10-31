@@ -4,7 +4,7 @@ import { mix, salt } from '../../../src/core/hash';
 import type { Candidate, CanonicalUrl, Source, TopicKey } from '../../../src/muse/contract';
 import { arr, obj, optStr, str, strs } from './json';
 import { mentions } from './text';
-import { normalizeTitle, wikipediaUrl } from './wikipedia';
+import { normalizeTitle, topicCategories, wikipediaUrl } from './wikipedia';
 
 export const FIXTURES_DIR = fileURLToPath(new URL('../../fixtures/', import.meta.url));
 export const CORPUS_PATH = `${FIXTURES_DIR}corpus.json`;
@@ -48,6 +48,9 @@ export function parseCandidate(raw: unknown, what = 'candidate'): Candidate {
   if (origin === 'wikipedia' && canonicalUrl !== wikipediaUrl(title)) throw new Error(`${what}: ${canonicalUrl} is not canonical`);
   if (summary === '' || summary.length > 400) throw new Error(`${what}.summary: ${summary.length} characters`);
   if (topics.length < 1 || topics.length > 7) throw new Error(`${what}.topics: ${topics.length} topics`);
+  if (origin === 'wikipedia' && topicCategories(topics.slice(1)).length !== topics.length - 1) {
+    throw new Error(`${what}.topics: holds a biographical or maintenance category`);
+  }
   return {
     origin,
     url: str(o.url, `${what}.url`),
