@@ -3,13 +3,20 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 export const SOCIAL = {
+  /** Units for the encounter rate (per hour while both are beyond). The rate itself is sociability · sociability · similarity. */
+  encountersPerHour: 8,
   familiarityBase: 1,
   familiaritySpan: 3,
   befriendBase: 0.5,
 
+  /** Share of pleasantness that comes from both Muses' warmth (mean sociability), whatever their interests. */
+  pleasantWarmth: 0.3,
   pleasantSimilarity: 0.6,
   pleasantStretch: 0.4,
-  unpleasantBelow: 0.3,
+  /** A hangout is unpleasant when it falls below this share of the pair's own average so far. */
+  unpleasantVsAverage: 0.7,
+  /** The pair needs this many hangouts before a drop can count against them. */
+  unpleasantAfterHangouts: 3,
   streakBase: 2,
   streakRapportStep: 2,
 

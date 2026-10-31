@@ -47,7 +47,7 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
         ...r,
         rapport: r.rapport + e.pleasantness,
         rapportSinceInvite: r.rapportSinceInvite + e.pleasantness,
-        unpleasantStreak: isUnpleasant(e.pleasantness) ? r.unpleasantStreak + 1 : 0,
+        unpleasantStreak: isUnpleasant(e.pleasantness, r) ? r.unpleasantStreak + 1 : 0,
         hangouts: r.hangouts + 1,
         lastRole: e.role,
         lastMetAt: at,

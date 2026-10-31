@@ -23,6 +23,8 @@ export function parseSoul(text: string): { readonly name: string | null; readonl
 }
 
 const SHOWN: readonly InterestStage[] = ['established', 'emerging'];
+/** SOUL.md shows Muse's strongest interests; the rest stay in the model and the Mind inspector. */
+const MAX_SHOWN = 8;
 
 function line(i: Interest): string {
   const sources = i.sources.length === 1 ? '1 source' : `${i.sources.length} sources`;
@@ -32,10 +34,12 @@ function line(i: Interest): string {
 /** The garden-owned section of SOUL.md: established and emerging interests with their evidence, and the latest narrative. */
 export function renderSoulSection(s: MuseState): string {
   const out = ["## What I've been into", '', `Garden soul version ${s.reflections.length}.`];
+  const strongest = [...s.interests.values()]
+    .filter((i) => SHOWN.includes(i.stage))
+    .sort((a, b) => b.affinity - a.affinity || b.sources.length - a.sources.length || (a.topic < b.topic ? -1 : 1))
+    .slice(0, MAX_SHOWN);
   for (const stage of SHOWN) {
-    const xs = [...s.interests.values()]
-      .filter((i) => i.stage === stage)
-      .sort((a, b) => b.affinity - a.affinity || b.sources.length - a.sources.length || (a.topic < b.topic ? -1 : 1));
+    const xs = strongest.filter((i) => i.stage === stage);
     if (xs.length === 0) continue;
     out.push('', `### ${stage === 'established' ? 'Established' : 'Emerging'}`, '', ...xs.map(line));
   }

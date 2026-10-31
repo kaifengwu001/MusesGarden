@@ -166,10 +166,9 @@ function fold(s: CoreState, stored: StoredEvent): CoreState {
       questions.delete(e.id);
       return { ...s, questions };
     }
-    case 'photo.taken': {
-      const today = localDay(e.photo.at, s.seed.timezone) === s.day.day;
-      return { ...s, photos: [...s.photos, e.photo], day: { ...s.day, photos: s.day.photos + (today ? 1 : 0) } };
-    }
+    case 'photo.taken':
+      // The owner receives a photo when its event lands, so the daily cap counts by delivery, not by when it was taken.
+      return { ...s, photos: [...s.photos, e.photo], day: { ...s.day, photos: s.day.photos + 1 } };
     case 'basket.delivered':
       return { ...s, baskets: [...s.baskets, e.basket], pendingBasket: [], day: { ...s.day, baskets: s.day.baskets + 1 } };
     case 'reflection.committed':
