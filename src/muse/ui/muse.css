@@ -234,6 +234,14 @@ body.postcard .mu {
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  z-index: 1;
+}
+
+/* Over the pins layer (which follows them in tab order). */
+.mu-status,
+.mu-dock,
+.mu-toast {
+  z-index: 2;
 }
 
 .mu-pin {
@@ -306,32 +314,107 @@ body.postcard .mu {
   color: var(--ink-soft);
 }
 
+/* An object Muse collected: a quiet glint until the renderer draws the object itself. The button is
+   the hit area; the glint is what shows. */
 .mu-plant {
-  position: absolute;
-  left: -9px;
-  top: -9px;
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
   padding: 0;
-  border: 2px solid var(--paper);
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: var(--mu-green);
-  box-shadow: 0 2px 8px rgba(28, 40, 60, 0.3);
+  border: 0;
+  border-radius: 50%;
+  background: none;
   cursor: pointer;
   pointer-events: auto;
 }
 
-.mu-plant.mu-private {
-  left: -5px;
-  top: -5px;
-  width: 10px;
-  height: 10px;
-  border-width: 1.5px;
+.mu-glint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
   border-radius: 50%;
-  background: rgba(79, 143, 52, 0.55);
+  background: radial-gradient(circle, #fffdf3 0 34%, rgba(255, 238, 186, 0.75) 58%, rgba(255, 238, 186, 0) 76%);
+  /* a hairline of ink keeps it visible on pale grass */
+  box-shadow:
+    0 0 0 1px rgba(62, 58, 54, 0.16),
+    0 0 8px 3px rgba(255, 246, 214, 0.55);
+  animation: mu-twinkle 4s ease-in-out infinite;
+  transition: scale 0.2s ease;
+}
+
+@keyframes mu-twinkle {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.mu-plant:hover .mu-glint,
+.mu-plant:focus-visible .mu-glint {
+  scale: 1.6;
+  animation-play-state: paused;
+}
+
+.mu-plant.mu-glow .mu-glint {
+  animation: mu-glow 1.1s ease-in-out 3;
+}
+
+@keyframes mu-glow {
+  50% {
+    scale: 2.6;
+    box-shadow: 0 0 14px 6px rgba(255, 246, 214, 0.8);
+  }
+}
+
+.mu-plant.mu-private {
   cursor: default;
   pointer-events: none;
+}
+
+.mu-private .mu-glint {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: rgba(251, 248, 238, 0.7);
+  box-shadow: none;
+  animation: none;
+}
+
+.mu-preview {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 220px;
+  padding: 10px 12px 11px;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 8px 26px rgba(28, 40, 60, 0.22);
+  color: var(--ink);
+  text-align: left;
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.mu-preview-thumb {
+  width: 100%;
+  height: 92px;
+  margin-bottom: 4px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.mu-preview .mu-title {
+  font-size: 16px;
+}
+
+.mu-preview .mu-quote {
+  font-size: 13px;
+  color: var(--ink-soft);
 }
 
 /* ---- dock and panels ----------------------------------------------------- */
@@ -471,6 +554,30 @@ body.postcard .mu {
   color: var(--ink);
   text-decoration: none;
   transition: translate 0.18s ease;
+}
+
+.mu-card-link {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  border-radius: 12px 12px 0 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.mu .mu-card-link:focus-visible {
+  outline-offset: -3px;
+}
+
+.mu-show {
+  align-self: flex-start;
+  margin: 0 14px 12px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.mu.visiting .mu-show {
+  display: none;
 }
 
 .mu-card:hover {
@@ -844,28 +951,24 @@ body.postcard .mu {
   display: none;
 }
 
-/* ---- visit --------------------------------------------------------------- */
+/* ---- an object's card ----------------------------------------------------- */
 
-.mu-visit-card {
-  position: fixed;
-  right: calc(var(--gutter) * 0.6);
-  bottom: calc(var(--mu-bottom) + 58px);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  z-index: 1002;
+.mu-object {
+  width: min(300px, calc(100vw - 2 * var(--gutter)));
+  overflow: hidden;
 }
 
-.mu-visit-card .mu-card {
-  flex: none;
-  width: 268px;
-  box-shadow: 0 14px 44px rgba(28, 60, 96, 0.22);
+.mu-object .mu-thumb {
+  height: 140px;
 }
 
-.mu-close {
-  background: var(--card);
-  box-shadow: var(--mu-shadow);
+.mu-object .mu-summary {
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+}
+
+.mu-object .mu-btn.mu-primary {
+  text-decoration: none;
 }
 
 /* ---- dev tools ----------------------------------------------------------- */
@@ -884,7 +987,7 @@ body.postcard .mu {
   backdrop-filter: blur(14px) saturate(1.1);
   box-shadow: var(--mu-shadow);
   font-size: 11.5px;
-  z-index: 1;
+  z-index: 2;
 }
 
 .mu-dev-head {
@@ -1092,8 +1195,7 @@ body.postcard .mu {
   .mu-tag {
     display: none;
   }
-  .mu-panel,
-  .mu-visit-card {
+  .mu-panel {
     left: var(--gutter);
     right: var(--gutter);
     bottom: calc(var(--gutter) * 0.5);
@@ -1112,8 +1214,7 @@ body.postcard .mu {
   .mu-dock {
     bottom: calc(var(--mu-bottom) + 58px);
   }
-  .mu-panel,
-  .mu-visit-card {
+  .mu-panel {
     bottom: calc(var(--mu-bottom) + 116px);
   }
 }

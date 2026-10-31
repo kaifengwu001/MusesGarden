@@ -80,6 +80,11 @@ export class Status {
     this.tick();
   }
 
+  /** The owner sent the camera somewhere else. */
+  unfollow(): void {
+    this.setFollowing(false);
+  }
+
   /** Hide while the owner is visiting another planet: this Muse isn't there. */
   setAway(away: boolean): void {
     this.el.hidden = away;

@@ -1,6 +1,8 @@
 import './muse.css';
+import { Vector3 } from 'three';
 import type { World } from '../../world';
-import type { MuseId } from '../contract';
+import type { MuseId, PlantCard } from '../contract';
+import { Anchors } from './anchors';
 import { MuseApi } from './api';
 import { DevTools } from './dev';
 import { button, el, SimClock } from './dom';
@@ -38,10 +40,10 @@ export function mountMuse(root: HTMLElement, world: World): void {
 
   const overlay = el('div', 'mu');
   const layer = el('div', 'mu-pins');
-  overlay.append(layer);
   root.append(overlay);
   const pins = new Pins(world, layer);
   const status = new Status(api, world, clock, pins);
+  const anchors = new Anchors(pins, () => setOpen(null));
   const toast = el('p', 'mu-toast');
   toast.setAttribute('role', 'status');
   toast.hidden = true;
@@ -50,11 +52,26 @@ export function mountMuse(root: HTMLElement, world: World): void {
     toast.hidden = false;
     window.setTimeout(() => (toast.hidden = true), 6000);
   };
-  const visit = new Visit(api, world, pins, clock, (visiting, note) => {
+  const visit = new Visit(api, world, anchors, clock, (visiting, note) => {
     status.setAway(visiting);
+    overlay.classList.toggle('visiting', visiting);
     if (note) say(note);
     if (visiting) setOpen(null);
+    else void homeAnchors();
   });
+
+  /** The owner's own planet: one anchor per collected object, its card fetched on click. */
+  async function homeAnchors(): Promise<void> {
+    if (visit.active) return;
+    const w = await api.world();
+    if (!visit.active) anchors.set(w.plants.map((p) => ({ id: p.id, dir: p.dir, preview: p.preview, card: () => api.plant(p.id) })));
+  }
+
+  const showOnPlanet = (card: PlantCard): void => {
+    status.unfollow();
+    world.rig.glideTo(new Vector3(...card.place.dir));
+    anchors.highlight(card.id);
+  };
 
   // One refresh at a time; a call during one runs another after it, so a command's effect is never missed.
   let refreshing: Promise<void> | null = null;
@@ -64,7 +81,7 @@ export function mountMuse(root: HTMLElement, world: World): void {
       again = true;
       return refreshing;
     }
-    refreshing = Promise.allSettled([status.refresh(), refreshBadge(), open ? show(open) : null, dev.visible ? dev.refresh() : null]).then(() => {
+    refreshing = Promise.allSettled([status.refresh(), homeAnchors(), refreshBadge(), open ? show(open) : null, dev.visible ? dev.refresh() : null]).then(() => {
       refreshing = null;
       visit.tick();
       if (again) {
@@ -76,7 +93,7 @@ export function mountMuse(root: HTMLElement, world: World): void {
   };
 
   const panels: Record<PanelName, Panel> = {
-    mailbox: new Mailbox(api, () => status.museName, () => void refresh(), (card) => void visit.enter(card)),
+    mailbox: new Mailbox(api, () => status.museName, () => void refresh(), (card) => void visit.enter(card), showOnPlanet),
     shelf: new Shelf(api),
     settings: new Settings(api, () => void refresh()),
   };
@@ -129,6 +146,7 @@ export function mountMuse(root: HTMLElement, world: World): void {
   function setOpen(next: PanelName | null): void {
     const prev = open;
     if (prev === next) return;
+    if (next) anchors.close();
     if (prev) {
       panels[prev].el.hidden = true;
       dockButtons[prev].setAttribute('aria-expanded', 'false');
@@ -146,7 +164,8 @@ export function mountMuse(root: HTMLElement, world: World): void {
     } else if (prev && panels[prev].el.contains(document.activeElement)) dockButtons[prev].focus();
   }
 
-  overlay.append(status.el, visit.banner, dock, ...Object.values(panels).map((p) => p.el), visit.card, dev.el, toast);
+  // The pins come after the dock in tab order: Follow and the dock first, then the objects on the planet.
+  overlay.append(status.el, visit.banner, dock, layer, ...Object.values(panels).map((p) => p.el), anchors.panel, dev.el, toast);
 
   // Keys typed into the overlay's fields, and arrows inside a panel, are the overlay's: the camera's
   // movement keys and main.ts's shortcuts (H, P) never see them. Esc still reaches the window.
@@ -156,7 +175,7 @@ export function mountMuse(root: HTMLElement, world: World): void {
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (!visit.closeCard()) setOpen(null);
+      if (!anchors.close()) setOpen(null);
     } else if (e.key.toLowerCase() === DEV_KEY && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e.target)) dev.toggle();
   });
 

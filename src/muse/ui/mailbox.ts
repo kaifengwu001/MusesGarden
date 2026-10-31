@@ -12,9 +12,10 @@ const TABS: readonly (readonly [Tab, string])[] = [
 
 const ANSWER_LABEL: Record<Answer, string> = { approve: 'Approve', accept: 'Accept', decline: 'Decline' };
 
-/** A find from a basket: why Muse kept it, then what it is. Opens the page. */
-export function findCard(card: PlantCard): HTMLAnchorElement {
-  const a = outLink(card.url, 'mu-card');
+/** A find from a basket: why Muse kept it, then what it is. The card opens the page; its button finds the object on the planet. */
+function findCard(card: PlantCard, showOnPlanet: (card: PlantCard) => void): HTMLElement {
+  const box = el('article', 'mu-card');
+  const a = outLink(card.url, 'mu-card-link');
   a.dataset.card = '';
   const img = thumb(card.thumb, 'mu-thumb');
   if (img) a.append(img);
@@ -23,7 +24,10 @@ export function findCard(card: PlantCard): HTMLAnchorElement {
   why.append(el('span', 'mu-eyebrow', 'Why I kept this'), el('span', 'mu-quote', card.reason));
   body.append(why, el('h3', 'mu-title', card.title), el('p', 'mu-summary', card.summary), el('span', 'mu-open', 'Read the page ↗'));
   a.append(body);
-  return a;
+  const show = button('Show on planet', 'mu-btn mu-show', () => showOnPlanet(card));
+  show.setAttribute('aria-label', `Show ${card.title} on the planet`);
+  box.append(a, show);
+  return box;
 }
 
 function photoTitle(p: PhotoView): string {
@@ -107,6 +111,8 @@ export class Mailbox {
     private readonly changed: () => void,
     /** Opens visit mode for an invitation. */
     private readonly visit: (card: InvitationCard) => void,
+    /** Glides the camera to a find on Muse's planet. */
+    private readonly showOnPlanet: (card: PlantCard) => void,
   ) {
     this.el.setAttribute('aria-label', 'Mailbox');
     this.baskets = new Paged(
@@ -173,7 +179,7 @@ export class Mailbox {
     section.append(el('h3', 'mu-basket-head', `${day(b.at)} · ${n} ${n === 1 ? 'find' : 'finds'}`));
     const row = el('div', 'mu-strip');
     row.dataset.row = '';
-    row.append(...b.items.map(findCard));
+    row.append(...b.items.map((c) => findCard(c, this.showOnPlanet)));
     section.append(row);
     return section;
   }
