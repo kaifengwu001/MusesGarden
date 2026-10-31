@@ -13,7 +13,6 @@ import type {
 import { eventRef } from './ids';
 import { gateAll } from './interests';
 import { REFLECTION_DUE_EXPERIENCES, REFLECTION_DUE_MS } from './policy/constants';
-import { core } from './state';
 
 const isReflection = (e: StoredEvent): boolean => e.event.kind === 'reflection.committed' || e.event.kind === 'reflection.no-change';
 
@@ -88,5 +87,5 @@ export function validateReflection(s: MuseState, log: readonly StoredEvent[], pr
 /** At the start of a rest: after REFLECTION_DUE_MS with something new to think about, or once experiences pile up. */
 export function reflectionDue(s: MuseState, now: number): boolean {
   const fresh = s.experiencesSinceReflection;
-  return fresh >= REFLECTION_DUE_EXPERIENCES || (fresh > 0 && now - core(s).lastReflectionAt >= REFLECTION_DUE_MS);
+  return fresh >= REFLECTION_DUE_EXPERIENCES || (fresh > 0 && now - s.lastReflectionAt >= REFLECTION_DUE_MS);
 }

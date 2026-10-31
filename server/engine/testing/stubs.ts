@@ -38,6 +38,8 @@ export function emptyState(seed: MuseSeed): MuseState {
     basketTime: null,
     hidden: new Set(),
     working: false,
+    workSince: null,
+    recentWork: [],
     episode: null,
     episodes: 0,
     interests: new Map(),
@@ -52,6 +54,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     baskets: [],
     photos: [],
     reflections: [],
+    lastReflectionAt: 0 as Instant,
     experiencesSinceReflection: 0,
     day: { day: '', restMs: 0, socialMs: 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
     social: { relationships: new Map(), invitations: new Map() },
@@ -70,7 +73,7 @@ export const reduceCore: ReduceCore = (s, stored) => {
       return {
         ...base,
         episodes: Math.max(s.episodes, e.n),
-        episode: { n: e.n, plan: e.plan, start: e.at, hops: 0, lastKept: null, pausedAt: null, remainingMs: null },
+        episode: { n: e.n, plan: e.plan, start: e.at, hops: 0, lastKept: null, pausedAt: null, remainingMs: null, activeSince: e.at },
       };
     case 'episode.paused':
       return s.episode ? { ...base, episode: { ...s.episode, pausedAt: e.at, remainingMs: e.remainingMs } } : base;

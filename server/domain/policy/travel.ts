@@ -3,7 +3,6 @@ import type { Candidate, Draw, Interest, Judgment, MuseState, QuestionId, Region
 import { farRegion, regionForNewTopic } from '../atlas';
 import { salienceAt, wOwner } from '../interests';
 import { categorical, lognormal, softmax } from '../rng';
-import { core } from '../state';
 import { DAY_MS } from '../time';
 import {
   BEYOND_SCALE,
@@ -59,10 +58,9 @@ function newTopic(s: MuseState, now: number): { topic: TopicKey; relatedTo: Topi
     .filter((i) => i.region === null && i.seededBy !== 'muse')
     .sort((a, b) => salienceAt(b, now) - salienceAt(a, now) || (a.topic < b.topic ? -1 : 1));
   if (seeds.length > 0) return { topic: seeds[0].topic, relatedTo: null };
-  const from = core(s).frontierFrom;
   for (let k = s.frontier.length - 1; k >= 0; k--) {
-    const topic = s.frontier[k];
-    if (!s.interests.get(topic)?.region) return { topic, relatedTo: from.get(topic) ?? null };
+    const { topic, from } = s.frontier[k];
+    if (!s.interests.get(topic)?.region) return { topic, relatedTo: from };
   }
   const asked = [...s.questions.values()].filter((q) => !s.interests.get(q.topic)?.region).sort((a, b) => a.openedAt - b.openedAt);
   return asked.length > 0 ? { topic: asked[0].topic, relatedTo: null } : null;

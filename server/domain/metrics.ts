@@ -1,7 +1,7 @@
 // Per-day numbers for tuning and for the arc: finds, areas, trips, photos, time spent, and how much of the
 // travelling the owner's interests still drive.
 import type { MetricsRow, MuseState, StoredEvent } from '../../src/muse/contract';
-import { type CoreState, emptyState, reduceCore } from './state';
+import { emptyState, reduceCore } from './state';
 import { HOUR_MS, localDay } from './time';
 
 type Row = { -readonly [K in keyof MetricsRow]: MetricsRow[K] } & { ownerTrips: number };
@@ -18,7 +18,7 @@ export function metrics(s: MuseState, log: readonly StoredEvent[]): MetricsRow[]
     }
     return r;
   };
-  const close = (st: CoreState): void => {
+  const close = (st: MuseState): void => {
     if (!st.day.day) return;
     const r = row(st.day.day);
     r.restHours = st.day.restMs / HOUR_MS;
@@ -54,7 +54,7 @@ export function metrics(s: MuseState, log: readonly StoredEvent[]): MetricsRow[]
       default:
         break;
     }
-    st = reduceCore(st, stored) as CoreState;
+    st = reduceCore(st, stored);
   }
   close(st);
   return [...rows.values()]

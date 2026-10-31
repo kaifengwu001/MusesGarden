@@ -57,7 +57,7 @@ function withoutExperiences(log: readonly StoredEvent[]): StoredEvent[] {
 }
 
 function replay(id: string, log: readonly StoredEvent[]): MuseState {
-  return log.reduce(fold, emptyState(seed(id)) as MuseState);
+  return log.reduce(fold, emptyState(seed(id)));
 }
 
 describe('divergence: history, not hidden parameters, drives what Muse keeps', () => {

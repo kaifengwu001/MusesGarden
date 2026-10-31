@@ -401,6 +401,8 @@ export interface EpisodeState {
   /** Set while work has the laptop out. */
   readonly pausedAt: Instant | null;
   readonly remainingMs: number | null;
+  /** When the episode last started or resumed; null while paused. Rest and social time since then aren't counted yet. */
+  readonly activeSince: Instant | null;
 }
 
 /** Counters for the owner's current local day (YYYY-MM-DD in their timezone). They reset when the day changes. */
@@ -464,11 +466,15 @@ export interface MuseState {
   readonly basketTime: string | null;
   readonly hidden: ReadonlySet<HiddenRef>;
   readonly working: boolean;
+  /** When the current work began, while working. */
+  readonly workSince: Instant | null;
+  /** Finished work in the recent window: rest gets likelier after it. */
+  readonly recentWork: readonly Window[];
   readonly episode: EpisodeState | null;
   readonly episodes: number;
   readonly interests: ReadonlyMap<TopicKey, Interest>;
-  /** Topics glimpsed on hops but not given a region yet: where new areas come from. */
-  readonly frontier: readonly TopicKey[];
+  /** Topics glimpsed on hops but not given a region yet, each with the hop topic it was seen from: where new areas come from. */
+  readonly frontier: readonly { readonly topic: TopicKey; readonly from: TopicKey }[];
   /** Explored regions and the topics living there. Home is explored from the start. */
   readonly regions: ReadonlyMap<RegionKey, readonly TopicKey[]>;
   readonly home: RegionKey;
@@ -480,6 +486,8 @@ export interface MuseState {
   readonly baskets: readonly Basket[];
   readonly photos: readonly PhotoSpec[];
   readonly reflections: readonly ReflectionRecord[];
+  /** The last reflection, committed or no-change: the 3-day clock restarts from it. */
+  readonly lastReflectionAt: Instant;
   readonly experiencesSinceReflection: number;
   readonly day: DayCounters;
   readonly social: SocialState;

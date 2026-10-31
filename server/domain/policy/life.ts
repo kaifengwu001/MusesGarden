@@ -4,7 +4,6 @@ import type { Draw, Instant, MuseState } from '../../../src/muse/contract';
 import { instant } from '../ids';
 import { salienceAt } from '../interests';
 import { categorical, lognormal } from '../rng';
-import { core } from '../state';
 import { localDay } from '../time';
 import {
   BEYOND_MEDIAN_MS,
@@ -25,7 +24,7 @@ const overlap = (a0: number, a1: number, b0: number, b1: number): number => Math
 
 /** min(1, work in the last 12 h ÷ 6 h). */
 export function recentWork(s: MuseState, now: number): number {
-  const x = core(s);
+  const x = s;
   const from = now - RECENT_WORK_WINDOW_MS;
   let ms = x.workSince === null ? 0 : overlap(x.workSince, now, from, now);
   for (const w of x.recentWork) ms += overlap(w.start, w.end, from, now);

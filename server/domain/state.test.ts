@@ -62,11 +62,12 @@ describe('the hero chain: Botanical illustration → Pigment → Ultramarine', (
   });
 
   it('remembers good pages it passed over as the frontier, and lifts them out once they get a region', () => {
-    expect(s.frontier).toEqual(topicsOf('Herbarium', 'Gum arabic', 'Lapis lazuli'));
+    expect(s.frontier.map((f) => f.topic)).toEqual(topicsOf('Herbarium', 'Gum arabic', 'Lapis lazuli'));
+    for (const f of s.frontier) expect(s.interests.has(f.from), `${f.topic} was seen from a pursued topic`).toBe(true);
     const after = new Life();
     for (const e of life.log) after.push(e.event.at, e.event);
     after.push(day + 3 * HOUR_MS, { kind: 'region.revealed', region: regionForNewTopic(s, topic('Pigment'), drawFor(MOSS.id, 2)), topic: topic('Lapis lazuli') });
-    expect(after.state.frontier).toEqual(topicsOf('Herbarium', 'Gum arabic'));
+    expect(after.state.frontier.map((f) => f.topic)).toEqual(topicsOf('Herbarium', 'Gum arabic'));
   });
 
   it('marks the region explored when it opens', () => {

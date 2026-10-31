@@ -1,6 +1,7 @@
 // Test support: a fixed temperament table, a seed, and a log builder that folds as it goes.
 import type {
   CanonicalUrl,
+  MuseState,
   Discovery,
   Instant,
   MuseEventBody,
@@ -14,7 +15,7 @@ import type {
 import { hopPlace } from './atlas';
 import { canonicalUrl, discoveryId, eventRef, instant, museId, topicKey } from './ids';
 import { drawFor } from './rng';
-import { type CoreState, emptyState, reduceCore } from './state';
+import { emptyState, reduceCore } from './state';
 
 export const TEMPERAMENTS = {
   hero: { curiosity: 0.6, focus: 0.7, sociability: 0.5, whimsy: 0.6, novelty: 0.5 },
@@ -39,7 +40,7 @@ export interface Page {
 
 export class Life {
   readonly log: StoredEvent[] = [];
-  state: CoreState;
+  state: MuseState;
 
   constructor(
     readonly seed: MuseSeed = MOSS,
@@ -51,7 +52,7 @@ export class Life {
   push(at: number, body: MuseEventBody): StoredEvent {
     const stored: StoredEvent = { museId: this.seed.id, seq: this.log.length + 1, event: { ...body, at: instant(at) } };
     this.log.push(stored);
-    this.state = reduceCore(this.state, stored) as CoreState;
+    this.state = reduceCore(this.state, stored);
     return stored;
   }
 
@@ -91,10 +92,10 @@ export class Life {
 }
 
 /** Folds a log from scratch, renumbering seq so a filtered log is still gapless. */
-export function foldLog(seed: MuseSeed, temperament: Temperament, events: readonly StoredEvent[]): CoreState {
+export function foldLog(seed: MuseSeed, temperament: Temperament, events: readonly StoredEvent[]): MuseState {
   let s = emptyState(seed, temperament);
   events.forEach((e, i) => {
-    s = reduceCore(s, { ...e, seq: i + 1 }) as CoreState;
+    s = reduceCore(s, { ...e, seq: i + 1 });
   });
   return s;
 }
