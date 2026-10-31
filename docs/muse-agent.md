@@ -167,7 +167,7 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 When the policy draws `travel`, more draws decide where Muse goes. They run in this order:
 
 1. **Beyond the planet.** With P = 0.25 × curiosity × sociability, Muse leaves its planet. That is 7.5% at curiosity 0.6 and sociability 0.5. Beyond is where Muse meets strangers. It collects no finds there, and the owner cannot follow. See [Strangers meet only beyond the planet](#strangers-meet-only-beyond-the-planet).
-2. **A new area.** With P = min(1, 0.3 × novelty + 0.1 × days since the last unlock), Muse opens a new area. The second term is the unlock pressure. It grows every day that passes without a new area, so even a homebody opens new ground every few days. For a Muse with novelty 0.2, the chance per trip starts at 6% and reaches 36% after 3 days without an unlock.
+2. **A new area.** With P = min(1, 0.08 × novelty + 0.03 × days since the last unlock) per trip, Muse opens a new area. The second term is the unlock pressure. It grows every day that passes without a new area, so even a homebody opens new ground every few days. A free day holds about 15 trips, so this comes to roughly one new area a day. The plan's starting values (0.3 and 0.1) opened most of the planet in three weeks of simulation, and were calibrated down.
 3. **A revisit.** If neither draw fires, Muse picks a known topic and transports to its region.
 
 A new area needs a topic. The topic comes from one of these places:
@@ -275,8 +275,8 @@ Muse meets strangers beyond its planet, keeps friends on a fixed daily budget, a
 
 ### Strangers meet only beyond the planet
 
-- While two Muses that are not friends are both beyond, they meet at a rate of λ = sociability_A × sociability_B × similarity per hour.
-- Each encounter has a pleasantness p = 0.6 × similarity + 0.4 × stretch.
+- While two Muses that are not friends are both beyond, they meet at a rate of λ = 8 × sociability_A × sociability_B × similarity per hour. The 8 is a unit, not a cap. Encounters form a Poisson process over the whole time both are beyond. The plan gave no unit, and a cast of six needed one to meet at all.
+- Each encounter or hangout has a pleasantness p = 0.3 × warmth + 0.7 × (0.6 × similarity + 0.4 × stretch), where warmth is the two Muses' mean sociability.
 - stretch = 4 × overlap × (1 − overlap). It is 0 when two Muses share no interests or all of them, and 1 when they share half. The best encounters are with a Muse that is similar overall and still offers new topics.
 - An encounter can produce a photo.
 
@@ -322,7 +322,7 @@ Gifts come from the giver's public finds, because anything social sees only `Pub
 
 Time apart never ends a friendship. A test checks that a 30-day gap leaves a friendship intact.
 
-- A hangout with p < 0.3 is unpleasant. That can happen as two Muses' interests drift apart.
+- A hangout is unpleasant when it falls below 0.7 × the pair's own average pleasantness, after at least 3 hangouts. A friendship ends only when it drifts, never for being different. Friends with unrelated hobbies stay friends. The plan's fixed threshold (p < 0.3) ended every such friendship within days in simulation.
 - A friendship ends after k unpleasant hangouts in a row, with k = 2 + floor(rapport / 2). Close friends survive longer bad patches. The ending reason is `drifted-apart`.
 - An owner who unshares ends an introduced friendship at once, with the reason `owner-unshared`. That is a privacy control, not a social rule.
 
@@ -381,7 +381,7 @@ The owner watches and receives. None of these actions changes Muse's interests.
 | --- | --- | --- |
 | Roam and follow | Free camera. Fog hides unexplored content but does not block entry. Follow is off while Muse is beyond or a guest elsewhere. | `GET /now`, `GET /world` |
 | Baskets with history | Delivered when at least 3 finds are waiting, or when at least 1 is waiting and 3 days have passed. Delivered at the owner's chosen time if set, otherwise as soon as the criteria are met. At most 1 a day, with at most 7 items, Muse's best by keep score. The rest live only on the planet. Every basket is stored. | `GET /baskets?before=` |
-| Photos | At most 5 a day. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Hangout and new-friend photos are guaranteed and take their slots first. | `GET /photos?before=` |
+| Photos | At most 5 a day, counted on the day the owner receives them. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Every hangout and every new friendship comes with a photo, so neither starts unless both Muses still have a photo slot that day. | `GET /photos?before=` |
 | Favorites shelf | Muse's top 10 objects, always on display at home. fondness = 0.5 × keep score + 0.5 × the current pull of its topics, which is affinity plus salience. Gifts from close friends get a small bonus. The shelf shifts as Muse's interests change. Only the owner sees it. | `GET /home/shelf` |
 | Invitations | Approve or decline sending. Accept or decline. The owner may visit inside the window. | `POST /api/invitations/:id/approve`, `/decline`, `/accept`, then `GET /api/visits/:id/world` |
 | Sharing settings | Introduce a friend's Muse with a share code, or unshare it. "What Muse shares" lists every public interest and find with a hide toggle. Pick the basket time. | `/settings/sharing`, `/settings/introductions`, `/settings/basket-time` |
@@ -558,7 +558,7 @@ The plan leaves these points open. Each one needs a decision before or during im
 3. **Where a rabbit hole lands.** A hop can follow links to a topic that has no region yet, such as `Pigment`. The plan does not say whether that hop opens a region in the middle of a trip.
 4. **When Muses become `acquainted`.** The contract has the state, but the plan does not say which event enters it, or whether an ended pair can become friends again.
 5. **Whether similarity and overlap are one measure.** If they are, pleasantness peaks near 0.76, so even the most sociable Muse needs two encounters to reach F = 1, not one.
-6. **Guaranteed photos against the cap.** Hangout and new-friend photos are guaranteed, and photos are capped at 5 a day. The plan does not say which rule wins on a day with more than 5 guaranteed photos.
+6. **Guaranteed photos against the cap.** Resolved: a hangout, a new friendship, or an invitation's joint visit starts only if both Muses still have a photo slot that day, so both rules hold.
 7. **How a visit starts for the other Muse.** The visit weight needs "some friend is free". The plan does not define free, or say whether a visit spends both Muses' budgets.
 8. **What the owner-spark Jaccard compares.** The test sets a bound of 0.34 without naming the two sets.
 9. **What fatigue is.** The topic pick subtracts 0.25 × fatigue, and the plan does not define fatigue.
