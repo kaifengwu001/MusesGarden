@@ -149,3 +149,122 @@ Some limits hold no matter what the draws say. Each one has a test.
 | Baskets | At most 1 per day, with at most 7 items |
 | Favorites shelf | At most 10 objects |
 | Social time | A daily budget of 3 h × sociability |
+
+## The planet is a map of Muse's mind
+
+Muse's planet starts almost empty and fills in as Muse explores. Where things sit on it shows what Muse cares about.
+
+- At first only the house and garden are explored.
+- Regions are fixed cells on the planet's surface. They come from the cube-sphere grid the renderer already uses, in `src/planet/cubesphere.ts`, and they stay put as the planet grows.
+- Each topic lives in a region. Related topics share a region or sit in nearby ones.
+- A topic's identity is its canonical Wikipedia title. "Ultramarine" is one topic however Muse reached it.
+- Muse transports between regions, so the explored pockets need not connect.
+- Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
+- The planet's growth value `g` follows the explored area.
+
+### Each trip goes beyond, opens new ground, or revisits
+
+When the policy draws `travel`, more draws decide where Muse goes. They run in this order:
+
+1. **Beyond the planet.** With P = 0.25 × curiosity × sociability, Muse leaves its planet. That is 7.5% at curiosity 0.6 and sociability 0.5. Beyond is where Muse meets strangers. It collects no finds there, and the owner cannot follow. See [Strangers meet only beyond the planet](#strangers-meet-only-beyond-the-planet).
+2. **A new area.** With P = min(1, 0.3 × novelty + 0.1 × days since the last unlock), Muse opens a new area. The second term is the unlock pressure. It grows every day that passes without a new area, so even a homebody opens new ground every few days. For a Muse with novelty 0.2, the chance per trip starts at 6% and reaches 36% after 3 days without an unlock.
+3. **A revisit.** If neither draw fires, Muse picks a known topic and transports to its region.
+
+A new area needs a topic. The topic comes from one of these places:
+
+- a link out of a past find
+- an open question
+- an owner-seeded interest that Muse has not visited yet
+
+The new region opens near the region of the related topic, so in the first days, new areas open near home. With chance ε = 0.1 × curiosity, the pick is a serendipity pick instead, and the new region can open anywhere on the planet.
+
+A revisit picks among known topics. Each topic gets a score:
+
+| Term | Weight |
+| --- | --- |
+| affinity | +0.35 |
+| salience | +0.30 |
+| [an open question on the topic] | +0.15 |
+| w_owner × [a recent mention in `MEMORY.md` or `SOUL.md`] | +0.20 |
+| fatigue | −0.25 |
+
+Then P = softmax(score / 0.15). Scores of 0.55, 0.45, and 0.10 give chances of 64%, 33%, and 3%. The low temperature lets the best topic win most trips, and the runner-up still gets a third of them. w_owner is the fading owner weight described in [The owner's pull fades](#the-owners-pull-fades).
+
+Revisits look only at pages Muse has not collected yet. The planet's seasons and growth also change what Muse sees, which gives it new things to photograph. Old places keep turning up something new.
+
+### Hops follow rabbit holes
+
+A trip on the planet is a chain of hops. Each hop moves Muse to a new spot.
+
+- Each hop looks at 6 to 10 pages. The first hop runs a search on the topic. Later hops follow the links of the last kept find, or Wikipedia's "more like this".
+- The Mind scores each page. Muse keeps at most 2 pages per hop, and only pages that score at least θ = 0.75. The sim reports finds per day so that θ can be tuned.
+- After each hop, Muse continues with P = focus × the best score this hop. A focused Muse on a good trail keeps going. A distracted Muse, or a dull hop, ends the trip.
+- Muse plants each find at the spot where it stood. Every object keeps that place, gifts included.
+- Hop spots never land on water. The placement code checks the terrain with `Terrain.sample` and stores each spot in the event.
+
+### The hero chain: Botanical illustration → Pigment → Ultramarine
+
+A test walks this chain through real pages from the fixtures. The steps show how such a chain plays out. The trait values and scores are illustrative.
+
+1. The owner's `MEMORY.md` mentions botanical illustration. The allow-list extracts the topic `Botanical illustration`, and it becomes one of Muse's first `hypothesis` interests, seeded by the owner.
+2. A trip draws a new area and picks that unvisited owner-seeded topic. Its region opens near home.
+3. Hop 1 searches `Botanical illustration`. The Mind keeps a page that scores above 0.75, and Muse plants it where it stands.
+4. With focus 0.7 and a best score of 0.9, Muse continues with P = 0.63.
+5. Hop 2 follows the kept page's links to `Pigment`. Hop 3 follows a pigment page's links to `Ultramarine`. The owner's status pill reads "Exploring: Pigment → Ultramarine".
+6. The owner never mentioned pigment. If later trips bring independent sources on it, a reflection can make it an interest of Muse's own, with `seededBy: 'muse'`.
+
+This is the arc the design exists for. The owner's interest starts the trail. Muse's own draws and judgments take it to topics the owner never mentioned.
+
+## Growth is slow and needs evidence
+
+Each interest carries two numbers that move at different speeds.
+
+| Field | Speed | How it changes |
+| --- | --- | --- |
+| `salience` | Fast | Decays as exp(−Δt / 3 days). It is the passing pull of a topic. |
+| `affinity` | Slow | Changes only through a committed reflection, by at most 0.2 per reflection. It is a lasting tendency. |
+
+Salience lets Muse chase a fresh topic for a few days without that chase rewriting who Muse is. Affinity moves only when a reflection finds evidence. This split follows a research lead on temporary adaptation versus lasting personality change. See [References](#references).
+
+Each interest also records where it came from, in `seededBy`. The values are `owner-memory`, `soul`, and `muse`.
+
+### An interest climbs stages only with independent sources
+
+| Stage | Gate |
+| --- | --- |
+| `hypothesis` | The starting stage. A single source can support only a hypothesis. |
+| `emerging` | At least 2 independent sources |
+| `established` | At least 4 independent sources across at least 2 days |
+| `fading` | 14 days without pursuit |
+
+Sources are counted by canonical URL. One source counts once, however many times Muse meets it.
+
+### Reflection proposes, and validation decides
+
+Reflection is the only way affinity and stages change.
+
+- **When it runs.** At the start of a rest, if at least 3 days have passed since the last reflection, or there are at least 8 new experiences.
+- **What it reads.** New experiences, grouped by canonical URL. Past reflections never count as evidence.
+- **What the Mind proposes.** A list of `InterestDelta {topic, Δaffinity in [−0.2, 0.2], stage?, evidence, reason}`, plus one narrative line and new questions.
+- **How validation works.** A pure function clamps each Δaffinity, drops each delta without non-reflection evidence, and applies the stage gates. The reducer runs the same validation again, so a reflection whose cited evidence is gone is dropped on replay too.
+- **No change is a valid outcome.** If nothing survives validation, the log records `reflection.no-change`.
+- **What it writes.** A committed reflection renders a new version of the garden-owned section of `SOUL.md`, with a diff, and adds to the day's `journal.md`.
+
+The Mind can propose something wrong. Validation means a wrong proposal cannot change Muse unless the log holds evidence for it.
+
+### The owner's pull fades
+
+The owner shapes Muse through life in the main chat, never through the garden. Nothing the owner does in the garden changes Muse's interests.
+
+- `MEMORY.md` is the starting point. On day one, the owner's interest topics become Muse's first `hypothesis` interests and its first new areas, near home.
+- `SOUL.md` is Muse's own voice, and it carries the temperament.
+- Both pulls fade with w_owner = 0.5 / (1 + 0.1 × gardenSoulVersion). gardenSoulVersion is the version of the garden-owned section of `SOUL.md`, so each committed reflection lowers w_owner.
+
+| Garden `SOUL.md` version | w_owner | Owner term in the topic pick, 0.20 × w_owner |
+| --- | --- | --- |
+| 0 | 0.50 | 0.10 |
+| 5 | 0.33 | 0.07 |
+| 10 | 0.25 | 0.05 |
+| 20 | 0.17 | 0.03 |
+
+The sim measures this arc. Week by week, it reports the share of trips driven by owner-seeded interests. The verification run expects that share to fall as Muse finds interests of its own. That is a target to check, not a result.
