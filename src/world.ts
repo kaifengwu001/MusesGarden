@@ -486,6 +486,8 @@ export class World {
       1,
     );
     this.surface.uniforms.uNearField.value.set(rig.up.x, rig.up.y, rig.up.z, Math.max(flowerNear, 0.001));
+    this.surface.uniforms.uFlowersBuilt.value = this.flowers.layer.builtMap;
+    this.surface.uniforms.uFlowerCells.value = this.flowers.layer.builtCells;
     this.petals.update(grassNear);
     if (this.growingBloom >= 0) {
       const disc = this.userBlooms[this.growingBloom];

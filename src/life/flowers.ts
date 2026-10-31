@@ -184,6 +184,7 @@ export class Flowers {
       headroom: 1.25,
       stride: STRIDE,
       channels: SPECIES_MESH.length,
+      mapBuilt: true,
     });
     SPECIES_MESH.forEach((make, species) => {
       const geometry = make();

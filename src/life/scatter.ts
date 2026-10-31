@@ -1,4 +1,4 @@
-import { DataTexture, FloatType, NearestFilter, RGBAFormat, Sphere, Vector3, type Frustum } from 'three';
+import { DataTexture, FloatType, NearestFilter, RedFormat, RGBAFormat, Sphere, UnsignedByteType, Vector3, type Frustum } from 'three';
 import type { BuildQueue } from '../core/buildQueue';
 import { gpuMemory } from '../core/gpuMemory';
 import { clamp } from '../core/math';
@@ -56,6 +56,8 @@ export interface ScatterSpec {
   readonly stride?: number;
   /** Separate pools, each drawn by its own mesh. */
   readonly channels?: number;
+  /** Keep a map of which tiles hold their instances (builtMap), for the ground's paint to wait on. */
+  readonly mapBuilt?: boolean;
 }
 
 /** Sorts a tile's points into channels, thins them by local density and writes their extras. */
@@ -170,6 +172,15 @@ export class ScatterLayer {
   readonly instanceCounts: number[];
   /** Instances held in visible pages, all channels (perf stat). */
   visibleInstances = 0;
+  /**
+   * With `mapBuilt`: a texel per tile at the current level (a face's
+   * builtCells × builtCells, the six faces stacked in v, face-major), 255
+   * where the tile's instances are in the pool and drawn (or would be, in
+   * view). Sent only when it changes.
+   */
+  builtMap: DataTexture | null = null;
+  builtCells = 0;
+  private builtPrev = new Uint8Array(0);
   /** Builds that had to truncate because a pool was full (perf stat; no logging in the frame). */
   saturated = 0;
   private readonly pools: Pool[] = [];
@@ -281,6 +292,8 @@ export class ScatterLayer {
       for (const n of this.tiles.values()) if (n.wanted && overlaps(t, n)) hidden.add(n);
     }
 
+    if (this.spec.mapBuilt) this.mapBuilt(level, hidden);
+
     // 3. The pages drawn: those of whole tiles in the (warped) frustum, in the near field (or kept over
     //    it while re-tiling), in pool order (as the pool was drawn before, so the blades are drawn in
     //    the same order).
@@ -300,6 +313,36 @@ export class ScatterLayer {
       this.instanceCounts[c] = d.length * this.spec.pageSize;
     }
     this.visibleInstances = visible;
+  }
+
+  /** Mark the tiles whose instances are ready (built, and not hidden under an old tile while re-tiling) at the current level. */
+  private mapBuilt(level: number, hidden: Set<Tile>): void {
+    const n = 1 << level;
+    if (this.builtCells !== n || !this.builtMap) {
+      this.builtMap?.dispose();
+      this.builtMap = new DataTexture(new Uint8Array(n * n * 6), n, n * 6, RedFormat, UnsignedByteType);
+      this.builtMap.minFilter = NearestFilter;
+      this.builtMap.magFilter = NearestFilter;
+      this.builtMap.needsUpdate = true;
+      this.builtCells = n;
+      this.builtPrev = new Uint8Array(n * n * 6);
+    }
+    const data = this.builtMap.image.data as Uint8Array;
+    data.fill(0);
+    for (const t of this.tiles.values()) {
+      if (!(t.sigma > 0 || t.count > 0) || hidden.has(t)) continue;
+      const shift = level - t.level;
+      if (shift >= 0) {
+        // a tile at the level or coarser (kept while re-tiling) covers s × s cells
+        const s = 1 << shift;
+        for (let b = 0; b < s; b++) data.fill(255, (t.face * n + t.j * s + b) * n + t.i * s, (t.face * n + t.j * s + b) * n + t.i * s + s);
+      } else data[(t.face * n + (t.j >> -shift)) * n + (t.i >> -shift)] = 255;
+    }
+    let same = true;
+    for (let k = 0; k < data.length && same; k++) same = data[k] === this.builtPrev[k];
+    if (same) return;
+    this.builtPrev.set(data);
+    this.builtMap.needsUpdate = true;
   }
 
   /**

@@ -15,6 +15,8 @@ uniform float uRadius;
 attribute vec4 aNode; // u0, v0, size (uv), face
 attribute vec4 aLod;  // morph start, morph end (m), level, -
 uniform float uGridSteps;
+uniform sampler2D uFlowersBuilt; // a texel per flower tile, 1 once its flowers are built (scatter.ts builtMap)
+uniform float uFlowerCells;      // flower tiles along a face's edge (0: none yet)
 
 varying vec3 vDir;
 varying vec3 vWarped;
@@ -24,6 +26,7 @@ varying float vSlope;       // |∇h|: turns height into distance to the shore p
 varying float vBloom;
 varying vec2 vGrid;
 varying float vMorph;
+varying float vFlowersBuilt; // 1 where the near field's flowers are built (the paint waits for them)
 flat varying vec2 vNodeInfo; // face, level
 
 // The mesh's ground at d (banked for its distance, water flat at the table).
@@ -85,6 +88,13 @@ void main() {
   vBloom = bloomAt(dir);
   vGrid = position.xy;
   vMorph = k;
+  float cells = uFlowerCells;
+  if (cells > 0.5) {
+    ivec2 cell = ivec2(clamp(floor(uv * cells), 0.0, cells - 1.0));
+    vFlowersBuilt = texelFetch(uFlowersBuilt, ivec2(cell.x, cell.y + face * int(cells)), 0).r;
+  } else {
+    vFlowersBuilt = 0.0;
+  }
   vNodeInfo = vec2(aNode.w, aLod.z);
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }

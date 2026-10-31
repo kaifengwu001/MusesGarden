@@ -10,6 +10,7 @@ import {
   ShaderMaterial,
   Vector4,
   type IUniform,
+  type Texture,
 } from 'three';
 import { ChunkSelection, NODE_FLOATS, type LodConfig, type LodView } from './chunks';
 import fragmentShader from './surface.frag.glsl?raw';
@@ -87,10 +88,16 @@ export class Surface {
   private readonly near: SurfacePart;
   private readonly away: SurfacePart;
   private grid = 0;
-  readonly uniforms: { uGridSteps: IUniform<number>; uNearField: IUniform<Vector4> };
+  readonly uniforms: { uGridSteps: IUniform<number>; uNearField: IUniform<Vector4>; uFlowersBuilt: IUniform<Texture | null>; uFlowerCells: IUniform<number> };
 
   constructor(shared: Record<string, IUniform>, grid: number) {
-    this.uniforms = { uGridSteps: { value: grid - 1 }, uNearField: { value: new Vector4(0, 1, 0, 0.001) } };
+    this.uniforms = {
+      uGridSteps: { value: grid - 1 },
+      uNearField: { value: new Vector4(0, 1, 0, 0.001) },
+      // which flower tiles are built (Flowers' builtMap): the paint's flowers give way to them only once they are
+      uFlowersBuilt: { value: null },
+      uFlowerCells: { value: 0 },
+    };
     const uniforms = { ...shared, ...this.uniforms };
     const material = (away: boolean): ShaderMaterial =>
       new ShaderMaterial({ name: away ? 'surface (away from home)' : 'surface', vertexShader, fragmentShader, uniforms, defines: away ? { AWAY_FROM_HOME: 1 } : {} });
