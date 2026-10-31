@@ -1,15 +1,4 @@
-import {
-  DataTexture,
-  DynamicDrawUsage,
-  InstancedInterleavedBuffer,
-  InterleavedBufferAttribute,
-  NearestFilter,
-  RedFormat,
-  Sphere,
-  UnsignedByteType,
-  Vector3,
-  type Frustum,
-} from 'three';
+import { DataTexture, FloatType, NearestFilter, RGBAFormat, Sphere, Vector3, type Frustum } from 'three';
 import type { BuildQueue } from '../core/buildQueue';
 import { gpuMemory } from '../core/gpuMemory';
 import { clamp } from '../core/math';
@@ -22,9 +11,13 @@ import { warpPoint, type WarpFrame } from '../render/warp';
 // rest-space point set. The area within `radius` is covered by quadtree tiles
 // of about `tileMeters`; each tile's points are enumerated by a time-sliced
 // job and copied into pages of a fixed instance pool, drawn in a single call.
-// A tiny page-visibility texture lets the vertex shader skip whole tiles
-// outside the frustum. Tiles in view are built before those out of it,
-// nearest first.
+// The pool is a float texture, a page a row, and the draw covers only the
+// pages of tiles in view: a short list of them (in pool order) tells each
+// instance which page and slot to read (through iteration 13 the pool was a
+// vertex buffer drawn up to its highest page, the pages out of view culled
+// one instance at a time: 911k instances drawn for 320k blades in view on
+// High, 1.3–1.7 ms a frame). Tiles in view are built before those out of
+// it, nearest first.
 //
 // Density falls off with distance (blades and flowers thin out toward the
 // edge of the near field). Thinning keeps points in rank order, so a far
@@ -41,8 +34,6 @@ import { warpPoint, type WarpFrame } from '../render/warp';
 
 /** Floats per instance without extras: direction xyz, ln(birth threshold), seed in [0, 1). */
 export const SCATTER_STRIDE = 5;
-/** Pages a row of the page-visibility texture holds (the vertex shaders index it page % 256, page / 256); it has as many rows as the pool needs. */
-const PAGE_ROWS = 256;
 /** ln threshold that is never reached: unused slots. */
 export const NEVER = 1e30;
 /** Build order: tiles out of view wait behind those in view as if this much farther away (m). */
@@ -59,7 +50,7 @@ export interface ScatterSpec {
   readonly pages: number;
   /** Build headroom on σ (≥ 1): fewer rebuilds while growing, more memory. */
   readonly headroom: number;
-  /** Floats per instance (≥ SCATTER_STRIDE); extras follow the seed. */
+  /** Floats per instance (SCATTER_STRIDE to 8); extras (up to three) follow the seed. */
   readonly stride?: number;
   /** Separate pools, each drawn by its own mesh. */
   readonly channels?: number;
@@ -120,12 +111,30 @@ interface Tile {
   inView: boolean;
 }
 
+/**
+ * One channel's instances, in two RGBA float textures a page a row: `main`
+ * holds each instance's direction and ln birth threshold; `rest` its seed
+ * (four to a texel) or, with extras, its seed and up to three extras (a
+ * texel each). `list` holds the pages to draw, four to a texel.
+ */
 interface Pool {
-  readonly data: Float32Array;
-  readonly buffer: InstancedInterleavedBuffer;
-  readonly visible: Uint8Array;
-  readonly texture: DataTexture;
+  readonly main: Float32Array;
+  readonly mainTexture: DataTexture;
+  readonly rest: Float32Array;
+  readonly restTexture: DataTexture;
+  readonly list: Float32Array;
+  readonly listTexture: DataTexture;
   readonly free: number[];
+}
+
+/** An RGBA float texture over `data`, read with texelFetch; its first upload sends one row (the rest is allocated, and written as pages fill). */
+function poolTexture(data: Float32Array, width: number, height: number): DataTexture {
+  const texture = new DataTexture(data, width, height, RGBAFormat, FloatType);
+  texture.minFilter = NearestFilter;
+  texture.magFilter = NearestFilter;
+  texture.addUpdateRange(0, width * 4);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 const corner = new Vector3();
@@ -142,13 +151,11 @@ function overlaps(a: Tile, b: Tile): boolean {
 export class ScatterLayer {
   readonly stride: number;
   readonly channels: number;
-  /** Per channel: the attributes to bind and the page-visibility texture. */
-  readonly aDir: InterleavedBufferAttribute[] = [];
-  readonly aBirth: InterleavedBufferAttribute[] = [];
-  /** Extra floats (stride > 5): up to four, as one attribute. */
-  readonly aExtra: InterleavedBufferAttribute[] = [];
-  readonly pageTextures: DataTexture[] = [];
-  /** Instances to draw per channel (all allocated pages). */
+  /** Per channel, for the vertex shaders: the pool's textures and the list of pages drawn (see Pool). */
+  readonly mainTextures: DataTexture[] = [];
+  readonly restTextures: DataTexture[] = [];
+  readonly listTextures: DataTexture[] = [];
+  /** Instances to draw per channel (the pages in the list). */
   readonly instanceCounts: number[];
   /** Instances held in visible pages, all channels (perf stat). */
   visibleInstances = 0;
@@ -158,35 +165,41 @@ export class ScatterLayer {
   private readonly tiles = new Map<string, Tile>();
   /** Staging buffers returned by finished builds, reused to avoid GC pauses. */
   private readonly spare: Float32Array[] = [];
-  private readonly maxPage: number[];
+  /** The pages drawn this frame, per channel (reused). */
+  private readonly drawn: number[][];
   private seed = -1;
 
   constructor(readonly spec: ScatterSpec) {
     this.stride = spec.stride ?? SCATTER_STRIDE;
     this.channels = spec.channels ?? 1;
     this.instanceCounts = new Array<number>(this.channels).fill(0);
-    this.maxPage = new Array<number>(this.channels).fill(-1);
+    this.drawn = Array.from({ length: this.channels }, () => []);
+    const size = spec.pageSize; // a multiple of 4
+    const packed = this.stride === SCATTER_STRIDE;
     for (let c = 0; c < this.channels; c++) {
-      const data = new Float32Array(spec.pages * spec.pageSize * this.stride);
-      for (let k = 0; k < data.length; k += this.stride) data[k + 3] = NEVER;
+      const main = new Float32Array(spec.pages * size * 4);
+      for (let k = 3; k < main.length; k += 4) main[k] = NEVER;
+      const rest = new Float32Array(spec.pages * size * (packed ? 1 : 4));
+      const listWidth = Math.ceil(spec.pages / 4);
+      const list = new Float32Array(listWidth * 4);
       const free: number[] = [];
       for (let k = spec.pages - 1; k >= 0; k--) free.push(k);
-      const buffer = new InstancedInterleavedBuffer(data, this.stride, 1);
-      buffer.setUsage(DynamicDrawUsage);
-      // (sized to the pool, so each frame uploads its few rows, not a 256² texture)
-      const rows = Math.ceil(spec.pages / PAGE_ROWS);
-      const visible = new Uint8Array(PAGE_ROWS * rows);
-      const texture = new DataTexture(visible, PAGE_ROWS, rows, RedFormat, UnsignedByteType);
-      texture.minFilter = NearestFilter;
-      texture.magFilter = NearestFilter;
-      this.pools.push({ data, buffer, visible, texture, free });
-      this.aDir.push(new InterleavedBufferAttribute(buffer, 3, 0));
-      this.aBirth.push(new InterleavedBufferAttribute(buffer, 2, 3));
-      if (this.stride > SCATTER_STRIDE) this.aExtra.push(new InterleavedBufferAttribute(buffer, Math.min(this.stride - SCATTER_STRIDE, 4), SCATTER_STRIDE));
-      this.pageTextures.push(texture);
+      const pool: Pool = {
+        main,
+        mainTexture: poolTexture(main, size, spec.pages),
+        rest,
+        restTexture: poolTexture(rest, packed ? size / 4 : size, spec.pages),
+        list,
+        listTexture: poolTexture(list, listWidth, 1),
+        free,
+      };
+      this.pools.push(pool);
+      this.mainTextures.push(pool.mainTexture);
+      this.restTextures.push(pool.restTexture);
+      this.listTextures.push(pool.listTexture);
     }
     let bytes = 0;
-    for (const p of this.pools) bytes += p.data.byteLength + p.visible.byteLength;
+    for (const p of this.pools) bytes += p.main.byteLength + p.rest.byteLength + p.list.byteLength;
     gpuMemory.set(`${spec.name} instances`, bytes);
   }
 
@@ -274,24 +287,22 @@ export class ScatterLayer {
       for (const n of this.tiles.values()) if (n.wanted && overlaps(t, n)) hidden.add(n);
     }
 
-    // 3. Page visibility: whole tiles against the (warped) frustum.
-    for (const p of this.pools) p.visible.fill(0);
-    const maxPage = this.maxPage.fill(-1);
+    // 3. The pages drawn: those of whole tiles in the (warped) frustum, in pool order (as the pool was
+    //    drawn before, so the blades are drawn in the same order).
+    const drawn = this.drawn;
+    for (const d of drawn) d.length = 0;
     let visible = 0;
     for (const t of this.tiles.values()) {
-      if (t.count === 0) continue;
-      const show = this.inFrustum(t, view) && !hidden.has(t);
-      for (let c = 0; c < this.channels; c++) {
-        for (const p of t.pages[c]) {
-          this.pools[c].visible[p] = show ? 255 : 0;
-          maxPage[c] = Math.max(maxPage[c], p);
-        }
-      }
-      if (show) visible += t.count;
+      if (t.count === 0 || hidden.has(t) || !this.inFrustum(t, view)) continue;
+      for (let c = 0; c < this.channels; c++) for (const p of t.pages[c]) drawn[c].push(p);
+      visible += t.count;
     }
     for (let c = 0; c < this.channels; c++) {
-      this.pools[c].texture.needsUpdate = true;
-      this.instanceCounts[c] = (maxPage[c] + 1) * this.spec.pageSize;
+      const pool = this.pools[c];
+      const d = drawn[c].sort((a, b) => a - b);
+      for (let k = 0; k < d.length; k++) pool.list[k] = d[k];
+      pool.listTexture.needsUpdate = true;
+      this.instanceCounts[c] = d.length * this.spec.pageSize;
     }
     this.visibleInstances = visible;
   }
@@ -383,26 +394,18 @@ export class ScatterLayer {
       const count = used[c] / stride;
       // release the old pages first, then take enough for the new data
       for (const p of tile.pages[c]) pool.free.push(p);
-      pool.free.sort((a, b) => b - a); // pop() returns the lowest index: the draw range stays tight
+      pool.free.sort((a, b) => b - a); // pop() returns the lowest index: the pages in use stay together
       tile.pages[c] = [];
       let needed = Math.ceil(count / size);
       if (needed > pool.free.length) {
         needed = pool.free.length;
         truncated = true;
       }
-      // Only add ranges: several tiles can commit in one frame, and three.js
-      // clears the ranges itself once they are uploaded.
       for (let k = 0; k < needed; k++) {
         const page = pool.free.pop()!;
         tile.pages[c].push(page);
-        const from = k * size * stride;
-        const to = Math.min(used[c], from + size * stride);
-        const base = page * size * stride;
-        pool.data.set(data[c].subarray(from, to), base);
-        for (let x = base + (to - from); x < base + size * stride; x += stride) pool.data[x + 3] = NEVER;
-        pool.buffer.addUpdateRange(base, size * stride);
+        this.writePage(pool, page, data[c], k * size, Math.min(count - k * size, size));
       }
-      if (needed > 0) pool.buffer.needsUpdate = true;
       total += Math.min(count, needed * size);
     }
     if (truncated) this.saturated++;
@@ -413,6 +416,41 @@ export class ScatterLayer {
     tile.version = truncated ? '' : version;
     tile.building = 0;
     tile.buildingVersion = '';
+  }
+
+  /**
+   * Copy `n` instances from `stride`-float records, starting at instance
+   * `first`, into a page (a row of each texture); the page's other slots are
+   * never born. Only ranges are added: several tiles can commit in one frame,
+   * and three.js clears the ranges itself once they are uploaded.
+   */
+  private writePage(pool: Pool, page: number, records: Float32Array, first: number, n: number): void {
+    const size = this.spec.pageSize;
+    const stride = this.stride;
+    const packed = stride === SCATTER_STRIDE;
+    const { main, rest } = pool;
+    let m = page * size * 4;
+    let r = page * size * (packed ? 1 : 4);
+    let o = first * stride;
+    for (let i = 0; i < size; i++, m += 4, o += stride) {
+      if (i >= n) {
+        main[m + 3] = NEVER;
+        continue;
+      }
+      main[m] = records[o];
+      main[m + 1] = records[o + 1];
+      main[m + 2] = records[o + 2];
+      main[m + 3] = records[o + 3];
+      if (packed) rest[r++] = records[o + 4];
+      else {
+        for (let e = 0; e < 4; e++) rest[r + e] = 4 + e < stride ? records[o + 4 + e] : 0;
+        r += 4;
+      }
+    }
+    pool.mainTexture.addUpdateRange(page * size * 4, size * 4);
+    pool.restTexture.addUpdateRange(page * size * (packed ? 1 : 4), size * (packed ? 1 : 4));
+    pool.mainTexture.needsUpdate = true;
+    pool.restTexture.needsUpdate = true;
   }
 
   private release(tile: Tile, queue: BuildQueue): void {

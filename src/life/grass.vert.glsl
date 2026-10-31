@@ -11,9 +11,9 @@ uniform float uRadius;
 #include <meadow_field>
 #include <meadow_wind>
 
-attribute vec3 aDir;
-attribute vec2 aBirth; // ln birth threshold, seed in [0, 1)
-uniform sampler2D uPages;
+uniform sampler2D uPool;     // per blade, a page a row: direction xyz, ln birth threshold
+uniform sampler2D uPoolRest; // per blade: its seed in [0, 1), four to a texel
+uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four to a texel (scatter.ts)
 uniform float uPageSize;
 uniform vec4 uGrass;     // height (m), width (m), near radius (m), ln density (per m²)
 uniform vec4 uGrassFade; // full-density radius (m), kept fraction at the edge
@@ -26,32 +26,38 @@ float rnd(float s, float k) {
 }
 
 void main() {
-  int page = gl_InstanceID / int(uPageSize);
-  if (texelFetch(uPages, ivec2(page % 256, page / 256), 0).r < 0.5) {
-    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
-    return;
-  }
-  vec3 dir = aDir;
+  int perPage = int(uPageSize);
+  int drawn = gl_InstanceID / perPage;
+  int slot = gl_InstanceID - drawn * perPage;
+  int page = int(texelFetch(uPageList, ivec2(drawn >> 2, 0), 0)[drawn & 3]);
+  vec4 blade = texelFetch(uPool, ivec2(slot, page), 0);
+  vec3 dir = blade.xyz;
+  float seed = texelFetch(uPoolRest, ivec2(slot >> 2, page), 0)[slot & 3];
   float d = chordAngle(dir, uFieldCentre.xyz) * uRadius;
   // Thinning by rank toward the edge: a point stays only while it would be
   // born at the thinned density, so the far field is a blue-noise subset.
   float keep = mix(1.0, uGrassFade.y, smoothstep(uGrassFade.x, uGrass.z, d));
-  float grow = presence(0.5 * (aBirth.x - uGrass.w - log(keep)));
+  float grow = presence(0.5 * (blade.w - uGrass.w - log(keep)));
+  // at the near field's edge the blades thin out (each at a random distance of its own), at full size
+  float edge = 1.0 - smoothstep(uGrass.z * 0.78, uGrass.z, d);
+  float born = grow * step(rnd(seed, 9.0), edge);
+  // (blades thinned out, and a page's empty slots, leave before reading the field maps)
+  if (born <= 0.002) {
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
   vec4 meadow;
   vec4 wind;
   float inside;
   vec4 f = fieldSample(dir, meadow, wind, inside);
   // right to the water's edge: the blades along a shore fringe the bank
   float mask = smoothstep(-0.03, 0.15, f.y) * (1.0 - smoothstep(0.25, 0.65, f.z)) * inside;
-  // at the near field's edge the blades thin out (each at a random distance of its own), at full size
-  float edge = 1.0 - smoothstep(uGrass.z * 0.78, uGrass.z, d);
-  float vis = grow * mask * step(rnd(aBirth.y, 9.0), edge);
+  float vis = born * mask;
   if (vis <= 0.002) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
 
-  float seed = aBirth.y;
   float bloom = f.w;
   float lush = meadow.x;
   float h = uGrass.x * (0.55 + 0.9 * rnd(seed, 1.0)) * mix(0.55, 1.15, bloom) * (0.85 + 0.3 * lush) * (0.25 + 0.75 * vis);

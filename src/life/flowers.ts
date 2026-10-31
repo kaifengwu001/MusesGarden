@@ -187,13 +187,12 @@ export class Flowers {
     });
     SPECIES_MESH.forEach((make, species) => {
       const geometry = make();
-      geometry.setAttribute('aDir', this.layer.aDir[species]);
-      geometry.setAttribute('aBirth', this.layer.aBirth[species]);
-      geometry.setAttribute('aLook', this.layer.aExtra[species]);
       geometry.instanceCount = 0;
       const own = {
         uPageSize: { value: 256 },
-        uPages: { value: this.layer.pageTextures[species] },
+        uPool: { value: this.layer.mainTextures[species] },
+        uPoolRest: { value: this.layer.restTextures[species] },
+        uPageList: { value: this.layer.listTextures[species] },
         uFlowers: { value: new Vector4(30, 0, species, 1) },
         uFlowerFade: { value: new Vector4(12, FLOWER_FADE.keepAtEdge, HEADS[species][0], HEADS[species][1]) },
       };

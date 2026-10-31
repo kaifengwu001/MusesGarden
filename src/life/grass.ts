@@ -45,7 +45,7 @@ export interface GrassFade {
 export class Grass {
   readonly mesh: Mesh;
   readonly layer: ScatterLayer;
-  readonly uniforms: { uPageSize: IUniform<number>; uPages: IUniform; uGrass: IUniform<Vector4>; uGrassFade: IUniform<Vector4>; uGrassPal: IUniform<Color[]> };
+  readonly uniforms: { uPageSize: IUniform<number>; uPool: IUniform; uPoolRest: IUniform; uPageList: IUniform; uGrass: IUniform<Vector4>; uGrassFade: IUniform<Vector4>; uGrassPal: IUniform<Color[]> };
   private readonly geometry: InstancedBufferGeometry;
 
   constructor(shared: Record<string, IUniform>, pages: number) {
@@ -58,12 +58,12 @@ export class Grass {
       headroom: 1.25,
     });
     this.geometry = bladeGeometry();
-    this.geometry.setAttribute('aDir', this.layer.aDir[0]);
-    this.geometry.setAttribute('aBirth', this.layer.aBirth[0]);
     this.geometry.instanceCount = 0;
     this.uniforms = {
       uPageSize: { value: 2048 },
-      uPages: { value: this.layer.pageTextures[0] },
+      uPool: { value: this.layer.mainTextures[0] },
+      uPoolRest: { value: this.layer.restTextures[0] },
+      uPageList: { value: this.layer.listTextures[0] },
       uGrass: { value: new Vector4(0.42, 0.05, 24, 0) },
       uGrassFade: { value: new Vector4(8, 0.16, 0, 0) },
       uGrassPal: { value: Array.from({ length: GRASS_COLOURS.length }, () => new Color()) },

@@ -13,12 +13,11 @@ uniform float uRadius;
 #include <meadow_field>
 #include <meadow_wind>
 
-attribute vec3 aDir;
-attribute vec2 aBirth; // ln birth threshold (at the local density), seed in [0, 1)
-attribute vec2 aLook;  // size factor, colour variant
 attribute float aPart; // 0 stem, 1 petal, 2 centre
 attribute float aT;    // along the stem 0..1; 1 on the head
-uniform sampler2D uPages;
+uniform sampler2D uPool;     // per flower, a page a row: direction xyz, ln birth threshold (at the local density)
+uniform sampler2D uPoolRest; // per flower: seed in [0, 1), size factor, colour variant
+uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four to a texel (scatter.ts)
 uniform float uPageSize;
 uniform vec4 uFlowers;    // near radius (m), ln mean density (per m²), species id, size scale
 uniform vec4 uFlowerFade; // full-density radius (m), kept fraction at the edge, stem top (m), nod
@@ -35,25 +34,33 @@ vec3 rotateAxis(vec3 v, vec3 axis, float angle) {
 }
 
 void main() {
-  int page = gl_InstanceID / int(uPageSize);
-  if (texelFetch(uPages, ivec2(page % 256, page / 256), 0).r < 0.5) {
-    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
-    return;
-  }
-  vec3 dir = aDir;
-  float seed = aBirth.y;
+  int perPage = int(uPageSize);
+  int drawn = gl_InstanceID / perPage;
+  int slot = gl_InstanceID - drawn * perPage;
+  int page = int(texelFetch(uPageList, ivec2(drawn >> 2, 0), 0)[drawn & 3]);
+  vec4 flower = texelFetch(uPool, ivec2(slot, page), 0);
+  vec4 rest = texelFetch(uPoolRest, ivec2(slot, page), 0);
+  vec3 dir = flower.xyz;
+  float seed = rest.x;
+  vec2 look = rest.yz; // size factor, colour variant
   int species = int(uFlowers.z + 0.5);
   float d = chordAngle(dir, uFieldCentre.xyz) * uRadius;
   float keep = mix(1.0, uFlowerFade.y, smoothstep(uFlowerFade.x, uFlowers.x, d));
-  float grow = presence(0.5 * (aBirth.x - uFlowers.y - log(keep)));
+  float grow = presence(0.5 * (flower.w - uFlowers.y - log(keep)));
+  // at the near field's edge the flowers thin out (each at a random distance of its own), at full size
+  float edge = 1.0 - smoothstep(uFlowers.x * 0.8, uFlowers.x, d);
+  float born = grow * step(rnd(seed, 9.0), edge);
+  // (flowers thinned out, and a page's empty slots, leave before reading the field maps)
+  if (born <= 0.002) {
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
   vec4 meadow;
   vec4 wind;
   float inside;
   vec4 f = fieldSample(dir, meadow, wind, inside);
   float mask = smoothstep(0.1, 0.45, f.y) * (1.0 - smoothstep(0.2, 0.6, f.z)) * inside;
-  // at the near field's edge the flowers thin out (each at a random distance of its own), at full size
-  float edge = 1.0 - smoothstep(uFlowers.x * 0.8, uFlowers.x, d);
-  float vis = grow * mask * step(rnd(seed, 9.0), edge);
+  float vis = born * mask;
   if (vis <= 0.002) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
@@ -61,7 +68,7 @@ void main() {
 
   // Bloom: buds ahead of the front, opening behind it with a per-flower delay.
   float open = clamp((f.w - 0.35 * rnd(seed, 2.0)) * 2.4, 0.0, 1.0);
-  float scale = uFlowers.w * aLook.x * (0.85 + 0.3 * rnd(seed, 3.0)) * (0.3 + 0.7 * vis);
+  float scale = uFlowers.w * look.x * (0.85 + 0.3 * rnd(seed, 3.0)) * (0.3 + 0.7 * vis);
   float stemScale = scale * mix(0.6, 1.0, open);
 
   // local frame: up = surface normal, random yaw
@@ -98,7 +105,7 @@ void main() {
   // colour by species, colony variant and part; cloud and cottage shadows
   float shadow = max(meadow.z, 0.85 * cottageShadow(dir));
   float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.9 * shadow);
-  float v = aLook.y;
+  float v = look.y;
   vec3 col;
   if (aPart < 0.5) {
     col = tone3(pal(ROW_PINK, 4), mix(pal(ROW_PINK, 4), pal(ROW_PINK, 5), 0.5), pal(ROW_PINK, 5), b * 0.85);
