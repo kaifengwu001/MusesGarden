@@ -24,6 +24,7 @@ import type {
   PhotoView,
   PlantCard,
   PlantPin,
+  PlantPreview,
   RegionKey,
   RegionView,
   SharingView,
@@ -70,8 +71,23 @@ export function card(d: Discovery): PlantCard {
   };
 }
 
-function pin(d: Discovery): PlantPin {
-  return { id: d.id, dir: d.place.dir, title: d.title, topic: d.topics[0] ?? (d.title as TopicKey) };
+function preview(d: Discovery): PlantPreview {
+  return { title: d.title, ...(d.thumb ? { thumb: d.thumb } : {}), reason: d.reason };
+}
+
+function pin(d: Discovery, sent: ReadonlySet<DiscoveryId>): PlantPin {
+  return {
+    id: d.id,
+    dir: d.place.dir,
+    topic: d.topics[0] ?? (d.title as TopicKey),
+    foundAt: d.at,
+    sent: sent.has(d.id),
+    preview: preview(d),
+  };
+}
+
+function sentIds(s: MuseState): ReadonlySet<DiscoveryId> {
+  return new Set(s.baskets.flatMap((b) => b.items));
 }
 
 function page<T extends { readonly id: string }>(newestFirst: readonly T[], before: string | null, limit: number): Page<T, T['id']> {
@@ -151,7 +167,8 @@ export class Views implements GardenQueries {
   world(museId: MuseId): WorldView | null {
     const s = this.s(museId);
     if (!s) return null;
-    return { museId, worldSeed: s.seed.worldSeed, g: this.helpers.growth(s), regions: this.regionViews(s), plants: [...s.discoveries.values()].map(pin) };
+    const sent = sentIds(s);
+    return { museId, worldSeed: s.seed.worldSeed, g: this.helpers.growth(s), regions: this.regionViews(s), plants: [...s.discoveries.values()].map((d) => pin(d, sent)) };
   }
 
   private regionViews(s: MuseState): RegionView[] {
@@ -226,7 +243,9 @@ export class Views implements GardenQueries {
       worldSeed: host.seed.worldSeed,
       g: this.helpers.growth(host),
       regions: this.regionViews(host),
-      plants: [...host.discoveries.values()].map((d) => ({ ...pin(d), card: shared.has(d.id) ? card(d) : null })),
+      plants: [...host.discoveries.values()].map((d) =>
+        shared.has(d.id) ? { id: d.id, dir: d.place.dir, preview: preview(d), card: card(d) } : { id: d.id, dir: d.place.dir, preview: null, card: null },
+      ),
       until: inv.window.end,
     };
   }
