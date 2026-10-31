@@ -290,10 +290,11 @@ async function boot(): Promise<void> {
   const budget = new BuildBudget(quality.device.mobile);
   const afterFrame = new MessageChannel();
   let frameStart = 0;
+  let frameJsMs = 0;
   afterFrame.port1.onmessage = () => {
     const backlog = world.queue.countBelow(AHEAD) > BACKLOG;
-    budget.begin(clock.frameMs, backlog);
-    world.queue.run(budget.next(backlog, frameStart + budget.frameMs - performance.now()));
+    budget.begin(clock.frameMs, backlog, frameJsMs + world.queue.lastMs);
+    world.queue.run(budget.next(backlog, performance.now() - frameStart));
   };
   const frame = (now: number): void => {
     clock.tick(now);
@@ -310,6 +311,7 @@ async function boot(): Promise<void> {
     gpuTimer.end();
     gpuTimer.poll();
     const jsMs = performance.now() - t0;
+    frameJsMs = jsMs;
     if (Number.isNaN(stats.firstFrameMs)) stats.firstFrameMs = performance.now();
     collectStats(jsMs);
     const entry = frameLog[logHead];

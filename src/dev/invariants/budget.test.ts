@@ -22,12 +22,15 @@ function* steps(n: number, clock: { advance: (ms: number) => void }, ms: number,
   }
 }
 
-/** Frames of this length, each leaving `leftMs` before the next is due, as the frame loop feeds them; the last budget. */
-function feed(b: BuildBudget, frames: number, frameMs: number, backlog: boolean, leftMs = 13): number {
+/**
+ * Frames of this length, the build running `sinceMs` after each began, the main thread busy for
+ * `busyMs` of each (its JS and the build), as the frame loop feeds them; the last budget.
+ */
+function feed(b: BuildBudget, frames: number, frameMs: number, backlog: boolean, sinceMs = 3.7, busyMs = 6): number {
   let budget = 0;
   for (let i = 0; i < frames; i++) {
-    b.begin(frameMs, backlog);
-    budget = b.next(backlog, leftMs);
+    b.begin(frameMs, backlog, busyMs);
+    budget = b.next(backlog, sinceMs);
   }
   return budget;
 }
@@ -83,17 +86,17 @@ describe('build queue', () => {
 describe('build budget', () => {
   it('gives the queue up to 2 ms of what the frame leaves when nothing waits, and at least 0.5', () => {
     const b = new BuildBudget(false);
-    expect(feed(b, 40, 16.7, false, 13)).toBeCloseTo(2, 5);
-    expect(feed(b, 40, 16.7, false, 4.3)).toBeCloseTo(0.5, 5);
+    expect(feed(b, 40, 16.7, false, 3.7)).toBeCloseTo(2, 5);
+    expect(feed(b, 40, 16.7, false, 12.4)).toBeCloseTo(0.5, 5);
   });
 
   it('judges each frame on its own: one slow frame does not hold the builds back', () => {
     const b = new BuildBudget(false);
     feed(b, 40, 16.7, false);
     // a shader's first use on the way down from orbit: a frame that leaves nothing
-    expect(feed(b, 1, 16.7, true, -60)).toBeCloseTo(0.5, 5);
+    expect(feed(b, 1, 16.7, true, 76.7)).toBeCloseTo(0.5, 5);
     // through iteration 13 the slowest recent update counted, forgotten 5 % a frame: 0.5 ms for about a second
-    expect(feed(b, 1, 16.7, true, 13)).toBeGreaterThanOrEqual(3.6);
+    expect(feed(b, 1, 16.7, true, 3.7)).toBeGreaterThanOrEqual(3.6);
   });
 
   it('grows its slice while frames keep time, to 8 ms on a desktop and 6 ms on a phone', () => {
@@ -109,9 +112,9 @@ describe('build budget', () => {
     const b = new BuildBudget(false);
     feed(b, 40, 16.7, false);
     feed(b, 30, 16.7, true);
-    b.begin(34, true); // a missed refresh
+    b.begin(34, true, 30); // a missed refresh, the main thread busy all along
     expect(b.slice).toBeCloseTo(4, 5);
-    b.begin(34, true);
+    b.begin(34, true, 30);
     expect(b.slice).toBeCloseTo(3.6, 5);
     feed(b, 1, 16.7, false);
     expect(b.slice).toBeCloseTo(3.6, 5);
@@ -120,7 +123,14 @@ describe('build budget', () => {
   it('never takes more than the frame leaves for it, less a margin for the browser', () => {
     const b = new BuildBudget(false);
     feed(b, 40, 16.7, false);
-    expect(feed(b, 30, 16.7, true, 9)).toBeCloseTo(9 - 4, 5);
+    expect(feed(b, 30, 16.7, true, 7.7)).toBeCloseTo(16.7 - 7.7 - 4, 5);
+  });
+
+  it('keeps growing while the GPU holds frames up and the main thread idles (the way down from orbit)', () => {
+    const b = new BuildBudget(false);
+    feed(b, 40, 16.7, false);
+    // 27 ms frames, the main thread busy 9 ms of each: late, but not the builds' doing
+    expect(feed(b, 30, 27, true, 2, 9)).toBeCloseTo(8, 5);
   });
 
   it('takes a slower frame rate from the frames without a backlog (a phone at 30 fps)', () => {
@@ -128,7 +138,7 @@ describe('build budget', () => {
     feed(b, 40, 33.3, false);
     expect(b.frameMs).toBeCloseTo(33.3, 5);
     // 33 ms frames are on time there, so the slice grows to the phone's ceiling
-    expect(feed(b, 30, 33.3, true, 25)).toBeCloseTo(6, 5);
+    expect(feed(b, 30, 33.3, true, 8, 20)).toBeCloseTo(6, 5);
   });
 
   it('never takes the usual frame shorter than 60 fps allows (a 120 Hz screen)', () => {

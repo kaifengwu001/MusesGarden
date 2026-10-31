@@ -228,6 +228,37 @@ export class CameraRig {
     this.changed = true;
   }
 
+  /**
+   * The camera where the rig is headed (the end of a glide, the zoom asked
+   * for, a named view's pitch), placed as update() would place it, so what it
+   * will see can be built before it gets there. Returns the altitude (m).
+   */
+  aim(radius: number, ground: GroundFn, out: PerspectiveCamera, up: Vector3): number {
+    const q = this.glideT < 1 ? this.glideEnd : this.frameTarget;
+    up.copy(Y).applyQuaternion(q);
+    const forward = tmpV.copy(NZ).applyQuaternion(q);
+    const top = this.overviewAltitude * radius;
+    const z = this.zoomTarget;
+    const alt = top * Math.pow(EYE_HEIGHT / top, z);
+    const tilt = Math.min(this.tiltAt(alt, z) + this.pitchTarget, Math.PI / 2 - 0.02);
+    out.position.copy(up).multiplyScalar(radius + ground(up) + alt);
+    out.up.copy(forward).multiplyScalar(Math.cos(tilt)).addScaledVector(up, Math.sin(tilt));
+    const look = forward.multiplyScalar(Math.sin(tilt)).addScaledVector(up, -Math.cos(tilt)).add(out.position);
+    out.lookAt(look);
+    out.fov = lerp(35, 55, smoothstep(0.3, 1, z));
+    out.aspect = this.camera.aspect;
+    out.near = clamp(alt * 0.2, 0.05, 0.5 * radius);
+    out.far = alt + radius * 3;
+    out.updateProjectionMatrix();
+    out.updateMatrixWorld();
+    return alt;
+  }
+
+  /** The zoom the rig is headed to. */
+  get zoomAim(): number {
+    return this.zoomTarget;
+  }
+
   update(realDt: number, radius: number, aspect: number, ground: GroundFn): void {
     this.radius = radius;
     // portrait screens: keep the whole planet in frame (disc ≤ 80 % of the narrow axis)

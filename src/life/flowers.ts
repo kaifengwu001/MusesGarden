@@ -8,7 +8,7 @@ import type { Layout } from '../planet/terrain';
 import { SPECIES_MESH } from './flowerMeshes';
 import fragmentShader from './grass.frag.glsl?raw';
 import vertexShader from './flower.vert.glsl?raw';
-import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterView } from './scatter';
+import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterLook, type ScatterView } from './scatter';
 
 // Flowers near the camera. One rest-space point set (so the total follows the
 // mean density per m² exactly), sorted on the CPU into four pools, one per
@@ -216,9 +216,9 @@ export class Flowers {
     return 1 + (FLOWER_FADE.keepAtEdge - 1) * smoothstep(near * FLOWER_FADE.fullRadius, near, d);
   }
 
-  update(view: Omit<ScatterView, 'falloff' | 'classifier'>, sizeScale: number): void {
-    const near = view.near;
-    this.layer.update({ ...view, falloff: (d) => Flowers.keep(d, near), classifier: this.classifier });
+  update(view: Omit<ScatterView, 'falloff' | 'classifier' | 'ahead'> & { ahead?: Omit<ScatterLook, 'falloff'> }, sizeScale: number): void {
+    const { near, ahead } = view;
+    this.layer.update({ ...view, falloff: (d) => Flowers.keep(d, near), classifier: this.classifier, ahead: ahead && { ...ahead, falloff: (d) => Flowers.keep(d, ahead.near) } });
     for (let s = 0; s < this.meshes.length; s++) {
       const mesh = this.meshes[s];
       mesh.geometry.instanceCount = this.layer.instanceCounts[s];

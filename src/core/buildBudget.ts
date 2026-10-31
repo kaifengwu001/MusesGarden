@@ -19,7 +19,11 @@ const CATCH_UP = {
   margin: 4,
   /** A frame this much longer than the usual interval missed its refresh. */
   late: 1.35,
+  /** ... the builds' fault only if the main thread was busy (the frame's JS and the build) for this much of it; otherwise the GPU held it up. */
+  busy: 0.6,
 } as const;
+/** The longest frame interval the time left is reckoned on (ms). */
+const LONGEST = 50;
 
 /** Frames the usual interval is taken over. */
 const HISTORY = 30;
@@ -43,6 +47,8 @@ export class BuildBudget {
   private readonly most: number;
   private readonly intervals = new Float64Array(HISTORY);
   private intervalCount = 0;
+  /** The last frame's interval (ms). */
+  private lastMs: number = FRAME_BUDGET_MS;
   private readonly scratch: number[] = [];
 
   constructor(phone: boolean) {
@@ -64,22 +70,31 @@ export class BuildBudget {
   }
 
   /**
-   * Once a frame: the time since the last one (ms), and whether tiles wait in
-   * sight. Grows or cuts the catch-up slice by how the last frame kept time.
+   * Once a frame: the time since the last one (ms), whether tiles wait in
+   * sight, and how long the main thread was busy over it (its JS and the
+   * build after it, ms). Grows or cuts the catch-up slice by how the last
+   * frame kept time: a frame the GPU held up (the main thread mostly idle,
+   * as on the way down from orbit) is not the builds' fault.
    */
-  begin(frameMs: number, backlog: boolean): void {
+  begin(frameMs: number, backlog: boolean, busyMs: number): void {
     if (!(frameMs > 0 && frameMs < 250)) return; // a hidden tab or a stall says nothing of the build
+    this.lastMs = Math.min(frameMs, LONGEST);
     if (!backlog) {
       this.intervals[this.intervalCount++ % HISTORY] = frameMs;
       this.slice = this.floor;
       return;
     }
-    const late = frameMs > this.frameMs * CATCH_UP.late;
+    const late = frameMs > this.frameMs * CATCH_UP.late && busyMs > frameMs * CATCH_UP.busy;
     this.slice = late ? Math.max(this.floor, this.slice * CATCH_UP.cut) : Math.min(this.most, this.slice + CATCH_UP.grow);
   }
 
-  /** The queue's budget (ms), with `leftMs` until the next frame is due. */
-  next(backlog: boolean, leftMs: number): number {
-    return clamp(leftMs - CATCH_UP.margin, PLAIN.min, backlog ? this.slice : PLAIN.slice);
+  /**
+   * The queue's budget (ms), `sinceMs` after the frame began: what is left
+   * before the next frame is due (by the usual interval, or the last one's
+   * while the GPU holds frames up), less the browser's margin.
+   */
+  next(backlog: boolean, sinceMs: number): number {
+    const left = Math.max(this.frameMs, this.lastMs) - sinceMs;
+    return clamp(left - CATCH_UP.margin, PLAIN.min, backlog ? this.slice : PLAIN.slice);
   }
 }

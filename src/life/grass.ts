@@ -4,7 +4,7 @@ import { salt } from '../core/hash';
 import { smoothstep } from '../core/math';
 import fragmentShader from './grass.frag.glsl?raw';
 import vertexShader from './grass.vert.glsl?raw';
-import { ScatterLayer, type ScatterView } from './scatter';
+import { ScatterLayer, type ScatterLook, type ScatterView } from './scatter';
 
 // Near-field grass: instanced blades (7 vertices) on the grass point set,
 // fading into the painted meadow at the edge of the near field.
@@ -86,9 +86,9 @@ export class Grass {
     GRASS_COLOURS.forEach(([row, col], k) => palette.get(row, col, this.uniforms.uGrassPal.value[k]));
   }
 
-  update(view: Omit<ScatterView, 'falloff'> & { fade: GrassFade }, height: number): void {
-    const { near, fade } = view;
-    this.layer.update({ ...view, falloff: (d) => Grass.keep(d, near, fade) });
+  update(view: Omit<ScatterView, 'falloff' | 'ahead'> & { fade: GrassFade; ahead?: Omit<ScatterLook, 'falloff'> }, height: number): void {
+    const { near, fade, ahead } = view;
+    this.layer.update({ ...view, falloff: (d) => Grass.keep(d, near, fade), ahead: ahead && { ...ahead, falloff: (d) => Grass.keep(d, ahead.near, fade) } });
     this.geometry.instanceCount = this.layer.instanceCount;
     this.uniforms.uGrass.value.set(height, 0.05, near, Math.log(view.density));
     this.uniforms.uGrassFade.value.set(near * fade.full, fade.edge, 0, 0);

@@ -40,6 +40,8 @@ export const NEVER = 1e30;
 const OUT_OF_VIEW_M = 60;
 /** Build order: tiles built ahead (beyond the near field's edge) wait behind every tile in it; the frame loop does not count them as a backlog. */
 export const AHEAD = 1000;
+/** Build order: the tiles where the camera is headed wait behind its own as if this much farther away (m). */
+const HEADED_M = 10;
 
 export interface ScatterSpec {
   readonly name: string;
@@ -71,13 +73,8 @@ export interface ScatterClassifier<S = unknown> {
   classify(state: S, p: RestPoint, sigma: number, record: Float32Array, o: number): number;
 }
 
-export interface ScatterView {
-  readonly seed: number;
-  readonly radius: number;
-  /** Top of the growth band (points must exist up to here to fade in). */
-  readonly radiusHi: number;
-  /** Points per m² (the mean, for a classified layer). */
-  readonly density: number;
+/** A camera's near field: around its focus, as its (warped) frustum sees it. */
+export interface ScatterLook {
   readonly focus: Vector3;
   /** Near-field radius, m. */
   readonly near: number;
@@ -85,8 +82,19 @@ export interface ScatterView {
   readonly falloff: (d: number) => number;
   readonly frustum: Frustum;
   readonly warp: WarpFrame;
+}
+
+export interface ScatterView extends ScatterLook {
+  readonly seed: number;
+  readonly radius: number;
+  /** Top of the growth band (points must exist up to here to fade in). */
+  readonly radiusHi: number;
+  /** Points per m² (the mean, for a classified layer). */
+  readonly density: number;
   readonly queue: BuildQueue;
   readonly classifier?: ScatterClassifier;
+  /** Where the camera is headed (a glide, a zoom, a named view): the tiles it will see are built on the way. */
+  readonly ahead?: ScatterLook;
 }
 
 interface Tile {
@@ -107,8 +115,10 @@ interface Tile {
   version: string;
   buildingVersion: string;
   wanted: boolean;
-  /** In the frustum at the last update (build order). */
-  inView: boolean;
+  /** This update: inside the camera's own near field (drawn), the density it needs and how soon (lower first). */
+  current: boolean;
+  need: number;
+  priority: number;
 }
 
 /**
@@ -138,6 +148,7 @@ function poolTexture(data: Float32Array, width: number, height: number): DataTex
 }
 
 const corner = new Vector3();
+const centreAt = new Vector3();
 const sphere = new Sphere();
 
 /** Do two quadtree tiles (any levels) cover overlapping parts of the same face? */
@@ -221,44 +232,27 @@ export class ScatterLayer {
     const level = clamp(Math.round(Math.log2(faceEdgeLength(R) / this.spec.tileMeters)), 0, 18);
     const version = view.classifier?.version ?? '';
 
-    // 1. Which tiles cover the near field, and what density each needs.
-    for (const t of this.tiles.values()) t.wanted = false;
-    const reach = view.near / R;
-    const visit = (face: number, l: number, i: number, j: number): void => {
-      const n = 2 ** l;
-      const centre = uvToSphere(face, (i + 0.5) / n, (j + 0.5) / n, new Vector3());
-      let cosAlpha = 1;
-      for (let c = 0; c < 4; c++) cosAlpha = Math.min(cosAlpha, uvToSphere(face, (i + (c & 1)) / n, (j + (c >> 1)) / n, corner).dot(centre));
-      const alpha = Math.acos(clamp(cosAlpha, -1, 1)) * 1.02;
-      const gap = Math.acos(clamp(centre.dot(view.focus), -1, 1)) - alpha;
-      if (gap > reach) return;
-      if (l < level) {
-        for (let c = 0; c < 4; c++) visit(face, l + 1, 2 * i + (c & 1), 2 * j + (c >> 1));
-        return;
-      }
-      const key = `${l}/${face}/${i}/${j}`;
-      let tile = this.tiles.get(key);
-      if (!tile) {
-        const pages = Array.from({ length: this.channels }, () => [] as number[]);
-        tile = { key, face, level: l, i, j, centre, alpha, pages, count: 0, sigma: 0, building: 0, version: '', buildingVersion: '', wanted: true, inView: false };
-        this.tiles.set(key, tile);
-      }
-      tile.wanted = true;
-      const nearest = Math.max(0, gap) * R;
-      const inView = this.inFrustum(tile, view);
-      if (inView !== tile.inView) {
-        tile.inView = inView;
-        if (tile.building > 0) view.queue.reprioritise(`${this.spec.name}:${tile.key}`, nearest + (inView ? 0 : OUT_OF_VIEW_M));
-      }
-      const priority = nearest + (inView ? 0 : OUT_OF_VIEW_M);
-      const need = view.density * view.radiusHi * view.radiusHi * view.falloff(nearest);
-      if (!(need > 0)) return; // an empty near field (or a degenerate falloff) needs nothing built
-      const grow = need > tile.sigma && tile.building < need;
-      const stale = tile.version !== version && tile.buildingVersion !== version;
-      if (grow) this.schedule(tile, need * this.spec.headroom, priority, view);
-      else if (stale) this.schedule(tile, Math.max(need * this.spec.headroom, tile.sigma), priority, view);
-    };
-    for (let face = 0; face < 6; face++) visit(face, 0, 0, 0);
+    // 1. Which tiles the near field needs, at what density, how soon: the camera's own, with a ring a
+    //    tile wide beyond its edge (built last, drawn once inside it: walking, the tiles at the edge are
+    //    ready before they show), and where the camera is headed (only what it will see there, so it
+    //    is built on the way: a glide, a named view, the way down from orbit).
+    for (const t of this.tiles.values()) {
+      t.wanted = false;
+      t.current = false;
+      t.need = 0;
+      t.priority = Number.POSITIVE_INFINITY;
+    }
+    this.visit(view, view, level, this.spec.tileMeters, 0);
+    if (view.ahead) this.visit(view, view.ahead, level, 0, HEADED_M);
+    for (const t of this.tiles.values()) {
+      if (!t.wanted) continue;
+      if (t.building > 0) view.queue.reprioritise(`${this.spec.name}:${t.key}`, t.priority);
+      if (!(t.need > 0)) continue; // an empty near field (or a degenerate falloff) needs nothing built
+      const grow = t.need > t.sigma && t.building < t.need;
+      const stale = t.version !== version && t.buildingVersion !== version;
+      if (grow) this.schedule(t, t.need * this.spec.headroom, t.priority, view);
+      else if (stale) this.schedule(t, Math.max(t.need * this.spec.headroom, t.sigma), t.priority, view);
+    }
 
     // 2. Re-tiling swaps region by region: an old-level tile stays (and keeps
     //    drawing) until every wanted new tile over its area is ready; a new
@@ -287,13 +281,14 @@ export class ScatterLayer {
       for (const n of this.tiles.values()) if (n.wanted && overlaps(t, n)) hidden.add(n);
     }
 
-    // 3. The pages drawn: those of whole tiles in the (warped) frustum, in pool order (as the pool was
-    //    drawn before, so the blades are drawn in the same order).
+    // 3. The pages drawn: those of whole tiles in the (warped) frustum, in the near field (or kept over
+    //    it while re-tiling), in pool order (as the pool was drawn before, so the blades are drawn in
+    //    the same order).
     const drawn = this.drawn;
     for (const d of drawn) d.length = 0;
     let visible = 0;
     for (const t of this.tiles.values()) {
-      if (t.count === 0 || hidden.has(t) || !this.inFrustum(t, view)) continue;
+      if (t.count === 0 || (t.wanted && !t.current) || hidden.has(t) || !this.inFrustum(t.centre, t.alpha, R, view)) continue;
       for (let c = 0; c < this.channels; c++) for (const p of t.pages[c]) drawn[c].push(p);
       visible += t.count;
     }
@@ -307,12 +302,55 @@ export class ScatterLayer {
     this.visibleInstances = visible;
   }
 
-  /** A tile against the (warped) frustum, by its bounding sphere. */
-  private inFrustum(t: Tile, view: ScatterView): boolean {
+  /**
+   * Visit the tiles of one near field (`look`, out to `margin` m beyond its
+   * edge), marking what each needs: the density there and how soon (`delay`
+   * m later than its own distance). The camera's own near field (`look` is
+   * the view) is drawn; any other is where it is headed, and only what it
+   * will see there is wanted.
+   */
+  private visit(view: ScatterView, look: ScatterLook, level: number, margin: number, delay: number): void {
     const R = view.radius;
-    sphere.center.copy(t.centre).multiplyScalar(R);
-    sphere.radius = 2 * R * Math.sin(t.alpha / 2) + 3;
-    const w = view.warp;
+    const reach = (look.near + margin) / R;
+    const own = look === view;
+    const full = view.density * view.radiusHi * view.radiusHi;
+    const at = (face: number, l: number, i: number, j: number): void => {
+      const n = 2 ** l;
+      // (one scratch vector: a node uses its centre before visiting its children)
+      const centre = uvToSphere(face, (i + 0.5) / n, (j + 0.5) / n, centreAt);
+      let cosAlpha = 1;
+      for (let c = 0; c < 4; c++) cosAlpha = Math.min(cosAlpha, uvToSphere(face, (i + (c & 1)) / n, (j + (c >> 1)) / n, corner).dot(centre));
+      const alpha = Math.acos(clamp(cosAlpha, -1, 1)) * 1.02;
+      const gap = Math.acos(clamp(centre.dot(look.focus), -1, 1)) - alpha;
+      if (gap > reach) return;
+      if (l < level) {
+        for (let c = 0; c < 4; c++) at(face, l + 1, 2 * i + (c & 1), 2 * j + (c >> 1));
+        return;
+      }
+      const inView = this.inFrustum(centre, alpha, R, look);
+      if (!own && !inView) return;
+      const key = `${l}/${face}/${i}/${j}`;
+      let tile = this.tiles.get(key);
+      if (!tile) {
+        const pages = Array.from({ length: this.channels }, () => [] as number[]);
+        tile = { key, face, level: l, i, j, centre: centre.clone(), alpha, pages, count: 0, sigma: 0, building: 0, version: '', buildingVersion: '', wanted: true, current: false, need: 0, priority: Number.POSITIVE_INFINITY };
+        this.tiles.set(key, tile);
+      }
+      tile.wanted = true;
+      const nearest = Math.max(0, gap) * R;
+      const inside = nearest <= look.near;
+      if (own && inside) tile.current = true;
+      tile.priority = Math.min(tile.priority, nearest + (inView ? 0 : OUT_OF_VIEW_M) + (inside ? 0 : AHEAD) + delay);
+      tile.need = Math.max(tile.need, full * look.falloff(nearest));
+    };
+    for (let face = 0; face < 6; face++) at(face, 0, 0, 0);
+  }
+
+  /** A tile (its centre direction and angular radius) against a look's (warped) frustum, by its bounding sphere. */
+  private inFrustum(centre: Vector3, alpha: number, R: number, look: ScatterLook): boolean {
+    sphere.center.copy(centre).multiplyScalar(R);
+    sphere.radius = 2 * R * Math.sin(alpha / 2) + 3;
+    const w = look.warp;
     if (w.k !== 0) {
       const tx = sphere.center.x - w.focus.x;
       const ty = sphere.center.y - w.focus.y;
@@ -322,7 +360,7 @@ export class ScatterLayer {
       warpPoint(w, sphere.center, sphere.center);
       sphere.radius += 2 * Math.abs(w.k) * tLen * sphere.radius;
     }
-    return view.frustum.intersectsSphere(sphere);
+    return look.frustum.intersectsSphere(sphere);
   }
 
   private schedule(tile: Tile, sigma: number, distance: number, view: ScatterView): void {

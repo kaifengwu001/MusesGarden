@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix4, PerspectiveCamera, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
@@ -26,7 +26,7 @@ import { createLookUniforms } from './render/look';
 import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
 import { localSun } from './render/sun';
-import { warpForZoom } from './render/warp';
+import { warpForZoom, type WarpFrame } from './render/warp';
 import { CameraRig } from './view/camera';
 import { findVista, type Vista } from './view/vista';
 
@@ -112,6 +112,11 @@ export class World {
   private fieldsStill = 0;
   private readonly frustum = new Frustum();
   private readonly projView = new Matrix4();
+  /** Where the camera is headed: its camera, frustum, focus direction and warp (the near field is built on the way). */
+  private readonly aimCamera = new PerspectiveCamera();
+  private readonly aimFrustum = new Frustum();
+  private readonly aimUp = new Vector3();
+  private readonly aimWarp = { focus: new Vector3(), up: new Vector3(0, 1, 0), k: 0 };
   private readonly ground = createGroundSample();
   private readonly east = new Vector3();
   private readonly tmp = new Vector3();
@@ -388,9 +393,10 @@ export class World {
     // Near field: grass blades and flowers replace the paint around the focus. Its field map is
     // drawn before the clouds' passes, its meadow pass reading the last frame's cloud shadows:
     // drawn after them, the main pass (whose blades read the map as they are placed) waited on both.
-    const lowness = smoothstep(90, 30, rig.altitude);
-    const grassNear = p.grass.nearRadius * this.tier.grassRadiusScale * lowness;
-    const flowerNear = 30 * this.tier.flowerRadiusScale * lowness;
+    const grassAt = (altitude: number): number => p.grass.nearRadius * this.tier.grassRadiusScale * smoothstep(90, 30, altitude);
+    const flowersAt = (altitude: number): number => 30 * this.tier.flowerRadiusScale * smoothstep(90, 30, altitude);
+    const grassNear = grassAt(rig.altitude);
+    const flowerNear = flowersAt(rig.altitude);
     this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
     this.nearFieldDrawn = grassNear > 0.5 || flowerNear > 0.5;
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
@@ -424,6 +430,25 @@ export class World {
       },
       this.lod,
     );
+    // Where the camera is headed (the end of a glide, the zoom asked for, a named view), when it is
+    // somewhere else: what it will see there is built on the way (scatter.ts)
+    let aimGrass = 0;
+    let aimFlowers = 0;
+    if (!rig.isSettled()) {
+      const altitude = rig.aim(R, (dir) => this.terrain.sample(dir, this.ground).height, this.aimCamera, this.aimUp);
+      const away = Math.acos(Math.min(1, this.aimUp.dot(rig.up))) * R;
+      if (away > 4 || Math.abs(Math.log(altitude / rig.altitude)) > 0.15) {
+        aimGrass = grassAt(altitude);
+        aimFlowers = flowersAt(altitude);
+        const aim = this.aimCamera;
+        this.aimFrustum.setFromProjectionMatrix(this.projView.multiplyMatrices(aim.projectionMatrix, aim.matrixWorldInverse));
+        this.aimWarp.up.copy(this.aimUp);
+        this.aimWarp.focus.copy(this.aimUp).multiplyScalar(aim.position.length() - altitude);
+        this.aimWarp.k = warpForZoom(rig.zoomAim, R, p.view.visualRadius);
+      }
+    }
+    const aimed = (near: number): { focus: Vector3; near: number; frustum: Frustum; warp: WarpFrame } | undefined =>
+      near > 0.5 ? { focus: this.aimUp, near, frustum: this.aimFrustum, warp: this.aimWarp } : undefined;
     this.grass.update(
       {
         seed: p.world.seed,
@@ -436,6 +461,7 @@ export class World {
         frustum: this.frustum,
         warp: this.warp,
         queue: this.queue,
+        ahead: aimed(aimGrass),
       },
       p.grass.height,
     );
@@ -455,6 +481,7 @@ export class World {
         frustum: this.frustum,
         warp: this.warp,
         queue: this.queue,
+        ahead: aimed(aimFlowers),
       },
       1,
     );
