@@ -3,7 +3,9 @@
 // instances: the skin first (instance 0), then the fur's shells stepped out
 // along the skin's normal (muse.frag.glsl keeps a shell's fragments only
 // where a strand of fur reaches that high). The tips droop a little and
-// lean with the wind, more the further out they are.
+// lean with the wind, more the further out they are; where the fur stands
+// up (a wave of it running up the body: museRig.ts), it stands straight out
+// and longer, each tuft a little more or less.
 #include <meadow_common>
 #include <meadow_warp>
 
@@ -20,7 +22,7 @@ attribute vec3 aRaiseNormal; // the skin's normal there, its length how much of 
 attribute float aRaiseOpen;  // and the open sky over it there
 #endif
 #if defined(MUSE_RAISE) || defined(MUSE_HANG)
-uniform float uMuseRaise;    // how far the left arm is up in a wave (0 … 1)
+uniform vec4 uMuseRaise;     // how much of each shoulder's correctives its arm's pose calls for (museRig.ts): raised (the left, the right), hung (the left, the right)
 #endif
 #ifdef MUSE_COMB
 attribute vec3 aComb;        // the fur's lie along the skin (rest space: museMesh.ts), its length how far it lies over
@@ -33,6 +35,7 @@ uniform vec3 uMusePos;   // where its feet stand, planet space (m)
 uniform mat3 uMuseFrame; // its frame in planet space (columns: left, up, forward)
 uniform vec4 uMuseSize;  // height (m), the fur's length (m), shells, -
 uniform vec4 uMuseWind;  // the wind's push on the fur's tips (planet space, m at full length), its flutter
+uniform vec4 uMuseFluff; // the fur standing up: how far up the body its wave has come (H, at rest), how much stands behind it, the crest's extra at its front, the front's width (H)
 uniform float uTime;
 
 attribute vec4 skinIndex;
@@ -63,9 +66,13 @@ void main() {
   ivec4 j = ivec4(skinIndex);
   vec3 rest = position;
   vec3 restNormal = normal;
+#if defined(MUSE_RAISE) || defined(MUSE_HANG)
+  // (each side's correctives go with its own arm)
+  float raised = position.x > 0.0 ? uMuseRaise.x : uMuseRaise.y;
+#endif
 #ifdef MUSE_HANG
-  // full on a hanging arm's root, gone from the left one as it rises into a wave
-  float hung = position.x > 0.0 ? 1.0 - uMuseRaise : 1.0;
+  // full on a hanging arm's root, gone as it rises
+  float hung = position.x > 0.0 ? uMuseRaise.z : uMuseRaise.w;
   rest += aHang * hung;
   restNormal = normalize(mix(normal, aHangNormal, hung));
 #endif
@@ -109,23 +116,28 @@ void main() {
   // the shoulder as the sculpt would have it with the arm up, coming in as the arm rises (in the
   // chest's frame, so it turns with the body)
   mat3 chest = mat3(uBones[MUSE_CHEST]);
-  p += chest * aRaise * uMuseRaise;
-  float k = uMuseRaise * length(aRaiseNormal);
+  p += chest * aRaise * raised;
+  float k = raised * length(aRaiseNormal);
   if (k > 0.0) n = normalize(mix(n, chest * normalize(aRaiseNormal), k));
 #endif
   float shell = float(gl_InstanceID) / uMuseSize.z;
   vec3 world = uMusePos + uMuseFrame * (p * uMuseSize.x);
   vec3 nw = normalize(uMuseFrame * n);
-  float len = uMuseSize.y * aFur;
+  // standing up behind the wave's front, most at its crest
+  float front = uMuseFluff.x - position.y;
+  float fluff = uMuseFluff.y * smoothstep(-uMuseFluff.w, uMuseFluff.w, front) + uMuseFluff.z * exp(-front * front / (uMuseFluff.w * uMuseFluff.w));
+  float stand = min(fluff, 1.0);
+  float tuft = fract(sin(dot(floor(position * 70.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  float len = uMuseSize.y * aFur * (1.0 + fluff * (0.45 + 0.3 * tuft));
   // out along the normal; the tips droop and lean with the wind, each tuft fluttering on its own beat
   vec3 up = uMuseFrame[1];
   float flutter = 1.0 + uMuseWind.w * sin(uTime * 5.3 + dot(position, vec3(41.0, 29.0, 37.0)));
-  world += nw * len * shell + (uMuseWind.xyz * flutter - up * 0.3 * len) * shell * shell * aFur;
+  world += nw * len * shell + (uMuseWind.xyz * flutter - up * 0.3 * len * (1.0 - stand)) * shell * shell * aFur;
   vRest = position;
 #ifdef MUSE_COMB
   // the strands lie over along the skin as they rise, as a plush's pile is brushed: each shell slides along the
   // lie, and reads the strands from as far back along it, so each strand is a curve from its root
-  float lie = COMB_LEAN * shell * shell;
+  float lie = COMB_LEAN * shell * shell * (1.0 - 0.85 * stand);
   world += uMuseFrame * (comb * len * lie);
   vRest -= aComb * (len / uMuseSize.x) * lie;
 #endif
@@ -137,7 +149,7 @@ void main() {
   vFur = aFur;
   vOpen = aOpen;
 #ifdef MUSE_RAISE
-  vOpen = mix(aOpen, aRaiseOpen, uMuseRaise);
+  vOpen = mix(aOpen, aRaiseOpen, raised);
 #endif
   vHeight = p.y;
 #ifdef MUSE_COLOURED

@@ -92,6 +92,8 @@ export interface MuseFit {
   reach?: number;
   /** The share of each upper arm's turn its shoulder takes (0 … 1): the skin round the arm's root then bends over both. */
   shoulder?: number;
+  /** The left mitten's middle as made (H): where it holds things (museRig.ts), and where the arm reaches from. */
+  hand?: readonly [number, number, number];
 }
 
 /** One leg (H, Muse's left): centre x and z, radius, top (inside the belly) and the rounding of the sole's edge. */
@@ -154,6 +156,7 @@ export const FIELD_FIT: MuseFit = {
   bind: { x: 0, z: 0, fore: 0 },
   hang: { x: 0, z: -ARMS_IN, fore: -0.03 },
   wave: { x: 0.15, y: 0.08, z: 1.75, fore: 0.95 },
+  hand: [ARM.hand[0], ARM.hand[1], ARM.hand[2]],
 };
 
 export interface MuseBody {

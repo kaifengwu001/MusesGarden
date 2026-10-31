@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { JOINT } from '../../life/museBody';
-import { rigSculpt, SCULPTS, type SculptKind } from '../../life/museMesh';
+import { rigSculpt, SCULPTS, type Sculpt, type SculptKind } from '../../life/museMesh';
 import { MuseRig } from '../../life/museRig';
 
 // The Tripo sculpts rigged on Muse's skeleton (museMesh.ts): its first (arms
@@ -175,7 +175,7 @@ for (const kind of ['tripo', 'tpose', 'tpose2', 'tpose5', 'tpose6'] as const) de
     expect(holes(m.position, m.index)).toBeLessThanOrEqual(holes(g.position, g.index));
   });
 
-  it('hangs its arms beside the belly, and waves with the left up beside the hood, the corrective only about that shoulder', () => {
+  it('hangs its arms beside the belly, and waves with the left up beside the hood, the corrective only about that shoulder (and its mirror)', () => {
     if (!m) return;
     // the left hand: the forearm's point farthest from the shoulder
     const fit = SCULPTS[kind].fit;
@@ -206,16 +206,20 @@ for (const kind of ['tripo', 'tpose', 'tpose2', 'tpose5', 'tpose6'] as const) de
         if (Math.abs(m.position[i * 3]) < 0.1 || m.position[i * 3 + 1] < 0.25 || m.position[i * 3 + 1] > 0.85) expect(d).toBe(0);
       }
     }
-    // the corrective: none on the right side or far from the left shoulder
-    let most = 0;
+    // the corrective: about the left shoulder, none far from it nor on the right side; where the right side is made
+    // the left's mirror, the right shoulder has the left's, mirrored (so either arm can go up)
+    const mirrored = (SCULPTS[kind] as Sculpt).mirrorArm === true;
+    const most = [0, 0];
     const raise = m.raise ?? new Float32Array(m.position.length);
     for (let i = 0; i < m.position.length / 3; i++) {
       const d = Math.hypot(raise[i * 3], raise[i * 3 + 1], raise[i * 3 + 2]);
-      most = Math.max(most, d);
-      if (m.position[i * 3] < 0 || m.position[i * 3 + 1] < 0.2 || m.position[i * 3 + 1] > 0.85) expect(d).toBe(0);
+      const right = m.position[i * 3] < 0;
+      most[right ? 1 : 0] = Math.max(most[right ? 1 : 0], d);
+      if ((right && !mirrored) || m.position[i * 3 + 1] < 0.2 || m.position[i * 3 + 1] > 0.85) expect(d).toBe(0);
     }
     // (it slides the skin along the surface too, evening its stretch out: up to a tenth of the height)
-    expect(most).toBeGreaterThan(0);
-    expect(most).toBeLessThan(0.12);
+    expect(most[0]).toBeGreaterThan(0);
+    expect(most[0]).toBeLessThan(0.12);
+    if (mirrored) expect(most[1]).toBeCloseTo(most[0], 1);
   });
 });

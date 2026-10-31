@@ -208,6 +208,7 @@ export const SCULPTS = {
       hang: { x: -0.426, z: -0.958, fore: -0.3 },
       wave: { x: 0.299, y: -0.246, z: 1.252, fore: 0.532, reach: 0.04 },
       shoulder: SHOULDER.share,
+      hand: [0.51, 0.41, -0.012],
     },
     cut: { arm: { x: 0.45, y: [0, 1] }, body: { x: 0.2, y: [0.3, 0.68], z: [-0.2, 0.2] } },
     ramp: 0.07,
@@ -554,6 +555,10 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     if (mirror) {
       mirrorVectors(hang, mirror, false);
       mirrorVectors(hangNormal, mirror, true);
+      // the raised arm's too, so either arm (or both) can go up
+      mirrorVectors(raise, mirror, false);
+      mirrorVectors(raiseNormal, mirror, false);
+      mirrorScalars(stretch, mirror);
     }
     const raiseOpen = Float32Array.from(open, (o, i) => 1 - (1 - o) / Math.max(1, stretch[i]));
     return { ...rigged, raise, raiseNormal, raiseOpen, hang, hangNormal };
@@ -1573,6 +1578,18 @@ function mirrorWeights(full: Float32Array, map: MirrorMap): void {
       for (let j = 0; j < JOINTS; j++) w[swap[j]] += share * own[corner * JOINTS + j];
     }
     for (let j = 0; j < JOINTS; j++) full[i * JOINTS + j] = own[i * JOINTS + j] + take * (w[j] - own[i * JOINTS + j]);
+  }
+}
+
+/** Values (one per vertex) carried from the left to the right by a mirror map. */
+function mirrorScalars(field: Float32Array, map: MirrorMap): void {
+  const own = field.slice();
+  for (let i = 0; i < map.take.length; i++) {
+    const take = map.take[i];
+    if (take <= 0) continue;
+    let v = 0;
+    for (let k = 0; k < 3; k++) v += map.shares[i * 3 + k] * own[map.corners[i * 3 + k]];
+    field[i] = own[i] + take * (v - own[i]);
   }
 }
 

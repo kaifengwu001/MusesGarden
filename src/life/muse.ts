@@ -124,8 +124,10 @@ export class Muse {
     uMuseSize: { value: new Vector4(MUSE_HEIGHT, FUR_LENGTH, SHELLS, 0) },
     uMuseWind: { value: new Vector4() },
     uMuseFace: { value: new Vector4(1, 0, 0, 0) },
+    uMuseMood: { value: new Vector4() },
+    uMuseFluff: { value: new Vector4(0, 0, 0, 0.12) },
     uMuseGrade: { value: new Vector3(1, 1, 1) },
-    uMuseRaise: { value: 0 },
+    uMuseRaise: { value: new Vector4(0, 0, 1, 1) },
   };
   private readonly action: MuseAction = { time: 0, walk: 0, stride: 1, gait: 0, wave: -1, lookYaw: 0, lookPitch: 0, look: 0 };
   /** The cottage's frame: across, up, toward the pond (planet space), and the ground of its clearing (m from the centre). */
@@ -315,8 +317,11 @@ export class Muse {
     a.time = time;
     this.rig.pose(a);
     // the eyes blink; it smiles more when you are close and in front, most while it waves
-    this.uniforms.uMuseFace.value.set(this.rig.eyes, Math.min(1, this.rig.smile + 0.35 * near), 0, 0);
-    this.uniforms.uMuseRaise.value = this.rig.raised;
+    const rig = this.rig;
+    this.uniforms.uMuseFace.value.set(rig.eyes, Math.min(1, rig.smile + 0.35 * near), rig.squint, rig.mouth);
+    this.uniforms.uMuseMood.value.set(rig.blush, rig.round, 0, 0);
+    this.uniforms.uMuseFluff.value.copy(rig.fluff);
+    this.uniforms.uMuseRaise.value.set(rig.raised, rig.raisedRight, rig.hung, rig.hungRight);
     // the wind lays the fur over along its way here, in gusts
     const strength = wind.w;
     const along = tmp.set(wind.x, wind.y, wind.z).cross(this.up);
