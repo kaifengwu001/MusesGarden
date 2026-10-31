@@ -1,6 +1,6 @@
 // The shared contract for the Muse agent. The server (server/) and the overlay
 // (src/muse/ui/) both import it. Types only: this file emits no runtime code.
-// Plan and rationale: docs/muse-agent-plan.md.
+// Rationale: docs/muse-agent.md.
 
 declare const brand: unique symbol;
 export type Brand<T, B extends string> = T & { readonly [brand]: B };

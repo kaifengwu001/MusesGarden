@@ -1,5 +1,5 @@
 // Every tunable number in the Muse's life, in one table. Each rule multiplies these by the Muse's own traits.
-// Plan: docs/muse-agent-plan.md ("A life in real time", "The probability model", "What the owner sees and does").
+// Rationale: docs/muse-agent.md ("A life is one unbroken timeline", "What the owner sees and does").
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../time';
 
 // ── Interests ──────────────────────────────────────────────────────────────
