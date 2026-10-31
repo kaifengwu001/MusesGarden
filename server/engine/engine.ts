@@ -451,7 +451,7 @@ export class Engine {
     const u = this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 2)('encounter.next', k);
     const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
     if (at >= Math.min(pa.until, pb.until)) return;
-    tx.schedule({ id: `enc:${a}:${b}:${as.episodes}:${k}`, at: at as Instant, museId: a, kind: 'encounter', payload: { other: b } });
+    tx.schedule({ id: `enc:${a}:${b}:${as.episodes}:${k}`, at: Math.floor(at) as Instant, museId: a, kind: 'encounter', payload: { other: b } });
   }
 
   /** Picks and starts Muse's next episode. Does nothing while Muse works or is mid-episode. */
@@ -473,14 +473,14 @@ export class Engine {
     }
     if (choice === 'rest') {
       if (life.reflectionDue(s, tx.now)) await this.reflect(tx, m);
-      const until = life.restUntil(tx.state(m), tx.now, draw);
+      const until = Math.floor(life.restUntil(tx.state(m), tx.now, draw)) as Instant;
       tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'rest', until } });
       this.scheduleEnd(tx, m, n, until);
       return;
     }
     const trip = life.startTrip(s, tx.now, draw);
     if (trip === null) {
-      const until = life.beyondUntil(s, tx.now, draw);
+      const until = Math.floor(life.beyondUntil(s, tx.now, draw)) as Instant;
       tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'beyond', until } });
       this.scheduleEnd(tx, m, n, until);
       this.scheduleEncounters(tx, m, until, draw);
@@ -536,7 +536,7 @@ export class Engine {
       const u = draw('encounter', hashId(other));
       const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
       if (at >= end) continue;
-      tx.schedule({ id: `enc:${m}:${other}:${s.episodes}`, at: at as Instant, museId: m, kind: 'encounter', payload: { other } });
+      tx.schedule({ id: `enc:${m}:${other}:${s.episodes}`, at: Math.floor(at) as Instant, museId: m, kind: 'encounter', payload: { other } });
     }
   }
 
@@ -599,11 +599,11 @@ export class Engine {
   }
 
   private scheduleEnd(tx: Tx, m: MuseId, n: number, at: Instant): void {
-    tx.schedule({ id: `end:${m}:${n}`, at, museId: m, kind: 'episode.end', payload: { n } });
+    tx.schedule({ id: `end:${m}:${n}`, at: Math.floor(at) as Instant, museId: m, kind: 'episode.end', payload: { n } });
   }
 
   private scheduleHop(tx: Tx, m: MuseId, p: HopPayload, at: number): void {
-    tx.schedule({ id: `hop:${m}:${p.n}:${p.k}`, at: at as Instant, museId: m, kind: 'trip.hop', payload: { ...p } });
+    tx.schedule({ id: `hop:${m}:${p.n}:${p.k}`, at: Math.floor(at) as Instant, museId: m, kind: 'trip.hop', payload: { ...p } });
   }
 
   private async applySoul(tx: Tx, m: MuseId, text: string): Promise<void> {
