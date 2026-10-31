@@ -23,14 +23,103 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 13: the review notes (in progress)
+## Iteration 13: the review notes
 
-Started from iteration 12 (9ad20e4). This table fills in as the notes are done.
+Started from iteration 12 (9ad20e4), the notes committed first (cb47909).
+Before it Kai asked for a post mortem of the flashes and a profile against
+the morning's build (iteration 4); both are summed up under the table.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Make the profile's lossless fixes: the cloud mirror drawn only where there is water, the ground's shader without the cottage's code on terrain away from it, the field map drawn before the clouds' passes, the flower clumps read from a texture, and resolution changes without reallocating | |
-| 2 | Trading graphics for performance means altering the look of the image, not the resolution: Auto may drop the resolution more aggressively than now if that keeps High as the quality; a little upscaling blur is welcome | |
+| 1 | Make the profile's lossless fixes: the cloud mirror drawn only where there is water, the ground's shader without the cottage's code on terrain away from it, the field map drawn before the clouds' passes, the flower clumps read from a texture, and resolution changes without reallocating | Four of the five, each checked against the build before it to the pixel. The field map is drawn first in the frame: its passes cost almost nothing to shade, but drawn after the clouds' passes the main pass, whose blades read it as they are placed, waited for both (0.9–1.5 ms). The cloud mirror is shaded only where a lake can read it: a mask of 8 px cells where the camera's rays meet the water table on wet ground (found from the bake, not by drawing the terrain again), grown by the farthest the wind's ruffle moves a lake's lookup; identical in nine views at the default wind and a gusty one, 0.1–2.2 ms saved. The terrain away from the homestead (beyond its plateau, its pond and the cottage's shadow) is drawn with a build of the ground's shader without the homestead's code: code that never ran there still slowed every pixel; 1.2–2.9 ms saved away from the cottage, nothing near it. Resolution: note 2. The fifth would have changed the look, so it is not done: the clumps' noise has 1–2 m features, finer than the bake's texels (0.4 m at R 128, 1.2 m at R 400), so a texture softens and shifts the beds' edges, more on bigger planets; the exact speed-ups (sharing the two clump fields' noise work) save under a tenth of it. Also found: the grass and flower page tables were 256² and sent whole every frame for pools of under 1,000 pages; now sized to the pools (uploads 440 → 125 KB a frame). Together, 1.6–4.9 ms a frame less near the ground on both tiers (Measured). |
+| 2 | Trading graphics for performance means altering the look of the image, not the resolution: Auto may drop the resolution more aggressively than now if that keeps High as the quality; a little upscaling blur is welcome | Auto now starts a desktop on High and keeps it, the render scale going down to 0.5 (was Medium, to 0.6); only a machine still far too slow at that floor drops a tier. A change of scale no longer resizes anything: the canvas and the screen-sized targets keep their size and the frame is drawn into part of them, which the grade spreads over the canvas (scale 1 draws exactly what it did). Each step of iteration 12's Auto reallocated about 130 MB and cost a frame of 70–90 ms; now a step costs nothing, so a slow stretch steps down after 0.75 s by as much as the frames ask (×0.92 to ×0.75). On a live walk Auto holds High at 0.69–0.88 while walking, with about twice iteration 12's grass in sight. |
+
+### Before the work: the post mortem and the profile
+
+- **The flashes** fixed in iteration 12 (a blank frame, a strip of grass
+  missing for a frame) both came from the order of a frame's work as the
+  first runnable build wrote it (S1–S5, c475766): the render scale's resize
+  after the draw, and tiles committed between the visibility pass and the
+  draw. Every build had them; they grew common as resizes (the tier ladder
+  of iteration 6, the 60 fps target of 7, the step-up probes of 11) and
+  rebuilds in view (walking in 5, High's wider grass in 6, view-first
+  builds in 7) did. On one 27 s walk with High chosen, blank frames:
+  iteration 4: 8, 5: 8, 6: 4, 7: 4, 9: 4, 10: 4, 11: 10, 12: 0 (10
+  resizes); frames missing a strip: 0 (iteration 4 had no walking), 142,
+  39, 278, 301, 297, 484, 0.
+- **The profile** (2880×1800, the same views, cameras and blade and flower
+  counts in each build): iteration 12 on Medium cost 28–47 % more GPU time
+  a frame than iteration 4 on its High. The ground and water shader grew
+  most (+1.4 to +6 ms; it is large enough that its code costs even where
+  it never runs), then the cloud mirror back at full resolution in
+  iteration 5 (+2.3 to +2.6 ms in the lake views, 78–100 % of its pixels
+  off the water), the field map's wait (1.3–1.6 ms, none of it shading)
+  and the planet-fixed cloud shadow maps (+0.3 to +0.9 ms). The clouds
+  themselves were unchanged. JS stayed under 0.5 ms a frozen frame. Each
+  of Auto's resolution steps was a 70–90 ms frame.
+
+### Measured (iteration 13)
+
+Frame time at 2880×1800 (1440×900 at DPR 2, Apple M1 Pro), the GPU's
+throughput with frames back to back, best of eight rounds alternating the
+two builds in one browser (a warm machine: these run 1–3 ms over a cool
+one's, the differences hold):
+
+| View | Iteration 12, Medium | Iteration 13, Medium | Iteration 12, High | Iteration 13, High |
+|---|---|---|---|---|
+| Orbit | 9.2 | 9.0 | 9.4 | 9.3 |
+| Bird's-eye (70 m) | 24.2 | 22.0 | 25.0 | 22.6 |
+| Standing (4.3 m) | 20.5 | 17.2 | 23.0 | 20.0 |
+| Meadow (1.6 m) | 18.2 | 13.3 | 20.6 | 16.9 |
+| Lakeside (1.6 m) | 11.5 | 9.7 | 15.8 | 13.4 |
+| Vista | 15.5 | 13.9 | 18.2 | 16.0 |
+| Cottage | 26.6 | 23.5 | 27.5 | 25.9 |
+
+Against iteration 4 (the morning's page, its High, measured cool), Medium is
+now faster in the meadow and 0.6–2.2 ms slower standing, at the lakeside and
+in the vista; the bird's-eye and cottage views still cost about 5 ms more
+(the pond twice the size, the cottage in its reflection, the clumps'
+noise). With the render scale free, Auto keeps 60 fps at High by resolution:
+at scale 0.5 the standing view takes 7.5 ms on Medium (16.1 at 1).
+
+The same Auto walk as iterations 11 and 12 (median frame time in ms /
+frames over 25 ms), just before the free steps and after:
+
+| | Walk | Turn while walking | Strafe | Stand | Tier and scale |
+|---|---|---|---|---|---|
+| Before (f42393e) | 17.6 / 0 | 18.2 / 15 | 18.3 / 1 (a 77 ms frame at a step) | 16.7 / 0 | Medium, 1.0 → 0.90 |
+| Iteration 13 | 17.5 / 0 | 17.8 / 1 | 17.2 / 0 | 16.7 / 0 | High, 0.88 → 0.69 → 0.77 |
+
+With High chosen the steps had cost frames of 92 and 83 ms; now no frame
+passes 25 ms outside the first second.
+
+- **GPU memory:** 246 MB on Medium, as before (the water mask 0.2 MB).
+- **Uploads:** 120–126 KB a frame in the meadow (440 before).
+- **Growth scrub:** JS p95 5.3–5.5 ms (5.3–5.4 in iteration 12): the
+  mask's passes and the terrain's second draw add about 0.05 ms of
+  submission. The invariant's limit is now 5.6 ms (it was 5.5).
+
+### Trades (iteration 13)
+
+- **Cloud shadows on the blades:** the grass and the flowers read the
+  clouds' shadows a frame (16.7 ms) late, as the field map is drawn before
+  the clouds' passes.
+- **Upscaling:** a lowered render scale is spread over the canvas by the
+  grade (bilinear) rather than by the browser, and the paper grain stays at
+  the screen's own resolution at any scale (it grew with the scale before).
+- (By Kai's choice, not a trade of the look: Auto keeps High at a lower
+  resolution instead of Medium at a higher one.)
+
+### Known issues
+
+- **The flower clumps' noise** stays per pixel (1–2.3 ms from above): a
+  texture would change the beds' edges.
+- **The largest costs left:** the clouds themselves (3.6–4.8 ms at eye
+  level, as in iteration 4), the water's bank march (1.7–3.6 ms), the
+  meadow paint from above.
+- Carried over: the distant grass finer than a pixel sparkles a little as
+  you move; the cottage's reflection without its rail, chair, bench or
+  window frames.
 
 ## Iteration 12: the review notes
 

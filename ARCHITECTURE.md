@@ -192,9 +192,18 @@ tests still read the same fields from the CPU side.
   bank lip widens with distance (CDLOD spacing grows with it), so far shores
   do not saw-tooth; it is a function of distance, not of the node, so the
   mesh stays watertight.
-- **CDLOD:** six face quadtrees with one shared 17² grid and one instanced
-  draw. The range factor is k = 5.5 and the morph runs over 0.9–1.0 of the
-  range. The morph is symmetric: odd vertices blend toward the midpoint of
+- **CDLOD:** six face quadtrees with one shared 17² grid, instanced in two
+  draws: the nodes reaching into the homestead's ground (its plateau, its
+  pond and the cottage's shadow: discs from `Terrain.homeAreas`, flagged by
+  the selection) with the full ground shader, and the rest with a build
+  without the homestead's code (`AWAY_FROM_HOME`: the clearing, the
+  cottage's shadow, the shade under the pier; their vertices read the baked
+  ground alone). It draws the same pixels, but the ground's shader is large
+  enough that code which never runs still slows every pixel (about 2 ms in
+  the vista, 237 m from the cottage, through iteration 12). The water's bank
+  march and the cottage in its reflection keep the homestead everywhere: a
+  reflected ray can reach it from far off. The range factor is k = 5.5 and
+  the morph runs over 0.9–1.0 of the range. The morph is symmetric: odd vertices blend toward the midpoint of
   their parent-grid neighbours. Classic CDLOD slides them toward one
   neighbour, which tears at cube-face seams where the two faces run the edge
   parameter in opposite directions. Crack-freeness is proven by test on
@@ -202,12 +211,16 @@ tests still read the same fields from the CPU side.
 - **Culling:** the camera's view frustum. Horizon culling uses the true sphere
   in Overview and the warped curvature in Wander: ground of height H is
   hidden beyond √(2·R_eff·h) + √(2·R_eff·H).
-- **Field maps:** every frame, three small passes (256² on high) evaluate the
-  ground (height, distance to the shore, clearing, bloom), the meadow and its
-  light (lushness, wetness, cloud shadow, colour variant) and the shared wind
-  (bend vector, sheen). Each is an azimuthal projection around the focus.
-  Grass, flowers and petals fetch these instead of re-running noise per
-  vertex. They are skipped when no vegetation is in view.
+- **Field maps:** every frame, three small passes (256² on medium, 512² on
+  high) evaluate the ground (height, distance to the shore, clearing, bloom),
+  the meadow and its light (lushness, wetness, cloud shadow, colour variant)
+  and the shared wind (bend vector, sheen). Each is an azimuthal projection
+  around the focus. Grass, flowers and petals fetch these instead of
+  re-running noise per vertex. They are skipped when no vegetation is in
+  view. They are drawn first in the frame, the meadow pass reading the last
+  frame's cloud shadows: their shading costs almost nothing, but drawn after
+  the clouds' passes the main pass, whose blades read the maps in their
+  vertex shader, waited for both (about 1.3 ms a frame through iteration 12).
 - **Scatter layer:** handles grass, flowers and later stones. Quadtree tiles
   around the focus are enumerated from the rest-space point set by
   time-sliced jobs (64 steps per tile, pooled typed buffers). They go into a
@@ -485,12 +498,26 @@ grass → flowers → birds → butterflies → clouds → particles. Before it,
 frame, the clouds render their shadow cube map (with the birds' discs, on the
 faces holding ground in sight) and its sharper window about the focus, their cover-from-below cube map (from orbit
 only) and their mirror (the billboards from the camera mirrored in the
-water, at full resolution). Post then draws to the screen.
+water, at full resolution). The mirror is shaded only where a lake can read
+it (waterMask.ts): a map of 8 px cells set where the camera's rays meet the
+water table on wet ground (found from the bake, not by drawing the terrain
+again), grown by the farthest the wind's ruffle can move a lake's lookup
+(cloudsInMirror); the mirror discards everything else first. Through
+iteration 12 it shaded the whole screen, and 78–100 % of that never reached
+a lake. Post then draws to the screen.
 
-A frame runs in this order: a resize the last frame asked for (the quality
-controller's render scale, a change of tier), then the build queue, then the
-update, then the render. A canvas resize clears the canvas, so it is never
-done after the draw (the drawn frame would be shown blank). Tiles are built
+A frame runs in this order: a resize the last frame asked for (a change of
+tier), then the build queue, then the update, then the render. A canvas
+resize clears the canvas, so it is never done after the draw (the drawn
+frame would be shown blank). The render scale is not a resize: the canvas
+and the screen-sized targets (the scene, the bloom chain, the clouds'
+mirror, the water mask) keep their size, the frame is drawn into the
+lower-left part of them the scale asks for (`Post.setView`, the targets'
+viewports), and the grade spreads it over the canvas, the paper grain at
+the canvas's own resolution. The grade, the bloom and the lakes' mirror
+keep their lookups inside the drawn part (their extents). A change of scale
+reallocates nothing (through iteration 12 each one reallocated about
+130 MB, a frame of 70–90 ms), and scale 1 draws exactly what it did. Tiles are built
 before the update, which decides from every tile's pages which are drawn
 (built between the two, a tile's blades moved to pages not marked visible,
 and a strip of it was missing for a frame). Both are tested on a live walk
@@ -551,19 +578,21 @@ so any view can be shared.
   across the meadow. The default stand (by the first water at the edge of
   the nearest wetland) is searched on the set-up ground (before iteration 10
   it ran at startup before the ground was set up).
-- **Tier selection:** `auto` starts desktops on medium (phones, and desktops
-  that fail the startup probe, on low); high is chosen, not picked. A live
-  controller aims at a steady 60 fps (16.7 ms; 24 ms, tried in iteration 6,
-  read as 30–40 fps with uneven frames on a 60 Hz screen) by the render
-  scale alone: frames slow for 1.5 s step it down (×0.9, to 0.6); steady
-  frames step it back up after 6 s, and each time a step up proves too much
-  the next waits twice as long (to 2 min), so it does not hunt. It does not
-  change the tier as you go: a tier change rebuilds every blade and flower
-  in sight, which reads as the meadow reloading and flickering (iterations
-  6–10 did, and reset the scale to full each time, so frames got slower
-  before they got faster). Only a machine still far too slow at the smallest
-  scale (frames over 25 ms for 5 s) steps an Auto tier down, keeping its
-  scale, and never back up. Covered by quality.test.ts.
+- **Tier selection:** `auto` starts desktops on high (phones, and desktops
+  that fail the startup probe, on low) and keeps it: resolution is not the
+  look (Kai, after iteration 12), and a little upscaling blur is welcome. A
+  live controller aims at a steady 60 fps (16.7 ms; 24 ms, tried in
+  iteration 6, read as 30–40 fps with uneven frames on a 60 Hz screen) by
+  the render scale alone, down to 0.5. A step costs nothing (see Frame), so
+  frames slow for 0.75 s step it down at once by as much as their time asks
+  (×0.92 to ×0.75); steady frames step it back up (×1/0.9) after 6 s, and
+  each time a step up proves too much the next waits twice as long (to
+  2 min), so it does not hunt. It does not change the tier as you go: a
+  tier change rebuilds every blade and flower in sight, which reads as the
+  meadow reloading and flickering (iterations 6–10 did). Only a machine
+  still far too slow at the smallest scale (frames over 25 ms for 5 s)
+  steps an Auto tier down, keeping its scale, and never back up. Covered by
+  quality.test.ts.
 - **MSAA:** a 4× HalfFloat MSAA target costs about 56 B per pixel, about
   200 MB at 1440p with DPR 2, which would break the memory budget on its own.
   So MSAA is used only on displays of DPR < 1.75 (whatever the render scale).
