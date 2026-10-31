@@ -1,5 +1,6 @@
 import './ui/style.css';
 import { NoToneMapping, SRGBColorSpace, Vector2, WebGLRenderer } from 'three';
+import { BuildBudget } from './core/buildBudget';
 import { FrameClock } from './core/clock';
 import { createGlobals } from './core/globals';
 import { gpuMemory } from './core/gpuMemory';
@@ -19,6 +20,7 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from './view/input';
+import { AHEAD } from './life/scatter';
 import { Keys } from './view/keys';
 import { World } from './world';
 
@@ -44,26 +46,13 @@ function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
   }
 }
 
-/** Budget for background work (tile builds) per frame, ms. */
-const BUILD_BUDGET_MS = 2;
 /**
- * The frame's JS (update, building, render submission) aims to stay under
- * this (ms): the build queue gets what is left after the update and the
- * render (as long as the last one took), never less than BUILD_MIN_MS so
- * the meadow keeps growing in, never more than its slice.
- */
-const FRAME_JS_MS = 3.6;
-const BUILD_MIN_MS = 0.5;
-/**
- * While a backlog of tiles waits (more than BACKLOG jobs: you zoomed in or
- * jumped), a desktop lets the frame's JS run to this and the build to its
- * larger slice, so the grass catches up about twice as fast; the GPU's share
- * of the frame is far longer, so the frame rate holds. Phones keep the
- * plain budget.
+ * More tiles than this waiting in the near field (you zoomed in, jumped or
+ * glided; tiles built ahead of its edge do not count) is a backlog, which
+ * the build queue catches up on with a larger slice of the frame, on a phone
+ * too (core/buildBudget.ts).
  */
 const BACKLOG = 4;
-const BACKLOG_FRAME_JS_MS = 5;
-const BACKLOG_BUILD_BUDGET_MS = 3.6;
 
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -99,7 +88,8 @@ async function boot(): Promise<void> {
 
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
-  if (import.meta.env.DEV) (window as unknown as { __world: World }).__world = world;
+  // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
+  if (import.meta.env.DEV || import.meta.env.VITE_PROBE) (window as unknown as { __world: World }).__world = world;
   const camera = world.rig.camera;
   const post = new Post(renderer);
   post.bloomEnabled = quality.tier.bloom;
@@ -291,30 +281,32 @@ async function boot(): Promise<void> {
     const n = Math.min(count, logCount);
     return Array.from({ length: n }, (_, k) => ({ ...frameLog[(logHead - n + k + LOG) % LOG] }));
   };
-  let renderMs = 1;
-  let updateMs = 1;
+  // Tile builds run after each frame, in a task of their own: the frame is handed to the GPU first,
+  // so a build overlaps the GPU's work instead of delaying it (run at the start of the frame through
+  // iteration 13, it added its time to every frame the GPU held up), in the time the frame leaves
+  // before the next one (core/buildBudget.ts). It finishes before the next frame's update, which
+  // decides from every tile's pages which are drawn (built between the update and the draw, a tile's
+  // blades moved to pages not yet marked visible and a strip of it was missing for a frame, iteration 12).
+  const budget = new BuildBudget(quality.device.mobile);
+  const afterFrame = new MessageChannel();
+  let frameStart = 0;
+  afterFrame.port1.onmessage = () => {
+    const backlog = world.queue.countBelow(AHEAD) > BACKLOG;
+    budget.begin(clock.frameMs, backlog);
+    world.queue.run(budget.next(backlog, frameStart + budget.frameMs - performance.now()));
+  };
   const frame = (now: number): void => {
     clock.tick(now);
     if (resizePending) {
       resizePending = false;
       resize();
     }
+    frameStart = now;
     const t0 = performance.now();
     gpuTimer.begin();
-    // Finish the tiles first: the update then decides what to draw from every tile's pages as
-    // they are. (Built between the update and the draw, a tile's blades moved to pages the
-    // update had not marked visible, so a strip of it went missing for a frame.) The budget is
-    // what the update and the render leave of the frame's JS, the update as long as the
-    // slowest of the last frames' (it can jump from one frame to the next while the world grows).
-    const catchUp = world.queue.size > BACKLOG && !quality.device.mobile;
-    world.queue.run(Math.min(catchUp ? BACKLOG_BUILD_BUDGET_MS : BUILD_BUDGET_MS, Math.max(BUILD_MIN_MS, (catchUp ? BACKLOG_FRAME_JS_MS : FRAME_JS_MS) - updateMs - renderMs)));
-    const u0 = performance.now();
     controls.tick(clock.realDt);
     update();
-    updateMs = Math.max(performance.now() - u0, updateMs * 0.95);
-    const r0 = performance.now();
     render();
-    renderMs += (performance.now() - r0 - renderMs) * 0.25;
     gpuTimer.end();
     gpuTimer.poll();
     const jsMs = performance.now() - t0;
@@ -334,12 +326,29 @@ async function boot(): Promise<void> {
       resizePending = true;
     } else if (change === 'scale') applyScale();
     hud.frame(stats, quality.tier.budgets, now);
+    afterFrame.port2.postMessage(null);
   };
 
   // Warm every shader before the first frame, against the real render target.
   resize();
   update();
   await post.warm(world.scene, camera);
+  // From orbit (the default start) the near field is not drawn, so its first use waited for the
+  // way down: the field map's, the clouds' mirror's and the water mask's programs linked and the
+  // grass and flower instances sent to the GPU then (a frame of 60–140 ms, which also starved the
+  // tile builds for about a second through iteration 13). Pay for them now: one frame drawn in
+  // the meadow, then the pose's own, before anything is shown.
+  if (!world.nearFieldDrawn) {
+    const zoom = world.rig.zoom;
+    world.rig.setZoom(1, true);
+    world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
+    render();
+    world.rig.setZoom(zoom, true);
+    update();
+    render();
+  }
+  // and every program's first use (its uniforms looked up) now rather than at its first draw
+  for (const program of renderer.info.programs ?? []) program.getUniforms();
 
   let markReady: () => void = () => undefined;
   const ready = new Promise<void>((resolve) => (markReady = resolve));

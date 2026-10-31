@@ -94,15 +94,20 @@ test.describe('growth', () => {
     );
     const log = (await page.evaluate(() => window.__meadow?.frameLog(160))) ?? [];
     expect(log.length).toBeGreaterThan(100);
-    const js = log.map((f) => f.jsMs).sort((a, b) => a - b);
+    const sorted = (k: 'jsMs' | 'frameMs'): number[] => log.map((f) => f[k]).sort((a, b) => a - b);
+    const js = sorted('jsMs');
+    const frames = sorted('frameMs');
     const build = Math.max(...log.map((f) => f.buildMs));
-    const p95 = js[Math.floor(js.length * 0.95)];
-    test.info().annotations.push({ type: 'scrub', description: `JS p95 ${p95.toFixed(2)} ms, max ${js.at(-1)!.toFixed(2)} ms, build slice max ${build.toFixed(2)} ms` });
-    // a desktop catching up on a backlog of tiles lets the frame's JS run to 5 ms (main.ts BACKLOG_FRAME_JS_MS);
-    // the rest is submission (since iteration 13 the water mask's passes and the terrain's second draw:
-    // about 0.05 ms, p95 5.3–5.5 ms on the M1 Pro, timed in 0.1 ms steps)
-    expect(p95).toBeLessThan(5.6);
-    expect(build).toBeLessThan(4.2); // the queue keeps to its 3.6 ms backlog slice (+ at most one short job step)
+    const p95 = (a: number[]): number => a[Math.floor(a.length * 0.95)];
+    test.info().annotations.push({ type: 'scrub', description: `frame p95 ${p95(frames).toFixed(2)} ms, JS p95 ${p95(js).toFixed(2)} ms, max ${js.at(-1)!.toFixed(2)} ms, build slice max ${build.toFixed(2)} ms` });
+    // Re-tiling as the planet grows is a backlog, which the queue catches up on after each frame (in a
+    // task of its own, overlapping the GPU's work) with a slice that grows while frames keep time
+    // (core/buildBudget.ts, to 8 ms on a desktop): the frames hold 60 fps (p95 16.7–16.8 ms on the
+    // M1 Pro, as with iteration 13's 3.6 ms slice inside the frame), the frame's own JS stays well
+    // within it, and the slice within its ceiling.
+    expect(p95(frames)).toBeLessThan(20);
+    expect(p95(js)).toBeLessThan(12.7);
+    expect(build).toBeLessThan(8.6); // 8 ms, at most one short job step over
   });
 });
 

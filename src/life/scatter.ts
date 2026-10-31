@@ -47,6 +47,8 @@ const PAGE_ROWS = 256;
 export const NEVER = 1e30;
 /** Build order: tiles out of view wait behind those in view as if this much farther away (m). */
 const OUT_OF_VIEW_M = 60;
+/** Build order: tiles built ahead (beyond the near field's edge) wait behind every tile in it; the frame loop does not count them as a backlog. */
+export const AHEAD = 1000;
 
 export interface ScatterSpec {
   readonly name: string;

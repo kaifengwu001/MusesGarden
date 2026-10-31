@@ -17,34 +17,50 @@ export class BuildQueue {
   /** Milliseconds spent in the most recent `run`. */
   lastMs = 0;
   private entries: Entry[] = [];
-  /** The longest recent job step (ms, slowly forgotten): a step is not started unless one that long would still fit. */
-  private stepMs = 0.2;
+  private readonly byKey = new Map<string, Entry>();
+  /**
+   * The mean job step of recent runs (ms): a step is not started unless twice
+   * that would still fit. A mean over whole runs, not the slowest single
+   * step: WebKit's clock reads whole milliseconds, so a single step measured
+   * 0 or 1 ms, and a guard on the slowest (iterations 5–13) let a phone run
+   * one 1/256 of a tile a frame.
+   */
+  private meanStep = 0.05;
 
   get size(): number {
     return this.entries.length;
   }
 
   has(key: string): boolean {
-    return this.entries.some((e) => e.key === key);
+    return this.byKey.has(key);
+  }
+
+  /** Jobs more urgent than `priority` (lower values). */
+  countBelow(priority: number): number {
+    let n = 0;
+    for (const e of this.entries) if (e.priority < priority) n++;
+    return n;
   }
 
   /** Add or replace the job under `key`. */
   add(key: string, priority: number, job: Job): void {
     this.cancel(key);
-    this.entries.push({ key, priority, job });
+    const entry = { key, priority, job };
+    this.entries.push(entry);
+    this.byKey.set(key, entry);
   }
 
   reprioritise(key: string, priority: number): void {
-    const e = this.entries.find((x) => x.key === key);
+    const e = this.byKey.get(key);
     if (e) e.priority = priority;
   }
 
   cancel(key: string): void {
-    const i = this.entries.findIndex((e) => e.key === key);
-    if (i >= 0) {
-      this.entries[i].job.return(undefined);
-      this.entries.splice(i, 1);
-    }
+    const e = this.byKey.get(key);
+    if (!e) return;
+    e.job.return(undefined);
+    this.byKey.delete(key);
+    this.entries.splice(this.entries.indexOf(e), 1);
   }
 
   /**
@@ -54,21 +70,21 @@ export class BuildQueue {
   run(budgetMs: number): number {
     const t0 = performance.now();
     if (this.entries.length > 1) this.entries.sort((a, b) => a.priority - b.priority);
-    let stepped = false;
+    let steps = 0;
     while (this.entries.length > 0) {
       const entry = this.entries[0];
       let done = false;
       while (!done) {
-        const start = performance.now();
-        if (stepped && start - t0 + this.stepMs > budgetMs) break;
+        if (steps > 0 && performance.now() - t0 + 2 * this.meanStep > budgetMs) break;
         done = entry.job.next().done === true;
-        stepped = true;
-        this.stepMs = Math.max(performance.now() - start, this.stepMs * 0.995);
+        steps++;
       }
       if (!done) break;
       this.entries.shift();
+      this.byKey.delete(entry.key);
     }
     this.lastMs = performance.now() - t0;
+    if (steps > 0 && Number.isFinite(budgetMs)) this.meanStep += (this.lastMs / steps - this.meanStep) * 0.2;
     return this.lastMs;
   }
 

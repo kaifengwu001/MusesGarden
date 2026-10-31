@@ -124,6 +124,8 @@ export class World {
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
+  /** Whether the last update drew the near field (grass or flowers around the focus). */
+  nearFieldDrawn = false;
   private readonly heightBound = (): number => this.terrain.maxHeight;
 
   constructor(
@@ -390,7 +392,8 @@ export class World {
     const grassNear = p.grass.nearRadius * this.tier.grassRadiusScale * lowness;
     const flowerNear = 30 * this.tier.flowerRadiusScale * lowness;
     this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
-    if (grassNear > 0.5 || flowerNear > 0.5) this.field.render(this.renderer, rig.up, rig.forward, R);
+    this.nearFieldDrawn = grassNear > 0.5 || flowerNear > 0.5;
+    if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
