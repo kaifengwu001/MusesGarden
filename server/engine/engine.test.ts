@@ -1,5 +1,9 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Instant, MuseId, MuseSeed, StoredEvent } from '../../src/muse/contract';
+import { openSqliteStore } from '../adapters/store/sqlite';
 import { Engine } from './engine';
 import { memoryStore, stubDeps } from './testing/stubs';
 
@@ -117,6 +121,31 @@ describe('engine clock', () => {
         if (e.event.kind === 'episode.ended') open--;
         expect(open === 0 || open === 1, `${id} at seq ${e.seq}`).toBe(true);
       }
+    }
+  });
+});
+
+describe('engine on SQLite', () => {
+  it('a restarted engine on the same database file picks up exactly where it left off', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'muse-engine-'));
+    try {
+      const path = join(dir, 'garden.db');
+      const reference = await world(['moss', 'wren'], { introduce: true, work: [['moss', 4, 6]] });
+      await reference.engine.advanceTo(at(30));
+
+      const first = new Engine(stubDeps(memoryStore(openSqliteStore(path))), T0);
+      for (const id of ['moss', 'wren']) await first.addMuse(seed(id), `I am ${id}.`, '', T0);
+      await first.introduce('moss' as MuseId, 'wren' as MuseId, T0);
+      first.scheduleWork('moss' as MuseId, at(4), at(6));
+      await first.advanceTo(at(11));
+
+      const store = openSqliteStore(path);
+      const second = new Engine(stubDeps(memoryStore(store)), at(11));
+      await second.advanceTo(at(30));
+      for (const id of ['moss', 'wren'] as MuseId[]) expect(strip(second.log(id))).toEqual(strip(reference.engine.log(id)));
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

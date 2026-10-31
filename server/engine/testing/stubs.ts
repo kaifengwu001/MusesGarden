@@ -4,12 +4,10 @@ import { hash32, mix, salt, unit } from '../../../src/core/hash';
 import type {
   Candidate,
   CanonicalUrl,
-  CommitBatch,
   Draw,
   EventRef,
   Instant,
   LifePolicy,
-  LlmCache,
   Mind,
   MuseId,
   MuseSeed,
@@ -17,13 +15,12 @@ import type {
   ReduceCore,
   ReduceSocial,
   RegionKey,
-  ScheduleItem,
   SocialPolicy,
   Source,
   Store,
-  StoredEvent,
   TopicKey,
 } from '../../../src/muse/contract';
+import { openMemoryStore } from '../../adapters/store/memory';
 import type { EngineDeps } from '../engine';
 
 const MIN = 60_000;
@@ -189,60 +186,23 @@ export const mind: Mind = {
   estimateTemperament: () => Promise.resolve({ curiosity: 0.5, focus: 0.5, sociability: 0.5, whimsy: 0.5, novelty: 0.5 }),
 };
 
-/** An in-memory Store with the real contract's atomicity and ordering. */
-export function memoryStore(): Store & { failNextCommit(): void } {
-  const muses: MuseSeed[] = [];
-  const events = new Map<MuseId, StoredEvent[]>();
-  let schedule = new Map<string, ScheduleItem>();
-  const souls = new Map<MuseId, string>();
-  const cache = new Map<string, string>();
+/** Lane B's memory store, plus a switch that makes the next commit fail like a crash would. */
+export function memoryStore(inner: Store = openMemoryStore()): Store & { failNextCommit(): void } {
   let fail = false;
-  const llmCache: LlmCache = {
-    get: (k) => Promise.resolve(cache.get(k)),
-    set: (k, v) => {
-      cache.set(k, v);
-      return Promise.resolve();
-    },
-  };
-  const order = (a: ScheduleItem, b: ScheduleItem) =>
-    a.at - b.at || cmp(a.museId, b.museId) || cmp(a.kind, b.kind) || cmp(a.id, b.id);
   return {
+    ...inner,
+    llmCache: inner.llmCache,
     failNextCommit: () => {
       fail = true;
     },
-    commit(batch: CommitBatch) {
+    commit(batch) {
       if (fail) {
         fail = false;
         throw new Error('injected crash');
       }
-      const next = new Map(events);
-      for (const e of batch.events) {
-        const log = [...(next.get(e.museId) ?? [])];
-        if (e.seq !== log.length + 1) throw new Error(`seq conflict for ${e.museId}`);
-        log.push(e);
-        next.set(e.museId, log);
-      }
-      const sched = new Map(schedule);
-      for (const id of batch.remove) sched.delete(id);
-      for (const item of batch.schedule) sched.set(item.id, item);
-      for (const [k, v] of next) events.set(k, v);
-      schedule = sched;
+      inner.commit(batch);
     },
-    addMuse: (seed) => void muses.push(seed),
-    muses: () => muses,
-    events: (id, after = 0) => (events.get(id) ?? []).filter((e) => e.seq > after),
-    lastSeq: (id) => events.get(id)?.length ?? 0,
-    due: (until, limit) => [...schedule.values()].filter((i) => i.at <= until).sort(order).slice(0, limit),
-    pending: (id) => [...schedule.values()].filter((i) => i.museId === id).sort(order),
-    soulText: (id) => souls.get(id) ?? null,
-    setSoulText: (id, text) => void souls.set(id, text),
-    llmCache,
-    close: () => undefined,
   };
-}
-
-function cmp(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 export function stubDeps(store: Store): EngineDeps {
