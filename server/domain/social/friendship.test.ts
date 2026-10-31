@@ -1,3 +1,4 @@
+import { SOCIAL } from './constants';
 import { describe, expect, it } from 'vitest';
 import type { MuseEventBody, MuseState } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
@@ -125,10 +126,16 @@ describe('friendships ending', () => {
     return Infinity;
   }
 
-  it('ends after k unpleasant hangouts in a row, and k grows with rapport', () => {
-    expect(hangoutsUntilEnded(0)).toBe(2);
-    // Seven hangouts at p = 0.6 give rapport 4.2: k = 2 + floor(4.2 / 2) = 4.
-    expect(hangoutsUntilEnded(7)).toBe(4);
+  it('ends only after k hangouts in a row fall well below the pair\'s usual, and k grows with rapport', () => {
+    const soon = hangoutsUntilEnded(3);
+    const later = hangoutsUntilEnded(7);
+    expect(Number.isFinite(soon)).toBe(true);
+    expect(soon).toBeGreaterThanOrEqual(SOCIAL.streakBase);
+    expect(later).toBeGreaterThan(soon);
+  });
+
+  it('never ends a friendship for being different: a pair that was never close cannot drift apart', () => {
+    expect(hangoutsUntilEnded(0)).toBe(Infinity);
   });
 
   it('starts the count over after a pleasant hangout', () => {

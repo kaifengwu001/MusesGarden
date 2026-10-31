@@ -11,7 +11,7 @@ function canMeet(a: MuseState, b: MuseState): boolean {
 
 export function encounterRate(a: MuseState, b: MuseState): number {
   if (!canMeet(a, b)) return 0;
-  return a.temperament.sociability * b.temperament.sociability * chemistry(a, b).similarity;
+  return SOCIAL.encountersPerHour * a.temperament.sociability * b.temperament.sociability * chemistry(a, b).similarity;
 }
 
 export function encounter(a: MuseState, b: MuseState, now: Instant, draw: Draw): PairOutcome {

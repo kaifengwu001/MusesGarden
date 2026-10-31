@@ -23,12 +23,10 @@ export function areFriends(a: MuseState, b: MuseState): boolean {
 export function chemistry(a: MuseState, b: MuseState): { readonly similarity: number; readonly pleasantness: number } {
   const pa = publicProfile(a);
   const pb = publicProfile(b);
-  if (pa.interests.length === 0 || pb.interests.length === 0) {
-    // Before either has anything public, sociability stands in, so a day-one introduction isn't judged drifted apart.
-    return { similarity: 0, pleasantness: (a.temperament.sociability + b.temperament.sociability) / 2 };
-  }
+  const warmth = (a.temperament.sociability + b.temperament.sociability) / 2;
   const sim = similarity(pa, pb);
-  return { similarity: sim, pleasantness: SOCIAL.pleasantSimilarity * sim + SOCIAL.pleasantStretch * stretch(overlap(pa, pb)) };
+  const shared = SOCIAL.pleasantSimilarity * sim + SOCIAL.pleasantStretch * stretch(overlap(pa, pb));
+  return { similarity: sim, pleasantness: SOCIAL.pleasantWarmth * warmth + (1 - SOCIAL.pleasantWarmth) * shared };
 }
 
 export function familiarityNeeded(t: Temperament): number {
@@ -39,8 +37,13 @@ export function befriendChance(sim: number, t: Temperament): number {
   return sim * (SOCIAL.befriendBase + (1 - SOCIAL.befriendBase) * t.sociability);
 }
 
-export function isUnpleasant(pleasantness: number): boolean {
-  return pleasantness < SOCIAL.unpleasantBelow;
+/**
+ * Unpleasant means worse than this pair usually is, not merely different: friends with unrelated interests stay
+ * friends, and a friendship ends only when it drifts (Kai: interests and personality change over time).
+ */
+export function isUnpleasant(pleasantness: number, r: Pick<Relationship, 'rapport' | 'hangouts'> | undefined): boolean {
+  if (!r || r.hangouts < SOCIAL.unpleasantAfterHangouts) return false;
+  return pleasantness < SOCIAL.unpleasantVsAverage * (r.rapport / r.hangouts);
 }
 
 export function toleratedStreak(rapport: number): number {

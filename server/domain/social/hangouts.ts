@@ -106,7 +106,7 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
 
   const rel = relationshipWith(host, guest.seed.id);
   const rapport = (rel?.rapport ?? 0) + pleasantness;
-  if (isUnpleasant(pleasantness) && (rel?.unpleasantStreak ?? 0) + 1 >= toleratedStreak(rapport)) {
+  if (isUnpleasant(pleasantness, rel) && (rel?.unpleasantStreak ?? 0) + 1 >= toleratedStreak(rapport)) {
     const ended = ending(host, guest, 'drifted-apart');
     return { host: [...hostLog, ...ended.self], guest: [...guestLog, ...ended.other] };
   }
