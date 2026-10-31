@@ -378,6 +378,14 @@ export class World {
     const cs = localSun(L.cottage, sun.elevation, sun.azimuth, this.tmp2);
     const sy = Math.max(cs.dot(L.cottage), 0.12);
     this.terrainUniforms.uCottageSun.value.set(cs.dot(across) / sy, cs.dot(L.homeBearing) / sy, 0, 0);
+    // Near field: grass blades and flowers replace the paint around the focus. Its field map is
+    // drawn before the clouds' passes, its meadow pass reading the last frame's cloud shadows:
+    // drawn after them, the main pass (whose blades read the map as they are placed) waited on both.
+    const lowness = smoothstep(90, 30, rig.altitude);
+    const grassNear = p.grass.nearRadius * this.tier.grassRadiusScale * lowness;
+    const flowerNear = 30 * this.tier.flowerRadiusScale * lowness;
+    this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
+    if (grassNear > 0.5 || flowerNear > 0.5) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
@@ -405,12 +413,6 @@ export class World {
       },
       this.lod,
     );
-    // Near field: grass blades and flowers replace the paint around the focus.
-    const lowness = smoothstep(90, 30, rig.altitude);
-    const grassNear = p.grass.nearRadius * this.tier.grassRadiusScale * lowness;
-    const flowerNear = 30 * this.tier.flowerRadiusScale * lowness;
-    this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
-    if (grassNear > 0.5 || flowerNear > 0.5) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.grass.update(
       {
         seed: p.world.seed,

@@ -12,11 +12,17 @@ uniform float uRadius;
 
 uniform mat4 uProjection; // projectionMatrix is not declared in fragment shaders
 uniform float uPixelAngle;
+#ifdef MIRROR_PASS
+uniform sampler2D uWaterMask; // the cells of the screen a lake can read the mirror in (waterMask.ts)
+#endif
 
 varying vec3 vPoint;
 flat varying int vRow;
 
 void main() {
+#ifdef MIRROR_PASS
+  if (texelFetch(uWaterMask, ivec2(gl_FragCoord.xy) / MASK_CELL, 0).r < 0.5) discard;
+#endif
   vec3 rd = normalize(vPoint - cameraPosition);
   Cloud cl = loadCloud(vRow);
   vec4 puffs[PUFFS];

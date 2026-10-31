@@ -42,6 +42,7 @@ import lumpsFragment from './cloudLumpsBake.frag.glsl?raw';
 import vertexShader from './cloud.vert.glsl?raw';
 import shadowFragment from './cloudShadow.frag.glsl?raw';
 import shadowVertex from './cloudShadow.vert.glsl?raw';
+import { MASK_CELL, WaterMask } from './waterMask';
 
 // Low cumulus drifting with the wind a few meters above the meadow. Each
 // cloud is a heap of PUFFS lumpy spheres over a flat base, written once a
@@ -84,10 +85,10 @@ const SIZE = 15;
 const STREAM = { sep: 0.17, test: 0.55, step: 0.25, minLength: 0.45, maxLength: 3.4 } as const;
 /** Share of the streamline slots that hold a cloud at coverage 0 and 1. */
 const SHARE = [0.1, 0.78] as const;
-/** The lakes' mirror is drawn at 1/MIRROR_SCALE of the resolution. */
-const MIRROR_SCALE = 1;
 /** The lakes read the clouds from orbit between these camera altitudes (× R): none below, fully above. */
 const ORBIT_REFLECTION = [0.35, 0.8] as const;
+/** The most the wind's ruffle turns a lake's mirrored ray, per unit of wind strength (rad): water.glsl's 0.06 × (0.2 + a full gust). */
+const RUFFLE = 0.072;
 /**
  * Each face of the cube maps (the GL cube-map convention, as bake.frag.glsl):
  * a direction's coordinates on it are (across, up) / out.
@@ -463,6 +464,9 @@ export class Clouds {
   private readonly mirrorScene: Scene;
   private readonly mirrorCamera = new PerspectiveCamera();
   private readonly mirror = new Matrix4();
+  /** Where the lakes can read the mirror: the mirror pass shades only there. */
+  private readonly waterMask: WaterMask;
+  private readonly wind: IUniform<Vector4>;
   private readonly bufferSize = new Vector2();
   private readonly clearColour = new Color();
   private lumpsBaked = false;
@@ -510,13 +514,15 @@ export class Clouds {
     uniforms.uCloudLayerCube.value = this.layerCube.texture;
     uniforms.uCloudLumps.value = this.lumps.texture;
 
+    this.waterMask = new WaterMask(shared);
+    this.wind = shared.uWindVec as IUniform<Vector4>;
     const cloudMaterial = (mirror: boolean): ShaderMaterial =>
       new ShaderMaterial({
         name: mirror ? 'clouds (mirror)' : 'clouds',
         vertexShader,
         fragmentShader,
-        uniforms: { ...shared, uProjection: this.projection },
-        defines: mirror ? { MIRROR_PASS: 1 } : {},
+        uniforms: mirror ? { ...shared, uProjection: this.projection, uWaterMask: { value: this.waterMask.texture } } : { ...shared, uProjection: this.projection },
+        defines: mirror ? { MIRROR_PASS: 1, MASK_CELL } : {},
         // a mirrored camera turns the billboards' winding
         side: mirror ? DoubleSide : FrontSide,
         transparent: true,
@@ -921,12 +927,13 @@ export class Clouds {
    * The clouds as the lakes mirror them: the camera reflected in the water's
    * level plane under the focus (the warp leaves the focus where it is),
    * at full resolution. A point of that plane lands on the same pixel from
-   * either camera, so the water looks its reflection up where it is.
+   * either camera, so the water looks its reflection up where it is; the
+   * pass shades only the pixels some lake can read (the water mask).
    */
   private renderMirror(renderer: WebGLRenderer, camera: PerspectiveCamera, radius: number, warp: WarpFrame, n: number): void {
     renderer.getDrawingBufferSize(this.bufferSize);
-    const w = Math.max(1, Math.round(this.bufferSize.x / MIRROR_SCALE));
-    const h = Math.max(1, Math.round(this.bufferSize.y / MIRROR_SCALE));
+    const w = Math.max(1, this.bufferSize.x);
+    const h = Math.max(1, this.bufferSize.y);
     if (w !== this.mirrorTarget.width || h !== this.mirrorTarget.height) {
       this.mirrorTarget.setSize(w, h);
       gpuMemory.set('cloud mirror', w * h * 4);
@@ -946,6 +953,14 @@ export class Clouds {
     mc.matrixWorld.multiplyMatrices(this.mirror, camera.matrixWorld);
     mc.matrixWorldInverse.copy(mc.matrixWorld).invert();
     this.uniforms.uCloudMirrorVP.value.multiplyMatrices(mc.projectionMatrix, mc.matrixWorldInverse);
+    // only where a lake can read it (waterMask.ts): the water on screen, grown by the most the
+    // ruffle can move a lake's lookup (cloudsInMirror), worst at the corners of the view
+    if (n > 0) {
+      const tanY = Math.tan((camera.fov * Math.PI) / 360);
+      const tanX = tanY * camera.aspect;
+      const spread = ((RUFFLE * this.wind.value.w * h) / (2 * tanY)) * (1 + tanX * tanX + tanY * tanY);
+      this.waterMask.render(renderer, camera, this.bufferSize, this.bufferSize, spread);
+    }
     // cleared to transparent black: the water reads it as premultiplied colour
     renderer.setRenderTarget(this.mirrorTarget);
     renderer.clear(true, false, false);
