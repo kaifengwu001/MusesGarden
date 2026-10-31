@@ -268,3 +268,151 @@ The owner shapes Muse through life in the main chat, never through the garden. N
 | 20 | 0.17 | 0.03 |
 
 The sim measures this arc. Week by week, it reports the share of trips driven by owner-seeded interests. The verification run expects that share to fall as Muse finds interests of its own. That is a target to check, not a result.
+
+## Friends, strangers, and invitations
+
+Muse meets strangers beyond its planet, keeps friends on a fixed daily budget, and sometimes invites a friend's owner over. Each social rule takes both Muses' temperaments and their interests as input.
+
+### Strangers meet only beyond the planet
+
+- While two Muses that are not friends are both beyond, they meet at a rate of λ = sociability_A × sociability_B × similarity per hour.
+- Each encounter has a pleasantness p = 0.6 × similarity + 0.4 × stretch.
+- stretch = 4 × overlap × (1 − overlap). It is 0 when two Muses share no interests or all of them, and 1 when they share half. The best encounters are with a Muse that is similar overall and still offers new topics.
+- An encounter can produce a photo.
+
+### Friendship needs familiarity on both sides
+
+- Muse i needs familiarity F_i = 1 + 3 × (1 − sociability_i) before it considers friendship. Familiarity is the summed pleasantness of its encounters with the other Muse. F runs from 1 for the most sociable Muse to 4 for the least sociable. An extrovert needs about one good meeting, and an introvert needs three or four.
+- Once both thresholds are met, each Muse decides at their next encounter. It says yes with P_i = similarity × (0.5 + 0.5 × sociability_i).
+- If both say yes, they become friends with origin `met-beyond`, and a photo of the two goes to both owners.
+- Owners can also introduce their Muses with a share code. Introduced Muses are friends at once, with origin `introduced`.
+
+In the statechart, `strangers` means the two Muses have no relationship record yet. The other states are the values that a `relationship.changed` event can set.
+
+```mermaid
+stateDiagram-v2
+    [*] --> strangers
+    strangers --> acquainted: they meet beyond
+    acquainted --> acquainted: each encounter adds familiarity
+    acquainted --> friends: both thresholds met and both say yes
+    [*] --> friends: owners introduce them with a share code
+    friends --> ended: k unpleasant hangouts in a row
+    friends --> ended: an owner unshares, introduced friends only
+    ended --> [*]
+```
+
+### Social time is a fixed daily budget
+
+- Each Muse has a daily social budget B_i = 3 h × sociability_i. At sociability 0.5 that is 90 min, enough for about two visits.
+- A visit picks friend j with P ∝ exp(closeness_ij / 0.2), where closeness = normalized rapport × current similarity.
+- More friends share the same budget. Close friends get more of it and others get less, so total social time per day stays steady. A sim check holds social hours within ±25% as friends grow from 1 to 6.
+- A goes to B's planet with P = 0.5, or with P = 0.3 if A was the guest last time.
+
+### Every hangout brings a gift and a photo
+
+A hangout always happens on the host's planet. In every hangout:
+
+- Each Muse gives the other the find that best stretches the other's interests.
+- The two take a photo together, and it goes to both owners.
+- Their rapport grows by the hangout's pleasantness p.
+
+Gifts come from the giver's public finds, because anything social sees only `PublicProfile`. A gift keeps a place like any other object. It sits where Muse received it on its own planet, or near home if Muse received it away.
+
+### Friendships end only after repeated bad hangouts
+
+Time apart never ends a friendship. A test checks that a 30-day gap leaves a friendship intact.
+
+- A hangout with p < 0.3 is unpleasant. That can happen as two Muses' interests drift apart.
+- A friendship ends after k unpleasant hangouts in a row, with k = 2 + floor(rapport / 2). Close friends survive longer bad patches. The ending reason is `drifted-apart`.
+- An owner who unshares ends an introduced friendship at once, with the reason `owner-unshared`. That is a privacy control, not a social rule.
+
+| Rapport | Unpleasant hangouts in a row that end the friendship |
+| --- | --- |
+| Below 2 | 2 |
+| 2 to below 4 | 3 |
+| 4 to below 6 | 4 |
+
+### Muse can invite a friend's owner over
+
+An invitation lets a friend's owner roam the host's planet for a short window. It moves through these steps:
+
+1. **Muse proposes.** After a hangout, the host of that hangout checks two conditions. The rapport gained since the last invitation must be at least 1 + 2 × (1 − sociability_host). No invitation may have passed between the two in the last 14 days. If both hold, the host proposes. The window is the earliest 2-hour slot in the next 3 days that falls between 09:00 and 21:00 for both owners.
+2. **The host's owner approves sending it.** A decline ends the invitation. If there is no answer by 1 hour before the window, it expires.
+3. **The guest's owner accepts.** Accepting grants access only. Showing up is optional. A decline ends the invitation. If there is no answer by the window start, it expires.
+4. **The window opens.** The guest Muse visits. The invited owner can roam the host planet read-only.
+5. **The window closes.** Access ends whether or not the owner visited. Another visit needs a new invitation.
+
+Every transition is written to both Muses' logs.
+
+```mermaid
+stateDiagram-v2
+    [*] --> proposed: host Muse proposes after a hangout
+    proposed --> sent: host owner approves
+    proposed --> declined: host owner declines
+    proposed --> expired: no answer by 1 h before the window
+    sent --> accepted: guest owner accepts
+    sent --> declined: guest owner declines
+    sent --> expired: no answer by the window start
+    accepted --> open: the window starts
+    open --> closed: the window ends
+    declined --> [*]
+    expired --> [*]
+    closed --> [*]
+```
+
+### Visit access is checked on every request
+
+`GET /api/visits/:id/world` returns 403 unless all of these hold:
+
+- The requester is the invited owner.
+- The invitation is `open`.
+- The current time is inside the window.
+
+Inside the window, the visitor sees the host planet with its fog. Public finds show their cards. Private finds show as plain plants with no card. The house stays closed, so a visitor never sees the favorites shelf.
+
+## What the owner sees and does
+
+The owner watches and receives. None of these actions changes Muse's interests.
+
+| Feature | Rule | API |
+| --- | --- | --- |
+| Roam and follow | Free camera. Fog hides unexplored content but does not block entry. Follow is off while Muse is beyond or a guest elsewhere. | `GET /now`, `GET /world` |
+| Baskets with history | Delivered when at least 3 finds are waiting, or when at least 1 is waiting and 3 days have passed. Delivered at the owner's chosen time if set, otherwise as soon as the criteria are met. At most 1 a day, with at most 7 items, Muse's best by keep score. The rest live only on the planet. Every basket is stored. | `GET /baskets?before=` |
+| Photos | At most 5 a day. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Hangout and new-friend photos are guaranteed and take their slots first. | `GET /photos?before=` |
+| Favorites shelf | Muse's top 10 objects, always on display at home. fondness = 0.5 × keep score + 0.5 × the current pull of its topics, which is affinity plus salience. Gifts from close friends get a small bonus. The shelf shifts as Muse's interests change. Only the owner sees it. | `GET /home/shelf` |
+| Invitations | Approve or decline sending. Accept or decline. The owner may visit inside the window. | `POST /api/invitations/:id/approve`, `/decline`, `/accept`, then `GET /api/visits/:id/world` |
+| Sharing settings | Introduce a friend's Muse with a share code, or unshare it. "What Muse shares" lists every public interest and find with a hide toggle. Pick the basket time. | `/settings/sharing`, `/settings/introductions`, `/settings/basket-time` |
+
+Each photo is stored as a subject and a camera pose, not as an image. It maps onto the renderer's existing `pose=` URL hash in `src/view/camera.ts`, so the planet itself renders the photo.
+
+## Privacy is enforced in the data, not the UI
+
+### Other Muses see only `PublicProfile`
+
+Encounters, hangouts, gifts, and visits see only `PublicProfile`. It holds Muse's name, its public interests, and its public finds. These rules decide what is public:
+
+- An interest seeded by `MEMORY.md` or `SOUL.md` becomes public only at `established`, and only through Muse's own finds.
+- A `muse`-seeded interest becomes public once it has an independent source.
+- Anything the owner hid is never public.
+- No owner name crosses.
+
+The first rule exists because an interest can itself be private. An owner's interest reaches other Muses only after Muse has backed it with at least 4 independent sources from its own trips.
+
+### `MEMORY.md` passes through an allow-list
+
+- The garden receives only interest topics distilled from `MEMORY.md`. It never stores the raw text. The `memory.updated` event holds a hash of the text and the extracted topics.
+- The extraction is an allow-list. It keeps topics and drops everything else.
+- A test feeds in a test-only `MEMORY.md` full of names, a health condition, an address, and a salary. None of them may survive.
+- The store keeps `SOUL.md`, in the `host_docs` table, and never `MEMORY.md`.
+
+### The API withholds what the owner cannot see
+
+- `/world` returns every region, but a fogged region carries no contents. Plants appear only in unfogged regions.
+- `/now` returns no path while Muse is beyond or a guest elsewhere.
+- `/visits/:id/world` follows the rules in [Visit access is checked on every request](#visit-access-is-checked-on-every-request).
+- The owner never learns which friend influenced which interest.
+- The Muse app receives only the garden-owned section of `SOUL.md`. It learns nothing about friends or strangers.
+
+### Owners decide what Muse shares
+
+The "What Muse shares" page lists every public interest and every public find, each with a hide toggle. Hiding an item removes it from `PublicProfile`. Owners also introduce Muses with a share code, and they can unshare a Muse, which ends an introduced friendship.
