@@ -11,7 +11,7 @@ export type PhotoId = Brand<string, 'PhotoId'>;
 export type BasketId = Brand<string, 'BasketId'>;
 export type QuestionId = Brand<string, 'QuestionId'>;
 export type InvitationId = Brand<string, 'InvitationId'>;
-/** A cell of the cube-sphere grid: `${face}:${i}:${j}`, face 0–5, i and j in [0, REGION_GRID). */
+/** A cell of the cube-sphere grid: `${face}:${i}:${j}`, face 0–5, i and j in [0, REGION_GRID) (server/domain/atlas.ts, 4 to start). */
 export type RegionKey = Brand<string, 'RegionKey'>;
 /** A canonical English Wikipedia title after redirects, e.g. "Ultramarine". */
 export type TopicKey = Brand<string, 'TopicKey'>;
@@ -165,3 +165,624 @@ export interface CastMember {
 
 /** server/fixtures/work-*.json: when each Muse is busy with its owner's tasks. ISO 8601 with offset. */
 export type WorkSchedule = Readonly<Record<string, readonly { readonly start: string; readonly end: string }[]>>;
+
+// ─── The planet ─────────────────────────────────────────────────────────────
+
+/** A unit vector from the planet's centre ("rest space"): it never moves as the planet grows. */
+export type Dir = readonly [number, number, number];
+
+export interface Place {
+  readonly dir: Dir;
+  readonly region: RegionKey;
+}
+
+// ─── What Muse keeps ────────────────────────────────────────────────────────
+
+export interface Discovery {
+  readonly id: DiscoveryId;
+  readonly url: string;
+  readonly canonicalUrl: CanonicalUrl;
+  readonly title: string;
+  readonly summary: string;
+  readonly thumb?: string;
+  readonly topics: readonly TopicKey[];
+  /** The events that led Muse here (the hop, and the seed or question behind the trip). */
+  readonly because: readonly EventRef[];
+  /** "Why I kept this", in Muse's voice. */
+  readonly reason: string;
+  readonly keepScore: number;
+  readonly provenance: 'own' | 'gift';
+  /** Where Muse found it. A gift: where Muse received it on its own planet, or near home if received away. */
+  readonly place: Place;
+  readonly at: Instant;
+}
+
+/** What other Muses may see of a find. No place, no provenance. */
+export interface PublicDiscovery {
+  readonly id: DiscoveryId;
+  readonly url: string;
+  readonly canonicalUrl: CanonicalUrl;
+  readonly title: string;
+  readonly summary: string;
+  readonly thumb?: string;
+  readonly topics: readonly TopicKey[];
+}
+
+export type PhotoSubject = 'selfie' | 'scenery' | 'creature' | 'find' | 'friend' | 'new-friend';
+
+/** A photo is a reproducible view: the frontend turns dir/forward/zoom into the `pose=` hash on planetOf's world. */
+export interface PhotoSpec {
+  readonly id: PhotoId;
+  readonly at: Instant;
+  readonly subject: PhotoSubject;
+  readonly planetOf: MuseId;
+  readonly dir: Dir;
+  readonly forward: Dir;
+  /** Camera zoom in [0, 1], as in the `pose=` hash. */
+  readonly zoom: number;
+  readonly companions: readonly MuseId[];
+  readonly discoveryId?: DiscoveryId;
+}
+
+export interface Basket {
+  readonly id: BasketId;
+  readonly at: Instant;
+  /** At most 7, Muse's best since the last basket by keep score. */
+  readonly items: readonly DiscoveryId[];
+}
+
+export interface OpenQuestion {
+  readonly id: QuestionId;
+  readonly topic: TopicKey;
+  readonly text: string;
+  readonly openedAt: Instant;
+}
+
+export interface Interest {
+  readonly topic: TopicKey;
+  /** null until Muse first travels there; then the region the topic lives in. */
+  readonly region: RegionKey | null;
+  /** Fast: boosted by events, decays exp(−Δt / 3 days). Read it with salienceAt(), never raw. */
+  readonly salience: { readonly value: number; readonly at: Instant };
+  /** Slow: changes only through reflection.committed. */
+  readonly affinity: number;
+  readonly stage: InterestStage;
+  /** Independent sources, by canonical URL. */
+  readonly sources: readonly CanonicalUrl[];
+  readonly lastPursued: Instant | null;
+  readonly seededBy: 'owner-memory' | 'soul' | 'muse';
+  /** The owner's MEMORY.md or SOUL.md mentioned it recently (feeds the w_owner term of the topic pick). */
+  readonly ownerMentionAt: Instant | null;
+}
+
+// ─── The log ────────────────────────────────────────────────────────────────
+
+export interface Window {
+  readonly start: Instant;
+  readonly end: Instant;
+}
+
+export type Activity = 'rest' | 'travel' | 'beyond' | 'visit';
+
+/** How a trip on Muse's own planet began. */
+export type TripStart =
+  | { readonly kind: 'revisit'; readonly topic: TopicKey; readonly region: RegionKey; readonly question: QuestionId | null }
+  | {
+      readonly kind: 'new-area';
+      readonly topic: TopicKey;
+      readonly region: RegionKey;
+      readonly relatedTo: TopicKey | null;
+      readonly question: QuestionId | null;
+    }
+  /** The topic comes from Source.serendipity once the trip starts; the region is far from home. */
+  | { readonly kind: 'serendipity'; readonly region: RegionKey };
+
+export type EpisodePlan =
+  | { readonly activity: 'rest'; readonly until: Instant }
+  | { readonly activity: 'travel'; readonly trip: TripStart }
+  | { readonly activity: 'beyond'; readonly until: Instant }
+  | {
+      readonly activity: 'visit';
+      readonly other: MuseId;
+      readonly role: 'host' | 'guest';
+      readonly until: Instant;
+      readonly invitation?: InvitationId;
+    };
+
+export interface Verdict {
+  readonly canonicalUrl: CanonicalUrl;
+  readonly title: string;
+  readonly topics: readonly TopicKey[];
+  readonly score: number;
+  readonly reason: string;
+  readonly kept: boolean;
+}
+
+export type InvitationState = 'proposed' | 'sent' | 'accepted' | 'open' | 'closed' | 'declined' | 'expired';
+export type RelationshipStatus = 'acquainted' | 'friends' | 'ended';
+export type RelationshipOrigin = 'introduced' | 'met-beyond';
+
+/** Everything that can happen to a Muse. The engine assigns `at`; the store assigns nothing. */
+export type MuseEventBody =
+  // From the Muse app and the owner.
+  | { readonly kind: 'host.work'; readonly state: 'started' | 'ended' }
+  | { readonly kind: 'soul.updated'; readonly version: number; readonly topics: readonly TopicKey[]; readonly temperament: Temperament }
+  /** Raw MEMORY.md is never stored: only its hash and the allow-listed topics. */
+  | { readonly kind: 'memory.updated'; readonly textHash: string; readonly topics: readonly TopicKey[] }
+  | { readonly kind: 'owner.settings'; readonly basketTime?: string | null; readonly hide?: readonly HiddenRef[]; readonly unhide?: readonly HiddenRef[] }
+  | { readonly kind: 'owner.introduced' | 'owner.unshared'; readonly other: MuseId }
+  // Life.
+  | { readonly kind: 'episode.started'; readonly n: number; readonly plan: EpisodePlan }
+  /** Work arrived: laptop out, in place. remainingMs is how much of a timed episode was left. */
+  | { readonly kind: 'episode.paused'; readonly n: number; readonly remainingMs: number | null }
+  | { readonly kind: 'episode.resumed'; readonly n: number }
+  | { readonly kind: 'episode.ended'; readonly n: number }
+  | {
+      readonly kind: 'trip.hop';
+      readonly n: number;
+      readonly k: number;
+      readonly topic: TopicKey;
+      readonly place: Place;
+      readonly looked: readonly Verdict[];
+      readonly kept: readonly DiscoveryId[];
+    }
+  | { readonly kind: 'region.revealed'; readonly region: RegionKey; readonly topic: TopicKey }
+  | { readonly kind: 'discovery.collected'; readonly discovery: Discovery }
+  | { readonly kind: 'question.opened'; readonly question: OpenQuestion }
+  | { readonly kind: 'question.closed'; readonly id: QuestionId; readonly reason: 'answered' | 'dropped' }
+  | { readonly kind: 'photo.taken'; readonly photo: PhotoSpec }
+  | { readonly kind: 'basket.delivered'; readonly basket: Basket }
+  | {
+      readonly kind: 'reflection.committed';
+      readonly version: number;
+      readonly deltas: readonly InterestDelta[];
+      readonly narrative: string;
+      readonly evidence: readonly EventRef[];
+    }
+  | { readonly kind: 'reflection.no-change'; readonly reviewed: readonly EventRef[] }
+  // Social: pair events, written to both Muses' logs in one transaction.
+  | { readonly kind: 'encounter'; readonly other: MuseId; readonly pleasantness: number; readonly similarity: number }
+  | {
+      readonly kind: 'hangout';
+      readonly other: MuseId;
+      readonly role: 'host' | 'guest';
+      readonly pleasantness: number;
+      readonly gave: DiscoveryId;
+      readonly received: PublicDiscovery;
+      readonly photo: PhotoId;
+    }
+  | {
+      readonly kind: 'relationship.changed';
+      readonly other: MuseId;
+      readonly to: RelationshipStatus;
+      readonly origin: RelationshipOrigin;
+      readonly reason?: 'drifted-apart' | 'owner-unshared';
+    }
+  | {
+      readonly kind: 'invitation';
+      readonly id: InvitationId;
+      readonly host: MuseId;
+      readonly guest: MuseId;
+      readonly to: InvitationState;
+      readonly window: Window;
+      readonly visited?: boolean;
+    };
+
+export type MuseEvent = MuseEventBody & { readonly at: Instant };
+
+/** `${kind}:${id}`: something the owner hid from what Muse shares. */
+export type HiddenRef = `topic:${string}` | `discovery:${string}`;
+
+/** One row of a Muse's append-only log. ref = `${museId}#${seq}`; seq starts at 1 and has no gaps. */
+export interface StoredEvent {
+  readonly museId: MuseId;
+  readonly seq: number;
+  readonly event: MuseEvent;
+}
+
+// ─── The fold ───────────────────────────────────────────────────────────────
+
+export interface MuseSeed {
+  readonly id: MuseId;
+  readonly name: string;
+  readonly worldSeed: number;
+  readonly timezone: string;
+}
+
+export interface EpisodeState {
+  readonly n: number;
+  readonly plan: EpisodePlan;
+  readonly start: Instant;
+  /** Hops taken so far on a planet trip. */
+  readonly hops: number;
+  /** The last kept find on this trip: where the next hop leads from. */
+  readonly lastKept: DiscoveryId | null;
+  /** Set while work has the laptop out. */
+  readonly pausedAt: Instant | null;
+  readonly remainingMs: number | null;
+}
+
+/** Counters for the owner's current local day (YYYY-MM-DD in their timezone). They reset when the day changes. */
+export interface DayCounters {
+  readonly day: string;
+  readonly restMs: number;
+  readonly socialMs: number;
+  readonly workMs: number;
+  readonly photos: number;
+  readonly trips: number;
+  readonly baskets: number;
+}
+
+export interface ReflectionRecord {
+  readonly ref: EventRef;
+  readonly version: number;
+  readonly at: Instant;
+  readonly narrative: string;
+  readonly deltas: readonly InterestDelta[];
+}
+
+export interface Relationship {
+  readonly other: MuseId;
+  readonly status: RelationshipStatus;
+  readonly origin: RelationshipOrigin;
+  /** Summed pleasantness of encounters beyond. */
+  readonly familiarity: number;
+  /** Summed pleasantness of hangouts. Never decays with time apart. */
+  readonly rapport: number;
+  readonly rapportSinceInvite: number;
+  readonly unpleasantStreak: number;
+  readonly encounters: number;
+  readonly hangouts: number;
+  readonly lastRole: 'host' | 'guest' | null;
+  readonly lastMetAt: Instant | null;
+  readonly lastInviteAt: Instant | null;
+}
+
+export interface Invitation {
+  readonly id: InvitationId;
+  readonly host: MuseId;
+  readonly guest: MuseId;
+  readonly state: InvitationState;
+  readonly window: Window;
+  readonly proposedAt: Instant;
+  readonly visited: boolean;
+}
+
+export interface SocialState {
+  readonly relationships: ReadonlyMap<MuseId, Relationship>;
+  readonly invitations: ReadonlyMap<InvitationId, Invitation>;
+}
+
+export interface MuseState {
+  readonly seed: MuseSeed;
+  readonly temperament: Temperament;
+  /** The last event folded in. */
+  readonly seq: number;
+  readonly at: Instant;
+  readonly soulVersion: number;
+  readonly basketTime: string | null;
+  readonly hidden: ReadonlySet<HiddenRef>;
+  readonly working: boolean;
+  readonly episode: EpisodeState | null;
+  readonly episodes: number;
+  readonly interests: ReadonlyMap<TopicKey, Interest>;
+  /** Topics glimpsed on hops but not given a region yet: where new areas come from. */
+  readonly frontier: readonly TopicKey[];
+  /** Explored regions and the topics living there. Home is explored from the start. */
+  readonly regions: ReadonlyMap<RegionKey, readonly TopicKey[]>;
+  readonly home: RegionKey;
+  readonly lastUnlockAt: Instant;
+  readonly questions: ReadonlyMap<QuestionId, OpenQuestion>;
+  readonly discoveries: ReadonlyMap<DiscoveryId, Discovery>;
+  readonly collected: ReadonlySet<CanonicalUrl>;
+  readonly pendingBasket: readonly DiscoveryId[];
+  readonly baskets: readonly Basket[];
+  readonly photos: readonly PhotoSpec[];
+  readonly reflections: readonly ReflectionRecord[];
+  readonly experiencesSinceReflection: number;
+  readonly day: DayCounters;
+  readonly social: SocialState;
+}
+
+/** server/domain/state.ts (lane A1). Must leave s.social untouched; the composed reducer folds social first. */
+export type ReduceCore = (s: MuseState, e: StoredEvent) => MuseState;
+/** server/domain/social/state.ts (lane A2). */
+export type ReduceSocial = (s: SocialState, e: StoredEvent, self: MuseId) => SocialState;
+
+// ─── Policy: pure, seeded decisions the engine calls ────────────────────────
+
+/** A uniform draw in [0, 1), already scoped by the engine to (museId, episode n). Same (kind, k) → same value. */
+export type Draw = (kind: string, k?: number) => number;
+
+/** Lane A1: server/domain/policy/. */
+export interface LifePolicy {
+  /** When an episode ends and Muse isn't working: what next. 'visit' is an intent; SocialPolicy.chooseVisit picks who. */
+  next(s: MuseState, now: Instant, draw: Draw, friendFree: boolean): 'rest' | 'travel' | 'visit';
+  restUntil(s: MuseState, now: Instant, draw: Draw): Instant;
+  beyondUntil(s: MuseState, now: Instant, draw: Draw): Instant;
+  /** Decides beyond first (null = go beyond the planet), then new area vs revisit. */
+  startTrip(s: MuseState, now: Instant, draw: Draw): TripStart | null;
+  /** The serendipity topic's region once Source.serendipity has given a topic. */
+  serendipityRegion(s: MuseState, topic: TopicKey, draw: Draw): RegionKey;
+  hopMs(s: MuseState, draw: Draw): number;
+  /** Where hop k of this trip stands: a spot inside `region`, off water. */
+  hopPlace(s: MuseState, region: RegionKey, k: number, draw: Draw): Place;
+  /** ≤ 2 with score ≥ KEEP_THRESHOLD, best first. */
+  keep(judgments: readonly Judgment[]): readonly Judgment[];
+  continueTrip(s: MuseState, k: number, bestScore: number, draw: Draw): boolean;
+  /** Photos taken while doing `activity` (or working) over [from, to), within the daily cap. Social photos come from SocialPolicy. */
+  photosDuring(s: MuseState, activity: Activity | 'work', from: Instant, to: Instant, draw: Draw): readonly PhotoSpec[];
+  /** A basket to deliver now, or null. */
+  basket(s: MuseState, now: Instant): Basket | null;
+  /** When to next check for a basket: the owner's chosen time, or null to check after each new find. */
+  nextBasketCheck(s: MuseState, now: Instant): Instant | null;
+  reflectionDue(s: MuseState, now: Instant): boolean;
+  experiences(s: MuseState, log: readonly StoredEvent[]): readonly Experience[];
+  /** The validated outcome: committed (version + 1) or no-change. */
+  validateReflection(s: MuseState, log: readonly StoredEvent[], proposal: ReflectionProposal, now: Instant): MuseEventBody;
+  /** Allow-listed MEMORY.md/SOUL.md labels: drops anything that looks like a person, health, money, place or identifier. */
+  privacyFilter(labels: readonly string[]): readonly string[];
+  /** Parses SOUL.md frontmatter; null traits are estimated by the Mind. */
+  parseSoul(text: string): { readonly name: string | null; readonly temperament: Partial<Temperament>; readonly body: string };
+}
+
+/** Lane A2: server/domain/social/. Outcomes are event bodies for each side; the engine timestamps and commits them. */
+export interface PairOutcome {
+  readonly self: readonly MuseEventBody[];
+  readonly other: readonly MuseEventBody[];
+}
+
+export interface SocialPolicy {
+  /** Who to visit among free friends, and which way; null if nobody suits. */
+  chooseVisit(
+    s: MuseState,
+    free: readonly { readonly state: MuseState }[],
+    now: Instant,
+    draw: Draw,
+  ): { readonly other: MuseId; readonly role: 'host' | 'guest'; readonly until: Instant } | null;
+  /** Encounters per hour while both Muses are beyond and not friends. */
+  encounterRate(a: MuseState, b: MuseState): number;
+  /** a met b beyond at `now`. */
+  encounter(a: MuseState, b: MuseState, now: Instant, draw: Draw): PairOutcome;
+  /** A hangout ends: gifts, the photo together, rapport, maybe an ending or an invitation proposal. */
+  hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] };
+  /** An owner's answer, or a deadline or window edge. Returns the transition events for both logs, or an error. */
+  invitationStep(
+    inv: Invitation,
+    action: 'approve' | 'decline-send' | 'accept' | 'decline' | 'deadline' | 'window-start' | 'window-end' | 'visited',
+    now: Instant,
+  ): { readonly ok: true; readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] } | { readonly ok: false; readonly error: string };
+  /** The instants the engine must schedule for this invitation's deadlines and window edges. */
+  invitationTimers(inv: Invitation): readonly { readonly at: Instant; readonly action: 'deadline' | 'window-start' | 'window-end' }[];
+  /** True only for the invited owner, while the invitation is open and inside its window. */
+  canVisit(inv: Invitation | undefined, requester: MuseId, now: Instant): boolean;
+  /** The only view of a Muse that crosses to other Muses or owners. */
+  publicProfile(s: MuseState): PublicProfile;
+  /** Owners introduced or unshared their Muses. */
+  ownerLink(a: MuseState, b: MuseState, op: 'introduce' | 'unshare', now: Instant): PairOutcome;
+}
+
+export interface PublicProfile {
+  readonly museId: MuseId;
+  readonly name: string;
+  readonly worldSeed: number;
+  readonly interests: readonly { readonly topic: TopicKey; readonly weight: number }[];
+  readonly discoveries: readonly PublicDiscovery[];
+}
+
+// ─── Storage (lane B) ───────────────────────────────────────────────────────
+
+export type ScheduleKind =
+  | 'episode.end'
+  | 'trip.hop'
+  | 'host.work'
+  | 'basket.check'
+  | 'encounter'
+  | 'invitation.timer';
+
+export interface ScheduleItem {
+  /** Deterministic: the same follow-up from the same cause always gets the same id. */
+  readonly id: string;
+  readonly at: Instant;
+  readonly museId: MuseId;
+  readonly kind: ScheduleKind;
+  readonly payload: Readonly<Record<string, unknown>>;
+}
+
+export interface CommitBatch {
+  /** The processed item, plus any the Muse no longer needs (work pauses pending hops and episode ends). */
+  readonly remove: readonly string[];
+  /** Appended in order. Each event's seq must be exactly the Muse's last seq + 1. */
+  readonly events: readonly StoredEvent[];
+  readonly schedule: readonly ScheduleItem[];
+}
+
+/** One writer: the engine. Every method is synchronous (node:sqlite). */
+export interface Store {
+  /** All of it or none of it. Throws on a seq conflict and writes nothing. */
+  commit(batch: CommitBatch): void;
+  addMuse(seed: MuseSeed): void;
+  muses(): readonly MuseSeed[];
+  events(museId: MuseId, afterSeq?: number): readonly StoredEvent[];
+  lastSeq(museId: MuseId): number;
+  /** Due items, ordered by (at, museId, kind, id). */
+  due(until: Instant, limit: number): readonly ScheduleItem[];
+  pending(museId: MuseId): readonly ScheduleItem[];
+  /** SOUL.md text (Muse's own, not private). MEMORY.md is never stored. */
+  soulText(museId: MuseId): string | null;
+  setSoulText(museId: MuseId, text: string): void;
+  readonly llmCache: LlmCache;
+  close(): void;
+}
+
+// ─── The HTTP API (lane H serves it, lane C reads it) ───────────────────────
+
+export interface NowView {
+  readonly museId: MuseId;
+  readonly name: string;
+  readonly at: Instant;
+  readonly activity: Activity;
+  readonly working: boolean;
+  /** A rest of 90 minutes or more. */
+  readonly sleeping: boolean;
+  readonly since: Instant;
+  readonly until: Instant | null;
+  /** "Exploring: Pigment → Ultramarine", "Napping", "Gone beyond the planet", "Wren is visiting", "Away at Wren's planet". */
+  readonly label: string;
+  /** Muse's route on its own planet; null while beyond or away (no follow). */
+  readonly path: readonly { readonly dir: Dir; readonly at: Instant; readonly transport?: true }[] | null;
+  readonly companion: { readonly museId: MuseId; readonly name: string } | null;
+  readonly away: { readonly kind: 'beyond' } | { readonly kind: 'planet'; readonly of: MuseId; readonly name: string } | null;
+}
+
+export interface RegionView {
+  readonly key: RegionKey;
+  readonly fogged: boolean;
+  /** Absent while fogged. */
+  readonly topics?: readonly { readonly topic: TopicKey; readonly label: string }[];
+}
+
+export interface PlantPin {
+  readonly id: DiscoveryId;
+  readonly dir: Dir;
+  readonly title: string;
+  readonly topic: TopicKey;
+}
+
+export interface WorldView {
+  readonly museId: MuseId;
+  readonly worldSeed: number;
+  /** The planet's growth parameter in [0, 1], from the explored area. */
+  readonly g: number;
+  readonly regions: readonly RegionView[];
+  readonly plants: readonly PlantPin[];
+}
+
+export interface PlantCard {
+  readonly id: DiscoveryId;
+  readonly title: string;
+  readonly url: string;
+  readonly summary: string;
+  readonly thumb?: string;
+  readonly reason: string;
+  readonly foundAt: Instant;
+  readonly place: Place;
+}
+
+export interface BasketView {
+  readonly id: BasketId;
+  readonly at: Instant;
+  readonly items: readonly PlantCard[];
+}
+
+export interface Page<T, C> {
+  readonly items: readonly T[];
+  /** Pass as `before` for the next page; null at the end. */
+  readonly next: C | null;
+}
+
+export interface PhotoView extends PhotoSpec {
+  readonly worldSeed: number;
+  readonly g: number;
+  readonly companionNames: readonly string[];
+}
+
+export interface ShelfView {
+  /** At most 10, most loved first. */
+  readonly items: readonly (PlantCard & { readonly fondness: number })[];
+}
+
+export interface InvitationCard {
+  readonly id: InvitationId;
+  /** From the viewer's side. */
+  readonly role: 'host' | 'guest';
+  readonly otherName: string;
+  readonly state: InvitationState;
+  readonly window: Window;
+  readonly actions: readonly ('approve' | 'decline' | 'accept')[];
+  readonly canVisitNow: boolean;
+}
+
+export interface VisitWorldView {
+  readonly invitation: InvitationId;
+  readonly host: { readonly museId: MuseId; readonly name: string };
+  readonly worldSeed: number;
+  readonly g: number;
+  readonly regions: readonly RegionView[];
+  /** Private finds have no card. The house is never included. */
+  readonly plants: readonly (PlantPin & { readonly card: PlantCard | null })[];
+  readonly until: Instant;
+}
+
+export interface SharingView {
+  readonly interests: readonly { readonly topic: TopicKey; readonly label: string; readonly hidden: boolean }[];
+  readonly finds: readonly { readonly id: DiscoveryId; readonly title: string; readonly hidden: boolean }[];
+  readonly friends: readonly { readonly museId: MuseId; readonly name: string; readonly origin: RelationshipOrigin }[];
+  readonly shareCode: string;
+  readonly basketTime: string | null;
+}
+
+export interface MetricsRow {
+  /** Owner-local YYYY-MM-DD. */
+  readonly day: string;
+  readonly finds: number;
+  readonly newAreas: number;
+  readonly revisits: number;
+  readonly trips: number;
+  readonly photos: number;
+  readonly restHours: number;
+  readonly socialHours: number;
+  readonly workHours: number;
+  /** Share of planet trips whose topic was seeded by MEMORY.md or SOUL.md. */
+  readonly ownerDrivenShare: number;
+}
+
+/** Dev only. */
+export interface MindView {
+  readonly museId: MuseId;
+  readonly temperament: Temperament;
+  readonly soulVersion: number;
+  readonly interests: readonly (Interest & { readonly label: string; readonly salienceNow: number })[];
+  readonly questions: readonly OpenQuestion[];
+  readonly relationships: readonly (Relationship & { readonly name: string })[];
+  readonly reflections: readonly ReflectionRecord[];
+}
+
+/** What the HTTP layer reads. The engine implements it in wave 2; lane H fakes it from src/muse/samples.ts. */
+export interface GardenQueries {
+  now(museId: MuseId, at: Instant): NowView | null;
+  world(museId: MuseId): WorldView | null;
+  plant(museId: MuseId, id: DiscoveryId): PlantCard | null;
+  baskets(museId: MuseId, before: BasketId | null, limit: number): Page<BasketView, BasketId>;
+  photos(museId: MuseId, before: PhotoId | null, limit: number): Page<PhotoView, PhotoId>;
+  shelf(museId: MuseId): ShelfView | null;
+  invitations(museId: MuseId, at: Instant): readonly InvitationCard[];
+  /** 'forbidden' unless `requester` is the invited owner's Muse, the invitation is open, and `at` is inside the window. */
+  visit(invitation: InvitationId, requester: MuseId, at: Instant): VisitWorldView | 'forbidden';
+  sharing(museId: MuseId): SharingView | null;
+  mind(museId: MuseId): MindView | null;
+  metrics(museId: MuseId): readonly MetricsRow[];
+  soulMd(museId: MuseId): string | null;
+  journalMd(museId: MuseId, day: string | null): string | null;
+  muses(): readonly { readonly museId: MuseId; readonly name: string; readonly role: CastMember['role'] }[];
+}
+
+export type CommandResult = { readonly ok: true } | { readonly ok: false; readonly status: 400 | 403 | 404 | 409; readonly error: string };
+
+/** What the HTTP layer may change. Owners act as the Muse they own (`as` in the request). */
+export interface GardenCommands {
+  invitation(id: InvitationId, as: MuseId, action: 'approve' | 'decline' | 'accept'): Promise<CommandResult>;
+  setBasketTime(museId: MuseId, hhmm: string | null): Promise<CommandResult>;
+  setHidden(museId: MuseId, ref: HiddenRef, hidden: boolean): Promise<CommandResult>;
+  introduce(museId: MuseId, shareCode: string): Promise<CommandResult>;
+  unshare(museId: MuseId, other: MuseId): Promise<CommandResult>;
+  // The host simulator: stands in for the Muse app.
+  hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult>;
+  hostSoul(museId: MuseId, text: string): Promise<CommandResult>;
+  /** Distilled at the boundary: only allow-listed topics are kept; the raw text is dropped. */
+  hostMemory(museId: MuseId, text: string): Promise<CommandResult>;
+  // Dev clock.
+  advance(hours: number): Promise<CommandResult>;
+  setClock(mode: 'live' | 'fast-forward'): Promise<CommandResult>;
+  clock(): { readonly mode: 'live' | 'fast-forward'; readonly now: Instant };
+}
