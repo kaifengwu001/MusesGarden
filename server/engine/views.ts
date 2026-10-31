@@ -1,0 +1,371 @@
+import { createHash } from 'node:crypto';
+import type {
+  BasketId,
+  BasketView,
+  CastMember,
+  CommandResult,
+  Dir,
+  Discovery,
+  DiscoveryId,
+  GardenCommands,
+  GardenQueries,
+  HiddenRef,
+  Instant,
+  Interest,
+  InvitationCard,
+  InvitationId,
+  MetricsRow,
+  MindView,
+  MuseId,
+  MuseState,
+  NowView,
+  Page,
+  PhotoId,
+  PhotoView,
+  PlantCard,
+  PlantPin,
+  RegionKey,
+  RegionView,
+  SharingView,
+  ShelfView,
+  SocialPolicy,
+  StoredEvent,
+  TopicKey,
+  VisitWorldView,
+  WorldView,
+} from '../../src/muse/contract';
+import type { Engine } from './engine';
+
+/** Domain functions the views need, injected so this file depends only on the contract. */
+export interface ViewHelpers {
+  readonly regions: readonly RegionKey[];
+  readonly regionCenter: (key: RegionKey) => Dir;
+  readonly growth: (s: MuseState) => number;
+  readonly salienceAt: (interest: Interest, now: Instant) => number;
+  readonly shelf: (s: MuseState, now: Instant) => readonly { readonly discovery: Discovery; readonly fondness: number }[];
+  readonly soulSection: (s: MuseState) => string;
+  readonly journal: (s: MuseState, log: readonly StoredEvent[], day: string | null) => string;
+  readonly metrics: (s: MuseState, log: readonly StoredEvent[]) => readonly MetricsRow[];
+}
+
+const SLEEP_MS = 90 * 60_000;
+
+export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
+
+export function shareCode(s: MuseState): string {
+  const h = createHash('sha256').update(`share:${s.seed.id}`).digest('hex').slice(0, 4).toUpperCase();
+  return `${s.seed.name.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6)}-${h}`;
+}
+
+export function card(d: Discovery): PlantCard {
+  return {
+    id: d.id,
+    title: d.title,
+    url: d.url,
+    summary: d.summary,
+    ...(d.thumb ? { thumb: d.thumb } : {}),
+    reason: d.reason,
+    foundAt: d.at,
+    place: d.place,
+  };
+}
+
+function pin(d: Discovery): PlantPin {
+  return { id: d.id, dir: d.place.dir, title: d.title, topic: d.topics[0] ?? (d.title as TopicKey) };
+}
+
+function page<T extends { readonly id: string }>(newestFirst: readonly T[], before: string | null, limit: number): Page<T, T['id']> {
+  const start = before === null ? 0 : newestFirst.findIndex((x) => x.id === before) + 1;
+  const items = start <= 0 && before !== null ? [] : newestFirst.slice(start, start + limit);
+  const last = items.at(-1);
+  const more = last ? newestFirst.indexOf(last) < newestFirst.length - 1 : false;
+  return { items, next: more && last ? last.id : null };
+}
+
+export class Views implements GardenQueries {
+  constructor(
+    private readonly engine: Engine,
+    private readonly social: SocialPolicy,
+    private readonly helpers: ViewHelpers,
+    private readonly roles: ReadonlyMap<MuseId, CastMember['role']>,
+  ) {}
+
+  private s(id: MuseId): MuseState | null {
+    return this.engine.state(id) ?? null;
+  }
+
+  private name(id: MuseId): string {
+    return this.engine.state(id)?.seed.name ?? 'a friend';
+  }
+
+  muses(): ReturnType<GardenQueries['muses']> {
+    return this.engine.museIds().map((museId) => ({ museId, name: this.name(museId), role: this.roles.get(museId) ?? 'stranger' }));
+  }
+
+  now(museId: MuseId, at: Instant): NowView | null {
+    const s = this.s(museId);
+    if (!s) return null;
+    const home = this.helpers.regionCenter(s.home);
+    const ep = s.episode;
+    const base = { museId, name: s.seed.name, at, working: s.working, companion: null, away: null } as const;
+    if (!ep) {
+      return { ...base, activity: 'rest', sleeping: false, since: s.at, until: null, label: s.working ? 'Working (laptop out)' : 'At home', path: [{ dir: home, at }] };
+    }
+    const plan = ep.plan;
+    const working = (label: string) => (s.working ? `Working (laptop out)${label ? `, ${label}` : ''}` : null);
+    switch (plan.activity) {
+      case 'rest': {
+        const sleeping = plan.until - ep.start >= SLEEP_MS;
+        return { ...base, activity: 'rest', sleeping, since: ep.start, until: plan.until, label: working('') ?? (sleeping ? 'Asleep' : 'Napping'), path: [{ dir: home, at }] };
+      }
+      case 'beyond':
+        return { ...base, activity: 'beyond', sleeping: false, since: ep.start, until: plan.until, label: working('beyond the planet') ?? 'Gone beyond the planet', path: null, away: { kind: 'beyond' } };
+      case 'visit': {
+        const other = { museId: plan.other, name: this.name(plan.other) };
+        if (plan.role === 'host') {
+          return { ...base, activity: 'visit', sleeping: false, since: ep.start, until: plan.until, label: working('') ?? `${other.name} is visiting`, path: [{ dir: home, at }], companion: other };
+        }
+        return {
+          ...base,
+          activity: 'visit',
+          sleeping: false,
+          since: ep.start,
+          until: plan.until,
+          label: working(`away at ${other.name}'s planet`) ?? `Away at ${other.name}'s planet`,
+          path: null,
+          away: { kind: 'planet', of: plan.other, name: other.name },
+        };
+      }
+      case 'travel': {
+        const hops = this.engine.log(museId).filter((e) => e.event.kind === 'trip.hop' && e.event.n === ep.n);
+        const topics = hops.map((e) => (e.event.kind === 'trip.hop' ? topicLabel(e.event.topic) : ''));
+        const first = plan.trip.kind === 'serendipity' ? topics[0] ?? 'somewhere new' : topicLabel(plan.trip.topic);
+        const trail = [first, ...topics.slice(1)].slice(-2).join(' → ');
+        const path: { dir: Dir; at: Instant; transport?: true }[] = [{ dir: home, at: ep.start }, { dir: this.helpers.regionCenter(plan.trip.region), at: ep.start, transport: true }];
+        for (const e of hops) if (e.event.kind === 'trip.hop') path.push({ dir: e.event.place.dir, at: e.event.at });
+        return { ...base, activity: 'travel', sleeping: false, since: ep.start, until: null, label: working('') ?? `Exploring: ${trail}`, path };
+      }
+    }
+  }
+
+  world(museId: MuseId): WorldView | null {
+    const s = this.s(museId);
+    if (!s) return null;
+    return { museId, worldSeed: s.seed.worldSeed, g: this.helpers.growth(s), regions: this.regionViews(s), plants: [...s.discoveries.values()].map(pin) };
+  }
+
+  private regionViews(s: MuseState): RegionView[] {
+    return this.helpers.regions.map((key) => {
+      const topics = s.regions.get(key);
+      return topics ? { key, fogged: false, topics: topics.map((topic) => ({ topic, label: topicLabel(topic) })) } : { key, fogged: true };
+    });
+  }
+
+  plant(museId: MuseId, id: DiscoveryId): PlantCard | null {
+    const d = this.s(museId)?.discoveries.get(id);
+    return d ? card(d) : null;
+  }
+
+  baskets(museId: MuseId, before: BasketId | null, limit: number): Page<BasketView, BasketId> {
+    const s = this.s(museId);
+    if (!s) return { items: [], next: null };
+    const views: BasketView[] = [...s.baskets].reverse().map((b) => ({
+      id: b.id,
+      at: b.at,
+      items: b.items.map((id) => s.discoveries.get(id)).filter((d): d is Discovery => !!d).map(card),
+    }));
+    return page(views, before, limit);
+  }
+
+  photos(museId: MuseId, before: PhotoId | null, limit: number): Page<PhotoView, PhotoId> {
+    const s = this.s(museId);
+    if (!s) return { items: [], next: null };
+    const views: PhotoView[] = [...s.photos].reverse().map((p) => {
+      const planet = this.s(p.planetOf) ?? s;
+      return { ...p, worldSeed: planet.seed.worldSeed, g: this.helpers.growth(planet), companionNames: p.companions.map((c) => this.name(c)) };
+    });
+    return page(views, before, limit);
+  }
+
+  shelf(museId: MuseId): ShelfView | null {
+    const s = this.s(museId);
+    if (!s) return null;
+    return { items: this.helpers.shelf(s, this.engine.now()).slice(0, 10).map(({ discovery, fondness }) => ({ ...card(discovery), fondness })) };
+  }
+
+  invitations(museId: MuseId, at: Instant): readonly InvitationCard[] {
+    const s = this.s(museId);
+    if (!s) return [];
+    return [...s.social.invitations.values()]
+      .filter((inv) => inv.host === museId || inv.guest === museId)
+      .map((inv) => {
+        const role = inv.host === museId ? ('host' as const) : ('guest' as const);
+        const actions: InvitationCard['actions'] =
+          role === 'host' && inv.state === 'proposed' ? ['approve', 'decline'] : role === 'guest' && inv.state === 'sent' ? ['accept', 'decline'] : [];
+        return {
+          id: inv.id,
+          role,
+          otherName: this.name(role === 'host' ? inv.guest : inv.host),
+          state: inv.state,
+          window: inv.window,
+          actions,
+          canVisitNow: this.social.canVisit(inv, museId, at),
+        };
+      });
+  }
+
+  visit(invitation: InvitationId, requester: MuseId, at: Instant): VisitWorldView | 'forbidden' {
+    const inv = this.engine.invitation(invitation);
+    if (!inv || !this.social.canVisit(inv, requester, at)) return 'forbidden';
+    const host = this.s(inv.host);
+    if (!host) return 'forbidden';
+    const shared = new Set(this.social.publicProfile(host).discoveries.map((d) => d.id));
+    return {
+      invitation,
+      host: { museId: inv.host, name: host.seed.name },
+      worldSeed: host.seed.worldSeed,
+      g: this.helpers.growth(host),
+      regions: this.regionViews(host),
+      plants: [...host.discoveries.values()].map((d) => ({ ...pin(d), card: shared.has(d.id) ? card(d) : null })),
+      until: inv.window.end,
+    };
+  }
+
+  sharing(museId: MuseId): SharingView | null {
+    const s = this.s(museId);
+    if (!s) return null;
+    const unhidden = this.social.publicProfile({ ...s, hidden: new Set() });
+    return {
+      interests: unhidden.interests.map((i) => ({ topic: i.topic, label: topicLabel(i.topic), hidden: s.hidden.has(`topic:${i.topic}`) })),
+      finds: unhidden.discoveries.map((d) => ({ id: d.id, title: d.title, hidden: s.hidden.has(`discovery:${d.id}`) })),
+      friends: [...s.social.relationships.values()]
+        .filter((r) => r.status === 'friends')
+        .map((r) => ({ museId: r.other, name: this.name(r.other), origin: r.origin })),
+      shareCode: shareCode(s),
+      basketTime: s.basketTime,
+    };
+  }
+
+  mind(museId: MuseId): MindView | null {
+    const s = this.s(museId);
+    if (!s) return null;
+    const now = this.engine.now();
+    return {
+      museId,
+      temperament: s.temperament,
+      soulVersion: s.soulVersion,
+      interests: [...s.interests.values()].map((i) => ({ ...i, label: topicLabel(i.topic), salienceNow: this.helpers.salienceAt(i, now) })),
+      questions: [...s.questions.values()],
+      relationships: [...s.social.relationships.values()].map((r) => ({ ...r, name: this.name(r.other) })),
+      reflections: s.reflections,
+    };
+  }
+
+  metrics(museId: MuseId): readonly MetricsRow[] {
+    const s = this.s(museId);
+    return s ? this.helpers.metrics(s, this.engine.log(museId)) : [];
+  }
+
+  soulMd(museId: MuseId): string | null {
+    const s = this.s(museId);
+    return s ? this.helpers.soulSection(s) : null;
+  }
+
+  journalMd(museId: MuseId, day: string | null): string | null {
+    const s = this.s(museId);
+    return s ? this.helpers.journal(s, this.engine.log(museId), day) : null;
+  }
+}
+
+const ok: CommandResult = { ok: true };
+const fail = (status: 400 | 403 | 404 | 409, error: string): CommandResult => ({ ok: false, status, error });
+
+/** The write side of the HTTP API, over the engine. The clock mode decides whether wall time drives the engine. */
+export class Commands implements GardenCommands {
+  private mode: 'live' | 'fast-forward';
+
+  constructor(
+    private readonly engine: Engine,
+    mode: 'live' | 'fast-forward',
+  ) {
+    this.mode = mode;
+  }
+
+  private known(id: MuseId): boolean {
+    return this.engine.state(id) !== undefined;
+  }
+
+  async invitation(id: InvitationId, as: MuseId, action: 'approve' | 'decline' | 'accept'): Promise<CommandResult> {
+    if (!this.engine.invitation(id)) return fail(404, 'no such invitation');
+    const r = await this.engine.answerInvitation(id, as, action);
+    return r.ok ? ok : fail(r.error === 'not yours to answer' ? 403 : 409, r.error ?? 'not allowed now');
+  }
+
+  async setBasketTime(museId: MuseId, hhmm: string | null): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    await this.engine.ownerSettings(museId, { kind: 'owner.settings', basketTime: hhmm });
+    return ok;
+  }
+
+  async setHidden(museId: MuseId, ref: HiddenRef, hidden: boolean): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    await this.engine.ownerSettings(museId, hidden ? { kind: 'owner.settings', hide: [ref] } : { kind: 'owner.settings', unhide: [ref] });
+    return ok;
+  }
+
+  async introduce(museId: MuseId, code: string): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    const other = this.engine.museIds().find((id) => {
+      const s = this.engine.state(id);
+      return s && shareCode(s) === code.trim().toUpperCase();
+    });
+    if (!other) return fail(404, 'no Muse has that share code');
+    if (other === museId) return fail(400, 'that is your own code');
+    await this.engine.introduce(museId, other, this.engine.now());
+    return ok;
+  }
+
+  async unshare(museId: MuseId, other: MuseId): Promise<CommandResult> {
+    if (!this.known(museId) || !this.known(other)) return fail(404, 'no such Muse');
+    await this.engine.unshare(museId, other);
+    return ok;
+  }
+
+  async hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    await this.engine.hostWork(museId, state);
+    return ok;
+  }
+
+  async hostSoul(museId: MuseId, text: string): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    await this.engine.hostSoul(museId, text);
+    return ok;
+  }
+
+  async hostMemory(museId: MuseId, text: string): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    await this.engine.hostMemory(museId, text);
+    return ok;
+  }
+
+  async advance(hours: number): Promise<CommandResult> {
+    if (this.mode === 'live') return fail(409, 'switch the clock to fast-forward first');
+    await this.engine.advanceTo((this.engine.now() + hours * 3_600_000) as Instant);
+    return ok;
+  }
+
+  setClock(mode: 'live' | 'fast-forward'): Promise<CommandResult> {
+    this.mode = mode;
+    return Promise.resolve(ok);
+  }
+
+  clock(): { readonly mode: 'live' | 'fast-forward'; readonly now: Instant } {
+    return { mode: this.mode, now: this.engine.now() };
+  }
+
+  /** The live clock's tick: wall time drives the engine only in live mode. */
+  async tick(wall: Instant): Promise<void> {
+    if (this.mode === 'live') await this.engine.advanceTo(wall);
+  }
+}
