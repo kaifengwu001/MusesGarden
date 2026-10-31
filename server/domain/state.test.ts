@@ -154,5 +154,28 @@ describe('owner seeds and gifts', () => {
     expect(isDry(MOSS.worldSeed, gift.place.dir)).toBe(true);
     expect(life.state.pendingBasket).toEqual([gift.id]);
     expect(life.state.interests.get(topic('Lichen'))?.sources).toEqual([wiki('Lichen')]);
+    expect(life.state.collected.has(wiki('Lichen'))).toBe(true);
+  });
+
+  it('never makes a second find of a page Muse already has, from a trip or another gift', () => {
+    const life = new Life();
+    const received: PublicDiscovery = { id: discoveryId('w-lichen'), url: wiki('Lichen'), canonicalUrl: wiki('Lichen'), title: 'Lichen', summary: '', topics: topicsOf('Lichen') };
+    const hangout = (other: string, at: number): void => {
+      life.push(at, { kind: 'hangout', other: museId(other), role: 'guest', pleasantness: 0.7, gave: discoveryId('d:x'), received, photo: photoId(MOSS.id, 1, at, 0) });
+    };
+    hangout('wren', day);
+    hangout('juniper', day + HOUR_MS);
+    const region = startTrip(life, day + 2 * HOUR_MS, 1, 'Lichen');
+    life.hop(day + 3 * HOUR_MS, 1, 0, 'Lichen', region, [{ title: 'Lichen', score: 0.95, kept: true }]);
+    expect([...life.state.discoveries.values()].map((d) => [d.title, d.provenance])).toEqual([['Lichen', 'gift']]);
+    expect(life.state.interests.get(topic('Lichen'))?.sources).toEqual([wiki('Lichen')]);
+  });
+
+  it('lets a hangout with no gift still count as time spent with a friend', () => {
+    const life = new Life();
+    life.push(day, { kind: 'hangout', other: museId('wren'), role: 'host', pleasantness: 0.4, photo: photoId(MOSS.id, 1, day, 0) });
+    expect(life.state.discoveries.size).toBe(0);
+    expect(life.state.pendingBasket).toEqual([]);
+    expect(life.state.experiencesSinceReflection).toBe(1);
   });
 });
