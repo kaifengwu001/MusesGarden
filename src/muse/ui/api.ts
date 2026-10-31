@@ -2,6 +2,7 @@ import type {
   BasketId,
   BasketView,
   CommandResult,
+  DiscoveryId,
   HiddenRef,
   Instant,
   InvitationCard,
@@ -13,6 +14,7 @@ import type {
   Page,
   PhotoId,
   PhotoView,
+  PlantCard,
   SharingView,
   ShelfView,
   VisitWorldView,
@@ -64,6 +66,7 @@ export class MuseApi {
 
   now = () => this.get<NowView>(`${this.m}/now`, () => this.sample.now());
   world = () => this.get<WorldView>(`${this.m}/world`, () => samples.sampleWorld);
+  plant = (id: DiscoveryId) => this.get<PlantCard | null>(`${this.m}/plants/${encodeURIComponent(id)}`, () => samples.sampleCards.find((c) => c.id === id) ?? null);
   baskets = (before: BasketId | null) => this.get<Page<BasketView, BasketId>>(`${this.m}/baskets${q({ before })}`, () => page(samples.sampleBaskets.items, before));
   photos = (before: PhotoId | null) => this.get<Page<PhotoView, PhotoId>>(`${this.m}/photos${q({ before })}`, () => page(samples.samplePhotos.items, before));
   shelf = () => this.get<ShelfView>(`${this.m}/home/shelf`, () => samples.sampleShelf);

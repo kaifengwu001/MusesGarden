@@ -47,6 +47,7 @@ export class Pins {
   add(el: HTMLElement, dir: Dir | null): Pin {
     const pin: Pin = { el, dir };
     el.classList.add('mu-pin', 'mu-off');
+    el.inert = true;
     this.layer.append(el);
     this.placed.add({ pin, shown: false, heightOf: null, r: Number.NaN, height: 0 });
     return pin;
@@ -87,6 +88,8 @@ export class Pins {
       if (shown !== s.shown) {
         s.shown = shown;
         s.pin.el.classList.toggle('mu-off', !shown);
+        // Over the horizon or off-screen: out of the tab order too.
+        s.pin.el.inert = !shown;
       }
     }
   };
