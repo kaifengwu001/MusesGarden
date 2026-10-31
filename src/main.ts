@@ -402,6 +402,11 @@ async function boot(): Promise<void> {
     const key = event.key.toLowerCase();
     if (key === 'h' || key === '`') store.set('ui.hud', !store.values.ui.hud);
     else if (key === 'p') panel.toggle();
+    else if (key === 'm') {
+      // to Muse, where it is now on its day
+      world.cameraPreset('muse');
+      userPosed = true;
+    }
   });
   canvas.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
