@@ -40,7 +40,7 @@ import { registerShaderChunks } from '../render/glsl';
 // down and its middle 799.5 px across), so the two can be laid side by side
 // and their silhouettes compared. The hash picks the body, the look, the view
 // and the moment:
-//   model=procedural|tripo|tpose|tpose2|tpose5|tpose6 (reference/muse/tripo*.glb, rigged on the skeleton by museMesh.ts)
+//   model=procedural|tripo|tpose|tpose2|tpose5|tpose6 (src/assets/muse/tripo*.glb, rigged on the skeleton by museMesh.ts)
 //   look=muse|raw|weights|clay|facet|stretch|rough   (Muse's shaders; the file as exported; each vertex coloured by its joints;
 //                           the bare skin in clay; the clay shaded by the triangles as drawn, not the skinned normals;
 //                           how much each part of the skin is stretched (red) or squashed (blue) in the pose;

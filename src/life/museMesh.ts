@@ -2,9 +2,9 @@ import { JOINT, JOINTS, openness, packWeights, SKIN_INSET, smooth01, smoothWeigh
 import { MeshField, type Box } from './meshField';
 import { MuseRig } from './museRig';
 
-// Muse from a sculpted mesh (an export from Tripo3D, say: reference/muse/,
-// kept out of git), rigged on Muse's skeleton as it was sculpted and painted
-// in the same shaders as the procedural body (museBody.ts).
+// Muse from a sculpted mesh (an export from Tripo3D: src/assets/muse/),
+// rigged on Muse's skeleton as it was sculpted and painted in the same
+// shaders as the procedural body (museBody.ts).
 //
 // The sculpt is kept as it was made, so Muse standing is exactly Tripo's.
 // Its body is coarse (1.3k vertices), so each triangle is refined into nine

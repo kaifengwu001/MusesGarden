@@ -4,16 +4,14 @@ import { rigSculpt, SCULPTS, type SculptKind } from '../../life/museMesh';
 import { MuseRig } from '../../life/museRig';
 
 // The Tripo sculpts rigged on Muse's skeleton (museMesh.ts): its first (arms
-// hanging, grown into the sides) and its T-pose. They stay out of git
-// (reference/muse/), so these skip without them, as the squint test does
-// without its still.
-const found = import.meta.glob<string>('/reference/muse/{tripo,tripo-tpose,tripo-tpose2,tripo-tpose5,tripo-tpose6}.glb', { query: '?inline', import: 'default', eager: true });
+// hanging, grown into the sides) and its T-poses (src/assets/muse/).
+const found = import.meta.glob<string>('/src/assets/muse/{tripo,tripo-tpose,tripo-tpose2,tripo-tpose5,tripo-tpose6}.glb', { query: '?inline', import: 'default', eager: true });
 const GLBS: Record<SculptKind, string | undefined> = {
-  tripo: found['/reference/muse/tripo.glb'],
-  tpose: found['/reference/muse/tripo-tpose.glb'],
-  tpose2: found['/reference/muse/tripo-tpose2.glb'],
-  tpose5: found['/reference/muse/tripo-tpose5.glb'],
-  tpose6: found['/reference/muse/tripo-tpose6.glb'],
+  tripo: found['/src/assets/muse/tripo.glb'],
+  tpose: found['/src/assets/muse/tripo-tpose.glb'],
+  tpose2: found['/src/assets/muse/tripo-tpose2.glb'],
+  tpose5: found['/src/assets/muse/tripo-tpose5.glb'],
+  tpose6: found['/src/assets/muse/tripo-tpose6.glb'],
 };
 /** Where each sculpt's left arm is as made (H): out past x, between two heights. */
 /** How high each sculpt's armpits are (H): its sides below them are the body's alone. */

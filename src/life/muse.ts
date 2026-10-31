@@ -186,8 +186,8 @@ export class Muse {
   /**
    * Switch Muse's body: the field's own, or a Tripo sculpt on the same
    * skeleton (Tripo's first, made with its arms hanging, or its T-pose; its
-   * own paint, the same fur and light). The sculpt is loaded the first time it is asked for; where it is
-   * not to be had (a build: it stays out of git) Muse keeps the field's.
+   * own paint, the same fur and light). The sculpt is loaded the first time it is asked for; where it
+   * cannot be had, Muse keeps the field's.
    */
   useModel(model: MuseModel): void {
     if (model === this.model) return;

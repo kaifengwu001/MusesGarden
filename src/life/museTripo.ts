@@ -3,19 +3,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { MuseMesh, SculptKind } from './museMesh';
 import SculptWorker from './museSculpt.worker?worker&inline';
 
-// The Tripo3D sculpt of Muse (reference/muse/tripo.glb: one GLB, unrigged,
-// a 2K base colour; kept out of git, so only the dev server has it), loaded
-// and rigged on Muse's skeleton (museMesh.ts, in a worker), its colours read
-// off its paint. Imported only when asked for, so the loader stays out of
-// the app until then.
+// The Tripo3D sculpts of Muse (src/assets/muse/: each one GLB, unrigged, its
+// 2K base colour inside it), loaded and rigged on Muse's skeleton
+// (museMesh.ts, in a worker), their colours read off their paint. Imported
+// only when asked for, so the loader stays out of the app until then; the
+// build carries the files as assets, fetched only when asked for.
 
 /** The sculpts: Tripo's first (arms hanging, grown into the sides), and its T-poses (arms straight out). */
 export const TRIPO_URLS: Record<SculptKind, string> = {
-  tripo: '/reference/muse/tripo.glb',
-  tpose: '/reference/muse/tripo-tpose.glb',
-  tpose2: '/reference/muse/tripo-tpose2.glb',
-  tpose5: '/reference/muse/tripo-tpose5.glb',
-  tpose6: '/reference/muse/tripo-tpose6.glb',
+  tripo: new URL('../assets/muse/tripo.glb', import.meta.url).href,
+  tpose: new URL('../assets/muse/tripo-tpose.glb', import.meta.url).href,
+  tpose2: new URL('../assets/muse/tripo-tpose2.glb', import.meta.url).href,
+  tpose5: new URL('../assets/muse/tripo-tpose5.glb', import.meta.url).href,
+  tpose6: new URL('../assets/muse/tripo-tpose6.glb', import.meta.url).href,
 };
 
 /**
