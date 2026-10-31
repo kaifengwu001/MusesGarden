@@ -34,8 +34,9 @@ const ZOOM: Record<PhotoSubject, number> = { selfie: 0.9, find: 0.95, creature: 
 /** Beyond the planet, the photo looks back at the whole of it. */
 const BEYOND_ZOOM = 0.05;
 
+/** Photos already delivered on `day`: the event day, which is when the owner receives them. */
 function photosOn(s: MuseState, day: string): number {
-  return s.photos.filter((p) => localDay(p.at, s.seed.timezone) === day).length;
+  return s.day.day === day ? s.day.photos : 0;
 }
 
 /** Slots left on `day` for photos of Muse's own, after one is set aside for each hangout today's social time still allows. */
@@ -80,7 +81,7 @@ export function photosDuring(s: MuseState, context: Context, from: number, to: n
   for (let k = 0; k < 1000; k++) {
     at += exponential(draw(kind, k), rate) * HOUR_MS;
     if (at >= to) break;
-    const day = localDay(at, s.seed.timezone);
+    const day = localDay(to, s.seed.timezone);
     if ((taken.get(day) ?? 0) >= allowance(s, day)) continue;
     taken.set(day, (taken.get(day) ?? 0) + 1);
     const subject = subjects[Math.max(0, categorical(draw(`${kind}.subject`, k), subjects.map(([, w]) => w)))][0];
