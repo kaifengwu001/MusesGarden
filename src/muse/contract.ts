@@ -521,8 +521,11 @@ export interface LifePolicy {
   experiences(s: MuseState, log: readonly StoredEvent[]): readonly Experience[];
   /** The validated outcome: committed (version + 1) or no-change. */
   validateReflection(s: MuseState, log: readonly StoredEvent[], proposal: ReflectionProposal, now: Instant): MuseEventBody;
-  /** Allow-listed MEMORY.md/SOUL.md labels: drops anything that looks like a person, health, money, place or identifier. */
-  privacyFilter(labels: readonly string[]): readonly string[];
+  /**
+   * Allow-listed MEMORY.md/SOUL.md labels: drops anything that looks like a person, health, money, place or identifier,
+   * and any label whose words all sit on a line of `text` that names someone or carries a private fact.
+   */
+  privacyFilter(labels: readonly string[], text: string): readonly string[];
   /** Parses SOUL.md frontmatter; null traits are estimated by the Mind. */
   parseSoul(text: string): { readonly name: string | null; readonly temperament: Partial<Temperament>; readonly body: string };
 }
