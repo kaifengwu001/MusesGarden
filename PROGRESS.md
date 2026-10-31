@@ -8,7 +8,7 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
-| 12 | https://muses-garden-iteration-12.vercel.app | the commit with this table |
+| 12 | https://muses-garden-iteration-12.vercel.app | 9ad20e4 |
 | 11 | https://muses-garden-iteration-11.vercel.app | 15b7dbb |
 | 10 | https://muses-garden-iteration-10.vercel.app | aadae30 |
 | 9 | https://muses-garden-iteration-9.vercel.app | 8bfde67 |
@@ -22,6 +22,15 @@ The latest is also at https://the-meadow-omega.vercel.app. Each iteration is
 its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
+
+## Iteration 13: the review notes (in progress)
+
+Started from iteration 12 (9ad20e4). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Make the profile's lossless fixes: the cloud mirror drawn only where there is water, the ground's shader without the cottage's code on terrain away from it, the field map drawn before the clouds' passes, the flower clumps read from a texture, and resolution changes without reallocating | |
+| 2 | Trading graphics for performance means altering the look of the image, not the resolution: Auto may drop the resolution more aggressively than now if that keeps High as the quality; a little upscaling blur is welcome | |
 
 ## Iteration 12: the review notes
 
