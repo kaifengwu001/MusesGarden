@@ -1,3 +1,4 @@
+import { ROUTES, type RouteName } from '../../src/muse/routes';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type {
   BasketId,
@@ -88,72 +89,57 @@ function routesFor({ queries, commands, now }: Garden): readonly Route[] {
     if (!queries.muses().some((m) => m.museId === museId)) throw new HttpError(404, 'no such Muse');
     return museId;
   };
-  const get = (path: string, handle: Route['handle']): Route => ({ method: 'GET', path: path.split('/'), handle });
-  const post = (path: string, handle: Route['handle']): Route => ({ method: 'POST', path: path.split('/'), handle });
 
-  return [
-    get('/api/muses', () => json(queries.muses())),
-    get('/api/muses/:id/now', ({ params }) => found(queries.now(muse(params.id), now()))),
-    get('/api/muses/:id/world', ({ params }) => found(queries.world(muse(params.id)))),
-    get('/api/muses/:id/plants/:pid', ({ params }) =>
-      found(queries.plant(muse(params.id), id<DiscoveryId>(params.pid, 'pid'))),
-    ),
-    get('/api/muses/:id/baskets', ({ params, query }) =>
-      json(queries.baskets(muse(params.id), before<BasketId>(query), limit(query))),
-    ),
-    get('/api/muses/:id/photos', ({ params, query }) =>
-      json(queries.photos(muse(params.id), before<PhotoId>(query), limit(query))),
-    ),
-    get('/api/muses/:id/home/shelf', ({ params }) => found(queries.shelf(muse(params.id)))),
-    get('/api/muses/:id/invitations', ({ params }) => json(queries.invitations(muse(params.id), now()))),
-    get('/api/muses/:id/settings/sharing', ({ params }) => found(queries.sharing(muse(params.id)))),
-    post('/api/muses/:id/settings/basket-time', async ({ params, body }) =>
-      result(await commands.setBasketTime(muse(params.id), hhmm(field(body, 'hhmm')))),
-    ),
-    post('/api/muses/:id/settings/hidden', async ({ params, body }) =>
+  // Typed by every route name, so a route without a handler doesn't compile.
+  const handlers: { readonly [N in RouteName]: Route['handle'] } = {
+    muses: () => json(queries.muses()),
+    now: ({ params }) => found(queries.now(muse(params.id), now())),
+    world: ({ params }) => found(queries.world(muse(params.id))),
+    plant: ({ params }) => found(queries.plant(muse(params.id), id<DiscoveryId>(params.pid, 'pid'))),
+    baskets: ({ params, query }) => json(queries.baskets(muse(params.id), before<BasketId>(query), limit(query))),
+    photos: ({ params, query }) => json(queries.photos(muse(params.id), before<PhotoId>(query), limit(query))),
+    shelf: ({ params }) => found(queries.shelf(muse(params.id))),
+    invitations: ({ params }) => json(queries.invitations(muse(params.id), now())),
+    sharing: ({ params }) => found(queries.sharing(muse(params.id))),
+    basketTime: async ({ params, body }) => result(await commands.setBasketTime(muse(params.id), hhmm(field(body, 'hhmm')))),
+    hidden: async ({ params, body }) =>
       result(await commands.setHidden(muse(params.id), hiddenRef(field(body, 'ref')), flag(field(body, 'hidden'), 'hidden'))),
-    ),
-    post('/api/muses/:id/settings/introductions', async ({ params, body }) =>
-      result(await commands.introduce(muse(params.id), shareCode(field(body, 'shareCode')))),
-    ),
-    post('/api/muses/:id/settings/unshare', async ({ params, body }) =>
-      result(await commands.unshare(muse(params.id), id<MuseId>(field(body, 'other'), 'other'))),
-    ),
-
-    ...(['approve', 'decline', 'accept'] as const).map((action) =>
-      post(`/api/invitations/:id/${action}`, async ({ params, query }) =>
-        result(await commands.invitation(id<InvitationId>(params.id, 'id'), requestingOwner(query), action)),
-      ),
-    ),
-    get('/api/visits/:id/world', ({ params, query }) => {
+    introduce: async ({ params, body }) => result(await commands.introduce(muse(params.id), shareCode(field(body, 'shareCode')))),
+    unshare: async ({ params, body }) => result(await commands.unshare(muse(params.id), id<MuseId>(field(body, 'other'), 'other'))),
+    answer: async ({ params, query }) => {
+      const action = params.action;
+      if (action !== 'approve' && action !== 'decline' && action !== 'accept') throw new HttpError(404, 'no such route');
+      return result(await commands.invitation(id<InvitationId>(params.id, 'id'), requestingOwner(query), action));
+    },
+    visit: ({ params, query }) => {
       const view = queries.visit(id<InvitationId>(params.id, 'id'), requestingOwner(query), now());
       if (view === 'forbidden') throw new HttpError(403, 'no open visit for you');
       return json(view);
-    }),
-
-    post('/api/host/:id/work', async ({ params, body }) =>
-      result(await commands.hostWork(muse(params.id), workState(field(body, 'state')))),
-    ),
-    post('/api/host/:id/soul', async ({ params, body }) =>
-      result(await commands.hostSoul(muse(params.id), text(field(body, 'text')))),
-    ),
-    post('/api/host/:id/memory', async ({ params, body }) => {
+    },
+    hostWork: async ({ params, body }) => result(await commands.hostWork(muse(params.id), workState(field(body, 'state')))),
+    hostSoul: async ({ params, body }) => result(await commands.hostSoul(muse(params.id), text(field(body, 'text')))),
+    hostMemory: async ({ params, body }) => {
       const museId = muse(params.id);
       const memory = text(field(body, 'text'));
       // The engine's errors may quote MEMORY.md (inside a Mind prompt, say), so none reaches a reply or a log.
       const r = await commands.hostMemory(museId, memory).catch(() => null);
       if (r === null) throw new HttpError(500, 'MEMORY.md update failed');
       return result(r.ok ? r : { ...r, error: 'MEMORY.md update rejected' });
-    }),
+    },
+    advance: async ({ body }) => result(await commands.advance(hours(field(body, 'hours')))),
+    setClock: async ({ body }) => result(await commands.setClock(clockMode(field(body, 'mode')))),
+    clock: () => json(commands.clock()),
+    mind: ({ params }) => found(queries.mind(muse(params.id))),
+    metrics: ({ params }) => json(queries.metrics(muse(params.id))),
+    soulMd: ({ params }) => markdown(queries.soulMd(muse(params.id))),
+    journalMd: ({ params, query }) => markdown(queries.journalMd(muse(params.id), day(query))),
+  };
 
-    post('/api/dev/advance', async ({ body }) => result(await commands.advance(hours(field(body, 'hours'))))),
-    post('/api/dev/clock', async ({ body }) => result(await commands.setClock(clockMode(field(body, 'mode'))))),
-    get('/api/dev/clock', () => json(commands.clock())),
-    get('/api/dev/:id/mind', ({ params }) => found(queries.mind(muse(params.id)))),
-    get('/api/dev/:id/metrics', ({ params }) => json(queries.metrics(muse(params.id)))),
-    get('/api/dev/:id/soul.md', ({ params }) => markdown(queries.soulMd(muse(params.id)))),
-    get('/api/dev/:id/journal.md', ({ params, query }) => markdown(queries.journalMd(muse(params.id), day(query)))),
-  ];
+  return (Object.keys(ROUTES) as RouteName[]).map((name) => ({
+    method: ROUTES[name].method,
+    path: ROUTES[name].pattern.split('/'),
+    handle: handlers[name],
+  }));
 }
 
 function decode(segment: string): string {

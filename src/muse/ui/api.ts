@@ -20,6 +20,7 @@ import type {
   VisitWorldView,
   WorldView,
 } from '../contract';
+import { path } from '../routes';
 import * as samples from '../samples';
 
 // The overlay's only door to the Muse server (vite proxies /api to npm run serve). Until a live
@@ -49,11 +50,13 @@ export class MuseApi {
   private sourceNow: DataSource = 'unknown';
   private readonly listeners = new Set<(s: DataSource) => void>();
   private readonly sample: SampleGarden;
-  private readonly m: string;
+
+  /** This Muse's id as route params. */
+  private readonly id: { readonly id: string };
 
   constructor(readonly museId: MuseId) {
+    this.id = { id: museId };
     this.sample = new SampleGarden(museId);
-    this.m = `/api/muses/${encodeURIComponent(museId)}`;
   }
 
   get source(): DataSource {
@@ -64,20 +67,20 @@ export class MuseApi {
     this.listeners.add(fn);
   }
 
-  now = () => this.get<NowView>(`${this.m}/now`, () => this.sample.now());
-  world = () => this.get<WorldView>(`${this.m}/world`, () => samples.sampleWorld);
-  plant = (id: DiscoveryId) => this.get<PlantCard | null>(`${this.m}/plants/${encodeURIComponent(id)}`, () => samples.sampleCards.find((c) => c.id === id) ?? null);
-  baskets = (before: BasketId | null) => this.get<Page<BasketView, BasketId>>(`${this.m}/baskets${q({ before })}`, () => page(samples.sampleBaskets.items, before));
-  photos = (before: PhotoId | null) => this.get<Page<PhotoView, PhotoId>>(`${this.m}/photos${q({ before })}`, () => page(samples.samplePhotos.items, before));
-  shelf = () => this.get<ShelfView>(`${this.m}/home/shelf`, () => samples.sampleShelf);
-  invitations = () => this.get<readonly InvitationCard[]>(`${this.m}/invitations`, () => this.sample.invitations());
-  sharing = () => this.get<SharingView>(`${this.m}/settings/sharing`, () => this.sample.sharing);
+  now = () => this.get<NowView>(path('now', this.id), () => this.sample.now());
+  world = () => this.get<WorldView>(path('world', this.id), () => samples.sampleWorld);
+  plant = (id: DiscoveryId) => this.get<PlantCard | null>(path('plant', { ...this.id, pid: id }), () => samples.sampleCards.find((c) => c.id === id) ?? null);
+  baskets = (before: BasketId | null) => this.get<Page<BasketView, BasketId>>(path('baskets', this.id, { before }), () => page(samples.sampleBaskets.items, before));
+  photos = (before: PhotoId | null) => this.get<Page<PhotoView, PhotoId>>(path('photos', this.id, { before }), () => page(samples.samplePhotos.items, before));
+  shelf = () => this.get<ShelfView>(path('shelf', this.id), () => samples.sampleShelf);
+  invitations = () => this.get<readonly InvitationCard[]>(path('invitations', this.id), () => this.sample.invitations());
+  sharing = () => this.get<SharingView>(path('sharing', this.id), () => this.sample.sharing);
 
   answer = (id: InvitationId, action: Answer) =>
-    this.command(`/api/invitations/${encodeURIComponent(id)}/${action}${q({ as: this.museId })}`, undefined, () => this.sample.answer(id, action));
+    this.command(path('answer', { id, action }, { as: this.museId }), undefined, () => this.sample.answer(id, action));
 
   async visit(id: InvitationId): Promise<VisitWorldView | 'forbidden'> {
-    const r = await this.request<VisitWorldView>('GET', `/api/visits/${encodeURIComponent(id)}/world${q({ as: this.museId })}`, undefined, () => {
+    const r = await this.request<VisitWorldView>('GET', path('visit', { id }, { as: this.museId }), undefined, () => {
       const v = this.sample.visit(id);
       return v ? ok(v) : { ok: false, status: 403, error: 'forbidden' };
     });
@@ -86,23 +89,23 @@ export class MuseApi {
     throw new ApiError(r.status, r.error);
   }
 
-  setHidden = (ref: HiddenRef, hidden: boolean) => this.command(`${this.m}/settings/hidden`, { ref, hidden }, () => this.sample.setHidden(ref, hidden));
-  introduce = (shareCode: string) => this.command(`${this.m}/settings/introductions`, { shareCode }, () => this.sample.introduce(shareCode));
-  unshare = (other: MuseId) => this.command(`${this.m}/settings/unshare`, { other }, () => this.sample.unshare(other));
-  setBasketTime = (hhmm: string | null) => this.command(`${this.m}/settings/basket-time`, { hhmm }, () => this.sample.setBasketTime(hhmm));
+  setHidden = (ref: HiddenRef, hidden: boolean) => this.command(path('hidden', this.id), { ref, hidden }, () => this.sample.setHidden(ref, hidden));
+  introduce = (shareCode: string) => this.command(path('introduce', this.id), { shareCode }, () => this.sample.introduce(shareCode));
+  unshare = (other: MuseId) => this.command(path('unshare', this.id), { other }, () => this.sample.unshare(other));
+  setBasketTime = (hhmm: string | null) => this.command(path('basketTime', this.id), { hhmm }, () => this.sample.setBasketTime(hhmm));
 
   // The host simulator: stands in for the Muse app.
-  hostWork = (state: 'started' | 'ended') => this.command(`/api/host/${encodeURIComponent(this.museId)}/work`, { state }, () => this.sample.work(state));
-  hostSoul = (text: string) => this.command(`/api/host/${encodeURIComponent(this.museId)}/soul`, { text }, () => DONE);
-  hostMemory = (text: string) => this.command(`/api/host/${encodeURIComponent(this.museId)}/memory`, { text }, () => DONE);
+  hostWork = (state: 'started' | 'ended') => this.command(path('hostWork', this.id), { state }, () => this.sample.work(state));
+  hostSoul = (text: string) => this.command(path('hostSoul', this.id), { text }, () => DONE);
+  hostMemory = (text: string) => this.command(path('hostMemory', this.id), { text }, () => DONE);
 
   // Dev only.
-  clock = () => this.get<{ readonly mode: ClockMode; readonly now: Instant }>('/api/dev/clock', () => this.sample.clock());
-  setClock = (mode: ClockMode) => this.command('/api/dev/clock', { mode }, () => this.sample.setClock(mode));
-  advance = (hours: number) => this.command('/api/dev/advance', { hours }, () => this.sample.advance(hours));
-  mind = () => this.get<MindView>(`/api/dev/${encodeURIComponent(this.museId)}/mind`, () => samples.sampleMind);
-  metrics = () => this.get<readonly MetricsRow[]>(`/api/dev/${encodeURIComponent(this.museId)}/metrics`, () => samples.sampleMetrics);
-  soulMd = () => this.get<string>(`/api/dev/${encodeURIComponent(this.museId)}/soul.md`, () => samples.sampleSoulMd);
+  clock = () => this.get<{ readonly mode: ClockMode; readonly now: Instant }>(path('clock', {}), () => this.sample.clock());
+  setClock = (mode: ClockMode) => this.command(path('setClock', {}), { mode }, () => this.sample.setClock(mode));
+  advance = (hours: number) => this.command(path('advance', {}), { hours }, () => this.sample.advance(hours));
+  mind = () => this.get<MindView>(path('mind', this.id), () => samples.sampleMind);
+  metrics = () => this.get<readonly MetricsRow[]>(path('metrics', this.id), () => samples.sampleMetrics);
+  soulMd = () => this.get<string>(path('soulMd', this.id), () => samples.sampleSoulMd);
 
   private async get<T>(path: string, offline: () => T): Promise<T> {
     const r = await this.request<T>('GET', path, undefined, () => ok(offline()));
@@ -157,10 +160,6 @@ async function errorOf(res: Response): Promise<string> {
   return raw || res.statusText;
 }
 
-function q(params: Record<string, string | null>): string {
-  const parts = Object.entries(params).flatMap(([k, v]) => (v === null ? [] : [`${k}=${encodeURIComponent(v)}`]));
-  return parts.length ? `?${parts.join('&')}` : '';
-}
 
 /** One item per page offline, so paging is exercised before the server exists. */
 function page<T extends { readonly id: string }>(items: readonly T[], before: string | null): Page<T, T['id']> {
