@@ -28,6 +28,28 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Iteration 16: Muse's interactions (in progress)
+
+Started from iteration 15 (74926b7). Since then Muse has come to the meadow
+(e2de5cf, 02a9840, 2fb02be, a7f6349): Tripo3D's sculpt rigged on a
+thirteen-joint skeleton, walking the cottage's terrace and waving on a 44 s
+day, with a lab (src/dev/museLab.html) that plays it live. Kai's notes for
+its interactions, to be built in the lab first ("make it cute!"); this table
+fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Idle: walk around | |
+| 2 | Idle: sit on the bench (port the meadow's bench to the lab) | |
+| 3 | Idle: fall asleep in the grass (belly up, a snore bubble, a Zzz sign; push the grass away) | |
+| 4 | Idle: fishing (a fishing rod) | |
+| 5 | Idle: gardening (garden tools) | |
+| 6 | Idle: cooking (a stretch goal; props) | |
+| 7 | Click: wave | |
+| 8 | Click: a happy bounce up and down, arms flapping | |
+| 9 | Long hold: petting; the head tilts, the eyes squint | |
+| 10 | The fur stands up in a wave while it squints, the neck tucks in (it has no neck, so maybe the whole body gets shorter) (a stretch goal) | |
+
 ## Iteration 15: specks on the blue flowers on 1× screens
 
 Started from iteration 14 (89b493a). The fix below was made after iteration
