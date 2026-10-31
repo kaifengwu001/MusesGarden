@@ -49,7 +49,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { smoothstep } from '../core/math';
 import { JOINT } from '../life/museBody';
 import { BED, BENCH, CAST, FIRE, MuseLife, POND, flowerAt, type Living } from '../life/museLife';
-import { FISH, GARDEN, POT, cookBeats, fishBeats, gardenBeats, sleepBeats, type MuseRig } from '../life/museRig';
+import { COOK, FISH, GARDEN, POT, STIR, cookBeats, fishBeats, gardenBeats, sleepBeats, type MuseRig } from '../life/museRig';
 
 // The Muse lab's stage (museLab.html#live=1&stage=1): a round lawn in a
 // pale sky where Muse lives its little day (museLife.ts) among the things
@@ -526,7 +526,6 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
   scene.add(can);
   /** Where the rose is on the can (its frame), and the can's rest by the bed. */
   const ROSE = new Vector3(0, 0.07, 0.19);
-  const canRest = new Matrix4().compose(new Vector3(BED.x - 0.95, 0.065, BED.z - 0.1), new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -0.6), new Vector3(1, 1, 1));
   const drops = new InstancedMesh(new SphereGeometry(0.011, 6, 4).scale(1, 1.5, 1), new MeshBasicMaterial({ color: 0x9fd4f0, transparent: true, opacity: 0.85 }), 18);
   drops.frustumCulled = false;
   scene.add(drops);
@@ -574,11 +573,11 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
   pot.position.set(FIRE.x, POT_TOP, FIRE.z);
   scene.add(pot);
   const ladle = new Group();
-  ladle.add(new Mesh(new CylinderGeometry(0.009, 0.009, 0.3, 6).translate(0, 0.15, 0), wood));
+  const LADLE = 0.44;
+  ladle.add(new Mesh(new CylinderGeometry(0.009, 0.009, LADLE, 6).translate(0, LADLE / 2, 0), wood));
   const bowl = new Mesh(new SphereGeometry(0.035, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), toon(0xb8bcc2, { side: DoubleSide }));
   ladle.add(bowl);
   scene.add(ladle);
-  const ladleRest = new Matrix4().compose(new Vector3(FIRE.x + 0.06, POT_TOP - 0.06, FIRE.z - 0.05), new Quaternion().setFromAxisAngle(new Vector3(1, 0, -0.4).normalize(), -0.35), new Vector3(1, 1, 1));
   // the steam: soft white puffs, a blurred disc drawn once
   const puff = (() => {
     const canvas = document.createElement('canvas');
@@ -607,7 +606,6 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
   rod.add(new Mesh(new CylinderGeometry(0.006, 0.012, ROD_LENGTH, 6).translate(0, ROD_LENGTH / 2 - 0.12, 0), toon(0xd8b86a)));
   rod.add(new Mesh(new CylinderGeometry(0.026, 0.026, 0.02, 12).rotateZ(Math.PI / 2).translate(0.02, 0.02, 0), toon(0x8a5a3a)));
   scene.add(rod);
-  const rodRest = new Matrix4().compose(new Vector3(POND.x - POND.r - 0.25, 0.03, POND.z + 0.5), new Quaternion().setFromEuler(new Euler(Math.PI / 2 - 0.05, 0.4, 0, 'YXZ')), new Vector3(1, 1, 1));
   const lineGeometry = new BufferGeometry().setAttribute('position', new BufferAttribute(new Float32Array(16 * 3), 3));
   const line = new Line(lineGeometry, new LineBasicMaterial({ color: 0xf4f1e8, transparent: true, opacity: 0.85 }));
   line.frustumCulled = false;
@@ -808,8 +806,8 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
     rig.pose(l.action);
     placeMuse(l);
     const face = u.uMuseFace.value as Vector4;
-    face.set(rig.eyes, rig.smile, rig.squint, rig.mouth);
-    (u.uMuseMood.value as Vector4).set(rig.blush, rig.round, 0, 0);
+    face.set(rig.eyes, rig.smile, rig.squint, rig.squeeze);
+    (u.uMuseMood.value as Vector4).set(rig.blush, 0, 0, 0);
     (u.uMuseRaise.value as Vector4).set(rig.raised, rig.raisedRight, rig.hung, rig.hungRight);
     // its spheres: the shadow, the grass, picking
     rig.joints(joints);
@@ -827,14 +825,13 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
     }
     for (let i = 0; i < CASTERS_MUSE; i++) casters[i].copy(spheres[i]);
 
-    // the watering can: in the right mitten while it waters (its handle in the mitten, tipped to pour), else by the bed
+    // the watering can: out of its pocket into the right mitten while it waters (hung by its handle, tipped to pour), back after
     const cues = l.cues;
     handAt(-1, held);
     const w = cues.water;
     const gw = w ? w.grip : 0;
     const tip = w ? gardenBeats(w.time).tip : 0;
-    const inHand = holding(-1, new Euler(0.1 + 0.8 * tip, 0, 0), new Vector3(0, -0.075, 0.0), new Matrix4());
-    blend(canRest, inHand, gw, can);
+    hold(can, holding(-1, new Euler(0.1 + 0.8 * tip, 0, 0), new Vector3(0, -0.122, 0.012), new Matrix4()), gw);
     // its water, falling from the rose to the flower
     const pour = w ? gardenBeats(w.time).pour : 0;
     const roseAt = tmp.copy(ROSE).applyMatrix4(can.matrix);
@@ -879,13 +876,24 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
       s.material.opacity = opening * Math.sin(Math.PI * v);
     });
 
-    // the ladle: in the right mitten while it cooks (its bowl down in the pot, or up at its mouth), else in the pot
+    // the ladle: out of its pocket into the right mitten while it cooks, its handle from the mitten down to its bowl going
+    // round in the pot, or (tasting) up from the mitten to the bowl before its mouth; back into the pocket after
     const c = l.cues.cook;
     const gc = c ? c.grip : 0;
-    const taste = c ? cookBeats(c.time).taste : 0;
-    // (held a little down its handle: stirring, the bowl down in the pot ahead; tasting, the bowl up at its mouth)
-    const ladleIn = holding(-1, new Euler(-0.68 + 3.42 * taste, 0, 0.2 * (1 - taste)), new Vector3(0, -0.24 + 0.12 * taste, 0), new Matrix4());
-    blend(ladleRest, ladleIn, gc, ladle);
+    const beat = c ? cookBeats(c.time) : { turn: 0, taste: 0 };
+    rig.frameOf(JOINT.head, hand);
+    const mouth = new Vector3(0, 0.01, 0.27).applyMatrix4(hand).applyMatrix4(place);
+    const inPot = new Vector3(FIRE.x + STIR.bowl * Math.cos(beat.turn), POT_TOP - 0.035, FIRE.z + STIR.bowl * Math.sin(beat.turn));
+    const bowlAt = inPot.lerp(mouth, beat.taste);
+    const mitten = new Vector3(held.elements[12], held.elements[13], held.elements[14]);
+    const handle = mitten.clone().sub(bowlAt);
+    // (before it is at work, in or out of the pocket, it stands upright in the mitten)
+    const working = c ? smoothstep(0.2, 0.9, c.time) * smoothstep(0.2, 0.9, COOK.period * 2 - c.time) : 0;
+    const upright = new Vector3(0, 1, 0);
+    const along = handle.lengthSq() > 1e-6 ? handle.normalize().lerp(upright, 1 - working).normalize() : upright;
+    const reach = Math.min(LADLE - 0.05, mitten.distanceTo(bowlAt));
+    const ladleAt = new Matrix4().compose(mitten.clone().addScaledVector(along, -(working * reach + (1 - working) * 0.3)), new Quaternion().setFromUnitVectors(upright, along), new Vector3(1, 1, 1));
+    hold(ladle, ladleAt, gc);
     // the fire's flames flickering, the steam rising
     flames.forEach((f, i) => {
       const flick = 0.85 + 0.25 * Math.sin(t * (9 + i * 3) + i) * Math.sin(t * (5.3 + i) + 2 * i);
@@ -906,8 +914,7 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
     // (pointing out over the water and up, raised with the yank, back over its shoulder for the cast)
     const fu = fsh ? ((fsh.time % FISH.period) + FISH.period) % FISH.period : 0;
     const swing = fsh ? 0.9 * Math.sin(Math.PI * Math.min(1, Math.max(0, fu - FISH.cast[0]) / 0.7)) * (fu < 0.7 ? 1 : 0) : 0;
-    const rodIn = holding(-1, new Euler(0.75 - 0.35 * fishBeats(fsh ? fsh.time : 0).yank * (fsh ? 1 : 0) - swing, 0, 0.12), new Vector3(0, 0, 0), new Matrix4());
-    blend(rodRest, rodIn, gf, rod);
+    hold(rod, holding(-1, new Euler(0.75 - 0.35 * fishBeats(fsh ? fsh.time : 0).yank * (fsh ? 1 : 0) - swing, 0, 0.12), new Vector3(0, 0, 0), new Matrix4()), gf);
     const rodTip = new Vector3(0, ROD_LENGTH - 0.12, 0).applyMatrix4(rod.matrix);
     const beats = fsh ? fishBeats(fsh.time) : { cast: 0, dip: 0, yank: 0, fish: 0, free: 0 };
     const u0 = fsh ? ((fsh.time % FISH.period) + FISH.period) % FISH.period : 0;
@@ -1008,20 +1015,13 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
     }
   };
 
-  /** A prop between where it rests and where it is held (0 … 1), its matrix set. */
-  function blend(rest: Matrix4, inHand: Matrix4, k: number, object: Object3D): void {
-    const a = new Vector3();
-    const b = new Vector3();
-    const qa = new Quaternion();
-    const qb = new Quaternion();
-    const s = new Vector3();
-    rest.decompose(a, qa, s);
-    inHand.decompose(b, qb, s);
-    const e = smoothstep(0, 1, k);
-    // (a little hop up as it moves between them)
-    object.position.lerpVectors(a, b, e).y += 0.15 * Math.sin(Math.PI * e);
-    object.quaternion.slerpQuaternions(qa, qb, e);
-    object.scale.set(1, 1, 1);
+  /** A tool in a mitten (its matrix there), there as much as it is held: it pops into being as it comes out of the pocket, and out as it goes back in. */
+  function hold(object: Object3D, inHand: Matrix4, k: number): void {
+    object.visible = k > 0.01;
+    inHand.decompose(object.position, object.quaternion, object.scale);
+    // (a little overshoot as it appears)
+    const pop = Math.min(1, k) * (1 + 0.25 * Math.sin(Math.PI * Math.min(1, k)));
+    object.scale.setScalar(Math.max(1e-3, pop));
     object.matrixAutoUpdate = true;
     object.updateMatrix();
   }

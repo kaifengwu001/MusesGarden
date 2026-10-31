@@ -318,8 +318,8 @@ export class Muse {
     this.rig.pose(a);
     // the eyes blink; it smiles more when you are close and in front, most while it waves
     const rig = this.rig;
-    this.uniforms.uMuseFace.value.set(rig.eyes, Math.min(1, rig.smile + 0.35 * near), rig.squint, rig.mouth);
-    this.uniforms.uMuseMood.value.set(rig.blush, rig.round, 0, 0);
+    this.uniforms.uMuseFace.value.set(rig.eyes, Math.min(1, rig.smile + 0.35 * near), rig.squint, rig.squeeze);
+    this.uniforms.uMuseMood.value.set(rig.blush, 0, 0, 0);
     this.uniforms.uMuseFluff.value.copy(rig.fluff);
     this.uniforms.uMuseRaise.value.set(rig.raised, rig.raisedRight, rig.hung, rig.hungRight);
     // the wind lays the fur over along its way here, in gusts

@@ -335,8 +335,8 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
       uMuseFrame: { value: new Matrix3() },
       uMuseSize: { value: new Vector4(1, FUR_LENGTH / MUSE_HEIGHT, SHELLS, 0) },
       uMuseWind: { value: new Vector4() },
-      uMuseFace: { value: new Vector4(rig.eyes, rig.smile, rig.squint, rig.mouth) },
-      uMuseMood: { value: new Vector4(rig.blush, rig.round, 0, 0) },
+      uMuseFace: { value: new Vector4(rig.eyes, rig.smile, rig.squint, rig.squeeze) },
+      uMuseMood: { value: new Vector4(rig.blush, 0, 0, 0) },
       uMuseFluff: { value: rig.fluff },
       uMuseGrade: { value: grade },
       uMuseRaise: { value: new Vector4(rig.raised, rig.raisedRight, rig.hung, rig.hungRight) },
@@ -493,8 +493,8 @@ if (!live) {
     else act(t);
     if (rigged) {
       const u = rigged.material.uniforms;
-      (u.uMuseFace.value as Vector4).set(rig.eyes, rig.smile, rig.squint, rig.mouth);
-      (u.uMuseMood.value as Vector4).set(rig.blush, rig.round, 0, 0);
+      (u.uMuseFace.value as Vector4).set(rig.eyes, rig.smile, rig.squint, rig.squeeze);
+      (u.uMuseMood.value as Vector4).set(rig.blush, 0, 0, 0);
       (u.uMuseRaise.value as Vector4).set(rig.raised, rig.raisedRight, rig.hung, rig.hungRight);
       u.uTime.value = t;
       if (look === 'stretch' || look === 'rough') rigged.paint();

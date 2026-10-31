@@ -10,6 +10,7 @@ import {
   LIE_BACK,
   PET,
   PLOP,
+  POCKET,
   POT,
   RISE,
   ROUSE,
@@ -73,8 +74,8 @@ type Facing = number | 'you';
 const HOME: Place = { x: 0, z: 0.5 };
 const AROUND: Place = { x: -0.9, z: -0.3 };
 const BENCH_FRONT: Place = { x: BENCH.x + BENCH.sit, z: BENCH.z + BENCH.before };
-/** (sat near the seat's front edge, so its legs swing out over it) */
-const BENCH_SEAT: Place = { x: BENCH.x + BENCH.sit, z: BENCH.z + BENCH.depth / 2 - 0.06, y: BENCH.seat };
+/** (sat at the seat's front edge, its hips just over it, so its legs hang down in front of the seat, its bottom on it) */
+const BENCH_SEAT: Place = { x: BENCH.x + BENCH.sit, z: BENCH.z + BENCH.depth / 2 + 0.02, y: BENCH.seat };
 const FISH_AT: Place = { x: POND.x - POND.r - 0.3, z: POND.z };
 const COOK_AT: Place = { x: FIRE.x - POT[0], z: FIRE.z - POT[2] };
 const NAP_AT: Place = { x: NAP.x, z: NAP.z };
@@ -150,6 +151,24 @@ function facingOf(f: Facing, at: Place, camera: { x: number; z: number }): numbe
 /** A pastime's own motions eased in over its first stretch and out over its last (s), its posture held throughout. */
 function ease(s: number, time: number, edge = 0.7): number {
   return smoothstep(0, edge, s) * smoothstep(0, edge, time - s);
+}
+
+/**
+ * A pastime with a tool, s into it (`total` long with a reach into its belly
+ * pocket at each end): the pastime's own time (from when the tool is out),
+ * how much of its motions show (in as the mitten leaves the pocket, out as
+ * it goes back), the pocket's reach, and the tool in the mitten (from as it
+ * comes out of the pocket until it goes back in).
+ */
+function withTool(s: number, total: number): { time: number; ease: number; pocket: number; grip: number } {
+  const back = total - s;
+  const at = (x: number): number => smoothstep(0, POCKET.in, x) * (1 - smoothstep(POCKET.out, POCKET.time, x));
+  return {
+    time: Math.max(0, s - POCKET.time),
+    ease: smoothstep(POCKET.out, POCKET.time, s) * smoothstep(POCKET.out, POCKET.time, back),
+    pocket: Math.max(at(s), at(back)),
+    grip: smoothstep(POCKET.out - 0.05, POCKET.out + 0.1, s) * smoothstep(POCKET.out - 0.05, POCKET.out + 0.1, back),
+  };
 }
 
 /** The day, built from places and pastimes: each walk turned toward first and turned out of after. */
@@ -273,14 +292,17 @@ function buildDay(): Segment[] {
   // a little wander
   go(AROUND, 0.6);
   stand('look about', 2.5, 0.6);
-  // the flowers, one after another
+  // the flowers, one after another (the can out of its pocket first, back in after)
   go(bedAt(0), 0, 'to the flowers');
   const water = GARDEN.period * BED.count;
+  const watering = water + 2 * POCKET.time;
   day.push({
     name: 'garden',
-    time: water,
+    time: watering,
     gait: 2 * (BED.count - 1),
-    play(s, out, ctx) {
+    play(at, out, ctx) {
+      const tool = withTool(at, watering);
+      const s = Math.min(tool.time, water);
       const n = Math.min(BED.count - 1, Math.floor(s / GARDEN.period));
       const u = s - n * GARDEN.period;
       // a few steps sideways to the next flower at the start of each watering
@@ -295,12 +317,14 @@ function buildDay(): Segment[] {
         out.action.stride = 0.4;
         out.action.gait = ctx.gait + 2 * (n - 1) + 2 * (u / 0.8);
       } else out.action.gait = ctx.gait + 2 * n;
-      out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: ease(s, water) * (n > 0 ? smoothstep(0.5, 0.9, u) : 1) });
+      out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: tool.ease * (n > 0 ? smoothstep(0.5, 0.9, u) : 1) });
+      if (tool.pocket > 0) out.action.moves.push({ kind: 'pocket', time: at, amount: tool.pocket });
       const f = flowerAt(n);
-      out.lookAt = [f.x, 0.1, f.z];
-      out.cues.water = { time: s, flower: n, grip: ease(s, water, 0.5) };
+      out.lookAt = tool.pocket > 0.5 ? null : [f.x, 0.1, f.z];
+      out.cues.water = { time: s, flower: n, grip: tool.grip };
     },
   });
+  here = bedAt(BED.count - 1);
   // the bench: up onto it, swinging its legs, humming, down again
   go(BENCH_FRONT, 0, 'to the bench');
   hop('hopUp', BENCH_SEAT);
@@ -312,18 +336,26 @@ function buildDay(): Segment[] {
   // fishing at the pond
   go(FISH_AT, FISH_FACING, 'to the pond');
   play('plop', 'plop', PLOP, FISH_FACING);
-  const fishing = 2 * FISH.period;
-  play('pond', 'fish', fishing, FISH_FACING, (s, out) => {
-    out.lookAt = [FISH_AT.x + CAST, 0, FISH_AT.z];
-    out.cues.fish = { time: s, grip: ease(s, fishing, 0.5) };
+  const fishing = 2 * FISH.period + 2 * POCKET.time;
+  play('pond', 'fish', fishing, FISH_FACING, (s, out, move) => {
+    const tool = withTool(s, fishing);
+    move.time = tool.time;
+    move.ease = tool.ease;
+    if (tool.pocket > 0) out.action.moves.push({ kind: 'pocket', time: s, amount: tool.pocket });
+    out.lookAt = tool.pocket > 0.5 ? null : [FISH_AT.x + CAST, 0, FISH_AT.z];
+    out.cues.fish = { time: tool.time, grip: tool.grip };
   });
   play('rise', 'rise', RISE, FISH_FACING);
   // cooking at the fire
   go(COOK_AT, 0, 'to the fire');
-  const cooking = 2 * COOK.period;
-  play('fire', 'stir', cooking, 0, (s, out) => {
-    out.lookAt = [FIRE.x, POT[1], FIRE.z];
-    out.cues.cook = { time: s, grip: ease(s, cooking, 0.5) };
+  const cooking = 2 * COOK.period + 2 * POCKET.time;
+  play('fire', 'stir', cooking, 0, (s, out, move) => {
+    const tool = withTool(s, cooking);
+    move.time = tool.time;
+    move.ease = tool.ease;
+    if (tool.pocket > 0) out.action.moves.push({ kind: 'pocket', time: s, amount: tool.pocket });
+    out.lookAt = tool.pocket > 0.5 ? null : [FIRE.x, POT[1], FIRE.z];
+    out.cues.cook = { time: tool.time, grip: tool.grip };
   });
   // a nap in the grass
   go(NAP_AT, -Math.PI / 2, 'to the nap');
@@ -550,7 +582,7 @@ export class MuseLife {
     const garden = this.find('garden');
     const nap = this.find('nap');
     for (let i = 0; i < BED.count; i++) {
-      const into = u - garden.start - i * GARDEN.period;
+      const into = u - garden.start - POCKET.time - i * GARDEN.period;
       let b = into < 0 ? 0 : into >= GARDEN.period ? 1 : gardenBeats(into).bloom;
       if (u > nap.start) b *= 1 - smoothstep(nap.start + 2, nap.start + nap.time - 2, u);
       bloom[i] = b;

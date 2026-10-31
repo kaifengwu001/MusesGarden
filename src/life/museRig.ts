@@ -34,7 +34,7 @@ import { FIELD_FIT, JOINT, JOINTS, ORDER, PARENT, type ArmTurn, type MuseFit } f
 // its mouth, round a pot) its arm is turned to reach it (two joints and the
 // forearm's twist, solved each frame from the arm as it hangs), and each
 // shoulder takes its share of its arm's turn. The face (the eyes, the smile,
-// a squint, the mouth and the blush) and the fur's standing up are set as
+// a squint, eyes squeezed shut, the blush) and the fur's standing up are set as
 // the layers go.
 
 /** A step (H): how far ahead a foot is set down, and how high it lifts. */
@@ -52,7 +52,7 @@ export const FLUFF = { tuck: 0.3, rise: 0.75, hold: 0.7, shake: 0.7, settle: 0.5
 export const FLUFF_LENGTH = FLUFF.tuck + FLUFF.rise + FLUFF.hold + FLUFF.shake + FLUFF.settle;
 /** Being petted: how long a hold before its fur stands up (s), and how long it takes to come out of it once let go. */
 export const PET = { fluff: 1.3, out: 0.6 } as const;
-/** A yawn and a stretch (s): the arms going up, held up with the mouth wide, coming down. */
+/** A yawn and a stretch (s): the arms going up, held up, coming down. */
 export const YAWN = { up: 0.7, hold: 1.5, down: 0.8 } as const;
 export const YAWN_LENGTH = YAWN.up + YAWN.hold + YAWN.down;
 /** Hopping up onto a seat and down off it (s): the whole hop, its take-off and its landing; how high it arcs over the straight line (H). */
@@ -69,9 +69,18 @@ export const GARDEN = { period: 12, pour: [0.7, 4.5], bloom: [4.4, 5.2], joy: [5
 /** Cooking (s into each taste): stirring (turns a second), the ladle up to its mouth, blown on, sipped, the yum, back to the pot. */
 export const COOK = { period: 12, rate: 0.7, lift: [6.8, 7.6], blow: [7.6, 8.5], sip: [8.5, 9.1], yum: [9.1, 10.8], back: [10.8, 11.6] } as const;
 
-/** Where its pastimes' things are (H, Muse's frame as it stands to them): the pot's middle at the ladle's height, the flower it waters, the rod's clasp before its belly. */
-export const POT = [-0.04, 0.38, 0.4] as const;
+/**
+ * Where its pastimes' things are (H, Muse's frame as it stands to them): the
+ * pot's middle at its rim (far enough out that its fur stays clear of it,
+ * the ladle reaching in), the flower it waters; where its mitten stirs from
+ * (held out over the pot, the arm drawn out a little) and the ladle's bowl
+ * goes round in the pot.
+ */
+export const POT = [-0.06, 0.4, 0.58] as const;
 export const FLOWER = [-0.12, 0.0, 0.52] as const;
+export const STIR = { x: -0.13, y: 0.48, z: 0.32, hand: 0.03, bowl: 0.07, reach: 0.03 } as const;
+/** Reaching into its belly pocket (s): the mitten in by `in`, rummaging until `out` (where a tool appears in it), back out by `time`. */
+export const POCKET = { in: 0.3, out: 0.85, time: 1.4 } as const;
 /** Where the rod is held (H, rest, carried by the chest): before the belly, to the right. */
 const ROD = { y: 0.36, z: 0.3 } as const;
 /** How long a tap's stirring lasts while it sleeps (s). */
@@ -93,7 +102,8 @@ export type MoveKind =
   | 'wake'
   | 'fish'
   | 'water'
-  | 'stir';
+  | 'stir'
+  | 'pocket';
 
 /** Something Muse is doing besides (museLife.ts): which, how far into it (s), how much of it shows (0 … 1). */
 export interface Move {
@@ -126,13 +136,12 @@ export interface MuseAction {
   moves?: readonly Move[];
 }
 
-/** The face as the poses set it: the eyes' openness (0 shut … 1 open), the smile (0 … 1), the squint (+1 shut in happy arcs ∩, −1 in content ones ∪), the mouth's opening (0 … 1) and roundness (0 an open smile … 1 an "o"), and the blush (0 … 1 more). */
+/** The face as the poses set it: the eyes' openness (0 shut … 1 open), the smile (0 … 1), the squint (+1 shut in happy arcs ∩, −1 in content ones ∪), the eyes squeezed shut (> <, 0 … 1), and the blush (0 … 1 more). The mouth only smiles. */
 interface Expression {
   eyes?: number;
   smile?: number;
   squint?: number;
-  mouth?: number;
-  round?: number;
+  squeeze?: number;
   blush?: number;
 }
 
@@ -161,11 +170,18 @@ function during(a: number, b: number, c: number, d: number, x: number): number {
   return smoothstep(a, b, x) * (1 - smoothstep(c, d, x));
 }
 
-/** Sitting (H, rad): on a seat and on the ground: how far the body comes down onto its bottom, how far it leans back, the legs' swing forward and splay. */
-const PERCH = { drop: 0.06, lean: 0.18, legs: -1.05, splay: 0.08 } as const;
-const SIT = { drop: 0.07, lean: 0.28, legs: -1.25, splay: 0.14 } as const;
-/** Lying on its back: how far it tips (rad), the legs, the head turned aside. */
-const LIE = { tip: 1.48, legs: -0.5, head: 0.42 } as const;
+/**
+ * Sitting (H, rad), on a seat and on the ground: how far the body comes down
+ * onto its bottom; how far the whole of it leans back; the hips rolled back
+ * under it (the lower body turning with the legs, so its bottom sits down
+ * flat and the legs bend from it, not out of the belly) and the waist and
+ * chest bringing it back upright over them, its weight over its bottom; the
+ * legs' swing forward (from straight down, as they end up) and splay.
+ */
+const PERCH = { drop: 0.07, lean: 0, hips: -0.38, waist: 0.25, chest: 0.12, legs: -0.75, splay: 0.08 } as const;
+const SIT = { drop: 0.075, lean: 0.05, hips: -0.42, waist: 0.26, chest: 0.12, legs: -1.32, splay: 0.14 } as const;
+/** Lying on its back: how far it tips (rad); the legs' bend from the body (back toward the ground, rad); the head turned aside; how much it flattens under its own weight (its depth less, its width more). */
+const LIE = { tip: 1.48, legs: 0.32, head: 0.42, flat: 0.11, wide: 0.045 } as const;
 /**
  * Muse's back in profile (H, rest, about the middle: height, depth), measured
  * off the sculpts: the points it rolls over as it lies back. The fur pressed
@@ -281,12 +297,11 @@ export class MuseRig {
   readonly dual = Array.from({ length: JOINTS * 2 }, () => new Vector4());
   /** Each joint's frame as the mesh was made (its arms turned as the fit binds them), inverted. */
   private readonly unbind = Array.from({ length: JOINTS }, () => new Matrix4());
-  /** The face: the eyes' openness (0 shut … 1 open), the smile (0 at rest … 1 beaming), the squint (+1 happy arcs, −1 content ones), the mouth's opening and roundness, the blush. */
+  /** The face: the eyes' openness (0 shut … 1 open), the smile (0 at rest … 1 beaming), the squint (+1 happy arcs, −1 content ones), the eyes squeezed shut (> <), the blush. */
   eyes = 1;
   smile = 0;
   squint = 0;
-  mouth = 0;
-  round = 0;
+  squeeze = 0;
   blush = 0;
   /** The fur standing up: how far up the body the wave has come (H, at rest), how much stands behind it, the crest's extra at its front, the front's width (H). */
   readonly fluff = new Vector4(0, 0, 0, 0.12);
@@ -423,8 +438,7 @@ export class MuseRig {
     if (e.eyes !== undefined) this.eyes += (e.eyes - this.eyes) * k;
     if (e.smile !== undefined) this.smile += (e.smile - this.smile) * k;
     if (e.squint !== undefined) this.squint += (e.squint - this.squint) * k;
-    if (e.mouth !== undefined) this.mouth += (e.mouth - this.mouth) * k;
-    if (e.round !== undefined) this.round += (e.round - this.round) * k;
+    if (e.squeeze !== undefined) this.squeeze += (e.squeeze - this.squeeze) * k;
     if (e.blush !== undefined) this.blush += (e.blush - this.blush) * k;
   }
 
@@ -446,8 +460,7 @@ export class MuseRig {
     // a little smile always, beaming while it waves
     this.smile = 0.15;
     this.squint = 0;
-    this.mouth = 0;
-    this.round = 0;
+    this.squeeze = 0;
     this.blush = 0;
     this.reach();
     this.idle(a.time, a.walk);
@@ -499,6 +512,8 @@ export class MuseRig {
         return this.water(t, e);
       case 'stir':
         return this.stir(t, e);
+      case 'pocket':
+        return this.pocket(t, k);
     }
   }
 
@@ -602,7 +617,13 @@ export class MuseRig {
 
   // ---- its answers to you ----
 
-  /** Three hops on the spot, squashing onto each landing and stretching out of it, arms flapping, beaming. */
+  /**
+   * Three hops on the spot, squashing onto each landing and stretching out of
+   * it, beaming. The arms, held out a little, are only carried by the hops:
+   * pressed down as it lands and springs off (they lag the body's push),
+   * floating up through the flight, the forearms a beat behind; after the
+   * last landing they settle.
+   */
   private bounce(t: number, k: number): void {
     const J = JOINT;
     const B = BOUNCE;
@@ -632,10 +653,14 @@ export class MuseRig {
     this.stretch += stretch * env;
     // the head nods down onto each landing
     this.addTurn(J.head, -0.5 * Math.min(0, stretch) * env, 0, 0);
-    // the arms out to the sides, flapping (down as it lands)
-    const flap = Math.sin(TAU * B.flap * t);
-    for (const side of [1, -1]) this.armBy(side, 0.32 * env, 0, (0.6 + 0.3 * flap) * env, (0.3 + 0.15 * flap) * env);
-    this.express(env, { squint: 1, smile: 1, mouth: 0.8, round: 0, blush: 0.55 });
+    // the arms swung by the hops: lowest just as it leaves the ground, highest as it comes down (dying away after the last)
+    const phase = t / B.period;
+    const after = Math.max(0, t - end) / B.settle;
+    const fade = 1 - smoothstep(0, 1, after);
+    const swing = -Math.cos(TAU * (phase - 0.3)) * fade;
+    const lag = -Math.cos(TAU * (phase - 0.4)) * fade;
+    for (const side of [1, -1]) this.armBy(side, 0.22 * env, 0, (0.42 + 0.3 * swing) * env, (0.18 + 0.14 * lag) * env);
+    this.express(env, { squint: 1, smile: 1, blush: 0.55 });
   }
 
   /**
@@ -659,7 +684,7 @@ export class MuseRig {
     // its mittens up to its cheeks
     this.reachFor(1, 0.2, 0.6, 0.2, J.head, 0.9 * on);
     this.reachFor(-1, -0.2, 0.6, 0.2, J.head, 0.9 * on);
-    this.express(on, { squint: 1, smile: 0.9, blush: 0.85, mouth: 0 });
+    this.express(on, { squeeze: 1, smile: 0.9, blush: 0.85 });
     // held long enough: the fur (time into it, and the shake from the let-go)
     const held0 = held ? t : t - release;
     const into = held0 - PET.fluff;
@@ -696,8 +721,8 @@ export class MuseRig {
       this.addTurn(J.pelvis, 0, 0.16 * s * k, 0.04 * s * k);
       this.addTurn(J.head, 0, -0.1 * s * k, -0.08 * s * k);
     }
-    const squeeze = tuck * (shake >= 0 ? 1 - smoothstep(F.shake * 0.6, F.shake + 0.2, shake) : 1);
-    this.express(squeeze * k, { squint: 1, smile: 0.7 });
+    const shut = tuck * (shake >= 0 ? 1 - smoothstep(F.shake * 0.6, F.shake + 0.2, shake) : 1);
+    this.express(shut * k, alone ? { squint: 1, smile: 0.7 } : { squeeze: 1, smile: 0.7 });
     if (alone) this.express(k * smoothstep(F.shake, F.shake + F.settle, shake) * (1 - smoothstep(F.shake + F.settle * 0.6, F.shake + F.settle, shake)), { smile: 1 });
   }
 
@@ -713,39 +738,56 @@ export class MuseRig {
     this.addTurn(J.head, -0.2 * up, 0, 0);
     this.addTurn(J.chest, -0.07 * up, 0, 0.03 * Math.sin(TAU * 7 * t) * up * hump(Y.up, Y.up + Y.hold, t) * 0.3);
     const open = during(Y.up * 0.5, Y.up + 0.25, Y.up + Y.hold - 0.3, Y.up + Y.hold + 0.25, t);
-    this.express(open * k, { mouth: 1, round: 0.75, squint: -1, smile: 0 });
+    this.express(open * k, { squint: -1, smile: 0.3 });
   }
 
   // ---- sitting, lying, and getting there ----
 
-  /** Perched on a seat (0 standing … 1 sat): the body down onto its bottom, leaning back a touch, the legs swung out over the seat's edge. */
-  private perchBase(k: number): void {
+  /** Sat (0 standing … 1 sat) as `how` has it: down onto its bottom, the hips rolled back under it and the body upright again over them, the legs swung forward. */
+  private seated(how: typeof PERCH | typeof SIT, k: number): void {
     const J = JOINT;
-    this.addShift(J.root, 0, -PERCH.drop * k, 0);
-    this.addTurn(J.root, -PERCH.lean * k, 0, 0);
-    this.addTurn(J.legL, (PERCH.legs + PERCH.lean) * k, 0, PERCH.splay * k);
-    this.addTurn(J.legR, (PERCH.legs + PERCH.lean) * k, 0, -PERCH.splay * k);
+    this.addShift(J.root, 0, -how.drop * k, 0);
+    this.addTurn(J.root, -how.lean * k, 0, 0);
+    this.addTurn(J.pelvis, how.hips * k, 0, 0);
+    this.addTurn(J.spine, how.waist * k, 0, 0);
+    this.addTurn(J.chest, how.chest * k, 0, 0);
+    this.addTurn(J.legL, (how.legs + how.lean) * k, 0, how.splay * k);
+    this.addTurn(J.legR, (how.legs + how.lean) * k, 0, -how.splay * k);
+  }
+
+  /** Perched on a seat (0 standing … 1 sat): sat on its bottom at the seat's edge, upright, the legs hanging over it. */
+  private perchBase(k: number): void {
+    this.seated(PERCH, k);
     // the arms down at its sides, a little out
     for (const side of [1, -1]) this.armBy(side, 0.1 * k, 0, 0.12 * k, 0.1 * k);
   }
 
-  /** Sitting on the ground (0 standing … 1 sat): down on its bottom, leaning back, the legs out in front. */
-  private sitBase(k: number, lean = SIT.lean): void {
-    const J = JOINT;
-    this.addShift(J.root, 0, groundLift(lean) * k, 0);
-    this.addTurn(J.root, -lean * k, 0, 0);
-    this.addTurn(J.legL, (SIT.legs + SIT.lean) * k, 0, SIT.splay * k);
-    this.addTurn(J.legR, (SIT.legs + SIT.lean) * k, 0, -SIT.splay * k);
+  /** Sitting on the ground (0 standing … 1 sat): down on its bottom, upright, the legs out in front. */
+  private sitBase(k: number): void {
+    this.seated(SIT, k);
     for (const side of [1, -1]) this.armBy(side, 0.05 * k, 0, 0.2 * k, 0.15 * k);
   }
 
-  /** From sitting (lying 0) to lying on its back (1), as much as k shows: tipped back onto its back, the legs up a little, the arms out to its sides, the head turned aside. */
+  /**
+   * From sitting (lying 0) to lying on its back (1), as much as k shows:
+   * tipped back onto its back (its hips and waist straightening as it goes),
+   * the body flattening a little under its weight, the legs bending back
+   * toward the ground, the arms out to its sides, the head turned aside.
+   */
   private lieBase(lying: number, k: number): void {
     const J = JOINT;
     const tip = SIT.lean + (LIE.tip - SIT.lean) * lying;
-    this.addShift(J.root, 0, groundLift(tip) * k, 0);
+    const sat = 1 - smoothstep(0, 0.6, lying);
+    const flat = smoothstep(0.5, 1, lying);
+    // (the hips' roll lowered its bottom: as they straighten it rolls onto its back; flattened, it settles lower)
+    this.addShift(J.root, 0, (groundLift(tip) - 0.024 * flat) * k, 0);
     this.addTurn(J.root, -tip * k, 0, 0);
-    // (the legs' turn from the body: sitting's, then lifted a little off the ground as it lies)
+    this.addTurn(J.pelvis, SIT.hips * sat * k, 0, 0);
+    this.addTurn(J.spine, SIT.waist * sat * k, 0, 0);
+    this.addTurn(J.chest, SIT.chest * sat * k, 0, 0);
+    for (const j of [J.pelvis, J.spine, J.chest]) this.addSwell(j, LIE.wide * flat * k, 0, -LIE.flat * flat * k);
+    this.addSwell(J.head, 0.5 * LIE.wide * flat * k, 0, -0.5 * LIE.flat * flat * k);
+    // (the legs' turn from the body: sitting's, then bending back toward the ground as it lies)
     const legs = SIT.legs + SIT.lean + (LIE.legs - SIT.legs - SIT.lean) * lying;
     this.addTurn(J.legL, legs * k, 0, SIT.splay * k);
     this.addTurn(J.legR, legs * k, 0, -SIT.splay * k);
@@ -769,7 +811,6 @@ export class MuseRig {
     this.addTurn(J.pelvis, (0.16 * crouch - 0.05 * land) * k, 0, 0.05 * Math.sin(TAU * 3 * t) * settle * k);
     // the arms swung back for the spring, up and out in the air
     for (const side of [1, -1]) this.armBy(side, (0.45 * crouch - 0.2 * air) * k, 0, (0.55 * air + 0.25 * land) * k, 0.2 * air * k);
-    this.express(air * k, { mouth: 0.4, round: 0.6 });
     this.express(settle * k, { squint: 1, smile: 0.9 });
   }
 
@@ -801,7 +842,6 @@ export class MuseRig {
     this.stretch += (0.05 * air - 0.12 * land + 0.025 * settle) * k;
     this.addTurn(J.pelvis, (0.2 * lean + 0.06 * land) * k, 0, 0);
     for (const side of [1, -1]) this.armBy(side, -0.3 * lean * k, 0, (0.5 * air + 0.3 * land) * k, 0.2 * air * k);
-    this.express(air * k, { mouth: 0.35, round: 0.7 });
   }
 
   /** Down onto the ground: a little bob, the bottom dropping, the legs swinging out, a bump. */
@@ -850,7 +890,7 @@ export class MuseRig {
   private sleep(t: number, k: number, e: number, roused: number): void {
     const J = JOINT;
     this.lieBase(1, k);
-    const { breath, bubble } = sleepBeats(t);
+    const { breath } = sleepBeats(t);
     this.addSwell(J.spine, 0.02 * breath * k, 0, 0.07 * breath * k);
     this.addSwell(J.chest, 0.015 * breath * k, 0, 0.05 * breath * k);
     this.addTurn(J.head, 0.03 * breath * k, 0, 0);
@@ -864,8 +904,8 @@ export class MuseRig {
     const r = roused >= 0 ? hump(0, ROUSE, roused) : 0;
     this.addTurn(J.root, 0, 0, -0.16 * r * k);
     this.addTurn(J.head, 0, -0.25 * r * k, 0);
-    this.express(k, { squint: -1, smile: 0.35, mouth: 0.22 * (bubble - 0.25) * (1 - r) + 0.25 * smack, round: 1 });
-    this.express(r * k, { squint: 0, eyes: 0.25, mouth: 0.3 * Math.abs(Math.sin(TAU * 3 * roused)), round: 0.6, smile: 0.2 });
+    this.express(k, { squint: -1, smile: 0.35 + 0.2 * smack });
+    this.express(r * k, { squint: 0, eyes: 0.25, smile: 0.2 });
   }
 
   /** Woken: eyes open with a start, sitting up, rubbing an eye with a mitten, blinking about. */
@@ -880,7 +920,6 @@ export class MuseRig {
     this.addTurn(J.head, 0.1 * rub * k, -0.1 * rub * k, -0.12 * rub * k);
     this.express(k * smoothstep(0, 0.12, t), { eyes: 1, squint: 0 });
     this.express(rub * k, { squint: -1, smile: 0.2 });
-    this.express(hump(0, 0.4, t) * k, { mouth: 0.4, round: 1 });
   }
 
   // ---- its pastimes ----
@@ -906,8 +945,8 @@ export class MuseRig {
     this.addShift(J.root, 0, 0.03 * Math.abs(Math.sin(TAU * 2.2 * (u - FISH.cheer[0]))) * cheer * e, 0);
     // the free mitten flung up for the catch, then waving the fish off
     this.waveArm(1, (0.55 * cheer + 0.75 * bye) * e, Math.sin(TAU * 2.4 * u) * bye);
-    this.express(Math.min(1, nib * 2) * e, { mouth: 0.35, round: 1, eyes: 1 });
-    this.express(cheer * e, { squint: 1, smile: 1, mouth: 0.7, round: 0, blush: 0.5 });
+    this.express(Math.min(1, nib * 2) * e, { eyes: 1, smile: 0.2 });
+    this.express(cheer * e, { squint: 1, smile: 1, blush: 0.5 });
     this.express(fish * (1 - cheer) * e, { smile: 0.8 });
     this.express(bye * e, { smile: 0.9, blush: 0.3 });
   }
@@ -929,8 +968,8 @@ export class MuseRig {
     // hopping for joy, the free arm flung up
     this.addShift(J.root, 0, 0.05 * Math.abs(Math.sin(TAU * 1.6 * (u - GARDEN.joy[0]))) * joy * e, 0);
     this.waveArm(1, 0.7 * joy * e, 0.5 * Math.sin(TAU * 3 * u) * joy);
-    this.express(gasp * e, { mouth: 0.5, round: 1, eyes: 1 });
-    this.express(joy * e, { squint: 1, smile: 1, mouth: 0.7, round: 0, blush: 0.5 });
+    this.express(gasp * e, { eyes: 1, smile: 0.2 });
+    this.express(joy * e, { squint: 1, smile: 1, blush: 0.5 });
     this.express(smell * e, { squint: -1, smile: 0.8, blush: 0.6 });
   }
 
@@ -942,8 +981,9 @@ export class MuseRig {
     const stirring = 1 - taste;
     const sip = during(COOK.sip[0], COOK.sip[0] + 0.15, COOK.sip[1] - 0.1, COOK.sip[1], u);
     const yum = during(COOK.yum[0], COOK.yum[0] + 0.15, COOK.yum[1] - 0.3, COOK.yum[1], u);
-    const r = 0.055;
-    this.reachFor(-1, POT[0] + r * Math.cos(turn), POT[1] + 0.06, POT[2] - 0.06 + r * Math.sin(turn), -1, e * stirring);
+    // the mitten held out over the pot going round (the arm drawn out a little), the ladle's bowl round in the pot
+    this.reachFor(-1, STIR.x + STIR.hand * Math.cos(turn), STIR.y, STIR.z + STIR.hand * Math.sin(turn), -1, e * stirring);
+    this.lengthen(J.upperArmR, J.foreArmR, STIR.reach * e * stirring);
     // the ladle to its mouth (its bowl before the mouth: the mitten a little below and to the side)
     this.reachFor(-1, -0.07, 0.6, 0.3, J.head, e * taste);
     this.addTurn(J.pelvis, 0, 0.05 * Math.sin(turn) * stirring * e, 0.02 * Math.cos(turn) * stirring * e);
@@ -956,10 +996,22 @@ export class MuseRig {
       const f = u - COOK.yum[0];
       this.fluff.set(Math.max(this.fluff.x, -0.15 + 1.35 * smoothstep(0, 0.7, f)), Math.max(this.fluff.y, 0.55 * yum * e), Math.max(this.fluff.z, 0.4 * hump(0, 0.7, f) * e), 0.12);
     }
-    this.express(blow * e, { mouth: 0.3, round: 1, smile: 0 });
-    this.express(sip * e, { squint: -1, mouth: 0 });
-    this.express(yum * e, { squint: 1, smile: 1, blush: 0.9, mouth: 0.35, round: 0 });
+    this.express(blow * e, { smile: 0 });
+    this.express(sip * e, { squint: -1 });
+    this.express(yum * e, { squint: 1, smile: 1, blush: 0.9 });
     this.express(stirring * e, { smile: 0.35 });
+  }
+
+  /** A mitten into its belly pocket (and the other at its edge), rummaging, the head bent to look: for a tool, or to put one away. */
+  private pocket(t: number, k: number): void {
+    const J = JOINT;
+    const r = 0.012;
+    const a = TAU * 5 * t;
+    // (the pocket low on the belly's front, a little to the right: as far in as its short arm goes, the mitten half into it)
+    this.reachFor(-1, -0.1 + r * Math.cos(a), 0.31 + r * Math.sin(a), 0.21, J.spine, k);
+    this.reachFor(1, 0.12, 0.32, 0.21, J.spine, 0.55 * k);
+    this.addTurn(J.head, 0.2 * k, -0.08 * k, 0);
+    this.addTurn(J.chest, 0.05 * k, 0, 0);
   }
 
   /** The arms hung as the fit hangs them, nothing else moved: a sculpt's roots are measured so (museMesh.ts). */
@@ -1107,7 +1159,7 @@ export class MuseRig {
       for (let c = 0; c < 5; c++) p[c] += b[c];
       // the elbow bends one way only, and so far
       p[3] = Math.max(-0.5 - bend, Math.min(2.3 - bend, p[3]));
-      p[4] = Math.max(-0.9, Math.min(0.9, p[4]));
+      p[4] = Math.max(-0.45, Math.min(0.45, p[4]));
     }
     return p;
   }
@@ -1300,7 +1352,7 @@ const chain = new Matrix4();
 const chest = new Matrix4();
 const arm = new Matrix4();
 /** The reach's preference for small turns (per turn: the upper arm's x, y, z, the elbow, the forearm's twist; H² per rad²). */
-const PRIOR = [0.002, 0.004, 0.002, 0.001, 0.012] as const;
+const PRIOR = [0.002, 0.004, 0.002, 0.001, 0.03] as const;
 
 /** Solve a 5 × 5 system in place (A row by row; the answer left in b), by elimination with partial pivoting. */
 function solve5(A: Float64Array, b: Float64Array): void {

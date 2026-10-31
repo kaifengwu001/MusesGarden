@@ -57,7 +57,7 @@ waving. This table fills in as each is done.
 | 8 | A button to find Muse and jump to it | |
 | 9 | Muse's page: its interests (with sharing and privacy), its friends, tagged when a friend's human is a friend of yours on Instagram or Facebook | |
 
-## Iteration 16: Muse's interactions (in progress)
+## Iteration 16: Muse's interactions (in the lab)
 
 Started from iteration 15 (74926b7). Since then Muse has come to the meadow
 (e2de5cf, 02a9840, 2fb02be, a7f6349): Tripo3D's sculpt rigged on a
@@ -68,16 +68,35 @@ fills in as they are done.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Idle: walk around | |
-| 2 | Idle: sit on the bench (port the meadow's bench to the lab) | |
-| 3 | Idle: fall asleep in the grass (belly up, a snore bubble, a Zzz sign; push the grass away) | |
-| 4 | Idle: fishing (a fishing rod) | |
-| 5 | Idle: gardening (garden tools) | |
-| 6 | Idle: cooking (a stretch goal; props) | |
-| 7 | Click: wave | |
-| 8 | Click: a happy bounce up and down, arms flapping | |
-| 9 | Long hold: petting; the head tilts, the eyes squint | |
-| 10 | The fur stands up in a wave while it squints, the neck tucks in (it has no neck, so maybe the whole body gets shorter) (a stretch goal) | |
+| 1 | Idle: walk around | A stage of its own in the lab (`museLab.html#model=tpose6&live=1`, src/dev/museStage.ts): a round lawn of about 25,000 blades in a pale sky. Muse lives a ~4-minute day on it in closed form (src/life/museLife.ts): it wanders and looks about, then walks between its pastimes (turn, waddle, turn), waving at you on the way out. Keys 1–7 go to each part; the camera follows it (G). |
+| 2 | Idle: sit on the bench (port the meadow's bench to the lab) | The meadow's bench (props.ts) in Muse's heights. Muse turns its back to it, crouches and hops up onto the seat's front edge, swings its legs in turns, now and then hums with its eyes shut (notes float up), and hops down. It sits upright: the hips roll back under it with the legs and the waist and chest bring it upright over them, so its bottom sits flat and the legs hang in front of the seat. |
+| 3 | Idle: fall asleep in the grass (belly up, a snore bubble, a Zzz sign; push the grass away) | It yawns and stretches, plops down, lies back onto its back, flattened a little by its weight, legs bent back toward the ground, arms out. It breathes slowly (the belly swells), a snore bubble grows and shrinks at its nose, Zzz rise; now and then it stirs. The grass is pressed down and parted round it (its body's spheres push the blades), and its soft shadow falls on the lawn. Then it wakes, sits up, rubs an eye and gets up. A tap while it sleeps pops the bubble and only half wakes it. |
+| 4 | Idle: fishing (a fishing rod) | It sits at the pond's edge, takes a rod out of its belly pocket, casts, watches the float, leans in to two nibbles, yanks the bite: the fish flies out on the line and hangs wriggling; it cheers, drops the fish back in (rings on the water) and waves it off; twice, then the rod goes back in the pocket. |
+| 5 | Idle: gardening (garden tools) | A flower bed of three sprouts, a trowel in the soil. It takes a watering can out of its pocket and waters each in turn, stepping along: the sprout grows and opens with sparkles, it hops for joy, leans in for a sniff. The flowers close as it naps. |
+| 6 | Idle: cooking (a stretch goal; props) | A campfire (stones, logs, flickering flames, a glow) with a pot of soup on a trivet, steam rising. It takes a ladle out of its pocket and stirs, arm held out over the pot, the ladle from its mitten down to the bowl going round in the soup; now and then it tastes (ladle up to its mouth, blown on, sipped), and its fur shivers up with a "yum". |
+| 7 | Click: wave | A tap stops whatever it is doing (its day is held back while it answers), turns it to you if it is standing or walking, and it waves (the first time in a while). |
+| 8 | Click: a happy bounce up and down, arms flapping | Further taps: three hops with squash and stretch, eyes shut in happy arcs, blushing. The arms are only carried by the hops: pressed down as it lands and springs off, floating up through the flight. |
+| 9 | Long hold: petting; the head tilts, the eyes squint | Hold it: the head tilts into your hand (toward where you press) and squishes a little, eyes squeezed shut (> <), blushing, paws up, hearts. Asleep, it smiles in its sleep. |
+| 10 | The fur stands up in a wave while it squints, the neck tucks in (it has no neck, so maybe the whole body gets shorter) (a stretch goal) | Held longer than 1.3 s: the whole body scrunches shorter and rounder (the head sinks, the shoulders rise) while the fur stands up in a wave from its feet to its head (longer, standing straight, each tuft its own); let go, it shakes it out and pops back up to its height. Also on its own as a move (`pose=fluff`). |
+
+Kai's review of the first pass (2026-10-31), done:
+
+- No mouth animations (the laugh and the "o" did not look good): the face changes by its eyes alone; the mouth only smiles.
+- (> <) eyes while it is petted.
+- The arms in the bounce follow the hops instead of flapping on their own.
+- On the bench: no legs through the seat; hips in contact, the body upright instead of leaning back as if to fall.
+- Asleep: flattened a little by its weight, the legs bent back.
+- The watering can no longer through the mitten; cooking: the bent wrist gone (the forearm's twist limited), the pot further off and the arm and ladle reaching out, so the fur clears the pot.
+- Tools come out of a belly pocket (a reach in, a rummage; the tool appears in the mitten as it comes out) and go back into it after, instead of flying in from the ground.
+
+How it is built:
+
+- **Rig** (museRig.ts): the whole body squashes and stretches about its feet (keeping its volume), a joint can swell on its own (a breath, a squished head), and a mitten can be sent to a point: the arm's turns, its elbow and the forearm's twist are solved each frame from the arm as it hangs (damped steps, preferring small turns, the shoulder's share counted). Moves (bounce, pet, fluff, yawn, the hops, sitting, lying, sleeping, waking, fishing, watering, stirring, the pocket) are closed-form functions of their own time.
+- **Face**: the squint shuts the eyes into arcs (∩ happy, ∪ content), the squeeze into > <, the blush deepens with strokes. The fur stands up behind a front running up the body (uMuseFluff).
+- **Shoulder correctives**: the wave's corrective is now mirrored onto the right shoulder (either arm or both can go up), and each side's hung and raised correctives are weighed by where its upper arm points along the arc from hanging, through the sculpt's own pose, to the top of a wave, giving way off that arc. Reaching forward, half-applied correctives had torn a spike at the armpit.
+- **Lab**: `pose=<move>` plays any move on the turntable, `view=cam:…` frames any still, `day=` and `pause=1` hold a moment of the stage, `hide=1` hides Muse to see the grass and shadows round it.
+
+Known: seen exactly from the side, sitting still shows a soft crease where the legs meet the belly (the fur mostly hides it; a sitting corrective like the shoulders' would fix it). The arms are too short to cup its cheeks, so the petting paws come up before its chest. Not yet in the meadow.
 
 ## Iteration 15: specks on the blue flowers on 1× screens
 
