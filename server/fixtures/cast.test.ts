@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CastMember, TopicKey } from '../../src/muse/contract';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
-import { FIXTURES_DIR, loadCast, parseSoul, readMemberDocs, sectionBullets, TRAITS } from './cast';
+import { HeuristicMind } from '../adapters/minds/heuristic';
+import { parseSoul } from '../domain/soul';
+import { FIXTURES_DIR, loadCast, readMemberDocs } from './cast';
+
+const TRAITS = ['curiosity', 'focus', 'sociability', 'whimsy', 'novelty'];
+const mind = new HeuristicMind();
 
 const cast = loadCast();
 const corpus = loadCorpus();
@@ -12,8 +17,9 @@ const source = new FixtureSource(corpus);
 const read = (path: string) => readFileSync(join(FIXTURES_DIR, path), 'utf8');
 const areaOf = (topic: TopicKey | null) => corpus.pages.find((p) => p.candidate.title === topic)?.area;
 
+/** The labels the engine itself would take from MEMORY.md, resolved to corpus topics. */
 async function interests(memory: string): Promise<(TopicKey | null)[]> {
-  return Promise.all(sectionBullets(memory, 'Interests').map((label) => source.resolveTopic(label)));
+  return Promise.all((await mind.extractInterests(memory, 'memory')).map((label) => source.resolveTopic(label)));
 }
 
 describe('cast.json', () => {
@@ -113,7 +119,7 @@ describe('privacy/MEMORY.sensitive.md', () => {
   });
 
   it('keeps its real interests free of anything sensitive', async () => {
-    const bullets = sectionBullets(text, 'Interests');
+    const bullets = await mind.extractInterests(text, 'memory');
     expect(bullets.length).toBeGreaterThan(0);
     expect(bullets.some((b) => b.includes('sensitive'))).toBe(false);
     expect(await interests(text)).toEqual(expect.arrayContaining(['Origami', 'Jazz', 'Astronomy']));
