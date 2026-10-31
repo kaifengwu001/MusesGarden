@@ -21,7 +21,7 @@ uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four t
 uniform float uPageSize;
 uniform vec4 uFlowers;    // near radius (m), ln mean density (per m²), species id, size scale
 uniform vec4 uFlowerFade; // full-density radius (m), kept fraction at the edge, stem top (m), nod
-varying vec3 vColour;
+centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
 
 float rnd(float s, float k) {
   return fract(sin(s * 78.233 + k * 12.9898) * 43758.5453);

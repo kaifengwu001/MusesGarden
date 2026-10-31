@@ -19,7 +19,7 @@ uniform vec4 uGrass;     // height (m), width (m), near radius (m), ln density (
 uniform vec4 uGrassFade; // full-density radius (m), kept fraction at the edge
 uniform vec3 uGrassPal[10]; // palette cells, see GRASS_COLOURS in grass.ts
 
-varying vec3 vColour;
+centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
 
 float rnd(float s, float k) {
   return fract(sin(s * 91.3458 + k * 47.123) * 43758.5453);

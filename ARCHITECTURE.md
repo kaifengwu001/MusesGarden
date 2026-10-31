@@ -636,7 +636,14 @@ so any view can be shared.
 - **MSAA:** a 4× HalfFloat MSAA target costs about 56 B per pixel, about
   200 MB at 1440p with DPR 2, which would break the memory budget on its own.
   So MSAA is used only on displays of DPR < 1.75 (whatever the render scale).
-  At DPR 2 the pixel density does the anti-aliasing.
+  At DPR 2 the pixel density does the anti-aliasing. Under MSAA a pixel
+  partly covered by a triangle is shaded once, at its centre, which can lie
+  outside a sub-pixel triangle (a blue floret, a star's point seen edge-on).
+  A per-vertex colour read there is extrapolated far out of range (−23 to
+  +49 in the HDR target), and the grade turns it into black or hot specks
+  that flicker as the flowers sway. So grass, flowers, petals and birds read
+  their colour at the centroid of the covered samples (grass.frag.glsl).
+  Without MSAA that is the pixel centre, so DPR 2 draws the same pixels.
 - **Trade-offs:** every trade of quality for speed is listed in `PROGRESS.md`.
 
 ## Invariants and how they are tested

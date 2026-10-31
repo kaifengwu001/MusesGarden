@@ -10,7 +10,7 @@ attribute float aHinge; // 0 body, ±1 inner wing, ±2 outer wing (sign: side)
 attribute vec3 aPos;    // planet space (m)
 attribute vec4 aFrame;  // heading (unit tangent), bank (rad)
 attribute vec4 aWing;   // wingbeat phase (rad), beat (rad), dihedral (rad), size (× the mesh)
-varying vec3 vColour;
+centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
 
 const vec2 SHOULDER = vec2(0.05, 0.0);
 const vec2 ELBOW = vec2(0.25, 0.0);

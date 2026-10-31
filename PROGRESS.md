@@ -25,6 +25,38 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## After iteration 14: specks on the blue flowers on 1× screens
+
+Kai's screen recording (2026-10-30) showed single black pixels, now and then
+a hot red or white one, flickering among the small blue flowers on some
+external screens. The MacBook's own screen and the ASUS were fine. The specks
+were in the frame itself: the recording shows them wherever it is played.
+
+- **Cause:** MSAA, which is on only below DPR 1.75 (1× screens). A pixel
+  partly covered by a triangle is shaded once, at its centre, and for a
+  sub-pixel triangle the centre can lie outside it. The flowers' colour is
+  set per vertex, so it was extrapolated there. A blue floret is a fan of
+  four 2.5 cm triangles from a pale centre to blue petals. A white star's
+  points run out from a yellow centre and are seen nearly edge-on. In the
+  standing view at 1440×900, 47–65 pixels a frame of the scene target were
+  negative (down to −23) or far too bright (up to 49). The grade turns them
+  into black or hot specks, and the flutter moves them every frame. All of
+  them came from the flowers: in that view mostly the white stars, then the
+  blue clusters, which go dark navy.
+- **Fix:** grass, flowers, petals and birds read their colour at the
+  centroid of the covered samples, which lies inside the triangle
+  (grass.frag.glsl). No out-of-range pixel is left: the scene's colours span
+  0.03–1.09 at 1×, as at 2×.
+- **Look:** at DPR 2, the same pixels in 16 views (High and Medium). At 1×
+  only pixels on the plants' edges change. In the cottage view 267k pixels
+  move by 1–4 levels, 12.6k by more than 4 and 156 by more than 64 (the
+  specks).
+- **Cost:** none measured. At 1× on High the change is −0.07 to +0.06 ms a
+  frame (median of 8 alternating rounds, 7 views).
+- **Test:** the invariant "under MSAA no pixel of the scene leaves the range
+  of its colours" (`npm run test:gpu`) reads the scene target at DPR 1.
+  Without the fix it fails (−6.2).
+
 ## Iteration 14: the review notes
 
 Started from iteration 13 (058b8a1), the notes committed first (a0ff6c2).

@@ -183,6 +183,62 @@ test.describe('frames', () => {
   });
 });
 
+test.describe('colour', () => {
+  test('under MSAA no pixel of the scene leaves the range of its colours', async ({ page }) => {
+    // At DPR 1 the scene target carries MSAA. A pixel partly covered by a
+    // sub-pixel triangle (a floret, a star's point edge-on) was shaded at its
+    // centre, outside the triangle, and its per-vertex colour extrapolated to
+    // −23…+49: black and hot specks that flickered on 1× screens.
+    await open(page, 'cam=wander&q=high&hud=0&pose=-0.426,0.3515,0.2406,0.7982,0.83');
+    const r = await page.evaluate(async () => {
+      type Target = { width: number; depthBuffer: boolean };
+      type Renderer = {
+        getContext: () => WebGL2RenderingContext;
+        getRenderTarget: () => Target | null;
+        render: (scene: unknown, camera: unknown) => void;
+        properties: { get: (t: Target) => { __webglFramebuffer: WebGLFramebuffer } };
+      };
+      const m = window.__meadow;
+      if (!m) throw new Error('harness missing');
+      const w = (window as unknown as { __world: { renderer: Renderer; scene: unknown } }).__world;
+      m.setScale(1);
+      await m.settle();
+      const gl = w.renderer.getContext();
+      // the scene target: the full-size target the world is drawn into
+      const found: { target: Target | null } = { target: null };
+      const render = w.renderer.render.bind(w.renderer);
+      w.renderer.render = (scene, camera) => {
+        const t = w.renderer.getRenderTarget();
+        if (scene === w.scene && t && t.depthBuffer && t.width === gl.drawingBufferWidth) found.target = t;
+        render(scene, camera);
+      };
+      const W = gl.drawingBufferWidth;
+      const H = gl.drawingBufferHeight;
+      const px = new Float32Array(W * H * 4);
+      let low = Infinity;
+      let high = -Infinity;
+      // a few moments of the flowers' flutter
+      for (const t of [3, 7.1, 11.6, 24.3]) {
+        m.freeze(t);
+        m.renderFrame();
+        if (!found.target) throw new Error('scene target not found');
+        gl.bindFramebuffer(gl.FRAMEBUFFER, w.renderer.properties.get(found.target).__webglFramebuffer);
+        gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, px);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        for (let i = 0; i < px.length; i += 4) {
+          low = Math.min(low, px[i], px[i + 1], px[i + 2]);
+          high = Math.max(high, px[i], px[i + 1], px[i + 2]);
+        }
+      }
+      return { samples: m.stats().samples, low, high };
+    });
+    test.info().annotations.push({ type: 'colour', description: `MSAA ${r.samples}×, scene colours ${r.low.toFixed(3)} to ${r.high.toFixed(3)}` });
+    expect(r.samples).toBeGreaterThan(0);
+    expect(r.low).toBeGreaterThanOrEqual(0);
+    expect(r.high).toBeLessThan(3);
+  });
+});
+
 test.describe('budgets', () => {
   test('first frame within 2 s', async ({ page }) => {
     await open(page, 'q=high');

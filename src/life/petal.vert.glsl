@@ -16,7 +16,7 @@ uniform float uRadius;
 
 attribute float aSeed;
 uniform vec4 uPetals; // near radius (m)
-varying vec3 vColour;
+centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
 
 float h1(float a, float b) {
   return fract(sin(a * 127.1 + b * 311.7) * 43758.5453);
