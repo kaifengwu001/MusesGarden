@@ -24,6 +24,18 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
+## Iteration 14: the review notes (in progress)
+
+Started from iteration 13 (058b8a1). Before it Kai asked why the grass loads
+in slowly; the study's findings set the fixes (all of them, measured, before
+the next review). This table fills in as the notes are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Grass loads in chunk by chunk, slowly and distractingly, when flying in from orbit or jumping to a new place; on a phone the chunks can fail to load at all; it got worse from iteration 4 to 5. Make the loading actually faster, even at a slightly higher cost while it loads | |
+| 2 | Make the grass cheaper to draw without dropping its count | |
+| 3 | Make the chunk-by-chunk load-in less distracting | |
+
 ## Iteration 13: the review notes
 
 Started from iteration 12 (9ad20e4), the notes committed first (cb47909).
