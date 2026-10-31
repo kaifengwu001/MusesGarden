@@ -29,6 +29,7 @@ export default defineConfig({
     { name: 'shots', testMatch: /shots\.spec\.ts/ },
     { name: 'invariants', testMatch: /invariants\.spec\.ts/ },
     { name: 'squint', testMatch: /squint\.spec\.ts/ },
+    { name: 'muse-ui', testDir: './src/muse/ui', testMatch: /.*\.spec\.ts/ },
   ],
   webServer: {
     command: `npx vite --port ${PORT} --strictPort`,
