@@ -31,6 +31,25 @@ async function post(api: APIRequestContext, path: string, body?: unknown): Promi
 const advance = (api: APIRequestContext, hours: number) => post(api, '/dev/advance', { hours });
 const now = (api: APIRequestContext, muse = HERO) => get<NowView>(api, `/muses/${muse}/now`);
 
+/** The overlay opens the mailbox by itself when an invitation is waiting; only click it open when it isn't. */
+async function openMailbox(page: Page): Promise<void> {
+  await page.waitForTimeout(1000);
+  const mailbox = page.locator('.mu-mailbox');
+  if (!(await mailbox.isVisible())) await page.locator('.mu-dock').getByRole('button', { name: /Mailbox/ }).click();
+  await expect(mailbox).toBeVisible();
+}
+
+/** Whether the world drew the 3D Muse this frame (dev builds expose the world). */
+const museDrawn = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __world?: { muse: { mesh: { visible: boolean } } } }).__world?.muse.mesh.visible ?? null);
+
+/** The camera to Muse (M in the meadow), then a moment for the glide and the body to load. */
+async function toMuse(page: Page): Promise<void> {
+  await page.locator('#scene').focus();
+  await page.keyboard.press('m');
+  await page.waitForTimeout(3500);
+}
+
 /** Advance an hour at a time until `done` holds, or fail after `maxHours`. */
 async function until<T>(api: APIRequestContext, maxHours: number, done: () => Promise<T | null>): Promise<T> {
   for (let h = 0; h <= maxHours; h++) {
@@ -72,8 +91,13 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     });
     await page.reload();
     await page.waitForFunction(() => window.__meadow?.isReady === true);
+    await toMuse(page);
+    expect(await museDrawn(page), 'the 3D Muse is drawn out on its planet').toBe(true);
+    await shot(page, '03a-muse-out-on-the-planet');
     await page.locator('.mu-dev').getByRole('button', { name: 'Start' }).click();
     await expect(page.locator('.mu-status .mu-label').first()).toHaveText('Working (laptop out)');
+    await toMuse(page);
+    await shot(page, '03b-muse-laptop-out');
     const working = await now(api);
     expect(working.working).toBe(true);
     expect(working.activity).toBe('travel');
@@ -87,6 +111,15 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     expect((await now(api)).working).toBe(false);
   });
 
+  await test.step('at rest, the 3D Muse is home on its terrace', async () => {
+    await until(api, 24, async () => ((await now(api)).activity === 'rest' ? true : null));
+    await page.reload();
+    await page.waitForFunction(() => window.__meadow?.isReady === true);
+    await toMuse(page);
+    expect(await museDrawn(page), 'the 3D Muse is drawn at home').toBe(true);
+    await shot(page, '03c-muse-at-home');
+  });
+
   await test.step('when Muse is beyond or away, there is no following it', async () => {
     const away = await until(api, 96, async () => {
       const n = await now(api);
@@ -98,6 +131,8 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     const status = page.locator('.mu-status').first();
     await expect(status.locator('.mu-label')).toHaveText(away.label);
     await expect(status.getByRole('button', { name: 'Follow' })).toHaveCount(0);
+    await page.waitForTimeout(1000);
+    expect(await museDrawn(page), 'no 3D Muse while it is away').toBe(false);
     await shot(page, '04-away-no-follow');
   });
 
@@ -109,7 +144,7 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     await page.reload();
     await page.waitForFunction(() => window.__meadow?.isReady === true);
     const mailbox = page.locator('.mu-mailbox');
-    await page.locator('.mu-dock').getByRole('button', { name: /Mailbox/ }).click();
+    await openMailbox(page);
     await expect(mailbox.locator('.mu-basket').first()).toBeVisible();
     const firstCards = await mailbox.locator('.mu-basket').first().locator('.mu-card').count();
     expect(firstCards).toBeGreaterThan(0);
@@ -181,14 +216,14 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     expect(guest).not.toBe('');
 
     await open(page, found.host);
-    await page.locator('.mu-dock').getByRole('button', { name: /Mailbox/ }).click();
+    await openMailbox(page);
     await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
     await shot(page, '09-host-approves');
     await page.locator('.mu-mailbox').getByRole('button', { name: 'Approve' }).first().click();
     await expect.poll(async () => (await get<InvitationCard[]>(api, `/muses/${found.host}/invitations`)).find((c) => c.id === found.card.id)?.state).toBe('sent');
 
     await open(page, guest);
-    await page.locator('.mu-dock').getByRole('button', { name: /Mailbox/ }).click();
+    await openMailbox(page);
     await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
     await page.locator('.mu-mailbox').getByRole('button', { name: 'Accept' }).first().click();
     await expect(page.locator('.mu-mailbox').getByRole('button', { name: 'Visit' })).toHaveCount(0);
@@ -196,7 +231,7 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     const clock = await get<{ now: number }>(api, '/dev/clock');
     await advance(api, (found.card.window.start - clock.now) / 3_600_000 + 0.05);
     await open(page, guest);
-    await page.locator('.mu-dock').getByRole('button', { name: /Mailbox/ }).click();
+    await openMailbox(page);
     await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
     const visit = page.locator('.mu-mailbox').getByRole('button', { name: 'Visit' });
     await expect(visit).toHaveCount(1);
@@ -210,7 +245,7 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     const after = await api.get(`${API}/visits/${encodeURIComponent(found.card.id)}/world?as=${guest}`);
     expect(after.status()).toBe(403);
     await open(page, guest);
-    await page.locator('.mu-dock').getByRole('button', { name: /Mailbox/ }).click();
+    await openMailbox(page);
     await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
     await expect(page.locator('.mu-mailbox').getByRole('button', { name: 'Visit' })).toHaveCount(0);
   });
