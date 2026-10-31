@@ -6,14 +6,14 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['dist/**', 'dist-single/**', 'shots/**', 'test-results/**', 'playwright-report/**', 'eslint.config.js', '.*.mjs'],
+    ignores: ['.worktrees/**', 'dist/**', 'dist-single/**', 'shots/**', 'test-results/**', 'playwright-report/**', 'eslint.config.js', '.*.mjs'],
   },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.node.json'],
+        project: ['./tsconfig.json', './tsconfig.node.json', './tsconfig.server.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -30,7 +30,7 @@ export default defineConfig(
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['*.config.ts', 'src/dev/**/*.spec.ts'],
+    files: ['*.config.ts', 'src/dev/**/*.spec.ts', 'server/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 );

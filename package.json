@@ -9,12 +9,14 @@
     "build": "tsc -p tsconfig.json && vite build",
     "build:single": "tsc -p tsconfig.json && vite build --mode single",
     "preview": "vite preview",
-    "check": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && eslint .",
+    "check": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && tsc -p tsconfig.server.json && eslint .",
     "test": "vitest run",
     "test:gpu": "playwright test --project=invariants",
     "shots": "playwright test --project=shots",
     "squint": "playwright test --project=squint",
-    "verify": "npm run check && npm test && npm run test:gpu && npm run shots"
+    "verify": "npm run check && npm test && npm run test:gpu && npm run shots",
+    "sim": "tsx --no-warnings server/cli/sim.ts",
+    "serve": "tsx --no-warnings server/http.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",
@@ -27,6 +29,7 @@
     "@types/three": "0.184.1",
     "eslint": "10.13.0",
     "globals": "17.13.0",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vite": "8.3.5",
