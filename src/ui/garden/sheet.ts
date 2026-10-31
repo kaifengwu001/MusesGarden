@@ -37,6 +37,7 @@ export abstract class Sheet {
     for (const other of open) if (other !== this) other.close();
     this.render();
     open.add(this);
+    document.body.classList.add('g-sheet-open');
     this.el.classList.add('is-open');
     this.scrim.classList.add('is-open');
     this.body.scrollTop = 0;
@@ -44,6 +45,7 @@ export abstract class Sheet {
 
   close(): void {
     open.delete(this);
+    if (open.size === 0) document.body.classList.remove('g-sheet-open');
     this.el.classList.remove('is-open');
     this.scrim.classList.remove('is-open');
   }

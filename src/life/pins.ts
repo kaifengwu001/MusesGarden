@@ -4,7 +4,8 @@ import { warpPoint, type WarpFrame } from '../render/warp';
 // Pins stuck in the globe, as on a map you keep: a heart-headed pin for
 // each find you liked and a round one with Muse's face for Muse. They show
 // only from orbit (the planet hides those round the back; nothing points
-// at pins off screen), keep a steady size on screen at any height, and pop
+// at pins off screen), keep a steady size on screen at any height, turn
+// their heads to you (Muse's face, the heart), and pop
 // up or down with a little bounce when they appear, when you toggle them,
 // or when you come down from orbit.
 
@@ -52,7 +53,9 @@ void main() {
   float key = dot(n, normalize(vec3(-0.45, 0.75, 0.5)));
   float lit = smoothstep(-0.15, 0.1, key) * 0.6 + smoothstep(0.45, 0.6, key) * 0.4;
   vec3 col = mix(uShade, uColour, lit);
-  col += vec3(1.0, 0.93, 0.8) * pow(1.0 - max(dot(n, v), 0.0), 3.0) * 0.28;
+  // a soft dark edge, as an ink line would, so a pin reads against clouds and water alike
+  float edge = 1.0 - max(dot(n, v), 0.0);
+  col *= mix(1.0, 0.62, smoothstep(0.55, 0.95, edge));
   if (uFace == 1) {
     // the face on the head's front (+z), as Muse's: eyes a little apart, a smile, cheeks
     vec2 p = vLocal.xy / 0.34;
@@ -109,14 +112,10 @@ interface Pin {
 
 const up = new Vector3();
 const p = new Vector3();
-const toCam = new Vector3();
-const front = new Vector3();
-const cross = new Vector3();
+const head = new Vector3();
 const scale = new Vector3();
 const q = new Quaternion();
-const turn = new Quaternion();
 const Y = new Vector3(0, 1, 0);
-const Z = new Vector3(0, 0, 1);
 
 export class Pins {
   readonly group = new Group();
@@ -155,11 +154,11 @@ export class Pins {
       const group = new Group();
       const needle = new Mesh(this.needle, this.materials.needle);
       const head = new Mesh(spec.kind === 'muse' ? this.ball : this.heartGeometry, spec.kind === 'muse' ? this.materials.muse : this.materials.liked);
-      head.position.y = spec.kind === 'muse' ? 1.28 : 1.3;
       needle.renderOrder = head.renderOrder = 10;
-      group.add(needle, head);
+      group.add(needle);
       group.matrixAutoUpdate = false;
-      this.group.add(group);
+      head.matrixAutoUpdate = false;
+      this.group.add(group, head);
       this.pins.set(spec.id, { spec, group, head, shown: 0, target: 0, delay: STAGGER * k++ });
     }
   }
@@ -190,18 +189,17 @@ export class Pins {
       up.copy(dir);
       warpPoint(warp, p.copy(dir).multiplyScalar(radius + ground), p);
       const size = p.distanceTo(camera.position) * halfHeight * 2 * SCREEN * pop;
-      // stand along the local up; the head turned about it to face the camera
+      // the needle stands along the local up; the head on its top faces the camera, upright on screen
+      // (a heart seen from straight above would be a sliver)
       q.setFromUnitVectors(Y, up);
-      toCam.copy(camera.position).sub(p);
-      toCam.addScaledVector(up, -toCam.dot(up));
-      if (toCam.lengthSq() > 1e-9) {
-        front.copy(Z).applyQuaternion(q);
-        const angle = Math.atan2(cross.crossVectors(front, toCam).dot(up), front.dot(toCam));
-        q.premultiply(turn.setFromAxisAngle(up, angle));
-      }
       pin.group.matrix.compose(p, q, scale.setScalar(size));
       pin.group.matrixWorldNeedsUpdate = true;
+      head.copy(p).addScaledVector(up, (pin.spec.kind === 'muse' ? 1.28 : 1.3) * size);
+      pin.head.matrix.compose(head, camera.quaternion, scale);
+      pin.head.matrixWorldNeedsUpdate = true;
+      pin.head.visible = true;
     }
+    for (const pin of this.pins.values()) if (!pin.group.visible) pin.head.visible = false;
     this.group.visible = any;
   }
 
@@ -212,9 +210,7 @@ export class Pins {
     const v = new Vector3();
     for (const pin of this.pins.values()) {
       if (!pin.group.visible) continue;
-      v.setFromMatrixPosition(pin.group.matrix);
-      const s = pin.group.matrix.getMaxScaleOnAxis();
-      v.addScaledVector(pin.spec.dir, 1.3 * s).project(camera);
+      v.setFromMatrixPosition(pin.head.matrix).project(camera);
       if (v.z > 1) continue;
       const d = Math.hypot(((v.x + 1) / 2) * w - x, ((1 - v.y) / 2) * h - y);
       if (d < bestD) {

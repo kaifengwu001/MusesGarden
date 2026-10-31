@@ -5,8 +5,8 @@ import type { CameraRig } from './camera';
 
 // Flights between places on the planet: to a find's bed, a basket's patch,
 // Muse or its cottage. The camera's frame turns along the great circle,
-// rises on a longer hop (the farther, the higher, like a bird going over the
-// hill rather than through it) and comes down to frame the place: from a
+// skims the meadow under the clouds (a long hop climbs over them, like a
+// bird crossing a valley) and comes down to frame the place: from a
 // distance and a height over the place's ground, looking at a point above it,
 // with the place a little below the middle of the view. Driven through the
 // rig's own controls each frame; any drag, zoom or key ends a flight.
@@ -28,6 +28,9 @@ type Ground = (dir: Vector3) => number;
 
 const Y = new Vector3(0, 1, 0);
 const NZ = new Vector3(0, 0, -1);
+/** A hop longer than this (m) goes over the clouds, this high (m) at least. */
+const LONG_HOP = 110;
+const OVER_CLOUDS = 80;
 
 export class Flight {
   private active = false;
@@ -82,8 +85,10 @@ export class Flight {
     const hop = angleBetween(rig.up, up) * radius;
     this.startAlt = rig.altitude;
     this.endAlt = pose.altitude;
-    // farther hops climb higher: about half the distance, never below either end
-    this.peakAlt = Math.max(this.startAlt, this.endAlt, hop > 20 ? hop * 0.55 : 0);
+    // The clouds float some 5 to 45 m up (life/clouds.ts), so a hop skims the meadow under them, as
+    // high as its higher end; only a long one (most of the way round a small planet) climbs over them.
+    const low = Math.max(this.startAlt, this.endAlt);
+    this.peakAlt = hop > LONG_HOP && low < OVER_CLOUDS ? Math.max(OVER_CLOUDS, hop * 0.6) : low;
     this.startPitch = this.pitch;
     this.endPitch = pose.pitch;
     this.duration = Math.min(3.4, 1.1 + 0.55 * Math.log1p(hop / 12) + (Math.abs(Math.log(this.endAlt / this.startAlt)) > 2 ? 0.5 : 0));

@@ -162,7 +162,8 @@ export class FindCard {
     this.card.className = `g-card g-card--${find.media.kind}`;
     this.kicker.textContent = `${context.basket} · ${context.index + 1} of ${context.total}`;
     this.openLink.href = find.media.url;
-    this.openLink.querySelector('span')!.textContent = find.media.kind === 'article' ? 'Read' : find.media.source === 'Instagram' ? 'Open in Instagram' : 'Open';
+    this.openLink.querySelector('span')!.textContent = find.media.kind === 'article' ? 'Read' : 'Open';
+    this.openLink.title = `Open on ${find.media.source}`;
     this.topic.innerHTML = '';
     const dot = el('i');
     dot.style.background = topicColour(interest);
@@ -211,10 +212,12 @@ export class FindCard {
     const w = this.card.offsetWidth;
     const h = this.card.offsetHeight;
     const margin = 14;
-    const right = width < 700 ? margin : 88; // clear of the rail
-    const bottom = width < 700 ? 150 : 96; // clear of the controls
+    const phone = width < 700;
+    const right = phone ? margin : 88; // clear of the rail
+    const bottom = phone ? 150 : 96; // clear of the controls
+    const above = phone ? 64 : margin; // clear of the panel's corner on a phone
     const cx = Math.min(Math.max(top.x, margin + w / 2), width - right - w / 2);
-    const cardBottom = Math.min(Math.max(top.y, margin + h), height - bottom);
+    const cardBottom = Math.min(Math.max(top.y, above + h), height - bottom);
     this.card.style.left = `${Math.round(cx - w / 2)}px`;
     this.card.style.top = `${Math.round(cardBottom - h)}px`;
     // the line from the bed to the card's foot, risen this far

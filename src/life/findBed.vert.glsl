@@ -53,8 +53,8 @@ void main() {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
-  float grow = rise(age, 0.75);
-  float open = smoothstep(0.35, 1.25, age);
+  float grow = rise(age, 0.95);
+  float open = smoothstep(0.45, 1.5, age);
   vec3 dir = aPlace.xyz;
   float seed = aLook.x;
   float scale = aLook.y * (0.85 + 0.3 * rnd(seed, 3.0)) * grow;

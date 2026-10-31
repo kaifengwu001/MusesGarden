@@ -15,7 +15,6 @@ import {
   Shape,
   SphereGeometry,
   SRGBColorSpace,
-  TorusGeometry,
   Vector3,
   WebGLRenderer,
   type BufferGeometry,
@@ -36,6 +35,9 @@ const ARCH = W / 2;
 const DEPTH = 0.72;
 const THICK = 0.024;
 const POST = 0.6;
+/** Where the count and an invitation's seal sit on the model (model space, m). */
+const COUNT_AT = new Vector3(-W / 2 + 0.02, WALL + ARCH * 0.72, DEPTH / 2 - 0.02);
+const SEAL_AT = new Vector3(0.07, WALL * 0.45, DEPTH / 2 + 0.03);
 
 const vertexShader = /* glsl */ `
 varying vec3 vNormal;
@@ -144,7 +146,7 @@ export class PostBox {
   private readonly seal: HTMLElement;
   private renderer: WebGLRenderer | null = null;
   private readonly scene = new Scene();
-  private readonly camera = new PerspectiveCamera(27, 150 / 176, 0.1, 20);
+  private readonly camera = new PerspectiveCamera(27, 156 / 184, 0.1, 20);
   private readonly model = new Group();
   private readonly door = new Group();
   private readonly flag = new Group();
@@ -155,6 +157,7 @@ export class PostBox {
   private wake = 0;
   private flagUp = false;
   private nextWaggle = 0;
+  private readonly tmp = new Vector3();
 
   constructor(parent: HTMLElement, onOpen: () => void) {
     this.el = el('div', 'g-postbox');
@@ -204,9 +207,10 @@ export class PostBox {
     // the door: hinged on its bottom edge at the mouth
     const doorGeometry = new ExtrudeGeometry(profile(-0.006), { depth: 0.022, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 3, curveSegments: 28 });
     const doorMesh = new Mesh(doorGeometry, blue);
-    const latch = new Mesh(new TorusGeometry(0.03, 0.009, 10, 24, Math.PI), brass);
-    latch.position.set(0, WALL + ARCH - 0.07, 0.04);
-    latch.rotation.z = Math.PI;
+    // a little brass pull at the top of the door
+    const latch = new Mesh(new CylinderGeometry(0.013, 0.016, 0.034, 16), brass);
+    latch.rotation.x = Math.PI / 2;
+    latch.position.set(0, WALL + ARCH - 0.06, 0.045);
     const plate = new Mesh(new BoxGeometry(0.15, 0.06, 0.008), card);
     plate.position.set(0, 0.12, 0.034);
     const stamp = new Mesh(new BoxGeometry(0.035, 0.04, 0.004), coral);
@@ -272,15 +276,15 @@ export class PostBox {
     this.model.position.y = 0.16;
     this.model.rotation.y = -0.38;
     this.scene.add(this.model);
-    this.camera.position.set(0.15, 0.5, 2.05);
-    this.camera.lookAt(0, -0.1, 0);
+    this.camera.position.set(0.22, 0.6, 2.85);
+    this.camera.lookAt(0.03, 0.04, 0);
   }
 
   private resize(): void {
     const r = this.renderer;
     if (!r) return;
-    const w = this.canvas.clientWidth || 150;
-    const h = this.canvas.clientHeight || 176;
+    const w = this.canvas.clientWidth || 156;
+    const h = this.canvas.clientHeight || 184;
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     r.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -329,6 +333,13 @@ export class PostBox {
     return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
   }
 
+  /** Hold a tag over a point of the model (model space). */
+  private pin(tag: HTMLElement, at: Vector3): void {
+    const p = this.tmp.copy(at).applyMatrix4(this.model.matrixWorld).project(this.camera);
+    tag.style.left = `${(((p.x + 1) / 2) * this.canvas.clientWidth).toFixed(1)}px`;
+    tag.style.top = `${(((1 - p.y) / 2) * this.canvas.clientHeight).toFixed(1)}px`;
+  }
+
   private wiggle(): void {
     if (this.tweens.has('wiggle')) return;
     this.state.wiggle = 0;
@@ -363,6 +374,9 @@ export class PostBox {
     this.model.rotation.z = w * 0.05;
     if (this.flagUp && s.flag > 0.99) this.flag.rotation.x = -w * 0.25;
     this.renderer?.render(this.scene, this.camera);
+    // the count on the box's shoulder by its flag, the seal pressed on its door
+    this.pin(this.count, COUNT_AT);
+    this.pin(this.seal, SEAL_AT);
     if (moving || this.flagUp) {
       // while the flag is up, wake only for its waggle
       clearTimeout(this.wake);

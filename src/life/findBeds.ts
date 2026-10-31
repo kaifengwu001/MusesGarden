@@ -17,7 +17,9 @@ import fragmentShader from './grass.frag.glsl?raw';
 // bed you are looking at is lit a little brighter.
 
 /** Plants per bed, the share of them that are companions, and their size against the meadow's flowers. */
-const PLANTS = 46;
+const PLANTS = 58;
+/** The smaller species grow bigger in a bed, so every bed reads at the same distance: pink cup, star, button, cluster. */
+const SPECIES_SIZE = [1.0, 1.12, 1.45, 1.4] as const;
 const COMPANIONS = 0.16;
 const SIZE = [1.25, 1.65] as const;
 /** Beds a draw can address (MAX_BEDS in the shader). */
@@ -106,12 +108,12 @@ export class FindBeds {
         t.copy(north).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
         travel(bed.dir, t, reach / radius, p);
         const species = companion ? ((entry.species + 1 + Math.floor(r() * 3)) % 4) : entry.species;
-        const size = SIZE[0] + (SIZE[1] - SIZE[0]) * r() * (1 - (0.35 * reach) / BED_RADIUS);
+        const size = (SIZE[0] + (SIZE[1] - SIZE[0]) * r() * (1 - (0.35 * reach) / BED_RADIUS)) * SPECIES_SIZE[species];
         const variant = companion ? r() : Math.min(1, Math.max(0, entry.variant + (r() - 0.5) * 0.18));
         const slot = per[species];
         slot.place.push(p.x, p.y, p.z, bed.ground);
         slot.look.push(r(), companion ? size * 0.8 : size, variant, b);
-        slot.delay.push((reach / BED_RADIUS) * 0.55 + r() * 0.12);
+        slot.delay.push((reach / BED_RADIUS) * 0.7 + r() * 0.15);
       }
     });
     if (looks.length > MAX_BEDS) console.warn(`garden: ${looks.length} finds, but the beds draw ${MAX_BEDS}`);
@@ -132,7 +134,7 @@ export class FindBeds {
       const b = this.index.get(id);
       if (b !== undefined) this.beds[b].x = now + k * gap;
     });
-    return after + (finds.length - 1) * gap + 1.3;
+    return after + (finds.length - 1) * gap + 1.6;
   }
 
   /** Hide beds again (not planted yet), e.g. to replay a planting. */

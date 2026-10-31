@@ -35,10 +35,11 @@ import { TravelSheet, Visit } from './travel';
 
 /** How a find is framed: the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
-/** A basket's patch, from a little higher. */
-const PATCH_VIEW = { distance: 15, height: 10.5, aim: 0 } as const;
-/** The line from a bed up to its card (m). */
+/** A basket's patch: its first find from a little farther back, under the clouds. */
+const PATCH_VIEW = { distance: 9.5, height: 3.6, aim: 1.0 } as const;
+/** The line from a bed up to its card (m); higher than this (m) a card is put away. */
 const STEM = 1.9;
+const CARD_UNDER = 30;
 /** The cottage's view and Muse's (as world.ts's named views): distance, height, bearing from the front (rad), looked-at point (cottage-local x, y, z, m). */
 const HOME_VIEW = { distance: 26, height: 11, bearing: 0.92, at: [-1.8, 2.6, 1.4] } as const;
 const MUSE_VIEW = { distance: 4.6, height: 1.35, bearing: 0.3, aim: 0.62 } as const;
@@ -132,7 +133,10 @@ export class GardenUi {
     this.root.append(this.ticket);
     this.visit = new Visit(this.root, world, store, {
       leaving: () => this.closeCard(),
-      changed: (away) => this.root.classList.toggle('is-away', away),
+      changed: (away) => {
+        this.root.classList.toggle('is-away', away);
+        document.body.classList.toggle('g-away', away);
+      },
     });
     this.mail = new Mail(this.root, this.state, this.postbox, {
       travel: (id) => this.board(id),
@@ -248,9 +252,11 @@ export class GardenUi {
       const foot = this.project(bed.dir, bed.ground + 0.35, width, height);
       const top = this.project(bed.dir, bed.ground + STEM, width, height);
       const inView = foot !== null && foot.x > -40 && foot.x < width + 40 && foot.y > -40 && foot.y < height + 40;
-      this.card.place(inView ? foot : null, inView ? top : null, dt, width, height);
-      // a bed left out of view for a moment closes its card
-      this.offscreen = inView || this.flight.flying ? 0 : this.offscreen + dt;
+      const shown = inView && (w.rig.altitude < CARD_UNDER || this.flight.flying);
+      this.card.place(shown ? foot : null, shown ? top : null, dt, width, height);
+      // a bed left out of view for a moment, or left far below, closes its card
+      const near = w.rig.altitude < CARD_UNDER;
+      this.offscreen = (inView && near) || this.flight.flying ? 0 : this.offscreen + dt;
       if (this.offscreen > 0.6 && this.card.shown) this.closeCard();
     } else this.card.place(null, null, dt, width, height);
   }
@@ -359,23 +365,27 @@ export class GardenUi {
 
   // ---- baskets ---------------------------------------------------------------------------
 
-  /** Fly to a basket's patch; a basket not yet visited is planted as you arrive, then its first card rises. */
+  /**
+   * Fly to a basket's patch, framed on its first find (the beds round it in view); a basket not yet
+   * visited is planted as you arrive, the middle bed first, and its card rises while the rest blossom.
+   */
   goToBasket(id: string): void {
     const basket = this.state.basket(id);
-    const patch = this.layout.patches.get(id);
-    if (!basket || !patch) return;
+    const first = basket?.finds.find((f) => this.layout.beds.has(f));
+    const bed = first ? this.layout.beds.get(first) : undefined;
+    if (!basket || !first || !bed) return;
     if (this.card.shown) this.card.hide(0);
     this.beds.highlight(null);
-    this.current = null;
+    this.current = first;
     const fresh = !this.state.visitedBasket(id);
-    const first = basket.finds[0];
-    const middle: Bed = { find: first, basket: id, dir: patch.dir, ground: this.ground(patch.dir) };
-    this.flight.to(this.framing(middle, { ...PATCH_VIEW, distance: PATCH_VIEW.distance + patch.reach }), this.world.growth.radius, this.ground, () => {
-      if (fresh) {
-        this.state.visit(id);
-        const done = this.beds.plant(basket.finds, 0.34, 0.15);
-        setTimeout(() => this.openFind(first), done * 1000 - 250);
-      } else this.openFind(first);
+    this.flight.to(this.framing(bed, PATCH_VIEW), this.world.growth.radius, this.ground, () => {
+      if (!fresh) {
+        this.raise(first);
+        return;
+      }
+      this.state.visit(id);
+      this.beds.plant(basket.finds, 0.24, 0.1);
+      setTimeout(() => this.raise(first), 1150);
     });
   }
 

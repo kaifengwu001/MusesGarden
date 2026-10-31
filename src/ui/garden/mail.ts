@@ -184,6 +184,7 @@ export class Mail {
     const mouth = await this.postbox.open();
     this.view = 'stack';
     this.el.classList.add('is-open');
+    document.body.classList.add('g-mail-open');
     this.el.dataset.view = 'stack';
     this.layStack(true, mouth);
     // collected: the flag comes down
@@ -204,6 +205,7 @@ export class Mail {
       e.style.opacity = '0';
     }
     this.el.classList.remove('is-open', 'is-album');
+    document.body.classList.remove('g-mail-open');
     setTimeout(() => this.postbox.close(), 220);
   }
 

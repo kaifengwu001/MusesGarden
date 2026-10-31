@@ -16,7 +16,8 @@
   color: var(--ink);
 }
 
-.garden button {
+/* (no weight of its own: each control's own class sets its type and colour) */
+:where(.garden) button {
   font: inherit;
   color: inherit;
   -webkit-tap-highlight-color: transparent;
@@ -230,9 +231,9 @@
 .g-postbox {
   position: fixed;
   right: calc(var(--gutter) * 0.3);
-  bottom: calc(var(--gutter) * 0.25);
-  width: 150px;
-  height: 176px;
+  bottom: calc(var(--gutter) * 0.2);
+  width: 156px;
+  height: 184px;
   z-index: 6;
 }
 
@@ -264,8 +265,9 @@
 
 .g-postbox-count {
   position: absolute;
-  left: 18px;
-  top: 30px;
+  left: 0;
+  top: 0;
+  margin: -12px 0 0 -12px;
   min-width: 23px;
   height: 23px;
   padding: 0 6px;
@@ -283,6 +285,7 @@
   transform: scale(0);
   transition: transform 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
   pointer-events: none;
+  box-sizing: border-box;
 }
 
 .g-postbox-count.is-on {
@@ -292,10 +295,11 @@
 /* an invitation's wax seal, pressed on the box */
 .g-seal {
   position: absolute;
-  right: 26px;
-  top: 64px;
-  width: 30px;
-  height: 30px;
+  left: 0;
+  top: 0;
+  margin: -12px 0 0 -12px;
+  width: 24px;
+  height: 24px;
   border-radius: 47% 53% 50% 50% / 52% 46% 54% 48%;
   background:
     radial-gradient(circle at 36% 30%, rgba(255, 210, 190, 0.55), transparent 40%),
@@ -312,7 +316,7 @@
 .g-seal::before {
   content: '';
   position: absolute;
-  inset: 7px;
+  inset: 6px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 210, 195, 0.45);
   box-shadow: inset 0 1px 1px rgba(80, 15, 10, 0.4);
@@ -348,8 +352,8 @@
 .g-ticket {
   appearance: none;
   position: fixed;
-  right: calc(var(--gutter) * 0.3 + 146px);
-  bottom: calc(var(--gutter) * 0.25 + 26px);
+  right: calc(var(--gutter) * 0.3 + 64px);
+  bottom: calc(var(--gutter) * 0.2 + 192px);
   display: flex;
   align-items: center;
   gap: 7px;
@@ -804,6 +808,7 @@
 
 .g-topic {
   flex: 1;
+  min-width: 60px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -962,17 +967,9 @@ body.garden-on .hud {
     width: 116px;
     height: 136px;
   }
-  .g-postbox-count {
-    left: 12px;
-    top: 22px;
-  }
-  .g-seal {
-    right: 18px;
-    top: 48px;
-  }
   .g-ticket {
-    right: 120px;
-    bottom: 126px;
+    right: 46px;
+    bottom: 244px;
     height: 40px;
     font-size: 14px;
   }
@@ -986,9 +983,17 @@ body.garden-on .hud {
   .g-card--reel {
     --card-w: min(64vw, 240px);
   }
+  /* on a phone a card is swiped; it keeps clear of the title and the panel's corner */
   .g-step {
-    width: 38px;
-    height: 38px;
+    display: none;
+  }
+  .g-toast {
+    top: calc(var(--gutter) * 0.5 + 64px);
+    width: calc(100vw - 32px);
+    box-sizing: border-box;
+    justify-content: space-between;
+    border-radius: 18px;
+    font-size: 14px;
   }
 }
 
@@ -2053,12 +2058,13 @@ body.garden-on .hud {
 
 .g-invite {
   position: absolute;
-  left: 5%;
-  right: 5%;
-  top: 6%;
-  height: 120%;
+  left: 6%;
+  right: 6%;
+  top: 4.5%;
+  height: 91%;
+  overflow: hidden;
   box-sizing: border-box;
-  padding: 5% 7%;
+  padding: 3.6% 7% 3%;
   border-radius: 3px;
   background: var(--grain), #fffcf3;
   box-shadow:
@@ -2066,19 +2072,49 @@ body.garden-on .hud {
     inset 0 0 0 calc(var(--w) * 0.015) var(--gold),
     0 2px 8px rgba(0, 0, 0, 0.12);
   text-align: center;
-  transform: translateY(0);
-  transition: transform 0.7s cubic-bezier(0.25, 1.1, 0.35, 1) 0.25s;
 }
 
+/* opening: the flap lifts, the card is drawn up out of the envelope, the envelope drops away behind
+   it and the card settles where the envelope was */
 .g-env.is-open .g-invite {
-  transform: translateY(-58%);
+  animation: g-invite-out 1.5s cubic-bezier(0.35, 0.9, 0.35, 1) 0.3s both;
+}
+
+@keyframes g-invite-out {
+  0% {
+    transform: translateY(0);
+  }
+  42% {
+    transform: translateY(-40%);
+  }
+  100% {
+    transform: translateY(0) scale(1.03);
+  }
+}
+
+.g-env.is-open .g-env-pocket,
+.g-env.is-open .g-env-body::before {
+  animation: g-env-away 1.5s ease 0.3s both;
+}
+
+@keyframes g-env-away {
+  0%,
+  38% {
+    opacity: 1;
+    transform: none;
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(16%);
+  }
 }
 
 .g-invite-kicker {
   margin: 0;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: calc(var(--w) * 0.032);
+  font-size: calc(var(--w) * 0.028);
   color: var(--gold);
 }
 
@@ -2086,29 +2122,29 @@ body.garden-on .hud {
   margin: 1% 0 0;
   font-family: var(--font-serif);
   font-weight: 330;
-  font-size: calc(var(--w) * 0.07);
+  font-size: calc(var(--w) * 0.06);
   line-height: 1.05;
   letter-spacing: -0.015em;
 }
 
 .g-invite-from {
-  margin: 1% 0 3%;
+  margin: 1% 0 2.4%;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: calc(var(--w) * 0.03);
+  font-size: calc(var(--w) * 0.026);
   color: var(--ink-soft);
 }
 
 .g-invite-pic {
-  aspect-ratio: 2.4 / 1;
+  aspect-ratio: 3.4 / 1;
   border-radius: 3px;
   background: center / cover;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .g-invite-blurb {
-  margin: 3% 4% 3%;
-  font-size: calc(var(--w) * 0.026);
+  margin: 2.4% 4% 2.4%;
+  font-size: calc(var(--w) * 0.024);
   line-height: 1.45;
 }
 
@@ -2131,8 +2167,8 @@ body.garden-on .hud {
 }
 
 .g-invite-once {
-  margin: 3% 0 0;
-  font-size: calc(var(--w) * 0.019);
+  margin: 2.4% 0 0;
+  font-size: calc(var(--w) * 0.017);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -2192,7 +2228,10 @@ body.garden-on .hud {
 
 .g-env.is-open .g-env-flap {
   transform: rotateX(180deg);
-  z-index: -1;
+  opacity: 0;
+  transition:
+    transform 0.55s cubic-bezier(0.4, 0, 0.3, 1),
+    opacity 0.3s ease 0.45s;
 }
 
 .g-env-seal {
@@ -2292,7 +2331,7 @@ body.garden-on .hud {
   position: absolute;
   left: 50%;
   top: calc(var(--gutter) * 0.6 + 74px);
-  bottom: var(--gutter);
+  max-height: calc(100vh - var(--gutter) * 1.6 - 74px);
   width: min(980px, calc(100vw - 2 * var(--gutter)));
   overflow-y: auto;
   border-radius: 10px;
@@ -2595,4 +2634,26 @@ body.garden-on .hud {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* while the post is open, the meadow's own chrome steps back */
+body.g-mail-open .masthead,
+body.g-mail-open .hints,
+body.g-mail-open .controlbar,
+body.g-mail-open .lil-gui.meadow-panel,
+body.g-mail-open .g-rail,
+body.g-mail-open .g-ticket,
+body.g-mail-open .hud {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease;
+}
+
+/* a sheet covers the rail and the panel's corner; a visit is not Muse's garden */
+body.g-sheet-open .lil-gui.meadow-panel,
+body.g-sheet-open .g-rail,
+body.g-away .masthead {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease;
 }
