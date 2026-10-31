@@ -73,8 +73,9 @@ export const SLEEP_MIN_MS = 90 * MINUTE_MS;
 /** P(beyond) = BEYOND_SCALE · curiosity · sociability. */
 export const BEYOND_SCALE = 0.25;
 /** P(new area) = min(1, NOVELTY_SCALE · novelty + UNLOCK_PRESSURE_PER_DAY · days since the last unlock). */
-export const NOVELTY_SCALE = 0.3;
-export const UNLOCK_PRESSURE_PER_DAY = 0.1;
+// Calibrated per trip against the 3-week sim (about 15 trips a free day), aiming at roughly one new area a day.
+export const NOVELTY_SCALE = 0.08;
+export const UNLOCK_PRESSURE_PER_DAY = 0.03;
 /** Within a new-area trip, ε = SERENDIPITY_SCALE · curiosity picks a far region instead. */
 export const SERENDIPITY_SCALE = 0.1;
 /** A new area opens in one of this many nearest fogged regions. */
