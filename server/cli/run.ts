@@ -1,12 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import type { CastFile, Instant, MuseId, MuseState, StoredEvent, WorkSchedule } from '../../src/muse/contract';
+import { readFileSync } from 'node:fs';
+import type { CastFile, Instant, LifePolicy, MuseId, MuseState, StoredEvent } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
+import { loadCast, readMemberDocs } from '../fixtures/cast';
+import { parseWorkSchedule } from '../fixtures/work';
 
 const H = 3_600_000;
 
 export interface SimOptions {
-  readonly fixtures: string;
   readonly cast: string;
   readonly work: string | null;
   readonly start: Instant;
@@ -14,29 +14,22 @@ export interface SimOptions {
   readonly owners: 'auto-accept' | 'auto-decline';
 }
 
-/** The hero's real files win over the placeholders. Raw MEMORY.md is only read here and handed to the engine. */
-export function readCastFile(fixtures: string, dir: string, name: 'SOUL' | 'MEMORY'): string {
-  for (const file of [`${name}.md`, `${name}.placeholder.md`]) {
-    const path = join(fixtures, dir, file);
-    if (existsSync(path)) return readFileSync(path, 'utf8');
-  }
-  return '';
-}
-
-export async function seedCast(engine: Engine, opts: SimOptions): Promise<CastFile> {
-  const cast = JSON.parse(readFileSync(join(opts.fixtures, opts.cast), 'utf8')) as CastFile;
+/**
+ * Seeds the cast. The hero's real SOUL.md and MEMORY.md win over the placeholders, and a name in SOUL.md's
+ * frontmatter wins over cast.json. Raw MEMORY.md is only read here and handed to the engine, which keeps topics.
+ */
+export async function seedCast(engine: Engine, life: LifePolicy, opts: SimOptions): Promise<CastFile> {
+  const cast = loadCast(opts.cast);
   for (const m of cast.members) {
-    await engine.addMuse(
-      { id: m.id, name: m.name, worldSeed: m.worldSeed, timezone: m.timezone },
-      readCastFile(opts.fixtures, m.dir, 'SOUL'),
-      readCastFile(opts.fixtures, m.dir, 'MEMORY'),
-      opts.start,
-    );
+    const docs = readMemberDocs(m);
+    const name = life.parseSoul(docs.soul).name ?? m.name;
+    await engine.addMuse({ id: m.id, name, worldSeed: m.worldSeed, timezone: m.timezone }, docs.soul, docs.memory, opts.start);
   }
   for (const [a, b] of cast.introductions) await engine.introduce(a, b, opts.start);
   if (opts.work) {
-    const schedule = JSON.parse(readFileSync(join(opts.fixtures, opts.work), 'utf8')) as WorkSchedule;
+    const schedule = parseWorkSchedule(JSON.parse(readFileSync(opts.work, 'utf8')));
     for (const [id, blocks] of Object.entries(schedule)) {
+      if (!engine.state(id as MuseId)) continue;
       for (const b of blocks) engine.scheduleWork(id as MuseId, Date.parse(b.start) as Instant, Date.parse(b.end) as Instant);
     }
   }
@@ -101,7 +94,12 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
 
   const hangouts = all.flatMap(({ log }) => log.filter((e) => e.event.kind === 'hangout'));
   const withPhoto = hangouts.filter((e) => e.event.kind === 'hangout' && e.event.photo);
-  out.push({ name: 'every hangout has a gift and a photo', pass: hangouts.length > 0 && withPhoto.length === hangouts.length, detail: `${hangouts.length} hangouts` });
+  const withGift = hangouts.filter((e) => e.event.kind === 'hangout' && (e.event.gave || e.event.received));
+  out.push({
+    name: 'every hangout has a photo, and gifts flow',
+    pass: hangouts.length > 0 && withPhoto.length === hangouts.length && withGift.length > 0,
+    detail: `${hangouts.length} hangouts, ${withGift.length} with a gift`,
+  });
 
   const metBeyond = all.some(({ log }) => log.some((e) => e.event.kind === 'relationship.changed' && e.event.to === 'friends' && e.event.origin === 'met-beyond'));
   out.push({ name: 'a stranger became a friend', pass: metBeyond, detail: metBeyond ? 'yes' : 'none' });
