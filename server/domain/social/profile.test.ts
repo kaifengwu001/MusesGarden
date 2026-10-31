@@ -46,7 +46,7 @@ describe('what a Muse shares', () => {
   });
 
   it('never gives a hidden or private find as a gift, even the one that would stretch the friend most', () => {
-    // bo shares only Tide: "Lichen tides" would be the perfect stretch, but Tide is ada's owner's interest.
+    // "Lichen tides" would stretch bo most, but Tide is ada's owner's private interest.
     const bo = muse('bo', { interests: topics('Tide') });
     const [a, b] = apply(ada, bo, policy.ownerLink(ada, bo, 'introduce', T0), T0);
     const [received] = ofKind(policy.hangout(a, b, at(T0 + HOUR), draws(1)).guest, 'hangout');

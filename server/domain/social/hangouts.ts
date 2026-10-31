@@ -19,7 +19,6 @@ import { areFriends, chemistry, ending, isUnpleasant, relationshipWith, tolerate
 
 type Visit = ReturnType<SocialPolicy['chooseVisit']>;
 
-/** Hangout time left in the owner's current local day. */
 export function socialLeftMs(s: MuseState, now: Instant): number {
   const used = s.day.day === localClock(now, s.seed.timezone).day ? s.day.socialMs : 0;
   return Math.max(0, Math.floor(SOCIAL.budgetMsAtFullSociability * s.temperament.sociability - used));
@@ -35,13 +34,11 @@ function pick<T>(items: readonly T[], weights: readonly number[], u: number): T 
   return items[items.length - 1];
 }
 
-/** A lognormal visit length around the median. */
 function visitMs(draw: Draw): number {
   const z = Math.sqrt(-2 * Math.log(1 - draw('visit.length', 0))) * Math.cos(2 * Math.PI * draw('visit.length', 1));
   return SOCIAL.visitMedianMs * Math.exp(SOCIAL.visitSigma * z);
 }
 
-/** Closer friends (rapport relative to the closest, times current similarity) are picked exponentially more often. */
 export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant, draw: Draw): Visit {
   const left = socialLeftMs(s, now);
   if (left <= 0) return null;
@@ -66,7 +63,6 @@ export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseS
   return { other: friend.seed.id, role, until: (now + Math.floor(length)) as Instant };
 }
 
-/** The giver's public find that best stretches the receiver: some overlap with what it shares, not too much. */
 export function chooseGift(giver: PublicProfile, receiver: MuseState, receiverProfile: PublicProfile): PublicDiscovery | null {
   let best: { find: PublicDiscovery; score: number } | null = null;
   for (const find of giver.discoveries) {
@@ -79,10 +75,8 @@ export function chooseGift(giver: PublicProfile, receiver: MuseState, receiverPr
 
 type Hangout = Extract<MuseEventBody, { kind: 'hangout' }>;
 
-/**
- * The contract's hangout event requires `gave` and `received`, but a Muse with nothing public has nothing to give.
- * Until the contract makes both optional, the gift-less side is cast here.
- */
+// The contract requires `gave` and `received`, but a Muse with nothing public has nothing to give: cast until it
+// makes them optional.
 function hangoutEvent(
   other: MuseId,
   role: 'host' | 'guest',
@@ -103,7 +97,6 @@ function hangoutEvent(
   return event as Hangout;
 }
 
-/** A hangout ends: a gift each way, one photo together on the host's planet, then maybe an ending or an invitation. */
 export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] } {
   if (!areFriends(host, guest)) return { host: [], guest: [] };
   const hostProfile = publicProfile(host);

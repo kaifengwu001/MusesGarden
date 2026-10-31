@@ -7,7 +7,6 @@ function normalize(x: number, y: number, z: number): Dir {
   return [x / n, y / n, z / n];
 }
 
-/** A stable direction on the sphere for `key`. */
 export function hashedDir(key: string): Dir {
   const h = salt(key);
   const z = 2 * unit(h) - 1;
@@ -16,7 +15,6 @@ export function hashedDir(key: string): Dir {
   return [r * Math.cos(phi), z, r * Math.sin(phi)];
 }
 
-/** A camera heading tangent to the sphere at `dir`. */
 function tangentAt(dir: Dir, draw: Draw): Dir {
   const [dx, dy, dz] = dir;
   for (let k = 0; k < 4; k++) {
@@ -28,7 +26,6 @@ function tangentAt(dir: Dir, draw: Draw): Dir {
   return Math.abs(dy) < 0.9 ? normalize(-dz, 0, dx) : normalize(0, dz, -dy);
 }
 
-/** Where the host stands: its current trip's last find, else its latest find, else a stable spot of its own. */
 export function whereIs(s: MuseState): Dir {
   const current = s.episode?.lastKept ? s.discoveries.get(s.episode.lastKept) : undefined;
   if (current) return current.place.dir;
@@ -39,7 +36,6 @@ export function whereIs(s: MuseState): Dir {
   return latest ? latest.dir : hashedDir(s.seed.id);
 }
 
-/** One photo of the two Muses, as a photo.taken for each log. Each copy lists the other Muse as companion. */
 export function photoTogether(
   subject: 'friend' | 'new-friend',
   a: MuseId,

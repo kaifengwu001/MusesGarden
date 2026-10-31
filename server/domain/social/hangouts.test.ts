@@ -8,7 +8,6 @@ function introduce(a: MuseState, b: MuseState): [MuseState, MuseState] {
 }
 
 describe('every hangout', () => {
-  // bo publicly likes Lichen and Jazz. ada's finds overlap that by all, half, a third, or nothing.
   const host = muse('ada', {
     interests: topics('Lichen', 'Moss'),
     discoveries: [
@@ -76,7 +75,6 @@ describe('choosing whom to visit', () => {
     return { ...s, day: { ...s.day, day } };
   };
 
-  /** ada and three introduced friends, from closest to newest. */
   function circle(): { self: MuseState; friends: MuseState[] } {
     let self = make('ada');
     const friends: MuseState[] = [];

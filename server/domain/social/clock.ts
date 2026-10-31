@@ -19,7 +19,6 @@ function formatFor(timeZone: string): Intl.DateTimeFormat {
   return format;
 }
 
-/** An owner's wall clock at `at`: the local date (YYYY-MM-DD) and minutes since local midnight. */
 export function localClock(at: Instant, timeZone: string): { readonly day: string; readonly minute: number } {
   const part: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
   for (const p of formatFor(timeZone).formatToParts(at)) part[p.type] = p.value;

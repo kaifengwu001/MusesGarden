@@ -20,18 +20,12 @@ const hostDeadline = (inv: Invitation) => (inv.window.start - SOCIAL.hostAnswerB
 const windowStart = (inv: Invitation) => inv.window.start;
 const windowEnd = (inv: Invitation) => inv.window.end;
 
-/** One transition: legal only when `due ≤ now < before`. */
 interface Edge {
   readonly to: InvitationState;
   readonly due?: (inv: Invitation) => Instant;
   readonly before?: (inv: Invitation) => Instant;
 }
 
-/**
- * proposed ─approve─► sent ─accept─► accepted ─window-start─► open ─window-end─► closed
- * Either owner can decline their step. No host answer by start − 1 h, or no guest answer by start, expires it.
- * `visited` records the guest owner's visit and leaves it open. closed, declined and expired are final.
- */
 const CHART: Readonly<Record<InvitationState, Partial<Record<Action, Edge>>>> = {
   proposed: {
     approve: { to: 'sent', before: hostDeadline },
@@ -78,10 +72,8 @@ const RANK: Readonly<Record<InvitationState, number>> = {
   expired: Infinity,
 };
 
-/**
- * Every timer still ahead of the invitation's state. A timer that no longer applies when it fires is rejected by
- * invitationStep, so the engine may schedule these once at proposal or again after each transition.
- */
+// Every timer still ahead. invitationStep rejects one that no longer applies, so the engine may schedule these once
+// at proposal or again after each transition.
 export function invitationTimers(inv: Invitation): readonly Timer[] {
   const timers: readonly (Timer & { readonly upTo: number })[] = [
     { at: hostDeadline(inv), action: 'deadline', upTo: RANK.proposed },
@@ -96,7 +88,6 @@ export function canVisit(inv: Invitation | undefined, requester: MuseId, now: In
   return inv !== undefined && inv.state === 'open' && requester === inv.guest && inv.window.start <= now && now < inv.window.end;
 }
 
-/** The earliest 2 h slot within the next 3 days that sits inside 09:00–21:00 for both owners. */
 export function visitWindow(hostZone: string, guestZone: string, now: Instant): Window | null {
   const step = SOCIAL.windowStepMs;
   const first = Math.ceil((now + SOCIAL.windowLeadMs) / step) * step;
@@ -114,7 +105,6 @@ function isDaytime(w: Window, zone: string): boolean {
   return from >= SOCIAL.windowDayStart && to <= SOCIAL.windowDayEnd && to > from;
 }
 
-/** The host Muse proposes inviting the guest's owner over; null when the owners share no daytime slot soon. */
 export function propose(host: MuseState, guest: MuseState, now: Instant): MuseEventBody | null {
   const window = visitWindow(host.seed.timezone, guest.seed.timezone, now);
   if (!window) return null;
@@ -122,7 +112,6 @@ export function propose(host: MuseState, guest: MuseState, now: Instant): MuseEv
   return { kind: 'invitation', id, host: host.seed.id, guest: guest.seed.id, to: 'proposed', window };
 }
 
-/** Withdraws every live invitation between `s` and `other`: the same events go to both logs. */
 export function withdrawAll(s: MuseState, other: MuseId): readonly MuseEventBody[] {
   const events: MuseEventBody[] = [];
   for (const inv of s.social.invitations.values()) {

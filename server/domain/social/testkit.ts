@@ -18,7 +18,6 @@ import { reduceSocial, emptySocial } from './state';
 
 export const HOUR = 3_600_000;
 export const DAY = 24 * HOUR;
-/** Monday 2 November 2026, 00:00 in Los Angeles. */
 export const T0 = Date.parse('2026-11-02T08:00:00Z') as Instant;
 export const at = (ms: number) => ms as Instant;
 
@@ -100,22 +99,18 @@ export function muse(id: string, spec: MuseSpec = {}): MuseState {
 
 export const topics = (...names: string[]) => names.map((n) => interest(n));
 
-/** Seeded uniform draws, as the engine scopes them. */
 export function draws(seed: number): Draw {
   return (kind, k = 0) => unit(hash32(mix(mix(salt(kind), k), seed)));
 }
 
-/** Every draw returns u: 0 says yes to every chance. */
 export const constant = (u: number): Draw => () => u;
 
-/** A past hangout with `other`, for building up rapport directly in the log. */
 export function pastHangout(other: MuseState, role: 'host' | 'guest', pleasantness: number): MuseEventBody {
   const gift = find(`${other.seed.id}-gift`, []);
   const received = { id: gift.id, url: gift.url, canonicalUrl: gift.canonicalUrl, title: gift.title, summary: gift.summary, topics: gift.topics };
   return { kind: 'hangout', other: other.seed.id, role, pleasantness, gave: 'given' as DiscoveryId, received, photo: 'photo' as PhotoId };
 }
 
-/** Folds events into a Muse's social state, as the composed reducer would. */
 export function fold(s: MuseState, events: readonly MuseEventBody[], now: Instant): MuseState {
   let next = s;
   for (const event of events) {
@@ -125,7 +120,6 @@ export function fold(s: MuseState, events: readonly MuseEventBody[], now: Instan
   return next;
 }
 
-/** Folds a pair outcome into both Muses. */
 export function apply(a: MuseState, b: MuseState, out: { readonly self: readonly MuseEventBody[]; readonly other: readonly MuseEventBody[] }, now: Instant): [MuseState, MuseState] {
   return [fold(a, out.self, now), fold(b, out.other, now)];
 }

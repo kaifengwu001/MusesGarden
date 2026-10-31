@@ -1,10 +1,7 @@
 import type { Discovery, Interest, MuseState, PublicDiscovery, PublicProfile, TopicKey } from '../../../src/muse/contract';
 import { SOCIAL } from './constants';
 
-/**
- * Owner- and soul-seeded interests say something about the owner, so they become public only once Muse has made
- * them its own (established). Muse's own interests are public once it has a source for them.
- */
+// Owner- and soul-seeded interests reveal the owner, so they stay private until Muse has made them its own.
 function isPublicInterest(s: MuseState, i: Interest): boolean {
   if (s.hidden.has(`topic:${i.topic}`)) return false;
   return i.seededBy === 'muse' ? i.sources.length >= 1 : i.stage === 'established';
@@ -16,10 +13,6 @@ function weight(s: MuseState, i: Interest): number {
   return Math.min(1, Math.max(0, w));
 }
 
-/**
- * A find follows its topics' visibility: it is public only if every interest it touches (as a source, or by topic)
- * is public, and it touches at least one. Gifts are never re-shared.
- */
 function isPublicFind(s: MuseState, d: Discovery, publicTopics: ReadonlySet<TopicKey>): boolean {
   if (d.provenance !== 'own' || s.hidden.has(`discovery:${d.id}`)) return false;
   let touches = false;
@@ -36,7 +29,6 @@ function toPublic(d: Discovery): PublicDiscovery {
   return thumb === undefined ? { id, url, canonicalUrl, title, summary, topics } : { id, url, canonicalUrl, title, summary, thumb, topics };
 }
 
-/** The only view of a Muse that crosses to other Muses or owners. */
 export function publicProfile(s: MuseState): PublicProfile {
   const interests = [...s.interests.values()]
     .filter((i) => isPublicInterest(s, i))
@@ -50,7 +42,6 @@ export function publicProfile(s: MuseState): PublicProfile {
   return { museId: s.seed.id, name: s.seed.name, worldSeed: s.seed.worldSeed, interests, discoveries };
 }
 
-/** Cosine similarity of the two weighted public-interest vectors, in [0, 1]. */
 export function similarity(a: PublicProfile, b: PublicProfile): number {
   const wb = new Map(b.interests.map((i) => [i.topic, i.weight]));
   let dot = 0;
@@ -60,7 +51,6 @@ export function similarity(a: PublicProfile, b: PublicProfile): number {
   return denominator > 0 ? dot / denominator : 0;
 }
 
-/** Jaccard overlap of the two public-interest topic sets, in [0, 1]. */
 export function overlap(a: PublicProfile, b: PublicProfile): number {
   const tb = new Set(b.interests.map((i) => i.topic));
   const shared = a.interests.filter((i) => tb.has(i.topic)).length;
@@ -68,14 +58,12 @@ export function overlap(a: PublicProfile, b: PublicProfile): number {
   return union > 0 ? shared / union : 0;
 }
 
-/** Share of a find's topics that the receiver publicly cares about, in [0, 1]. */
 export function findOverlap(find: PublicDiscovery, receiver: PublicProfile): number {
   if (find.topics.length === 0) return 0;
   const tr = new Set(receiver.interests.map((i) => i.topic));
   return find.topics.filter((t) => tr.has(t)).length / find.topics.length;
 }
 
-/** 1 at half overlap, 0 at none or total: what stretches without losing the other. */
 export function stretch(x: number): number {
   return 4 * x * (1 - x);
 }

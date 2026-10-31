@@ -9,7 +9,6 @@ function pair(sociability: number, a = shared, b = shared): [MuseState, MuseStat
   return [muse('ada', { sociability, interests: topics(...a) }), muse('bo', { sociability, interests: topics(...b) })];
 }
 
-/** Encounters beyond until the two become friends; returns how many it took. */
 function meetUntilFriends(a: MuseState, b: MuseState, seed: number | null, limit = 200): number {
   for (let n = 1; n <= limit; n++) {
     const now = at(T0 + n * HOUR);
@@ -101,7 +100,6 @@ describe('friendships ending', () => {
     return apply(a, b, policy.ownerLink(a, b, 'introduce', T0), T0);
   }
 
-  /** Hangouts until the friendship ends: returns how many ended it, after `pleasant` good ones first. */
   function hangoutsUntilEnded(pleasant: number): number {
     let [a, b] = friends(withFinds('ada', shared), withFinds('bo', shared));
     let t = T0;

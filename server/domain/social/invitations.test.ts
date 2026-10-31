@@ -74,10 +74,6 @@ describe('the invitation statechart', () => {
 describe('an invitation over time', () => {
   type Answer = { readonly at: Instant; readonly action: Action };
 
-  /**
-   * A tiny engine: owners' answers plus the policy's timers, in time order, folded into the host's log. It either
-   * schedules every timer once at proposal, or cancels and reschedules them after each transition.
-   */
   function live(answers: readonly Answer[], style: 'once' | 'reschedule'): { readonly state: InvitationState; readonly visited: boolean; readonly trail: string[] } {
     const proposed: MuseEventBody = { kind: 'invitation', id: 'inv-1' as InvitationId, host: HOST, guest: GUEST, to: 'proposed', window: { start, end } };
     let social = reduceSocial(emptySocial(), { museId: HOST, seq: 1, event: { ...proposed, at: T0 } }, HOST);
@@ -164,7 +160,6 @@ describe('who may visit', () => {
 describe('proposing an invitation', () => {
   const like = topics('Lichen', 'Moss', 'Fern');
 
-  /** Daily hangouts hosted by ada; returns the proposals with the day each was made. */
   function hangOut(host: MuseState, guest: MuseState, days: number) {
     let [a, b] = apply(host, guest, policy.ownerLink(host, guest, 'introduce', T0), T0);
     const proposals: { day: number; event: Extract<MuseEventBody, { kind: 'invitation' }> }[] = [];
@@ -205,7 +200,6 @@ describe('proposing an invitation', () => {
       expect(local(e, zone)).toBeLessThanOrEqual(21 * 60);
       expect(local(e, zone)).toBeGreaterThan(local(s, zone));
     }
-    // Every earlier quarter-hour start that leaves the owners 2 h to answer falls outside someone's daytime.
     const daytime = (from: number) =>
       ['America/Los_Angeles', 'Asia/Tokyo'].every((z) => local(from, z) >= 9 * 60 && local(from + 2 * HOUR, z) <= 21 * 60 && local(from + 2 * HOUR, z) > local(from, z));
     for (let earlier = s - QUARTER; earlier >= now + 2 * HOUR; earlier -= QUARTER) expect(daytime(earlier)).toBe(false);

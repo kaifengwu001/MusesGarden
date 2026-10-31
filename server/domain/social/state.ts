@@ -31,7 +31,6 @@ function withRelationship(s: SocialState, other: MuseId, origin: RelationshipOri
 const befriend = (origin: RelationshipOrigin) => (r: Relationship): Relationship => ({ ...r, status: 'friends', origin, unpleasantStreak: 0 });
 const end = (r: Relationship): Relationship => (r.status === 'ended' ? r : { ...r, status: 'ended' });
 
-/** Folds the social events of `self`'s log. Time apart changes nothing: only events do. */
 export const reduceSocial: ReduceSocial = (s, stored, self) => {
   const e = stored.event;
   const at: Instant = e.at;

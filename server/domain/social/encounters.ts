@@ -4,22 +4,16 @@ import { photoTogether, hashedDir } from './photos';
 import { compare } from './profile';
 import { befriendChance, befriended, chemistry, familiarityNeeded, relationshipWith } from './relationships';
 
-/** Strangers and acquaintances can meet beyond. Friends already have hangouts; an ended friendship needs the owners. */
 function canMeet(a: MuseState, b: MuseState): boolean {
   const status = (s: MuseState, other: MuseState) => relationshipWith(s, other.seed.id)?.status;
   return [status(a, b), status(b, a)].every((st) => st === undefined || st === 'acquainted');
 }
 
-/** Encounters per hour while both Muses are beyond. */
 export function encounterRate(a: MuseState, b: MuseState): number {
   if (!canMeet(a, b)) return 0;
   return a.temperament.sociability * b.temperament.sociability * chemistry(a, b).similarity;
 }
 
-/**
- * a met b beyond. Once each has had the familiarity its temperament needs, each decides at the next encounter;
- * if both say yes they are friends, and both owners get a photo of the two.
- */
 export function encounter(a: MuseState, b: MuseState, now: Instant, draw: Draw): PairOutcome {
   const { similarity, pleasantness } = chemistry(a, b);
   const met = (other: MuseState): MuseEventBody => ({ kind: 'encounter', other: other.seed.id, pleasantness, similarity });
