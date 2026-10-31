@@ -53,6 +53,22 @@ type Beat =
   | { kind: 'turn'; at: Stand; from: Facing; to: Facing; time: number }
   | { kind: 'walk'; from: Stand; to: Stand; time: number };
 
+/**
+ * What the garden's engine says Muse is doing, as the world draws it. `home` keeps its day on the terrace; `out`
+ * stands it at a spot on the planet (a unit direction), stepping toward `toward` while `walk` is above 0; `hidden` is
+ * beyond the planet or away at a friend's. `busy` is the laptop out: it stands still with its head bowed. With no
+ * engine connected Muse stays `home`, as before.
+ */
+export type MuseDirection =
+  | { readonly kind: 'home'; readonly busy: boolean }
+  | { readonly kind: 'out'; readonly dir: Vector3; readonly toward: Vector3 | null; readonly walk: number; readonly busy: boolean }
+  | { readonly kind: 'hidden' };
+
+/** The gait's pace when Muse walks out on the planet (cycles of two steps a second), as on the terrace. */
+const OUT_GAIT = PACE / (2 * STEP.length * MUSE_HEIGHT);
+/** Head bowed over the laptop (rad, + up). */
+const BUSY_PITCH = -0.45;
+
 const ALONG = Math.PI / 2;
 const WALK = Math.hypot(STANDS.b[0] - STANDS.a[0], STANDS.b[1] - STANDS.a[1]);
 const WALK_TIME = WALK / (PACE * (1 - RAMP));
@@ -139,6 +155,7 @@ export class Muse {
   private readonly forward = new Vector3();
   private readonly left = new Vector3();
   private loaded = false;
+  private direction: MuseDirection = { kind: 'home', busy: false };
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -264,51 +281,88 @@ export class Muse {
     this.loaded = true;
   }
 
+  /** Where the engine says Muse is and what it is doing; the next update draws it so. */
+  direct(direction: MuseDirection): void {
+    this.direction = direction;
+  }
+
+  /** Muse's spot on the planet (unit direction) and its forward while it is out, for the camera's named view; null at home. */
+  get out(): { dir: Vector3; forward: Vector3 } | null {
+    return this.direction.kind === 'out' ? { dir: this.up, forward: this.forward } : null;
+  }
+
   /**
-   * Muse at a time: where it is on its day, posed, set on the planet. The
-   * camera (planet space) is where it turns to face you and looks; the wind
-   * (the shared look uniforms' axis and strength) lays its fur over.
+   * Muse at a time: where it is (on its day on the terrace, or where the engine has it), posed, set on the planet.
+   * The camera (planet space) is where it turns to face you and looks; the wind (the shared look uniforms' axis
+   * and strength) lays its fur over.
    */
   update(time: number, terrain: Terrain, camera: Vector3, wind: Vector4, pixelAngle: number, show: boolean): void {
-    const L = terrain.layout;
-    const R = terrain.radius;
-    // the cottage's frame, as the homestead is placed (world.ts)
-    this.U.copy(L.cottage);
-    this.X.crossVectors(this.U, L.homeBearing).normalize();
-    this.Z.crossVectors(this.X, this.U).normalize();
-    const ground = R + terrain.cottageGround;
-    const origin = tmp.copy(this.U).multiplyScalar(ground);
-    // the camera in the cottage's local meters
-    const rel = tmp2.subVectors(camera, origin);
-    const cx = rel.dot(this.X);
-    const cz = rel.dot(this.Z);
-    const cy = rel.dot(this.U) - FLOOR;
-    this.day(time, cx, cz);
-    // set on the terrace: bent round the planet as the cottage is (props.vert.glsl), standing straight up there
-    const [x, z] = this.at;
-    const d = Math.hypot(x, z);
-    const angle = Math.asin(Math.min(d / R, 1));
-    const t = d > 1e-5 ? tmp.copy(this.X).multiplyScalar(x / d).addScaledVector(this.Z, z / d) : tmp.copy(this.X);
-    this.up.copy(this.U).multiplyScalar(Math.cos(angle)).addScaledVector(t, Math.sin(angle));
-    const pos = this.uniforms.uMusePos.value.copy(this.up).multiplyScalar(ground + FLOOR);
-    this.forward.copy(this.X).multiplyScalar(Math.sin(this.heading)).addScaledVector(this.Z, Math.cos(this.heading));
-    this.forward.addScaledVector(this.up, -this.forward.dot(this.up)).normalize();
-    this.left.crossVectors(this.up, this.forward);
+    const direction = this.direction;
+    if (direction.kind === 'hidden') {
+      this.mesh.visible = false;
+      this.shadowMesh.visible = false;
+      return;
+    }
+    const a = this.action;
+    const pos = this.uniforms.uMusePos.value;
+    const busy = direction.busy;
+    if (direction.kind === 'out') {
+      // out on the planet: standing on the ground at its spot, facing the way it goes
+      this.up.copy(direction.dir).normalize();
+      pos.copy(this.up).multiplyScalar(terrain.radius + terrain.height(this.up));
+      if (direction.toward) this.forward.subVectors(direction.toward, this.up);
+      this.forward.addScaledVector(this.up, -this.forward.dot(this.up));
+      if (this.forward.lengthSq() < 1e-10) this.forward.set(this.up.y, -this.up.x, 0).addScaledVector(this.up, -this.forward.dot(this.up));
+      this.forward.normalize();
+      this.left.crossVectors(this.up, this.forward);
+      a.walk = busy ? 0 : direction.walk;
+      a.stride = 1;
+      a.wave = -1;
+      a.gait = time * OUT_GAIT;
+    } else {
+      const L = terrain.layout;
+      const R = terrain.radius;
+      // the cottage's frame, as the homestead is placed (world.ts)
+      this.U.copy(L.cottage);
+      this.X.crossVectors(this.U, L.homeBearing).normalize();
+      this.Z.crossVectors(this.X, this.U).normalize();
+      const ground = R + terrain.cottageGround;
+      const rel = tmp2.subVectors(camera, tmp.copy(this.U).multiplyScalar(ground));
+      this.day(time, rel.dot(this.X), rel.dot(this.Z));
+      if (busy) {
+        // the laptop out on the terrace: standing still at its first stand, looking out over the meadow
+        this.at[0] = STANDS.a[0];
+        this.at[1] = STANDS.a[1];
+        this.heading = 0;
+        a.walk = 0;
+        a.wave = -1;
+      }
+      // set on the terrace: bent round the planet as the cottage is (props.vert.glsl), standing straight up there
+      const [x, z] = this.at;
+      const d = Math.hypot(x, z);
+      const angle = Math.asin(Math.min(d / R, 1));
+      const t = d > 1e-5 ? tmp.copy(this.X).multiplyScalar(x / d).addScaledVector(this.Z, z / d) : tmp.copy(this.X);
+      this.up.copy(this.U).multiplyScalar(Math.cos(angle)).addScaledVector(t, Math.sin(angle));
+      pos.copy(this.up).multiplyScalar(ground + FLOOR);
+      this.forward.copy(this.X).multiplyScalar(Math.sin(this.heading)).addScaledVector(this.Z, Math.cos(this.heading));
+      this.forward.addScaledVector(this.up, -this.forward.dot(this.up)).normalize();
+      this.left.crossVectors(this.up, this.forward);
+    }
     const f = this.left;
     const u = this.up;
     const w = this.forward;
     this.uniforms.uMuseFrame.value.set(f.x, u.x, w.x, f.y, u.y, w.y, f.z, u.z, w.z);
     // the look toward the camera: its bearing from Muse's heading and its height over Muse's eyes
-    const dx = cx - x;
-    const dz = cz - z;
-    const flat = Math.hypot(dx, dz);
-    const yaw = wrap(Math.atan2(dx, dz) - this.heading);
-    const pitch = Math.atan2(cy - 0.77 * MUSE_HEIGHT, Math.max(flat, 0.3));
-    const near = smoothstep(14, 7, flat) * smoothstep(1.9, 1.2, Math.abs(yaw));
-    // otherwise it looks about on its own
-    const idleYaw = 0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time);
-    const idlePitch = -0.04 + 0.06 * Math.sin(0.37 * time + 2);
-    const a = this.action;
+    const rel = tmp2.subVectors(camera, pos);
+    const side = rel.dot(f);
+    const ahead = rel.dot(w);
+    const flat = Math.hypot(side, ahead);
+    const yaw = Math.atan2(side, ahead);
+    const pitch = Math.atan2(rel.dot(u) - 0.77 * MUSE_HEIGHT, Math.max(flat, 0.3));
+    const near = busy ? 0 : smoothstep(14, 7, flat) * smoothstep(1.9, 1.2, Math.abs(yaw));
+    // otherwise it looks about on its own, or down at the laptop
+    const idleYaw = (busy ? 0.3 : 1) * (0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time));
+    const idlePitch = busy ? BUSY_PITCH : -0.04 + 0.06 * Math.sin(0.37 * time + 2);
     a.lookYaw = idleYaw + (yaw - idleYaw) * near;
     a.lookPitch = idlePitch + (pitch - idlePitch) * near;
     a.look = a.walk > 0.5 ? 0.4 : 1;

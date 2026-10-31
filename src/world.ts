@@ -244,6 +244,20 @@ export class World {
       // out in front of the terrace, a little toward the steps, looking at Muse's middle (where it is now on its day)
       this.muse.update(this.clock?.time ?? 0, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, true);
       const V = MUSE_VIEW;
+      const out = this.muse.out;
+      if (out) {
+        // out on the planet: in front of Muse, looking back at it
+        const target = out.dir.clone();
+        const focus = travel(target, out.forward, V.distance / R, new Vector3());
+        this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));
+        const curve = (V.distance * V.distance) / (2 * R);
+        const zoom = this.rig.zoomForAltitude(Math.max(0.6, this.terrain.height(target) + V.height + curve - this.terrain.height(focus)));
+        this.rig.setZoom(zoom, true);
+        const { tilt } = this.rig.framing(zoom);
+        this.rig.lookUp(Math.atan2(V.distance, V.height - V.at * MUSE_HEIGHT + curve) - tilt);
+        this.posed = true;
+        return;
+      }
       const { x, z } = this.muse.spot;
       const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
       const target = travel(travel(L.cottage, across, x / R, new Vector3()), L.homeBearing, z / R, new Vector3());
