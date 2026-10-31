@@ -291,6 +291,29 @@ describe('logs and errors', () => {
   });
 });
 
+describe('error bodies', () => {
+  it.each<[number, string, string, unknown?, Parameters<typeof serve>[0]?]>([
+    [400, 'POST', '/api/dev/clock', { mode: 'slow' }],
+    [403, 'GET', `/api/visits/${INVITE}/world?as=wren`],
+    [404, 'GET', '/api/muses/nobody/now'],
+    [404, 'GET', '/api/nothing'],
+    [409, 'POST', `/api/invitations/${INVITE}/accept?as=hero`, undefined, {
+      commands: { invitation: () => Promise.resolve({ ok: false, status: 409, error: 'already answered' }) },
+    }],
+    [413, 'POST', '/api/host/hero/soul', { text: 'a'.repeat(64 * 1024) }],
+    [500, 'GET', '/api/muses/hero/world', undefined, { queries: { world: () => { throw new Error('store offline'); } } }],
+  ])('a %i is JSON with a short error message', async (status, method, path, body, overrides) => {
+    if (overrides !== undefined) await serve(overrides);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await call(method, path, body);
+    expect(res.status).toBe(status);
+    expect(res.type).toBe('application/json; charset=utf-8');
+    const parsed = JSON.parse(res.text) as unknown;
+    expect(Object.keys(parsed as object)).toEqual(['error']);
+    expect((parsed as { error: unknown }).error).toMatch(/^.{1,80}$/);
+  });
+});
+
 describe('CORS', () => {
   it('answers a preflight and lets any origin read replies', async () => {
     const pre = await fetch(`${base}/api/host/hero/memory`, {
