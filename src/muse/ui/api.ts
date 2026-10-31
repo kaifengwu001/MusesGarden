@@ -71,7 +71,7 @@ export class MuseApi {
   sharing = () => this.get<SharingView>(`${this.m}/settings/sharing`, () => this.sample.sharing);
 
   answer = (id: InvitationId, action: Answer) =>
-    this.command(`/api/invitations/${encodeURIComponent(id)}/${action}`, { as: this.museId }, () => this.sample.answer(id, action));
+    this.command(`/api/invitations/${encodeURIComponent(id)}/${action}${q({ as: this.museId })}`, undefined, () => this.sample.answer(id, action));
 
   async visit(id: InvitationId): Promise<VisitWorldView | 'forbidden'> {
     const r = await this.request<VisitWorldView>('GET', `/api/visits/${encodeURIComponent(id)}/world${q({ as: this.museId })}`, undefined, () => {
@@ -83,10 +83,10 @@ export class MuseApi {
     throw new ApiError(r.status, r.error);
   }
 
-  setHidden = (ref: HiddenRef, hidden: boolean) => this.command(`${this.m}/settings/sharing`, { ref, hidden }, () => this.sample.setHidden(ref, hidden));
-  introduce = (shareCode: string) => this.command(`${this.m}/settings/introductions`, { op: 'introduce', shareCode }, () => this.sample.introduce(shareCode));
-  unshare = (other: MuseId) => this.command(`${this.m}/settings/introductions`, { op: 'unshare', other }, () => this.sample.unshare(other));
-  setBasketTime = (time: string | null) => this.command(`${this.m}/settings/basket-time`, { time }, () => this.sample.setBasketTime(time));
+  setHidden = (ref: HiddenRef, hidden: boolean) => this.command(`${this.m}/settings/hidden`, { ref, hidden }, () => this.sample.setHidden(ref, hidden));
+  introduce = (shareCode: string) => this.command(`${this.m}/settings/introductions`, { shareCode }, () => this.sample.introduce(shareCode));
+  unshare = (other: MuseId) => this.command(`${this.m}/settings/unshare`, { other }, () => this.sample.unshare(other));
+  setBasketTime = (hhmm: string | null) => this.command(`${this.m}/settings/basket-time`, { hhmm }, () => this.sample.setBasketTime(hhmm));
 
   // The host simulator: stands in for the Muse app.
   hostWork = (state: 'started' | 'ended') => this.command(`/api/host/${encodeURIComponent(this.museId)}/work`, { state }, () => this.sample.work(state));
@@ -130,7 +130,7 @@ export class MuseApi {
     }
     if (!res) return { ok: false, status: 503, error: 'The garden is unreachable.' };
     this.setSource('live');
-    if (!res.ok) return { ok: false, status: res.status, error: (await res.text()) || res.statusText };
+    if (!res.ok) return { ok: false, status: res.status, error: await errorOf(res) };
     const json = (res.headers.get('content-type') ?? '').includes('json');
     return ok((json ? await res.json() : await res.text()) as T);
   }
@@ -140,6 +140,18 @@ export class MuseApi {
     this.sourceNow = s;
     for (const fn of this.listeners) fn(s);
   }
+}
+
+/** The server answers errors as JSON {error}. */
+async function errorOf(res: Response): Promise<string> {
+  const raw = await res.text();
+  try {
+    const { error } = JSON.parse(raw) as { error?: unknown };
+    if (typeof error === 'string') return error;
+  } catch {
+    // not JSON: use the text as it is
+  }
+  return raw || res.statusText;
 }
 
 function q(params: Record<string, string | null>): string {

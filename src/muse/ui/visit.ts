@@ -67,8 +67,8 @@ export class Visit {
       }
       const card = plant.card;
       const b = button('', 'mu-plant', () => this.show(card));
-      b.setAttribute('aria-label', plant.title);
-      b.title = plant.title;
+      b.setAttribute('aria-label', card.title);
+      b.title = card.title;
       return this.pins.add(b, plant.dir);
     });
     this.visiting = { view, home, pins };
