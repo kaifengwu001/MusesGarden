@@ -416,3 +416,172 @@ The first rule exists because an interest can itself be private. An owner's inte
 ### Owners decide what Muse shares
 
 The "What Muse shares" page lists every public interest and every public find, each with a hide toggle. Hiding an item removes it from `PublicProfile`. Owners also introduce Muses with a share code, and they can unshare a Muse, which ends an introduced friendship.
+
+## Architecture
+
+### The event log is the source of truth
+
+Each Muse has one append-only event log. `MuseState` is a pure fold of that log, `reduce(state, event)`. Relationships, invitations, the shelf, and settings are all folds of the log, not tables of their own.
+
+- Pair events are written to both Muses' logs in one transaction.
+- The fold derives everything that needs no event of its own. That covers relationships with their rapport, closeness, and streaks, the social time and rest used today, the shelf, basket eligibility, and the public profile.
+
+The contract, `src/muse/contract.ts`, defines the events as types only. They fall into three groups.
+
+| Group | Event kinds |
+| --- | --- |
+| From the Muse app and the owner | `host.work`, `soul.updated`, `memory.updated`, `owner.settings`, `owner.introduced`, `owner.unshared` |
+| Life | `episode.started`, `episode.paused`, `episode.resumed`, `episode.ended`, `trip.hop`, `region.revealed`, `discovery.collected`, `question.opened`, `question.closed`, `photo.taken`, `basket.delivered`, `reflection.committed`, `reflection.no-change` |
+| Social, written to both logs | `encounter`, `hangout`, `relationship.changed`, `invitation` |
+
+A log makes history into data, and the ablation test depends on that. Drop the experiences from a log, fold it again, and Muse must choose exactly as it would from its seed alone. Mutable tables with hand-written history could not show that.
+
+Each of these invariants is enforced by a type, the reducer, an access check, or a test:
+
+- A `Discovery` exists only from a fetched `Candidate`, so every find has a real URL. Every object has a place.
+- Topic identity is the canonical Wikipedia title.
+- Independent sources are counted by canonical URL.
+- The reducer enforces the evidence gate.
+- The privacy rules, the allow-list, the visibility rules, and the caps hold as described above.
+
+### One clock drives every Muse
+
+The engine is a discrete-event simulation over a persisted `schedule` table. The table holds every pending item: episode ends, next hops, host inputs, basket checks, reflection checks, invitation deadlines, and window starts and ends.
+
+`advanceTo(T)` pops due items in (time, museId, kind) order and processes each one in a single transaction.
+
+```mermaid
+flowchart TD
+    start["advanceTo(T)"] --> due{"Is an item due by T?"}
+    due -->|"no"| done["Return"]
+    due -->|"yes, the earliest by time, museId, kind"| tx["Begin one transaction"]
+    tx --> del["Delete the item"]
+    del --> run["Run the policy and write its events, to both logs for pair events"]
+    run --> follow["Insert follow-up items"]
+    follow --> commit["Commit"]
+    commit --> due
+```
+
+- A crash in the middle of an item rolls the whole item back, so a restarted run picks up where it stopped.
+- Rerunning an item changes nothing.
+- The order of Muses in the cast does not change the log. Items sort by (time, museId, kind), and each draw is keyed by its Muse, not by a shared random stream.
+- Work start removes the Muse's pending items and stores the time each had left. Work end puts them back, shifted by the length of the work.
+
+The clock runs in two modes:
+
+- **Live.** A 1-minute timer calls `advanceTo(now)`, and so does every request.
+- **Fast-forward.** `POST /api/dev/advance {hours}` jumps ahead.
+
+A host simulator stands in for the Muse app. It sends work, `SOUL.md` and `MEMORY.md` edits, and the owners' answers and settings. A 3-week run looks like this:
+
+```sh
+npm run sim -- --hours 504 --cast fixtures/cast.json --work fixtures/work-3weeks.json --owners auto-accept
+```
+
+### Modules follow the domain
+
+The code is split by domain, not by pipeline phase.
+
+```
+src/muse/contract.ts        types only: events, state, plans, social states, Candidate, Discovery, PhotoSpec, PublicProfile, ports, API shapes
+src/muse/ui/                DOM overlay (frontend track)
+server/domain/              pure: rng, state (reduce), interests, reflection, atlas (topics → regions, fog, unlocks), shelf, profile, renders
+server/domain/policy/       constants, life (next activity, rest budget, work pause), travel (trip start, topic pick, hops, keep), photo, basket
+server/domain/social/       relationships (statechart, familiarity, endings), encounters, hangouts (budget, closeness, gifts), invitations (statechart), access
+server/engine/              clock (advanceTo, schedule, pause/resume), ports (Mind, Source, Store)
+server/adapters/            store/{memory,sqlite}, minds/{heuristic,meta}, sources/{fixture,wikipedia,rss}
+server/http.ts              node:http, small hand-written parsers at the boundary
+server/cli/sim.ts           the sim CLI
+server/fixtures/            cast, work schedules, hero chain, page pools
+docs/muse-agent.md          this doc
+```
+
+Everything under `server/domain/` is pure. Tuning happens in `server/domain/policy/constants.ts`.
+
+### Storage is SQLite with six tables
+
+The server runs on `node:sqlite` under Node 22.13, through `tsx`, with no web framework and no schema library. The tables are:
+
+- `muses`
+- `events`, append-only
+- `schedule`
+- `host_docs`, which holds `SOUL.md` only
+- `candidates`
+- `llm_cache`
+
+### Two Minds sit behind one port
+
+- `MetaMind` calls OpenAI-style chat completions at `https://api.meta.ai/v1` with `MODEL_API_KEY` and the model `muse-spark-1.3`. Environment variables can override all three. It parses JSON by hand, retries once, and then falls back to `HeuristicMind`.
+- `HeuristicMind` is deterministic, so tests and fast-forward runs reproduce exactly.
+- Pages come from Wikipedia, curated RSS feeds, and a recorded fixture pool that replays offline.
+- If `MODEL_API_KEY` is unset, the precomputed hero run uses `HeuristicMind` and says so.
+
+## How we know it works
+
+The plan sets these acceptance tests. They are targets. None of them has run yet.
+
+### Divergence shows that history drives choices
+
+| Test | Setup | Passes when |
+| --- | --- | --- |
+| Owner spark | Two Muses with identical seeds. One `MEMORY.md` is about botany, the other about jazz. 7 free days on a page pool that neither Muse has seen. | Jaccard similarity is at most 0.34 |
+| Friends | Two Muses with identical seeds. One is introduced to a botany Muse, the other to a music Muse. 14 days. | Their top 3 interests differ |
+| Control | The same inputs, run twice | The two logs are identical |
+| Ablation | One log with its experiences removed, folded again | `decide(fold(log − experiences)) == decide(fold(seedOnly))` |
+
+All four must still hold after the SQLite database is closed and reopened. Together they show that history drives Muse's choices, and that removing the history reverts them. The tests judge growth by what Muse chooses, not by how it describes itself.
+
+### Caps, budgets, access, and privacy each have a test
+
+- Rest stays at most 4 h per owner-day, and rises after recent work.
+- Photos stay at most 5 a day. Baskets stay at most 1 a day, with at most 7 items. The shelf holds at most 10 objects and changes when affinities change.
+- Social hours per day stay within ±25% as friends grow from 1 to 6.
+- Encounters happen only while both Muses are beyond. An introvert pair needs more encounters than an extrovert pair to become friends.
+- A 30-day gap never ends a friendship. A run of k unpleasant hangouts does, and k grows with rapport.
+- Visit access returns 403 outside the window and for the wrong owner. It never returns the house or private cards.
+- Hidden items never reach `PublicProfile`.
+- The allow-list test drops every sensitive fact.
+- The engine matches host work to the minute. A shuffled cast gives an identical log. A killed and restarted run converges.
+
+A 3-week sim with the fixture cast must also read as believable, with its metrics inside the caps.
+
+## Open questions
+
+The plan leaves these points open. Each one needs a decision before or during implementation.
+
+1. **What raises salience.** The plan gives salience a 3-day decay but no rule for how it rises.
+2. **What work does to wall-clock items.** Work start removes all of a Muse's pending items and shifts them back afterward. The same table holds invitation deadlines, window starts and ends, and basket checks, which follow the owners' clocks.
+3. **Where a rabbit hole lands.** A hop can follow links to a topic that has no region yet, such as `Pigment`. The plan does not say whether that hop opens a region in the middle of a trip.
+4. **When Muses become `acquainted`.** The contract has the state, but the plan does not say which event enters it, or whether an ended pair can become friends again.
+5. **Whether similarity and overlap are one measure.** If they are, pleasantness peaks near 0.76, so even the most sociable Muse needs two encounters to reach F = 1, not one.
+6. **Guaranteed photos against the cap.** Hangout and new-friend photos are guaranteed, and photos are capped at 5 a day. The plan does not say which rule wins on a day with more than 5 guaranteed photos.
+7. **How a visit starts for the other Muse.** The visit weight needs "some friend is free". The plan does not define free, or say whether a visit spends both Muses' budgets.
+8. **What the owner-spark Jaccard compares.** The test sets a bound of 0.34 without naming the two sets.
+9. **What fatigue is.** The topic pick subtracts 0.25 × fatigue, and the plan does not define fatigue.
+
+## References
+
+### Research leads
+
+These come from the team's personality research notes of 2026-10-31. The notes describe each paper briefly, and we have not checked those descriptions against the papers. Each entry says what the notes describe and what this design takes from it.
+
+- [Emergi-PersonaOS](https://arxiv.org/abs/2609.27417), arXiv 2609.27417. The notes describe enduring traits, goals and values, narrative identity, and evidence-backed revisions, shown in a limited fictional-character demonstration. This design takes evidence-backed, versioned revisions, in reflection and the versioned `SOUL.md` section.
+- [Structured Personality Control and Adaptation for LLM Agents](https://arxiv.org/abs/2601.10025), arXiv 2601.10025. The notes describe temporary adaptation versus lasting personality change. This design takes the split between salience and affinity.
+- [Spontaneous Emergence of Agent Individuality](https://arxiv.org/abs/2411.03252), Takata et al., arXiv 2411.03252. The notes describe agents that come to differ through their interaction histories in a small simulation, evaluated partly with MBTI. This design takes individuality from interaction history, and checks it with the divergence test.
+- Semi-Markov activity models. This is the model class behind the timeline. This doc cites no single paper for it.
+
+### Design rules from the research notes
+
+The same notes gave rules that shaped the design. The notes mark the hypothesis rule as an engineering heuristic, not an established threshold.
+
+- Previous reflections never count as fresh evidence. Reflection ignores reflection events.
+- One event can create only a hypothesis. An interest needs 2 sources to reach `emerging`.
+- Temporary reactions stay separate from lasting tendencies. Salience and affinity are separate fields.
+- A reflection may produce no update. `reflection.no-change` is a valid outcome.
+- Development is judged through future behavior and choices, not self-description. The divergence tests measure choices.
+
+### Product and API sources
+
+- [Meta Model API docs](https://dev.meta.ai/docs/models.md), for the base URL, `MODEL_API_KEY`, and the `muse-spark-1.3` model.
+- [KDnuggets on Meta Muse](https://kdnuggets.com/meta-muse-explained-what-it-is-how-it-works-and-what-it-can-do) and [SmartScope on Muse's `SOUL.md`](https://smartscope.blog/en/blog/meta-muse-soul-md-personality-file-contents-editing-2026/). These are secondary sources for the product frame, read through search summaries.
+- [The work plan](muse-agent-plan.md), with its revision history.
