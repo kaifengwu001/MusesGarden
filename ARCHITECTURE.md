@@ -223,11 +223,30 @@ tests still read the same fields from the CPU side.
   vertex shader, waited for both (about 1.3 ms a frame through iteration 12).
 - **Scatter layer:** handles grass, flowers and later stones. Quadtree tiles
   around the focus are enumerated from the rest-space point set by
-  time-sliced jobs (64 steps per tile, pooled typed buffers). They go into a
-  fixed instance pool split into pages and are drawn in one call. A page
-  visibility texture culls whole tiles. Density falls off by rank toward the
+  time-sliced jobs (256 steps per tile, pooled typed buffers). They go into a
+  fixed instance pool split into pages and are drawn in one call. The pool
+  is two RGBA float textures, a page a row (direction and ln birth threshold;
+  the seed, four to a texel, or the seed and a flower's size and colour), and
+  the draw covers only the pages of tiles in view: a short list of them, in
+  pool order, tells each instance which page and slot to read. Through
+  iteration 13 the pool was a vertex buffer drawn up to its highest page, the
+  pages out of view culled one instance at a time by a page table (911k
+  instances drawn for 320k blades in view on High); the same frames to the
+  pixel now cost 2.3–4.2 ms less on High near the ground, 0.7–1.9 ms on
+  Medium. Blades thinned out and a page's empty slots leave the vertex
+  shader before it reads the field maps. Density falls off by rank toward the
   edge, so far tiles are built sparser. Re-tiling as R changes swaps region
   by region, which never leaves a hole and never deadlocks a full pool.
+- **Building ahead:** besides the near field itself, the layer wants a ring of
+  tiles a tile wide beyond its edge (built after every tile inside it, drawn
+  only once inside it: their blades would not show there anyway), so walking
+  never finds a tile missing at the edge. Where the camera is headed (the end
+  of a glide, the zoom asked for, a named view: CameraRig.aim), the tiles its
+  frustum will see there are wanted too, ten meters behind the camera's own
+  in the build order: they are built on the way, so the way down from orbit
+  (the default start) has the meadow ready as it arrives. Only what it will
+  see, so the pool never holds two whole near fields. A tile that needs more
+  density as you approach keeps its pages until it is rebuilt.
 - **Classified layers (flowers):** a classifier sees each tile first (the
   flora fields on a 4×4 grid, from the CPU mirror), says how far the local
   density rises above the mean (the enumeration bound), then sorts each point
@@ -393,7 +412,11 @@ click is what you see.
   the same brushed marks at every height, only finer in meters as you come
   down; the colonies' wash of colour under them holds all the way down too.
   Both give way to the flowers themselves in the near field, but only where
-  those are big enough on screen to carry the flowerbeds. They lie at 80 %
+  those are big enough on screen to carry the flowerbeds, and once they are
+  built there: the flower layer keeps a texel per tile (`builtMap`, sent only
+  when it changes), which the ground reads per vertex, so after a jump the
+  near meadow keeps its painted flowers until each tile's flowers arrive
+  (through iteration 13 it was bare until then). They lie at 80 %
   over the grass (`FLOWER_PAINT`). Up close the paint's beds fade out over a
   meter or so along a ragged edge and fill unevenly (`paintClumps`); far
   away they keep the drifts' crisp edges. Near blades
@@ -507,7 +530,8 @@ iteration 12 it shaded the whole screen, and 78–100 % of that never reached
 a lake. Post then draws to the screen.
 
 A frame runs in this order: a resize the last frame asked for (a change of
-tier), then the build queue, then the update, then the render. A canvas
+tier), then the update, then the render; the build queue runs after it, in a
+task of its own once the frame is handed to the GPU. A canvas
 resize clears the canvas, so it is never done after the draw (the drawn
 frame would be shown blank). The render scale is not a resize: the canvas
 and the screen-sized targets (the scene, the bloom chain, the clouds'
@@ -518,14 +542,30 @@ the canvas's own resolution. The grade, the bloom and the lakes' mirror
 keep their lookups inside the drawn part (their extents). A change of scale
 reallocates nothing (through iteration 12 each one reallocated about
 130 MB, a frame of 70–90 ms), and scale 1 draws exactly what it did. Tiles are built
-before the update, which decides from every tile's pages which are drawn
+before the next update, which decides from every tile's pages which are drawn
 (built between the two, a tile's blades moved to pages not marked visible,
 and a strip of it was missing for a frame). Both are tested on a live walk
-(invariants.spec.ts, "frames"). The build queue gets what is left of 3.6 ms
-of JS after the update (as long as the slowest of the last frames') and the
-render (at least 0.5 ms, at most 2 ms; on a desktop with more than four jobs
-waiting, of 5 ms and at most 3.6 ms), and never starts a step that would not
-fit. Tiles in
+(invariants.spec.ts, "frames"). The build queue (core/buildBudget.ts) runs
+in the time the frame leaves before the next one is due (by the usual
+interval, the median of the frames without a backlog and never shorter than
+60 fps allows, or the last one's while the GPU holds frames up), less 4 ms
+for the browser: up to 2 ms, at least 0.5. With more than four tiles waiting
+in the near field (a jump, a fly-in, a glide; tiles built ahead do not
+count), on a phone too, a slice that grows by 0.5 ms each frame that keeps
+time, to 8 ms on a desktop and 6 on a phone, and halves at a frame that is
+late while the main thread was busy for most of it (a frame the GPU held
+up, the main thread idle, is not the builds' doing). Each frame is judged
+on its own: through iteration 13 the queue took what was left of 3.6 ms of
+the frame's JS after the update, reckoned as the slowest of the last
+frames' (forgotten 5 % a frame), so one slow frame (on the way down from
+orbit, a shader's first use: 60–140 ms) starved it for about a second, and
+a phone, never given the catch-up slice, built half as fast as iteration 4.
+The queue never starts a step unless twice the mean step of recent runs
+would still fit (a mean, not the slowest step: WebKit's clock reads whole
+milliseconds, and a guard on the slowest let a phone run 1/256 of a tile a
+frame). At start-up, from orbit, one frame is drawn in the meadow and every
+program's uniforms are looked up, so the near field's passes, programs and
+instance pools are ready before the way down. Tiles in
 view are built before those out of it, nearest first, and spawn straight in
 (a grow-in, tried in iteration 7, made the change of detail more visible).
 Blades and flowers never change size as you move: they are there or not
@@ -560,7 +600,7 @@ so any view can be shared.
 | Triangles | ≤ 4 M on high, 1.8 M on medium | ≤ 500 k |
 | Visible grass instances | ≤ 600 k on high, 250 k on medium | ≤ 60 k |
 | GPU memory | < 256 MB | < 256 MB |
-| JS per frame | ≤ 4 ms (≤ 5 ms while catching up on a backlog of tiles) | ≤ 4 ms |
+| JS per frame | ≤ 4 ms; tile builds after the frame, in the time it leaves (to 8 ms while catching up) | ≤ 4 ms; builds to 6 ms while catching up |
 | First frame | < 2 s | |
 
 - **Tiers:** low (phones), medium (iteration 5's high) and high: grass to
@@ -618,7 +658,7 @@ so any view can be shared.
       main.ts              boot, renderer, frame loop, quality tier wiring, input and UI wiring
       world.ts             the scene and every system; per-frame order; interactions
       params.ts            typed schema, store, URL query, presets
-      core/                clock, hash sync, quality tiers, build queue, hashing, GPU memory ledger, shared uniforms
+      core/                clock, hash sync, quality tiers, build queue and its budget, hashing, GPU memory ledger, shared uniforms
       planet/
         growth.ts          g → A → R, inverse
         cubesphere.ts/.glsl spherified cube, closed-form inverse, analytic area element
@@ -634,7 +674,7 @@ so any view can be shared.
         geo.ts             spherical arcs and travel
       life/
         fieldMap.ts/.glsl  ground, meadow and wind maps around the focus
-        scatter.ts         tiles, paged pools (one per channel), classifier hook, page culling, re-tiling
+        scatter.ts         tiles, paged pool textures (one per channel), the list of pages drawn, building ahead, classifier hook, re-tiling, the map of built tiles
         grass.ts/.glsl     5-vertex blades in the wind, sheen
         flowers.ts/.glsl   drift, colony and clump classifier, four species pools (meshes in flowerMeshes.ts), bloom, flutter
         petals.ts/.glsl    petals lifting at the bloom front and in gusts

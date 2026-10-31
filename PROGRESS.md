@@ -24,17 +24,140 @@ its own Vercel project, so its production address is public and stays put.
 `scripts/publish.sh N --latest` publishes the checkout as iteration N and as
 the latest; `scripts/publish.sh N <commit>` publishes an older commit.
 
-## Iteration 14: the review notes (in progress)
+## Iteration 14: the review notes
 
-Started from iteration 13 (058b8a1). Before it Kai asked why the grass loads
-in slowly; the study's findings set the fixes (all of them, measured, before
-the next review). This table fills in as the notes are done.
+Started from iteration 13 (058b8a1), the notes committed first (a0ff6c2).
+Before it Kai asked why the grass loads in slowly and what could be done;
+the study is summed up under the table. Kai asked for all of its fixes,
+measured, before the next review. Every number below compares production
+builds of iteration 13 and 14 in one browser.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Grass loads in chunk by chunk, slowly and distractingly, when flying in from orbit or jumping to a new place; on a phone the chunks can fail to load at all; it got worse from iteration 4 to 5. Make the loading actually faster, even at a slightly higher cost while it loads | |
-| 2 | Make the grass cheaper to draw without dropping its count | |
-| 3 | Make the chunk-by-chunk load-in less distracting | |
+| 1 | Grass loads in chunk by chunk, slowly and distractingly, when flying in from orbit or jumping to a new place; on a phone the chunks can fail to load at all; it got worse from iteration 4 to 5. Make the loading actually faster, even at a slightly higher cost while it loads | Three causes, all fixed. **The budget:** since iteration 5 the tile builds took what was left of 3.6 ms of the frame's JS, so the slower the device, the less they got, and a phone never got the larger slice desktops have had while catching up since iteration 7; since iteration 12 the frame's update was reckoned as the slowest of the last frames', so one slow frame starved the builds for about a second (on the way down from orbit, the default start, the first use of three shaders and of 41 MB of instances took 60–140 ms); and on a phone, whose browser reads the clock in whole milliseconds, the guard against long steps often let one 1/256 of a tile be built a frame. The builds now run after each frame, in a task of their own while the GPU draws it, in the time the frame leaves; while tiles wait in the near field the slice grows to 8 ms on a desktop and 6 on a phone as long as frames keep time, each frame judged on its own. The near field's first use is paid at start-up. **Moving:** a tile that needed more density as you came closer was rebuilt from scratch; on the phone-like run, gliding threw away 96 of 127 builds and left a third of the near field missing (the chunks that never load). Now a ring a tile wide beyond the near field's edge is built ahead, and so is what the camera will see where it is headed (a glide, a zoom, a named view). **Result:** flying in from orbit now has 90 % of the grass in view after 0.4 s on High (1.9 s before), a jump 0.3 s (1.1 s); on the phone-like run 0.09 s and 0.33 s (6.2 s and 3.6 s). Walking and gliding no longer leave a tile of the near field missing in any frame (on High, 131 of 462 frames had one while walking). |
+| 2 | Make the grass cheaper to draw without dropping its count | The grass and flower pools are textures now, a page a row, and the draw covers only the pages of the tiles in view (a short list of them tells each instance where to read); through iteration 13 the draw ran over every page up to the highest, culling the pages out of view one instance at a time (911k instances drawn for 320k blades in view on High). 2.3–4.2 ms a frame less on High near the ground, 0.7–1.9 ms on Medium, nothing lost or gained from orbit; the same frames to the pixel in 24 views on all three tiers. Blades thinned out, and a page's empty slots, leave the shader before it reads the field maps. With the time saved Auto keeps High at a higher resolution on the live walk (0.86 of full, 0.65 before). |
+| 3 | Make the chunk-by-chunk load-in less distracting | Most of it is note 1: the meadow is built on the way, so on arrival there is little left to come in, and what is left arrives within a few frames instead of over a second or two ([flying in from orbit](docs/checkpoints/iteration-14/fly-in-from-orbit.jpg), [a jump](docs/checkpoints/iteration-14/jump-first-frames.jpg)). And after a jump the near meadow keeps its painted flowers until each tile's flowers are built: before, the paint gave way at once and the meadow around you was bare for about half a second ([the first frame](docs/checkpoints/iteration-14/first-frame-after-a-jump.jpg)). Plants still spawn at full size; nothing grows in. |
+
+Checkpoint images: [docs/checkpoints/iteration-14](docs/checkpoints/iteration-14/).
+
+### Before the work: the study
+
+Load-in after a jump, a glide and the way down from orbit, timed frame by
+frame against iterations 4 (67a2742) and 5 (b1209d0), on the M1 Pro and on a
+phone-like run (Chromium emulating an iPhone 15: Auto's phone path, a clock
+read in whole milliseconds as WebKit's is, the CPU slowed three times):
+
+- On a desktop, iteration 13 loaded the same grass faster than iteration 4
+  (Medium after a jump: 0.7 s against 2.0 s), except the first way down
+  from orbit (1.7–1.8 s against 1.2 s, the starved second). High, Auto's
+  tier since iteration 13, draws twice iteration 4's grass in 144 tiles.
+- On the phone-like run iteration 5 took twice iteration 4's time (90 % of
+  the grass in view after a jump: 2.4–3.1 s against 1.2 s) and iteration 13
+  up to three times (1.3–3.5 s; 6.2 s down from orbit), while moving worse.
+- A whole near field on High is 286 ms of JS (Medium 156, Low 59): a full-
+  density grass tile is 7,500 points, 1.3 ms.
+
+### Measured (iteration 14)
+
+The grass in view after each move (when half and 90 % of what will be there
+is drawn), and when the build queue empties, production builds, the M1 Pro
+at 2880×1800:
+
+| | Iteration 13 | Iteration 14 |
+|---|---|---|
+| Down from orbit (the default start), High | 1.6 / 1.9 s, empty 3.0 s | 0.15 / 0.4 s, empty 1.4–1.7 s |
+| Down from orbit, Medium | 1.5 / 1.6 s, empty 2.1 s | 0.08 / 0.22 s, empty 0.9–1.0 s |
+| Down from orbit again, High | 0.5 / 0.76 s | 0.16 / 0.42 s |
+| A jump, High | 0.78 / 1.1 s, empty 2.3 s | 0.2 / 0.3 s, empty 1.0 s |
+| A jump, Medium | 0.37 / 0.5 s | 0.15 / 0.2 s |
+| Phone-like, down from orbit | 4.6 / 6.2 s, empty 9.7 s | 0.09 / 0.09 s, empty 1.0 s |
+| Phone-like, down again | 2.2 / 3.2 s | 0.08 / 0.08 s |
+| Phone-like, a jump | 1.9 / 3.6 s, empty 7.3 s | 0.18 / 0.33 s, empty 1.25 s |
+
+(The queue empties later than the grass in view is drawn: the tiles out of
+view, then the ring beyond the edge, are built after it.)
+
+Moving (frames with a tile of the near field missing in view, the share of
+those tiles built on average, builds thrown away):
+
+| | Iteration 13 | Iteration 14 |
+|---|---|---|
+| Walking 8 s, High | 131 of 462 frames, 99.1 % | 0 of 477, 100 % |
+| Walking, Medium | 85 of 481, 99.4 % | 0 of 481, 100 % |
+| Walking, phone-like | 424 of 481, 81 % (worst 61 %), 214 of 347 builds thrown away | 0 of 481, 100 %, 1 |
+| A glide, High | 31 of 149, 99.5 % | 0 of 151, 100 % |
+| A glide, phone-like | 122 of 150, 67 % (worst 44 %), 96 of 127 thrown away | 0 of 150, 100 %, 1 |
+
+Frame time (frames back to back, best and median of eight rounds
+alternating the two builds; a warm machine, about 1 ms over a cool one's):
+
+| View | High, 13 → 14 | Medium, 13 → 14 |
+|---|---|---|
+| Orbit | 11.5 → 11.4 | 11.4 → 11.5 |
+| Bird's-eye (70 m) | 27.2 → 27.1 | 26.4 → 26.4 |
+| Standing (4.3 m) | 23.2 → 19.4 | 20.6 → 19.6 |
+| Meadow (1.6 m) | 19.7 → 17.3 | 16.1 → 15.4 |
+| Lakeside (1.6 m) | 15.9 → 12.6 | 11.7 → 10.6 |
+| Vista | 18.7 → 15.2 | 16.1 → 14.2 |
+| Cottage | 30.5 → 26.3 | 27.9 → 27.0 |
+
+The same Auto walk as iterations 11–13 (median frame time in ms / frames
+over 25 ms), two runs each:
+
+| | Load | Walk | Turn while walking | Strafe | Stand | Scale |
+|---|---|---|---|---|---|---|
+| Iteration 13 | 19.6 / 1–2 | 17.0–17.3 / 0 | 17.6–17.8 / 7–8 | 16.7–16.8 / 0 | 16.7–16.8 / 0 | 0.65 → 0.50 → 0.56 |
+| Iteration 14 | 18.2–18.3 / 1–2 | 17.0–17.1 / 0 | 17.3–17.4 / 16–19 | 17.2–17.4 / 0 | 16.7–16.8 / 0 | 0.86 → 0.68 |
+
+At one fixed resolution (scale 1, High) iteration 14 is the smoother in
+every phase: walking 21.0 ms median / 8–13 frames over 25 ms (24.3 / 105–118),
+turning 21.0–22.5 / 48–52 (24.4 / 61–72), strafing 25.7 / 97–101 (29.2 /
+131–135).
+
+- **Growth scrub:** frames hold 60 fps (p95 16.7–16.8 ms) in both builds;
+  the frame's own JS p95 2.3 ms (5.3–5.4): the builds run after it, up to
+  8.2 ms. The invariant now checks the frames (p95 under 20 ms), the frame's
+  JS (under 12.7 ms) and the slice (under 8.6 ms).
+- **Way down from orbit, its first 1.2 s:** 64–68 frames in both builds,
+  mean 17.6–18.6 ms; none over 34 ms (iteration 13 had one of 88–126 ms, the
+  first use of the near field's shaders and instances).
+- **GPU memory:** 252.7 MB in the meadow on High (250.8 before: the flower
+  pools' second texel, +1.9 MB).
+- **First frame:** 370–410 ms on High from orbit (370–390 before).
+- **Tests:** 68 CPU invariants (11 new on the build budget and queue),
+  browser invariants, 15 shots, all passing.
+
+### Trades (iteration 14)
+
+- **Tile builds take more of the main thread while catching up:** up to
+  8 ms after a frame on a desktop (6 on a phone), in a task of their own
+  while the GPU draws it, only while frames keep time (it was 3.6 ms inside
+  the frame, on desktops only).
+- **The way down from orbit draws the grass sooner,** so its heaviest
+  heights (about 5–20 m up, 22–30 ms a frame at full resolution) now draw
+  grass too: on Medium 3–7 more frames of 25–32 ms in its first 1.2 s.
+- **Auto spends the time the grass saves on resolution,** so the first turn
+  of a walk is heavier (16–19 frames over 25 ms, 7–8 before) until Auto
+  steps the scale down; at a fixed resolution every phase is smoother.
+- **Start-up from orbit** draws one frame in the meadow before the first
+  frame, so the near field's targets (about 20 MB) are allocated at once
+  rather than on the way down.
+
+### Known issues
+
+- **No real phone measured:** the phone-like runs emulate an iPhone's
+  budget rules and clock on a slowed M1 Pro. A real phone draws fewer frames
+  a second, so its times will be longer.
+- **The builds still run on the main thread.** Web Workers could take the
+  286 ms of a High near field off it entirely and build it in a few frames;
+  not done.
+- **Tiles still appear one at a time,** nearest first, now within 0.2–0.4 s
+  of arriving. Revealing all the tiles in view at once, or letting the near
+  field's ragged edge widen over them, could make it a single change: an
+  A/B for review.
+- Carried over: the distant grass finer than a pixel sparkles a little as
+  you move; the cottage's reflection without its rail, chair, bench or
+  window frames.
 
 ## Iteration 13: the review notes
 
@@ -947,7 +1070,7 @@ Every state lives in the URL hash, including the camera pose (`pose=`) and froze
 |---|---|
 | `npm run dev` | dev server on :5173 (add `#hud=1&t=12` etc. to the URL) |
 | `npm run check` | tsc (app and node) plus ESLint |
-| `npm test` | Vitest CPU invariants (50 tests) |
+| `npm test` | Vitest CPU invariants (68 tests) |
 | `npm run test:gpu` | Playwright browser invariants (determinism, parity, scrub, budgets) |
 | `npm run shots` | 15 screenshots into `/shots` (`MEADOW_GL=swiftshader` for the CPU rasterizer) |
 | `npm run squint` | the vista against `reference/howls-lake.webp` (kept out of git), shrunk and blurred: mean ΔE, and `shots/squint.png` |
