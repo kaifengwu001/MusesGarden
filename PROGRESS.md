@@ -28,7 +28,14 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
-## After iteration 14: specks on the blue flowers on 1× screens
+## Iteration 15: specks on the blue flowers on 1× screens
+
+Started from iteration 14 (89b493a). The fix below was made after iteration
+14 was published (2499967) and reached the latest page alone; Kai asked
+(2026-10-31) for it to be published as an iteration of its own, iteration
+14's page kept as it was. Iteration 15 is iteration 14 with this fix and
+nothing else: the rest is notes and `scripts/publish.sh latest`. Muse, being
+built in the same folder, is not in it.
 
 Kai's screen recording (2026-10-30) showed single black pixels, now and then
 a hot red or white one, flickering among the small blue flowers on some
@@ -59,6 +66,15 @@ were in the frame itself: the recording shows them wherever it is played.
 - **Test:** the invariant "under MSAA no pixel of the scene leaves the range
   of its colours" (`npm run test:gpu`) reads the scene target at DPR 1.
   Without the fix it fails (−6.2).
+
+### Checked (iteration 15)
+
+Built from a clean checkout of the published commit, so Muse's work in
+progress stays out.
+
+- **Tests:** `npm run check`, 68 CPU invariants, 12 browser invariants (the
+  speck guard among them) and 15 shots, all passing.
+- **Known issues:** as iteration 14's.
 
 ## Iteration 14: the review notes
 
