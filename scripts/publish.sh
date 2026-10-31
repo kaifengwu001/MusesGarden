@@ -3,14 +3,17 @@
 # Vercel project, muses-garden-iteration-N, whose production address
 # (https://muses-garden-iteration-N.vercel.app) is public (iterations 4 and 5,
 # published as Garden of Muse, are garden-of-muse-iteration-N). With --latest it
-# also becomes the latest at the main project's production address. Needs the
-# Vercel CLI, logged in to the scope that owns the projects.
+# also becomes the latest at the main project's production address; `latest`
+# in place of N publishes the latest alone (a fix between iterations, the
+# iteration pages left as they were). Needs the Vercel CLI, logged in to the
+# scope that owns the projects.
 #
 #   scripts/publish.sh 5 --latest       the current checkout as iteration 5
 #   scripts/publish.sh 4 HEAD~9         an older commit as iteration 4
+#   scripts/publish.sh latest           the current checkout as the latest only
 set -euo pipefail
 
-n="${1:?usage: scripts/publish.sh <iteration> [commit] [--latest]}"
+n="${1:?usage: scripts/publish.sh <iteration|latest> [commit] [--latest]}"
 shift
 commit=""
 latest=false
@@ -54,7 +57,11 @@ deploy() {
   done
   echo "${address:-$url}"
 }
-echo "iteration $n: $(deploy "muses-garden-iteration-$n")"
+if [ "$n" = latest ]; then
+  latest=true
+else
+  echo "iteration $n: $(deploy "muses-garden-iteration-$n")"
+fi
 if $latest; then
   echo "latest: $(deploy "$MAIN")"
 fi

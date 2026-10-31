@@ -20,10 +20,13 @@ next. Each iteration has its own page, kept for comparison (Versions).
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
-The latest is also at https://the-meadow-omega.vercel.app. Each iteration is
-its own Vercel project, so its production address is public and stays put.
-`scripts/publish.sh N --latest` publishes the checkout as iteration N and as
-the latest; `scripts/publish.sh N <commit>` publishes an older commit.
+The latest is also at https://the-meadow-omega.vercel.app. Since 2026-10-31
+it carries the fix after iteration 14 (2499967), which iteration 14's page
+does not. Each iteration is its own Vercel project, so its production address
+is public and stays put. `scripts/publish.sh N --latest` publishes the
+checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
+publishes an older commit; `scripts/publish.sh latest` publishes the checkout
+as the latest alone (a fix between iterations).
 
 ## After iteration 14: specks on the blue flowers on 1× screens
 
