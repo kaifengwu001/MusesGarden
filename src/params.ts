@@ -129,6 +129,10 @@ export const schema = {
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.88, 0, 1, 0.01, 'live'),
   },
+  muse: {
+    show: bool('mu', 'Show Muse', true, 'live'),
+    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'tripo', 'field'], 'tpose6', 'live'),
+  },
   light: {
     // one light for now (late morning); dawn and golden hour are kept in the palette for later
     timeOfDay: num('tod', 'Time of day', 11.5, 5.5, 19, 0.05, 'live', { unit: 'h', hidden: true }),

@@ -10,6 +10,8 @@ shots/
 
 # film stills for the squint test, kept out of git
 reference/howls-lake.webp
+# Muse's design references (renders and photos of the character), kept out of git
+reference/muse/
 
 # local probe scripts
 .*.mjs

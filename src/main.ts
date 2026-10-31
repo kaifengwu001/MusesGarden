@@ -368,6 +368,7 @@ async function boot(): Promise<void> {
       },
       settle: async () => {
         store.flush();
+        await world.muse.ready;
         world.settle();
         update();
         world.settle();
