@@ -38,7 +38,7 @@ function reflectNow(life: Life, at: number, p: ReflectionProposal): MuseEventBod
 function lived(): Life {
   const life = new Life();
   life.push(D1, { kind: 'soul.updated', version: 1, topics: topicsOf('Origami'), temperament: TEMPERAMENTS.hero });
-  life.push(D1, { kind: 'memory.updated', textHash: 'h1', topics: topicsOf(BI, 'Jazz') });
+  life.push(D1, { kind: 'memory.updated', textHash: 'h1', topics: topicsOf(BI, 'Jazz', IP) });
   const region = trip(life, D1, 1, BI, null);
   life.hop(D1 + 40 * MINUTE_MS, 1, 0, BI, region, [{ title: BI, score: 0.9, kept: true }]);
   const [pigment] = life.hop(D1 + 80 * MINUTE_MS, 1, 1, BI, region, [{ title: 'Pigment', score: 0.86, kept: true, topics: ['Pigment', IP] }]);
@@ -119,7 +119,7 @@ describe('the evidence-gated reducer', () => {
 
 describe('validateReflection', () => {
   const life = new Life();
-  life.push(D1, { kind: 'memory.updated', textHash: 'h', topics: topicsOf(BI) });
+  life.push(D1, { kind: 'memory.updated', textHash: 'h', topics: topicsOf(BI, IP) });
   const region = trip(life, D1, 1, BI, null);
   const [find] = life.hop(D1 + HOUR_MS, 1, 0, BI, region, [{ title: 'Pigment', score: 0.86, kept: true, topics: ['Pigment', IP] }]);
   const [other] = life.hop(D1 + 2 * HOUR_MS, 1, 1, 'Pigment', region, [{ title: 'Ultramarine', score: 0.9, kept: true, topics: ['Ultramarine', IP] }]);

@@ -27,6 +27,7 @@ import {
   FRONTIER_MIN_SCORE,
   KEEP_THRESHOLD,
   RECENT_WORK_WINDOW_MS,
+  CATEGORY_THEME_MIN_FINDS,
 } from './policy/constants';
 import { drawFor } from './rng';
 import { localDay } from './time';
@@ -242,8 +243,9 @@ function collect(s: MuseState, d: Discovery, amount: number): MuseState {
   const own = d.provenance === 'own';
   const interests = new Map(s.interests);
   const placed: TopicKey[] = [];
-  for (const t of d.topics) {
-    const i = interests.get(t) ?? newInterest(t, d.at, 'muse');
+  for (const [k, t] of d.topics.entries()) {
+    const i = interests.get(t) ?? themeOrTopic(s, d, t, k);
+    if (!i) continue;
     if (!i.region) placed.push(t);
     interests.set(t, {
       ...withSource(boost(i, amount, d.at), d.canonicalUrl),
@@ -260,6 +262,17 @@ function collect(s: MuseState, d: Discovery, amount: number): MuseState {
     experiencesSinceReflection: s.experiencesSinceReflection + (own ? 1 : 0),
   };
   return settle(next, d.place.region, placed, d.at);
+}
+
+/**
+ * A find's own topic becomes an interest at once. One of its categories becomes an interest only once it ties
+ * several finds together, a theme rather than a catalogue label, and then with all of those finds as sources.
+ */
+function themeOrTopic(s: MuseState, d: Discovery, t: TopicKey, k: number): Interest | null {
+  if (k === 0) return newInterest(t, d.at, 'muse');
+  const sharing = [...s.discoveries.values()].filter((x) => x.topics.includes(t));
+  if (sharing.length + 1 < CATEGORY_THEME_MIN_FINDS) return null;
+  return sharing.reduce((i, x) => withSource(i, x.canonicalUrl), newInterest(t, d.at, 'muse'));
 }
 
 /** The gift a hangout brought becomes a find of Muse's own, planted near home. */

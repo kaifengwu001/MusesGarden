@@ -53,12 +53,19 @@ describe('the hero chain: Botanical illustration → Pigment → Ultramarine', (
     }
   });
 
-  it('gives the topics it found a home in the same region, and counts a shared category twice', () => {
+  it('gives the topics it found a home in the same region', () => {
     expect(s.interests.get(topic('Pigment'))?.region).toBe(region);
     expect(s.interests.get(topic('Ultramarine'))?.region).toBe(region);
     expect(s.regions.get(region)).toEqual(expect.arrayContaining(topicsOf(BI, 'Pigment', 'Ultramarine')));
-    expect(s.interests.get(topic('Inorganic pigments'))?.sources).toEqual([wiki('Pigment'), wiki('Ultramarine')]);
     expect(s.collected.has(wiki('Ultramarine'))).toBe(true);
+  });
+
+  it('holds a category back until it ties three finds together, then counts all three', () => {
+    expect(s.interests.has(topic('Inorganic pigments'))).toBe(false);
+    const after = new Life();
+    for (const e of life.log) after.push(e.event.at, e.event);
+    after.hop(day + 3 * HOUR_MS, 2, 0, 'Pigment', region, [{ title: 'Cobalt blue', score: 0.9, kept: true, topics: ['Cobalt blue', 'Inorganic pigments'] }]);
+    expect(after.state.interests.get(topic('Inorganic pigments'))?.sources).toEqual([wiki('Pigment'), wiki('Ultramarine'), wiki('Cobalt blue')]);
   });
 
   it('remembers good pages it passed over as the frontier, and lifts them out once they get a region', () => {

@@ -135,3 +135,6 @@ export const SHELF_SIZE = 10;
 export const SHELF_KEEP = 0.5;
 export const SHELF_PULL = 0.5;
 export const SHELF_GIFT = 0.1;
+
+/** A Wikipedia category becomes an interest once this many of Muse's finds share it: a theme, not a label. */
+export const CATEGORY_THEME_MIN_FINDS = 3;
