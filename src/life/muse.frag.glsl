@@ -54,6 +54,7 @@ const vec3 EYE = vec3(0.008, 0.006, 0.007);
 const vec3 MOUTH = vec3(0.03, 0.016, 0.013);
 // the face's features (H): museBody.ts FEATURES
 const vec3 EYE_AT = vec3(0.0973, 0.7709, 0.0198);
+const float GLINT = 0.24; // the eyes' highlight's radius (× the eye's)
 const vec4 MOUTH_AT = vec4(0.004, 0.7228, 0.0285, 0.0106);
 const float MOUTH_WIDTH = 0.0045;
 const vec3 BLUSH_AT = vec3(0.106, 0.727, 0.036);
@@ -103,9 +104,16 @@ vec3 face(vec2 f, float eyes, float smile, out float dark) {
     vec2 c = vec2(float(s) * EYE_AT.x, EYE_AT.y);
     float open = max(eyes * (1.0 - 0.22 * smile), 0.1);
     vec2 d = (f - c) / vec2(EYE_AT.z, EYE_AT.z * open);
-    float inside = 1.0 - smoothstep(1.0 - aa / EYE_AT.z * 1.5, 1.0 + aa / EYE_AT.z * 1.5, length(d));
+    // its edge softened over a pixel; smaller than that, a dark dot a pixel or two across, paler the further off it is,
+    // not a smudge over the face (though darker than its size alone, so the eyes still read)
+    float soft = 0.75 * aa / EYE_AT.z;
+    float inside = (1.0 - smoothstep(1.0 - soft, 1.0 + soft, length(d))) / max(1.0, soft);
     vec3 eye = mix(EYE, vec3(0.05, 0.045, 0.05), smoothstep(0.2, 1.0, -d.y) * 0.6);
-    float shine = 1.0 - smoothstep(0.24, 0.24 + aa / EYE_AT.z * 2.0, length(d - vec2(0.34, 0.36)));
+    // the highlight, its edge softened over a pixel about its rim; further off, where it would be under a pixel
+    // or so, it goes (smeared over the whole eye, it turned the eyes to white dots): far off, the eyes are dark dots
+    float edge = 0.5 * aa / EYE_AT.z;
+    float shine = 1.0 - smoothstep(GLINT - edge, GLINT + edge, length(d - vec2(0.34, 0.36)));
+    shine *= smoothstep(0.8, 1.3, GLINT / edge);
     eye = mix(eye, vec3(0.92, 0.92, 0.95), shine * smoothstep(0.35, 0.7, eyes));
     col = mix(col, eye, inside);
     dark = max(dark, inside);

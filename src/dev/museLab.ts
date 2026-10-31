@@ -47,6 +47,7 @@ import { registerShaderChunks } from '../render/glsl';
 //                           how far each normal of the posed skin turns from its neighbours' (bumps, creases: red))
 //   wire=1 (the triangles over it)
 //   view=front|left|back|turn:<deg>|persp:<deg>   pose=idle|walk|wave|hang   t=<s>   gait=<cycles>   fur=0|1   bones=0|1
+//   size=<px> (Muse this many pixels tall, as if seen from further off)
 //   skin=lbs|dqs (the joints blended as matrices, as Muse is drawn, or as dual quaternions)   raise=0 (without the correctives)
 //   hang=<z>,<x>  wave=<z>,<fore>[,<x>,<y>] (other arm angles on the body's fit, rad)   reach=<H> (arms drawn longer)   comb=0 (the fur standing straight)
 //   live=1: Muse played over and over, the window filled, the camera on a turntable (drag to turn, wheel to come
@@ -79,8 +80,10 @@ if (!canvas) throw new Error('museLab.html is missing #lab');
 const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.outputColorSpace = SRGBColorSpace;
 renderer.setPixelRatio(live ? Math.min(devicePixelRatio, 2) : 1);
+// (size=<px>: Muse this many pixels tall, the frame scaled with it, as if seen from further off)
+const scale = params.has('size') ? Number(params.get('size')) / REF.tall : 1;
 if (live) renderer.setSize(innerWidth, innerHeight);
-else renderer.setSize(REF.width, REF.height, false);
+else renderer.setSize(Math.round(REF.width * scale), Math.round(REF.height * scale), false);
 renderer.setClearColor(new Color(1, 1, 1));
 registerShaderChunks();
 const scene = new Scene();
