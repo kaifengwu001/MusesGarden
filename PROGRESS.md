@@ -28,6 +28,35 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The garden's interfaces (in progress, alongside iteration 16)
+
+Started from 73de432, in the same folder as iteration 16's work on Muse
+(that session builds in the lab; this one adds files of its own and only
+hooks into main.ts). Kai's brief (2026-10-31), with the ideas doc (MG1, the
+brainstorm with Tracy) and the backend plan as references. Two corrections
+to the backend plan: what grows on the planet is only what Muse chose to
+keep or gave you in a basket; and finds are not only Instagram reels, but
+posts, news articles and the like too.
+
+The look: the clean, elegant interface the meadow already has; the post
+box, the postcards and the invitations very skeuomorphic (拟物), physical
+models even; in the meadow's painted style, with Travel Frog as the main
+reference. Placeholders for the media and posts, used over and over, and
+for Muse's postcards screenshots taken in the world of two Muses, one
+waving. This table fills in as each is done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Finds (reels, posts, news articles) in cards above their flower patches. Planted: a small patch blossoms from its centre, then the card pops up | |
+| 2 | Browsing: tap a plant or a bed and a line rises, the card pops up; swipe left or right (or the arrow buttons) to the next find, flying round the world; a like button; an example gallery; the hook a backend fills (placeholders for now) | |
+| 3 | Pins in the world: liked finds and Muse; toggle them on and off; only in orbit and in view (no off-screen pins) | |
+| 4 | Postcards, after Travel Frog: the card's design; an on-screen post box (preferred to Muse's hut for now): tap it, it pops open, a stack of cards, a gallery; one card flies forward to like or put away; a new card on login raises the box's flag, with a notification | |
+| 5 | Invitations to other worlds, in the postcard system with a special notification; a button near the post box to travel | |
+| 6 | A button to go to Muse's house, showing when Muse is not home | |
+| 7 | Baskets: the history as a timeline; tap one to go to its place on the planet | |
+| 8 | A button to find Muse and jump to it | |
+| 9 | Muse's page: its interests (with sharing and privacy), its friends, tagged when a friend's human is a friend of yours on Instagram or Facebook | |
+
 ## Iteration 16: Muse's interactions (in progress)
 
 Started from iteration 15 (74926b7). Since then Muse has come to the meadow
