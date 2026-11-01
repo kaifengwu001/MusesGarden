@@ -1851,6 +1851,30 @@ body.garden-on .hud {
 
 .g-pc.is-focus {
   --w: min(780px, 88vw, calc((100vh - 230px) * 1.5));
+  touch-action: none;
+}
+
+/* a card deep in a pile lies hidden under the last one that shows */
+.g-pc.is-buried {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* the card up close follows the finger, then is thrown off or springs back */
+.g-pc.is-dragging {
+  cursor: grabbing;
+  transition:
+    opacity 0.35s ease,
+    width 0.5s cubic-bezier(0.2, 1, 0.3, 1),
+    margin 0.5s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.g-pc.is-thrown {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.4s cubic-bezier(0.25, 0.6, 0.4, 1),
+    opacity 0.25s ease 0.15s;
 }
 
 .g-pc.is-away {
@@ -2106,6 +2130,13 @@ body.garden-on .hud {
 .g-env.is-open .g-env-pocket,
 .g-env.is-open .g-env-body::before {
   animation: g-env-away 1.5s ease 0.3s both;
+}
+
+/* gone from sight, the envelope's front, flap and seal still lie over the card: clicks pass through them */
+.g-env.is-open .g-env-pocket,
+.g-env.is-open .g-env-flap,
+.g-env.is-open .g-env-seal {
+  pointer-events: none;
 }
 
 @keyframes g-env-away {
