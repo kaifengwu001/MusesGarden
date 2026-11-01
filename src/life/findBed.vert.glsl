@@ -26,7 +26,7 @@ attribute float aT;    // along the stem 0..1; 1 on the head
 attribute vec4 aPlace; // the plant's direction (unit), its ground's height over R (m)
 attribute vec4 aLook;  // seed in [0, 1), size factor, colour variant, bed index
 attribute float aDelay; // s after its bed is planted before this plant starts to rise (its distance from the bed's middle)
-uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, -, -
+uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, pulsed at (s; findForms.ts), -
 uniform float uPlantClock;
 uniform int uSpecies;
 uniform vec4 uBedLook; // stem top (m), nod, -, -

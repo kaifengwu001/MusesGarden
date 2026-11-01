@@ -1,4 +1,5 @@
-import { DoubleSide, InstancedBufferAttribute, Mesh, ShaderMaterial, Vector3, Vector4, type InstancedBufferGeometry, type IUniform } from 'three';
+import { DoubleSide, InstancedBufferAttribute, Mesh, ShaderMaterial, Vector3, Vector4, type BufferGeometry, type InstancedBufferGeometry, type IUniform } from 'three';
+import { gpuMemory } from '../core/gpuMemory';
 import { hash32, unit } from '../core/hash';
 import { BED_RADIUS, type Bed } from '../garden/placement';
 import { travel, tangentToward } from '../planet/geo';
@@ -22,6 +23,8 @@ const PLANTS = 58;
 const SPECIES_SIZE = [1.0, 1.12, 1.45, 1.4] as const;
 const COMPANIONS = 0.16;
 const SIZE = [1.25, 1.65] as const;
+/** The bed's middle is left to the find's specimen (findForms.ts): no flower within this (m). */
+const HOLE = 0.25;
 /** Beds a draw can address (MAX_BEDS in the shader). */
 export const MAX_BEDS = 64;
 /** A bed planted long ago: fully grown. A bed not planted yet: hidden. */
@@ -41,6 +44,12 @@ function rand(seed: number): () => number {
   return () => unit((s = hash32((s + 0x9e3779b9) >>> 0)));
 }
 
+/** Bytes a geometry holds on the GPU: every attribute and the index. */
+export function geometryBytes(g: BufferGeometry): number {
+  const index = g.getIndex()?.array.byteLength ?? 0;
+  return Object.values(g.attributes).reduce((sum, a) => sum + a.array.byteLength, index);
+}
+
 function idSeed(id: string): number {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
@@ -49,10 +58,14 @@ function idSeed(id: string): number {
 
 export class FindBeds {
   readonly meshes: Array<Mesh<InstancedBufferGeometry, ShaderMaterial>> = [];
-  /** Per bed: planted at (s on the plant clock), highlight; shared by the four draws. */
-  private readonly beds = Array.from({ length: MAX_BEDS }, () => new Vector4(LONG_AGO, 0, 0, 0));
+  /** Per bed: planted at (s on the plant clock), highlight, pulsed at (s), -; shared by the four draws and the finds' specimens (findForms.ts). */
+  private readonly beds = Array.from({ length: MAX_BEDS }, () => new Vector4(LONG_AGO, 0, LONG_AGO, 0));
   private readonly clock = { value: 0 };
+  /** The beds' timeline, for other draws that plant and light up with them. */
+  readonly uniforms: { readonly uBeds: IUniform<Vector4[]>; readonly uPlantClock: IUniform<number> } = { uBeds: { value: this.beds }, uPlantClock: this.clock };
   private readonly index = new Map<string, number>();
+  /** The find each bed was last laid out for: a bed handed to another find starts its timeline again. */
+  private readonly holder: Array<string | null> = Array.from({ length: MAX_BEDS }, () => null);
   private highlighted = -1;
   private readonly start = performance.now();
 
@@ -66,8 +79,7 @@ export class FindBeds {
         fragmentShader,
         uniforms: {
           ...shared,
-          uBeds: { value: this.beds },
-          uPlantClock: this.clock,
+          ...this.uniforms,
           uSpecies: { value: species },
           uBedLook: { value: new Vector4(HEADS[species][0], HEADS[species][1], 0, 0) },
         },
@@ -95,15 +107,20 @@ export class FindBeds {
     looks.slice(0, MAX_BEDS).forEach((entry, b) => {
       const { bed } = entry;
       this.index.set(bed.find, b);
+      if (this.holder[b] !== bed.find) {
+        this.holder[b] = bed.find;
+        this.beds[b].x = LONG_AGO;
+        this.beds[b].z = LONG_AGO;
+      }
       if (hidden.has(bed.find)) this.beds[b].x = NOT_YET;
       else if (this.beds[b].x === NOT_YET) this.beds[b].x = LONG_AGO;
       const r = rand(idSeed(bed.find));
       const north = tangentToward(bed.dir, new Vector3(0, 1, 0), new Vector3());
       const east = new Vector3().crossVectors(bed.dir, north);
       for (let k = 0; k < PLANTS; k++) {
-        // denser in the middle; companions toward the rim
+        // denser in the middle, round the find's own specimen; companions toward the rim
         const companion = r() < COMPANIONS;
-        const reach = BED_RADIUS * Math.pow(r(), companion ? 0.45 : 0.7);
+        const reach = HOLE + (BED_RADIUS - HOLE) * Math.pow(r(), companion ? 0.45 : 0.7);
         const a = r() * Math.PI * 2;
         t.copy(north).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
         travel(bed.dir, t, reach / radius, p);
@@ -136,6 +153,21 @@ export class FindBeds {
       }
       g.instanceCount = count;
     });
+    gpuMemory.set('find beds', this.meshes.reduce((sum, mesh) => sum + geometryBytes(mesh.geometry), 0));
+  }
+
+  /** The bed a find is drawn in (the newest MAX_BEDS finds), if any. */
+  slot(find: string): number | undefined {
+    return this.index.get(find);
+  }
+
+  /** These beds' finds pulse once, from now. */
+  pulse(finds: readonly string[]): void {
+    const now = this.now;
+    for (const id of finds) {
+      const b = this.index.get(id);
+      if (b !== undefined) this.beds[b].z = now;
+    }
   }
 
   /** Plant beds now, one after another `gap` s apart (the order given): each blossoms from its middle out. Returns when the last is done (s). */
