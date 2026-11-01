@@ -436,15 +436,15 @@ interface BloomStyle {
 
 const BLOOMS: readonly BloomStyle[] = [
   // goblet: a few broad petals in a deep cup
-  { petals: [4, 6], outline: 'round', overlap: [1.2, 1.4], cup: [0.85, 1.1], curl: [0.1, 0.3], spoon: 0.3, head: [0.12, 0.16], disc: [0.16, 0.2], dome: [0.4, 0.7], nod: [0, 0.25] },
+  { petals: [4, 6], outline: 'round', overlap: [1.2, 1.4], cup: [0.85, 1.1], curl: [0.1, 0.3], spoon: 0.3, head: [0.13, 0.17], disc: [0.16, 0.2], dome: [0.4, 0.7], nod: [0, 0.25] },
   // star: flat pointed petals
-  { petals: [5, 8], outline: 'pointed', overlap: [0.6, 0.8], cup: [0.1, 0.3], curl: [-0.3, 0], spoon: 0.15, head: [0.14, 0.19], disc: [0.12, 0.16], dome: [0.4, 0.8], nod: [0.1, 0.45] },
+  { petals: [5, 8], outline: 'pointed', overlap: [0.6, 0.8], cup: [0.1, 0.3], curl: [-0.3, 0], spoon: 0.15, head: [0.16, 0.2], disc: [0.12, 0.16], dome: [0.4, 0.8], nod: [0.1, 0.45] },
   // ray: many strap petals round a broad boss
-  { petals: [7, 9], outline: 'notched', overlap: [0.7, 0.9], cup: [0.05, 0.2], curl: [-0.2, 0.05], spoon: 0.12, head: [0.15, 0.2], disc: [0.22, 0.3], dome: [0.5, 0.8], nod: [0.15, 0.5] },
+  { petals: [7, 9], outline: 'notched', overlap: [0.7, 0.9], cup: [0.05, 0.2], curl: [-0.2, 0.05], spoon: 0.12, head: [0.17, 0.2], disc: [0.22, 0.3], dome: [0.5, 0.8], nod: [0.15, 0.5] },
   // cone: swept-back petals under a tall cone
-  { petals: [6, 9], outline: 'pointed', overlap: [0.6, 0.8], cup: [-0.3, -0.05], curl: [-0.6, -0.3], spoon: 0.15, head: [0.13, 0.18], disc: [0.22, 0.28], dome: [0.9, 1.3], nod: [0.1, 0.4] },
+  { petals: [6, 9], outline: 'pointed', overlap: [0.6, 0.8], cup: [-0.3, -0.05], curl: [-0.6, -0.3], spoon: 0.15, head: [0.15, 0.19], disc: [0.22, 0.28], dome: [0.9, 1.3], nod: [0.1, 0.4] },
   // saucer: round overlapping petals in a shallow bowl
-  { petals: [5, 6], outline: 'round', overlap: [1.05, 1.25], cup: [0.3, 0.55], curl: [0, 0.25], spoon: 0.25, head: [0.15, 0.2], disc: [0.14, 0.2], dome: [0.3, 0.6], nod: [0.05, 0.35] },
+  { petals: [5, 6], outline: 'round', overlap: [1.05, 1.25], cup: [0.3, 0.55], curl: [0, 0.25], spoon: 0.25, head: [0.17, 0.2], disc: [0.14, 0.2], dome: [0.3, 0.6], nod: [0.05, 0.35] },
 ];
 
 function bloom(p: Piece, f: Form, kin: Dice, me: Dice): void {
@@ -460,11 +460,15 @@ function bloom(p: Piece, f: Form, kin: Dice, me: Dice): void {
   const nod = Math.max(0, kin.span(style.nod) + me.wobble(0.1));
   const leaves = kin.count([1, 2]);
   const leaf = { length: kin.span([0.17, 0.24]), width: kin.span([0.1, 0.15]), rise: kin.span([0.45, 0.85]), droop: kin.span([0.6, 1.1]), side: kin.next() * TAU };
-  // a petal's share of the ring where it is widest sets its width, whatever the count and the cup
-  const widest = curve([disc * 0.5, 0, 0], X, UP, length, (s) => cup + curl * s)(0.6).p[0];
-  const width = (overlap * Math.PI * widest) / petals;
+  // a petal in the head's frame: out from the axis along x, up it along y
+  const petal = curve([disc * 0.5, 0, 0], X, UP, length, (s) => cup + curl * s);
+  // its share of the ring where it is widest sets its width, whatever the count and the cup
+  const width = (overlap * Math.PI * petal(0.6).p[0]) / petals;
+  // the stem stops short by what the tilted head rises above it, so the find stands at its height
+  const tip = petal(1).p;
+  const above = Math.max(0.006 + dome, tip[1] * Math.cos(nod) + tip[0] * Math.sin(nod));
 
-  const stem = rising([0, 0, 0], UP, X, f.height - 0.02, (s) => nod * 0.55 * s * s);
+  const stem = rising([0, 0, 0], UP, X, f.height - above, (s) => nod * 0.55 * s * s);
   tube(p, stem, [[0, 0.0075], [0.45, 0.0065], [0.93, 0.0055], [1, 0.0095]], 3, PART.stem, (s) => s);
 
   for (let j = 0; j < leaves; j++) {
@@ -612,11 +616,11 @@ interface FernStyle {
 
 const FERNS: readonly FernStyle[] = [
   // shuttlecock: an upright vase of narrow fronds
-  { fronds: [5, 7], rise: [1.42, 1.5], droop: [0.8, 1.1], bend: 2, leaflets: 8, leaflet: [0.15, 0.18] },
+  { fronds: [5, 7], rise: [1.42, 1.5], droop: [0.8, 1.1], bend: 2, leaflets: 8, leaflet: [0.12, 0.15] },
   // arching: fronds spreading, tips bowing down
-  { fronds: [5, 7], rise: [1.38, 1.46], droop: [2.3, 2.8], bend: 3, leaflets: 8, leaflet: [0.14, 0.17] },
+  { fronds: [5, 7], rise: [1.4, 1.48], droop: [2, 2.4], bend: 3, leaflets: 8, leaflet: [0.11, 0.14] },
   // broad: a few wide fronds held up like hands
-  { fronds: [4, 5], rise: [1.3, 1.4], droop: [1.4, 1.7], bend: 2.5, leaflets: 7, leaflet: [0.17, 0.2] },
+  { fronds: [4, 5], rise: [1.35, 1.45], droop: [1.2, 1.5], bend: 2.5, leaflets: 7, leaflet: [0.14, 0.17] },
 ];
 
 /**
@@ -640,27 +644,34 @@ function frond(p: Piece, path: Path, leaflets: number, leaflet: number, part: Pa
   }
 }
 
+/** The highest point of a path of unit length that sets out level and rises by angle(s). */
+function crown(angle: (s: number) => number): number {
+  const path = curve([0, 0, 0], X, UP, 1, angle);
+  return Math.max(...Array.from({ length: 13 }, (_, i) => path(i / 12).p[1]));
+}
+
+/** A fiddlehead: straight up, then coiled tighter and tighter at the top. */
+const coil = (s: number): number => 1.45 - 6 * Math.max(0, (s - 0.72) / 0.28) ** 1.5;
+
 function fern(p: Piece, f: Form, kin: Dice, me: Dice): void {
   const style = kin.pick(FERNS);
   const fronds = kin.count(style.fronds);
   const rise = kin.span(style.rise);
   const droop = kin.span(style.droop);
   const leaflet = kin.span(style.leaflet);
-  // the frond length that brings the tallest one's crown to the find's height
-  const shape = curve([0, 0, 0], X, UP, 1, (s) => rise - droop * s ** style.bend);
-  const crown = Math.max(...Array.from({ length: 13 }, (_, i) => shape(i / 12).p[1]));
-  const full = f.height / crown;
+  // the frond length that brings a crown to the find's height; fiddleheads stand two thirds as tall, above the grass
+  const full = f.open ? f.height / crown((s) => rise - droop * s ** style.bend) : (0.65 * f.height) / crown(coil);
 
   const spin = me.next() * TAU;
   for (let j = 0; j < fronds; j++) {
     const d = heading(spin + ((j + me.wobble(0.25)) / fronds) * TAU);
-    const len = full * (1 - 0.18 * me.next());
+    // the first frond stands full height, the rest a little shorter
+    const len = full * (j === 0 ? 1 : 1 - 0.18 * me.next());
     const up = rise + me.wobble(0.08);
     const bow = droop + me.wobble(0.15);
     const t = (s: number): number => (s * len) / f.height;
     if (f.open) frond(p, curve(mul(d, 0.015), d, UP, len, (s) => up - bow * s ** style.bend), style.leaflets, leaflet * len, PART.petal, t);
-    // a fiddlehead: straight up, then coiled tighter and tighter
-    else frond(p, curve(mul(d, 0.015), d, UP, len * 0.42, (s) => 1.35 - 6 * Math.max(0, (s - 0.3) / 0.7) ** 1.5), style.leaflets, leaflet * len * 0.2, PART.bud, t);
+    else frond(p, curve(mul(d, 0.015), d, UP, len, coil), style.leaflets, leaflet * len * 0.2, PART.bud, t);
   }
 }
 

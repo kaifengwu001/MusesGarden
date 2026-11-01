@@ -160,7 +160,7 @@ describe('buildMesh', () => {
       for (let v = 0; v < vertices(m); v++) [low, high] = [Math.min(low, m.position[v * 3 + 1]), Math.max(high, m.position[v * 3 + 1])];
       expect(low).toBeGreaterThanOrEqual(-0.05);
       // closed buds and fiddleheads stand lower than they will
-      if (f.open || f.family === 'stone') expect(Math.abs(high - f.height) / f.height).toBeLessThan(0.12);
+      if (f.open || f.family === 'stone') expect(Math.abs(high - f.height) / f.height).toBeLessThan(0.1);
     }
   });
 
