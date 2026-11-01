@@ -30,13 +30,8 @@ export const SOCIAL = {
   inviteRapportBase: 1,
   inviteRapportSpan: 2,
   inviteCooldownMs: 14 * DAY,
-  windowMs: 2 * HOUR,
-  windowLeadMs: 2 * HOUR,
-  windowSearchMs: 3 * DAY,
-  windowStepMs: 15 * MINUTE,
-  windowDayStart: 9 * 60,
-  windowDayEnd: 21 * 60,
-  hostAnswerBeforeStartMs: HOUR,
+  /** The guest's visit view stays readable this long after they use the invitation, so a reload still works. */
+  visitViewMs: 2 * HOUR,
 
   weightFloor: 0.2,
   weightAffinity: 0.5,

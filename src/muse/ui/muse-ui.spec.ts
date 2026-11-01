@@ -145,20 +145,18 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await shot(page, '05-mailbox-photos');
   });
 
-  await test.step('mailbox: invitations answer per their actions, no Visit before the window', async () => {
+  await test.step('mailbox: the host may withdraw its invitation; no Visit before the guest uses theirs', async () => {
     await mailbox.getByRole('tab', { name: 'Invitations' }).click();
     const letters = mailbox.locator('.mu-letter');
     await expect(letters).toHaveCount(2);
-    await expect(dock.locator('.mu-badge')).toHaveText('2');
     const wren = letters.filter({ hasText: 'Wren invites you over' });
-    const juniper = letters.filter({ hasText: 'Moss would like to invite Juniper’s human' });
-    await expect(wren.getByRole('button')).toHaveText(['Accept', 'Decline']);
-    await expect(juniper.getByRole('button')).toHaveText(['Approve', 'Decline']);
+    const juniper = letters.filter({ hasText: 'Moss invited Juniper’s human' });
+    await expect(wren.getByRole('button')).toHaveCount(0);
+    await expect(juniper.getByRole('button')).toHaveText(['Withdraw']);
     await expect(mailbox.getByRole('button', { name: 'Visit' })).toHaveCount(0);
     await shot(page, '06-mailbox-invitations');
-    await wren.getByRole('button', { name: 'Accept' }).click();
-    await expect(wren).toContainText('Accepted. Come by during the window if you like.');
-    await expect(dock.locator('.mu-badge')).toHaveText('1');
+    await juniper.getByRole('button', { name: 'Withdraw' }).click();
+    await expect(juniper).toContainText('Withdrawn.');
     await page.keyboard.press('Escape');
     await expect(mailbox).toBeHidden();
   });
@@ -201,7 +199,7 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await expect(status.locator('.mu-label')).toHaveText('Exploring: Pigment → Ultramarine');
   });
 
-  await test.step('visit: inside the window, the host planet with its public finds; out when it closes', async () => {
+  await test.step('visit: for 2 h after the invitation was used, the host planet with its public finds; out after', async () => {
     const hours = dev.getByLabel('Hours to advance');
     await hours.fill('24');
     await dev.getByRole('button', { name: 'Advance' }).click();

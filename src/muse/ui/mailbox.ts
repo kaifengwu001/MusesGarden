@@ -1,5 +1,5 @@
 import type { BasketId, BasketView, InvitationCard, MuseId, PhotoId, PhotoSubject, PhotoView, PlantCard } from '../contract';
-import type { Answer, MuseApi } from './api';
+import type { MuseApi } from './api';
 import { arrowNav, button, day, el, outLink, thumb, time } from './dom';
 import { photoHash } from './pose';
 
@@ -10,7 +10,6 @@ const TABS: readonly (readonly [Tab, string])[] = [
   ['letters', 'Invitations'],
 ];
 
-const ANSWER_LABEL: Record<Answer, string> = { approve: 'Approve', accept: 'Accept', decline: 'Decline' };
 
 /** A find from a basket: why Muse kept it, then what it is. The card opens the page; its button finds the object on the planet. */
 function findCard(card: PlantCard, showOnPlanet: (card: PlantCard) => void): HTMLElement {
@@ -195,20 +194,19 @@ export class Mailbox {
   private letter(c: InvitationCard): HTMLElement {
     const card = el('article', 'mu-letter');
     card.dataset.state = c.state;
-    const title =
-      c.role === 'guest' ? `${c.otherName} invites you over` : c.state === 'proposed' ? `${this.museName()} would like to invite ${c.otherName}’s human` : `An invitation to ${c.otherName}’s human`;
-    const when = `${day(c.window.start)}, ${time(c.window.start)} to ${time(c.window.end)}`;
+    const title = c.role === 'guest' ? `${c.otherName} invites you over` : `${this.museName()} invited ${c.otherName}’s human`;
+    const when = `Sent ${day(c.sentAt)}, ${time(c.sentAt)}`;
     card.append(el('h3', 'mu-title', title), el('p', 'mu-caption', when), el('p', 'mu-state', stateLine(c)));
     const actions = el('div', 'mu-actions');
-    for (const a of c.actions) actions.append(button(ANSWER_LABEL[a], a === 'decline' ? 'mu-btn' : 'mu-btn mu-primary', () => void this.answer(c, a, card)));
+    if (c.actions.includes('withdraw')) actions.append(button('Withdraw', 'mu-btn', () => void this.withdraw(c, card)));
     if (c.canVisitNow) actions.append(button('Visit', 'mu-btn mu-primary', () => this.visit(c)));
     if (actions.childElementCount) card.append(actions);
     return card;
   }
 
-  private async answer(c: InvitationCard, action: Answer, card: HTMLElement): Promise<void> {
+  private async withdraw(c: InvitationCard, card: HTMLElement): Promise<void> {
     for (const b of card.querySelectorAll('button')) b.disabled = true;
-    const r = await this.api.answer(c.id, action);
+    const r = await this.api.withdraw(c.id);
     if (!r.ok) card.append(el('p', 'mu-error', r.error));
     this.changed();
   }
@@ -216,19 +214,11 @@ export class Mailbox {
 
 function stateLine(c: InvitationCard): string {
   switch (c.state) {
-    case 'proposed':
-      return 'Send it?';
     case 'sent':
-      return c.role === 'guest' ? 'Will you come?' : 'Sent. Waiting for an answer.';
-    case 'accepted':
-      return 'Accepted. Come by during the window if you like.';
-    case 'open':
-      return c.role === 'guest' ? 'The door is open now.' : 'The window is open.';
-    case 'closed':
-      return 'The window has closed.';
-    case 'declined':
-      return 'Declined.';
-    case 'expired':
-      return 'Expired without an answer.';
+      return c.role === 'guest' ? 'Good for one visit, whenever you like.' : 'Sent. It stays good until it is used.';
+    case 'used':
+      return 'Used.';
+    case 'withdrawn':
+      return 'Withdrawn.';
   }
 }

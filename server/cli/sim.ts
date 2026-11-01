@@ -1,4 +1,4 @@
-// npm run sim -- --hours 504 --work server/fixtures/work-3weeks.json --owners auto-accept [--db garden.db] [--mind meta] [--seed 7]
+// npm run sim -- --hours 504 --work server/fixtures/work-3weeks.json [--db garden.db] [--mind meta] [--seed 7]
 // Simulates the cast on the real engine, prints what each Muse did, and checks the plan's promises against the logs.
 import { parseArgs } from 'node:util';
 import type { Instant, MuseId, MuseState } from '../../src/muse/contract';
@@ -14,7 +14,6 @@ const { values } = parseArgs({
     hours: { type: 'string', default: '504' },
     cast: { type: 'string', default: 'server/fixtures/cast.json' },
     work: { type: 'string', default: 'server/fixtures/work-3weeks.json' },
-    owners: { type: 'string', default: 'auto-accept' },
     db: { type: 'string' },
     mind: { type: 'string', default: 'heuristic' },
     start: { type: 'string', default: '2026-11-01T13:00:00Z' },
@@ -25,7 +24,6 @@ const { values } = parseArgs({
 
 const hours = Number(values.hours);
 const start = Date.parse(values.start) as Instant;
-const owners = values.owners === 'auto-decline' ? 'auto-decline' : 'auto-accept';
 const cast = loadCast(values.cast);
 const hero = cast.members.find((m) => m.role === 'hero')?.id ?? null;
 const garden = buildGarden({
@@ -38,7 +36,7 @@ const garden = buildGarden({
   roles: new Map(cast.members.map((m) => [m.id, m.role])),
   seed: Number(values.seed),
 });
-const opts = { cast: values.cast, work: values.work === 'none' ? null : values.work, start, hours, owners } as const;
+const opts = { cast: values.cast, work: values.work === 'none' ? null : values.work, start, hours } as const;
 
 const t0 = performance.now();
 if (garden.engine.museIds().length === 0) await seedCast(garden.engine, lifePolicy, opts);

@@ -15,7 +15,7 @@ export const ROUTES = {
   hidden: { method: 'POST', pattern: '/api/muses/:id/settings/hidden' },
   introduce: { method: 'POST', pattern: '/api/muses/:id/settings/introductions' },
   unshare: { method: 'POST', pattern: '/api/muses/:id/settings/unshare' },
-  answer: { method: 'POST', pattern: '/api/invitations/:id/:action' },
+  withdraw: { method: 'POST', pattern: '/api/invitations/:id/withdraw' },
   visit: { method: 'GET', pattern: '/api/visits/:id/world' },
   hostWork: { method: 'POST', pattern: '/api/host/:id/work' },
   hostSoul: { method: 'POST', pattern: '/api/host/:id/soul' },

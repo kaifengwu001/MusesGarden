@@ -307,13 +307,7 @@ export type EpisodePlan =
   | { readonly activity: 'rest'; readonly until: Instant }
   | { readonly activity: 'travel'; readonly trip: TripStart }
   | { readonly activity: 'beyond'; readonly until: Instant }
-  | {
-      readonly activity: 'visit';
-      readonly other: MuseId;
-      readonly role: 'host' | 'guest';
-      readonly until: Instant;
-      readonly invitation?: InvitationId;
-    };
+  | { readonly activity: 'visit'; readonly other: MuseId; readonly role: 'host' | 'guest'; readonly until: Instant };
 
 export interface Verdict {
   readonly canonicalUrl: CanonicalUrl;
@@ -324,7 +318,8 @@ export interface Verdict {
   readonly kept: boolean;
 }
 
-export type InvitationState = 'proposed' | 'sent' | 'accepted' | 'open' | 'closed' | 'declined' | 'expired';
+/** Sent straight to the guest's owner. It never expires: the owner uses it once, or the host's owner withdraws it. */
+export type InvitationState = 'sent' | 'used' | 'withdrawn';
 export type RelationshipStatus = 'acquainted' | 'friends' | 'ended';
 export type RelationshipOrigin = 'introduced' | 'met-beyond' | 'known-on';
 /** What the owner liked in the garden. */
@@ -389,15 +384,7 @@ export type MuseEventBody =
       readonly origin: RelationshipOrigin;
       readonly reason?: 'drifted-apart' | 'owner-unshared';
     }
-  | {
-      readonly kind: 'invitation';
-      readonly id: InvitationId;
-      readonly host: MuseId;
-      readonly guest: MuseId;
-      readonly to: InvitationState;
-      readonly window: Window;
-      readonly visited?: boolean;
-    };
+  | { readonly kind: 'invitation'; readonly id: InvitationId; readonly host: MuseId; readonly guest: MuseId; readonly to: InvitationState };
 
 export type MuseEvent = MuseEventBody & { readonly at: Instant };
 
@@ -476,9 +463,9 @@ export interface Invitation {
   readonly host: MuseId;
   readonly guest: MuseId;
   readonly state: InvitationState;
-  readonly window: Window;
-  readonly proposedAt: Instant;
-  readonly visited: boolean;
+  readonly sentAt: Instant;
+  /** When the guest's owner travelled; null until then. */
+  readonly usedAt: Instant | null;
 }
 
 export interface SocialState {
@@ -588,18 +575,20 @@ export interface SocialPolicy {
   encounterRate(a: MuseState, b: MuseState): number;
   /** a met b beyond at `now`. */
   encounter(a: MuseState, b: MuseState, now: Instant, draw: Draw): PairOutcome;
-  /** A hangout ends: gifts, the photo together, rapport, maybe an ending or an invitation proposal. */
+  /** A hangout ends: gifts, the photo together, rapport, maybe an ending or an invitation. */
   hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] };
-  /** An owner's answer, or a deadline or window edge. Returns the transition events for both logs, or an error. */
+  /**
+   * The guest's owner uses the invitation ("Travel now"), or the host's owner withdraws it. The event goes to both
+   * logs; null means nothing changes (using it again inside the visit, withdrawing it twice).
+   */
   invitationStep(
     inv: Invitation,
-    action: 'approve' | 'decline-send' | 'accept' | 'decline' | 'deadline' | 'window-start' | 'window-end' | 'visited',
+    action: 'use' | 'withdraw',
+    as: MuseId,
     now: Instant,
-  ): { readonly ok: true; readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] } | { readonly ok: false; readonly error: string };
-  /** The instants the engine must schedule for this invitation's deadlines and window edges. */
-  invitationTimers(inv: Invitation): readonly { readonly at: Instant; readonly action: 'deadline' | 'window-start' | 'window-end' }[];
-  /** True only for the invited owner, while the invitation is open and inside its window. */
-  canVisit(inv: Invitation | undefined, requester: MuseId, now: Instant): boolean;
+  ): { readonly ok: true; readonly event: MuseEventBody | null } | { readonly ok: false; readonly status: 403 | 409; readonly error: string };
+  /** When `requester`'s visit to the host's planet stops being readable: 2 h after the guest used it. Null for anyone else, or before use. */
+  visitUntil(inv: Invitation | undefined, requester: MuseId): Instant | null;
   /** Photo slots left on today's delivery day. Every hangout brings a photo, so none starts without a slot. */
   photoSlotsLeft(s: MuseState, now: Instant): number;
   /** The only view of a Muse that crosses to other Muses or owners. */
@@ -623,8 +612,7 @@ export type ScheduleKind =
   | 'trip.hop'
   | 'host.work'
   | 'basket.check'
-  | 'encounter'
-  | 'invitation.timer';
+  | 'encounter';
 
 export interface ScheduleItem {
   /** Deterministic: the same follow-up from the same cause always gets the same id. */
@@ -768,8 +756,11 @@ export interface InvitationCard {
   readonly role: 'host' | 'guest';
   readonly otherName: string;
   readonly state: InvitationState;
-  readonly window: Window;
-  readonly actions: readonly ('approve' | 'decline' | 'accept')[];
+  readonly sentAt: Instant;
+  readonly usedAt: Instant | null;
+  /** The guest's owner may use a sent invitation; the host's owner may withdraw it. */
+  readonly actions: readonly ('use' | 'withdraw')[];
+  /** The visit view is readable now. */
   readonly canVisitNow: boolean;
 }
 
@@ -827,7 +818,7 @@ export interface GardenQueries {
   photos(museId: MuseId, before: PhotoId | null, limit: number): Page<PhotoView, PhotoId>;
   shelf(museId: MuseId): ShelfView | null;
   invitations(museId: MuseId, at: Instant): readonly InvitationCard[];
-  /** 'forbidden' unless `requester` is the invited owner's Muse, the invitation is open, and `at` is inside the window. */
+  /** 'forbidden' unless `requester` is the guest's Muse and its owner used the invitation less than 2 h before `at`. */
   visit(invitation: InvitationId, requester: MuseId, at: Instant): VisitWorldView | 'forbidden';
   sharing(museId: MuseId): SharingView | null;
   mind(museId: MuseId): MindView | null;
@@ -843,15 +834,16 @@ export type CommandResult = { readonly ok: true } | { readonly ok: false; readon
 
 /** What the HTTP layer may change. Owners act as the Muse they own (`as` in the request). */
 export interface GardenCommands {
-  invitation(id: InvitationId, as: MuseId, action: 'approve' | 'decline' | 'accept'): Promise<CommandResult>;
   setBasketTime(museId: MuseId, hhmm: string | null): Promise<CommandResult>;
   setHidden(museId: MuseId, ref: HiddenRef, hidden: boolean): Promise<CommandResult>;
   introduce(museId: MuseId, shareCode: string): Promise<CommandResult>;
   unshare(museId: MuseId, other: MuseId): Promise<CommandResult>;
   /** A like or an unlike in the garden. */
   like(museId: MuseId, target: LikeTarget, liked: boolean): Promise<CommandResult>;
-  /** "Travel now" on an invitation the owner received: good for one visit. */
+  /** "Travel now" on an invitation the owner received: good for one visit, whenever they like. */
   useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
+  /** The host's owner takes back an invitation not yet used. Nothing else ever withdraws one. */
+  withdrawInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   // The host simulator: stands in for the Muse app.
   hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult>;
   hostSoul(museId: MuseId, text: string): Promise<CommandResult>;

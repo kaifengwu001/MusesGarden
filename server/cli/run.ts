@@ -1,17 +1,18 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Instant, LifePolicy, MuseId, MuseState, StoredEvent } from '../../src/muse/contract';
+import type { CastFile, Instant, InvitationState, LifePolicy, MuseId, MuseState, StoredEvent } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
 
 const H = 3_600_000;
+/** The scripted guest's owner keeps an invitation for later, then travels this long after it arrived. */
+const TRAVEL_AFTER_MS = 48 * H;
 
 export interface SimOptions {
   readonly cast: string;
   readonly work: string | null;
   readonly start: Instant;
   readonly hours: number;
-  readonly owners: 'auto-accept' | 'auto-decline';
 }
 
 /**
@@ -36,21 +37,18 @@ export async function seedCast(engine: Engine, life: LifePolicy, opts: SimOption
   return cast;
 }
 
-/** Advances hour by hour, answering invitations the way the owners' policy says. */
+/** Advances hour by hour. Each guest's owner keeps an invitation for later and uses it a couple of days on. */
 export async function run(engine: Engine, opts: SimOptions): Promise<void> {
   for (let h = 1; h <= opts.hours; h++) {
     await engine.advanceTo((opts.start + h * H) as Instant);
-    await answerOwners(engine, opts.owners);
+    await travelOnKeptInvitations(engine);
   }
 }
 
-async function answerOwners(engine: Engine, policy: SimOptions['owners']): Promise<void> {
+async function travelOnKeptInvitations(engine: Engine): Promise<void> {
   for (const id of engine.museIds()) {
-    const s = engine.state(id);
-    if (!s) continue;
-    for (const inv of s.social.invitations.values()) {
-      if (inv.state === 'proposed' && inv.host === id) await engine.answerInvitation(inv.id, id, policy === 'auto-accept' ? 'approve' : 'decline');
-      if (inv.state === 'sent' && inv.guest === id) await engine.answerInvitation(inv.id, id, policy === 'auto-accept' ? 'accept' : 'decline');
+    for (const inv of engine.state(id)?.social.invitations.values() ?? []) {
+      if (inv.guest === id && inv.state === 'sent' && engine.now() - inv.sentAt >= TRAVEL_AFTER_MS) await engine.invitationAction(inv.id, id, 'use');
     }
   }
 }
@@ -104,8 +102,9 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
   const metBeyond = all.some(({ log }) => log.some((e) => e.event.kind === 'relationship.changed' && e.event.to === 'friends' && e.event.origin === 'met-beyond'));
   out.push({ name: 'a stranger became a friend', pass: metBeyond, detail: metBeyond ? 'yes' : 'none' });
 
-  const closed = all.some(({ log }) => log.some((e) => e.event.kind === 'invitation' && e.event.to === 'closed'));
-  out.push({ name: 'one invitation went from proposed to closed', pass: closed, detail: closed ? 'yes' : 'none' });
+  const invitations = (to: InvitationState) => new Set(all.flatMap(({ log }) => log.flatMap((e) => (e.event.kind === 'invitation' && e.event.to === to ? [e.event.id] : [])))).size;
+  const [sent, used] = [invitations('sent'), invitations('used')];
+  out.push({ name: 'an invitation was sent and used', pass: sent > 0 && used > 0, detail: `${sent} sent, ${used} used` });
 
   const reflections = all.reduce((n, { s }) => n + s.reflections.length, 0);
   out.push({ name: 'reflections committed', pass: reflections > 0, detail: `${reflections}` });

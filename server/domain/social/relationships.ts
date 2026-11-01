@@ -9,7 +9,6 @@ import type {
   Temperament,
 } from '../../../src/muse/contract';
 import { SOCIAL } from './constants';
-import { withdrawAll } from './invitations';
 import { overlap, publicProfile, similarity, stretch } from './profile';
 
 export function relationshipWith(s: MuseState, other: MuseId): Relationship | undefined {
@@ -57,11 +56,7 @@ function changed(other: MuseId, to: 'friends' | 'ended', origin: RelationshipOri
 
 export function ending(a: MuseState, b: MuseState, reason: 'drifted-apart' | 'owner-unshared'): PairOutcome {
   const origin = relationshipWith(a, b.seed.id)?.origin ?? 'met-beyond';
-  const withdrawn = withdrawAll(a, b.seed.id);
-  return {
-    self: [changed(b.seed.id, 'ended', origin, reason), ...withdrawn],
-    other: [changed(a.seed.id, 'ended', origin, reason), ...withdrawn],
-  };
+  return { self: [changed(b.seed.id, 'ended', origin, reason)], other: [changed(a.seed.id, 'ended', origin, reason)] };
 }
 
 export function befriended(a: MuseState, b: MuseState, origin: RelationshipOrigin): PairOutcome {

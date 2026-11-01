@@ -28,7 +28,6 @@ import * as samples from '../samples';
 // in-memory SampleGarden built from src/muse/samples.ts, so the overlay works before the server
 // exists. After a live answer, errors are real errors.
 
-export type Answer = 'approve' | 'decline' | 'accept';
 export type ClockMode = 'live' | 'fast-forward';
 export type DataSource = 'unknown' | 'live' | 'sample';
 
@@ -76,8 +75,7 @@ export class MuseApi {
   invitations = () => this.get<readonly InvitationCard[]>(path('invitations', this.id), () => this.sample.invitations());
   sharing = () => this.get<SharingView>(path('sharing', this.id), () => this.sample.sharing);
 
-  answer = (id: InvitationId, action: Answer) =>
-    this.command(path('answer', { id, action }, { as: this.museId }), undefined, () => this.sample.answer(id, action));
+  withdraw = (id: InvitationId) => this.command(path('withdraw', { id }, { as: this.museId }), undefined, () => this.sample.withdraw(id));
 
   async visit(id: InvitationId): Promise<VisitWorldView | 'forbidden'> {
     const r = await this.request<VisitWorldView>('GET', path('visit', { id }, { as: this.museId }), undefined, () => {
@@ -209,25 +207,20 @@ class SampleGarden {
 
   invitations(): readonly InvitationCard[] {
     const t = this.at();
-    return [...this.cards.values()].map((c): InvitationCard => {
-      if (c.state !== 'accepted' && c.state !== 'open') return c;
-      if (t >= c.window.end) return { ...c, state: 'closed', canVisitNow: false };
-      const open = t >= c.window.start;
-      return { ...c, state: open ? 'open' : 'accepted', canVisitNow: open && c.role === 'guest' };
-    });
+    return [...this.cards.values()].map((c) => ({ ...c, canVisitNow: c.role === 'guest' && c.usedAt !== null && t >= c.usedAt && t < c.usedAt + 2 * HOUR }));
   }
 
-  answer(id: InvitationId, action: Answer): CommandResult {
+  withdraw(id: InvitationId): CommandResult {
     const card = this.cards.get(id);
     if (!card) return { ok: false, status: 404, error: 'no such invitation' };
-    if (!card.actions.includes(action)) return { ok: false, status: 409, error: `cannot ${action} now` };
-    this.cards.set(id, { ...card, actions: [], state: action === 'decline' ? 'declined' : action === 'approve' ? 'sent' : 'accepted' });
+    if (!card.actions.includes('withdraw')) return { ok: false, status: 409, error: 'cannot withdraw it now' };
+    this.cards.set(id, { ...card, actions: [], state: 'withdrawn' });
     return DONE;
   }
 
   visit(id: InvitationId): VisitWorldView | null {
     const card = this.invitations().find((c) => c.id === id);
-    return card?.canVisitNow ? { ...samples.sampleVisit, invitation: id, until: card.window.end } : null;
+    return card?.canVisitNow && card.usedAt !== null ? { ...samples.sampleVisit, invitation: id, until: (card.usedAt + 2 * HOUR) as Instant } : null;
   }
 
   setHidden(ref: HiddenRef, hidden: boolean): CommandResult {

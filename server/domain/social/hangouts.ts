@@ -11,7 +11,7 @@ import type {
 } from '../../../src/muse/contract';
 import { localClock } from './clock';
 import { SOCIAL } from './constants';
-import { propose } from './invitations';
+import { invite } from './invitations';
 import { photoSlotsLeft, photoTogether, whereIs } from './photos';
 import { compare, findOverlap, publicProfile, similarity, stretch } from './profile';
 import { areFriends, chemistry, ending, isUnpleasant, relationshipWith, toleratedStreak } from './relationships';
@@ -114,6 +114,6 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const sinceInvite = (rel?.rapportSinceInvite ?? 0) + pleasantness;
   const needed = SOCIAL.inviteRapportBase + SOCIAL.inviteRapportSpan * (1 - host.temperament.sociability);
   const cooled = rel?.lastInviteAt == null || now - rel.lastInviteAt >= SOCIAL.inviteCooldownMs;
-  const invitation = sinceInvite >= needed && cooled ? propose(host, guest, now) : null;
+  const invitation = sinceInvite >= needed && cooled ? invite(host, guest, now) : null;
   return invitation ? { host: [...hostLog, invitation], guest: [...guestLog, invitation] } : { host: hostLog, guest: guestLog };
 }

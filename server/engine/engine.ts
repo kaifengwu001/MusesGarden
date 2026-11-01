@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type {
   Candidate,
+  CommandResult,
   Discovery,
   DiscoveryId,
   Draw,
@@ -48,8 +49,6 @@ export interface EngineDeps {
 const CANDIDATES_PER_HOP = 8;
 const MAX_HOPS = 4;
 const HOUR = 3_600_000;
-
-type InvitationAction = Parameters<SocialPolicy['invitationStep']>[1];
 
 interface HopPayload {
   readonly n: number;
@@ -199,22 +198,20 @@ export class Engine {
     });
   }
 
-  /** An owner answers an invitation. `as` is the Muse whose owner is answering. */
-  answerInvitation(id: InvitationId, as: MuseId, answer: 'approve' | 'decline' | 'accept'): Promise<{ ok: boolean; error?: string }> {
-    return this.exclusive(() => {
+  /** The guest's owner uses an invitation, or the host's owner withdraws it. `as` is the Muse whose owner acts. */
+  invitationAction(id: InvitationId, as: MuseId, action: 'use' | 'withdraw'): Promise<CommandResult> {
+    return this.exclusive((): CommandResult => {
       const inv = this.invitation(id);
-      if (!inv) return { ok: false, error: 'no such invitation' };
-      const isHost = inv.host === as;
-      const isGuest = inv.guest === as;
-      let action: InvitationAction | null = null;
-      if (answer === 'approve' && isHost) action = 'approve';
-      if (answer === 'accept' && isGuest) action = 'accept';
-      if (answer === 'decline') action = isHost ? 'decline-send' : isGuest ? 'decline' : null;
-      if (!action) return { ok: false, error: 'not yours to answer' };
-      const tx = this.tx(this.clockAt);
-      const r = this.stepInvitation(tx, inv, action);
-      if (r.ok) this.commit(tx);
-      return r;
+      if (!inv) return { ok: false, status: 404, error: 'no such invitation' };
+      const r = this.deps.social.invitationStep(inv, action, as, this.clockAt);
+      if (!r.ok) return r;
+      if (r.event) {
+        const tx = this.tx(this.clockAt);
+        tx.emit(inv.host, r.event);
+        tx.emit(inv.guest, r.event);
+        this.commit(tx);
+      }
+      return { ok: true };
     });
   }
 
@@ -245,7 +242,6 @@ export class Engine {
   }
 
   private commit(tx: Tx): void {
-    this.scheduleInvitationTimers(tx);
     this.deps.store.commit(tx.batch());
     for (const [id, s] of tx.touched()) this.states.set(id, s);
     if (tx.now > this.clockAt) this.clockAt = tx.now;
@@ -271,11 +267,6 @@ export class Engine {
       case 'encounter':
         this.onEncounter(tx, item.museId, item.payload.other as MuseId);
         break;
-      case 'invitation.timer': {
-        const inv = this.invitation(item.payload.invitation as InvitationId);
-        if (inv) this.stepInvitation(tx, inv, item.payload.action as InvitationAction);
-        break;
-      }
     }
     this.commit(tx);
   }
@@ -490,19 +481,13 @@ export class Engine {
     this.scheduleHop(tx, m, { n, k: 0, since: tx.now, from: null }, tx.now + life.hopMs(tx.state(m), draw));
   }
 
-  private startVisit(tx: Tx, m: MuseId, other: MuseId, role: 'host' | 'guest', until: Instant, invitation?: InvitationId): void {
+  private startVisit(tx: Tx, m: MuseId, other: MuseId, role: 'host' | 'guest', until: Instant): void {
     const os = tx.state(other);
     if (os.episode) {
       for (const i of this.deps.store.pending(other)) if (i.kind === 'episode.end' || i.kind === 'trip.hop') tx.remove(i.id);
       tx.emit(other, { kind: 'episode.ended', n: os.episode.n });
     }
-    const plan = (who: MuseId, r: 'host' | 'guest'): EpisodePlan => ({
-      activity: 'visit',
-      other: who,
-      role: r,
-      until,
-      ...(invitation ? { invitation } : {}),
-    });
+    const plan = (who: MuseId, r: 'host' | 'guest'): EpisodePlan => ({ activity: 'visit', other: who, role: r, until });
     const n = tx.state(m).episodes + 1;
     tx.emit(m, { kind: 'episode.started', n, plan: plan(other, role) });
     const on = tx.state(other).episodes + 1;
@@ -562,40 +547,6 @@ export class Engine {
 
   private emitPhotos(tx: Tx, m: MuseId, photos: readonly PhotoSpec[]): void {
     for (const photo of photos) tx.emit(m, { kind: 'photo.taken', photo });
-  }
-
-  private stepInvitation(tx: Tx, inv: Invitation, action: InvitationAction): { ok: boolean; error?: string } {
-    const r = this.deps.social.invitationStep(inv, action, tx.now);
-    if (!r.ok) return { ok: false, error: r.error };
-    tx.emitAll(inv.host, r.host);
-    tx.emitAll(inv.guest, r.guest);
-    if (action === 'window-start') {
-      const host = tx.state(inv.host);
-      const guest = tx.state(inv.guest);
-      const social = this.deps.social;
-      const canPhoto = social.photoSlotsLeft(host, tx.now) > 0 && social.photoSlotsLeft(guest, tx.now) > 0;
-      if (!host.working && !guest.working && canPhoto) this.startVisit(tx, inv.guest, inv.host, 'guest', inv.window.end, inv.id);
-    }
-    return { ok: true };
-  }
-
-  /** Every invitation event in this tx gets its deadlines and window edges on the schedule. Stale timers are no-ops. */
-  private scheduleInvitationTimers(tx: Tx): void {
-    for (const e of tx.emitted()) {
-      if (e.event.kind !== 'invitation' || e.museId !== e.event.host) continue;
-      const inv = tx.state(e.event.host).social.invitations.get(e.event.id);
-      if (!inv) continue;
-      for (const t of this.deps.social.invitationTimers(inv)) {
-        if (t.at < tx.now) continue;
-        tx.schedule({
-          id: `inv:${inv.id}:${t.action}`,
-          at: t.at,
-          museId: inv.host,
-          kind: 'invitation.timer',
-          payload: { invitation: inv.id, action: t.action },
-        });
-      }
-    }
   }
 
   private scheduleEnd(tx: Tx, m: MuseId, n: number, at: Instant): void {

@@ -62,18 +62,16 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
       return s.relationships.has(e.other) ? withRelationship(s, e.other, 'introduced', end) : s;
     case 'invitation': {
       const previous = s.invitations.get(e.id);
+      if (e.to !== 'sent' && !previous) return s;
       const invitations = new Map(s.invitations);
-      invitations.set(e.id, {
-        id: e.id,
-        host: e.host,
-        guest: e.guest,
-        state: e.to,
-        window: e.window,
-        proposedAt: previous?.proposedAt ?? at,
-        visited: e.visited ?? previous?.visited ?? false,
-      });
+      invitations.set(
+        e.id,
+        previous
+          ? { ...previous, state: e.to, usedAt: e.to === 'used' ? at : previous.usedAt }
+          : { id: e.id, host: e.host, guest: e.guest, state: 'sent', sentAt: at, usedAt: null },
+      );
       const next = { ...s, invitations };
-      if (e.to !== 'proposed') return next;
+      if (e.to !== 'sent') return next;
       const other = e.host === self ? e.guest : e.host;
       return withRelationship(next, other, 'met-beyond', (r) => ({ ...r, rapportSinceInvite: 0, lastInviteAt: at }));
     }

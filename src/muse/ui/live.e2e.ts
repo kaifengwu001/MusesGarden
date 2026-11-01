@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import type {} from '../../dev/harnessApi';
-import type { BasketView, InvitationCard, MuseId, NowView, Page as ApiPage, PhotoView, WorldView } from '../contract';
+import type { BasketView, MuseId, NowView, Page as ApiPage, PhotoView, WorldView } from '../contract';
 
 // The overlay on the real engine: fast-forward the clock through the dev API, act the way an owner would in the
 // page, and assert what changed. Screenshots for a human eye go to shots/muse-live/.
@@ -201,52 +201,5 @@ test('the owner checks live behaviour on the real engine', async ({ page, reques
     expect(await page.evaluate(() => (window as unknown as { __canvasDowns: number }).__canvasDowns)).toBe(0);
     await shot(page, '08-object-card');
     await page.keyboard.press('Escape');
-  });
-
-  await test.step('an invitation: Muse proposes, the host approves, the guest accepts, and Visit shows only inside the window', async () => {
-    const found = await until(api, 21 * 24, async () => {
-      for (const m of muses) {
-        const cards = await get<InvitationCard[]>(api, `/muses/${m.museId}/invitations`);
-        const proposed = cards.find((c) => c.role === 'host' && c.state === 'proposed');
-        if (proposed) return { host: m.museId, card: proposed };
-      }
-      return null;
-    });
-    const guest = muses.find((m) => m.name === found.card.otherName)?.museId ?? '';
-    expect(guest).not.toBe('');
-
-    await open(page, found.host);
-    await openMailbox(page);
-    await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
-    await shot(page, '09-host-approves');
-    await page.locator('.mu-mailbox').getByRole('button', { name: 'Approve' }).first().click();
-    await expect.poll(async () => (await get<InvitationCard[]>(api, `/muses/${found.host}/invitations`)).find((c) => c.id === found.card.id)?.state).toBe('sent');
-
-    await open(page, guest);
-    await openMailbox(page);
-    await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
-    await page.locator('.mu-mailbox').getByRole('button', { name: 'Accept' }).first().click();
-    await expect(page.locator('.mu-mailbox').getByRole('button', { name: 'Visit' })).toHaveCount(0);
-
-    const clock = await get<{ now: number }>(api, '/dev/clock');
-    await advance(api, (found.card.window.start - clock.now) / 3_600_000 + 0.05);
-    await open(page, guest);
-    await openMailbox(page);
-    await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
-    const visit = page.locator('.mu-mailbox').getByRole('button', { name: 'Visit' });
-    await expect(visit).toHaveCount(1);
-    await visit.click();
-    await page.waitForTimeout(4000);
-    await shot(page, '10-visiting');
-    const r = await api.get(`${API}/visits/${encodeURIComponent(found.card.id)}/world?as=${guest}`);
-    expect(r.status()).toBe(200);
-
-    await advance(api, 2.1);
-    const after = await api.get(`${API}/visits/${encodeURIComponent(found.card.id)}/world?as=${guest}`);
-    expect(after.status()).toBe(403);
-    await open(page, guest);
-    await openMailbox(page);
-    await page.locator('.mu-mailbox').getByRole('tab', { name: 'Invitations' }).click();
-    await expect(page.locator('.mu-mailbox').getByRole('button', { name: 'Visit' })).toHaveCount(0);
   });
 });

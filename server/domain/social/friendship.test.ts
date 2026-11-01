@@ -203,7 +203,7 @@ describe('owners introducing and unsharing', () => {
     expect(policy.hangout(a, b, at(T0 + 2 * HOUR), draws(1))).toEqual({ host: [], guest: [] });
   });
 
-  it('withdraws a live invitation when an owner unshares, so the window never opens', () => {
+  it('leaves an invitation good when an owner unshares: only the sender withdraws one', () => {
     let [a, b] = pair(0.9);
     [a, b] = apply(a, b, policy.ownerLink(a, b, 'introduce', T0), T0);
     let invitation: Extract<MuseEventBody, { kind: 'invitation' }> | undefined;
@@ -213,14 +213,11 @@ describe('owners introducing and unsharing', () => {
       invitation = ofKind(out.host, 'invitation')[0];
     }
     expect(invitation).toBeDefined();
-    const out = policy.ownerLink(b, a, 'unshare', at(T0 + 3 * HOUR));
-    expect(ofKind(out.self, 'invitation')).toEqual([{ ...invitation, to: 'declined' }]);
-    expect(ofKind(out.other, 'invitation')).toEqual([{ ...invitation, to: 'declined' }]);
-    const [unsharer, other] = apply(b, a, out, at(T0 + 3 * HOUR));
-    expect(unsharer.social.invitations.get(invitation!.id)?.state).toBe('declined');
-    const inv = other.social.invitations.get(invitation!.id)!;
-    expect(inv.state).toBe('declined');
-    expect(policy.invitationStep(inv, 'approve', at(T0 + 3 * HOUR)).ok).toBe(false);
-    expect(policy.invitationTimers(inv)).toEqual([]);
+    const out = policy.ownerLink(b, a, 'unshare', at(T0 + DAY));
+    expect([...ofKind(out.self, 'invitation'), ...ofKind(out.other, 'invitation')]).toEqual([]);
+    const [, host] = apply(b, a, out, at(T0 + DAY));
+    const inv = host.social.invitations.get(invitation!.id)!;
+    expect(inv.state).toBe('sent');
+    expect(policy.invitationStep(inv, 'use', inv.guest, at(T0 + 30 * DAY))).toMatchObject({ ok: true });
   });
 });

@@ -222,23 +222,24 @@ export class Views implements GardenQueries {
       .filter((inv) => inv.host === museId || inv.guest === museId)
       .map((inv) => {
         const role = inv.host === museId ? ('host' as const) : ('guest' as const);
-        const actions: InvitationCard['actions'] =
-          role === 'host' && inv.state === 'proposed' ? ['approve', 'decline'] : role === 'guest' && inv.state === 'sent' ? ['accept', 'decline'] : [];
+        const until = this.social.visitUntil(inv, museId);
         return {
           id: inv.id,
           role,
           otherName: this.name(role === 'host' ? inv.guest : inv.host),
           state: inv.state,
-          window: inv.window,
-          actions,
-          canVisitNow: this.social.canVisit(inv, museId, at),
+          sentAt: inv.sentAt,
+          usedAt: inv.usedAt,
+          actions: inv.state !== 'sent' ? [] : role === 'guest' ? ['use'] : ['withdraw'],
+          canVisitNow: until !== null && at < until,
         };
       });
   }
 
   visit(invitation: InvitationId, requester: MuseId, at: Instant): VisitWorldView | 'forbidden' {
     const inv = this.engine.invitation(invitation);
-    if (!inv || !this.social.canVisit(inv, requester, at)) return 'forbidden';
+    const until = this.social.visitUntil(inv, requester);
+    if (!inv || until === null || at >= until) return 'forbidden';
     const host = this.s(inv.host);
     if (!host) return 'forbidden';
     const shared = new Set(this.social.publicProfile(host).discoveries.map((d) => d.id));
@@ -251,7 +252,7 @@ export class Views implements GardenQueries {
       plants: [...host.discoveries.values()].map((d) =>
         shared.has(d.id) ? { id: d.id, dir: d.place.dir, preview: preview(d), card: card(d) } : { id: d.id, dir: d.place.dir, preview: null, card: null },
       ),
-      until: inv.window.end,
+      until,
     };
   }
 
@@ -321,12 +322,6 @@ export class Commands implements GardenCommands {
     return this.engine.state(id) !== undefined;
   }
 
-  async invitation(id: InvitationId, as: MuseId, action: 'approve' | 'decline' | 'accept'): Promise<CommandResult> {
-    if (!this.engine.invitation(id)) return fail(404, 'no such invitation');
-    const r = await this.engine.answerInvitation(id, as, action);
-    return r.ok ? ok : fail(r.error === 'not yours to answer' ? 403 : 409, r.error ?? 'not allowed now');
-  }
-
   async setBasketTime(museId: MuseId, hhmm: string | null): Promise<CommandResult> {
     if (!this.known(museId)) return fail(404, 'no such Muse');
     await this.engine.ownerSettings(museId, { kind: 'owner.settings', basketTime: hhmm });
@@ -361,8 +356,12 @@ export class Commands implements GardenCommands {
     return Promise.resolve(fail(409, 'likes are not in this build yet'));
   }
 
-  useInvitation(): Promise<CommandResult> {
-    return Promise.resolve(fail(409, 'travel is not in this build yet'));
+  useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult> {
+    return this.engine.invitationAction(id, museId, 'use');
+  }
+
+  withdrawInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult> {
+    return this.engine.invitationAction(id, museId, 'withdraw');
   }
 
   async hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult> {
