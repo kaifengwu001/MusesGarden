@@ -2,7 +2,7 @@
 // (src/muse/ui/) both import it. Types only: this file emits no runtime code.
 // Rationale: docs/muse-agent.md.
 
-import type { GardenSnapshot, MediaKind } from '../garden/types';
+import type { GardenEvent, GardenSnapshot, MediaKind } from '../garden/types';
 
 declare const brand: unique symbol;
 export type Brand<T, B extends string> = T & { readonly [brand]: B };
@@ -837,6 +837,12 @@ export interface GardenQueries {
   muses(): readonly { readonly museId: MuseId; readonly name: string; readonly role: CastMember['role'] }[];
   /** Everything the garden's interface shows, as of `at` (src/garden/types.ts). */
   garden(museId: MuseId, at: Instant): GardenSnapshot | null;
+}
+
+/** One garden event as a server-sent event: `id` is the log seq it came from, so a reconnect resumes after it. */
+export interface GardenFrame {
+  readonly id: number;
+  readonly event: GardenEvent;
 }
 
 export type CommandResult = { readonly ok: true } | { readonly ok: false; readonly status: 400 | 403 | 404 | 409; readonly error: string };
