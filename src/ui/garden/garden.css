@@ -2132,6 +2132,13 @@ body.garden-on .hud {
   animation: g-env-away 1.5s ease 0.3s both;
 }
 
+/* gone from sight, the envelope's front, flap and seal still lie over the card: clicks pass through them */
+.g-env.is-open .g-env-pocket,
+.g-env.is-open .g-env-flap,
+.g-env.is-open .g-env-seal {
+  pointer-events: none;
+}
+
 @keyframes g-env-away {
   0%,
   38% {
