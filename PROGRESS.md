@@ -28,6 +28,21 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Iteration 17: Muse lives on the planet (in progress)
+
+Started from 86dadbd: iteration 16's interactions, built in the lab, go into
+the meadow. Kai's notes (2026-10-31); this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Muse roams the planet at random and starts its activities where it is, more often close to its hut | |
+| 2 | Some things have fixed places, like the bench (the terrace's) | |
+| 3 | Watering plants anywhere about the meadow, not over a flower bed; no new flower growing, no sniffing it | |
+| 4 | Cooking on the hut's front porch, at a little stove kept there (for now; later the house gets an inside and a kitchen) | |
+| 5 | Fishing: usually off the pier's end, sometimes from a shore it has wandered to | |
+| 6 | As in the lab: asleep in the grass (pressing it down only where it lies), taps and holds on Muse | |
+| 7 | M frames Muse, as now (the camera does not follow it) | |
+
 ## The garden's interfaces (in progress, alongside iteration 16)
 
 Started from 73de432, in the same folder as iteration 16's work on Muse
