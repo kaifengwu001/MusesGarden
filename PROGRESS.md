@@ -32,6 +32,25 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the second pass
+
+Started from d9b8f92 (the terraces' second pass: villages, flocks, the squint test). Kai's notes (2026-11-01), with three more references kept out of git under reference/terraces/: an aerial photo of terraces following the contours, white flooded bands among greens (contours-aerial.webp); a painting of flat fields in a patchwork of square-ish plots and roads (flats-painting.webp); a photo of flat rice fields, rectangular plots in many greens, a road winding through (flats-photo.webp). This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | The algorithm still doesn't imitate the paddies' distribution and shapes well | |
+| 2 | The paddies are 2D textures, not 3D geometry: too simplified and cartoonish, and water can't stand in paddies at several levels | |
+| 3 | They should follow the mountains' contours with small variations, so the mountains need more detail (noise overlaid at several scales) | |
+| 4 | The variations: occasional paddies wider than the others, which then naturally have a taller wall at their end | |
+| 5 | The breaks between paddies on the same level are not short straight lines across but an organic, round turn | |
+| 6 | Paddies exist only above some slope: where it is flat enough for huge areas, the fields break into smaller, square-ish plots (references 12 and 13) | |
+| 7 | Villages then stand on those flatter areas | |
+| 8 | The houses are too simple, cartoonish and repetitive: the next round | |
+| 9 | The key to the colour: slight variations of green, rice plants of different heights, water tables at different heights | |
+| 10 | Rice plants can be longer blades of grass for now, to save performance | |
+
+### The first and second passes
+
 Started from a20b606 (iteration 17 after Kai's review). Kai's brief
 (2026-10-31): a second planet to visit, built on the same procedural
 fundamentals as the meadow. Eight reference images came with it, kept out of
