@@ -21,7 +21,10 @@
     "new-environment": "node --experimental-strip-types scripts/new-environment.ts",
     "dev:scarlet": "vite --port 5227 --strictPort",
     "build:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && vite build --config environments/scarlet-sail-canyon/vite.config.ts",
-    "check:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && eslint environments/scarlet-sail-canyon"
+    "check:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && eslint environments/scarlet-sail-canyon",
+    "dev:cobalt": "vite --host 127.0.0.1 --port 5217 --strictPort",
+    "build:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && vite build --config environments/cobalt-windfields/vite.config.ts",
+    "check:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && eslint environments/cobalt-windfields"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

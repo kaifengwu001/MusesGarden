@@ -52,6 +52,8 @@ The meadow keeps its own commands (`npm run dev` at `/`, `npm run build`) and it
 records the meadow commit it was copied from.
 
 
-## World in this checkout
+## Worlds in this checkout
 
 [Scarlet Sail Canyon](scarlet-sail-canyon/README.md) is served on port 5227. Its code, build output and resident storage are independent of the original meadow.
+
+[Cobalt Windfields](cobalt-windfields/README.md) is served on port 5217 with `npm run dev:cobalt`. Its blue rock formations, peach sand, native plants, wildlife and local residents live entirely inside its own environment folder.
