@@ -60,6 +60,8 @@ const DOOR = { x0: -OUTER.x + FRONT.door[0], x1: -OUTER.x + FRONT.door[1], y0: F
 const SHELF = { slop: 18, beacon: 26, cardFoot: 0.8 } as const;
 /** Nearer than this to the cottage (m) and lower than this (m), the hut's furniture is fetched ahead of a knock. */
 const NEAR_HUT = { distance: 70, altitude: 80 } as const;
+/** Muse this near the hut (m) is about it: its door opens to you, wherever Muse is pottering. */
+const MUSE_NEAR = 30;
 /** Where Muse stands in its hut (local m), facing the way the cutaway looks in from. */
 const INSIDE = { x: 0.95, z: 0.4 } as const;
 
@@ -704,15 +706,19 @@ export class GardenUi {
     return Math.abs(area) / 2 > 90;
   }
 
-  /** A knock on the door: in, if Muse is in or about the hut; if not, why not. */
+  /** Whether Muse is about the hut: home, or out in the meadow but close by (MUSE_NEAR); not when it is out exploring. */
+  private museAbout(): boolean {
+    const w = this.world;
+    if (!this.state.status.home || w.muse.away) return false;
+    return w.muse.home || angleBetween(w.muse.where.dir, w.terrain.layout.cottage) * w.growth.radius < MUSE_NEAR;
+  }
+
+  /** A knock on the door: in, if Muse is in or about the hut (or the room is being laid out); if not, why not. */
   private knock(): void {
     const w = this.world;
-    if (!this.state.status.home || w.muse.away) {
-      this.toast('Muse is out exploring, and the door is shut. It’ll be back with a basket.');
-      return;
-    }
-    if (!w.muse.home) {
-      this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
+    if (!this.museAbout() && !this.editor) {
+      if (!this.state.status.home || w.muse.away) this.toast('Muse is out exploring, and the door is shut. It’ll be back with a basket.');
+      else this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
       return;
     }
     this.closeCard();
@@ -884,7 +890,7 @@ export class GardenUi {
     const ground = this.world.terrain.cottageGround;
     this.flight.to({ dir: at, ground, distance: HOME_VIEW.distance, height: HOME_VIEW.height, aim: HOME_VIEW.at[1], from }, R, this.ground, () => {
       if (!this.state.status.home) this.toast('Muse is out exploring, and the door is shut. It’ll be back with a basket.');
-      else if (!this.world.muse.home) this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
+      else if (!this.museAbout()) this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
       else this.toast('Muse is home. Tap the door to go in.');
     });
   }
