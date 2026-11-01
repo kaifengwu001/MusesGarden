@@ -157,8 +157,11 @@ function indexLog(log: readonly StoredEvent[]): LogIndex {
 export function soulLine(soul: string | null): string {
   const paragraph = (soul ?? '')
     .split(/\r?\n\s*\r?\n/)
-    .map((block) => block.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join(' ').replace(/\s+/g, ' ').trim())
-    .find((block) => block !== '');
+    .map((block) => block.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)))
+    .find((lines) => lines.length > 0 && !lines.every((line) => /^\s*([-*+]|\d+\.)\s/.test(line) || line.trim() === ''))
+    ?.join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!paragraph) return '';
   if (paragraph.length <= SOUL_CHARS) return paragraph;
   const sentences = /^.*[.!?…](?=\s)/.exec(paragraph.slice(0, SOUL_CHARS + 1))?.[0];
@@ -167,7 +170,7 @@ export function soulLine(soul: string | null): string {
   return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '')}…`;
 }
 
-function status(now: NowView): MuseStatus {
+export function museStatus(now: NowView): MuseStatus {
   const out = now.activity === 'travel' || now.away !== null;
   return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note: now.label };
 }
@@ -289,7 +292,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   ];
   return {
     world: { seed: s.seed.worldSeed, g: input.g },
-    muse: { name: s.seed.name, soul: soulLine(input.soul), status: status(input.now) },
+    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now) },
     interests: interests(input, finds, index),
     friends: friends(input, index),
     baskets: delivered.map(({ basket }) => basket),
@@ -360,6 +363,6 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
       if (postcard) frame(seq, { type: 'postcard', postcard });
     }
   }
-  if (withStatus === 'always' || events.some((e) => MOVES.has(e.event.kind))) frame(s.seq, { type: 'status', status: status(input.now) });
+  if (withStatus === 'always' || events.some((e) => MOVES.has(e.event.kind))) frame(s.seq, { type: 'status', status: museStatus(input.now) });
   return frames;
 }

@@ -1,6 +1,7 @@
 // A stand-in garden that serves src/muse/samples.ts, so the overlay can talk to a live server before the engine
 // exists. Only the hero Muse has samples; the rest of the cast is known but empty.
-import type { GardenCommands, GardenQueries, Instant, MuseId, Page } from '../../src/muse/contract';
+import type { Find, GardenSnapshot, Postcard } from '../../src/garden/types';
+import type { GardenCommands, GardenQueries, Instant, MuseId, Page, TopicKey } from '../../src/muse/contract';
 import {
   HERO,
   sampleBaskets,
@@ -18,6 +19,8 @@ import {
   sampleVisit,
   sampleWorld,
 } from '../../src/muse/samples';
+import { localDay } from '../domain/time';
+import { coatOf, flowerOf, museStatus, postcardImage, soulLine, topicLabel } from '../engine/garden';
 
 const HOUR = 3_600_000;
 const JOURNAL_DAY = '2026-11-04';
@@ -34,6 +37,71 @@ function page<T extends { readonly id: C }, C>(items: readonly T[], before: C | 
   const rest = before !== null && from === 0 ? [] : items.slice(from);
   const chunk = rest.slice(0, limit);
   return { items: chunk, next: rest.length > limit ? chunk[chunk.length - 1].id : null };
+}
+
+const day = (at: number) => localDay(at, 'America/Los_Angeles');
+
+/** The samples as the garden's interface sees them. A find comes home in the first basket that holds it. */
+function sampleGarden(): GardenSnapshot {
+  const topicOf = new Map(sampleWorld.plants.map((p) => [p.id as string, p.topic]));
+  const shared = new Set(sampleSharing.interests.filter((i) => !i.hidden).map((i) => i.topic as string));
+  const placed = new Set<string>();
+  const baskets = [...sampleBaskets.items].reverse().map((b) => {
+    const cards = b.items.filter((c) => !placed.has(c.id));
+    for (const c of cards) placed.add(c.id);
+    return { basket: { id: b.id, day: day(b.at), finds: cards.map((c) => c.id) }, cards };
+  });
+  const finds: Find[] = baskets.flatMap(({ basket, cards }) =>
+    cards.map((c) => ({
+      id: c.id,
+      basket: basket.id,
+      topic: topicOf.get(c.id) ?? c.title,
+      media: { kind: 'article', url: c.url, source: 'en.wikipedia.org', title: c.title, text: c.summary, image: c.thumb },
+      note: c.reason,
+      place: c.place.dir,
+    })),
+  );
+  const topics = [...new Set([...sampleMind.interests.map((i) => i.topic as string), ...finds.map((f) => f.topic)])];
+  const invitation = sampleInvitations.find((i) => i.id === sampleVisit.invitation)!;
+  const host = sampleVisit.host;
+  const postcards: Postcard[] = [
+    ...samplePhotos.items.map((p) => ({
+      id: p.id,
+      day: day(p.at),
+      image: postcardImage(p.subject),
+      place: p.planetOf === HERO ? 'Out exploring' : `On ${p.companionNames[0]}’s planet`,
+      with: p.companions[0],
+    })),
+    {
+      id: invitation.id,
+      day: day(invitation.window.start),
+      image: postcardImage('invitation'),
+      place: `From ${host.name}’s planet`,
+      with: host.museId,
+      invitation: { from: host.museId, world: host.museId, worldName: `${host.name}’s planet`, blurb: `Where ${host.name} keeps Lichen.`, used: false },
+    },
+  ];
+  return {
+    world: { seed: sampleWorld.worldSeed, g: sampleWorld.g },
+    muse: { name: sampleNowExploring.name, soul: soulLine(sampleSoulMd), status: museStatus(sampleNowExploring) },
+    interests: topics.map((topic) => ({
+      id: topic,
+      name: topicLabel(topic as TopicKey),
+      ...flowerOf(topic),
+      shared: shared.has(topic),
+      since: day(sampleCards[0].foundAt),
+    })),
+    friends: sampleSharing.friends.map((f) => ({
+      id: f.museId,
+      name: f.name,
+      coat: coatOf(f.museId),
+      shared: [...shared].map((t) => topicLabel(t as TopicKey)),
+      met: day(sampleMind.relationships.find((r) => r.other === f.museId)?.lastMetAt ?? sampleNowExploring.at),
+    })),
+    baskets: baskets.map(({ basket }) => basket),
+    finds,
+    postcards,
+  };
 }
 
 export function fakeQueries(): GardenQueries {
@@ -55,7 +123,7 @@ export function fakeQueries(): GardenQueries {
     soulMd: (museId) => heroOnly(museId, sampleSoulMd),
     journalMd: (museId, day) => (day === null || day === JOURNAL_DAY ? heroOnly(museId, sampleJournalMd) : null),
     muses: () => sampleMuses,
-    garden: () => null,
+    garden: (museId) => heroOnly(museId, sampleGarden()),
   };
 }
 

@@ -7,6 +7,7 @@ import { run, seedCast } from '../cli/run';
 import { lifePolicy } from '../domain/policy/index';
 import { FIXTURES_DIR, loadCast, readMemberDocs } from '../fixtures/cast';
 import { buildGarden, type Garden } from './compose';
+import { soulLine } from './garden';
 
 const START = Date.parse('2026-11-02T08:00:00-08:00') as Instant;
 const HERO = 'hero' as MuseId;
@@ -143,6 +144,18 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.muse.status.home).toBe(now.activity !== 'travel' && now.away === null);
     if (now.activity === 'travel') expect(Math.hypot(...snap.muse.status.where!)).toBeCloseTo(1, 6);
     else expect(snap.muse.status.where).toBeUndefined();
+  });
+});
+
+describe('the soul line', () => {
+  it('is the first paragraph of prose, past headings and lists, in whole sentences when they fit', () => {
+    expect(soulLine('# Fern\n\n- **Tea** (emerging)\n- **Ink**\n\nI look closely.\nThen I draw.\n\nMore later.')).toBe('I look closely. Then I draw.');
+    const long = `${'A leaf, '.repeat(15)}then another. And a third sentence that runs on past the end of the line for sure.`;
+    expect(soulLine(long)).toBe(`${'A leaf, '.repeat(15)}then another.`);
+    const word = soulLine('word '.repeat(60));
+    expect(word.length).toBeLessThanOrEqual(160);
+    expect(word).toMatch(/^(word )+word…$/);
+    expect(soulLine(null)).toBe('');
   });
 });
 
