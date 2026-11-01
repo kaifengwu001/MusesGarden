@@ -1,6 +1,6 @@
 import { Vector3, type InstancedBufferAttribute } from 'three';
 import { describe, expect, it } from 'vitest';
-import { FindBeds, type BedLook } from './findBeds';
+import { FindBeds, heroStance, type BedLook } from './findBeds';
 
 const R = 128;
 
@@ -26,7 +26,7 @@ describe('FindBeds', () => {
   it('grows a patch for every find, old baskets included, and a sphere for each', () => {
     const beds = new FindBeds({});
     const list = looks(400);
-    beds.set(list, R, new Set());
+    beds.set(list, R);
     const each = plants(beds, list);
     expect(each.every((p) => p.length === each[0].length && p.length > 30)).toBe(true);
     expect(beds.spheres.geometry.drawRange.count).toBe(400);
@@ -35,19 +35,15 @@ describe('FindBeds', () => {
   it('fills each patch to its middle with flowers', () => {
     const beds = new FindBeds({});
     const list = looks(40);
-    beds.set(list, R, new Set());
+    beds.set(list, R);
     // (the quarter metre round the middle was once left to a specimen)
     for (const distances of plants(beds, list)) expect(distances.filter((d) => d < 0.25).length).toBeGreaterThanOrEqual(3);
   });
 
-  it('plants a patch hidden until now, and marks the picked basket', () => {
+  it('marks the picked basket and lifts the find under the pointer', () => {
     const beds = new FindBeds({});
     const list = looks(10);
-    beds.set(list, R, new Set(['find-3']));
-    expect(beds.planted('find-3')).toBe(false);
-    expect(beds.planted('find-4')).toBe(true);
-    beds.plant(['find-3'], 0.3, -1);
-    expect(beds.planted('find-3')).toBe(true);
+    beds.set(list, R);
     beds.select(['find-1', 'find-8']);
     beds.hover('find-8');
     expect(beds.selected).toEqual(['find-1', 'find-8']);
@@ -57,7 +53,7 @@ describe('FindBeds', () => {
   it('flags one hero per patch: of the find’s own species, the plant nearest its middle', () => {
     const beds = new FindBeds({});
     const list = looks(60);
-    beds.set(list, R, new Set());
+    beds.set(list, R);
     const flagged = list.map((): Array<{ species: number; d: number; k: number }> => []);
     const nearest = list.map(() => Infinity);
     beds.meshes.forEach((mesh, species) => {
@@ -90,16 +86,41 @@ describe('FindBeds', () => {
     expect(beds.hero('not-a-find')).toBeNull();
   });
 
+  it('stands a hero where its patch grows it, upright, and taller and larger in focus or marked', () => {
+    const beds = new FindBeds({});
+    const list = looks(12);
+    beds.set(list, R);
+    for (const { bed } of list) {
+      const hero = beds.hero(bed.find)!;
+      const rest = heroStance(hero, R, { mark: 0, lift: 0, focus: 0, open: 0 });
+      // its foot on its own ground, its up the planet's there, its frame square and right-handed
+      expect(rest.foot.clone().normalize().angleTo(hero.dir)).toBeLessThan(1e-9);
+      expect(rest.foot.length()).toBeCloseTo(R + hero.ground, 1);
+      expect(rest.up.angleTo(hero.dir)).toBeLessThan(1e-9);
+      expect([rest.side.dot(rest.up), rest.forward.dot(rest.up), rest.side.dot(rest.forward)].map((d) => Math.abs(d) < 1e-9)).toEqual([true, true, true]);
+      expect(rest.side.clone().cross(rest.up).dot(rest.forward)).toBeCloseTo(1, 9);
+      // about its plant's own size
+      expect(rest.scale / hero.size).toBeGreaterThan(0.84);
+      expect(rest.scale / hero.size).toBeLessThan(1.16);
+      const focused = heroStance(hero, R, { mark: 0, lift: 0, focus: 1, open: 0 });
+      const marked = heroStance(hero, R, { mark: 1, lift: 0, focus: 0, open: 0 });
+      expect(focused.foot.length()).toBeGreaterThan(rest.foot.length() + 0.05);
+      expect(focused.scale).toBeGreaterThan(rest.scale * 1.2);
+      expect(marked.scale).toBeGreaterThan(rest.scale * 1.2);
+      expect(focused.side.angleTo(rest.side)).toBeLessThan(1e-9);
+    }
+  });
+
   it('fits 400 finds’ patches and spheres in 1 MB, hero flags and all', () => {
     const beds = new FindBeds({});
-    beds.set(looks(400), R, new Set());
+    beds.set(looks(400), R);
     const bytes = [...beds.meshes, beds.spheres].flatMap((m) => Object.values(m.geometry.attributes).map((a) => a.array.byteLength));
     expect(bytes.reduce((sum, b) => sum + b, 0)).toBeLessThanOrEqual(1_000_000);
   });
 
   it('brings one find’s hero into focus at a time', () => {
     const beds = new FindBeds({});
-    beds.set(looks(5), R, new Set());
+    beds.set(looks(5), R);
     beds.focus('find-2');
     expect(beds.focused).toBe('find-2');
     beds.focus(null);
@@ -108,7 +129,7 @@ describe('FindBeds', () => {
 
   it('hands the patches over to the spheres as the camera rises', () => {
     const beds = new FindBeds({});
-    beds.set(looks(5), R, new Set());
+    beds.set(looks(5), R);
     const at = (altitude: number, shown = true): [boolean, boolean, number] => {
       beds.update(altitude, shown);
       return [beds.bedsShown(), beds.spheres.visible, beds.spheresShown()];

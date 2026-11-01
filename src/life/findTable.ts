@@ -1,12 +1,11 @@
 // Each find's state, as its patch and its sphere read it: one row of STRIDE
 // floats per find, uploaded as a float texture (two texels a find, PER_ROW
 // finds to a row). Kept by find, not by place in the garden, so a find keeps
-// its planting, its card's light and its basket's mark when the garden is
-// laid out again round a newer basket.
+// its pulse, its card's light, its focus and its basket's mark when the
+// garden is laid out again round a newer basket.
 
-/** Planted long ago: fully grown. Not planted yet: hidden. */
+/** Long ago: a patch planted then stands fully grown, and a pulse or landing then is over. */
 export const LONG_AGO = -1e6;
-export const NOT_YET = 1e9;
 /** Floats per find (two RGBA texels), and finds per row of the texture. */
 export const STRIDE = 8;
 export const PER_ROW = 256;
@@ -61,11 +60,8 @@ export class FindTable {
     return s === undefined ? undefined : this.data[s * STRIDE + FIELD[field]];
   }
 
-  /**
-   * Lay out these finds, one row each in the order given. A find laid out before keeps its state; a new
-   * one stands grown. `hidden`: finds not planted yet, which wait unseen until planted.
-   */
-  assign(ids: readonly string[], hidden: ReadonlySet<string>): void {
+  /** Lay out these finds, one row each in the order given. A find laid out before keeps its state; a new one stands grown. */
+  assign(ids: readonly string[]): void {
     const data = new Float32Array(Math.max(1, Math.ceil(ids.length / PER_ROW)) * PER_ROW * STRIDE);
     const slots = new Map<string, number>();
     ids.forEach((id, s) => {
@@ -77,23 +73,12 @@ export class FindTable {
         data[at + FIELD.pulsed] = LONG_AGO;
         data[at + FIELD.landed] = LONG_AGO;
       }
-      if (hidden.has(id)) data[at + FIELD.planted] = NOT_YET;
-      else if (data[at + FIELD.planted] === NOT_YET) data[at + FIELD.planted] = LONG_AGO;
       slots.set(id, s);
     });
     this.data = data;
     this.ids = ids.slice();
     this.slots = slots;
     this.version++;
-  }
-
-  /** Plant these finds from `at` (s), one after another `gap` s apart. */
-  plant(ids: readonly string[], at: number, gap: number): void {
-    ids.forEach((id, k) => this.write(id, FIELD.planted, at + k * gap));
-  }
-
-  unplant(ids: readonly string[]): void {
-    for (const id of ids) this.write(id, FIELD.planted, NOT_YET);
   }
 
   pulse(ids: readonly string[], at: number): void {

@@ -11,7 +11,7 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, MuseStatus, P
 // turns it down). The rest of your side, and likes and stars a source doesn't
 // keep, are remembered in this browser only (localStorage, where it is allowed).
 
-export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'interests' | 'finds' | 'status' | 'friends';
+export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'visited' | 'interests' | 'finds' | 'status' | 'friends';
 
 /** A reaction that flips a switch the source keeps. */
 type Flip = Extract<Reaction, { liked: boolean } | { shared: boolean } | { favorite: boolean }>;
@@ -283,10 +283,11 @@ export class GardenState {
     return this.baskets.find((b) => !this.visited.has(b.id));
   }
 
+  /** You opened this basket: the rail's dot and the timeline's ring for it go. */
   visit(basketId: string): void {
     if (this.visited.has(basketId)) return;
     this.visited.add(basketId);
-    this.emit('baskets');
+    this.emit('visited');
   }
 
   // ---- postcards --------------------------------------------------------------

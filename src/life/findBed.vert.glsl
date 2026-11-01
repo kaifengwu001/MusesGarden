@@ -178,4 +178,12 @@ void main() {
   vec3 wp = warpPosition(world);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+  if (shown) {
+    // a hero landing or in focus is the flower that came home: drawn over its own patch (its depth brought
+    // HERO_NEAR m nearer, where it stands on the screen kept), so the plants round it never swallow it
+    vec4 view = viewMatrix * vec4(wp, 1.0);
+    view.z += HERO_NEAR;
+    vec4 near = projectionMatrix * view;
+    gl_Position = vec4(gl_Position.xy / gl_Position.w * near.w, near.z, near.w);
+  }
 }
