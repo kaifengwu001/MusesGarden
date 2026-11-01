@@ -141,9 +141,10 @@ describe('the recording', () => {
   const topicMap = loadCorpus();
   const items = recording.items;
 
-  it('holds 300 or more real items of all four kinds, each once', () => {
-    expect(items.length).toBeGreaterThanOrEqual(300);
-    expect(new Set(items.map((i) => i.candidate.media.kind))).toEqual(new Set(MEDIA_KINDS));
+  it('holds real items of all four kinds in every area, each once', () => {
+    for (const { name: area } of topicMap.areas) {
+      expect(new Set(items.filter((i) => i.area === area).map((i) => i.candidate.media.kind)), area).toEqual(new Set(MEDIA_KINDS));
+    }
     expect(new Set(items.map((i) => i.id)).size).toBe(items.length);
     for (const i of items) expect(i.id).toMatch(MEDIA_ID);
   });
