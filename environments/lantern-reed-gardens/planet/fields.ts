@@ -522,4 +522,3 @@ export function damp(species: number, wet: number): number {
       return 0.9 + 0.25 * wet;
   }
 }
-
