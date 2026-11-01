@@ -16,7 +16,11 @@
     "squint": "playwright test --project=squint",
     "verify": "npm run check && npm test && npm run test:gpu && npm run shots",
     "sim": "tsx --no-warnings server/cli/sim.ts",
-    "serve": "tsx --no-warnings server/http.ts"
+    "serve": "tsx --no-warnings server/http.ts",
+    "new-environment": "node --experimental-strip-types scripts/new-environment.ts",
+    "dev:scarlet": "vite --port 5227 --strictPort",
+    "build:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && vite build --config environments/scarlet-sail-canyon/vite.config.ts",
+    "check:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && eslint environments/scarlet-sail-canyon"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

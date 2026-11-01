@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
   return {
     base: './',
+    cacheDir: '.vite-cache',
     plugins: single ? [viteSingleFile()] : [],
     build: {
       target: 'es2022',

@@ -23,3 +23,7 @@ reference/muse/
 # the Muse server's local garden (npm run serve)
 .muse/
 .muse-live-e2e/
+
+dist-environments/
+
+.vite-cache/
