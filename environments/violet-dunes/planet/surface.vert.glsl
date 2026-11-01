@@ -23,6 +23,7 @@ uniform float uFlowerCells;      // flower tiles along a face's edge (0: none ye
 varying vec3 vDir;
 varying vec3 vWarped;
 varying vec3 vNormal;       // warped (lighting, rims)
+varying vec3 vGroundNormal; // unwarped slope, for camera-independent slip-face pigment
 varying float vClearing;
 varying float vSlope;
 varying float vBloom;
@@ -74,6 +75,7 @@ void main() {
   vDir = dir;
   vWarped = w;
   vNormal = warpNormal(p, n);
+  vGroundNormal = n;
   vClearing = g.clearing;
   vSlope = g.slope;
   vBloom = bloomAt(dir);

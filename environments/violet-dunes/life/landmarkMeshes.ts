@@ -54,11 +54,26 @@ function vertex(m: Mesh, p: Vector3, n: Vector3, part: readonly [number, number,
 
 function finish(m: Mesh): InstancedBufferGeometry {
   const g = new InstancedBufferGeometry();
-  g.setAttribute('position', new BufferAttribute(new Float32Array(m.pos), 3));
+  const positions = new Float32Array(m.pos);
+  const indices: number[] = [];
+  const seen = new Set<string>();
+  const at = (i: number): Vector3 => new Vector3(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+  for (let i = 0; i < m.idx.length; i += 3) {
+    const ids = m.idx.slice(i, i + 3);
+    const points = ids.map(at);
+    const cross = points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0]));
+    if (cross.lengthSq() < 1e-20) continue;
+    // A single thin surface is already visible from both sides. Never submit mirrored copies.
+    const key = points.map((p) => [p.x, p.y, p.z].map((v) => Math.round(v * 1e6)).join(',')).sort().join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    indices.push(...ids);
+  }
+  g.setAttribute('position', new BufferAttribute(positions, 3));
   g.setAttribute('normal', new BufferAttribute(new Float32Array(m.normal), 3));
   g.setAttribute('aPart', new BufferAttribute(new Float32Array(m.part), 4));
   g.setAttribute('aLeaf', new BufferAttribute(new Float32Array(m.leaf), 2));
-  g.setIndex(m.idx);
+  g.setIndex(indices);
   g.computeBoundingSphere();
   return g;
 }
@@ -217,7 +232,7 @@ function stem(m: Mesh, root: Vector3, tip: Vector3, bow: Vector3, width: number,
 
 /** A thin, folded leaf. Wide bases give orchard leaves their heart/kite silhouette. */
 function leaf(m: Mesh, at: Vector3, dir: Vector3, length: number, width: number, droop: number, slot: number, height: number, part = 2, broad = false): void {
-  const segments = part === 5 ? 3 : part === 6 ? 5 : 8;
+  const segments = part === 5 ? 2 : part === 6 ? 4 : height <= 1 ? 4 : 7;
   const across = new Vector3().crossVectors(dir, UP);
   if (across.lengthSq() < 1e-6) across.set(1, 0, 0);
   across.normalize();
@@ -248,7 +263,7 @@ function leaf(m: Mesh, at: Vector3, dir: Vector3, length: number, width: number,
 }
 
 /** Small visible fruit; hidden fruit is omitted from closed calyces. */
-function berry(m: Mesh, centre: Vector3, radius: number, height: number): void {
+function berry(m: Mesh, centre: Vector3, radius: number, height: number, slot = 0): void {
   const nx = 10;
   const ny = 6;
   const rows: number[][] = [];
@@ -261,7 +276,7 @@ function berry(m: Mesh, centre: Vector3, radius: number, height: number): void {
       const a = k / nx * Math.PI * 2;
       const n = new Vector3(Math.cos(a) * r, y, Math.sin(a) * r);
       const p = centre.clone().addScaledVector(n, radius);
-      row.push(vertex(m, p, n, [4, Math.max(p.y, 0) / height, 0, k / nx * 2 - 1], [v, radius * 2]));
+      row.push(vertex(m, p, n, [4, Math.max(p.y, 0) / height, slot, k / nx * 2 - 1], [v, radius * 2]));
     }
     rows.push(row);
   }
@@ -271,7 +286,7 @@ function berry(m: Mesh, centre: Vector3, radius: number, height: number): void {
 }
 
 /** Physalis: a softly inflated, five-ribbed papery calyx, not a geometric lamp. */
-function calyx(m: Mesh, top: Vector3, size: number, height: number, open: boolean, turn: number): void {
+function calyx(m: Mesh, top: Vector3, size: number, height: number, open: boolean, turn: number, slot = 0): void {
   const nx = 20;
   const ny = 7;
   const rows: number[][] = [];
@@ -284,30 +299,35 @@ function calyx(m: Mesh, top: Vector3, size: number, height: number, open: boolea
     for (let k = 0; k <= nx; k++) {
       const a = k / nx * Math.PI * 2 + turn;
       const rib = 1 + 0.065 * Math.cos(a * 5);
-      const r = radii[j] * size * rib;
-      const opening = open ? Math.pow(v, 1.6) * size * 0.21 : 0;
+      const r = radii[j] * size * 0.78 * rib;
+      const opening = open ? Math.pow(v, 1.6) * size * 0.065 : 0;
       const p = top.clone().add(new Vector3(Math.cos(a) * (r + opening), -v * size, Math.sin(a) * (r + opening)));
       const n = new Vector3(Math.cos(a), (0.5 - v) * 0.6, Math.sin(a)).normalize();
-      row.push(vertex(m, p, n, [3, Math.max(p.y, 0) / height, 0, k / nx * 2 - 1], [v, size]));
+      row.push(vertex(m, p, n, [3, Math.max(p.y, 0) / height, slot, a / Math.PI - 1], [v, size]));
     }
     rows.push(row);
   }
   for (let j = 0; j < ny; j++) for (let k = 0; k < nx; k++) {
     // Open calyces split into five sepals; two peel away and reveal the little fruit.
-    if (open && j > 2 && ((k >= 3 && k < 7) || (k >= 13 && k < 17))) continue;
+    if (open && j > 2 && ((k >= 3 && k < 7) || (k >= 13 && k < 16))) continue;
     m.idx.push(rows[j][k], rows[j + 1][k], rows[j + 1][k + 1], rows[j][k], rows[j + 1][k + 1], rows[j][k + 1]);
   }
-  if (open) berry(m, centre, size * 0.24, height);
+  if (open) berry(m, centre, size * 0.24, height, slot);
 }
 
 /** Arched orchard shrub: stems, broad golden leaves and natural papery husks. */
 export function reed(): InstancedBufferGeometry {
   const m = mesh();
   const H = KIT.reed[2];
+  const trunkRoot = new Vector3(0, -0.05, 0);
+  const trunkTip = new Vector3(0.08, 1.35, 0.02);
+  const trunkBow = new Vector3(-0.10, 0.03, 0.035);
+  const trunkAt = (t: number): Vector3 => trunkRoot.clone().lerp(trunkTip, t).addScaledVector(trunkBow, Math.sin(Math.PI * t));
+  stem(m, trunkRoot, trunkTip, trunkBow, 0.068, H);
   const stems = [
-    { root: new Vector3(0, -0.05, 0), tip: new Vector3(0.58, 2.65, 0.04), bow: new Vector3(-0.15, 0.2, 0.02) },
-    { root: new Vector3(0.03, -0.05, 0.05), tip: new Vector3(-0.68, 2.25, 0.27), bow: new Vector3(0.03, 0.18, 0.12) },
-    { root: new Vector3(-0.03, -0.05, -0.02), tip: new Vector3(0.28, 1.75, -0.6), bow: new Vector3(-0.06, 0.15, -0.05) },
+    { root: trunkAt(0.90), tip: new Vector3(0.58, 2.65, 0.04), bow: new Vector3(-0.15, 0.2, 0.02) },
+    { root: trunkAt(0.62), tip: new Vector3(-0.68, 2.25, 0.27), bow: new Vector3(0.03, 0.18, 0.12) },
+    { root: trunkAt(0.42), tip: new Vector3(0.28, 1.75, -0.6), bow: new Vector3(-0.06, 0.15, -0.05) },
   ];
   const on = (i: number, t: number): Vector3 => {
     const st = stems[i];
@@ -323,12 +343,12 @@ export function reed(): InstancedBufferGeometry {
     const dir = new Vector3(Math.cos(yaw) * 0.88, 0.8, Math.sin(yaw) * 0.88).normalize();
     leaf(m, on(i, t), dir, len, wid, 0.22, 0, H, 2, true);
   });
-  const fruits: Array<[number, number, number, boolean]> = [[0, 0.84, 0.42, true], [1, 0.8, 0.39, false], [2, 0.72, 0.35, false], [0, 0.49, 0.36, true]];
+  const fruits: Array<[number, number, number, boolean]> = [[0, 0.79, 0.39, false], [1, 0.77, 0.38, true], [2, 0.68, 0.35, false]];
   fruits.forEach(([i, t, size, open], k) => {
     const root = on(i, t);
     const tip = root.clone().add(new Vector3(k % 2 ? -0.24 : 0.25, -0.15, k % 2 ? 0.15 : -0.18));
     stem(m, root, tip, new Vector3(0, 0.05, 0), 0.015, H);
-    calyx(m, tip, size, H, open, k * 0.7);
+    calyx(m, tip, size, H, open, k * 0.7, k === 2 ? 4 : 0);
   });
   return finish(m);
 }

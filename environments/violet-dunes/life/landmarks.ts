@@ -41,16 +41,31 @@ export interface StarGroup {
   readonly density: number;
 }
 
-/** Separate outcrop islands, with the strongest foreground mass to the left of the route. */
+/** Broken outcrops sit inside the planted bank, not at the centres of repeated circular pots. */
 export const COMPOSITION_GROUPS: ReadonlyArray<readonly [number, number, number, number, number, number]> = [
-  // x, z, half width, half depth, stones, crowns
-  [-11.0, 9.5, 3.6, 3.0, 8, 9],
-  [-6.4, 2.5, 2.7, 2.3, 6, 7],
-  [9.5, 9.0, 2.2, 2.0, 4, 4],
-  [-5.8, -7.8, 3.8, 2.7, 6, 8],
-  [7.2, -11.2, 3.0, 2.4, 4, 4],
-  [-5.8, 17.4, 2.2, 1.8, 6, 3],
-  [5.8, 12.8, 2.2, 2.1, 3, 5],
+  // x, z, half width, half depth, stones, retained review weight
+  [-10.4, 12.1, 3.3, 2.4, 7, 9],
+  [-6.7, 4.1, 2.7, 2.1, 5, 7],
+  [-12.6, 7.0, 2.7, 1.9, 5, 6],
+  [-5.1, -4.8, 2.6, 2.2, 4, 6],
+  [8.6, 7.3, 2.3, 2.1, 4, 4],
+  [5.5, 13.7, 2.0, 1.7, 3, 3],
+  [6.5, -9.0, 2.4, 1.8, 3, 3],
+];
+
+interface AuthoredBed {
+  readonly polygon: ReadonlyArray<readonly [number, number]>;
+  readonly low: number;
+  readonly crowns: number;
+  readonly young: number;
+}
+
+/** The dominant connected left bank, a shelter tributary and two smaller irregular rims. */
+export const PLANT_BEDS: readonly AuthoredBed[] = [
+  { polygon: [[-15, 3], [-10, 1], [-6, 2.5], [-4, 7], [-5.5, 11], [-4.5, 18.5], [-8, 20], [-12.5, 16], [-15.2, 9]], low: 220, crowns: 18, young: 18 },
+  { polygon: [[-10, -8.5], [-4.5, -8.5], [-3.4, -4], [-3.7, 0.5], [-6, 3], [-10.5, -1]], low: 70, crowns: 8, young: 6 },
+  { polygon: [[4, 3.5], [8.5, 2.5], [11, 7], [8.7, 13], [5.8, 15.5], [3.5, 11], [4.5, 8]], low: 75, crowns: 8, young: 6 },
+  { polygon: [[4, -11], [8.8, -12.5], [11, -9], [7, -4.5], [4, -5.5]], low: 20, crowns: 4, young: 2 },
 ];
 
 /** Native fauna rest in these open sand pockets; vegetation must not occupy them. */
@@ -70,63 +85,78 @@ function random(seed: number): () => number {
   return () => unit((s = hash32(mix(s, 0x9e3779b9))));
 }
 
-/** One composed orchard: overlapping rock outcrops and plant pockets, separated by open sand. */
+/** A connected low planting bank with sparse airy crowns and an open, asymmetric sand corridor. */
 export function homePatch(): LandmarkInstance[] {
   const out: LandmarkInstance[] = [];
   const rand = random(0x5ad1);
-  const add = (kind: KitKind, x: number, z: number, scale: number, yaw: number): void => {
-    if (orchardClear(x, z)) return;
+  const stoneFeet: Array<{ x: number; z: number; yaw: number; halfX: number; halfZ: number }> = [];
+  const overStone = (x: number, z: number): boolean => stoneFeet.some((stone) => {
+    const dx = x - stone.x;
+    const dz = z - stone.z;
+    const c = Math.cos(stone.yaw);
+    const sn = Math.sin(stone.yaw);
+    return Math.abs(dx * c - dz * sn) < stone.halfX && Math.abs(dx * sn + dz * c) < stone.halfZ;
+  });
+  const add = (kind: KitKind, x: number, z: number, scale: number, yaw: number): boolean => {
+    if (orchardClear(x, z)) return false;
     const rock = !isPlant(kind);
     const footprint = rock ? Math.hypot(KIT[kind][0], KIT[kind][1]) * scale * 0.5 : 0.25;
-    if (rock && Math.abs(x) < 2.35 + footprint && z > -2.8 - footprint && z < 23 + footprint) return;
-    if (rock && Math.abs(x) < 3.2 + footprint && Math.abs(z) < 2.8 + footprint) return;
-    if (FAUNA_POCKETS.some(([px, pz]) => Math.hypot(x - px, z - pz) < 0.9 + footprint)) return;
-    out.push({ kind, x, z, yaw, scale, seed: rand(), leaves: kind === 'reed' ? 5 : 0 });
+    if (rock && Math.abs(x) < 2.35 + footprint && z > -2.8 - footprint && z < 23 + footprint) return false;
+    if (rock && Math.abs(x) < 3.2 + footprint && Math.abs(z) < 2.8 + footprint) return false;
+    if (FAUNA_POCKETS.some(([px, pz]) => Math.hypot(x - px, z - pz) < 0.9 + footprint)) return false;
+    if (!rock && overStone(x, z)) return false;
+    out.push({ kind, x, z, yaw, scale, seed: rand(), leaves: kind === 'reed' ? 3 + Math.floor(rand() * 3) : 0 });
+    if (rock) stoneFeet.push({ x, z, yaw, halfX: KIT[kind][0] * scale * 0.32, halfZ: KIT[kind][1] * scale * 0.30 });
+    return true;
   };
   const clustered = (): number => (rand() + rand() + rand() - 1.5) / 1.5;
-  COMPOSITION_GROUPS.forEach(([cx, cz, rx, rz, stones, crowns], group) => {
+  for (const [cx, cz, rx, rz, stones] of COMPOSITION_GROUPS) {
     const heading = rand() * Math.PI * 2;
-    // Overlapping broad faces are a small outcrop, never a line of equally spaced slabs.
     for (let k = 0; k < stones; k++) {
-      const x = cx + clustered() * rx * 0.88;
-      const z = cz + clustered() * rz * 0.88;
-      const kind = k === 0 || k % 3 === 0 ? 'slab' : 'block';
-      add(kind, x, z, k === 0 ? 1.2 + rand() * 0.2 : 0.72 + rand() * 0.48, heading + (rand() - 0.5) * 1.7);
+      const x = cx + clustered() * rx;
+      const z = cz + clustered() * rz;
+      add(k === 0 || k % 3 === 0 ? 'slab' : 'block', x, z, k === 0 ? 1.2 + rand() * 0.2 : 0.72 + rand() * 0.48, heading + (rand() - 0.5) * 1.7);
     }
-    // Chips concentrate below the exposed rock faces, with empty stretches between islands.
-    for (let k = 0; k < stones + 3; k++) {
+    for (let k = 0; k < stones + 2; k++) {
       const a = rand() * Math.PI * 2;
-      const r = 0.65 + rand() * 0.65;
+      const r = 0.55 + rand() * 0.65;
       add('wedge', cx + Math.cos(a) * rx * r, cz + Math.sin(a) * rz * r, 0.65 + rand() * 0.65, rand() * Math.PI * 2);
     }
-    for (let k = 0; k < crowns; k++) {
-      const a = heading + k * 2.39996 + (rand() - 0.5) * 0.8;
-      const r = 0.6 + rand() * 0.4;
-      const x = cx + Math.cos(a) * rx * r;
-      const z = cz + Math.sin(a) * rz * r;
-      const h = REED_HEIGHT[0] + (REED_HEIGHT[1] - REED_HEIGHT[0]) * rand();
-      add('reed', x, z, h / KIT.reed[2], a + rand() * 1.2);
-    }
-    // Each sheltered pocket mixes three to six close, overlapping low plants.
-    for (let pocket = 0; pocket < (group === 0 ? 10 : 6); pocket++) {
-      const a = heading + pocket * 1.7 + rand() * 0.4;
-      const px = cx + Math.cos(a) * rx * (0.8 + rand() * 0.25);
-      const pz = cz + Math.sin(a) * rz * (0.8 + rand() * 0.25);
-      const count = 4 + Math.floor(rand() * 3);
-      for (let k = 0; k < count; k++) {
-        const t = k * 2.39996;
-        const r = Math.sqrt((k + 0.3) / count) * (0.30 + rand() * 0.22);
-        add((k + pocket) % 3 === 0 ? 'comb' : 'tussock', px + Math.cos(t) * r, pz + Math.sin(t) * r, 0.78 + rand() * 0.36, rand() * Math.PI * 2);
-      }
-      if (pocket === 1) add('reed', px + 0.3, pz - 0.2, 0.40 + rand() * 0.08, rand() * Math.PI * 2);
-    }
-  });
-  // Two small doorstep groups are subordinate to the foreground outcrops.
-  for (const [x, z] of [[-3.8, -1], [4.1, -2]]) {
-    add('reed', x, z, 0.75, rand() * Math.PI * 2);
-    for (let k = 0; k < 8; k++) add(k % 3 === 0 ? 'comb' : 'tussock', x + (rand() - 0.5) * 1.1, z + (rand() - 0.5) * 1.1, 0.85 + rand() * 0.2, rand() * Math.PI * 2);
-    add('reed', x + 0.6, z + 0.8, 0.42, rand() * Math.PI * 2);
   }
+  const contains = (polygon: AuthoredBed['polygon'], x: number, z: number): boolean => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const [ax, az] = polygon[i];
+      const [bx, bz] = polygon[j];
+      if ((az > z) !== (bz > z) && x < (bx - ax) * (z - az) / (bz - az) + ax) inside = !inside;
+    }
+    return inside;
+  };
+  PLANT_BEDS.forEach((bed, index) => {
+    const xs = bed.polygon.map(([x]) => x);
+    const zs = bed.polygon.map(([, z]) => z);
+    const x0 = Math.min(...xs);
+    const x1 = Math.max(...xs);
+    const z0 = Math.min(...zs);
+    const z1 = Math.max(...zs);
+    const fill = (number: number, mode: 'low' | 'young' | 'crown'): void => {
+      let placed = 0;
+      for (let attempt = 0; attempt < number * 120 && placed < number; attempt++) {
+        const x = x0 + rand() * (x1 - x0);
+        const z = z0 + rand() * (z1 - z0);
+        if (!contains(bed.polygon, x, z)) continue;
+        // Broad irregular patches rather than points on circular planter rims.
+        const shelter = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(x * 0.83 + index) * Math.sin(z * 0.57 - index));
+        if (rand() > shelter) continue;
+        const kind: KitKind = mode === 'low' ? (rand() < 0.31 ? 'comb' : 'tussock') : 'reed';
+        const scale = mode === 'crown' ? (REED_HEIGHT[0] + (REED_HEIGHT[1] - REED_HEIGHT[0]) * rand()) / KIT.reed[2] : mode === 'young' ? 0.31 + rand() * 0.19 : kind === 'comb' ? 0.52 + rand() * 0.40 : 0.55 + rand() * 0.48;
+        if (add(kind, x, z, scale, rand() * Math.PI * 2)) placed++;
+      }
+    };
+    fill(bed.low, 'low');
+    fill(bed.young, 'young');
+    fill(bed.crowns, 'crown');
+  });
   return out;
 }
 

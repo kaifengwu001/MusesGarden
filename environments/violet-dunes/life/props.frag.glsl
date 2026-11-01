@@ -160,7 +160,7 @@ void main() {
     float sh = top ? max(cloud, 0.85 * cottageShadow(dir)) : shadow;
     col = painted(base, sunlight(ns, sun, sh), vec3(0.66, 0.66, 0.8));
     // violet sand drifted against the foot, and a dusting on the ledge toward its outer edge
-    float drift = top ? smoothstep(0.35, 0.05, min(2.47 - abs(vLocal.x), 2.37 - abs(vLocal.z))) * 0.3 * smoothstep(-0.2, 0.5, gnoise(vec3(vLocal.xz * 1.7, 2.0), 963u))
+    float drift = top ? (1.0 - smoothstep(0.05, 0.35, min(2.47 - abs(vLocal.x), 2.37 - abs(vLocal.z)))) * 0.3 * smoothstep(-0.2, 0.5, gnoise(vec3(vLocal.xz * 1.7, 2.0), 963u))
                       : 1.0 - smoothstep(-0.02, 0.06 + 0.05 * gnoise(vec3(uv.x * 1.6, 0.0, 3.0), 962u), vLocal.y);
     col = mix(col, painted(pal(ROW_SAND, 1), sunlight(vUp, sun, sh), vec3(0.72, 0.72, 0.86)), drift * 0.75);
   } else if (uKind == 1) {

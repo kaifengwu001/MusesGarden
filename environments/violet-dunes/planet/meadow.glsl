@@ -24,13 +24,9 @@ const float FLOWER_PAINT = 0.85;
 // The starflower dabs: never smaller than a flower (m) or than DAB_PIXELS on screen.
 const float DAB_METERS = 0.14;
 const float DAB_PIXELS = 4.0;
-// Ripples: spacing (m) of the coarser of the two trains drawn, and the
-// smallest spacing on screen (px) they are drawn at.
-const float RIPPLE_METERS = 0.32;
-const float RIPPLE_PIXELS = 3.0;
 // Pebbles: their size (m), and how many cells hold one on open sand and deep in the habitat.
-const float PEBBLE_METERS = 0.12;
-const vec2 PEBBLE_FILL = vec2(0.005, 0.22);
+const float PEBBLE_METERS = 0.09;
+const vec2 PEBBLE_FILL = vec2(0.002, 0.1);
 
 // Wind direction at a point: a solid-body rotation field around uWindVec.xyz.
 vec3 windDir(vec3 dir) {
@@ -194,56 +190,6 @@ float strokeAt(vec3 dir, float pixelMeters) {
   return mix(strokes(dir, f0, along, uTerrainSeed + 80u + lv), strokes(dir, f1, along, uTerrainSeed + 81u + lv), t);
 }
 
-// Ripple trains: lines running along the crests (the meridians of the grain
-// axis: the crests run along it), about RIPPLE_METERS apart. Two trains, at
-// the two whole-number frequencies around the axis that bracket that spacing
-// here, cross-faded, so as R grows they split or merge in place, never slide;
-// a gentle meander (the same in meters for both) keeps them from looking
-// ruled. Returns the light they add (−1..1, before strength) where they show.
-float ripplesAt(vec3 dir, float pixelMeters) {
-  vec3 g = uDuneGrain.xyz;
-  vec3 e1 = normalize(cross(g, abs(g.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
-  vec3 e2 = cross(g, e1);
-  vec2 q = vec2(dot(dir, e1), dot(dir, e2));
-  float ring = length(q) * uRadius; // the radius (m) of the circle around the axis through here
-  if (ring < 4.0) return 0.0;
-  float meander = 0.3 * patternNoise(dir, 2.6, pixelMeters, 6.0, uTerrainSeed + 130u) + 0.08 * patternNoise(dir, 0.8, pixelMeters, 6.0, uTerrainSeed + 132u);
-  float phi = atan(q.y, q.x) + meander / ring;
-  float l = log2(6.2831853 * ring / RIPPLE_METERS);
-  float l0 = floor(l);
-  float t = l - l0;
-  float f0 = exp2(l0);
-  float spacing0 = 6.2831853 * ring / f0;
-  // each train shows only where its lines are a few pixels apart
-  float v0 = smoothstep(RIPPLE_PIXELS, 2.0 * RIPPLE_PIXELS, spacing0 / pixelMeters);
-  float v1 = smoothstep(RIPPLE_PIXELS, 2.0 * RIPPLE_PIXELS, 0.5 * spacing0 / pixelMeters);
-  if (v0 <= 0.0) return 0.0;
-  // the light a ripple's two faces take: its slope across the lines toward the sun
-  vec3 across = normalize(cross(g, dir));
-  float toSun = dot(uSunDir, across);
-  float a = sin(phi * f0);
-  float b = sin(phi * 2.0 * f0);
-  // sharp-crested ripples: the lit face long and gentle, the shaded face short
-  float r0 = exp(-abs(a - 0.35) * 12.0) - 0.65 * exp(-abs(a + 0.35) * 12.0);
-  float r1 = exp(-abs(b - 0.35) * 12.0) - 0.65 * exp(-abs(b + 0.35) * 12.0);
-  return mix(r0 * v0, r1 * v1, t) * (0.3 + 0.7 * toSun);
-}
-
-// Two stable octave scales of broken pencil strokes. No fragment derivatives:
-// this paint chunk is also compiled by the vertex/ground-field passes.
-float pencilSand(vec3 dir, float pixelMeters) {
-  float f0, f1; uint level;
-  float t = patternOctaves(0.085, pixelMeters, 2.0, f0, f1, level);
-  vec3 axis = normalize(cross(uDuneGrain.xyz, vec3(0.31, 0.77, -0.48)));
-  float p0 = dot(dir, axis) * f0;
-  float p1 = p0 * 2.0;
-  float wobble = 0.18 * patternNoise(dir, 0.8, pixelMeters, 5.0, uTerrainSeed + 617u);
-  float a = 1.0 - smoothstep(0.05, 0.18, abs(fract(p0 + wobble) - 0.5));
-  float b = 1.0 - smoothstep(0.05, 0.18, abs(fract(p1 + wobble) - 0.5));
-  float broken = smoothstep(-0.3, 0.25, patternNoise(dir, 0.35, pixelMeters, 4.0, uTerrainSeed + 620u));
-  return mix(a, b, t) * broken * (1.0 - smoothstep(0.09, 0.22, pixelMeters));
-}
-
 // The sand's colour at a point.
 vec3 sandPaint(Sand s) {
   float tone = s.tone;
@@ -261,24 +207,9 @@ vec3 sandPaint(Sand s) {
   col = mix(col, pal(ROW_SAND, 3) * uSunTint, smoothstep(0.4, 0.9, st) * 0.3 * s.light);
   col = mix(col, pal(ROW_BRUSH, 1), smoothstep(-0.4, -0.9, st) * 0.3 * (1.0 - s.light * 0.4));
 
-  // ripple trains, near only: in patches, not on the trodden pad, fewer on steep faces and among the slate
-  float near = 1.0 - smoothstep(0.045, 0.095, s.pixelMeters);
-  if (near > 0.0) {
-    float train = smoothstep(-0.1, 0.25, patternNoise(s.dir, 7.0, s.pixelMeters, 6.0, uTerrainSeed + 134u));
-    float upright = smoothstep(0.25, 0.75, dot(s.normal, normalize(s.dir)));
-    float show = near * train * upright * (1.0 - s.clearing) * (1.0 - 0.6 * s.habitat);
-    if (show > 0.0) {
-      float r = ripplesAt(s.dir, s.pixelMeters) * show;
-      col = mix(col, r > 0.0 ? pal(ROW_SAND, 7) * uSunTint : pal(ROW_SAND, 8) * uShadeTint, abs(r) * 0.43 * s.sunlit);
-    }
-  }
-
-  float pencil = pencilSand(s.dir, s.pixelMeters);
-  col = mix(col, pal(ROW_SAND, 8), pencil * (0.3 + 0.15 * (1.0 - s.light)) * (1.0 - 0.6 * s.clearing));
-
-  // a very fine grain, only right underfoot
-  float grainShow = 1.0 - smoothstep(0.004, 0.012, s.pixelMeters);
-  if (grainShow > 0.0) col *= 1.0 + 0.05 * grainShow * gnoise(s.dir * (uRadius / 0.03), uTerrainSeed + 140u);
+  // Surface-scale grain and ripples are shaded in the fragment-only sand
+  // material. Keeping them out of this shared paint chunk also keeps the
+  // field-map and vertex passes derivative-free.
 
   // pebbles of slate: a scatter on open sand, many in the habitat; tiny marks far off
   float f0, f1;

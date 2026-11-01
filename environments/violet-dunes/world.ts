@@ -289,7 +289,7 @@ export class World {
     const side = new Vector3().crossVectors(animal.dir, animal.heading).normalize();
     const towardEye = animal.heading.clone().multiplyScalar(0.86).addScaledVector(side, 0.5).normalize();
     const focus = travel(animal.dir, towardEye, animal.distance / R, new Vector3());
-    const height = kind === 'dune-skipper' ? 0.75 : 0.5;
+    const height = kind === 'dune-skipper' ? 1.1 : 0.5;
     const altitude = Math.max(0.65, animal.height + height - this.terrain.height(focus));
     this.rig.lookAlong(focus, tangentToward(focus, animal.dir, new Vector3()));
     const zoom = this.rig.zoomForAltitude(altitude);

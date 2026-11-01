@@ -66,7 +66,14 @@ const STUD = 0.12;
 const PLATE = { w: 0.13, h: 0.15, y: EAVE - 0.075 } as const;
 const TIE = { w: 0.13, h: 0.13, y: 2.17 } as const;
 const RAFTER = { w: 0.11, h: 0.13 } as const;
-const RIDGE_BEAM = { w: 0.13, h: 0.15, y: RIDGE - 0.075 } as const;
+const RIDGE_BEAM = { w: 0.13, h: 0.15 } as const;
+const ARRIS = 0.2;
+const MAX_ROOF_BAY_SAG = 0.18;
+// A flat beam top cannot sit at the canvas's pointed ridge: its shoulders
+// would emerge through both slopes. Seat its actual chamfered section below
+// the lowest possible canvas at the shoulder, including the bay's sag.
+const RIDGE_SHOULDER = RIDGE_BEAM.w / 2 - ARRIS * Math.min(RIDGE_BEAM.w, RIDGE_BEAM.h);
+const RIDGE_BEAM_Y = RIDGE - RIDGE_BEAM.h / 2 - SLOPE * RIDGE_SHOULDER - MAX_ROOF_BAY_SAG * Math.sin(Math.PI * RIDGE_SHOULDER / WALL.x);
 const KING = 0.13;
 const JAMB = { w: 0.11, h: 0.12, x: DOOR.half + 0.055 } as const;
 const LINTEL = { h: 0.08, y: FLOOR + DOOR.height + 0.04 } as const;
@@ -299,6 +306,8 @@ interface Member {
   h: number;
   /** The way its depth is measured: any direction not along it. */
   up: Vector3;
+  /** An end cut through `to`, rather than a square cut across the axis. */
+  endNormal?: Vector3;
   flag?: 'timber' | 'door' | 'iron';
 }
 
@@ -321,19 +330,23 @@ function frame(): Member[] {
   // each gable: a king post from the tie beam to the ridge beam, two rafters from past the posts up to the ridge
   for (const sz of [-1, 1]) {
     const z = sz * WALL.z;
-    m.push(upright(0, z, TIE.y + TIE.h / 2, RIDGE_BEAM.y - 0.05, KING));
+    m.push(upright(0, z, TIE.y + TIE.h / 2, RIDGE_BEAM_Y - 0.05, KING));
     for (const sx of [-1, 1]) {
       const x = sx * (WALL.x + 0.14);
-      m.push(level(at3(x, roofLine(x) - RAFTER_DROP, z), at3(0, RIDGE - RAFTER_DROP, z), RAFTER.w, RAFTER.h));
+      // The two rafters meet on the ridge's vertical plane. Square end cuts
+      // let their front/back faces cover the same small patch at the apex.
+      m.push({ ...level(at3(x, roofLine(x) - RAFTER_DROP, z), at3(0, RIDGE - RAFTER_DROP, z), RAFTER.w, RAFTER.h), endNormal: at3(-sx, 0, 0) });
     }
   }
   // the ridge beam, front to back, stopping short of the canvas's ends
-  m.push(level(at3(0, RIDGE_BEAM.y, -ROOF.z + 0.1), at3(0, RIDGE_BEAM.y, ROOF.z - 0.1), RIDGE_BEAM.w, RIDGE_BEAM.h));
+  m.push(level(at3(0, RIDGE_BEAM_Y, -ROOF.z + 0.1), at3(0, RIDGE_BEAM_Y, ROOF.z - 0.1), RIDGE_BEAM.w, RIDGE_BEAM.h));
   // the door frame: jambs up to the tie beam, a lintel over the door, a threshold under it
   const z = WALL.z;
   for (const sx of [-1, 1]) m.push(upright(sx * JAMB.x, z, FLOOR, TIE.y, JAMB.w, JAMB.h));
-  m.push(level(at3(-JAMB.x - 0.05, LINTEL.y, z), at3(JAMB.x + 0.05, LINTEL.y, z), JAMB.h, LINTEL.h));
-  m.push(level(at3(-JAMB.x - 0.05, FLOOR + 0.02, z), at3(JAMB.x + 0.05, FLOOR + 0.02, z), 0.14, 0.04));
+  // Jambs own the corners; horizontal pieces butt against their inner faces.
+  // In particular, the threshold must not duplicate the jambs' bottom caps.
+  m.push(level(at3(-DOOR.half, LINTEL.y, z), at3(DOOR.half, LINTEL.y, z), JAMB.h, LINTEL.h));
+  m.push(level(at3(-DOOR.half, FLOOR + 0.02, z), at3(DOOR.half, FLOOR + 0.02, z), 0.14, 0.04));
   // the door, its planks set back a little in the frame, and an iron pull
   const doorTop = LINTEL.y - LINTEL.h / 2;
   m.push({ from: at3(0, FLOOR + 0.04, z - 0.01), to: at3(0, doorTop - 0.005, z - 0.01), w: 2 * DOOR.half - 0.02, h: 0.045, up: Z, flag: 'door' });
@@ -350,9 +363,11 @@ function workNook(): Member[] {
   m.push(level(at3(loX, top, (loZ + hiZ) / 2), at3(hiX, top, (loZ + hiZ) / 2), hiZ - loZ, 0.05));
   for (const x of [1.2, 1.73]) {
     const z = 2.075, w = 0.36, d = 0.235;
+    const rim = 0.021;
     m.push(level(at3(x - w / 2, top + 0.036, z), at3(x + w / 2, top + 0.036, z), d, 0.022));
-    for (const zz of [z - d / 2, z + d / 2]) m.push(level(at3(x - w / 2, top + 0.0745, zz), at3(x + w / 2, top + 0.0745, zz), 0.021, 0.055));
-    for (const xx of [x - w / 2, x + w / 2]) m.push(level(at3(xx, top + 0.0745, z - d / 2), at3(xx, top + 0.0745, z + d / 2), 0.021, 0.055));
+    for (const zz of [z - d / 2, z + d / 2]) m.push(level(at3(x - w / 2, top + 0.0745, zz), at3(x + w / 2, top + 0.0745, zz), rim, 0.055));
+    // Long rims own each corner; end rims fit between them without layered caps.
+    for (const xx of [x - (w - rim) / 2, x + (w - rim) / 2]) m.push(level(at3(xx, top + 0.0745, z - (d - rim) / 2), at3(xx, top + 0.0745, z + (d - rim) / 2), rim, 0.055));
   }
   return m;
 }
@@ -364,12 +379,16 @@ function member(b: Builder, m: Member, seed: number): void {
   dir.divideScalar(len);
   const side = new Vector3().crossVectors(m.up, dir).normalize();
   const up = new Vector3().crossVectors(dir, side);
-  const ring = chamfered(m.w / 2, m.h / 2, 0.2 * Math.min(m.w, m.h));
+  const ring = chamfered(m.w / 2, m.h / 2, ARRIS * Math.min(m.w, m.h));
   const flag = TIMBER_FLAG[m.flag ?? 'timber'];
   const segs = Math.max(1, Math.ceil(len / 0.9));
   const p = new Vector3();
   const n = new Vector3();
-  const at = (s: number, u: number, along: number): Vector3 => p.copy(m.from).addScaledVector(dir, along).addScaledVector(side, s).addScaledVector(up, u);
+  const at = (s: number, u: number, along: number): Vector3 => {
+    let end = len;
+    if (m.endNormal) end -= (m.endNormal.dot(side) * s + m.endNormal.dot(up) * u) / m.endNormal.dot(dir);
+    return p.copy(m.from).addScaledVector(dir, along / len * end).addScaledVector(side, s).addScaledVector(up, u);
+  };
   ring.forEach(([s0, u0], k) => {
     const [s1, u1] = ring[(k + 1) % ring.length];
     const width = Math.hypot(s1 - s0, u1 - u0);
@@ -390,7 +409,7 @@ function member(b: Builder, m: Member, seed: number): void {
     [0, -1],
     [len, 1],
   ] as const) {
-    n.copy(dir).multiplyScalar(sign);
+    n.copy(sign > 0 && m.endNormal ? m.endNormal : dir).multiplyScalar(sign);
     const ids = ring.map(([s, u]) => b.vertex(at(s, u, along), n, s, u, [m.w / 2, m.h / 2, seed, endFlag]));
     for (let k = 1; k + 1 < ids.length; k++) b.tri(ids[0], ids[k], ids[k + 1]);
   }
@@ -431,7 +450,7 @@ function lashings(): Lashing[] {
   for (const sz of [-1, 1]) {
     const z = sz * WALL.z;
     cross(at3(0, TIE.y + TIE.h / 2 + 0.01, z), X, Z, KING / 2);
-    cross(at3(0, RIDGE_BEAM.y - 0.1, z), X, Z, KING / 2, 0.095);
+    cross(at3(0, RIDGE_BEAM_Y - 0.1, z), X, Z, KING / 2, 0.095);
   }
   for (const sx of [-1, 1]) cross(at3(sx * JAMB.x, TIE.y, WALL.z), X, Z, JAMB.h / 2);
   for (const z of SIDE_STUDS) for (const sx of [-1, 1]) cross(at3(sx * WALL.x, PLATE.y - 0.03, z), Z, X, PLATE.w / 2);
@@ -639,7 +658,7 @@ export class Homestead {
     const timber = new Builder();
     for (const m of [...frame(), ...workNook()]) member(timber, m, rand.next());
     const cloth = new Builder();
-    roof(cloth, { bay: rand.range(0.14, 0.18), eave: rand.range(0.075, 0.1), end: rand.range(0.085, 0.115) });
+    roof(cloth, { bay: rand.range(0.14, MAX_ROOF_BAY_SAG), eave: rand.range(0.075, 0.1), end: rand.range(0.085, 0.115) });
     walls(cloth, rand);
     const rope = new Builder();
     for (const l of lashings()) lashing(rope, l, rand.next());

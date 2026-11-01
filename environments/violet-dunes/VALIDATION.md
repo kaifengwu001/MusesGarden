@@ -1,7 +1,7 @@
 # Paper Orchard validation
 
-Review date: 1 November 2026. Checkout: `violet-dunes-refinement-01a195f7`,
-branch `planet/violet-dunes-refinement`, based on `8e4b9f9`. Preview port 5231.
+Review date: 1 November 2026. Delivery branch: `environment_violet_dune`,
+based on `main` at `ad37acf`. Preview port 5231.
 
 ## Visual contract
 
@@ -12,9 +12,9 @@ supersedes the original diamond seed packets and the intermediate flat fans.
 
 | Relationship | Implementation to inspect |
 | --- | --- |
-| Violet granular sand, wind-worked crests and open interdune ground | Three asymmetric curved authored ridges over meter-scaled procedural dunes; separate slip-face pigment, broken ripple lines and pencil strokes |
+| Violet granular sand, wind-worked crests and open interdune ground | Four asymmetric curved crest profiles over meter-scaled procedural dunes; separate slip-face pigment, broken wind-ripple trains and filtered mineral grain |
 | Golden crowns with natural papery fruit | Thin tapering leaves, curved branching stems, rounded five-rib calyces and some openings showing a gold berry; no artificial lamp fittings or glow |
-| Dense planted slate islands framing a quieter route | Overlapping chipped slate, ivory feather fronds, periwinkle low foliage and small gold growth; distinct groups rather than continuous stone rails |
+| Dense planted slate islands framing a quieter route | Connected left planting bank, shelter tributary and smaller right rim; three height layers of ivory fronds, periwinkle low foliage and golden Physalis |
 | A small inhabited home among plants | Slate courses, visible timber, sagging canvas, work shelf and trays; protected floor and Muse apron |
 | Rose sky without a warm filter over every material | Local pink sky palette and distant lilac cirrus; neutral daylight on slate, cloth and sand |
 | Recognisable native life | Three four-footed dune skippers, four two-winged seed gliders, physical landing stems and matching animated shadows |
@@ -36,8 +36,44 @@ slate has physical fractured edges; thin plants retain independent scale.
 The review page places the concept beside actual app checkpoints. The
 `checkpoint-first-pass.png` image is an intermediate integrated pass preserved
 before the later composition/material fixes; it is **not** a pristine capture
-of the original implementation. Raw captures and machine-readable evidence
+of the original implementation. `material-before.png` preserves the preceding
+PR checkpoint at the same Orchard camera, before this material/planting pass.
+The sand, paper and shelter-joint close views are raw renderer exports.
+Raw captures and machine-readable evidence
 are generated under `shots/violet-dunes/refinement/` and are ignored by Git.
+
+## Current material and surface pass
+
+- Sand now has independently shaded light shoulders and sheltered ripple
+  edges, broken wind-aligned trains, fine grain and sparse individual mineral
+  flecks. Detail fades with its pixel footprint. The broad slip-face pigment
+  is applied before the granular paint rather than covering it afterward.
+- Authored crests use a maximum envelope instead of adding together into one
+  swollen mound. The CPU supplies the same four ridge parameters to GLSL;
+  terrain, planting and picking use the same surface.
+- Physalis uses narrower ovoid husks, five longitudinal ribs, branching veins,
+  fine fibres and warm tan paper shading. Leaves have midribs, side veins,
+  restrained pigment variation, dry tips and backlit edges.
+- The local authored patch now contains 455 plants (70 Physalis, 117 ivory
+  frond plants and 268 low plants), compared with 289. Planting forms irregular
+  connected banks with young, medium and tall crowns while retaining the
+  entrance, approach and animal pockets. Its 222,060 authored triangles are
+  below the previous 272,336 and the unchanged 300,000 limit.
+- Actual triangle-interior clipping identified 77 visible coplanar overlaps
+  in the old timber joints. Rafters now meet with mitred ends; lintel,
+  threshold and tray rims butt together. The ridge beam sits below the actual
+  sagging roof. No polygon offset masks these joints. Thin plant templates
+  omit collapsed pole/tip triangles and duplicate double-sided faces.
+- A strict close-camera test exposed intermittent Muse silhouette pixels.
+  The local fur shader now evaluates derivatives before branches/discards,
+  derives footprints from ordinary interpolation while retaining centroid
+  shading coordinates, and uses defined ascending-edge smoothsteps. The final
+  suite passes three identical redraws at every close/orbit view and an exact
+  return to its starting camera. Three additional fresh focused runs passed.
+
+The static surface checks cover the actual shelter triangles at seeds 1, 412
+and 771, including beam-to-canvas clearance and one supported walking floor.
+They do not infer geometric overlap merely from matching vertex indices.
 
 ## Correctness findings
 
@@ -65,26 +101,30 @@ are generated under `shots/violet-dunes/refinement/` and are ignored by Git.
   this change. The source checkout remains untouched; delivery uses its own
   branch based on current `main`.
 
-## Validated refinement checks
+## Current validation
 
 | Check | Result |
 | --- | --- |
 | TypeScript and ESLint | `npm run check` passes |
-| Environment CPU contracts | 42 tests in six files pass, including actual fauna feet, asset bounds, authored slopes and bake allocation/disposal |
+| Environment CPU contracts | 52 tests in seven files pass, including triangle overlap, plant topology/composition, actual fauna feet, asset bounds, authored slopes and bake allocation/disposal |
 | Browser invariants | All 12 pass, including three exact frozen-frame checks, CPU/GPU parity, picking, growth performance, walking/resize continuity, MSAA colours, startup/draw budgets and URL state |
 | Expanded ecology | Passes at R40 → R128 → R400 → R128; 64 ground/warp samples at each size, all nine view captures, no shader or runtime errors, exact returned globe hash |
-| Height agreement | Maximum error 6.92 mm at R40, 4.49 mm at R128 and 12.48 mm at R400, under the unchanged 20 mm limit |
-| Growth performance | Local 1600×1000 Metal run: frame p95 16.80 ms, JS p95 4.40 ms, max build slice 8.30 ms, all inside unchanged thresholds |
-| Frame continuity | 347 observed frames, two resizes, zero blank frames and zero tile drops |
-| MSAA material range | Four samples, scene RGB 0.020–1.025, inside the unchanged 0–3 range |
+| Material and joint motion | Three close views plus a 17-step orbit/dolly, three exact redraws at each pose, exact starting-camera return, no runtime or shader errors |
+| Height agreement | Maximum error 4.80 mm at R40, 4.15 mm at R128 and 12.48 mm at R400, under the unchanged 20 mm limit |
+| Growth performance | Final 1600×1000 Metal run: frame p95 16.70 ms, JS p95 4.50 ms, max build slice 8.10 ms, all inside unchanged thresholds |
+| Frame continuity | 355 observed frames, two resizes, zero blank frames and zero tile drops |
+| MSAA material range | Four samples, scene RGB 0.018–1.025, inside the unchanged 0–3 range |
 | View matrix | 19 desktop, medium and mobile captures written; baseline recorded, no older-frame equality claim |
 | Production build | Standalone Vite build passes |
 | Isolation and formatting | `git diff --check` passes; no changed paths outside this environment |
 
 One inherited browser test remains marked `fixme`: automatic detection of LOD
 rings during a dolly. It is not counted as a pass. Performance numbers describe
-this local run; an extra concurrently rendering preview produced a slower run,
-so the final measurement used one active app render loop.
+this local run. The final combined ecology/invariants/frame-lock run has
+16 passes, one inherited skip and no failures. Earlier integration and material
+runs measured frame p95 33.40 ms; the final run measured 16.70 ms with the same
+thresholds. This host variation remains recorded rather than implying a frame
+rate guarantee on other hardware or with concurrent rendering clients.
 
 The durable [check summary](reference/validation-evidence.json) preserves the
 growth errors, repeated-frame hashes and test annotations. The review exports
@@ -131,15 +171,10 @@ untouched `main` also changes 300 pixels (maximum channel difference 126).
 This inherited self-check variation is not counted as a successful equality
 check and was not changed here.
 
-Integration verification: root type checks and lint, the 42 environment CPU
-tests and standalone production build pass. The orchard, survey and Muse views
-are pixel-identical to refinement commit `b697519`. Both ecology tests pass;
-the browser run totals 13 passes, one failure and one inherited `fixme` skip.
-
-The remaining failure is the unchanged growth frame-time ceiling: the current
-integration run and one focused repeat both measure frame p95 33.40 ms against
-the 20 ms limit. The focused run's JS p95 is 4.20 ms and maximum build slice is
-8.20 ms, within their respective limits. The earlier refinement run measured
-16.80 ms with one active render loop. Current GPU/presentation performance is
-therefore recorded as an open check, not claimed to pass on this host. No
-threshold or scene detail was reduced for the integration.
+The original integration passed root checks, 42 CPU tests and its production
+build. Its Orchard, survey and Muse frames matched refinement commit `b697519`
+exactly. That is historical evidence for the integration, not a claim that the
+new material/planting pass matches those older frames. The original browser
+run had 13 passes, one frame-time failure at 33.40 ms and one inherited skip.
+The current results above supersede that check; its raw summary is retained
+in the durable evidence file. Shared source is still unchanged.

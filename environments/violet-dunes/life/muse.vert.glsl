@@ -43,6 +43,12 @@ attribute float aOpen; // open sky over the skin (0 deep in a crease … 1 open)
 // (all read at the centroid, as in grass.frag.glsl: under MSAA a sub-pixel triangle's
 // centre would extrapolate them, and the paint built from them, far out of range)
 centroid varying vec3 vRest;   // the rest position (H): the strands and the face's paint stay fixed to it
+// Footprints use pixel-centre interpolation; centroid positions can choose
+// different covered samples in adjacent pixels of the overlapping shells.
+varying vec3 vRestGradient;
+#ifdef MUSE_FACET
+varying vec3 vPlanetGradient;
+#endif
 centroid varying vec3 vNormal; // planet space, unwarped (the light)
 centroid varying vec3 vPlanet; // planet space (m), unwarped
 centroid varying vec3 vWorld;  // warped
@@ -130,6 +136,10 @@ void main() {
   vRest -= aComb * (len / uMuseSize.x) * lie;
 #endif
   vec3 wp = warpPosition(world);
+  vRestGradient = vRest;
+#ifdef MUSE_FACET
+  vPlanetGradient = world;
+#endif
   vNormal = nw;
   vPlanet = world;
   vWorld = wp;

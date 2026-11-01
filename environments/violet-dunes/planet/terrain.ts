@@ -28,12 +28,13 @@ export const HOME = { flat: 4.8, blend: 7.2, calm: 12, calmKeep: 0.78 } as const
 const HOME_LEVEL_REACH = 8;
 /** Authored dune ridges behind the settlement; same meter-space recipe in terrain.glsl. */
 export const ORCHARD_DUNES = [
-  [28, -28, 10, 16, 30],
-  [-25, -62, 11, 15, 30],
-  [25, -95, 15, 16, 40],
+  [28, -23, 5.2, 9.5, 22],
+  [58, -49, 11.5, 15, 34],
+  [-22, -76, 8.5, 17, 32],
+  [30, -99, 15.5, 20, 42],
 ] as const;
 const ORCHARD_REACH = 112;
-const ORCHARD_MAX = 36;
+const ORCHARD_MAX = Math.max(...ORCHARD_DUNES.map((dune) => dune[2]));
 /** The shelter's plinth (props.ts PLINTH): half sizes (m). */
 export const PLINTH_HALF = { x: 2.5, z: 2.4 } as const;
 /** The approach to the door, left unplanted: x0, x1, z0, z1 (m, shelter-local). */
@@ -236,7 +237,7 @@ export class Terrain {
         const dz = c.z - z - bend;
         const q = dz / (dz < 0 ? width * 2.2 : width);
         const profile = Math.max(0, 1 - Math.sqrt(q * q + 0.0009));
-        dunes += amplitude * profile * Math.exp(-(dx ** 2));
+        dunes = Math.max(dunes, amplitude * profile * Math.exp(-(dx ** 2)));
       }
       h += dunes * smoothstep(14, 24, dc) * (1 - smoothstep(90, ORCHARD_REACH, dc));
     }
@@ -313,6 +314,9 @@ export interface TerrainUniforms {
   uCottage: { value: Vector4 };
   /** Toward the shelter's front (xyz). */
   uCottageB: { value: Vector4 };
+  /** Four authored crest profiles and their along-crest lengths, shared with the GPU. */
+  uOrchardRidges: { value: Vector4[] };
+  uOrchardLengths: { value: Vector4 };
   /** Shadow sweep per meter of height in shelter-local x, z (sun direction / its elevation). */
   uCottageSun: { value: Vector4 };
   /** Starflower clumps (Fields.clumps): octave level, blend, threshold, patchiness. */
@@ -329,6 +333,8 @@ export function createTerrainUniforms(): TerrainUniforms {
     uBank: { value: new Vector4(BANK.height, BANK.width, 0.75, BANK.minSlope) },
     uCottage: { value: new Vector4(0, 1, 0, 0) },
     uCottageB: { value: new Vector4(1, 0, 0, 0) },
+    uOrchardRidges: { value: ORCHARD_DUNES.map(([x, z, height, width]) => new Vector4(x, z, height, width)) },
+    uOrchardLengths: { value: new Vector4(...ORCHARD_DUNES.map((dune) => dune[4]) as [number, number, number, number]) },
     uCottageSun: { value: new Vector4(0, 0, 0, 0) },
     uClumps: { value: new Vector4(0, 0, 0, 0) },
     uDuneGrain: { value: new Vector4(0, 1, 0, 0) },

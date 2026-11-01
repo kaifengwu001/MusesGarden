@@ -34,13 +34,17 @@
   <div class="views" aria-label="Implementation review views">
     <button aria-pressed="true" data-file="checkpoint-orchard.png" data-label="Orchard">Orchard</button>
     <button aria-pressed="false" data-file="checkpoint-dunes.png" data-label="Dune survey">Dune survey</button>
+    <button aria-pressed="false" data-file="checkpoint-sand.png" data-label="Sand and ripple close view">Sand</button>
+    <button aria-pressed="false" data-file="checkpoint-paper.png" data-label="Paper husks and leaf veins">Paper and leaves</button>
+    <button aria-pressed="false" data-file="checkpoint-joints.png" data-label="Shelter floor and joints">Shelter joints</button>
     <button aria-pressed="false" data-file="checkpoint-skipper.png" data-label="Dune skipper">Dune skipper</button>
     <button aria-pressed="false" data-file="checkpoint-glider.png" data-label="Seed glider">Seed glider</button>
     <button aria-pressed="false" data-file="checkpoint-planet.png" data-label="Whole planet · R128">Whole planet</button>
+    <button aria-pressed="false" data-file="material-before.png" data-label="Before material and planting revision">Before materials</button>
     <button aria-pressed="false" data-file="checkpoint-first-pass.png" data-label="Earlier integrated pass">Earlier pass</button>
   </div>
   <figure><img id="detail" src="checkpoint-orchard.png" alt="Orchard implementation checkpoint."><figcaption id="caption">Orchard · actual app checkpoint</figcaption></figure>
-  <p class="note">Compare the large dune shapes, open route and grouped planting first, then inspect slate, thin calyces, canvas, ground contacts and animal anatomy. The earlier pass is a saved intermediate state, not an untouched baseline. Broader shapes and simpler drawing detail remain visible differences from the concept.</p>
+  <p class="note">Compare the large dune shapes, open route and grouped planting first, then inspect grain, wind ripples, thin calyces, leaf veins and shelter joints. “Before materials” uses the same Orchard camera as the current checkpoint. The earlier pass is a saved intermediate state, not an untouched baseline. Broader shapes and simpler drawing detail remain visible differences from the concept.</p>
 </main>
 <script>
   for (const button of document.querySelectorAll('button[data-file]')) {

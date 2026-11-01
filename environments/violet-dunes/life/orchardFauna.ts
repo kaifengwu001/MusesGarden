@@ -136,7 +136,7 @@ export class OrchardFauna {
     const animal = this.animals.find(({ motion }) => motion.anchor.kind === kind);
     if (!animal) return null;
     const p = animal.motion.pose, skipper = kind === 'dune-skipper';
-    return { dir: p.dir.clone(), height: p.height + (skipper ? 0.33 : 0.06), heading: p.heading.clone(), distance: skipper ? 3.2 : 2.6 };
+    return { dir: p.dir.clone(), height: p.height + (skipper ? 0.33 : 0.06), heading: p.heading.clone(), distance: skipper ? 2.3 : 2.6 };
   }
 
   snapshot(): OrchardFaunaSnapshot[] {

@@ -262,3 +262,54 @@ test('camera composition review', async ({ page }) => {
     await page.locator('#scene').screenshot({ path: `${OUT}/camera-${view.name}.png` });
   }
 });
+
+test('material close views and shelter camera motion remain stable', async ({ page }) => {
+  test.setTimeout(180_000);
+  const out = 'shots/violet-dunes/materials';
+  mkdirSync(out, { recursive: true });
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.goto('/environments/violet-dunes/#q=high&hud=0&t=12');
+  await page.waitForFunction(() => window.__meadow?.isReady, undefined, { timeout: 120_000 });
+  type View = { height: number; distance: number; azimuth: number; at: number[] };
+  const place = async (view: View): Promise<{ hash: string; png: string }> => page.evaluate(async view => {
+    const m = window.__meadow;
+    if (!m) throw new Error('harness missing');
+    const world = (window as unknown as { __world: { frameHome(view: unknown, immediate: boolean): void } }).__world;
+    m.freeze(12);
+    m.setScale(1);
+    world.frameHome(view, true);
+    await m.settle();
+    await m.settle();
+    const hashes = [m.frameHash(), m.frameHash(), m.frameHash()];
+    if (new Set(hashes).size !== 1) throw new Error(`frozen material view changes between draws: ${JSON.stringify({ view, hashes })}`);
+    m.renderFrame();
+    return { hash: hashes[0], png: document.querySelector<HTMLCanvasElement>('#scene')!.toDataURL('image/png') };
+  }, view);
+  const save = (name: string, png: string): void => {
+    writeFileSync(`${out}/${name}.png`, Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
+  };
+  for (const [name, view] of [
+    ['sand-close', { height: 1.1, distance: 5, azimuth: -0.1, at: [0, 0.1, 15] }],
+    ['shelter-floor', { height: 1.6, distance: 7, azimuth: 0.3, at: [0, 0.35, 2] }],
+    ['paper-close', { height: 2.2, distance: 5, azimuth: -0.25, at: [-7, 1, 3] }],
+  ] as Array<[string, View]>) save(name, (await place(view)).png);
+
+  const initial: View = { height: 4, distance: 9, azimuth: -0.35, at: [0, 1, 0] };
+  const first = await place(initial);
+  const frames: string[] = [];
+  // Frozen time separates surface ownership from plant wind and animation.
+  // A small orbit/dolly crosses roof, door and floor joints continuously.
+  for (let k = 0; k < 17; k++) {
+    const result = await place({ ...initial, distance: 9 - k * 0.02, azimuth: -0.35 + k * 0.009 });
+    frames.push(result.hash);
+    if (k % 4 === 0) save(`shelter-motion-${String(k).padStart(2, '0')}`, result.png);
+  }
+  expect((await place(initial)).hash, 'camera return restores exactly the same supported surfaces').toBe(first.hash);
+  expect(new Set(frames).size, 'the camera actually moves across the joints').toBeGreaterThan(10);
+  expect(errors, 'no shader or runtime errors in close views').toEqual([]);
+  writeFileSync(`${out}/motion-evidence.json`, `${JSON.stringify({ time: 12, scale: 1, frames, returnHash: first.hash, errors }, null, 2)}\n`);
+});

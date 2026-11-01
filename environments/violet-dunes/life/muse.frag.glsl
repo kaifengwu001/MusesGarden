@@ -37,6 +37,10 @@ varying vec3 vWeightColour;
 #endif
 
 centroid varying vec3 vRest;
+varying vec3 vRestGradient;
+#ifdef MUSE_FACET
+varying vec3 vPlanetGradient;
+#endif
 centroid varying vec3 vNormal;
 centroid varying vec3 vPlanet;
 centroid varying vec3 vWorld;
@@ -73,14 +77,13 @@ float vnoise(vec3 p) {
 // How high the coat reaches here (× the fur's length): strands in clumps, the
 // strands given up for the clumps where they are finer than a pixel, the
 // clumps for their mean further off.
-float coat(vec3 q, float shell) {
-  float px = max(length(fwidth(q)), 1e-6);
+float coat(vec3 q, float shell, float px) {
   float clump = vnoise(q / 0.009);
   vec3 cell = floor(q / 0.0024);
   vec3 c = fract(q / 0.0024) - 0.5;
   float strand = hash13(cell + 13.7) * (1.0 - 1.6 * dot(c, c));
-  float fine = smoothstep(0.0024 * 1.6, 0.0024 * 0.8, px);
-  float coarse = smoothstep(0.011 * 1.5, 0.011 * 0.8, px);
+  float fine = 1.0 - smoothstep(0.0024 * 0.8, 0.0024 * 1.6, px);
+  float coarse = 1.0 - smoothstep(0.011 * 0.8, 0.011 * 1.5, px);
   float reach = mix(0.6, 1.0, clump) * mix(1.0, 0.62 + 0.5 * strand, fine);
   return mix(0.62, reach, coarse);
 }
@@ -88,10 +91,9 @@ float coat(vec3 q, float shell) {
 // The face's paint over the skin (rest position, H): returns the colour. A
 // smile (0 … 1) widens and deepens the mouth and lifts the cheeks under the
 // eyes a little.
-vec3 face(vec2 f, float eyes, float smile, out float dark) {
+vec3 face(vec2 f, float eyes, float smile, out float dark, float aa) {
   vec3 col = SKIN;
   dark = 0.0;
-  float aa = max(length(fwidth(f)), 1e-5);
   // blush on each cheek
   vec2 b = vec2(abs(f.x), f.y) - BLUSH_AT.xy;
   col = mix(col, BLUSH, 0.6 * exp(-2.4 * dot(b, b) / (BLUSH_AT.z * BLUSH_AT.z)));
@@ -138,6 +140,14 @@ vec3 face(vec2 f, float eyes, float smile, out float dark) {
 }
 
 void main() {
+  // A fur strand may discard just one lane of a fragment quad. Evaluate
+  // both footprints while every lane is active, before the shell/face
+  // branches, so neighbouring coverage cannot change their derivatives.
+  float coatFootprint = max(length(fwidth(vRestGradient * uMuseSize.x)), 1e-6);
+  float faceFootprint = max(length(fwidth(vRestGradient.xy)), 1e-5);
+#ifdef MUSE_FACET
+  vec3 facetNormal = normalize(cross(dFdx(vPlanetGradient), dFdy(vPlanetGradient)));
+#endif
   float shell = vShell;
   float H = uMuseSize.x;
   bool skin = shell <= 0.0;
@@ -145,13 +155,13 @@ void main() {
   if (!skin) {
     // a shell: only where a strand reaches this high (none on the face)
     if (vFur < 0.03) discard;
-    if (coat(vRest * H, shell) < shell) discard;
+    if (coat(vRest * H, shell, coatFootprint) < shell) discard;
   }
   vec3 n = normalize(vNormal);
   if (!gl_FrontFacing) n = -n;
 #ifdef MUSE_FACET
   // the lab's true surface: the normal of the triangle as drawn (not the skinned vertex normals)
-  n = normalize(cross(dFdx(vPlanet), dFdy(vPlanet)));
+  n = facetNormal;
 #endif
   vec3 up = uMuseFrame[1];
   vec3 toCam = cameraPosition - vWorld;
@@ -174,7 +184,7 @@ void main() {
   vec3 col;
   if (skin && onFace) {
     float dark;
-    col = face(vRest.xy, uMuseFace.x, uMuseFace.y, dark);
+    col = face(vRest.xy, uMuseFace.x, uMuseFace.y, dark, faceFootprint);
     float light = smoothstep(-0.25, 0.8, ndl) * (1.0 - cloud);
     light = mix(light, toonLight(ndl) * (1.0 - cloud), 0.25);
     col = mix(col * shade * mix(vec3(1.0), uShadeTint, 0.5), col * vec3(1.03, 1.0, 0.94) * uSunTint, light);

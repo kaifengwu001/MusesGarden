@@ -30,6 +30,8 @@ uniform samplerCube uFloraBake;   // starflowers per m² in channel 1
 uniform vec4 uBank;               // bank height (0 m), bank width (m), gradient step (m), minimum slope
 uniform vec4 uCottage;            // the shelter's direction, its pad's level (m)
 uniform vec4 uCottageB;           // toward the shelter's front
+uniform vec4 uOrchardRidges[4]; // authored crest parameters from terrain.ts
+uniform vec4 uOrchardLengths;
 uniform vec4 uCottageSun;         // shadow sweep per meter of height in shelter-local x, z
 
 struct Ground {
@@ -60,19 +62,14 @@ float homestead(vec3 dir, float h) {
   float dc = chordAngle(dir, uCottage.xyz) * uRadius;
   if (dc < ORCHARD_REACH) {
     vec2 c = cottageLocal(dir);
-    vec4 ridge[3];
-    ridge[0] = vec4(28.0, -28.0, 10.0, 16.0);
-    ridge[1] = vec4(-25.0, -62.0, 11.0, 15.0);
-    ridge[2] = vec4(25.0, -95.0, 15.0, 16.0);
-    float lengths[3]; lengths[0] = 30.0; lengths[1] = 30.0; lengths[2] = 40.0;
     float dunes = 0.0;
-    for (int i = 0; i < 3; i++) {
-      float x = c.x - ridge[i].x;
-      float dx = x / lengths[i];
-      float dz = c.y - ridge[i].y - 0.22 * x - 0.006 * x * x;
-      float q = dz / (dz < 0.0 ? ridge[i].w * 2.2 : ridge[i].w);
+    for (int i = 0; i < 4; i++) {
+      float x = c.x - uOrchardRidges[i].x;
+      float dx = x / uOrchardLengths[i];
+      float dz = c.y - uOrchardRidges[i].y - 0.22 * x - 0.006 * x * x;
+      float q = dz / (dz < 0.0 ? uOrchardRidges[i].w * 2.2 : uOrchardRidges[i].w);
       float profile = max(0.0, 1.0 - sqrt(q * q + 0.0009));
-      dunes += ridge[i].z * profile * exp(-dx * dx);
+      dunes = max(dunes, uOrchardRidges[i].z * profile * exp(-dx * dx));
     }
     h += dunes * smoothstep(14.0, 24.0, dc) * (1.0 - smoothstep(90.0, ORCHARD_REACH, dc));
   }

@@ -36,7 +36,7 @@ type Rows = Partial<Record<number, readonly string[]>>;
 const NOON: Rows = {
   // sand: lit (sand highlight), mid (sand), shade, sunlit highlight, pale, deep shade (the brief's shadow),
   // far sand, ripple light, ripple shade, warm sand
-  [ROW.SAND]: ['#E4CFE4', '#BCA2D6', '#8872B7', '#F1E4EE', '#CDBFDF', '#6F6397', '#AE9ED0', '#EEDFEC', '#7864A7', '#DDC2D8'],
+  [ROW.SAND]: ['#E9CFE0', '#BE9DCC', '#8873AE', '#F5E3EA', '#D4BADD', '#695C91', '#AA94C8', '#F1DCE7', '#7E6AAB', '#E8C6D8'],
   // drybrush light, drybrush violet, the habitat's grey-violet, warm stroke, -, -, sail-reed ochre (far wash)
   [ROW.BRUSH]: ['#F4ECF0', '#A493CB', '#9E95B8', '#DDC3D2', '#8D86A6', '#5E5874', '#D9B24A'],
   // (the meadow's water: no shader in this world draws it)
