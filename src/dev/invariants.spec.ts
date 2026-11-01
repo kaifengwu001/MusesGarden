@@ -279,9 +279,9 @@ test.describe('finds', () => {
       project(dir: V3, height: number, width: number, height2: number): { x: number; y: number } | null;
     };
     layout(): { beds: Map<string, { dir: V3; ground: number }> };
-    forms: {
-      specimens: { geometry: { attributes: Record<string, { array: ArrayBufferView }>; getIndex(): { array: ArrayBufferView } | null } };
-      spheres: { geometry: { getIndex(): { count: number; array: ArrayBufferView } | null } };
+    beds: {
+      meshes: Array<{ geometry: { attributes: Record<string, { array: ArrayBufferView }> } }>;
+      spheres: { geometry: { attributes: Record<string, { array: ArrayBufferView }>; drawRange: { count: number } } };
     };
   }
 
@@ -328,22 +328,22 @@ test.describe('finds', () => {
       }
       g.state.receive({ type: 'basket', basket, finds });
       g.state.visit(basket.id);
-      return g.forms.spheres.geometry.getIndex()?.count ?? 0;
+      return g.beds.spheres.geometry.drawRange.count;
     }, count);
   }
 
-  async function steady(page: Page): Promise<{ drawCalls: number; gpuBytes: number; gpuFrameMs: number }> {
+  async function steady(page: Page): Promise<{ drawCalls: number; triangles: number; submitted: number; gpuBytes: number; gpuFrameMs: number }> {
     await page.evaluate(async () => window.__meadow?.settle());
     return page.evaluate(() => {
       const m = window.__meadow;
       if (!m) throw new Error('harness missing');
       m.renderFrame();
       const s = m.stats();
-      return { drawCalls: s.drawCalls, gpuBytes: s.gpuBytes, gpuFrameMs: m.benchmark(60) };
+      return { drawCalls: s.drawCalls, triangles: s.triangles, submitted: s.trianglesSubmitted, gpuBytes: s.gpuBytes, gpuFrameMs: m.benchmark(60) };
     });
   }
 
-  test('400 finds add at most two draws past their beds, stay in the memory budget, and fit their specimens in 1 MB', async ({ page }) => {
+  test('400 finds add four draws of patches near the ground and one of spheres high up, stay in the memory budget, and fit their buffers in 1 MB', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (m) => {
       if (m.type() === 'error') errors.push(m.text());
@@ -355,19 +355,19 @@ test.describe('finds', () => {
       const before = await steady(page);
       expect(await scatter(page, 400)).toBe(400);
       const after = await steady(page);
-      notes.push(`${cam}: draw calls ${before.drawCalls} → ${after.drawCalls}, GPU ${(before.gpuBytes / MB).toFixed(2)} → ${(after.gpuBytes / MB).toFixed(2)} MB, GPU-bound frame ${before.gpuFrameMs.toFixed(2)} → ${after.gpuFrameMs.toFixed(2)} ms`);
-      // near the ground the beds draw too, one draw per species of flower (findBeds.ts); high up only the spheres
-      expect(after.drawCalls - before.drawCalls, cam).toBeLessThanOrEqual(cam === 'wander' ? 4 + 2 : 2);
+      notes.push(`${cam}: draw calls ${before.drawCalls} → ${after.drawCalls}, triangles ${before.triangles} → ${after.triangles} (submitted ${before.submitted} → ${after.submitted}), GPU ${(before.gpuBytes / MB).toFixed(2)} → ${(after.gpuBytes / MB).toFixed(2)} MB, GPU-bound frame ${before.gpuFrameMs.toFixed(2)} → ${after.gpuFrameMs.toFixed(2)} ms`);
+      // near the ground the patches, one draw per species of flower (findBeds.ts); high up only the spheres
+      expect(after.drawCalls - before.drawCalls, cam).toBeLessThanOrEqual(cam === 'wander' ? 4 : 1);
       expect(after.gpuBytes, cam).toBeLessThan(256 * MB);
     }
-    const specimenBytes = await page.evaluate(() => {
-      const { specimens, spheres } = (window as unknown as { __garden: GardenProbe }).__garden.forms;
-      const buffers = [...Object.values(specimens.geometry.attributes).map((a) => a.array), specimens.geometry.getIndex()?.array, spheres.geometry.getIndex()?.array];
-      return buffers.reduce((sum, b) => sum + (b?.byteLength ?? 0), 0);
+    const findBytes = await page.evaluate(() => {
+      const { meshes, spheres } = (window as unknown as { __garden: GardenProbe }).__garden.beds;
+      const buffers = [...meshes, spheres].flatMap((m) => Object.values(m.geometry.attributes).map((a) => a.array));
+      return buffers.reduce((sum, b) => sum + b.byteLength, 0);
     });
-    notes.push(`specimens and spheres of 400 finds: ${(specimenBytes / 1e6).toFixed(3)} MB`);
+    notes.push(`patches and spheres of 400 finds: ${(findBytes / 1e6).toFixed(3)} MB`);
     test.info().annotations.push({ type: 'finds', description: notes.join('; ') });
-    expect(specimenBytes).toBeLessThanOrEqual(1_000_000);
+    expect(findBytes).toBeLessThanOrEqual(1_000_000);
     expect(errors).toEqual([]);
   });
 
@@ -440,7 +440,7 @@ test.describe('finds', () => {
         facing: Math.round(f.facing * 100) / 100,
         at: `${Math.round(f.screen!.x)},${Math.round(f.screen!.y)}`,
       });
-      return { k: g.ui.world.warp.k, spheres: g.forms.spheres.geometry.getIndex()?.count ?? 0, visible: visible.map(report), hidden: clear.map(report) };
+      return { k: g.ui.world.warp.k, spheres: g.beds.spheres.geometry.drawRange.count, visible: visible.map(report), hidden: clear.map(report) };
     });
     test.info().annotations.push({ type: 'spheres', description: `${seen.spheres} spheres; ${seen.visible.length} finds in sight, dimmest brightened ${Math.min(...seen.visible.map((v) => v.rise)).toFixed(0)}; ${seen.hidden.length} past the horizon clear of others, brightest ${Math.max(...seen.hidden.map((v) => v.rise)).toFixed(0)}` });
     expect(Math.abs(seen.k)).toBeLessThan(1e-6);
