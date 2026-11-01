@@ -13,7 +13,7 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaK
 // (source.ts): ten interests, six baskets of finds over the last ten days
 // (reels, posts, articles and a video, every picture a placeholder from
 // art.ts, each found somewhere on the planet), Muse's postcards (photographed in the world: two Muses, Muse
-// waving), an invitation from a friend, and the friends themselves. Days are
+// waving), two invitations from friends, and the friends themselves. Days are
 // counted back from today, so the newest basket is always today's.
 
 /** An ISO date `back` days before today (local time). */
@@ -160,6 +160,14 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
     place: 'An invitation',
     with: 'pip',
     invitation: { from: 'pip', fromName: 'Pip', coat: '#f2c4a0', world: 'mossy-hollow', worldName: 'Mossy Hollow', blurb: 'A redwood grove with a little shrine, where the fog comes in after lunch.' },
+  },
+  {
+    id: 'inv-juniper',
+    back: 3,
+    image: pierUrl,
+    place: 'An invitation',
+    with: 'juniper',
+    invitation: { from: 'juniper', fromName: 'Juniper', coat: '#c3d6b8', world: 'starfall-ridge', worldName: 'Starfall Ridge', blurb: 'A high ridge of old snow, where the stars come out before the sun is down.' },
   },
 ];
 

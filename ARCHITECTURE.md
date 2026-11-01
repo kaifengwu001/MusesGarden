@@ -696,8 +696,9 @@ so any view can be shared.
                            hover, pulse, picked basket) in a float texture, any number of finds
         pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo)
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
-                           react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes, post
-                           read and put away, baskets visited), where the finds grow (placement.ts)
+                           react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes and
+                           stars, post read, today's post and the tickets, baskets visited), where the finds grow
+                           (placement.ts)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
@@ -711,6 +712,7 @@ so any view can be shared.
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
-                           baskets), the post box (a model in its own canvas), postcards, the album and
-                           invitations (mail.ts), the sheets (baskets, Muse's page, travel), the visit stand-in
+                           baskets), the post box (a model in its own canvas), the post (mail.ts: today's deck,
+                           the heart and star, the Favorite and Album pages, the tickets), the sheets (baskets,
+                           Muse's page), the visit stand-in
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

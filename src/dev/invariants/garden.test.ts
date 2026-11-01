@@ -182,7 +182,8 @@ describe('the placeholder gallery', () => {
   it('names Muses only, and tags friends known elsewhere by network alone', () => {
     for (const f of snap.friends) expect(Object.keys(f).sort()).toEqual(expect.arrayContaining(['coat', 'id', 'met', 'name', 'shared']));
     expect(snap.friends.some((f) => f.knownOn === 'instagram')).toBe(true);
-    expect(snap.postcards.filter((p) => p.invitation)).toHaveLength(1);
+    const hosts = snap.postcards.flatMap((p) => (p.invitation ? [p.invitation.from] : []));
+    expect(hosts, 'two invitations, each from its own friend').toEqual(['pip', 'juniper']);
   });
 });
 
@@ -197,7 +198,7 @@ describe('the garden’s state', () => {
     vi.useRealTimers();
   });
 
-  it('likes, reads, puts away and uses an invitation once; tells the source', async () => {
+  it('likes, stars, and uses an invitation once; tells the source', async () => {
     const source = placeholderSource();
     const reactions: unknown[] = [];
     source.react = (r) => (reactions.push(r), Promise.resolve());
@@ -206,16 +207,16 @@ describe('the garden’s state', () => {
     const id = state.browseOrder[2];
     expect(state.toggleLike(id)).toBe(true);
     expect(state.likedFindIds).toEqual([id]);
-    state.putAway('pc-terrace');
-    expect(state.mail.some((p) => p.id === 'pc-terrace')).toBe(false);
-    expect(state.isRead('pc-terrace')).toBe(true);
-    expect(state.invitations).toHaveLength(1);
+    expect(state.toggleCardFavorite('pc-terrace')).toBe(true);
+    expect([state.cardFavorite('pc-terrace'), state.cardLiked('pc-terrace')], 'a star is not a like').toEqual([true, false]);
+    expect(state.invitations.map((p) => p.id)).toEqual(['inv-pip', 'inv-juniper']);
     state.useInvitation('inv-pip');
-    expect(state.invitations).toHaveLength(0);
+    expect(state.invitations.map((p) => p.id)).toEqual(['inv-juniper']);
     state.setShared('noodles', true);
     expect(state.interest('noodles')?.shared).toBe(true);
     expect(reactions).toEqual([
       { type: 'like-find', id, liked: true },
+      { type: 'favorite-postcard', id: 'pc-terrace', favorite: true },
       { type: 'use-invitation', id: 'inv-pip' },
       { type: 'share-interest', id: 'noodles', shared: true },
     ]);
@@ -240,11 +241,49 @@ describe('the garden’s state', () => {
   });
 });
 
+describe('the post: from today, envelopes and tickets', () => {
+  const ids = (cards: readonly { id: string }[]) => cards.map((p) => p.id);
+
+  it('From today holds the day’s photos and the day’s invitation in its envelope; the older invitation is a ticket', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    expect(ids(state.today)).toEqual(['pc-terrace', 'inv-pip']);
+    expect(ids(state.tickets)).toEqual(['inv-juniper']);
+  });
+
+  it('opening the box collects the post but leaves the envelope sealed; opened, the envelope is a ticket', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    expect(ids(state.unread)).toEqual(['pc-terrace', 'inv-pip']);
+    state.collect();
+    expect(ids(state.unread)).toEqual(['inv-pip']);
+    expect(ids(state.today)).toEqual(['pc-terrace', 'inv-pip']);
+    state.markRead('inv-pip');
+    expect(ids(state.today)).toEqual(['pc-terrace']);
+    expect(ids(state.tickets)).toEqual(['inv-pip', 'inv-juniper']);
+    state.useInvitation('inv-juniper');
+    expect(ids(state.tickets), 'a used ticket is gone').toEqual(['inv-pip']);
+  });
+
+  it('counts today by the source’s day, which turns when post of a later day arrives', async () => {
+    const snapshot = placeholderSnapshot(NOW);
+    const source = placeholderSource();
+    source.load = () => Promise.resolve(snapshot);
+    const state = new GardenState(source);
+    await state.start();
+    expect(snapshot.today).toBe('2026-10-31');
+    expect(ids(state.today)).toEqual(['pc-terrace', 'inv-pip']);
+    source.push({ type: 'postcard', postcard: { ...snapshot.postcards[0], id: 'pc-next', day: '2026-11-01' } });
+    expect(ids(state.today)).toEqual(['pc-next']);
+    expect(ids(state.tickets), 'yesterday’s invitation, never opened, waits as a ticket').toEqual(['inv-pip', 'inv-juniper']);
+  });
+});
+
 describe('likes and sharing, kept by the backend', () => {
   /** A backend that keeps likes: the placeholders with every like answered. */
   function keeping(): { snapshot: GardenSnapshot; source: ReturnType<typeof placeholderSource> } {
     const s = placeholderSnapshot(NOW);
-    const snapshot = { ...s, finds: s.finds.map((f) => ({ ...f, liked: false })), postcards: s.postcards.map((p) => ({ ...p, liked: false })) };
+    const snapshot = { ...s, finds: s.finds.map((f) => ({ ...f, liked: false })), postcards: s.postcards.map((p) => ({ ...p, liked: false, favorite: false })) };
     const source = placeholderSource();
     source.load = () => Promise.resolve(snapshot);
     return { snapshot, source };
@@ -300,23 +339,25 @@ describe('likes and sharing, kept by the backend', () => {
     const find = first.browseOrder[0];
     first.toggleLike(find);
     first.toggleCardLike('pc-terrace');
+    first.toggleCardFavorite('pc-terrace');
     first.setShared('noodles', true);
     const again = new GardenState(source);
     await again.start();
-    expect([again.liked(find), again.cardLiked('pc-terrace'), again.interest('noodles')?.shared]).toEqual([false, false, false]);
+    expect([again.liked(find), again.cardLiked('pc-terrace'), again.cardFavorite('pc-terrace'), again.interest('noodles')?.shared]).toEqual([false, false, false, false]);
     vi.unstubAllGlobals();
   });
 
-  it('without a backend that keeps likes, this browser remembers them, as before', async () => {
+  it('without a backend that keeps likes and stars, this browser remembers them, as before', async () => {
     browserStorage();
     const first = new GardenState(placeholderSource());
     await first.start();
     const find = first.browseOrder[0];
     first.toggleLike(find);
     first.toggleCardLike('pc-terrace');
+    first.toggleCardFavorite('pc-pier');
     const again = new GardenState(placeholderSource());
     await again.start();
-    expect([again.liked(find), again.likedFindIds, again.cardLiked('pc-terrace')]).toEqual([true, [find], true]);
+    expect([again.liked(find), again.likedFindIds, again.cardLiked('pc-terrace'), again.cardFavorite('pc-pier'), again.cardFavorite('pc-terrace')]).toEqual([true, [find], true, true, false]);
     vi.unstubAllGlobals();
   });
 
@@ -329,11 +370,12 @@ describe('likes and sharing, kept by the backend', () => {
     state.subscribe((c) => changes.push(c));
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(state.toggleCardLike('pc-terrace')).toBe(true);
+    expect(state.toggleCardFavorite('pc-pier')).toBe(true);
     state.shareFind(state.browseOrder[0], false);
-    expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([true, false]);
+    expect([state.cardLiked('pc-terrace'), state.cardFavorite('pc-pier'), state.findShared(state.browseOrder[0])]).toEqual([true, true, false]);
     await Promise.resolve();
-    expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([false, true]);
-    expect(changes).toEqual(['postcards', 'finds', 'postcards', 'finds']);
+    expect([state.cardLiked('pc-terrace'), state.cardFavorite('pc-pier'), state.findShared(state.browseOrder[0])]).toEqual([false, false, true]);
+    expect(changes).toEqual(['postcards', 'postcards', 'finds', 'postcards', 'postcards', 'finds']);
     vi.restoreAllMocks();
   });
 });

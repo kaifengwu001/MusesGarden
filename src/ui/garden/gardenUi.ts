@@ -24,11 +24,11 @@ import { ICONS } from './icons';
 import { Mail } from './mail';
 import { MuseSheet } from './musePage';
 import { PostBox } from './postbox';
-import { TravelSheet, Visit } from './travel';
+import { Visit } from './travel';
 
 // The garden's interface over the meadow: Muse's finds as patches of flowers
 // with their cards, the pins on the globe, the post box with Muse's postcards and
-// invitations, the ticket to other worlds, and a rail down the right: Muse
+// the tickets to other worlds, and a rail down the right: Muse
 // (its page), find Muse, its cottage, the baskets. Everything it
 // shows comes from a GardenSource (garden/source.ts) through GardenState.
 // main.ts calls update() before the world moves its camera, frame() after,
@@ -88,7 +88,6 @@ export class GardenUi {
   private readonly mail: Mail;
   private readonly basketsSheet: BasketsSheet;
   private readonly museSheet: MuseSheet;
-  private readonly travelSheet: TravelSheet;
   private readonly visit: Visit;
   private readonly portrait: HTMLButtonElement;
   private readonly status: HTMLElement;
@@ -96,7 +95,6 @@ export class GardenUi {
   private readonly basketsButton: HTMLButtonElement;
   private readonly sign: HTMLElement;
   private readonly basketDot: HTMLElement;
-  private readonly ticket: HTMLButtonElement;
   private readonly toastEl: HTMLElement;
   private toastTimer = 0;
   private layout: GardenLayout = { beds: new Map() };
@@ -167,10 +165,8 @@ export class GardenUi {
     rail.append(this.portrait, find, this.homeButton, this.basketsButton);
     this.root.append(rail);
 
-    // the post box and the ticket beside it
+    // the post box
     this.postbox = new PostBox(this.root, () => void this.mail.open());
-    this.ticket = button('g-ticket', 'Travel to other worlds', `${ICONS.globe}<span>Travel</span><i class="g-ticket-seal"></i>`, () => this.travelSheet.open());
-    this.root.append(this.ticket);
     this.visit = new Visit(this.root, world, store, {
       leaving: () => this.closeCard(),
       changed: (away) => {
@@ -183,7 +179,6 @@ export class GardenUi {
     });
     this.basketsSheet = new BasketsSheet(this.root, this.state, (id, from) => this.goToBasket(id, from));
     this.museSheet = new MuseSheet(this.root, this.state, { muse: museFace, friend: friendFace });
-    this.travelSheet = new TravelSheet(this.root, this.state, (id) => this.board(id));
 
     this.toastEl = el('div', 'g-toast');
     this.toastEl.setAttribute('role', 'status');
@@ -213,7 +208,6 @@ export class GardenUi {
     if (change === 'snapshot' || change === 'likes' || change === 'status') this.refreshPins();
     const unread = s.unread.length;
     this.postbox.setMail(unread, s.invitations.filter((p) => !s.isRead(p.id)).length);
-    this.ticket.classList.toggle('has-invite', s.invitations.length > 0);
     this.basketDot.classList.toggle('is-on', s.freshBasket !== undefined);
     const home = s.status.home;
     this.portrait.classList.toggle('is-out', !home);
@@ -224,10 +218,7 @@ export class GardenUi {
       const fresh = s.freshBasket;
       setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', (from) => this.goToBasket(fresh.id, from)), 1800);
     }
-    if (change === 'postcards' || change === 'snapshot') {
-      this.mail.refresh();
-      this.travelSheet.render();
-    }
+    if (change === 'postcards' || change === 'snapshot') this.mail.refresh();
     if (change === 'baskets' || change === 'snapshot') this.basketsSheet.render();
     if (change === 'interests' || change === 'snapshot' || change === 'status' || change === 'friends') this.museSheet.render();
   }
@@ -406,7 +397,7 @@ export class GardenUi {
   private key(e: KeyboardEvent): void {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target instanceof HTMLInputElement) return;
     if (e.key === 'Escape') {
-      if (this.mail.isOpen) this.mail.close();
+      if (this.mail.isOpen) this.mail.back();
       else if (this.card.shown) this.closeCard();
     } else if (this.card.shown && !this.mail.isOpen && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       e.preventDefault();
@@ -572,10 +563,8 @@ export class GardenUi {
     const card = this.state.postcards.find((p) => p.id === invitationId);
     if (!card?.invitation) return;
     this.mail.close();
-    this.travelSheet.close();
     this.state.useInvitation(invitationId);
-    const friend = this.state.snapshot?.friends.find((f) => f.id === card.invitation?.from);
-    void this.visit.start(card.invitation, friend?.name ?? 'A friend');
+    void this.visit.start(card.invitation);
   }
 
   // ---- toasts ----------------------------------------------------------------------------------
@@ -626,7 +615,8 @@ export class GardenUi {
       mail: () => this.mail.open(),
       muse: () => this.museSheet.open(),
       baskets: () => this.basketsSheet.open(),
-      travel: () => this.travelSheet.open(),
+      /** The post, where the tickets are. */
+      travel: () => this.mail.open(),
       home: (h: boolean) => this.setHome(h),
       flying: () => this.flight.flying,
       /** Take the pins off the globe, or put them back (a frame or a draw count without them). */

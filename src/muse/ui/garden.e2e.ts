@@ -8,9 +8,9 @@ import type { Find, GardenSnapshot, MediaKind } from '../../garden/types';
 import { FIRST_PLANET } from '../../planet/firstPlanet';
 
 // The garden's interface on the real engine: the hero's planet, a basket that arrives over the event stream and
-// flies its finds to where they were found, hover and the find card, the spheres from high up, likes that reach
-// the engine's log, a find made private, a reconnect that catches up, a card of each kind, a friend known
-// elsewhere, and an invitation used once. Screenshots and the basket flight's recording go to shots/garden-live/.
+// flies its finds to where they were found, hover and the find card, the spheres from high up, likes and stars that
+// reach the engine's log, a find made private, a reconnect that catches up, a card of each kind, a friend known
+// elsewhere, and an invitation used once from its ticket in the post. Screenshots and the basket flight's recording go to shots/garden-live/.
 // Every test shares one engine (playwright.live.config.ts), so each takes what it needs from where the engine
 // stands, advancing it when that isn't there yet.
 
@@ -50,6 +50,7 @@ interface GardenProbe {
     snapshot: GardenSnapshot | null;
     baskets: { id: string; finds: readonly string[] }[];
     postcards: { id: string }[];
+    today: { id: string }[];
     basket(id: string): unknown;
     find(id: string): Find | undefined;
     visitedBasket(id: string): boolean;
@@ -492,17 +493,19 @@ test('a garden that lost its event stream catches up from where it left off when
   await relay.close();
 });
 
-test('a like on a photo postcard reaches the engine’s log, and the postcard still reads liked after a reload', async ({ page, request: api }) => {
+test('a like and a star on a photo postcard reach the engine’s log, and the postcard still reads both after a reload', async ({ page, request: api }) => {
   test.setTimeout(15 * 60_000);
-  const card = await advanceUntil(api, 'a photo postcard not yet liked', (s) => s.postcards.find((p) => !p.invitation && !p.liked));
+  const card = await advanceUntil(api, 'a photo postcard neither liked nor starred', (s) => s.postcards.find((p) => !p.invitation && !p.liked && !p.favorite));
+  const side = page.locator('.g-mail-side');
+  const like = side.getByRole('button', { name: 'Like' });
+  const star = side.getByRole('button', { name: 'Favorite' });
+  const views = page.locator('.g-segments');
+  // (up close from the album, where every postcard is, whatever day it came)
   const focus = async () => {
     await page.evaluate(() => (window as unknown as Win).__garden.mail());
-    const node = page.locator(`.g-pc[data-id="${card.id}"]`);
-    await expect(node).toBeAttached();
-    await page.waitForTimeout(1500);
-    // (a tap on the card where it lies in the stack, under the postcards on top of it)
-    await node.dispatchEvent('click');
-    await expect(node).toHaveClass(/is-focus/);
+    await views.getByRole('button', { name: 'Album' }).click();
+    await page.locator(`.g-album-slot[data-id="${card.id}"]`).click();
+    await expect(page.locator(`.g-pc[data-id="${card.id}"]`)).toHaveClass(/is-top/);
     await page.waitForTimeout(800);
   };
   await openGarden(page);
@@ -510,22 +513,37 @@ test('a like on a photo postcard reaches the engine’s log, and the postcard st
   await page.screenshot({ path: `${SHOTS}/10-photo-postcard.png` });
 
   const likedBefore = log('owner.liked').length;
-  const like = page.locator('.g-mail-bar').getByRole('button', { name: 'Like' });
-  await expect(like).not.toHaveClass(/is-liked/);
-  const sent = reaction(page, 'like-postcard', card.id);
+  const starredBefore = log('owner.favorited').length;
+  await expect(like).toHaveAttribute('aria-pressed', 'false');
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  const liked = reaction(page, 'like-postcard', card.id);
   await like.click();
-  await expect(like).toHaveClass(/is-liked/);
-  expect((await sent).status(), 'the engine took the like').toBe(200);
+  await expect(like).toHaveAttribute('aria-pressed', 'true');
+  expect((await liked).status(), 'the engine took the like').toBe(200);
+  const starred = reaction(page, 'favorite-postcard', card.id);
+  await star.click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  expect((await starred).status(), 'the engine took the star').toBe(200);
   await expect
     .poll(() => log('owner.liked').slice(likedBefore).map((e) => e.body), { message: 'owner.liked in the engine log' })
     .toContainEqual(expect.objectContaining({ kind: 'owner.liked', target: { photo: card.id }, liked: true }));
-  expect((await snapshot(api)).postcards.find((p) => p.id === card.id)?.liked, 'the engine’s garden reads the postcard liked').toBe(true);
+  await expect
+    .poll(() => log('owner.favorited').slice(starredBefore).map((e) => e.body), { message: 'owner.favorited in the engine log' })
+    .toContainEqual(expect.objectContaining({ kind: 'owner.favorited', photo: card.id, favorite: true }));
+  expect((await snapshot(api)).postcards.find((p) => p.id === card.id), 'the engine’s garden reads the postcard liked and starred').toMatchObject({ liked: true, favorite: true });
 
   await page.reload();
   await ready(page);
   await focus();
-  await expect(page.locator('.g-mail-bar').getByRole('button', { name: 'Like' }), 'still liked after a reload').toHaveClass(/is-liked/);
-  await expect(page.locator('.g-mail-bar')).toContainText('Liked');
+  await expect(like, 'still liked after a reload').toHaveAttribute('aria-pressed', 'true');
+  await expect(star, 'still starred after a reload').toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await views.getByRole('button', { name: 'Favorite' }).click();
+  const kept = page.locator(`.g-album-slot[data-id="${card.id}"]`);
+  await expect(kept, 'on the Favorite page').toBeVisible();
+  await expect(kept.locator('.g-album-heart'), 'its caption ends in a heart').toHaveText('♥');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${SHOTS}/10b-favorites.png` });
 });
 
 test('a card for each kind of find: reel, post, article and video', async ({ page, request: api }) => {
@@ -563,28 +581,35 @@ test('Muse’s page shows a friend tagged as a friend on Instagram or Facebook',
   await page.screenshot({ path: `${SHOTS}/12-muse-friend-known.png` });
 });
 
-test('an invitation reaches the hero: Travel now works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
-  // invite-flap: the open envelope's flap covers Travel now and Keep for later; the fix is in mail.ts.
+test('an invitation reaches the hero as a ticket in the post: boarding works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
   test.setTimeout(20 * 60_000);
   const card = await advanceUntil(api, 'an invitation for the hero', (s) => s.postcards.find((p) => p.invitation && !p.invitation.used));
 
   await openGarden(page);
-  await expect(page.locator('.g-ticket')).toHaveClass(/has-invite/);
   await page.evaluate(() => (window as unknown as Win).__garden.mail());
-  const envelope = page.locator(`.g-env[data-id="${card.id}"]`);
-  await expect(envelope).toBeAttached();
-  await page.waitForTimeout(1500);
-  // (a tap on the envelope where it lies in the stack, under the postcards on top of it)
-  await envelope.dispatchEvent('click');
-  await expect(envelope).toHaveClass(/is-focus/);
-  await expect(envelope).toHaveClass(/is-open/);
-  const travel = envelope.getByRole('button', { name: 'Travel now' });
-  await expect(travel).toBeVisible();
+  const ticket = page.locator(`.g-tickets .g-ticket[data-id="${card.id}"]`);
+  const sealed = await page.evaluate((id) => (window as unknown as Win).__garden.state.today.some((p) => p.id === id), card.id);
+  if (sealed) {
+    // today's: it comes in its envelope, and opened, its ticket flies to the others
+    const envelope = page.locator(`.g-env[data-id="${card.id}"]`);
+    await expect(envelope).toBeAttached();
+    await page.waitForTimeout(1500);
+    for (let k = 0; k < 12 && !(await envelope.evaluate((e) => e.classList.contains('is-top'))); k++) await page.keyboard.press('ArrowRight');
+    await expect(envelope).toHaveClass(/is-top/);
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${SHOTS}/13-invitation-envelope.png` });
+    await envelope.click();
+    await expect(envelope, 'the envelope leaves the deck').not.toBeAttached({ timeout: 5000 });
+  }
+  await expect(ticket).toBeVisible();
+  await expect(ticket).not.toHaveClass(/is-incoming/);
+  await expect(ticket).toContainText(card.invitation!.worldName);
+  await expect(ticket).toContainText(`from ${card.invitation!.fromName}`);
   await page.waitForTimeout(800);
-  await page.screenshot({ path: `${SHOTS}/13-invitation-postcard.png` });
+  await page.screenshot({ path: `${SHOTS}/13-invitation-ticket.png` });
   const used = reaction(page, 'use-invitation', card.id);
-  await travel.click();
-  expect((await used).status(), 'Travel now: the engine took the invitation').toBe(200);
+  await ticket.click();
+  expect((await used).status(), 'boarding: the engine took the invitation').toBe(200);
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${SHOTS}/14-visiting.png` });
 

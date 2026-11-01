@@ -3,30 +3,33 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, MuseStatus, P
 
 // The garden as the interface sees it: the snapshot from the source, kept
 // current by its events, and what you have done here: the finds you liked
-// or made public or private, the postcards you read, liked or put away, the
+// or made public or private, the postcards you read, liked or starred, the
 // baskets you have visited. Everything you do that
-// Muse should hear about goes back through the source as a reaction. Likes
-// and sharing are the source's to keep when it sends them: a switch you
+// Muse should hear about goes back through the source as a reaction. Likes,
+// stars and sharing are the source's to keep when it sends them: a switch you
 // flip shows at once and holds until the source sends that value back (or
-// turns it down). The rest of your side, and likes a source doesn't keep,
-// are remembered in this browser only (localStorage, where it is allowed).
+// turns it down). The rest of your side, and likes and stars a source doesn't
+// keep, are remembered in this browser only (localStorage, where it is allowed).
 
 export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'interests' | 'finds' | 'status' | 'friends';
 
 /** A reaction that flips a switch the source keeps. */
-type Flip = Extract<Reaction, { liked: boolean } | { shared: boolean }>;
-const FLIPS: readonly Flip['type'][] = ['like-find', 'like-postcard', 'share-find', 'share-interest'];
+type Flip = Extract<Reaction, { liked: boolean } | { shared: boolean } | { favorite: boolean }>;
+const FLIPS: readonly Flip['type'][] = ['like-find', 'like-postcard', 'favorite-postcard', 'share-find', 'share-interest'];
 
 interface Kept {
   likedFinds: string[];
   likedCards: string[];
+  favoriteCards: string[];
   readCards: string[];
-  awayCards: string[];
   visited: string[];
   usedInvitations: string[];
 }
 
 const KEY = 'muses-garden.garden.v1';
+
+/** The later of two ISO days. */
+const later = (a: string, b: string): string => (b > a ? b : a);
 
 function load(): Partial<Kept> {
   try {
@@ -42,8 +45,8 @@ export class GardenState {
   private readonly listeners = new Set<(change: Change) => void>();
   private readonly likedFinds: Set<string>;
   private readonly likedCards: Set<string>;
+  private readonly favoriteCards: Set<string>;
   private readonly readCards: Set<string>;
-  private readonly awayCards: Set<string>;
   private readonly visited: Set<string>;
   private readonly usedInvitations: Set<string>;
   /** What you flipped here that the source has not sent back yet, by switch and id. */
@@ -60,8 +63,8 @@ export class GardenState {
     this.firstVisit = Object.keys(kept).length === 0;
     this.likedFinds = new Set(kept.likedFinds);
     this.likedCards = new Set(kept.likedCards);
+    this.favoriteCards = new Set(kept.favoriteCards);
     this.readCards = new Set(kept.readCards);
-    this.awayCards = new Set(kept.awayCards);
     this.visited = new Set(kept.visited);
     this.usedInvitations = new Set(kept.usedInvitations);
   }
@@ -87,8 +90,8 @@ export class GardenState {
     const kept: Kept = {
       likedFinds: [...this.likedFinds],
       likedCards: [...this.likedCards],
+      favoriteCards: [...this.favoriteCards],
       readCards: [...this.readCards],
-      awayCards: [...this.awayCards],
       visited: [...this.visited],
       usedInvitations: [...this.usedInvitations],
     };
@@ -131,13 +134,18 @@ export class GardenState {
     if (event.type === 'basket') {
       const known = this.basketIndex.get(event.basket.id)?.finds;
       const again = known?.length === event.basket.finds.length && known.every((id, i) => id === event.basket.finds[i]);
-      this.snapshot = { ...s, baskets: [...s.baskets.filter((b) => b.id !== event.basket.id), event.basket], finds: [...s.finds.filter((f) => f.basket !== event.basket.id), ...event.finds] };
+      this.snapshot = {
+        ...s,
+        today: later(s.today, event.basket.day),
+        baskets: [...s.baskets.filter((b) => b.id !== event.basket.id), event.basket],
+        finds: [...s.finds.filter((f) => f.basket !== event.basket.id), ...event.finds],
+      };
       this.reindex();
       this.settle();
       // a basket you already have, sent again because a like or its sharing changed: no arrival to replay
       this.emit(again ? 'likes' : 'baskets');
     } else if (event.type === 'postcard') {
-      this.snapshot = { ...s, postcards: [...s.postcards.filter((p) => p.id !== event.postcard.id), event.postcard] };
+      this.snapshot = { ...s, today: later(s.today, event.postcard.day), postcards: [...s.postcards.filter((p) => p.id !== event.postcard.id), event.postcard] };
       this.settle();
       this.emit('postcards');
     } else {
@@ -161,14 +169,25 @@ export class GardenState {
         return this.findIndex.get(id)?.shared;
       case 'like-postcard':
         return this.snapshot?.postcards.find((p) => p.id === id)?.liked;
+      case 'favorite-postcard':
+        return this.snapshot?.postcards.find((p) => p.id === id)?.favorite;
       case 'share-interest':
         return this.snapshot?.interests.find((i) => i.id === id)?.shared;
     }
   }
 
-  /** Likes this browser keeps for a source that doesn't. */
+  /** Likes and stars this browser keeps for a source that doesn't. */
   private kept(type: Flip['type']): Set<string> | undefined {
-    return type === 'like-find' ? this.likedFinds : type === 'like-postcard' ? this.likedCards : undefined;
+    switch (type) {
+      case 'like-find':
+        return this.likedFinds;
+      case 'like-postcard':
+        return this.likedCards;
+      case 'favorite-postcard':
+        return this.favoriteCards;
+      default:
+        return undefined;
+    }
   }
 
   private value(type: Flip['type'], id: string): boolean {
@@ -178,7 +197,7 @@ export class GardenState {
   /** Show a flip at once and tell Muse; if the source turns it down, show what the source holds again. */
   private flip(reaction: Flip, change: Change): void {
     const { type, id } = reaction;
-    const on = 'liked' in reaction ? reaction.liked : reaction.shared;
+    const on = 'liked' in reaction ? reaction.liked : 'shared' in reaction ? reaction.shared : reaction.favorite;
     const kept = this.kept(type);
     const pending = this.pending.get(type)!;
     if (kept && this.sent(type, id) === undefined) {
@@ -272,11 +291,6 @@ export class GardenState {
 
   // ---- postcards --------------------------------------------------------------
 
-  /** Postcards still in the post box (not put away), newest first. */
-  get mail(): Postcard[] {
-    return this.postcards.filter((p) => !this.awayCards.has(p.id));
-  }
-
   /** Every postcard, newest first. */
   get postcards(): Postcard[] {
     return [...(this.snapshot?.postcards ?? [])].sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : a.id < b.id ? 1 : -1));
@@ -292,7 +306,34 @@ export class GardenState {
 
   /** Invitations not yet used. */
   get invitations(): Postcard[] {
-    return this.postcards.filter((p) => p.invitation && !p.invitation.used && !this.usedInvitations.has(p.id));
+    return this.postcards.filter((p) => this.unused(p));
+  }
+
+  private unused(card: Postcard): boolean {
+    return !!card.invitation && !card.invitation.used && !this.usedInvitations.has(card.id);
+  }
+
+  /** An invitation in today's post you have not opened: it comes as an envelope, and once opened it is a ticket. */
+  private sealed(card: Postcard): boolean {
+    return card.day === this.snapshot?.today && !this.readCards.has(card.id);
+  }
+
+  /** Today's post, newest first: Muse's photos of the day, and each invitation of the day still in its envelope. */
+  get today(): Postcard[] {
+    return this.postcards.filter((p) => p.day === this.snapshot?.today && (!p.invitation || (this.unused(p) && this.sealed(p))));
+  }
+
+  /** The tickets: every invitation not yet used, but for those still sealed in today's post, newest first. */
+  get tickets(): Postcard[] {
+    return this.invitations.filter((p) => !this.sealed(p));
+  }
+
+  /** Opening the box collects the post: everything in it counts as read, but an envelope stays sealed until it is opened. */
+  collect(): void {
+    const sealed = new Set(this.today.filter((p) => p.invitation).map((p) => p.id));
+    const fresh = this.unread.filter((p) => !sealed.has(p.id));
+    for (const p of fresh) this.readCards.add(p.id);
+    if (fresh.length > 0) this.emit('postcards');
   }
 
   markRead(id: string): void {
@@ -311,14 +352,14 @@ export class GardenState {
     return liked;
   }
 
-  isAway(id: string): boolean {
-    return this.awayCards.has(id);
+  cardFavorite(id: string): boolean {
+    return this.value('favorite-postcard', id);
   }
 
-  putAway(id: string): void {
-    this.readCards.add(id);
-    this.awayCards.add(id);
-    this.emit('postcards');
+  toggleCardFavorite(id: string): boolean {
+    const favorite = !this.cardFavorite(id);
+    this.flip({ type: 'favorite-postcard', id, favorite }, 'postcards');
+    return favorite;
   }
 
   useInvitation(id: string): void {
