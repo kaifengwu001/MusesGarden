@@ -451,6 +451,8 @@ export interface Relationship {
   readonly rapport: number;
   readonly rapportSinceInvite: number;
   readonly unpleasantStreak: number;
+  /** In [0, 0.9]: unpleasant hangouts push it up, pleasant ones slowly bring it down. A distant pair visits less. */
+  readonly distance: number;
   readonly encounters: number;
   readonly hangouts: number;
   readonly lastRole: 'host' | 'guest' | null;

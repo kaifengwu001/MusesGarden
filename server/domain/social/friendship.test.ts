@@ -1,8 +1,7 @@
-import { SOCIAL } from './constants';
 import { describe, expect, it } from 'vitest';
 import type { MuseEventBody, MuseState } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
-import { DAY, HOUR, T0, apply, at, constant, draws, find, interest, muse, ofKind, topics } from './testkit';
+import { DAY, HOUR, T0, apply, at, constant, draws, find, fold, interest, muse, ofKind, pastHangout, topics } from './testkit';
 
 const shared = ['Lichen', 'Moss', 'Fern'];
 
@@ -126,12 +125,43 @@ describe('friendships ending', () => {
     return Infinity;
   }
 
-  it('ends only after k hangouts in a row fall well below the pair\'s usual, and k grows with rapport', () => {
-    const soon = hangoutsUntilEnded(3);
-    const later = hangoutsUntilEnded(7);
-    expect(Number.isFinite(soon)).toBe(true);
-    expect(soon).toBeGreaterThanOrEqual(SOCIAL.streakBase);
-    expect(later).toBeGreaterThan(soon);
+  it('ends only after 6 hangouts in a row fall well below the pair\'s usual, however close they were', () => {
+    expect(hangoutsUntilEnded(3)).toBe(6);
+    expect(hangoutsUntilEnded(7)).toBe(6);
+  });
+
+  it('grows distant with each unpleasant hangout, and comes back more slowly than it drifted', () => {
+    let [a, b] = friends(withFinds('ada', shared), withFinds('bo', shared));
+    const drifted = { ...b, interests: new Map(topics('Jazz', 'Opera').map((x) => [x.topic, x])) };
+    const distances: number[] = [];
+    [b, b, b, drifted, drifted, drifted, b, b, b].forEach((guest, i) => {
+      const t = at(T0 + (i + 1) * DAY);
+      const out = policy.hangout(a, { ...guest, social: b.social }, t, draws(i));
+      [a, b] = apply(a, b, { self: out.host, other: out.guest }, t);
+      distances.push(a.social.relationships.get(b.seed.id)?.distance ?? NaN);
+    });
+    const steps = distances.slice(1).map((d, i) => d - distances[i]);
+    expect(distances.slice(0, 3)).toEqual([0, 0, 0]);
+    expect(steps.slice(2, 5).every((x) => x > 0)).toBe(true);
+    expect(steps.slice(5).every((x) => x < 0)).toBe(true);
+    expect(Math.abs(steps[5])).toBeLessThan(steps[2]);
+    expect(distances[8]).toBeGreaterThan(0);
+    expect(b.social.relationships.get(a.seed.id)?.distance).toBe(distances[8]);
+  });
+
+  it('visits a distant friend less often, but still now and then', () => {
+    const [a0, b] = friends(withFinds('ada', shared), withFinds('bo', shared));
+    const close = fold(a0, [0.9, 0.9, 0.9].map((p) => pastHangout(b, 'host', p)), T0);
+    const distant = fold(close, [0.1, 0.1, 0.1, 0.1].map((p) => pastHangout(b, 'host', p)), T0);
+    const visits = (s: MuseState) => {
+      let n = 0;
+      for (let seed = 0; seed < 2000; seed++) if (policy.chooseVisit(s, [{ state: b }], at(T0 + 10 * HOUR), draws(seed))) n++;
+      return n / 2000;
+    };
+    expect(distant.social.relationships.get(b.seed.id)?.status).toBe('friends');
+    expect(visits(close)).toBe(1);
+    expect(visits(distant)).toBeLessThan(0.4);
+    expect(visits(distant)).toBeGreaterThan(0.1);
   });
 
   it('never ends a friendship for being different: a pair that was never close cannot drift apart', () => {

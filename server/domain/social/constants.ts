@@ -17,8 +17,14 @@ export const SOCIAL = {
   unpleasantVsAverage: 0.7,
   /** The pair needs this many hangouts before a drop can count against them. */
   unpleasantAfterHangouts: 3,
-  streakBase: 2,
-  streakRapportStep: 2,
+  /** A friendship ends only after this many unpleasant hangouts in a row; before that the pair just grows distant. */
+  endingStreak: 6,
+  /** Each unpleasant hangout moves distance this share of the way to distanceMax... */
+  distantStep: 0.4,
+  /** ...and each pleasant one keeps this share of it, so coming back takes longer than drifting. */
+  closerKeep: 0.8,
+  /** Below 1, so a distant pair still meets now and then. */
+  distanceMax: 0.9,
 
   budgetMsAtFullSociability: 3 * HOUR,
   closenessTemperature: 0.2,

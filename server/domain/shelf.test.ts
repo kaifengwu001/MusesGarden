@@ -68,6 +68,7 @@ describe('the favorites shelf', () => {
       rapport,
       rapportSinceInvite: 0,
       unpleasantStreak: 0,
+      distance: 0,
       encounters: 0,
       hangouts: 1,
       lastRole: null,

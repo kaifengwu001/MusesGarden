@@ -14,7 +14,7 @@ import { SOCIAL } from './constants';
 import { invite } from './invitations';
 import { photoSlotsLeft, photoTogether, whereIs } from './photos';
 import { compare, findOverlap, publicProfile, similarity, stretch } from './profile';
-import { areFriends, chemistry, ending, isUnpleasant, relationshipWith, toleratedStreak } from './relationships';
+import { areFriends, chemistry, ending, isUnpleasant, relationshipWith } from './relationships';
 
 type Visit = ReturnType<SocialPolicy['chooseVisit']>;
 
@@ -55,6 +55,7 @@ export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseS
     return Math.exp(closeness / SOCIAL.closenessTemperature);
   });
   const friend = pick(friends, weights, draw('visit.friend'));
+  if (draw('visit.distant') < (relationshipWith(s, friend.seed.id)?.distance ?? 0)) return null;
 
   const wasGuest = relationshipWith(s, friend.seed.id)?.lastRole === 'guest';
   const role = draw('visit.direction') < (wasGuest ? SOCIAL.goAfterBeingGuest : SOCIAL.goUsually) ? 'guest' : 'host';
@@ -105,8 +106,7 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const guestLog: MuseEventBody[] = [photo.b, hangoutEvent(host.seed.id, 'guest', pleasantness, photo.id, fromGuest, fromHost)];
 
   const rel = relationshipWith(host, guest.seed.id);
-  const rapport = (rel?.rapport ?? 0) + pleasantness;
-  if (isUnpleasant(pleasantness, rel) && (rel?.unpleasantStreak ?? 0) + 1 >= toleratedStreak(rapport)) {
+  if (isUnpleasant(pleasantness, rel) && (rel?.unpleasantStreak ?? 0) + 1 >= SOCIAL.endingStreak) {
     const ended = ending(host, guest, 'drifted-apart');
     return { host: [...hostLog, ...ended.self], guest: [...guestLog, ...ended.other] };
   }

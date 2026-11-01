@@ -323,6 +323,7 @@ export const sampleMind: MindView = {
       rapport: 2.4,
       rapportSinceInvite: 0.6,
       unpleasantStreak: 0,
+      distance: 0,
       encounters: 0,
       hangouts: 4,
       lastRole: 'guest',

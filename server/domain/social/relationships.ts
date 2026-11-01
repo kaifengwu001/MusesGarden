@@ -38,15 +38,15 @@ export function befriendChance(sim: number, t: Temperament): number {
 
 /**
  * Unpleasant means worse than this pair usually is, not merely different: friends with unrelated interests stay
- * friends, and a friendship ends only when it drifts (Kai: interests and personality change over time).
+ * friends. Unpleasant hangouts make a pair distant; only a long unbroken run of them ends it.
  */
 export function isUnpleasant(pleasantness: number, r: Pick<Relationship, 'rapport' | 'hangouts'> | undefined): boolean {
   if (!r || r.hangouts < SOCIAL.unpleasantAfterHangouts) return false;
   return pleasantness < SOCIAL.unpleasantVsAverage * (r.rapport / r.hangouts);
 }
 
-export function toleratedStreak(rapport: number): number {
-  return SOCIAL.streakBase + Math.floor(rapport / SOCIAL.streakRapportStep);
+export function distanceAfter(distance: number, unpleasant: boolean): number {
+  return unpleasant ? distance + SOCIAL.distantStep * (SOCIAL.distanceMax - distance) : distance * SOCIAL.closerKeep;
 }
 
 function changed(other: MuseId, to: 'friends' | 'ended', origin: RelationshipOrigin, reason?: 'drifted-apart' | 'owner-unshared'): MuseEventBody {

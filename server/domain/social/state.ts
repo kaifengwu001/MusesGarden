@@ -1,5 +1,5 @@
 import type { Instant, MuseId, ReduceSocial, Relationship, RelationshipOrigin, SocialState } from '../../../src/muse/contract';
-import { isUnpleasant } from './relationships';
+import { distanceAfter, isUnpleasant } from './relationships';
 
 export function emptySocial(): SocialState {
   return { relationships: new Map(), invitations: new Map() };
@@ -14,6 +14,7 @@ function fresh(other: MuseId, origin: RelationshipOrigin): Relationship {
     rapport: 0,
     rapportSinceInvite: 0,
     unpleasantStreak: 0,
+    distance: 0,
     encounters: 0,
     hangouts: 0,
     lastRole: null,
@@ -48,6 +49,7 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
         rapport: r.rapport + e.pleasantness,
         rapportSinceInvite: r.rapportSinceInvite + e.pleasantness,
         unpleasantStreak: isUnpleasant(e.pleasantness, r) ? r.unpleasantStreak + 1 : 0,
+        distance: distanceAfter(r.distance, isUnpleasant(e.pleasantness, r)),
         hangouts: r.hangouts + 1,
         lastRole: e.role,
         lastMetAt: at,

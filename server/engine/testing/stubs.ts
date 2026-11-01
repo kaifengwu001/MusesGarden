@@ -110,6 +110,7 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
     rapport: 0,
     rapportSinceInvite: 0,
     unpleasantStreak: 0,
+    distance: 0,
     encounters: 0,
     hangouts: 0,
     lastRole: null,
