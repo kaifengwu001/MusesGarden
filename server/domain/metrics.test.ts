@@ -10,7 +10,7 @@ const D1 = t('2026-11-02T09:00:00-08:00');
 const D2 = t('2026-11-03T09:00:00-08:00');
 
 /** Day 1: an owner-seeded new area and three finds, a nap. Day 2: work, a revisit of Muse's own topic, a far trip. */
-function twoDays(): Life {
+function twoDays(likePigment = false): Life {
   const life = new Life();
   const home = life.state.home;
   const r = neighbours(home)[0];
@@ -25,6 +25,8 @@ function twoDays(): Life {
   life.push(D1 + 80 * MINUTE_MS, { kind: 'episode.ended', n: 1 });
   life.push(D1 + 2 * HOUR_MS, { kind: 'episode.started', n: 2, plan: { activity: 'rest', until: instant(D1 + 3 * HOUR_MS) } });
   life.push(D1 + 3 * HOUR_MS, { kind: 'episode.ended', n: 2 });
+  const pigment = [...life.state.discoveries.values()].find((d) => d.title === 'Pigment');
+  if (likePigment && pigment) life.push(D1 + 4 * HOUR_MS, { kind: 'owner.liked', target: { find: pigment.id }, liked: true });
   life.push(D2, { kind: 'host.work', state: 'started' });
   life.push(D2 + 2 * HOUR_MS, { kind: 'host.work', state: 'ended' });
   life.push(D2 + 2 * HOUR_MS, { kind: 'episode.started', n: 3, plan: { activity: 'travel', trip: { kind: 'revisit', topic: topic('Pigment'), region: r, question: null } } });
@@ -41,6 +43,11 @@ describe('metrics', () => {
       { day: '2026-11-02', finds: 3, newAreas: 1, revisits: 0, trips: 1, photos: 0, restHours: 1, socialHours: 0, workHours: 0, ownerDrivenShare: 1 },
       { day: '2026-11-03', finds: 0, newAreas: 0, revisits: 1, trips: 2, photos: 0, restHours: 0, socialHours: 0, workHours: 2, ownerDrivenShare: 0 },
     ]);
+  });
+
+  it("counts a trip to a topic the owner liked within the week as the owner's", () => {
+    const life = twoDays(true);
+    expect(metrics(life.state, life.log)[1]).toMatchObject({ day: '2026-11-03', trips: 2, ownerDrivenShare: 0.5 });
   });
 });
 
