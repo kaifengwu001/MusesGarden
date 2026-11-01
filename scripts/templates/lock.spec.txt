@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, test, type Browser } from '@playwright/test';
 import type {} from './harnessApi';
 
-// `npm run lock`: canvas hashes of fixed views at frozen time, the HUD off (its
+// The frame-lock Playwright project: canvas hashes of fixed views at frozen time, the HUD off (its
 // live numbers would differ run to run). `LOCK_BASELINE=<hashes.json>` fails on
 // any view whose pixels differ from that earlier run's: the proof that a change
 // left a world as it was. Hashes are only comparable on one machine and GL backend.
