@@ -13,10 +13,10 @@ interface Visiting {
 }
 
 /**
- * Visit mode: inside an open invitation window, the world switches to the host's planet through the
- * URL hash (HashSync applies it like any typed URL), the host's finds take the anchors (private ones
- * as plain dots), and a banner counts down the window. When the window ends, the owner's own hash
- * comes back and `onChange(false)` hands the anchors back to the owner's planet.
+ * Visit mode: for 2 h after the owner uses an invitation, the world switches to the host's planet through
+ * the URL hash (HashSync applies it like any typed URL), the host's finds take the anchors (private ones
+ * as plain dots), and a banner counts the visit down. When it ends, the owner's own hash comes back and
+ * `onChange(false)` hands the anchors back to the owner's planet.
  */
 export class Visit {
   readonly banner = el('div', 'mu-status mu-visit');
@@ -76,12 +76,12 @@ export class Visit {
     this.onChange(false, note);
   }
 
-  /** Counts the window down; leaves when it closes. */
+  /** Counts the visit down; leaves when it ends. */
   tick(): void {
     const v = this.visiting;
     if (!v) return;
     const ms = v.view.until - this.clock.now();
-    if (ms <= 0) this.leave(`The window closed. Back home from ${v.view.host.name}’s planet.`);
+    if (ms <= 0) this.leave(`The visit is over. Back home from ${v.view.host.name}’s planet.`);
     else this.left.textContent = `${duration(ms)} left`;
   }
 }

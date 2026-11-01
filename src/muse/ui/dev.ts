@@ -1,6 +1,8 @@
-import type { CommandResult, MetricsRow, MindView } from '../contract';
+import type { CommandResult, MetricsRow, MindView, RelationshipOrigin } from '../contract';
 import type { ClockMode, MuseApi } from './api';
 import { button, day, el, time } from './dom';
+
+const ORIGIN: Readonly<Record<RelationshipOrigin, string>> = { introduced: 'shared by owners', 'known-on': 'known online', 'met-beyond': 'met beyond' };
 
 const METRIC_COLUMNS: readonly (readonly [Exclude<keyof MetricsRow, 'day'>, string, (v: number) => string])[] = [
   ['finds', 'finds', String],
@@ -178,7 +180,8 @@ export class DevTools {
     const most = Math.max(1, ...m.relationships.map((r) => r.rapport));
     for (const r of m.relationships) {
       const li = el('li', 'mu-trait');
-      li.append(el('span', '', `${r.name} · ${r.status} · ${r.origin === 'introduced' ? 'introduced' : 'met beyond'}`), bar(r.rapport / most), el('span', 'mu-mono', r.rapport.toFixed(1)));
+      const status = r.status === 'friends' && r.distance >= 0.5 ? 'friends, distant' : r.status;
+      li.append(el('span', '', `${r.name} · ${status} · ${ORIGIN[r.origin]}`), bar(r.rapport / most), el('span', 'mu-mono', r.rapport.toFixed(1)));
       rel.append(li);
     }
     if (!m.relationships.length) rel.append(el('li', 'mu-empty', 'No one yet.'));

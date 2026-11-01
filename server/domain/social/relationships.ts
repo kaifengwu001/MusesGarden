@@ -63,7 +63,7 @@ export function befriended(a: MuseState, b: MuseState, origin: RelationshipOrigi
   return { self: [changed(b.seed.id, 'friends', origin)], other: [changed(a.seed.id, 'friends', origin)] };
 }
 
-// Unsharing ends a friendship of either origin: it is the owner's privacy control.
+// Unsharing ends a friendship of any origin: it is the owner's privacy control.
 export function ownerLink(a: MuseState, b: MuseState, op: 'introduce' | 'unshare', _now: Instant): PairOutcome {
   const status = relationshipWith(a, b.seed.id)?.status;
   const record: MuseEventBody = { kind: op === 'introduce' ? 'owner.introduced' : 'owner.unshared', other: b.seed.id };

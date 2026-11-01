@@ -54,7 +54,7 @@ export function experiences(s: MuseState, log: readonly StoredEvent[]): Experien
         if (e.received) offer({ ref, at: e.at, kind: 'gift', topics: e.received.topics, canonicalUrl: e.received.canonicalUrl, note: `A friend gave me "${e.received.title}".` });
         break;
       case 'encounter':
-        others.push({ ref, at: e.at, kind: 'encounter', topics: [], note: 'Met another Muse out beyond the planet.' });
+        others.push({ ref, at: e.at, kind: 'encounter', topics: [], note: e.where === 'online' ? 'Got talking online with the Muse of someone my owner knows.' : 'Met another Muse out beyond the planet.' });
         break;
       default:
         break;

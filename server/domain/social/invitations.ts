@@ -4,7 +4,6 @@ import { SOCIAL } from './constants';
 type Action = Parameters<SocialPolicy['invitationStep']>[1];
 type StepResult = ReturnType<SocialPolicy['invitationStep']>;
 
-/** Whose owner may take each action. */
 const ACTOR: Readonly<Record<Action, 'host' | 'guest'>> = { use: 'guest', withdraw: 'host' };
 
 const CHART: Readonly<Record<InvitationState, Partial<Record<Action, InvitationState>>>> = {

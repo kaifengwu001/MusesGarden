@@ -231,7 +231,7 @@ test('the owner roams, follows, opens the mailbox, shelf and settings, and visit
     await hours.fill('2');
     await dev.getByRole('button', { name: 'Advance' }).click();
     await expect(banner).toBeHidden();
-    await expect(page.locator('.mu-toast')).toContainText('The window closed');
+    await expect(page.locator('.mu-toast')).toContainText('The visit is over');
     await expect.poll(() => page.evaluate(() => location.hash)).not.toContain('seed=2207');
     await expect(page.locator('.mu-object')).toBeHidden();
     await expect(page.locator('.mu-plant.mu-private')).toHaveCount(0);

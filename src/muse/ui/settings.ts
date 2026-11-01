@@ -60,7 +60,7 @@ export class Settings {
         const row = el('li', 'mu-row');
         const unshare = button('Unshare', 'mu-btn', () => void this.run(this.api.unshare(f.museId), `${f.name} is no longer introduced.`));
         unshare.setAttribute('aria-label', `Unshare ${f.name}`);
-        row.append(el('span', 'mu-row-label', f.name), el('span', 'mu-chip', f.origin === 'introduced' ? 'introduced' : 'met beyond'), unshare);
+        row.append(el('span', 'mu-row-label', f.name), el('span', 'mu-chip', f.origin === 'introduced' ? 'introduced' : f.origin === 'known-on' ? 'known online' : 'met beyond'), unshare);
         return row;
       }),
     );

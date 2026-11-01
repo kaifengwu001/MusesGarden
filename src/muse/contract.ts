@@ -457,7 +457,7 @@ export interface Relationship {
   readonly origin: RelationshipOrigin;
   /** When they became friends; null while they aren't. */
   readonly friendsSince: Instant | null;
-  /** Summed pleasantness of encounters beyond. */
+  /** Summed pleasantness of encounters, beyond or online. */
   readonly familiarity: number;
   /** Summed pleasantness of hangouts. Never decays with time apart. */
   readonly rapport: number;
@@ -803,6 +803,7 @@ export interface VisitWorldView {
   readonly regions: readonly RegionView[];
   /** The house is never included. */
   readonly plants: readonly VisitPlant[];
+  /** 2 h after the invitation was used: until then a reload is the same visit. */
   readonly until: Instant;
 }
 
