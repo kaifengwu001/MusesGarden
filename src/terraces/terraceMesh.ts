@@ -296,7 +296,9 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
       const batter = TERRACE.batter * (top - below);
       // (a path: the bund widened, its top flat almost to its edge; fl[1] tells the paint)
       const pw = path(x, y);
-      const w = bw + (PATHS.width - bw) * pw;
+      chartDir(s, R, x, y, pd);
+      const wob = gnoise(pd.x * R * 0.45, pd.y * R * 0.45, pd.z * R * 0.45, 0x6b1d);
+      const w = (bw + (PATHS.width - bw) * pw) * (1 + 0.45 * wob * (1 - pw));
       const cr = TERRACE.crest + (0.85 - TERRACE.crest) * pw;
       const fl = [upperH, pw, 0, 0];
       // the riser's face leans back uphill as steep as it stands; the bund rounds over to the floor above

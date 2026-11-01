@@ -80,6 +80,8 @@ void main() {
       vec3 vw = normalize(cameraPosition - vWarped);
       float tint = smoothstep(0.3, 0.9, fract(c.variant * 5.31));
       under = paddyWater(dir, vWarped, nUp, vw, bUp, waves.x, tint);
+      // (softened into a pale silver wash, as the paddy painting lays its flooded fields: the mirror's darks kept, quieter)
+      under = mix(under, mix(pal(TR_WATER, 0), pal(TR_WATER, 6), 0.5), 0.4);
     }
     // the crop's rows along the band (vFloor.w: meters from its lower wall), a row every 0.3 m: seedlings stand
     // on them over their water (green lines on silver, the paintings' young fields), a grown crop shows them as
@@ -99,6 +101,15 @@ void main() {
       fallow *= 1.0 + 0.08 * mottle;
       col = c.water > 0.0 ? mix(under, fallow, 0.55) : fallow;
     }
+    // painted as the paddy painting washes them: each paddy a wash, paler and darker in soft blooms a few meters
+    // across, its pigment pooling a little darker and cooler along its edges where it meets its walls, a fine
+    // granulation up close
+    float width = vFloor.w / max(vFloor.z, 0.02);
+    float edge = min(vFloor.w, max(width - vFloor.w, 0.0));
+    float bloom = 0.55 * gnoise(sp * 0.16 + c.variant * 13.0, uTerrainSeed + 938u) + 0.45 * gnoise(sp * 0.47, uTerrainSeed + 939u);
+    float gran = gnoise(sp * 7.0, uTerrainSeed + 940u) * (1.0 - smoothstep(0.03, 0.1, pixelMeters));
+    col *= 1.0 + 0.075 * bloom + 0.035 * gran;
+    col = mix(col * vec3(0.84, 0.88, 0.87), col, smoothstep(0.0, 0.8, edge));
   } else if (part == 1) {
     // a riser: grass over earth, lit as it leans, darker toward its foot, in tufts and streaks of grass
     float up = clamp((vHeight - vFloor.x + 1.0) / 1.4, 0.0, 1.0);
