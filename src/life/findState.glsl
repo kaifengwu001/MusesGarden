@@ -11,6 +11,9 @@ struct FindState {
   float lift;    // under the pointer, 0..1
   float pulsed;  // s on uPlantClock
   float mark;    // the picked basket's mark, 0..1
+  float focus;   // its hero in focus, 0..1
+  float landed;  // s on uPlantClock: its flower came down into its patch
+  float away;    // its hero hidden while its twin is in the air, 0 or 1
 };
 
 FindState findState(float index) {
@@ -18,7 +21,7 @@ FindState findState(float index) {
   ivec2 at = ivec2((i % FIND_PER_ROW) * 2, i / FIND_PER_ROW);
   vec4 a = texelFetch(uFinds, at, 0);
   vec4 b = texelFetch(uFinds, at + ivec2(1, 0), 0);
-  return FindState(a.x, a.y, a.z, a.w, b.x);
+  return FindState(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w);
 }
 
 // Once as it comes home: 0 → 1 → 0 over FIND_PULSE s.

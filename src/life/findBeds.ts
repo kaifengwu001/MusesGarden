@@ -43,6 +43,11 @@ import fragmentShader from './grass.frag.glsl?raw';
 // one whose card is up is a touch brighter, the one under the pointer lifts
 // and glows, one coming home pulses, and the picked basket's grow larger in a
 // cool tint until another basket is picked.
+// Each patch has a hero: the plant of its species nearest its middle, the one a
+// find's flower in the basket stands for. It is flagged by a negative aDelay (the
+// shader reads abs()), so the buffers keep their size. It can be hidden while
+// its twin is in the air, land (a sway runs out through the patch), and stand
+// in focus: lifted, larger and lit.
 
 /** Plants per patch, the share of them that are companions, and their size against the meadow's flowers. */
 const PLANTS = 58;
@@ -62,6 +67,18 @@ const MARK_SIZE = 1.3;
 export interface BedLook {
   readonly bed: Bed;
   readonly species: 0 | 1 | 2 | 3;
+  readonly variant: number;
+}
+
+/** A patch's hero plant, as its patch draws it. */
+export interface Hero {
+  /** Where it stands: a unit direction, and its ground's height over R (m). */
+  readonly dir: Vector3;
+  readonly ground: number;
+  readonly species: 0 | 1 | 2 | 3;
+  /** As findBed.vert.glsl reads them (aLook): its size factor, its seed in [0, 1) and its colour variant. */
+  readonly size: number;
+  readonly seed: number;
   readonly variant: number;
 }
 
@@ -104,6 +121,7 @@ export class FindBeds {
   readonly meshes: Array<Mesh<InstancedBufferGeometry, ShaderMaterial>> = [];
   readonly spheres: Points<BufferGeometry, ShaderMaterial>;
   private readonly table = new FindTable();
+  private heroes = new Map<string, Hero>();
   private readonly state: IUniform<DataTexture>;
   private uploaded = -1;
   private readonly clock = { value: 0 };
@@ -176,6 +194,7 @@ export class FindBeds {
     const spheres = { place: [] as number[], look: [] as number[] };
     const p = new Vector3();
     const t = new Vector3();
+    const heroes = new Map<string, Hero>();
     looks.forEach((entry, b) => {
       const { bed } = entry;
       spheres.place.push(bed.dir.x, bed.dir.y, bed.dir.z, bed.ground);
@@ -183,6 +202,7 @@ export class FindBeds {
       const r = rand(idSeed(bed.find));
       const north = tangentToward(bed.dir, new Vector3(0, 1, 0), new Vector3());
       const east = new Vector3().crossVectors(bed.dir, north);
+      let best: { at: number; reach: number; hero: Hero } | null = null;
       for (let k = 0; k < PLANTS; k++) {
         // denser in the middle; companions toward the rim
         const companion = r() < COMPANIONS;
@@ -194,11 +214,22 @@ export class FindBeds {
         const size = (SIZE[0] + (SIZE[1] - SIZE[0]) * r() * (1 - (0.35 * reach) / BED_RADIUS)) * SPECIES_SIZE[species];
         const variant = companion ? r() : Math.min(1, Math.max(0, entry.variant + (r() - 0.5) * 0.18));
         const slot = per[species];
+        const seed = r();
+        const scale = companion ? size * 0.8 : size;
+        if (!companion && (!best || reach < best.reach)) {
+          best = { at: slot.delay.length, reach, hero: { dir: p.clone(), ground: bed.ground, species: entry.species, size: scale, seed, variant } };
+        }
         slot.place.push(p.x, p.y, p.z, bed.ground);
-        slot.look.push(r(), companion ? size * 0.8 : size, variant, b);
+        slot.look.push(seed, scale, variant, b);
         slot.delay.push((reach / BED_RADIUS) * 0.7 + r() * 0.15);
       }
+      if (best) {
+        const delay = per[entry.species].delay;
+        delay[best.at] = -delay[best.at];
+        heroes.set(bed.find, best.hero);
+      }
     });
+    this.heroes = heroes;
     this.meshes.forEach((mesh, s) => {
       const { place, look, delay } = per[s];
       fill(mesh.geometry, { aPlace: { values: place, size: 4 }, aLook: { values: look, size: 4 }, aDelay: { values: delay, size: 1 } }, true);
@@ -220,6 +251,30 @@ export class FindBeds {
   /** Hide patches again (not planted yet), e.g. to replay a planting. */
   unplant(finds: readonly string[]): void {
     this.table.unplant(finds);
+  }
+
+  /** A find's hero plant (null: no such find in the garden). */
+  hero(find: string): Hero | null {
+    return this.heroes.get(find) ?? null;
+  }
+
+  /** Bring a find's hero into focus, easing (null: none). One at a time; the last one eases back. */
+  focus(find: string | null): void {
+    this.table.focus(find);
+  }
+
+  get focused(): string | null {
+    return this.table.focused;
+  }
+
+  /** A find's flower has come down into its patch, now. */
+  land(find: string): void {
+    this.table.land(find, this.now);
+  }
+
+  /** Hide a find's hero while its twin is in the air, or show it again. */
+  away(find: string, on: boolean): void {
+    this.table.away(find, on);
   }
 
   /** These finds pulse once, from now. */
