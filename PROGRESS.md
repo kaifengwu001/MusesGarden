@@ -32,6 +32,21 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the fourth pass
+
+Started from eea900c (the fourth pass: Kai's models, the river, the gentler hills, the watercolour paddies). Kai (2026-11-01): "This has certainly been an improvement. items identified as still off are also correct." Next steps, with a screenshot of the paddies from above (kept out of git: reference/terraces/kai-notes-small-rings.webp). This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | The paddies' geometry can glitch when zoomed in | |
+| 2 | Some mountains are floating or have gaps at the bottom: move them lower | |
+| 3 | Too many houses, too dispersed: villages should group closer together, and houses certainly shouldn't sit on rivers | |
+| 4 | The cuts in the bands are not simply a curve across: observe the references for how a cut takes part in the shape of the banks | |
+| 5 | Odd small circle paddies (the screenshot): those should just merge with the larger paddies | |
+| 6 | The fog needs to be thicker and more volumetric | |
+| 7 | In wander mode distant mountains shouldn't become fully white: their peaks should keep their colour, a gradient; close-by mountains look good | |
+| 8 | A colour pass: deeper greens | |
+
 ### Kai's notes on the third pass
 
 Started from 8529225 (the terraces' third pass: the terraces built on the hills). Kai's notes (2026-11-01), with two new references to start from, kept out of git under reference/terraces/: a painting of the valley (valley-painting.webp: karst towers in mist, a river winding between terraced hills, flooded and green paddies in sweeping curves, white houses with dark roofs, a stone-walled path in front) and a painting of the whole planet from above (planet-painting.webp: karst towers round the rim and a few inside, a river looping across it under a bridge, curved terraces in lime, deep green and silver water, villages along winding paths, trees everywhere, the planet in a sea of cloud and far towers); and ten models to use, repeated with rotation: five karst mountains and five houses (reference/terraces/models/, as sent). This table fills in as they are done.
