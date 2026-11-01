@@ -691,9 +691,11 @@ so any view can be shared.
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings
         props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench
-        findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, planted from the middle out)
-                           and their glowing spheres from high up; findTable.ts each find's state (planted, card,
-                           hover, pulse, picked basket) in a float texture, any number of finds
+        findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, always grown) and their
+                           glowing spheres from high up; a hero plant per patch, the one a basket's flower lands
+                           into (heroStance: where and how large it stands); findTable.ts each find's state (card,
+                           hover, pulse, picked basket, its hero's focus, landing and away) in a float texture,
+                           any number of finds
         pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo)
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
                            react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes and
@@ -712,7 +714,13 @@ so any view can be shared.
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
-                           baskets), the post box (a model in its own canvas), the post (mail.ts: today's deck,
-                           the heart and star, the Favorite and Album pages, the tickets), the sheets (baskets,
-                           Muse's page), the visit stand-in
+                           baskets), the post box (a model in its own canvas, toyPaint.ts its paint), the post
+                           (mail.ts: today's deck, the heart and star, the Favorite and Album pages, the tickets),
+                           Muse's page, the visit stand-in, and the basket: its phases as one pure step
+                           (basketMachine.ts; gardenUi.ts carries out its effects), a wicker basket and the finds'
+                           own flower meshes in a full-screen canvas of its own drawn only while it is out
+                           (basketStage.ts; flowerPaint.ts paints each flower as its patch paints its hero, through
+                           the frame's grade, so it matches where it lands), and what you touch over it
+                           (basketOverlay.ts: the scrim, a button over each flower, the preview, the day timeline;
+                           basketFan.ts and timeline.ts lay them out)
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
