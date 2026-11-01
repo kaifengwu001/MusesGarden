@@ -128,6 +128,21 @@ describe('revisits', () => {
     });
   });
 
+  it('lean toward a topic the owner liked within the week by 0.20 · w_like, and let it go after', () => {
+    const base = settled([
+      [0.5, 0.5],
+      [0.5, 0.5],
+    ]);
+    const liked = { ...base, interests: new Map(base.interests).set(topic('T1'), { ...(base.interests.get(topic('T1')) as Interest), likedAt: START }) };
+    const share = (s: MuseState, now: number): number => {
+      const revisits = Array.from({ length: 20_000 }, (_, k) => startTrip(s, now, drawFor(MOSS.id, k))).filter((trip) => trip?.kind === 'revisit');
+      return revisits.filter((trip) => trip.topic === topic('T1')).length / revisits.length;
+    };
+    const lean = Math.exp((0.2 * 0.5) / 0.15);
+    expect(share(liked, START + DAY_MS)).toBeCloseTo(lean / (1 + lean), 1);
+    expect(share(liked, START + 8 * DAY_MS)).toBeCloseTo(0.5, 1);
+  });
+
   it('look only at pages Muse has not collected, and go back to where the topic lives', () => {
     const life = new Life(MOSS, { ...TEMPERAMENTS.homebody, sociability: 0 });
     const r = neighbours(life.state.home)[1];
