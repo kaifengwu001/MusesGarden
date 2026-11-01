@@ -1,0 +1,312 @@
+{
+  "about": [
+    "Where Muse's finds come from, for each area of the topic map. `npm run record:media` reads the newest items of every source here, keeps the ones whose links answer, files each under topics, and writes server/fixtures/media.json.",
+    "articles: RSS or Atom feeds of magazines, museums and blogs. youtube: channel handles (their videos and Shorts are read from the channel pages). vimeo: channel or user feeds. flickr: tag sets (every tag must match). bluesky: account handles. instagram: public business or creator accounts, read only when META_IG_TOKEN is set.",
+    "search: a word that keeps a topic search in the area (\"Ultramarine\" plus \"pigment\"). A topic the sources above leave with fewer than 3 items is filled from Bluesky posts that name it.",
+    "Edit freely: add or remove entries, then re-record. A source that stops answering is reported and skipped."
+  ],
+  "areas": [
+    {
+      "area": "botanical illustration",
+      "search": "botanical",
+      "articles": [
+        "https://www.botanicalartandartists.com/news/feed",
+        "https://emmasbotanicals.substack.com/feed",
+        "https://lizzieharper.co.uk/feed/",
+        "https://drawbotanical.com/feed/",
+        "https://stories.rbge.org.uk/feed"
+      ],
+      "youtube": ["@drawbotanical", "@dewintonpaperco", "@kewgardens", "@nybg"],
+      "vimeo": [],
+      "flickr": ["botanicalillustration", "botanicalart", "botanical,illustration", "herbarium"],
+      "bluesky": ["biodivlibrary.bsky.social", "brushwhisperer.bsky.social"],
+      "instagram": [
+        "kewgardens",
+        "asba.art",
+        "societybotanicalartists",
+        "drawbotanical",
+        "lizzie_harper_illustrator"
+      ]
+    },
+    {
+      "area": "pigments and colour history",
+      "search": "pigment",
+      "articles": [
+        "https://daily.jstor.org/tag/color/feed/",
+        "https://www.thisiscolossal.com/tags/pigment/feed/",
+        "https://hyperallergic.com/tag/color/rss/",
+        "https://janeblundellart.blogspot.com/feeds/posts/default",
+        "https://www.thisiscolossal.com/tags/color/feed/"
+      ],
+      "youtube": ["@rublevcolours", "@BotanicalColors", "@maiwahandprints", "@winsornewton"],
+      "vimeo": [],
+      "flickr": ["pigment", "lapislazuli", "naturaldye", "naturaldyes"],
+      "bluesky": ["talu.earth"],
+      "instagram": ["natural.pigments", "botanicalcolors", "winsorandnewton", "colourlex"]
+    },
+    {
+      "area": "jazz",
+      "search": "jazz",
+      "articles": [
+        "https://www.jazzwax.com/feed",
+        "https://jazzprofiles.blogspot.com/feeds/posts/default",
+        "https://feeds.npr.org/10002/rss.xml",
+        "https://www.freejazzblog.org/feeds/posts/default",
+        "https://syncopatedtimes.com/feed/"
+      ],
+      "youtube": ["@jalc", "@bluenote", "@VerveRecords", "@openstudiojazz"],
+      "vimeo": [],
+      "flickr": ["jazz", "jazzfestival", "bebop", "jazz,concert"],
+      "bluesky": ["bluenoterecords.bsky.social", "jazzdotorg.bsky.social", "citizenjazz.com"],
+      "instagram": [
+        "bluenoterecords",
+        "jazzdotorg",
+        "ververecords",
+        "wbgojazz",
+        "syncopatedtimes"
+      ]
+    },
+    {
+      "area": "astronomy",
+      "search": "astronomy",
+      "articles": [
+        "https://www.nasa.gov/feeds/iotd-feed/",
+        "https://www.eso.org/public/news/feed/",
+        "https://esahubble.org/news/feed/",
+        "https://noirlab.edu/public/news/feed/",
+        "https://www.universetoday.com/rss.xml"
+      ],
+      "youtube": ["@NASA", "@ESOobservatory", "@NOIRLabAstro", "@AstrumSpace"],
+      "vimeo": [],
+      "flickr": ["nebula", "nebula,astrophotography", "galaxy,astrophotography", "telescope,astronomy"],
+      "bluesky": ["eso.org", "thenrao.bsky.social", "apod.shinyakato.dev"],
+      "instagram": [
+        "nasa",
+        "esoastronomy",
+        "hubbleesa",
+        "noirlabastro",
+        "europeanspaceagency"
+      ]
+    },
+    {
+      "area": "sailing and navigation",
+      "search": "sailing",
+      "articles": [
+        "https://www.rmg.co.uk/rss.xml",
+        "https://www.cruisingworld.com/feed/",
+        "https://www.yachtingworld.com/feed",
+        "https://www.yachtingmonthly.com/feed",
+        "https://www.sailingworld.com/feed/"
+      ],
+      "youtube": ["@royalmuseumsgreenwich", "@yachtingworld", "@svdelos", "@SailingLaVagabonde"],
+      "vimeo": [],
+      "flickr": ["tallship", "sailingship", "tallship,sailing", "sailing,regatta"],
+      "bluesky": ["seamuseum.bsky.social", "sailingtotem.bsky.social"],
+      "instagram": [
+        "royalmuseumsgreenwich",
+        "yachtingworldmagazine",
+        "cruisingworldmag",
+        "mysticseaportmuseum",
+        "svdelos"
+      ]
+    },
+    {
+      "area": "fungi",
+      "search": "fungi",
+      "articles": [
+        "https://kittyhardy.substack.com/feed",
+        "https://www.thisiscolossal.com/tags/fungi/feed/",
+        "https://mycologicalmemories.substack.com/feed",
+        "https://blog.mycology.cornell.edu/feed/",
+        "https://namyco.org/feed/"
+      ],
+      "youtube": ["@anna-identifies-mushrooms", "@mushroomwonderland1", "@FascinatedByFungi", "@northspore"],
+      "vimeo": [],
+      "flickr": ["fungi", "lichen", "mycology", "amanitamuscaria"],
+      "bluesky": ["britmycolsoc.org.uk", "newyorkmyc.org", "petravergunst.bsky.social"],
+      "instagram": [
+        "northamericanmyco",
+        "newyorkmyc",
+        "fungifoundation",
+        "spununderground",
+        "fascinatedbyfungi"
+      ]
+    },
+    {
+      "area": "Japanese woodblock prints",
+      "search": "woodblock",
+      "articles": [
+        "https://www.thisiscolossal.com/tags/woodblock-prints/feed/",
+        "https://www.thisiscolossal.com/tags/ukiyo-e/feed/",
+        "https://japan-forward.com/tag/ukiyo-e/feed/",
+        "https://linesandcolors.com/category/prints-and-printmaking/feed/",
+        "https://spoon-tamago.com/category/art/feed/"
+      ],
+      "youtube": ["@MieGallery", "@brandonjohnsonstudio", "@UkiyoeArtist_jp", "@seseragistudio"],
+      "vimeo": [],
+      "flickr": ["hokusai", "hiroshige", "ukiyoe,hiroshige", "woodblockprint,japan"],
+      "bluesky": ["scholten-japanese.bsky.social", "utagawahiroshige.bsky.social", "mokuhangamagic.bsky.social"],
+      "instagram": [
+        "roningallery",
+        "thejedhenry",
+        "brandonjohnson_studio",
+        "mokuhangamagic",
+        "spoontamago"
+      ]
+    },
+    {
+      "area": "fermentation",
+      "search": "fermentation",
+      "articles": [
+        "https://www.theperfectloaf.com/feed/",
+        "https://www.thefreshloaf.com/rss.xml",
+        "https://revolutionfermentation.com/en/feed/",
+        "https://www.kombuchakamp.com/feed",
+        "https://www.kingarthurbaking.com/blog/feed"
+      ],
+      "youtube": ["@theperfectloaf", "@Maangchi", "@ProofBread", "@FoodGeek"],
+      "vimeo": [],
+      "flickr": ["kimchi", "fermentedfood", "sourdoughbread", "breadbaking"],
+      "bluesky": ["sourdough2021.bsky.social", "yetanotherbaker.bsky.social"],
+      "instagram": [
+        "kingarthurbaking",
+        "maurizio",
+        "sandorkraut",
+        "kombuchakamp",
+        "bakewithjack"
+      ]
+    },
+    {
+      "area": "brutalist architecture",
+      "search": "brutalist",
+      "articles": [
+        "https://www.dezeen.com/tag/brutalism/feed/",
+        "https://archeyes.com/tag/brutalism/feed/",
+        "https://c20society.org.uk/feed",
+        "https://www.docomomo-us.org/rss.xml",
+        "https://municipaldreams.wordpress.com/feed/"
+      ],
+      "youtube": ["@dezeen", "@ArchDaily", "@DamiLeeArch", "@fondationlecorbusier"],
+      "vimeo": [],
+      "flickr": ["brutalism", "brutalism,concrete", "brutalism,london", "lecorbusier"],
+      "bluesky": ["modinmetro.bsky.social", "zupagrafika.bsky.social", "dezeen.com"],
+      "instagram": [
+        "c20society",
+        "zupagrafika",
+        "fondationlecorbusier",
+        "barbicancentre",
+        "dezeen"
+      ]
+    },
+    {
+      "area": "birds",
+      "search": "bird",
+      "articles": [
+        "https://www.birdnote.org/rss.xml",
+        "https://www.10000birds.com/feed",
+        "https://www.aba.org/feed/",
+        "https://www.audubon.org/rss.xml",
+        "https://www.bto.org/rss.xml"
+      ],
+      "youtube": ["@CornellBirdCams", "@RSPBVideo", "@abcbirds", "@lesleythebirdnerd"],
+      "vimeo": ["https://vimeo.com/audubon/videos/rss", "https://vimeo.com/birdlife/videos/rss"],
+      "flickr": ["birdwatching", "songbird", "corvid", "bird,migration"],
+      "bluesky": ["cornellbirds.bsky.social", "rspb.bsky.social", "btobirds.bsky.social"],
+      "instagram": [
+        "audubonsociety",
+        "rspb",
+        "btobirds",
+        "birdlife.international",
+        "americanbirdconservancy"
+      ]
+    },
+    {
+      "area": "cartography",
+      "search": "map",
+      "articles": [
+        "https://googlemapsmania.blogspot.com/feeds/posts/default",
+        "https://www.maproomblog.com/feed/",
+        "https://blogs.loc.gov/maps/feed/",
+        "https://somethingaboutmaps.wordpress.com/feed/",
+        "https://adventuresinmapping.com/feed/"
+      ],
+      "youtube": ["@JayandMark", "@OrdnanceSurvey", "@emperortigerstar", "@TheGraphicEarth"],
+      "vimeo": [],
+      "flickr": ["cartography", "oldmap", "historicmap", "globe,map"],
+      "bluesky": ["simongerman600.bsky.social", "maproomblog.com", "mapsmania.bsky.social"],
+      "instagram": [
+        "ordnancesurvey",
+        "david_rumsey_maps",
+        "mapbox",
+        "oshermaplibrary",
+        "bplmaps"
+      ]
+    },
+    {
+      "area": "typography",
+      "search": "typography",
+      "articles": [
+        "https://letterformarchive.org/feed/",
+        "https://www.alphabettes.org/feed/",
+        "https://www.dezeen.com/tag/typography/feed/",
+        "https://www.tdc.org/feed/",
+        "https://glyphsapp.com/news/feed/"
+      ],
+      "youtube": ["@SleepyLetterpress", "@letterformarchive", "@calligraphymasters", "@TypeDirectorsClub"],
+      "vimeo": ["https://vimeo.com/letterformarchive/videos/rss"],
+      "flickr": ["letterpress", "woodtype", "typography,poster", "blackletter"],
+      "bluesky": ["letterformarchive.org", "fontsinuse.com", "ilovetypography.bsky.social"],
+      "instagram": [
+        "letterformarchive",
+        "typedirectors",
+        "hamiltonwoodtype",
+        "ilovetypography",
+        "googlefonts"
+      ]
+    },
+    {
+      "area": "origami",
+      "search": "origami",
+      "articles": [
+        "https://origami.me/feed/",
+        "https://www.thisiscolossal.com/tags/origami/feed/",
+        "https://www.thisiscolossal.com/tags/paper/feed/",
+        "https://www.dezeen.com/tag/origami/feed/",
+        "https://design-milk.com/tag/origami/feed/"
+      ],
+      "youtube": ["@JeremyShaferOrigami", "@easyorigamiandcrafts", "@JoNakashima", "@OrigamiTree"],
+      "vimeo": [],
+      "flickr": ["origami", "origami,crane", "origami,tessellation", "papercutting"],
+      "bluesky": ["britishorigami.bsky.social", "origami-boxes.bsky.social", "mkosmul.bsky.social"],
+      "instagram": [
+        "origamiusa",
+        "britishorigami",
+        "jonakashima",
+        "langorigami",
+        "origami.me.hq"
+      ]
+    },
+    {
+      "area": "tea",
+      "search": "tea",
+      "articles": [
+        "https://teajourney.pub/feed/",
+        "https://teamasters.blogspot.com/feeds/posts/default",
+        "https://www.teaformeplease.com/feed/",
+        "https://teadb.org/feed/",
+        "https://www.worldteanews.com/rss.xml"
+      ],
+      "youtube": ["@MeiLeaf", "@NioTeas", "@YunnanSourcing", "@TheTeaCrane"],
+      "vimeo": [],
+      "flickr": ["teaceremony", "greentea", "gaiwan", "tea,plantation"],
+      "bluesky": ["camelliakyoto.bsky.social", "cultivatetastetea.bsky.social", "artfultea.bsky.social"],
+      "instagram": [
+        "mei_leaf",
+        "teajourneymag",
+        "teaformeplease",
+        "palaisdesthes",
+        "harneytea"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "members": [
+    { "id": "hero", "name": "Fern", "worldSeed": 1031, "timezone": "America/Los_Angeles", "dir": "cast/hero", "role": "hero" },
+    { "id": "wren", "name": "Wren", "worldSeed": 4271, "timezone": "Europe/London", "dir": "cast/wren", "role": "friend" },
+    { "id": "juniper", "name": "Juniper", "worldSeed": 7703, "timezone": "Asia/Tokyo", "dir": "cast/juniper", "role": "friend" },
+    { "id": "moss", "name": "Moss", "worldSeed": 2389, "timezone": "America/Chicago", "dir": "cast/moss", "role": "stranger" },
+    { "id": "lark", "name": "Lark", "worldSeed": 5512, "timezone": "Asia/Kolkata", "dir": "cast/lark", "role": "stranger" },
+    { "id": "sorrel", "name": "Sorrel", "worldSeed": 8846, "timezone": "Australia/Sydney", "dir": "cast/sorrel", "role": "stranger" },
+    { "id": "clover", "name": "Clover", "worldSeed": 3157, "timezone": "America/Denver", "dir": "cast/clover", "role": "known" },
+    { "id": "bramble", "name": "Bramble", "worldSeed": 6624, "timezone": "Europe/Berlin", "dir": "cast/bramble", "role": "known" },
+    { "id": "thistle", "name": "Thistle", "worldSeed": 9031, "timezone": "America/New_York", "dir": "cast/thistle", "role": "known" }
+  ],
+  "introductions": [
+    ["hero", "wren"],
+    ["hero", "juniper"]
+  ],
+  "knownOn": [
+    { "a": "hero", "b": "clover", "on": "instagram" },
+    { "a": "hero", "b": "bramble", "on": "instagram" },
+    { "a": "hero", "b": "thistle", "on": "facebook" }
+  ]
+}

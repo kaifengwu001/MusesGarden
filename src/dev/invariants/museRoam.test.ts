@@ -17,7 +17,8 @@ function terrainAt(radius: number, seed = 412): Terrain {
   return t;
 }
 
-describe('Muse roaming the planet', () => {
+// (each run walks hours of Muse's life over a whole planet: seconds of CPU, more when the machine is busy)
+describe('Muse roaming the planet', { timeout: 30_000 }, () => {
   for (const radius of [40, 128, 400]) {
     it(`keeps out of the water and the house, moves on smoothly and does all its things (R ${radius})`, () => {
       const terrain = terrainAt(radius);

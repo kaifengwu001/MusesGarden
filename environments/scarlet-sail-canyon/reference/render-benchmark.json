@@ -1,0 +1,153 @@
+{
+  "method": "30 GPU-synchronised renders after 8 warmups, frozen t=12, 1600x1000, high quality. One local before/after run. The asynchronous HUD GPU timer in stats is not the benchmark result.",
+  "baseline": {
+    "hash": "2edda34d:1600x1000",
+    "benchMs": 45.67333333293597,
+    "stats": {
+      "frameMs": 366.6999999999998,
+      "jsMs": 4.300000011920929,
+      "gpuMs": 73.135374,
+      "drawCalls": 85,
+      "triangles": 3181892,
+      "trianglesSubmitted": 3181892,
+      "grassInstances": 0,
+      "flowerInstances": 0,
+      "textures": 21,
+      "geometries": 90,
+      "programs": 35,
+      "gpuBytes": 239991542,
+      "width": 1600,
+      "height": 1000,
+      "pixelRatio": 1,
+      "samples": 4,
+      "tier": "high",
+      "tierChoice": "high",
+      "benchMs": null,
+      "renderScale": 1,
+      "growth": 0.1886,
+      "area": 205806.71251824812,
+      "radius": 127.97491085906613,
+      "chunks": 264,
+      "lodMin": 2,
+      "lodMax": 5,
+      "buildQueue": 0,
+      "buildMs": 0,
+      "firstFrameMs": 5325.300000011921,
+      "time": 12,
+      "frozen": true
+    },
+    "scenery": [
+      {
+        "name": "Persistent scarlet fan trees",
+        "vertices": 3606,
+        "index": null,
+        "instances": 328
+      },
+      {
+        "name": "Fractured chalk slabs",
+        "vertices": 357,
+        "index": null,
+        "instances": 815
+      },
+      {
+        "name": "Ivory comb-ferns",
+        "vertices": 1800,
+        "index": null,
+        "instances": 131
+      },
+      {
+        "name": "Connected chalk escarpments",
+        "vertices": 11370,
+        "index": null,
+        "instances": 306
+      },
+      {
+        "name": "Sage leafy cushions",
+        "vertices": 2760,
+        "index": null,
+        "instances": 863
+      },
+      {
+        "name": "Scarlet lobed understory",
+        "vertices": 1260,
+        "index": null,
+        "instances": 274
+      }
+    ]
+  },
+  "indexed": {
+    "hash": "2edda34d:1600x1000",
+    "benchMs": 21.743333333730696,
+    "stats": {
+      "frameMs": 166.69999999999982,
+      "jsMs": 2.199999988079071,
+      "gpuMs": 41.937166,
+      "drawCalls": 85,
+      "triangles": 3181892,
+      "trianglesSubmitted": 3181892,
+      "grassInstances": 0,
+      "flowerInstances": 0,
+      "textures": 21,
+      "geometries": 90,
+      "programs": 35,
+      "gpuBytes": 239991542,
+      "width": 1600,
+      "height": 1000,
+      "pixelRatio": 1,
+      "samples": 4,
+      "tier": "high",
+      "tierChoice": "high",
+      "benchMs": null,
+      "renderScale": 1,
+      "growth": 0.1886,
+      "area": 205806.71251824812,
+      "radius": 127.97491085906613,
+      "chunks": 264,
+      "lodMin": 2,
+      "lodMax": 5,
+      "buildQueue": 0,
+      "buildMs": 0,
+      "firstFrameMs": 3936.900000035763,
+      "time": 12,
+      "frozen": true
+    },
+    "scenery": [
+      {
+        "name": "Persistent scarlet fan trees",
+        "vertices": 791,
+        "index": 3606,
+        "instances": 328
+      },
+      {
+        "name": "Fractured chalk slabs",
+        "vertices": 357,
+        "index": 357,
+        "instances": 815
+      },
+      {
+        "name": "Ivory comb-ferns",
+        "vertices": 654,
+        "index": 1800,
+        "instances": 131
+      },
+      {
+        "name": "Connected chalk escarpments",
+        "vertices": 5017,
+        "index": 11370,
+        "instances": 306
+      },
+      {
+        "name": "Sage leafy cushions",
+        "vertices": 987,
+        "index": 2760,
+        "instances": 863
+      },
+      {
+        "name": "Scarlet lobed understory",
+        "vertices": 456,
+        "index": 1260,
+        "instances": 274
+      }
+    ]
+  }
+}

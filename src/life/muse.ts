@@ -8,8 +8,8 @@ import BodyWorker from './museBody.worker?worker&inline';
 import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from './muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
-import { MuseRig } from './museRig';
-import { MuseRoam, type Roaming } from './museRoam';
+import { MuseRig, STEP } from './museRig';
+import { MuseRoam, PACE, type Roaming } from './museRoam';
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from './museShadow.vert.glsl?raw';
 
@@ -38,6 +38,22 @@ export const FUR_LENGTH = 0.06;
 export const SHELLS = 20;
 /** Farther than this from the camera (m) Muse is a pixel or two and is not drawn. */
 const SEEN = 160;
+
+/**
+ * What the garden's engine says Muse is doing, over its own life. `home` leaves it to its life by the hut, or, while
+ * `busy` (working at home), sat on the bench with its head bowed; `out` stands it at a spot out on the planet (a unit
+ * direction), stepping toward `toward` while `walk` is above 0, still with its head bowed while `busy`; `hidden` is
+ * beyond the planet or away at a friend's (away: not drawn, its life keeps time). With no engine Muse lives its life.
+ */
+export type MuseDirection =
+  | { readonly kind: 'home'; readonly busy: boolean }
+  | { readonly kind: 'out'; readonly dir: Vector3; readonly toward: Vector3 | null; readonly walk: number; readonly busy: boolean }
+  | { readonly kind: 'hidden' };
+
+/** The gait out on the planet (cycles of two steps a second), at its life's pace. */
+const OUT_GAIT = PACE / (2 * STEP.length);
+/** Head bowed over its work (rad, + up). */
+const BUSY_PITCH = -0.45;
 /** Muse's body as spheres about its joints (the joint, how far up its own frame, the radius, all × its height): its press on the grass and where a tap finds it. */
 const BODY: readonly [number, number, number][] = [
   [JOINT.pelvis, 0.06, 0.21],
@@ -99,6 +115,17 @@ export class Muse {
   readonly spheres = Array.from({ length: BODY.length }, () => new Vector4());
   /** The last life read; its things (the porch's stove, what it holds, what floats about it). */
   living: Roaming | null = null;
+  /** What the engine says it is doing (directed), and the life it is given for that when it isn't its own. */
+  private direction: MuseDirection = { kind: 'home', busy: false };
+  private readonly directed: Roaming = {
+    dir: new Vector3(0, 1, 0),
+    height: 0,
+    heading: new Vector3(1, 0, 0),
+    action: { time: 0, walk: 0, stride: 1, gait: 0, wave: -1, lookYaw: 0, lookPitch: 0, look: 0, moves: [] },
+    lookAt: null,
+    cues: { water: null, fish: null, cook: null, sleep: null, hum: 0, petted: -1 },
+    home: false,
+  };
   readonly props: MuseProps;
   private loaded = false;
   private readonly press: { value: Vector4[] } | null;
@@ -240,7 +267,7 @@ export class Muse {
   update(time: number, terrain: Terrain, camera: Vector3, wind: Vector4, pixelAngle: number, show: boolean): void {
     if (!this.roam?.fits(terrain)) this.roam = new MuseRoam(terrain, MUSE_HEIGHT);
     const R = terrain.radius;
-    const l = this.roam.at(time, camera);
+    const l = this.lifeAt(time, terrain, camera, this.roam);
     this.living = l;
     this.where.dir.copy(l.dir);
     this.where.height = l.height;
@@ -289,6 +316,53 @@ export class Muse {
     this.uniforms.uMuseSize.value.z = shells;
     (this.mesh.geometry as InstancedBufferGeometry).instanceCount = shells + 1;
     this.props.update(time, l, rig, this.place, terrain, MUSE_HEIGHT, seen);
+  }
+
+  /** The engine's say over Muse's life (null-free: with no engine it stays home, living its life). */
+  direct(direction: MuseDirection): void {
+    this.direction = direction;
+    this.away = direction.kind === 'hidden';
+  }
+
+  /** Its life at a time, unless the engine has it out on the planet or working at home. */
+  private lifeAt(time: number, terrain: Terrain, camera: Vector3, roam: MuseRoam): Roaming {
+    const d = this.direction;
+    const life = roam.at(time, camera);
+    if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;
+    const r = this.directed;
+    const a = r.action;
+    a.moves.length = 0;
+    a.time = time;
+    a.wave = -1;
+    a.look = 1;
+    a.lookYaw = (d.busy ? 0.3 : 1) * (0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time));
+    a.lookPitch = d.busy ? BUSY_PITCH : -0.04 + 0.06 * Math.sin(0.37 * time + 2);
+    if (d.kind === 'home') {
+      // working at home: on the bench, still, head bowed over its lap
+      const seat = roam.benchSeat();
+      r.dir.copy(seat.dir);
+      r.height = seat.height;
+      r.heading.copy(seat.heading);
+      a.walk = 0;
+      a.stride = 1;
+      a.gait = 0;
+      a.moves.push({ kind: 'perch', time, amount: 1, ease: 0 });
+      r.home = true;
+      return r;
+    }
+    // out on the planet: on the ground at its spot, facing the way it goes
+    r.dir.copy(d.dir).normalize();
+    r.height = terrain.height(r.dir);
+    if (d.toward) r.heading.subVectors(d.toward, r.dir);
+    r.heading.addScaledVector(r.dir, -r.heading.dot(r.dir));
+    if (r.heading.lengthSq() < 1e-10) r.heading.set(r.dir.y, -r.dir.x, 0);
+    if (r.heading.lengthSq() < 1e-10) r.heading.set(1, 0, 0);
+    r.heading.normalize();
+    a.walk = d.busy ? 0 : d.walk;
+    a.stride = 1;
+    a.gait = time * OUT_GAIT;
+    r.home = false;
+    return r;
   }
 
   /**

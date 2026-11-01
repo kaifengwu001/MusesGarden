@@ -3,8 +3,14 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client"
+    ],
     "strict": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
@@ -16,6 +22,14 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src"],
-  "exclude": ["src/dev/**/*.spec.ts"]
+  "include": [
+    "src",
+    "environments"
+  ],
+  "exclude": [
+    "src/dev/**/*.spec.ts",
+    "src/muse/ui/**/*.e2e.ts",
+    "environments/**/*.spec.ts",
+    "environments/*/vite.config.ts"
+  ]
 }
