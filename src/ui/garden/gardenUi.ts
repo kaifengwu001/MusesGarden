@@ -6,7 +6,8 @@ import { placeholderSource, type PlaceholderSource } from '../../garden/placehol
 import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
-import { FindBeds, type BedLook } from '../../life/findBeds';
+import { FindBeds } from '../../life/findBeds';
+import { FindForms, type FormLook } from '../../life/findForms';
 import type { MuseDirection } from '../../life/muse';
 import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
@@ -70,6 +71,7 @@ export class GardenUi {
   readonly state: GardenState;
   private readonly root: HTMLElement;
   private readonly beds: FindBeds;
+  private readonly forms: FindForms;
   private readonly pins = new Pins();
   /** The finds' specimens and spheres, once they are drawn. */
   marks: FindMarks | null = null;
@@ -120,7 +122,9 @@ export class GardenUi {
     parent.append(this.root);
     document.body.classList.add('garden-on');
     this.beds = new FindBeds(world.shared);
-    world.scene.add(...this.beds.meshes, this.pins.group);
+    this.forms = new FindForms(world.shared, this.beds);
+    this.marks = this.forms;
+    world.scene.add(...this.beds.meshes, ...this.forms.objects, this.pins.group);
     this.flight = new Flight(world.rig);
     this.basketFlight = new BasketFlight(this.root, {
       project: (dir, height) => this.project(dir, height, window.innerWidth, window.innerHeight),
@@ -242,7 +246,7 @@ export class GardenUi {
     if (!s) return;
     this.laidFor = { radius, layout: w.terrain.layout };
     this.layout = layOut(w.terrain, s.baskets, s.finds);
-    const looks: BedLook[] = [];
+    const looks: FormLook[] = [];
     const hidden = new Set<string>();
     for (const basket of this.state.baskets) {
       for (const id of basket.finds) {
@@ -250,11 +254,12 @@ export class GardenUi {
         const find = this.state.find(id);
         if (!bed || !find) continue;
         const interest = this.state.interest(find.topic);
-        looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5 });
+        looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5, topic: find.topic });
         if (!this.state.visitedBasket(basket.id) || this.basketFlight.waiting(id)) hidden.add(id);
       }
     }
     this.beds.set(looks, radius, hidden);
+    this.forms.set(looks, w.terrain, hidden);
     this.refreshPins();
   }
 
@@ -292,6 +297,7 @@ export class GardenUi {
     // (picked when the pointer moved, or while a flight moves the view under it)
     if (this.pointer && (this.pointerMoved || this.flight.flying)) this.hover(this.pointer);
     this.beds.update(away ? Infinity : w.rig.altitude);
+    this.forms.update(w.rig.altitude, !away);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -598,6 +604,7 @@ export class GardenUi {
       state: this.state,
       ui: this,
       layout: () => this.layout,
+      forms: this.forms,
       open: (id: string) => this.openFind(id),
       basket: (id?: string) => this.goToBasket(id ?? this.state.baskets[0]?.id ?? ''),
       /** Replay a basket's planting: its beds hidden again and the basket marked new. */
