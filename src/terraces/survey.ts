@@ -27,8 +27,14 @@ import { createCropSample, createPlotSample, SEASON, TERRACE, type CropSample, t
 // The meshes are built from this (floors.ts, terraceMesh.ts): each grid
 // square clipped exactly at the walls, the cuts and the land's edge.
 
-/** The planet's cuts: a cut wherever a wall's cut field (plots.ts cutField, a noise so many meters across) crosses a step; at most this long across its band (m), drawn at this spacing (m), heading at least this much up the slope (the cosine). */
-export const CUTS = { step: 0.24, reach: 30, spacing: 0.25, uphill: 0.6 } as const;
+/**
+ * The planet's cuts: a cut wherever a wall's cut field (plots.ts cutField, a noise so many meters across) crosses a step; at most this long across its band (m),
+ * drawn at this spacing (m), heading at least this much up the slope (the cosine); it runs into the upper bank this far on (× the band's width there), its ends
+ * along the banks for this share of its length (cutAcross).
+ */
+/** A closed contour enclosing less than this (m²) is a small ring: its bump or dip is levelled into the band round it. */
+const SMALL_RING = 300;
+export const CUTS = { step: 0.24, reach: 30, spacing: 0.25, uphill: 0.6, ahead: [0.8, 2.2], tangent: 0.42 } as const;
 
 /**
  * What a survey lays out: the terraces on the hills (their riser, their cuts' field this many meters
@@ -554,6 +560,22 @@ export function* surveyCellJob(
       floorH: 0.5 * (levels[b] + levels[b + 1]),
     });
 
+  // small rings: a closed contour round a small bump or dip would wall off a little round paddy (Kai: "odd
+  // small circle paddies… should just merge with the larger paddies"); the bump is levelled down to the band
+  // round it, the dip filled up to it, before the walls are traced, so the ring never forms (bumps from the
+  // lowest level up, so an outer ring takes its inner ones with it; dips from the highest down)
+  for (const bumps of [true, false]) {
+    for (let w0 = 1; w0 < levels.length - 1; w0++) {
+      const w = bumps ? w0 : levels.length - 1 - w0;
+      if (levels[w] < lo || levels[w] > hi) continue;
+      for (const line of contour(hs, n, g, half, levels[w], inLand)) {
+        if (!line.closed || Math.abs(ringArea(line.points)) > SMALL_RING) continue;
+        levelRing(hs, n, g, half, line.points, levels[w], bumps);
+      }
+    }
+    yield;
+  }
+
   // the walls: contours at the levels inside the land
   const walls: Wall[] = [];
   for (let w = 1; w < levels.length - 1; w++) {
@@ -635,6 +657,16 @@ export function* surveyCellJob(
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) E[j * n + i] = lensSide(B, hs[j * n + i], gentle[j * n + i]);
     for (const line of contour(E, n, g, half, 0, inLand, [i0, j0, i1, j1])) {
       for (const part of withinBand(G, B, line.points, line.closed)) {
+        // (a small closed lens is a small round paddy too, Kai's "odd small circle": no lens there, the band
+        // runs on over it: steeper as the lens reads it, out of the lens as the paddies read it)
+        if (part.closed && Math.abs(ringArea(part.points)) < SMALL_RING) {
+          const steep = (B.hi - B.lo) / (0.9 * LENS.wide[0]);
+          forInside(n, g, half, part.points, (k) => {
+            gentle[k] = Math.max(gentle[k], steep);
+            sub[k] = 0;
+          });
+          continue;
+        }
         const rs = resample(part.points, part.closed, 0.5);
         lensWalls.push({ band: b, points: rs.p, closed: part.closed });
       }
@@ -668,7 +700,11 @@ export function* surveyCellJob(
       const y0 = 0.5 * (w.points[2 * c + 1] + w.points[2 * c + 3]);
       const at = Math.max(step[c], step[c + 1]);
       const hb = plots.hash(0, w.level, at, 0, 42);
-      const points = cutAcross(G, B, x0, y0, (wallsBy.get(w.index + 1) ?? []).map((u) => walls[u].points), hb, M.bow) ?? cutUphill(G, B, x0, y0);
+      // (the lower bank's way there: the cut leaves it along it)
+      const bx = w.points[2 * c + 2] - w.points[2 * c];
+      const by = w.points[2 * c + 3] - w.points[2 * c + 1];
+      const bl = Math.hypot(bx, by) || 1;
+      const points = cutAcross(G, B, x0, y0, bx / bl, by / bl, (wallsBy.get(w.index + 1) ?? []).map((u) => walls[u].points), hb) ?? cutUphill(G, B, x0, y0);
       chartDir(chart, R, x0, y0, pd);
       if (points) traced.push({ band: B.index, points, rank: [w.level, at, pd.x + 3 * pd.y] });
     }
@@ -1149,40 +1185,77 @@ function withinBand(G: Grid, B: Band, points: number[], closed: boolean): Array<
 }
 
 /**
- * A cut across band B from (x0, y0) on its lower wall: a gentle arc to the nearest point of the upper walls
- * (bowed to one side by a share of its length, `bow`), ended where it leaves the band near its end; null with
- * no upper wall in reach up the slope, or where the arc leaves the band early (it would cross a spur or a hollow).
+ * A cut across band B from (x0, y0) on its lower wall, as the paddies' ends are in the references: it leaves
+ * the lower bank along it (tx, ty: the bank's way there, turned to the side the cut leans), sweeps across the
+ * band and runs into the upper bank along it, a little further on (a band's width or two), so the paddy on one
+ * side ends in a long point and the one on the other in a rounded shoulder, both part of the banks' shape (Kai:
+ * "not simply a curve across"). A cubic tangent to both banks; ended where it leaves the band near its end; null
+ * with no upper wall in reach up the slope, or where it leaves the band early (it would cross a spur or a hollow).
  */
-function cutAcross(G: Grid, B: Band, x0: number, y0: number, upper: readonly Float64Array[], hb: number, bow: readonly [number, number]): Float64Array | null {
+function cutAcross(G: Grid, B: Band, x0: number, y0: number, tx: number, ty: number, upper: readonly Float64Array[], hb: number): Float64Array | null {
   let best = CUTS.reach * CUTS.reach;
-  let x1 = Number.NaN;
-  let y1 = Number.NaN;
+  let wall: Float64Array | null = null;
+  let at = -1;
   for (const p of upper) {
     for (let k = 0; k < p.length; k += 2) {
       const d = (p[k] - x0) ** 2 + (p[k + 1] - y0) ** 2;
       if (d < best) {
         best = d;
-        x1 = p[k];
-        y1 = p[k + 1];
+        wall = p;
+        at = k;
       }
     }
   }
-  if (Number.isNaN(x1)) return null;
-  const len = Math.sqrt(best);
-  if (len < 0.3) return null;
+  if (!wall) return null;
+  const width = Math.sqrt(best);
+  if (width < 0.3) return null;
   // (roughly up the slope: not to where an upper wall ends, off to one side)
   const grad = { x: 0, y: 0 };
   gradAt(G, x0, y0, grad);
-  if ((x1 - x0) * grad.x + (y1 - y0) * grad.y < CUTS.uphill * len * Math.hypot(grad.x, grad.y)) return null;
-  const share = (bow[0] + (bow[1] - bow[0]) * unit(hb)) * ((hb & 256) === 0 ? 1 : -1);
-  const cx = 0.5 * (x0 + x1) - ((y1 - y0) / len) * share * len;
-  const cy = 0.5 * (y0 + y1) + ((x1 - x0) / len) * share * len;
-  const count = Math.max(2, Math.ceil((len * (1 + 2 * Math.abs(share))) / CUTS.spacing));
+  if ((wall[at] - x0) * grad.x + (wall[at + 1] - y0) * grad.y < CUTS.uphill * width * Math.hypot(grad.x, grad.y)) return null;
+  // leaning one way or the other along the banks, a band's width or two on
+  const lean = (hb & 256) === 0 ? 1 : -1;
+  const ux = tx * lean;
+  const uy = ty * lean;
+  const ahead = width * (CUTS.ahead[0] + (CUTS.ahead[1] - CUTS.ahead[0]) * unit(hb));
+  // along the upper wall the same way, as far ahead
+  const m = wall.length / 2;
+  const tan = (k: number): [number, number] => {
+    const a = Math.max(k - 1, 0);
+    const c = Math.min(k + 1, m - 1);
+    const dx = wall[2 * c] - wall[2 * a];
+    const dy = wall[2 * c + 1] - wall[2 * a + 1];
+    const l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l];
+  };
+  let k = at / 2;
+  const [wx, wy] = tan(k);
+  const dir = wx * ux + wy * uy >= 0 ? 1 : -1;
+  let walked = 0;
+  while (walked < ahead) {
+    const kn = k + dir;
+    if (kn < 0 || kn >= m) break;
+    walked += Math.hypot(wall[2 * kn] - wall[2 * k], wall[2 * kn + 1] - wall[2 * k + 1]);
+    k = kn;
+  }
+  const x1 = wall[2 * k];
+  const y1 = wall[2 * k + 1];
+  const [ex, ey] = tan(k);
+  const vx = ex * dir;
+  const vy = ey * dir;
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  const reach = CUTS.tangent * len;
+  const c1x = x0 + ux * reach;
+  const c1y = y0 + uy * reach;
+  const c2x = x1 - vx * reach;
+  const c2y = y1 - vy * reach;
+  const count = Math.max(3, Math.ceil((1.4 * len) / CUTS.spacing));
   const out: number[] = [];
   for (let i = 0; i <= count; i++) {
     const t = i / count;
-    const x = (1 - t) * (1 - t) * x0 + 2 * t * (1 - t) * cx + t * t * x1;
-    const y = (1 - t) * (1 - t) * y0 + 2 * t * (1 - t) * cy + t * t * y1;
+    const s = 1 - t;
+    const x = s * s * s * x0 + 3 * s * s * t * c1x + 3 * s * t * t * c2x + t * t * t * x1;
+    const y = s * s * s * y0 + 3 * s * s * t * c1y + 3 * s * t * t * c2y + t * t * t * y1;
     if (i > 0 && i < count && !inBand(G, B, x, y)) {
       if (t < 0.6) return null;
       break;
@@ -1190,6 +1263,56 @@ function cutAcross(G: Grid, B: Band, x0: number, y0: number, upper: readonly Flo
     out.push(x, y);
   }
   return out.length >= 4 ? Float64Array.from(out) : null;
+}
+
+/** A ring's area (m², signed: a closed polyline's shoelace). */
+function ringArea(p: readonly number[]): number {
+  let a = 0;
+  const m = p.length / 2;
+  for (let k = 0; k < m; k++) {
+    const l = (k + 1) % m;
+    a += p[2 * k] * p[2 * l + 1] - p[2 * l] * p[2 * k + 1];
+  }
+  return 0.5 * a;
+}
+
+/** Each grid point inside a ring (a closed polyline in the chart, even–odd), its index. */
+function forInside(n: number, g: number, half: number, p: ArrayLike<number>, visit: (k: number) => void): void {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let k = 0; k < p.length; k += 2) {
+    x0 = Math.min(x0, p[k]);
+    x1 = Math.max(x1, p[k]);
+    y0 = Math.min(y0, p[k + 1]);
+    y1 = Math.max(y1, p[k + 1]);
+  }
+  const i0 = Math.max(0, Math.floor((x0 + half) / g));
+  const i1 = Math.min(n - 1, Math.ceil((x1 + half) / g));
+  const j0 = Math.max(0, Math.floor((y0 + half) / g));
+  const j1 = Math.min(n - 1, Math.ceil((y1 + half) / g));
+  const m = p.length / 2;
+  for (let j = j0; j <= j1; j++) {
+    const y = -half + j * g;
+    for (let i = i0; i <= i1; i++) {
+      const x = -half + i * g;
+      let inside = false;
+      for (let a = 0, b = m - 1; a < m; b = a++) {
+        const ya = p[2 * a + 1];
+        const yb = p[2 * b + 1];
+        if (ya > y !== yb > y && x < ((p[2 * b] - p[2 * a]) * (y - ya)) / (yb - ya) + p[2 * a]) inside = !inside;
+      }
+      if (inside) visit(j * n + i);
+    }
+  }
+}
+
+/** Levels what lies inside a ring (a closed contour at H) to just under H where it is a bump (just over where a dip). */
+function levelRing(hs: Float32Array, n: number, g: number, half: number, p: readonly number[], H: number, bump: boolean): void {
+  forInside(n, g, half, p, (k) => {
+    hs[k] = bump ? Math.min(hs[k], H - 0.02) : Math.max(hs[k], H + 0.02);
+  });
 }
 
 /** A cut traced up the slope from (x0, y0) to the band's upper level or the land's edge (where the band has no upper wall in reach); null where it gets to neither (it would part nothing). */

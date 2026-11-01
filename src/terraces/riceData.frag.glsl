@@ -44,5 +44,12 @@ void main() {
     return;
   }
   vec2 xy = s > 1e-9 ? tan2 / s * r : vec2(0.0);
-  gl_FragColor = textureLod(uPaddyMap, xy * 0.5 + 0.5, 0.0);
+  vec4 here = textureLod(uPaddyMap, xy * 0.5 + 0.5, 0.0);
+  // a blade only where its floor reaches a quarter meter out every way: it stands back from the bunds, the
+  // risers and the ridges, so none arches out over them (they made a hairy fringe along the bunds up close)
+  float o = 0.25 / (uRadius * uMapCentre.w);
+  float clear = min(min(textureLod(uPaddyMap, (xy + vec2(o, 0.0)) * 0.5 + 0.5, 0.0).r, textureLod(uPaddyMap, (xy - vec2(o, 0.0)) * 0.5 + 0.5, 0.0).r),
+                    min(textureLod(uPaddyMap, (xy + vec2(0.0, o)) * 0.5 + 0.5, 0.0).r, textureLod(uPaddyMap, (xy - vec2(0.0, o)) * 0.5 + 0.5, 0.0).r));
+  if (clear <= 0.01) here.r = 0.0;
+  gl_FragColor = here;
 }

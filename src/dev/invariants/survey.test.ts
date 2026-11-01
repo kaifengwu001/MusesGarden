@@ -98,6 +98,10 @@ describe('the terraces as surveyed', () => {
           const A = s.cuts[i];
           const B = s.cuts[j];
           if (A.band !== B.band) continue;
+          // (two cuts whose boxes do not meet cannot cross: skipped, so the check runs in time with the longer cuts)
+          const ba = box(A.points);
+          const bb = box(B.points);
+          if (ba[0] > bb[2] || bb[0] > ba[2] || ba[1] > bb[3] || bb[1] > ba[3]) continue;
           for (let a = 0; a + 3 < A.points.length; a += 2) {
             for (let b = 0; b + 3 < B.points.length; b += 2) {
               const p = A.points;
@@ -201,4 +205,16 @@ function sideAt(s: CellSurvey, x: number, y: number): number {
   const i = Math.min(Math.max(Math.round((x + s.half) / s.g), 0), s.n - 1);
   const j = Math.min(Math.max(Math.round((y + s.half) / s.g), 0), s.n - 1);
   return s.side[j * s.n + i];
+}
+
+/** A polyline's bounding box: min x, min y, max x, max y. */
+function box(p: Float64Array): [number, number, number, number] {
+  const b: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let k = 0; k < p.length; k += 2) {
+    b[0] = Math.min(b[0], p[k]);
+    b[1] = Math.min(b[1], p[k + 1]);
+    b[2] = Math.max(b[2], p[k]);
+    b[3] = Math.max(b[3], p[k + 1]);
+  }
+  return b;
 }

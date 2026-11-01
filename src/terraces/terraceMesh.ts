@@ -363,11 +363,12 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
         const pl = paddyAt(x - sx * 0.6, y - sy * 0.6);
         const pr = paddyAt(x + sx * 0.6, y + sy * 0.6);
         parts.push(pl >= 0 && pr >= 0 && pl !== pr);
-        let left = floorAt(x - sx * 0.6, y - sy * 0.6);
-        let right = floorAt(x + sx * 0.6, y + sy * 0.6);
-        if (Number.isNaN(left)) left = right;
-        if (Number.isNaN(right)) right = left;
-        if (Number.isNaN(left)) left = right = natural(x, y);
+        // (its own band's floors either side: at its ends, where it meets a wall, a side can reach over onto the
+        // band above or below, and the ridge would stand up to that floor, a pale post on the wall)
+        const own = s.bands[cut.band]?.floorH ?? natural(x, y);
+        const near = (h: number): number => (Number.isNaN(h) || Math.abs(h - own) > 0.3 ? own : h);
+        const left = near(floorAt(x - sx * 0.6, y - sy * 0.6));
+        const right = near(floorAt(x + sx * 0.6, y + sy * 0.6));
         const crest = Math.max(left, right) + 0.8 * bh;
         const fl = [Math.max(left, right), 0, 0, 0];
         ring.push([
