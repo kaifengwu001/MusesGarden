@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Instant, InvitationState, LifePolicy, MuseId, MuseState, StoredEvent } from '../../src/muse/contract';
+import type { CastFile, Instant, InvitationState, LifePolicy, MuseId, MuseState, RelationshipOrigin, StoredEvent } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
@@ -27,6 +27,7 @@ export async function seedCast(engine: Engine, life: LifePolicy, opts: SimOption
     await engine.addMuse({ id: m.id, name, worldSeed: m.worldSeed, timezone: m.timezone }, docs.soul, docs.memory, opts.start);
   }
   for (const [a, b] of cast.introductions) await engine.introduce(a, b, opts.start);
+  for (const { a, b, on } of cast.knownOn) await engine.connectOwners(a, b, on, opts.start);
   if (opts.work) {
     const schedule = parseWorkSchedule(JSON.parse(readFileSync(opts.work, 'utf8')));
     for (const [id, blocks] of Object.entries(schedule)) {
@@ -99,8 +100,13 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
     detail: `${hangouts.length} hangouts, ${withGift.length} with a gift`,
   });
 
-  const metBeyond = all.some(({ log }) => log.some((e) => e.event.kind === 'relationship.changed' && e.event.to === 'friends' && e.event.origin === 'met-beyond'));
-  out.push({ name: 'a stranger became a friend', pass: metBeyond, detail: metBeyond ? 'yes' : 'none' });
+  const made = friendships(engine);
+  const metBeyond = all.reduce((n, { log }) => n + log.filter((e) => e.event.kind === 'encounter' && e.event.where === 'beyond').length, 0) / 2;
+  out.push({
+    name: 'each path made a friend (strangers, rarer, at least met beyond)',
+    pass: made.introduced > 0 && made['known-on'] > 0 && made['met-beyond'] + metBeyond > 0,
+    detail: `shared ${made.introduced}, known online ${made['known-on']}, strangers ${made['met-beyond']} (${metBeyond} meetings beyond)`,
+  });
 
   const invitations = (to: InvitationState) => new Set(all.flatMap(({ log }) => log.flatMap((e) => (e.event.kind === 'invitation' && e.event.to === to ? [e.event.id] : [])))).size;
   const [sent, used] = [invitations('sent'), invitations('used')];
@@ -108,6 +114,15 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
 
   const reflections = all.reduce((n, { s }) => n + s.reflections.length, 0);
   out.push({ name: 'reflections committed', pass: reflections > 0, detail: `${reflections}` });
+  return out;
+}
+
+/** Friendships made over the run, by how they began, counted once per pair. */
+export function friendships(engine: Engine): Record<RelationshipOrigin, number> {
+  const out: Record<RelationshipOrigin, number> = { introduced: 0, 'known-on': 0, 'met-beyond': 0 };
+  for (const id of engine.museIds()) {
+    for (const { event: e } of engine.log(id)) if (e.kind === 'relationship.changed' && e.to === 'friends' && id < e.other) out[e.origin]++;
+  }
   return out;
 }
 

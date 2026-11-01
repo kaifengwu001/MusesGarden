@@ -28,6 +28,9 @@ const OWNERS: Readonly<Record<string, Owner>> = {
   moss: { window: [11, 23], week: ['heavy', 'heavy', 'light', 'light', 'empty', 'empty', 'empty'] },
   lark: { window: [9, 21], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'light', 'empty'] },
   sorrel: { window: [8, 18], week: ['heavy', 'heavy', 'heavy', 'light', 'empty', 'empty', 'empty'] },
+  clover: { window: [9, 19], week: ['heavy', 'heavy', 'light', 'light', 'light', 'empty', 'empty'] },
+  bramble: { window: [8, 17], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'empty', 'empty'] },
+  thistle: { window: [10, 20], week: ['heavy', 'heavy', 'heavy', 'heavy', 'light', 'empty', 'empty'] },
 };
 
 /** Each day kind: total work in quarter hours [min, max], block count [min, max], shortest block. */

@@ -2,7 +2,7 @@ import type { Instant, MuseId, ReduceSocial, Relationship, RelationshipOrigin, S
 import { distanceAfter, isUnpleasant } from './relationships';
 
 export function emptySocial(): SocialState {
-  return { relationships: new Map(), invitations: new Map(), likedPhotos: new Set() };
+  return { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() };
 }
 
 function fresh(other: MuseId, origin: RelationshipOrigin): Relationship {
@@ -45,7 +45,7 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
   const at: Instant = e.at;
   switch (e.kind) {
     case 'encounter':
-      return withRelationship(s, e.other, 'met-beyond', (r) => ({
+      return withRelationship(s, e.other, e.where === 'online' ? 'known-on' : 'met-beyond', (r) => ({
         ...r,
         familiarity: r.familiarity + e.pleasantness,
         encounters: r.encounters + 1,
@@ -70,6 +70,8 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
       return withRelationship(s, e.other, 'introduced', befriend('introduced', at));
     case 'owner.unshared':
       return s.relationships.has(e.other) ? withRelationship(s, e.other, 'introduced', end) : s;
+    case 'owners.connected':
+      return { ...s, knownOn: new Map(s.knownOn).set(e.other, e.on) };
     case 'owner.liked': {
       if (!e.liked || !e.friend || !('photo' in e.target) || s.likedPhotos.has(e.target.photo) || !s.relationships.has(e.friend)) return s;
       const likedPhotos = new Set(s.likedPhotos).add(e.target.photo);

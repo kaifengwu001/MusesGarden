@@ -7,7 +7,7 @@ import { renderSoulSection } from '../domain/soul';
 import { localDay } from '../domain/time';
 import { buildGarden } from '../engine/compose';
 import { loadCast } from '../fixtures/cast';
-import { checks, run, seedCast } from './run';
+import { checks, friendships, run, seedCast } from './run';
 
 const { values } = parseArgs({
   options: {
@@ -80,7 +80,12 @@ const all = garden.engine.museIds().flatMap((id) => garden.engine.log(id));
 const beyond = all.filter((e) => e.event.kind === 'episode.started' && e.event.plan.activity === 'beyond').length;
 const encounters = all.filter((e) => e.event.kind === 'encounter');
 const acquainted = all.filter((e) => e.event.kind === 'relationship.changed' && e.event.to === 'acquainted').length;
-console.info(`Beyond trips: ${beyond}  encounters: ${encounters.length / 2}  acquaintances: ${acquainted / 2}  encounter pleasantness: ${encounters.map((e) => (e.event.kind === 'encounter' ? e.event.pleasantness.toFixed(2) : '')).slice(0, 12).join(' ')}`);
+const online = encounters.filter((e) => e.event.kind === 'encounter' && e.event.where === 'online').length;
+console.info(`Beyond trips: ${beyond}  encounters: ${(encounters.length - online) / 2} beyond, ${online / 2} online  acquaintances: ${acquainted / 2}`);
+const made = friendships(garden.engine);
+const endings = all.filter((e) => e.event.kind === 'relationship.changed' && e.event.to === 'ended' && e.museId < e.event.other);
+const ended = (reason: string) => endings.filter((e) => e.event.kind === 'relationship.changed' && e.event.reason === reason).length;
+console.info(`Friendships made: shared ${made.introduced}, known online ${made['known-on']}, strangers met beyond ${made['met-beyond']}.  Ended: ${ended('drifted-apart')} drifted apart, ${ended('owner-unshared')} unshared`);
 
 const owner = garden.engine.museIds().flatMap((id) => garden.views.metrics(id).map((r) => ({ id, ...r })));
 const weeks = new Map<number, number[]>();

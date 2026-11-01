@@ -57,7 +57,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     lastReflectionAt: 0 as Instant,
     experiencesSinceReflection: 0,
     day: { day: '', restMs: 0, socialMs: 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
-    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
   };
 }
 
@@ -125,7 +125,7 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
 const at = (n: number) => n as Instant;
 
 export const life: LifePolicy = {
-  next: (_s, _now, draw, friendFree) => (friendFree && draw('visit') < 0.3 ? 'visit' : draw('next') < 0.4 ? 'rest' : 'travel'),
+  next: (_s, _now, draw, offer) => (offer !== 'none' && draw('visit') < 0.3 ? 'visit' : draw('next') < 0.4 ? 'rest' : 'travel'),
   restUntil: (_s, now) => at(now + 30 * MIN),
   beyondUntil: (_s, now) => at(now + 60 * MIN),
   startTrip: (_s, _now, draw) =>

@@ -9,6 +9,13 @@ export const SOCIAL = {
   familiaritySpan: 3,
   befriendBase: 0.5,
 
+  /** Online, between Muses whose owners know each other: knownPerHour · sociability · sociability · (knownBase + similarity). */
+  knownPerHour: 0.3,
+  knownBase: 0.5,
+  /** They may become friends once this familiar, with chance knownBefriendBase + (1 − knownBefriendBase) · the lower sociability. */
+  knownFamiliarity: 1,
+  knownBefriendBase: 0.5,
+
   /** Share of pleasantness that comes from both Muses' warmth (mean sociability), whatever their interests. */
   pleasantWarmth: 0.3,
   pleasantSimilarity: 0.6,

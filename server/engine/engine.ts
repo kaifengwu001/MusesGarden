@@ -5,12 +5,14 @@ import type {
   Discovery,
   DiscoveryId,
   Draw,
+  EncounterPlace,
   EpisodePlan,
   Instant,
   Interest,
   Invitation,
   InvitationId,
   Judgment,
+  KnownOn,
   LifePolicy,
   Mind,
   MindContext,
@@ -56,6 +58,28 @@ interface HopPayload {
   readonly since: number;
   readonly from: Candidate | null;
 }
+
+/** An encounter holds only while both Muses are still in the episodes it was drawn in. */
+interface EncounterPayload {
+  readonly other: MuseId;
+  readonly where: EncounterPlace;
+  readonly n: number;
+  readonly otherN: number;
+}
+
+/**
+ * Where two Muses can meet. Beyond: both out there. Online: Muse explores while the other is free, and a free Muse is
+ * exploring too, since resting, working, hosting and being away all keep it busy.
+ */
+const CAN_MEET: Readonly<Record<EncounterPlace, (s: MuseState) => boolean>> = {
+  beyond: (s) => s.episode?.plan.activity === 'beyond' && s.episode.pausedAt === null,
+  online: (s) => !s.working && s.episode?.plan.activity === 'travel' && s.episode.pausedAt === null,
+};
+/** Draw kinds and schedule ids per place; beyond keeps the names it always had, so earlier runs replay the same. */
+const ENCOUNTER_KEY: Readonly<Record<EncounterPlace, { readonly draw: string; readonly id: string }>> = {
+  beyond: { draw: 'encounter', id: 'enc' },
+  online: { draw: 'online', id: 'online' },
+};
 
 /**
  * The one clock for every Muse: a discrete-event simulation over the store's persisted schedule. Each due item is
@@ -139,6 +163,17 @@ export class Engine {
       const out = this.deps.social.ownerLink(tx.state(a), tx.state(b), 'introduce', at);
       tx.emitAll(a, out.self);
       tx.emitAll(b, out.other);
+      this.commit(tx);
+    });
+  }
+
+  /** Owners who are friends on Instagram or Facebook. Recorded once, in both logs, and never in a public profile. */
+  connectOwners(a: MuseId, b: MuseId, on: KnownOn, at: Instant): Promise<void> {
+    return this.exclusive(() => {
+      const tx = this.tx(at);
+      if (tx.state(a).social.knownOn.has(b)) return;
+      tx.emit(a, { kind: 'owners.connected', other: b, on });
+      tx.emit(b, { kind: 'owners.connected', other: a, on });
       this.commit(tx);
     });
   }
@@ -265,7 +300,7 @@ export class Engine {
         this.scheduleBasketCheck(tx, item.museId);
         break;
       case 'encounter':
-        this.onEncounter(tx, item.museId, item.payload.other as MuseId);
+        this.onEncounter(tx, item.museId, item.payload as unknown as EncounterPayload);
         break;
     }
     this.commit(tx);
@@ -418,31 +453,31 @@ export class Engine {
     }
   }
 
-  private onEncounter(tx: Tx, a: MuseId, b: MuseId): void {
+  private onEncounter(tx: Tx, a: MuseId, p: EncounterPayload): void {
     const as = tx.state(a);
-    const bs = tx.state(b);
-    const beyond = (s: MuseState) => s.episode?.plan.activity === 'beyond' && s.episode.pausedAt === null;
-    if (!beyond(as) || !beyond(bs)) return;
-    const k = as.social.relationships.get(b)?.encounters ?? 0;
-    const out = this.deps.social.encounter(as, bs, tx.now, this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 1 + k));
+    const bs = tx.state(p.other);
+    const still = (s: MuseState, n: number) => s.episode?.n === n && CAN_MEET[p.where](s);
+    if (!still(as, p.n) || !still(bs, p.otherN)) return;
+    const k = as.social.relationships.get(p.other)?.encounters ?? 0;
+    const out = this.deps.social.encounter(as, bs, p.where, tx.now, this.deps.drawFor(a, p.n * 64 + 1 + k));
     tx.emitAll(a, out.self);
-    tx.emitAll(b, out.other);
-    this.scheduleNextEncounter(tx, a, b, k + 1);
+    tx.emitAll(p.other, out.other);
+    const u = this.deps.drawFor(a, p.n * 64 + 2)(`${ENCOUNTER_KEY[p.where].draw}.next`, k + 1);
+    this.scheduleEncounter(tx, a, p.other, p.where, u, `:${k + 1}`);
   }
 
-  /** Encounters are a Poisson process while both Muses stay beyond: each one schedules the next arrival. */
-  private scheduleNextEncounter(tx: Tx, a: MuseId, b: MuseId, k: number): void {
+  /** Encounters are a Poisson process while both Muses stay where they can meet: each one schedules the next arrival. */
+  private scheduleEncounter(tx: Tx, a: MuseId, b: MuseId, where: EncounterPlace, u: number, idSuffix: string): void {
     const as = tx.state(a);
     const bs = tx.state(b);
-    const pa = as.episode?.plan;
-    const pb = bs.episode?.plan;
-    if (pa?.activity !== 'beyond' || pb?.activity !== 'beyond') return;
-    const rate = this.deps.social.encounterRate(as, bs);
+    if (!as.episode || !bs.episode || !CAN_MEET[where](as) || !CAN_MEET[where](bs)) return;
+    const rate = this.deps.social.encounterRate(as, bs, where);
     if (rate <= 0) return;
-    const u = this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 2)('encounter.next', k);
     const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
-    if (at >= Math.min(pa.until, pb.until)) return;
-    tx.schedule({ id: `enc:${a}:${b}:${as.episodes}:${k}`, at: Math.floor(at) as Instant, museId: a, kind: 'encounter', payload: { other: b } });
+    const [pa, pb] = [as.episode.plan, bs.episode.plan];
+    if (pa.activity === 'beyond' && pb.activity === 'beyond' && at >= Math.min(pa.until, pb.until)) return;
+    const payload: EncounterPayload = { other: b, where, n: as.episode.n, otherN: bs.episode.n };
+    tx.schedule({ id: `${ENCOUNTER_KEY[where].id}:${a}:${b}:${as.episodes}${idSuffix}`, at: Math.floor(at) as Instant, museId: a, kind: 'encounter', payload: { ...payload } });
   }
 
   /** Picks and starts Muse's next episode. Does nothing while Muse works or is mid-episode. */
@@ -474,11 +509,12 @@ export class Engine {
       const until = Math.floor(life.beyondUntil(s, tx.now, draw)) as Instant;
       tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'beyond', until } });
       this.scheduleEnd(tx, m, n, until);
-      this.scheduleEncounters(tx, m, until, draw);
+      this.scheduleEncounters(tx, m, 'beyond', draw);
       return;
     }
     tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'travel', trip } });
     this.scheduleHop(tx, m, { n, k: 0, since: tx.now, from: null }, tx.now + life.hopMs(tx.state(m), draw));
+    this.scheduleEncounters(tx, m, 'online', draw);
   }
 
   private startVisit(tx: Tx, m: MuseId, other: MuseId, role: 'host' | 'guest', until: Instant): void {
@@ -508,20 +544,11 @@ export class Engine {
     return out;
   }
 
-  private scheduleEncounters(tx: Tx, m: MuseId, until: Instant, draw: Draw): void {
-    const s = tx.state(m);
-    for (const other of this.states.keys()) {
-      if (other === m) continue;
-      const os = tx.state(other);
-      const ep = os.episode;
-      if (!ep || ep.plan.activity !== 'beyond' || ep.pausedAt !== null) continue;
-      const rate = this.deps.social.encounterRate(s, os);
-      if (rate <= 0) continue;
-      const end = Math.min(until, ep.plan.until);
-      const u = draw('encounter', hashId(other));
-      const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
-      if (at >= end) continue;
-      tx.schedule({ id: `enc:${m}:${other}:${s.episodes}`, at: Math.floor(at) as Instant, museId: m, kind: 'encounter', payload: { other } });
+  /** Muse just went beyond or set off exploring: anyone already there may be met. Online, only those its owner knows. */
+  private scheduleEncounters(tx: Tx, m: MuseId, where: EncounterPlace, draw: Draw): void {
+    const others = where === 'online' ? tx.state(m).social.knownOn.keys() : this.states.keys();
+    for (const other of others) {
+      if (other !== m && this.states.has(other)) this.scheduleEncounter(tx, m, other, where, draw(ENCOUNTER_KEY[where].draw, hashId(other)), '');
     }
   }
 

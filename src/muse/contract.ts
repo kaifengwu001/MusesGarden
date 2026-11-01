@@ -172,8 +172,11 @@ export interface CastFile {
   /** Pairs whose owners introduced their Muses at the start. */
   readonly introductions: readonly (readonly [MuseId, MuseId])[];
   /** Pairs whose owners are friends on Instagram or Facebook (simulated: the platforms give no such list). */
-  readonly knownOn?: readonly { readonly a: MuseId; readonly b: MuseId; readonly on: 'instagram' | 'facebook' }[];
+  readonly knownOn: readonly { readonly a: MuseId; readonly b: MuseId; readonly on: KnownOn }[];
 }
+
+/** Where two owners are friends online. */
+export type KnownOn = 'instagram' | 'facebook';
 
 export interface CastMember {
   readonly id: MuseId;
@@ -183,7 +186,8 @@ export interface CastMember {
   readonly timezone: string;
   /** Relative to server/fixtures/. */
   readonly dir: string;
-  readonly role: 'hero' | 'friend' | 'stranger';
+  /** friend: introduced to the hero; known: its owner knows the hero's owner online; stranger: neither. */
+  readonly role: 'hero' | 'friend' | 'known' | 'stranger';
 }
 
 /** server/fixtures/work-*.json: when each Muse is busy with its owner's tasks. ISO 8601 with offset. */
@@ -322,6 +326,8 @@ export interface Verdict {
 export type InvitationState = 'sent' | 'used' | 'withdrawn';
 export type RelationshipStatus = 'acquainted' | 'friends' | 'ended';
 export type RelationshipOrigin = 'introduced' | 'met-beyond' | 'known-on';
+/** Strangers meet beyond the planet; Muses whose owners know each other meet online, wherever they are. */
+export type EncounterPlace = 'beyond' | 'online';
 /** What the owner liked in the garden. */
 export type LikeTarget = { readonly find: DiscoveryId } | { readonly photo: PhotoId };
 
@@ -334,6 +340,8 @@ export type MuseEventBody =
   | { readonly kind: 'memory.updated'; readonly textHash: string; readonly topics: readonly TopicKey[] }
   | { readonly kind: 'owner.settings'; readonly basketTime?: string | null; readonly hide?: readonly HiddenRef[]; readonly unhide?: readonly HiddenRef[] }
   | { readonly kind: 'owner.introduced' | 'owner.unshared'; readonly other: MuseId }
+  /** The two owners are friends on a network. It never reaches another Muse or the public profile. */
+  | { readonly kind: 'owners.connected'; readonly other: MuseId; readonly on: KnownOn }
   /** A like or an unlike in the garden; `friend` is the friend a liked photo shows, filled in by the engine. */
   | { readonly kind: 'owner.liked'; readonly target: LikeTarget; readonly liked: boolean; readonly friend?: MuseId }
   // Life.
@@ -366,7 +374,7 @@ export type MuseEventBody =
     }
   | { readonly kind: 'reflection.no-change'; readonly reviewed: readonly EventRef[] }
   // Social: pair events, written to both Muses' logs in one transaction.
-  | { readonly kind: 'encounter'; readonly other: MuseId; readonly pleasantness: number; readonly similarity: number }
+  | { readonly kind: 'encounter'; readonly other: MuseId; readonly pleasantness: number; readonly similarity: number; readonly where: EncounterPlace }
   | {
       readonly kind: 'hangout';
       readonly other: MuseId;
@@ -479,6 +487,8 @@ export interface SocialState {
   readonly invitations: ReadonlyMap<InvitationId, Invitation>;
   /** Photos whose first like already counted toward a friend's fondness, so toggling a like can't pump it. */
   readonly likedPhotos: ReadonlySet<PhotoId>;
+  /** Muses whose owners are friends with this one's owner online, and where. */
+  readonly knownOn: ReadonlyMap<MuseId, KnownOn>;
 }
 
 export interface MuseState {
@@ -587,10 +597,13 @@ export interface SocialPolicy {
     now: Instant,
     draw: Draw,
   ): { readonly other: MuseId; readonly role: 'host' | 'guest'; readonly until: Instant } | null;
-  /** Encounters per hour while both Muses are beyond and not friends. */
-  encounterRate(a: MuseState, b: MuseState): number;
-  /** a met b beyond at `now`. */
-  encounter(a: MuseState, b: MuseState, now: Instant, draw: Draw): PairOutcome;
+  /**
+   * Encounters per hour while two Muses that aren't friends are both beyond, or online: one exploring while the other
+   * is free, which only Muses whose owners know each other do.
+   */
+  encounterRate(a: MuseState, b: MuseState, where: EncounterPlace): number;
+  /** a met b at `now`, beyond or online. */
+  encounter(a: MuseState, b: MuseState, where: EncounterPlace, now: Instant, draw: Draw): PairOutcome;
   /** A hangout ends: gifts, the photo together, rapport, maybe an ending or an invitation. */
   hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] };
   /**

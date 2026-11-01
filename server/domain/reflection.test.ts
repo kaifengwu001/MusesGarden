@@ -190,10 +190,10 @@ describe('reflectionDue', () => {
     const life = new Life();
     life.push(D1, { kind: 'memory.updated', textHash: 'h', topics: [] });
     expect(reflectionDue(life.state, D1 + 4 * DAY_MS)).toBe(false);
-    life.push(D1 + HOUR_MS, { kind: 'encounter', other: museId('wren'), pleasantness: 0.5, similarity: 0.5 });
+    life.push(D1 + HOUR_MS, { kind: 'encounter', other: museId('wren'), pleasantness: 0.5, similarity: 0.5, where: 'beyond' });
     expect(reflectionDue(life.state, D1 + 2 * DAY_MS)).toBe(false);
     expect(reflectionDue(life.state, D1 + 3 * DAY_MS)).toBe(true);
-    for (let k = 0; k < 7; k++) life.push(D1 + 2 * HOUR_MS, { kind: 'encounter', other: museId('wren'), pleasantness: 0.5, similarity: 0.5 });
+    for (let k = 0; k < 7; k++) life.push(D1 + 2 * HOUR_MS, { kind: 'encounter', other: museId('wren'), pleasantness: 0.5, similarity: 0.5, where: 'beyond' });
     expect(reflectionDue(life.state, D1 + 3 * HOUR_MS)).toBe(true);
     life.push(D1 + 4 * HOUR_MS, { kind: 'reflection.no-change', reviewed: [] });
     expect(reflectionDue(life.state, D1 + 5 * HOUR_MS)).toBe(false);
