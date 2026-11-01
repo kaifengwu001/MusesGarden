@@ -128,6 +128,12 @@ function main(): void {
   const commit = git('rev-parse', '--short', 'HEAD');
   const copied = new Set<string>(COPIED);
 
+  // Detect removed/renamed meadow modules before creating a partial world.
+  for (const file of [...COPIED, ...TESTS]) {
+    const source = file === 'dev/lock.spec.ts' ? join(REPO, 'scripts/templates/lock.spec.txt') : join(SRC, file);
+    if (!existsSync(source) || !statSync(source).isFile()) fail(`missing source for ${file}; update the scaffold's module list before creating a world`);
+  }
+
   for (const file of [...COPIED, ...TESTS]) {
     let text = readFileSync(file === 'dev/lock.spec.ts' ? join(REPO, 'scripts/templates/lock.spec.txt') : join(SRC, file), 'utf8');
     if (!file.endsWith('.glsl')) text = rewriteImports(file, text, copied, out);
