@@ -132,10 +132,13 @@ export class GardenState {
     const s = this.snapshot;
     if (!s) return;
     if (event.type === 'basket') {
+      const known = this.basketIndex.get(event.basket.id)?.finds;
+      const again = known?.length === event.basket.finds.length && known.every((id, i) => id === event.basket.finds[i]);
       this.snapshot = { ...s, baskets: [...s.baskets.filter((b) => b.id !== event.basket.id), event.basket], finds: [...s.finds.filter((f) => f.basket !== event.basket.id), ...event.finds] };
       this.reindex();
       this.settle();
-      this.emit('baskets');
+      // a basket you already have, sent again because a like or its sharing changed: no arrival to replay
+      this.emit(again ? 'likes' : 'baskets');
     } else if (event.type === 'postcard') {
       this.snapshot = { ...s, postcards: [...s.postcards.filter((p) => p.id !== event.postcard.id), event.postcard] };
       this.settle();

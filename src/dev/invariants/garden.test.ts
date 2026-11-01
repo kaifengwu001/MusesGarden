@@ -213,6 +213,21 @@ describe('likes and sharing, kept by the backend', () => {
     expect(seen(), 'changed elsewhere, after it answered').toEqual([false, true, false]);
   });
 
+  it('a basket sent again only updates its finds: the garden hears of likes, not of a basket arriving', async () => {
+    const { snapshot, source } = keeping();
+    const state = new GardenState(source);
+    await state.start();
+    const changes: string[] = [];
+    state.subscribe((c) => changes.push(c));
+    const basket = state.baskets[0];
+    const finds = snapshot.finds.filter((f) => f.basket === basket.id);
+    source.push({ type: 'basket', basket, finds: finds.map((f, i) => (i === 0 ? { ...f, liked: true } : f)) });
+    expect(state.liked(finds[0].id)).toBe(true);
+    source.push({ type: 'basket', basket: { ...basket, finds: [...basket.finds, 'f-more'] }, finds: [...finds, { ...finds[0], id: 'f-more' }] });
+    source.push({ type: 'basket', basket: { id: 'b-new', day: '2099-01-01', finds: ['f-new'] }, finds: [{ ...finds[0], id: 'f-new', basket: 'b-new' }] });
+    expect(changes).toEqual(['likes', 'baskets', 'baskets']);
+  });
+
   it('a reload shows what the backend keeps, not what this browser saw', async () => {
     browserStorage();
     const { source } = keeping();
