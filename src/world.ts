@@ -32,7 +32,7 @@ import { warpForZoom, type WarpFrame } from './render/warp';
 import { CameraRig } from './view/camera';
 import { findVista, type Vista } from './view/vista';
 
-const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 0 } as const;
+const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 0, cells: 0 } as const;
 const NOON_SUN = new Palette().get(ROW.LIGHT, 0);
 const NOON_SKY = new Palette().get(ROW.LIGHT, 1);
 const WORLD_UP = new Vector3(0, 1, 0);

@@ -9,7 +9,7 @@ uniform float uRadius;
 #include <meadow_fog>
 #include <meadow_warp>
 #include <terraces_common>
-#include <terraces_ground>
+#include <terraces_plots>
 #include <terraces_fog>
 
 varying vec3 vLocal;

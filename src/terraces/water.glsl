@@ -6,13 +6,19 @@
 // misty; the valley fog lies over whatever the mirror shows. Looking down
 // into a paddy you see more of its muddy body, looking across it more of
 // the mirror. Gusts ruffle it a little.
-// Requires: toon, warp, terraces_common, terraces_ground, terraces_fog.
+// Requires: toon, warp, terraces_common, terraces_plots, terraces_ground, terraces_fog.
 
 uniform vec4 uPaddyWater; // reflection strength, the march's highest ground (m), -, time (s)
 
 // The open sky as the paddies show it, by the mirrored ray's elevation (0 horizon … 1 zenith).
 vec3 paddySky(float e) {
   return mix(pal(TR_WATER, 0), pal(TR_WATER, 1), smoothstep(0.02, 0.6, e));
+}
+
+// What the mirror meets standing on the ground: the terraces' walls, the
+// forest's crowns over the wild.
+float mirrorGround(vec3 d) {
+  return terraceHeightCoarse(d) + 5.0 * smoothstep(0.35, 0.65, textureLod(uTerraceBake, d, 0.0).b);
 }
 
 // The ground along a mirrored ray (view space) from the water at wp: how far
@@ -28,14 +34,14 @@ float groundAlong(vec3 wp, vec3 r, float rise) {
     float len = length(q);
     float above = len - uRadius;
     if (above > uPaddyWater.y) break;
-    if (above < terraceHeight(q / len)) {
+    if (above < mirrorGround(q / len)) {
       float lo = t;
       float hi = tn;
       for (int k = 0; k < 4; k++) {
         float mid = 0.5 * (lo + hi);
         vec3 m = unwarpPosition(wp + r * mid);
         float ml = length(m);
-        if (ml - uRadius < terraceHeight(m / ml)) hi = mid;
+        if (ml - uRadius < mirrorGround(m / ml)) hi = mid;
         else lo = mid;
       }
       return hi;
@@ -47,15 +53,17 @@ float groundAlong(vec3 wp, vec3 r, float rise) {
 }
 
 // What the mirror shows of the ground at q (planet space): broad strokes, a
-// little darker than in the air; the riser right behind a paddy reads as its
-// dark band.
+// little darker than in the air; a wall right behind a paddy (well over the
+// floor beyond it) reads as its dark band, the crop beyond it green.
 vec3 mirroredGround(vec3 q) {
   float l = length(q);
   vec3 d = q / l;
-  Terrace t = terraceAt(d);
-  vec3 wild = mix(pal(TR_FOREST, 1), pal(TR_PEAK, 0), smoothstep(1.1, 1.8, t.slope));
-  vec3 tame = mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), t.rise);
-  vec3 c = mix(tame, wild, t.wild);
+  vec4 base = textureLod(uTerraceBake, d, 0.0);
+  float wild = smoothstep(0.35, 0.65, base.b);
+  vec3 forest = mix(pal(TR_FOREST, 1), pal(TR_PEAK, 0), smoothstep(1.1, 1.8, base.g));
+  float onWall = smoothstep(0.1, 0.35, terraceHeightCoarse(d) - (l - uRadius) + 0.4);
+  vec3 tame = mix(mix(pal(TR_RICE, 2), pal(TR_EARTH, 2), 0.35), pal(TR_EARTH, 3), onWall);
+  vec3 c = mix(tame, forest, wild);
   return mix(c, pal(TR_WATER, 5), 0.3) * 0.9;
 }
 

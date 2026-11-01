@@ -4,15 +4,15 @@ import { uvToSphere } from '../planet/cubesphere';
 import { angleBetween, travel } from '../planet/geo';
 import { enumerateCell } from '../planet/rest';
 import { gradientFrame } from './fields';
-import { createTerraceSample, TERRACE, type TerraceTerrain } from './terrain';
+import { createTerraceSample, type TerraceTerrain } from './terrain';
 
 // Villages (ARCHITECTURE.md, "Land use", 6). Sites come from a progressive
 // point set (a constant number per km² as the planet grows) and are kept on
-// gentle terraced ground just below a forest edge, as the Hani lay them out:
-// the forest above, the village, the terraces below. Houses stand on terrace
-// floors round the site: each level is flat, so a house stands level on it,
-// along the contour, its front facing downhill. Its ground is courtyard, not
-// paddy (ground.glsl reads the houses).
+// a valley's flat floor near the foot of the hills (Kai's note after the
+// second pass: villages on the flatter land), among its plots. Houses stand
+// round the site, each level on the plot under it, its front facing down the
+// valley's gentle fall. Its ground is courtyard, not paddy (ground.glsl and
+// the ground's paint read the houses).
 
 export const VILLAGES = { density: 1 / 9000, max: 12, houses: [3, 9], spacing: 2.6, reach: 26, search: 64 } as const;
 export const MAX_HOUSES = 96;
@@ -39,6 +39,7 @@ export interface Village {
 }
 
 const s = createTerraceSample();
+const base = { natural: 0, slope: 0, wild: 0, flat: 0 };
 const a = new Vector3();
 const b = new Vector3();
 const q = new Vector3();
@@ -55,16 +56,15 @@ function uphill(terrain: TerraceTerrain, d: Vector3, out: Vector3): Vector3 {
   return out.lengthSq() > 1e-12 ? out.normalize() : out.copy(a);
 }
 
-/** Whether a spot suits a village: gentle terraced ground on the slopes (floors wide enough for a house), a forest edge above it, no peak near. */
+/** Whether a spot suits a village: a valley's flat floor, the foot of the hills near uphill, no peak near. */
 function suits(terrain: TerraceTerrain, d: Vector3): boolean {
   const R = terrain.radius;
-  terrain.terraceAt(d, s);
-  if (s.wild > 0.15 || s.slope < 0.03 || s.slope > 0.21 || s.natural < 2.5) return false;
+  const b = terrain.fields.base(d, base);
+  if (b.wild > 0.15 || b.flat < 0.75) return false;
   for (const pk of terrain.fields.peaks) if (angleBetween(d, pk.dir) * R < pk.radius * 1.6 + 12) return false;
   uphill(terrain, d, up);
-  for (let dist = 8; dist <= 56; dist += 6) {
-    terrain.terraceAt(travel(d, up, dist / R, q), s);
-    if (s.wild > 0.6) return true;
+  for (let dist = 10; dist <= 60; dist += 10) {
+    if (terrain.fields.base(travel(d, up, dist / R, q), base).flat < 0.3) return true;
   }
   return false;
 }
@@ -85,9 +85,8 @@ function spotNear(terrain: TerraceTerrain, site: Vector3, out: Vector3): Vector3
 }
 
 /**
- * The houses round a site: candidates on a loose spiral out from it, each
- * moved across its band to the middle of the floor, kept where the floor is
- * deep enough for it and it clears the others.
+ * The houses round a site: candidates on a loose spiral out from it, kept on
+ * the flat floor where they clear the others, each level on the plot under it.
  */
 function housesAt(terrain: TerraceTerrain, site: Vector3, seed: number): House[] {
   const R = terrain.radius;
@@ -107,20 +106,8 @@ function housesAt(terrain: TerraceTerrain, site: Vector3, seed: number): House[]
     t0.copy(a).multiplyScalar(Math.cos(angle)).addScaledVector(b, Math.sin(angle));
     travel(site, t0, r / R, c);
     terrain.terraceAt(c, s);
-    if (s.wild > 0.25) continue;
-    const band = TERRACE.step / Math.max(s.slope, 0.01);
-    const wr = Math.min(Math.min(TERRACE.riser, 0.33 * band) / band, 0.6);
-    const wb = Math.min(TERRACE.bund / band, 0.3);
-    const floorWidth = band * (1 - wr - wb);
+    if (s.wild > 0.2 || s.flatness < 0.6) continue;
     const depth = 2.8 + 0.9 * rand();
-    if (floorWidth < depth + 0.9) continue;
-    // to the middle of the floor, across the band
-    const level = s.level;
-    const target = wb + 0.5 * (1 - wr - wb);
-    uphill(terrain, c, up);
-    travel(c, up, ((target - s.f) * band) / R, c);
-    terrain.terraceAt(c, s);
-    if (s.level !== level || s.wild > 0.25 || s.rise > 0.02 || s.bund > 0.02) continue;
     const length = 4.4 + 3.2 * rand();
     const wall = 2.5 + 0.6 * rand();
     uphill(terrain, c, up);

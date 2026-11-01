@@ -10,7 +10,7 @@ uniform float uRadius;
 #include <meadow_toon>
 #include <meadow_fog>
 #include <terraces_common>
-#include <terraces_ground>
+#include <terraces_plots>
 #include <terraces_fog>
 
 uniform mat4 uProjection;

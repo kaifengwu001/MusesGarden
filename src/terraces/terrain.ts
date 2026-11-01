@@ -1,35 +1,19 @@
 import { Vector3, Vector4, type Texture } from 'three';
 import { hash32, mix as hashMix } from '../core/hash';
-import { clamp, smoothstep } from '../core/math';
+import { clamp } from '../core/math';
 import type { GroundSample } from '../planet/terrain';
-import { gradientFrame, TerraceFields, type TerraceBase, type TerraceFieldParams } from './fields';
+import { TerraceCells } from './cells';
+import { TerraceFields, type TerraceFieldParams } from './fields';
+import { createCropSample, createPlotSample, PLOTS, SEASON, TERRACE, TerracePlots, type CropSample, type PlotSample } from './plots';
 
 // The terraced ground on the CPU: the camera's footing, picking, placement
-// and tests read it (terrain.glsl's twin is ground.glsl, paddy.glsl).
-//
-//   levels   the hills cut into levels a riser apart (the bake's offset
-//            shifts where they fall); a flat paddy floor each, a bund along
-//            its outer edge on top of the riser below, a riser up to the next
-//            level at its inner edge. Widths in meters, as shares of the
-//            band they sit in (a band is riser / slope wide)
-//   paddies  a level's band cut across by cross-bunds: within a cell of a
-//            Voronoi tiling (direction space, chosen per octave of R) every
-//            9–22 m along the contour's way at the cell's middle, staggered
-//            from level to level, and at the cell's edge. Each paddy decides
-//            its infill: its place in the season, or fallow
-//   wild     forest, peaks, steep slopes and hilltops keep their own shape
+// and tests read it. Its twins on the GPU are plots.glsl, paddy.glsl and
+// ground.glsl (plots.ts holds the mirror); the cells (cells.ts) are what the
+// layout bake holds.
 
 export const R_REF = 128;
-/** Riser height (m), the riser's width (m), the bund's width (m) and height (m), the water in a paddy (m). */
-export const TERRACE = { step: 0.8, riser: 0.45, bund: 0.38, bundHeight: 0.2, water: 0.08 } as const;
-/** The cells that cut the bands are about this wide (m), the Voronoi tiling chosen per octave of R. */
-export const CELL_M = 48;
-/** Within a cell each level is cut every so many meters along the band (its own spacing, between these), and a share of paddies lie fallow. */
-export const PADDY = { cuts: [9, 22], fallow: 0.05 } as const;
-/** How the season spreads: the share of the season field in a paddy's delay (the rest its own chance), and its width. */
-export const SEASON = { field: 0.3, spread: 0.42 } as const;
-/** The mesh keeps its terraces out to this distance (m), and has the hills' own shape from this one. */
-export const MESH_TERRACES = { near: 22, far: 46 } as const;
+/** The mesh's finest grid (m: the leaves' 2 m over 16 steps), and how coarse it is at a distance (at most d / 22: CDLOD's ranges, chunks.ts). */
+export const MESH = { finest: 0.125, perMeter: 1 / 22, gather: [0.45, 0.55] } as const;
 
 export interface TerraceLayout {
   readonly seed: number;
@@ -51,154 +35,67 @@ export function generateTerraceLayout(seed: number): TerraceLayout {
   return { seed, noiseSeed: hash32(hashMix(seed, 0x51ce7a)), grain: new Vector3(s * Math.cos(a), s * Math.sin(a), z) };
 }
 
-/** A point of the terraced ground (mirrors Terrace in ground.glsl). */
-export interface TerraceSample {
-  natural: number;
-  slope: number;
-  wild: number;
-  x: number;
-  level: number;
-  f: number;
-  floorH: number;
-  rise: number;
-  bund: number;
+/** The terraced ground at a point: its plot, its crop, and the ground, water and surface there (m). */
+export interface TerraceSample extends PlotSample {
+  readonly crop: CropSample;
+  /** Floor, bunds and walls (m). */
+  ground: number;
+  /** The water's level (m), or −1e4 where it is dry. */
+  water: number;
+  /** The surface: the ground, or the water over it; the hills' own where wild. */
   height: number;
 }
 
 export function createTerraceSample(): TerraceSample {
-  return { natural: 0, slope: 0, wild: 0, x: 0, level: 0, f: 0, floorH: 0, rise: 0, bund: 0, height: 0 };
+  return { ...createPlotSample(), crop: createCropSample(), ground: 0, water: -1e4, height: 0 };
 }
 
-/** One paddy (mirrors Paddy in paddy.glsl). */
-export interface PaddySample {
-  id: number;
-  /** Its cell's middle, and the band's way there. */
-  centre: Vector3;
-  along: Vector3;
-  /** Distance (m) to the nearest cross-bund. */
-  wall: number;
-  variant: number;
-  maturity: number;
-  fallow: boolean;
-}
-
-/** GLSL meadowHash over an integer cell (noise.glsl), bit-identical. */
-function cellHash(x: number, y: number, z: number, seed: number): number {
-  const h = Math.imul((Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791) ^ seed) >>> 0, 0x27d4eb2d) >>> 0;
-  return (h ^ (h >>> 15)) >>> 0;
-}
-
-const unitHash = (h: number): number => (h >>> 8) / 16777216;
-
-const base: TerraceBase = { natural: 0, slope: 0, wild: 0, offset: 0 };
 const scratch = createTerraceSample();
-const centreTmp = new Vector3();
 
 export class TerraceTerrain {
   radius = R_REF;
   readonly fields: TerraceFields;
+  readonly cells: TerraceCells;
+  readonly plots: TerracePlots;
   /** The season's front (paddy.glsl uPaddy.y): paddies whose delay is under it are on their way. */
   seasonFront = 0.72;
-  /** Voronoi frequency in direction space (paddy.glsl uPaddy.x). */
-  paddyFrequency = R_REF / CELL_M;
 
   constructor(public layout: TerraceLayout) {
     this.fields = new TerraceFields(layout.noiseSeed, layout.grain);
+    this.cells = new TerraceCells(this.fields, layout.noiseSeed);
+    this.plots = new TerracePlots(this.fields, this.cells, layout.noiseSeed);
   }
 
   /** Refresh what depends on R and the parameters (cheap but for the peaks, placed once per size). */
   update(radius: number, p: TerraceFieldParams, bloom: number): void {
     this.radius = radius;
     this.fields.update(radius, p);
-    this.paddyFrequency = 2 ** Math.round(Math.log2(radius / CELL_M));
+    this.cells.update(radius, `${radius}/${JSON.stringify(p)}`);
     this.seasonFront = seasonFront(bloom);
   }
 
-  /** The terraced ground at a direction (mirrors terraceFrom in ground.glsl). */
+  /** The terraced ground at a direction: its plot and crop, the ground, the water and the surface. */
   terraceAt(dir: Vector3, out: TerraceSample): TerraceSample {
-    const b = this.fields.base(dir, base);
-    return terraceFrom(b.natural, b.slope, b.wild, b.offset, out);
-  }
-
-  /** The paddy a direction falls in on a level (mirrors paddyAt in paddy.glsl). */
-  paddyAt(dir: Vector3, level: number, out: PaddySample): PaddySample {
-    const f = this.paddyFrequency;
-    const px = dir.x * f;
-    const py = dir.y * f;
-    const pz = dir.z * f;
-    const bx = Math.floor(px);
-    const by = Math.floor(py);
-    const bz = Math.floor(pz);
-    let d1 = 1e9;
-    let d2 = 1e9;
-    let cx = bx;
-    let cy = by;
-    let cz = bz;
-    const seed = (this.layout.noiseSeed + 811) >>> 0;
-    for (let z = -1; z <= 1; z++) {
-      for (let y = -1; y <= 1; y++) {
-        for (let x = -1; x <= 1; x++) {
-          const h = cellHash(bx + x, by + y, bz + z, seed);
-          const fx = bx + x + 0.15 + (0.7 * (h & 1023)) / 1023;
-          const fy = by + y + 0.15 + (0.7 * ((h >>> 10) & 1023)) / 1023;
-          const fz = bz + z + 0.15 + (0.7 * ((h >>> 20) & 1023)) / 1023;
-          const d = (fx - px) ** 2 + (fy - py) ** 2 + (fz - pz) ** 2;
-          if (d < d1) {
-            d2 = d1;
-            d1 = d;
-            cx = bx + x;
-            cy = by + y;
-            cz = bz + z;
-            centreTmp.set(fx, fy, fz);
-          } else if (d < d2) d2 = d;
-        }
-      }
-    }
-    const edge = ((0.5 * (Math.sqrt(d2) - Math.sqrt(d1))) / f) * this.radius;
-    out.centre.copy(centreTmp).normalize();
-    this.contourAt(out.centre, out.along);
-    // this level's cuts in this cell: their spacing and phase
-    const levelKey = Math.imul(((level | 0) + 4096) >>> 0, 2654435761);
-    const lh = cellHash(cx, cy, cz, (this.layout.noiseSeed + 813 + levelKey) >>> 0);
-    const spacing = PADDY.cuts[0] + (PADDY.cuts[1] - PADDY.cuts[0]) * unitHash(lh);
-    const s = (cutTmp.subVectors(dir, out.centre).dot(out.along) * this.radius) / spacing + unitHash((Math.imul(lh, 747796405) + 2891336453) >>> 0);
-    const k = Math.floor(s);
-    out.wall = Math.min(edge, (0.5 - Math.abs(s - k - 0.5)) * spacing);
-    out.id = cellHash(cx, cy, cz, (this.layout.noiseSeed + 812 + levelKey + Math.imul(((k | 0) + 1024) >>> 0, 40503)) >>> 0);
-    out.variant = unitHash(out.id);
-    const chance = unitHash((out.id ^ 0x9e3779b9) >>> 0);
-    const delay = clamp(SEASON.field * this.fields.season(out.centre) + (1 - SEASON.field) * chance, 0, 1);
-    out.maturity = clamp((this.seasonFront - delay) / SEASON.spread, 0, 1);
-    out.fallow = unitHash((out.id ^ 0x85ebca6b) >>> 0) < PADDY.fallow;
+    this.plots.plotAt(dir, out);
+    this.plots.cropOf(out, this.seasonFront, out.crop);
+    out.ground = this.plots.ground(out);
+    out.water = out.crop.water > 0 ? out.floorH + out.crop.water : -1e4;
+    out.height = this.plots.surface(out, out.crop);
     return out;
   }
 
-  /** The contour's way at a direction: across the hills' slope there (mirrors contourAt in paddy.glsl). */
-  contourAt(d: Vector3, out: Vector3): Vector3 {
-    gradientFrame(d, ga, gb);
-    const e = 2 / this.radius;
-    const h0 = this.fields.natural(d);
-    const ha = this.fields.natural(gd.copy(d).addScaledVector(ga, e).normalize()) - h0;
-    const hb = this.fields.natural(gd.copy(d).addScaledVector(gb, e).normalize()) - h0;
-    gu.copy(ga).multiplyScalar(ha).addScaledVector(gb, hb);
-    if (gu.lengthSq() < 1e-10) return out.copy(ga);
-    return out.crossVectors(d, gu).normalize();
-  }
-
-  /** Whether the water shows at a direction: on a paddy's floor, the paddy flooded or its crop still open. */
-  wetAt(dir: Vector3, t: TerraceSample): boolean {
-    if (t.wild > 0.5 || t.rise > 0.15 || t.bund > 0.3) return false;
-    const p = this.paddyAt(dir, t.level, paddyScratch);
-    return p.wall > 0.2 && !p.fallow && p.maturity < 0.55;
+  /** Whether the water shows at a point: on a paddy's floor, under its water, its crop still open. */
+  wetAt(t: TerraceSample): boolean {
+    return t.wild < 0.35 && t.water > t.ground + 0.01 && t.crop.height < 0.5;
   }
 
   /** The ground at a direction for picking and the camera (GroundSample, as the meadow's Terrain gives it). */
   sample(dir: Vector3, out: GroundSample): GroundSample {
     const t = this.terraceAt(dir, scratch);
     out.height = t.height;
-    const wet = this.wetAt(dir, t);
+    const wet = this.wetAt(t);
     out.water = wet ? -1 : 1;
-    out.depth = wet ? TERRACE.water : 0;
+    out.depth = wet ? t.water - t.ground : 0;
     out.clearing = 0;
     out.wet = wet ? 1 : 0;
     return out;
@@ -210,60 +107,45 @@ export class TerraceTerrain {
 
   /** Highest the ground can stand (m), for culling. */
   get maxHeight(): number {
-    return this.fields.maxHeight + TERRACE.bundHeight + 1;
+    return this.fields.maxHeight + TERRACE.riser[1] + TERRACE.bundHeight + 1;
   }
 
-  /** Uniform values for ground.glsl and paddy.glsl. */
-  writeUniforms(u: TerrainUniforms): void {
+  /** Uniform values for plots.glsl, paddy.glsl and ground.glsl; texel: the terrain and layout bakes' texel (m) at its coarsest (the life bake's is twice it). */
+  writeUniforms(u: TerrainUniforms, texel: number): void {
     u.uTerrainSeed.value = this.layout.noiseSeed;
-    u.uTerrace.value.set(TERRACE.step, TERRACE.riser, TERRACE.bund, TERRACE.bundHeight);
-    u.uTerraceMesh.value.set(MESH_TERRACES.near, MESH_TERRACES.far, TERRACE.water, 0);
-    u.uPaddy.value.set(this.paddyFrequency, this.seasonFront, 0, 0);
+    u.uTerraceShape.value.set(TERRACE.band, TERRACE.riser[0], TERRACE.riser[1], TERRACE.spread);
+    u.uTerraceLevels.value.set(TERRACE.jitter, TERRACE.merge, TERRACE.cuts[0], TERRACE.cuts[1]);
+    u.uTerraceWall.value.set(TERRACE.batter, TERRACE.bund, TERRACE.bundHeight, TERRACE.crest);
+    u.uPlots.value.set(PLOTS.width[0], PLOTS.width[1], PLOTS.length[0], PLOTS.length[1]);
+    u.uLayoutInfo.value.set(2 * texel, TERRACE.square, 0.5 * texel, 0);
+    u.uTerraceMesh.value.set(MESH.finest, MESH.perMeter, MESH.gather[0], MESH.gather[1]);
+    u.uPaddy.value.set(0, this.seasonFront, SEASON.cell, 0);
   }
 }
-
-const paddyScratch: PaddySample = { id: 0, centre: new Vector3(), along: new Vector3(), wall: 0, variant: 0, maturity: 0, fallow: false };
-const cutTmp = new Vector3();
-const ga = new Vector3();
-const gb = new Vector3();
-const gd = new Vector3();
-const gu = new Vector3();
 
 /** The season's front for the bloom slider: everything flooded at 0; at 1 (the default) about a quarter of the paddies flooded, the rest on their way or grown. */
 export function seasonFront(bloom: number): number {
   return 0.62 * clamp(bloom, 0, 1);
 }
 
-/** The terraced ground from the bake's four values (mirrors terraceFrom in ground.glsl). */
-export function terraceFrom(natural: number, slope: number, wild: number, offset: number, out: TerraceSample): TerraceSample {
-  const T = TERRACE;
-  out.natural = natural;
-  out.slope = Math.max(slope, 0.01);
-  out.wild = wild;
-  out.x = natural / T.step + offset;
-  out.level = Math.floor(out.x);
-  out.f = out.x - out.level;
-  const band = T.step / out.slope;
-  // (on the steepest terraces the riser is a near-vertical wall, at most a third of the band)
-  const wr = clamp(Math.min(T.riser, 0.33 * band) / band, 0.03, 0.6);
-  const wb = clamp(T.bund / band, 0.01, 0.3);
-  out.rise = smoothstep(1 - wr, 1, out.f);
-  out.bund = smoothstep(0, 0.35 * wb, out.f) * (1 - smoothstep(0.6 * wb, wb, out.f));
-  out.floorH = out.level * T.step;
-  const terraced = out.floorH + T.step * out.rise + T.bundHeight * out.bund;
-  out.height = terraced + (natural - terraced) * wild;
-  return out;
-}
-
 export interface TerrainUniforms {
   uTerrainSeed: { value: number };
   uTerraceBake: { value: Texture | null };
   uTerraceLife: { value: Texture | null };
-  /** Riser height (m), riser width (m), bund width (m), bund height (m). */
-  uTerrace: { value: Vector4 };
-  /** The mesh's terraces out to (m), gone by (m); the water's depth (m). */
+  uTerraceLayout: { value: Texture | null };
+  /** A cell's band (m), its riser between (m), each cell's spread of it. */
+  uTerraceShape: { value: Vector4 };
+  /** Each wall's jitter, the share of walls left out, the cuts along a band between (m). */
+  uTerraceLevels: { value: Vector4 };
+  /** A riser's batter, a bund's width (m), its height (m), its flat top's share. */
+  uTerraceWall: { value: Vector4 };
+  /** The flats' rows between (m) wide, their plots between (× the row) long. */
+  uPlots: { value: Vector4 };
+  /** How far in a cell is read near its edge (m), bands wider than this (m) cut square-ish, half the layout's texel (m). */
+  uLayoutInfo: { value: Vector4 };
+  /** The mesh: its finest grid (m), its spacing per meter away, the gathering's fade (spacing / band). */
   uTerraceMesh: { value: Vector4 };
-  /** Paddy cells' frequency, the season's front. */
+  /** -, the season's front, the cell's share of a paddy's delay. */
   uPaddy: { value: Vector4 };
 }
 
@@ -272,8 +154,13 @@ export function createTerrainUniforms(): TerrainUniforms {
     uTerrainSeed: { value: 0 },
     uTerraceBake: { value: null },
     uTerraceLife: { value: null },
-    uTerrace: { value: new Vector4(TERRACE.step, TERRACE.riser, TERRACE.bund, TERRACE.bundHeight) },
-    uTerraceMesh: { value: new Vector4(MESH_TERRACES.near, MESH_TERRACES.far, TERRACE.water, 0) },
-    uPaddy: { value: new Vector4(R_REF / CELL_M, 0.72, 0, 0) },
+    uTerraceLayout: { value: null },
+    uTerraceShape: { value: new Vector4(TERRACE.band, TERRACE.riser[0], TERRACE.riser[1], TERRACE.spread) },
+    uTerraceLevels: { value: new Vector4(TERRACE.jitter, TERRACE.merge, TERRACE.cuts[0], TERRACE.cuts[1]) },
+    uTerraceWall: { value: new Vector4(TERRACE.batter, TERRACE.bund, TERRACE.bundHeight, TERRACE.crest) },
+    uPlots: { value: new Vector4(PLOTS.width[0], PLOTS.width[1], PLOTS.length[0], PLOTS.length[1]) },
+    uLayoutInfo: { value: new Vector4(1, TERRACE.square, 0, 0) },
+    uTerraceMesh: { value: new Vector4(MESH.finest, MESH.perMeter, MESH.gather[0], MESH.gather[1]) },
+    uPaddy: { value: new Vector4(0, 0.72, SEASON.cell, 0) },
   };
 }

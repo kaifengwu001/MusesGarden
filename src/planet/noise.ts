@@ -2,7 +2,8 @@
 // The hash is bit-identical to the GLSL uint version (Math.imul and >>>
 // reproduce 32-bit wrap-around); interpolation differs only by float rounding.
 
-function latticeHash(x: number, y: number, z: number, seed: number): number {
+/** GLSL meadowHash over an integer cell (noise.glsl), bit-identical. */
+export function latticeHash(x: number, y: number, z: number, seed: number): number {
   const h = Math.imul((Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791) ^ seed) >>> 0, 0x27d4eb2d) >>> 0;
   return (h ^ (h >>> 15)) >>> 0;
 }

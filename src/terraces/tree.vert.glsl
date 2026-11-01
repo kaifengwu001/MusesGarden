@@ -8,6 +8,8 @@
 uniform float uRadius;
 #include <meadow_rest>
 #include <terraces_common>
+#include <terraces_plots>
+#include <terraces_paddy>
 #include <terraces_ground>
 
 attribute vec4 aTree;  // direction, ln birth threshold
@@ -32,13 +34,13 @@ void main() {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
-  Terrace t = terraceFrom(b);
   float size = mix(0.72, 1.28, fract(aSeed * 3.97)) * mix(1.0, 0.7, smoothstep(1.0, 2.0, b.g));
   float rc = 1.9 * size;
   // low crowns: in a wood the trunks hide under the canopy
   float H = mix(3.4, 5.6, fract(aSeed * 5.3)) * size;
-  vec3 foot = dir * (uRadius + t.height - 0.3);
-  vec3 mid = dir * (uRadius + t.height + 0.5 * H);
+  float ground = terraceHeightCoarse(dir);
+  vec3 foot = dir * (uRadius + ground - 0.3);
+  vec3 mid = dir * (uRadius + ground + 0.5 * H);
   vec3 g = warpPosition(foot);
   vec3 m = warpPosition(mid);
   vec3 up = warpNormal(mid, dir);

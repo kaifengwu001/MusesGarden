@@ -1,13 +1,17 @@
 // The terraces' CDLOD ground (planet/surface.ts draws it as it draws the
-// meadow's): one shared grid mesh, instanced per selected node. Terraced
-// near the camera; beyond where the grid could draw a riser the hills keep
-// their own shape and the fragment shader paints the terraces on them.
+// meadow's): one shared grid mesh, instanced per selected node. Near the
+// camera its rows gather onto the walls' edges, so the steps stand sharp in
+// the mesh itself and the water lies at each paddy's own level; beyond where
+// the grid could draw a riser the hills keep their own shape and the
+// fragment shader paints the terraces on them (ground.glsl, terraceVertex).
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_cubesphere>
 #include <meadow_warp>
 uniform float uRadius;
 #include <terraces_common>
+#include <terraces_plots>
+#include <terraces_paddy>
 #include <terraces_ground>
 
 attribute vec4 aNode; // u0, v0, size (uv), face
@@ -16,18 +20,16 @@ uniform float uGridSteps;
 
 varying vec3 vDir;
 varying vec3 vWarped;
-varying vec3 vNormal; // warped
+varying vec3 vNormal; // warped; the hills' own (the paint lights the terraces' faces itself)
 varying vec2 vGrid;
 varying float vMorph;
+varying float vHeight; // the mesh's own height (m): where it stands off the true ground it is a wall's face
 flat varying vec2 vNodeInfo; // face, level
-
-float meshHeight(vec3 d) {
-  return terraceMeshHeight(d, distance(cameraPosition, d * uRadius));
-}
 
 vec3 surfacePoint(int face, vec2 uv) {
   vec3 d = uvToSphere(face, uv);
-  return d * (uRadius + meshHeight(d));
+  vec4 m = terraceVertex(d, distance(cameraPosition, d * uRadius));
+  return m.xyz * (uRadius + m.w);
 }
 
 void main() {
@@ -35,10 +37,10 @@ void main() {
   vec2 idx = floor(position.xy * uGridSteps + 0.5);
   vec2 uv = aNode.xy + idx / uGridSteps * aNode.z;
   vec3 dir = uvToSphere(face, uv);
-  float height = meshHeight(dir);
-  vec3 p = dir * (uRadius + height);
+  vec4 m = terraceVertex(dir, distance(cameraPosition, dir * uRadius));
+  vec3 p = m.xyz * (uRadius + m.w);
 
-  // symmetric geomorph, as the meadow's (chunks.ts)
+  // symmetric geomorph, as the meadow's (chunks.ts): toward the midpoint of its neighbours' moved positions
   vec2 odd = mod(idx, 2.0);
   float k = 0.0;
   if (odd.x + odd.y > 0.5) {
@@ -50,24 +52,17 @@ void main() {
     }
   }
 
-  // normal from two neighbours about half a grid step away
-  float spacing = aNode.z * 1.5707963 * uRadius / uGridSteps;
-  float e = clamp(0.5 * spacing, 0.12, 30.0) / uRadius;
-  vec3 t1, t2;
-  gradientFrame(dir, t1, t2);
-  vec3 d1 = normalize(dir + t1 * e);
-  vec3 d2 = normalize(dir + t2 * e);
-  vec3 p0 = dir * (uRadius + height);
-  vec3 p1 = d1 * (uRadius + meshHeight(d1));
-  vec3 p2 = d2 * (uRadius + meshHeight(d2));
-  vec3 n = normalize(cross(p1 - p0, p2 - p0));
+  float slope;
+  vec3 up = uphillAt(dir, textureLod(uTerraceBake, dir, 0.0).r, slope);
+  vec3 n = normalize(dir - up * slope);
 
   vec3 w = warpPosition(p);
-  vDir = dir;
+  vDir = normalize(p);
   vWarped = w;
   vNormal = warpNormal(p, n);
   vGrid = position.xy;
   vMorph = k;
+  vHeight = length(p) - uRadius;
   vNodeInfo = vec2(aNode.w, aLod.z);
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }

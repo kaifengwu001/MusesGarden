@@ -2,7 +2,8 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { tangentToward } from '../planet/geo';
 import { unwarpPoint, type WarpFrame } from '../render/warp';
 import { gradientFrame } from './fields';
-import { createTerraceSample, type PaddySample, type TerraceTerrain } from './terrain';
+import { PLOT_FLAT } from './plots';
+import { createTerraceSample, type TerraceTerrain } from './terrain';
 
 // The vista (the Vista button, the squint test): a stand and heading framed
 // like the green terraces painting (reference/terraces/vista-green.webp):
@@ -30,15 +31,12 @@ export interface TerraceVista {
 export type VistaFraming = (height: number) => { fov: number; k: number };
 
 const s = createTerraceSample();
-const paddy: PaddySample = { id: 0, centre: new Vector3(), along: new Vector3(), wall: 0, variant: 0, maturity: 0, fallow: false };
 const q = new Vector3();
 const p = new Vector3();
 const ray = new Vector3();
 
 /** Villages to keep out of the vista (the painting has none): their middles and reach (m). */
 let avoid: ReadonlyArray<{ dir: Vector3; radius: number }> = [];
-/** The valley floors under the fog (m): the painting shows only the slopes, so ground this low is a miss too. */
-let valley = 0;
 
 /** The level of the last terraced ground a ray met (-1e9: none). */
 let lastLevel = -1e9;
@@ -57,10 +55,10 @@ function classify(terrain: TerraceTerrain, origin: Vector3, dir: Vector3, warp: 
       for (const v of avoid) if (p.distanceTo(v.dir) * R < v.radius + 12) return 'h';
       terrain.terraceAt(p, s);
       if (s.wild > 0.5) return 'f';
-      if (s.natural < valley) return 'v';
+      // (the valleys' flat floors, their plots under the fog: the painting shows only the slopes)
+      if (s.kind === PLOT_FLAT) return 'v';
       lastLevel = s.level;
-      terrain.paddyAt(p, s.level, paddy);
-      return !paddy.fallow && paddy.maturity < 0.3 ? 'w' : 'c';
+      return !s.crop.fallow && s.crop.maturity < 0.3 ? 'w' : 'c';
     }
     if (t > 700) break;
     t += Math.max(1.2, 0.045 * t, 0.5 * (above - terrain.maxHeight));
@@ -114,11 +112,10 @@ const cache = new Map<string, TerraceVista>();
  * The stand and heading that frame the terraces like the painting. key: what
  * the result depends on (the world, its size, the framing); cached.
  */
-export function findTerraceVista(terrain: TerraceTerrain, framing: VistaFraming, aspect: number, height: number, tilt: number, villages: ReadonlyArray<{ dir: Vector3; radius: number }>, fogTop: number, key: string): TerraceVista {
+export function findTerraceVista(terrain: TerraceTerrain, framing: VistaFraming, aspect: number, height: number, tilt: number, villages: ReadonlyArray<{ dir: Vector3; radius: number }>, key: string): TerraceVista {
   const hit = cache.get(key);
   if (hit) return hit;
   avoid = villages;
-  valley = fogTop;
   const R = terrain.radius;
   const camera = new PerspectiveCamera(40, aspect, 0.1, 5000);
   const warp = { focus: new Vector3(), up: new Vector3(), k: 0 };

@@ -16,6 +16,7 @@ import { Palette, ROW, sunAt } from '../render/palette';
 import { Sky } from '../render/sky';
 import { localSun } from '../render/sun';
 import { warpForZoom } from '../render/warp';
+import { smoothstep } from '../core/math';
 import { CameraRig } from '../view/camera';
 import { pickSurface, type Pick } from '../view/picking';
 import fragmentShader from './bake.frag.glsl?raw';
@@ -25,6 +26,7 @@ import surfaceFragment from './surface.frag.glsl?raw';
 import surfaceVertex from './surface.vert.glsl?raw';
 import { TerraceBirds } from './birds';
 import { Houses } from './houses';
+import { Rice, RICE } from './rice';
 import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
 import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
@@ -35,7 +37,7 @@ const NOON_SUN = NOON.get(ROW.LIGHT, 0);
 const NOON_SKY = NOON.get(ROW.LIGHT, 1);
 const WORLD_UP = new Vector3(0, 1, 0);
 const WORLD_X = new Vector3(1, 0, 0);
-const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 4 } as const;
+const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 4, cells: 5 } as const;
 /** Parameters the terraces' fields (and so the bake) depend on. */
 const FIELD_PATHS: ReadonlySet<string> = new Set(['terraces.hills', 'terraces.forest']);
 /**
@@ -52,6 +54,8 @@ const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
  * small planet curves away and the sky shows, where the painting has none.
  */
 const VISTA = { height: 24, tilt: (52 * Math.PI) / 180, widen: 28 } as const;
+/** The rice's pool, in pages of 2048 blades (rice.ts). */
+const RICE_PAGES = 400;
 
 /**
  * The terraces: a second planet to visit, built on the meadow's foundations
@@ -80,11 +84,14 @@ export class TerraceWorld implements PlanetWorld {
   readonly sunDir = new Vector3(0, 1, 0);
   lod: LodConfig = LOD_DEFAULT;
   nearFieldDrawn = false;
-  readonly nearInstances = { grass: 0, flowers: 0 };
+  get nearInstances(): { grass: number; flowers: number } {
+    return { grass: this.rice.layer.visibleInstances, flowers: 0 };
+  }
   /** How long the last vista search took (ms; 0 when cached). */
   vistaMs = 0;
   readonly houses: Houses;
   readonly trees: Trees;
+  readonly rice: Rice;
   readonly birds: TerraceBirds;
   /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
   villages: Village[] = [];
@@ -97,6 +104,7 @@ export class TerraceWorld implements PlanetWorld {
     uFogCover: { value: new Vector4(0.56, 0.16, 0.8, 0) },
     uPaddyWater: { value: new Vector4(0.85, 80, 0, 0) },
     uRiceLook: { value: new Vector4(0.6, 0, 0, 0) },
+    uRiceNear: { value: new Vector4(0, 1, 0, 0) },
   };
   private fieldParams: TerraceFieldParams = { hills: 18, forest: 0.15 };
   private fieldKey = '';
@@ -120,12 +128,13 @@ export class TerraceWorld implements PlanetWorld {
     private readonly store: ParamStore,
     tier: Tier,
   ) {
-    this.bake = new TerrainBake(tier.maps.bake, { name: 'terraces bake', fragmentShader, uniforms: createTerraceFieldUniforms() });
+    this.bake = new TerrainBake(tier.maps.bake, { name: 'terraces bake', fragmentShader, uniforms: createTerraceFieldUniforms(), layout: true });
     this.terrain = new TerraceTerrain(generateTerraceLayout(store.values.world.seed));
     this.refreshFieldParams();
     this.look.uPalette.value = this.palette.texture;
     this.terrainUniforms.uTerraceBake.value = this.bake.terrainTexture(false);
     this.terrainUniforms.uTerraceLife.value = this.bake.floraTexture(false);
+    this.terrainUniforms.uTerraceLayout.value = this.bake.layoutTexture(false);
     this.shared = {
       ...globals,
       ...this.look,
@@ -141,13 +150,15 @@ export class TerraceWorld implements PlanetWorld {
     this.houses = new Houses(this.shared);
     this.trees = new Trees(this.shared);
     this.birds = new TerraceBirds(this.shared);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
+    this.rice = new Rice(this.shared, RICE_PAGES);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.rice.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
     this.applyTier(tier);
   }
 
   applyTier(tier: Tier): void {
-    // a finer grid near the camera than the meadow's: the risers are half a meter wide
-    this.lod = { ...LOD_DEFAULT, grid: tier.terrainGrid, leafSize: 4 };
+    // a finer grid near the camera than the meadow's: its rows gather onto the walls' edges, a bund is
+    // a third of a meter across (MESH in terrain.ts holds the finest spacing this gives)
+    this.lod = { ...LOD_DEFAULT, grid: tier.terrainGrid, leafSize: 2 };
   }
 
   get needsDefaultPose(): boolean {
@@ -229,7 +240,7 @@ export class TerraceWorld implements PlanetWorld {
       };
       const aspect = this.rig.camera.aspect;
       const t0 = performance.now();
-      const v = findTerraceVista(this.terrain, framing, aspect, VISTA.height, VISTA.tilt, this.villages, FOG.top, `${this.fieldsKey}/${R}/${rv}/${aspect.toFixed(3)}/${this.terrain.seasonFront.toFixed(3)}`);
+      const v = findTerraceVista(this.terrain, framing, aspect, VISTA.height, VISTA.tilt, this.villages, `${this.fieldsKey}/${R}/${rv}/${aspect.toFixed(3)}/${this.terrain.seasonFront.toFixed(3)}`);
       this.vistaMs = performance.now() - t0;
       this.rig.lookAlong(v.focus, v.forward, immediate);
       const zoom = this.rig.zoomForAltitude(v.height);
@@ -327,10 +338,12 @@ export class TerraceWorld implements PlanetWorld {
     this.fieldsKey = this.fieldKey;
     this.fieldsFull = full;
     this.terrain.update(R, this.fieldParams, this.store.values.world.bloom);
-    this.terrain.writeUniforms(this.terrainUniforms);
+    // (near a cell's edge its cell is read from more than a texel of the life bake in: it is at half resolution)
+    this.terrain.writeUniforms(this.terrainUniforms, this.bake.texelMeters(R, full));
     this.bake.bake(this.renderer, this.terrain.fields, `${R}/${this.fieldKey}`, full);
     this.terrainUniforms.uTerraceBake.value = this.bake.terrainTexture(full);
     this.terrainUniforms.uTerraceLife.value = this.bake.floraTexture(full);
+    this.terrainUniforms.uTerraceLayout.value = this.bake.layoutTexture(full);
     // the villages, once the ground holds still (they read the ground: a few ms)
     const key = `${R}/${this.fieldKey}`;
     if (full && key !== this.villagesFor) {
@@ -400,6 +413,16 @@ export class TerraceWorld implements PlanetWorld {
       },
       this.lod,
     );
+    // the rice near the focus, fewer as the camera rises, none from a bird's height
+    const riceNear = RICE.near * smoothstep(60, 22, rig.altitude);
+    this.nearFieldDrawn = riceNear > 0.5;
+    this.rice.update(
+      this.renderer,
+      { seed: p.world.seed, radius: R, radiusHi: this.band.radiusHi, focus: rig.up, frustum: this.frustum, warp: this.warp, queue: this.queue, near: riceNear },
+      riceNear,
+      p.wind.sheen * 1.2,
+    );
+    this.atmosphere.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }

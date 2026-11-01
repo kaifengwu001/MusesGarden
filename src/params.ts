@@ -158,8 +158,8 @@ export const schema = {
   ui: {
     hud: bool('hud', 'Perf HUD', import.meta.env.DEV, 'ui'),
     postcard: bool('pc', 'Postcard', false, 'ui'),
-    // land: the terraces' land use and each paddy's infill in flat colours (the terraces only)
-    debug: choice('dbg', 'Debug view', ['off', 'chunks', 'morph', 'normals', 'land'], 'off', 'ui'),
+    // land: the terraces' land use and each paddy's infill in flat colours; cells: their cells (the terraces only)
+    debug: choice('dbg', 'Debug view', ['off', 'chunks', 'morph', 'normals', 'land', 'cells'], 'off', 'ui'),
   },
 } as const;
 

@@ -2,7 +2,7 @@
 // (bake.frag.glsl). Change both together. Requires: meadow_noise,
 // terraces_common, uRadius.
 
-#define HILL_OCTAVES 6
+#define HILL_OCTAVES 8
 #define MAX_PEAKS 96
 const float HILL_BASE_FREQ = 1.2;
 const float GRAIN = 0.4;
@@ -16,7 +16,7 @@ uniform vec4 uTGrain;   // grain axis xyz, compression
 uniform vec4 uTFloor;   // valley floor (m), softness (m), spread of the hills' local relief (m), -
 uniform vec4 uTForest;  // forest threshold, softness, steepest terraced slope (start, full)
 uniform vec4 uTPairsA;  // octave pairs (level, t): forest, forest detail
-uniform vec4 uTPairsB;  // offset, region
+uniform vec4 uTPairsB;  // the flat floors' edge (FLAT in fields.ts); -
 uniform vec4 uTPairsC;  // fog A, fog B
 uniform vec4 uTPairsD;  // season, -
 uniform sampler2D uPeaks; // per peak: direction xyz, height (m); radius (m), cos of its reach
@@ -110,11 +110,12 @@ float wildAt(vec3 t, float h, float local, float peak, float slope) {
   return max(max(max(woods, steep), max(crown, gully)), tower);
 }
 
-float offsetAt(vec3 t) {
-  return clamp(0.5 + 1.7 * tPair(t, uTPairsB.x, uTPairsB.y, 660u), 0.03, 0.97);
+// 0 on the hills … 1 on a valley's flat floor (plots, not terraces), from the hills' raw height.
+float flatAt(float raw) {
+  return 1.0 - smoothstep(uTPairsB.x, uTPairsB.y, (raw - uTFloor.x) / uTFloor.y);
 }
 
-// The bake's terrain pass: natural height (m), slope, wild, level offset.
+// The bake's terrain pass: natural height (m), slope, wild, flat.
 vec4 terraceBase(vec3 dir) {
   vec3 t = tTwirl(dir);
   vec2 parts = hillParts(t);
@@ -126,15 +127,18 @@ vec4 terraceBase(vec3 dir) {
   float h1 = naturalAt(normalize(dir + a * e));
   float h2 = naturalAt(normalize(dir + b * e));
   float slope = length(vec2(h1 - h, h2 - h)) / SLOPE_STEP;
-  return vec4(h, slope, wildAt(t, h, parts.y, peak, slope), offsetAt(t));
+  return vec4(h, slope, wildAt(t, h, parts.y, peak, slope), flatAt(parts.x));
 }
 
-// The bake's life pass, each 0..1: the fog's two layers, the season's spread, the colour regions.
-vec4 terraceLife(vec3 dir) {
+// The season's spread over the hillsides, 0..1: where paddies are planted early or late.
+float seasonAt(vec3 dir) {
+  return clamp(0.5 + 1.7 * tPair(tTwirl(dir), uTPairsD.x, uTPairsD.y, 700u), 0.0, 1.0);
+}
+
+// The fog's two layers, each 0..1 (the life pass's first two channels).
+vec2 terraceFog(vec3 dir) {
   vec3 t = tTwirl(dir);
   float fogA = 0.5 + 1.6 * tPair(t, uTPairsC.x, uTPairsC.y, 680u);
   float fogB = 0.5 + 1.6 * tPair(t, uTPairsC.z, uTPairsC.w, 690u);
-  float season = 0.5 + 1.7 * tPair(t, uTPairsD.x, uTPairsD.y, 700u);
-  float region = 0.5 + 1.7 * tPair(t, uTPairsB.z, uTPairsB.w, 710u);
-  return clamp(vec4(fogA, fogB, season, region), 0.0, 1.0);
+  return clamp(vec2(fogA, fogB), 0.0, 1.0);
 }

@@ -13,7 +13,9 @@ import { enumerateCell } from '../planet/rest';
 //
 //   hills      direction-space octaves weighted by their size in meters, so
 //              the hills keep their size as R grows; twirled and drawn out a
-//              little along a grain axis, so ridges and spurs swirl
+//              little along a grain axis, so ridges and spurs swirl; finer
+//              octaves down to a few meters, small, so the contours (and the
+//              terraces along them) turn a little as hillsides do
 //   valleys    the hills' hollows flattened (a soft floor), so the valleys
 //              are broad and level, paddies from side to side
 //   peaks      karst towers: a progressive point set (a constant number per
@@ -26,24 +28,32 @@ import { enumerateCell } from '../planet/rest';
 //              gullies (well below them, on a slope), slopes too steep to
 //              terrace, the peaks, and stretches of whole hillside (woods: a
 //              share of the hills, by a macro noise)
-//   offset     where the terraces' levels fall: the hills' height is cut
-//              into levels a riser apart, shifted by this slow field, so the
-//              terraces wander off the contours, narrow and merge
+//   flat       where the valleys' floors are flat enough that the fields
+//              are plots, not terraces along the contours (the hills
+//              well under their soft floor)
 //   life       the fog's two drifting layers, the season's spread over the
 //              hillsides and the paddies' colour regions (the second bake)
 
-export const HILL_OCTAVES = 6;
+export const HILL_OCTAVES = 8;
 export const HILL_BASE_FREQ = 1.2;
 /** Spread (std) of gnoise; the normalised octave pairs keep it. */
 export const NOISE_STD = 0.27;
 /** Grain compression (hills run about 1.5× longer than wide). */
 const GRAIN = 0.4;
 /** Pattern sizes (m). */
-export const PATTERN = { forest: 110, forestDetail: 38, offset: 60, fogA: 55, fogB: 150, season: 80, region: 34 } as const;
+export const PATTERN = { forest: 110, forestDetail: 38, fogA: 55, fogB: 150, season: 80, region: 34 } as const;
 /** How much the forest's detail octave adds to its broad one. */
 export const FOREST_DETAIL = 0.45;
 /** Seeds (added to the world's noise seed). */
-const SEED = { hills: 600, forest: 640, forestDetail: 650, offset: 660, fogA: 680, fogB: 690, season: 700, region: 710, range: 720, twirl: 730 } as const;
+const SEED = { hills: 600, forest: 640, forestDetail: 650, fogA: 680, fogB: 690, season: 700, region: 710, range: 720, twirl: 730 } as const;
+
+/** The terraces' cells (cells.glsl, cells.ts): about this wide (m), their lattice warped by this much (in cells); a cell's frame read this far (m) either side of its middle. */
+export const CELLS = { meters: 56, warp: 0.6, frame: 6 } as const;
+
+/** The cells' lattice frequency in direction space at R (a power of two: they re-tile only an octave apart). */
+export function cellFrequency(radius: number): number {
+  return 2 ** Math.round(Math.log2(radius / CELLS.meters));
+}
 
 /** Karst peaks: per m² (before the ranges keep some), the share of the planet in ranges, and their sizes. */
 export const PEAKS = { density: 1 / 3200, ranges: 0.32, height: [16, 54], radius: [13, 27], max: 96 } as const;
@@ -66,10 +76,19 @@ export interface Peak {
   readonly radius: number;
 }
 
+/** The finer octaves' amplitude at 30 m (per meter of hills), falling as (w / 30)^1.3 below it to a few meters. */
+export const HILL_DETAIL = 0.155;
+
 /** Amplitude (per meter of hills) of an octave whose bumps are w meters apart. */
 export function hillSpectrum(w: number): number {
-  return smoothstep(14, 30, w) * (1 - smoothstep(220, 420, w)) * Math.sqrt(w / 90);
+  const broad = smoothstep(14, 30, w) * (1 - smoothstep(220, 420, w)) * Math.sqrt(w / 90);
+  // (the small turns of a hillside, a few meters to a couple of dozen: a contour wanders about a meter on a terraced slope)
+  const fine = HILL_DETAIL * (w / 30) ** 1.3 * smoothstep(2.5, 5, w);
+  return Math.max(broad, fine);
 }
+
+/** The valleys' flat floors: the hills this far under their soft floor (in its softness) are plots, not terraces (fully by the first). */
+export const FLAT = [-1.7, -0.7] as const;
 
 /**
  * A karst tower's profile at s = distance / base radius: a round top on
@@ -97,7 +116,7 @@ export interface TerraceFieldUniforms {
   uTForest: { value: Vector4 };
   /** Octave pairs (level, t): forest, forest detail. */
   uTPairsA: { value: Vector4 };
-  /** Octave pairs: offset, region. */
+  /** The flat floors' edge (FLAT); octave pair: region. */
   uTPairsB: { value: Vector4 };
   /** Octave pairs: fog A, fog B. */
   uTPairsC: { value: Vector4 };
@@ -107,6 +126,8 @@ export interface TerraceFieldUniforms {
   uPeakCount: { value: number };
   uTTwirl: { value: Vector4[] };
   uTTwirlRadius: { value: Vector4 };
+  /** The cells: lattice frequency, warp, the frame's half step (m). */
+  uCells: { value: Vector4 };
 }
 
 export function createTerraceFieldUniforms(): TerraceFieldUniforms {
@@ -125,6 +146,7 @@ export function createTerraceFieldUniforms(): TerraceFieldUniforms {
     uPeakCount: { value: 0 },
     uTTwirl: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, 0)) },
     uTTwirlRadius: { value: new Vector4(1, 1, 1, 1) },
+    uCells: { value: new Vector4(2, CELLS.warp, CELLS.frame, 0) },
   };
 }
 
@@ -139,7 +161,7 @@ export interface WildParts {
   tower: number;
 }
 const wildOut: WildParts = { woods: 0, steep: 0, crown: 0, gully: 0, tower: 0 };
-const landBase: TerraceBase = { natural: 0, slope: 0, wild: 0, offset: 0 };
+const landBase: TerraceBase = { natural: 0, slope: 0, wild: 0, flat: 0 };
 const baseTw = new Vector3();
 const d1 = new Vector3();
 const d2 = new Vector3();
@@ -150,12 +172,13 @@ const X = new Vector3(1, 0, 0);
 /** The finite-difference step (m) of the baked slope; the CPU uses the same. */
 export const SLOPE_STEP = 1.5;
 
-/** Everything the bake writes for one direction (pass 0), and the hills' raw height under it. */
+/** Everything the bake writes for one direction (pass 0). */
 export interface TerraceBase {
   natural: number;
   slope: number;
   wild: number;
-  offset: number;
+  /** 0 on the hills … 1 on a valley's flat floor (plots, not terraces). */
+  flat: number;
 }
 
 export class TerraceFields {
@@ -171,7 +194,6 @@ export class TerraceFields {
   readonly steep = WILD.steep;
   readonly forestPair: OctavePair = { level: 0, t: 0 };
   readonly forestDetailPair: OctavePair = { level: 0, t: 0 };
-  readonly offsetPair: OctavePair = { level: 0, t: 0 };
   readonly regionPair: OctavePair = { level: 0, t: 0 };
   readonly fogAPair: OctavePair = { level: 0, t: 0 };
   readonly fogBPair: OctavePair = { level: 0, t: 0 };
@@ -211,7 +233,6 @@ export class TerraceFields {
     if (p.forest <= 0) this.forestThreshold = 9;
     octavePair(radius, PATTERN.forest, this.forestPair);
     octavePair(radius, PATTERN.forestDetail, this.forestDetailPair);
-    octavePair(radius, PATTERN.offset, this.offsetPair);
     octavePair(radius, PATTERN.region, this.regionPair);
     octavePair(radius, PATTERN.fogA, this.fogAPair);
     octavePair(radius, PATTERN.fogB, this.fogBPair);
@@ -344,7 +365,7 @@ export class TerraceFields {
     out.natural = h;
     out.slope = slope;
     out.wild = this.wildAt(t, h, local, peak, slope);
-    out.offset = this.offsetAt(t);
+    out.flat = this.flatAt(raw);
     return out;
   }
 
@@ -382,9 +403,9 @@ export class TerraceFields {
     return this.wildParts(twirl(this.twirls, dir, baseTw), h, local, peak, b.slope, out);
   }
 
-  /** Where the terraces' levels fall, 0..1 (a riser's share). */
-  private offsetAt(t: Vector3): number {
-    return clamp(0.5 + 1.7 * this.pair(t, this.offsetPair, SEED.offset), 0.03, 0.97);
+  /** 0 on the hills … 1 on a valley's flat floor, from the hills' raw height under their soft floor. */
+  flatAt(raw: number): number {
+    return 1 - smoothstep(FLAT[0], FLAT[1], (raw - this.floor) / this.floorSoft);
   }
 
   /** The season's spread over the hillsides, 0..1 (the life pass's third channel): where paddies are planted early or late. */
@@ -400,7 +421,7 @@ export class TerraceFields {
     u.uTFloor.value.set(this.floor, this.floorSoft, this.localStd, 0);
     u.uTForest.value.set(this.forestThreshold, this.forestSoft, this.steep[0], this.steep[1]);
     u.uTPairsA.value.set(this.forestPair.level, this.forestPair.t, this.forestDetailPair.level, this.forestDetailPair.t);
-    u.uTPairsB.value.set(this.offsetPair.level, this.offsetPair.t, this.regionPair.level, this.regionPair.t);
+    u.uTPairsB.value.set(FLAT[0], FLAT[1], this.regionPair.level, this.regionPair.t);
     u.uTPairsC.value.set(this.fogAPair.level, this.fogAPair.t, this.fogBPair.level, this.fogBPair.t);
     u.uTPairsD.value.set(this.seasonPair.level, this.seasonPair.t, 0, 0);
     u.uPeaks.value = this.peakTexture;
@@ -409,6 +430,7 @@ export class TerraceFields {
       u.uTTwirl.value[i].set(tw.centre.x, tw.centre.y, tw.centre.z, tw.turn);
       u.uTTwirlRadius.value.setComponent(i, tw.radius);
     });
+    u.uCells.value.set(cellFrequency(this.radius), CELLS.warp, CELLS.frame, 0);
   }
 
   /** Highest the natural ground can stand (m), for culling and the reflections' march. */

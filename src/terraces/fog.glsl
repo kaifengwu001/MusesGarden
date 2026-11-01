@@ -6,7 +6,7 @@
 // view in planet space: the stretch of a segment under the fog's highest
 // top (a sphere), eight samples of its density. Around the camera the fog
 // clears (you walk in a clearing of it, never in a white-out).
-// Requires: uRadius, terraces_common (uWindVec), terraces_ground (uTerraceLife),
+// Requires: uRadius, terraces_common (uWindVec), terraces_plots (uTerraceLife),
 // toon (pal), warp.
 
 uniform vec4 uValleyFog; // density in a bank (1/m), the banks' top (m), the top's softness (m), the clearing round the camera (m)
