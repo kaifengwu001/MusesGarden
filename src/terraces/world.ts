@@ -24,7 +24,6 @@ import { createTerraceFieldUniforms, gradientFrame, type TerraceFieldParams, typ
 import { TERRACE_ROWS } from './palette';
 import surfaceFragment from './surface.frag.glsl?raw';
 import surfaceVertex from './surface.vert.glsl?raw';
-import { Backdrop } from './backdrop';
 import { TerraceBirds } from './birds';
 import { Houses } from './houses';
 import { Rice, RICE } from './rice';
@@ -99,7 +98,6 @@ export class TerraceWorld implements PlanetWorld {
   vistaMs = 0;
   readonly houses: Houses;
   readonly towers: Towers;
-  readonly backdrop: Backdrop;
   readonly trees: Trees;
   readonly rice: Rice;
   readonly objects: TerraceObjects;
@@ -161,7 +159,6 @@ export class TerraceWorld implements PlanetWorld {
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
     };
     this.sky = new Sky();
-    this.backdrop = new Backdrop(store.values.world.seed);
     this.surface = new Surface(this.shared, tier.terrainGrid, { name: 'terraces ground', vertexShader: surfaceVertex, fragmentShader: surfaceFragment });
     this.houses = new Houses(this.shared);
     this.towers = new Towers(this.shared);
@@ -171,7 +168,7 @@ export class TerraceWorld implements PlanetWorld {
     Object.assign(this.shared, this.paddyMap.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceObjects(this.shared);
-    this.scene.add(this.sky.mesh, this.backdrop.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.towers.group, this.trees.mesh, this.birds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.towers.group, this.trees.mesh, this.birds.mesh);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone:
     // terraces, rice, houses, towers, trees, birds, fog; the ground always)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
@@ -464,7 +461,6 @@ export class TerraceWorld implements PlanetWorld {
     );
     this.atmosphere.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
-    this.backdrop.update(cam, this.palette, clock.time, 1 - smoothstep(0.15, 0.6, rig.tilt));
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }
 
