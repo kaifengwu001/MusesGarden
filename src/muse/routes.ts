@@ -27,6 +27,11 @@ export const ROUTES = {
   metrics: { method: 'GET', pattern: '/api/dev/:id/metrics' },
   soulMd: { method: 'GET', pattern: '/api/dev/:id/soul.md' },
   journalMd: { method: 'GET', pattern: '/api/dev/:id/journal.md' },
+  garden: { method: 'GET', pattern: '/api/muses/:id/garden' },
+  gardenEvents: { method: 'GET', pattern: '/api/muses/:id/garden/events' },
+  gardenReactions: { method: 'POST', pattern: '/api/muses/:id/garden/reactions' },
+  media: { method: 'GET', pattern: '/api/media/:mid' },
+  postcardImage: { method: 'GET', pattern: '/api/postcards/:name' },
 } as const satisfies Record<string, { readonly method: 'GET' | 'POST'; readonly pattern: string }>;
 
 export type RouteName = keyof typeof ROUTES;

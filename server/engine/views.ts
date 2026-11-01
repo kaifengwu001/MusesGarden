@@ -35,6 +35,7 @@ import type {
   VisitWorldView,
   WorldView,
 } from '../../src/muse/contract';
+import type { GardenSnapshot } from '../../src/garden/types';
 import type { Engine } from './engine';
 
 /** Domain functions the views need, injected so this file depends only on the contract. */
@@ -116,6 +117,10 @@ export class Views implements GardenQueries {
 
   muses(): ReturnType<GardenQueries['muses']> {
     return this.engine.museIds().map((museId) => ({ museId, name: this.name(museId), role: this.roles.get(museId) ?? 'stranger' }));
+  }
+
+  garden(): GardenSnapshot | null {
+    return null;
   }
 
   now(museId: MuseId, at: Instant): NowView | null {
@@ -350,6 +355,14 @@ export class Commands implements GardenCommands {
     if (!this.known(museId) || !this.known(other)) return fail(404, 'no such Muse');
     await this.engine.unshare(museId, other);
     return ok;
+  }
+
+  like(): Promise<CommandResult> {
+    return Promise.resolve(fail(409, 'likes are not in this build yet'));
+  }
+
+  useInvitation(): Promise<CommandResult> {
+    return Promise.resolve(fail(409, 'travel is not in this build yet'));
   }
 
   async hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult> {

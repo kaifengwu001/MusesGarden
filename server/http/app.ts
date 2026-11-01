@@ -133,6 +133,19 @@ function routesFor({ queries, commands, now }: Garden): readonly Route[] {
     metrics: ({ params }) => json(queries.metrics(muse(params.id))),
     soulMd: ({ params }) => markdown(queries.soulMd(muse(params.id))),
     journalMd: ({ params, query }) => markdown(queries.journalMd(muse(params.id), day(query))),
+    garden: ({ params }) => found(queries.garden(muse(params.id), now())),
+    gardenEvents: () => {
+      throw new HttpError(404, 'no such route');
+    },
+    gardenReactions: () => {
+      throw new HttpError(404, 'no such route');
+    },
+    media: () => {
+      throw new HttpError(404, 'no such route');
+    },
+    postcardImage: () => {
+      throw new HttpError(404, 'no such route');
+    },
   };
 
   return (Object.keys(ROUTES) as RouteName[]).map((name) => ({

@@ -150,6 +150,7 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       return gift(s, stored, e);
     case 'owner.introduced':
     case 'owner.unshared':
+    case 'owner.liked':
     case 'relationship.changed':
     case 'invitation':
       return s;

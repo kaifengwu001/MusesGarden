@@ -2,6 +2,8 @@
 // (src/muse/ui/) both import it. Types only: this file emits no runtime code.
 // Rationale: docs/muse-agent.md.
 
+import type { GardenSnapshot, MediaKind } from '../garden/types';
+
 declare const brand: unique symbol;
 export type Brand<T, B extends string> = T & { readonly [brand]: B };
 
@@ -40,6 +42,24 @@ export type InterestStage = 'hypothesis' | 'emerging' | 'established' | 'fading'
 
 // ─── What Muse finds on the internet ────────────────────────────────────────
 
+export type { MediaKind };
+/** Where a find lives online. */
+export type Network = 'instagram' | 'facebook' | 'youtube' | 'vimeo' | 'tiktok' | 'flickr' | 'bluesky' | 'web';
+/** A find as it lives online, beyond its url, title and text: what kind it is, where, by whom, and its picture. */
+export interface MediaInfo {
+  readonly kind: MediaKind;
+  readonly network: Network;
+  /** A public account's handle, or an article's byline. */
+  readonly author?: string;
+  readonly image?: string;
+  /** The picture's width over its height. */
+  readonly aspect?: number;
+  /** A reel's or a video's length (s). */
+  readonly duration?: number;
+  /** Minutes to read an article. */
+  readonly minutes?: number;
+}
+
 /** One page Muse looked at. A Discovery can only be made from a Candidate, so every find has a real URL. */
 export interface Candidate {
   readonly origin: 'wikipedia' | 'rss';
@@ -51,6 +71,7 @@ export interface Candidate {
   readonly thumb?: string;
   /** topics[0] is the page's own topic; the rest are its non-hidden categories (at most 6). */
   readonly topics: readonly TopicKey[];
+  readonly media?: MediaInfo;
 }
 
 /** Where pages come from. Implementations: live Wikipedia, live RSS, and a recorded offline corpus. */
@@ -150,6 +171,8 @@ export interface CastFile {
   readonly members: readonly CastMember[];
   /** Pairs whose owners introduced their Muses at the start. */
   readonly introductions: readonly (readonly [MuseId, MuseId])[];
+  /** Pairs whose owners are friends on Instagram or Facebook (simulated: the platforms give no such list). */
+  readonly knownOn?: readonly { readonly a: MuseId; readonly b: MuseId; readonly on: 'instagram' | 'facebook' }[];
 }
 
 export interface CastMember {
@@ -195,6 +218,9 @@ export interface Discovery {
   /** Where Muse found it. A gift: where Muse received it on its own planet, or near home if received away. */
   readonly place: Place;
   readonly at: Instant;
+  readonly media?: MediaInfo;
+  /** The topic of the trip that found it: the interest it belongs to in the garden. */
+  readonly pursuing?: TopicKey | null;
 }
 
 /** What other Muses may see of a find. No place, no provenance. */
@@ -300,7 +326,9 @@ export interface Verdict {
 
 export type InvitationState = 'proposed' | 'sent' | 'accepted' | 'open' | 'closed' | 'declined' | 'expired';
 export type RelationshipStatus = 'acquainted' | 'friends' | 'ended';
-export type RelationshipOrigin = 'introduced' | 'met-beyond';
+export type RelationshipOrigin = 'introduced' | 'met-beyond' | 'known-on';
+/** What the owner liked in the garden. */
+export type LikeTarget = { readonly find: DiscoveryId } | { readonly photo: PhotoId };
 
 /** Everything that can happen to a Muse. The engine assigns `at`; the store assigns nothing. */
 export type MuseEventBody =
@@ -311,6 +339,8 @@ export type MuseEventBody =
   | { readonly kind: 'memory.updated'; readonly textHash: string; readonly topics: readonly TopicKey[] }
   | { readonly kind: 'owner.settings'; readonly basketTime?: string | null; readonly hide?: readonly HiddenRef[]; readonly unhide?: readonly HiddenRef[] }
   | { readonly kind: 'owner.introduced' | 'owner.unshared'; readonly other: MuseId }
+  /** A like or an unlike in the garden; `friend` is the friend a liked photo shows, filled in by the engine. */
+  | { readonly kind: 'owner.liked'; readonly target: LikeTarget; readonly liked: boolean; readonly friend?: MuseId }
   // Life.
   | { readonly kind: 'episode.started'; readonly n: number; readonly plan: EpisodePlan }
   /** Work arrived: laptop out, in place. remainingMs is how much of a timed episode was left. */
@@ -805,6 +835,8 @@ export interface GardenQueries {
   soulMd(museId: MuseId): string | null;
   journalMd(museId: MuseId, day: string | null): string | null;
   muses(): readonly { readonly museId: MuseId; readonly name: string; readonly role: CastMember['role'] }[];
+  /** Everything the garden's interface shows, as of `at` (src/garden/types.ts). */
+  garden(museId: MuseId, at: Instant): GardenSnapshot | null;
 }
 
 export type CommandResult = { readonly ok: true } | { readonly ok: false; readonly status: 400 | 403 | 404 | 409; readonly error: string };
@@ -816,6 +848,10 @@ export interface GardenCommands {
   setHidden(museId: MuseId, ref: HiddenRef, hidden: boolean): Promise<CommandResult>;
   introduce(museId: MuseId, shareCode: string): Promise<CommandResult>;
   unshare(museId: MuseId, other: MuseId): Promise<CommandResult>;
+  /** A like or an unlike in the garden. */
+  like(museId: MuseId, target: LikeTarget, liked: boolean): Promise<CommandResult>;
+  /** "Travel now" on an invitation the owner received: good for one visit. */
+  useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   // The host simulator: stands in for the Muse app.
   hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult>;
   hostSoul(museId: MuseId, text: string): Promise<CommandResult>;

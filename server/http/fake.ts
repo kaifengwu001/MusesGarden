@@ -55,6 +55,7 @@ export function fakeQueries(): GardenQueries {
     soulMd: (museId) => heroOnly(museId, sampleSoulMd),
     journalMd: (museId, day) => (day === null || day === JOURNAL_DAY ? heroOnly(museId, sampleJournalMd) : null),
     muses: () => sampleMuses,
+    garden: () => null,
   };
 }
 
@@ -87,6 +88,8 @@ export function fakeCommands(): FakeCommands {
     setHidden: (...args) => accept({ name: 'setHidden', args }),
     introduce: (...args) => accept({ name: 'introduce', args }),
     unshare: (...args) => accept({ name: 'unshare', args }),
+    like: (...args) => accept({ name: 'like', args }),
+    useInvitation: (...args) => accept({ name: 'useInvitation', args }),
     hostWork: (...args) => accept({ name: 'hostWork', args }),
     hostSoul: (...args) => accept({ name: 'hostSoul', args }),
     hostMemory: (...args) => accept({ name: 'hostMemory', args }),
