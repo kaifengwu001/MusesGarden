@@ -30,20 +30,38 @@ export interface CardActions {
   close(): void;
 }
 
-/** The four species' colours in the interface (the meadow's palette, as CSS), by variant. */
-export function topicColour(interest: Pick<Interest, 'species' | 'variant'> | undefined): string {
-  if (!interest) return 'hsl(40 30% 70%)';
+/** The four species' colours in the interface (the meadow's palette), by variant: hue (°), saturation and lightness (%). */
+function topicHsl(interest: Pick<Interest, 'species' | 'variant'> | undefined): readonly [number, number, number] {
+  if (!interest) return [40, 30, 70];
   const v = interest.variant;
   switch (interest.species) {
     case 0:
-      return `hsl(${348 - 10 * v} ${58 + 10 * v}% ${70 - 12 * v}%)`;
+      return [348 - 10 * v, 58 + 10 * v, 70 - 12 * v];
     case 1:
-      return `hsl(${46 + 8 * v} ${30 + 20 * v}% ${90 - 8 * v}%)`;
+      return [46 + 8 * v, 30 + 20 * v, 90 - 8 * v];
     case 2:
-      return `hsl(${46 - 10 * v} ${82}% ${62 - 6 * v}%)`;
+      return [46 - 10 * v, 82, 62 - 6 * v];
     default:
-      return `hsl(${224 - 18 * v} ${52 + 8 * v}% ${68 - 8 * v}%)`;
+      return [224 - 18 * v, 52 + 8 * v, 68 - 8 * v];
   }
+}
+
+/** A topic's colour as CSS. */
+export function topicColour(interest: Pick<Interest, 'species' | 'variant'> | undefined): string {
+  const [h, s, l] = topicHsl(interest);
+  return `hsl(${h} ${s}% ${l}%)`;
+}
+
+/** A topic's colour as linear RGB (0 … 1), for what is drawn in the world (the favourites' lights on Muse's shelf). */
+export function topicRgb(interest: Pick<Interest, 'species' | 'variant'> | undefined): [number, number, number] {
+  const [h, s, l] = topicHsl(interest);
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const channel = (n: number): number => {
+    const k = (n + h / 30) % 12;
+    const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return [channel(0), channel(8), channel(4)];
 }
 
 function media(find: Find): HTMLElement {

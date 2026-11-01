@@ -1,0 +1,14 @@
+// A favourite's light on the shelf (hutDot.vert.glsl): a soft halo in its
+// colour round a near-white core, screened onto what is behind it, as the
+// finds' spheres are (findSphere.frag.glsl).
+varying vec3 vColour;
+
+void main() {
+  vec2 p = gl_PointCoord * 2.0 - 1.0;
+  float r = length(p);
+  if (r >= 1.0) discard;
+  float halo = 1.5 * (1.0 - r * r) * exp(-2.2 * r * r);
+  float core = 1.0 - smoothstep(0.16, 0.3, r);
+  float strength = max(max(vColour.r, vColour.g), vColour.b);
+  gl_FragColor = vec4(vColour * halo + vec3(1.0, 0.97, 0.9) * strength * core, 1.0);
+}

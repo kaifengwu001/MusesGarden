@@ -154,11 +154,14 @@ async function boot(): Promise<void> {
   let pettingMuse = false;
   attachInput(canvas, {
     drag: (dx, dy) => {
+      // (in Muse's hut a drag turns round the room)
+      if (garden.drag(dx, dy, canvas.clientWidth, canvas.clientHeight)) return;
       garden.interrupt();
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
       userPosed = true;
     },
     zoom: (delta) => {
+      if (garden.zoom(delta)) return;
       garden.interrupt();
       world.rig.zoomBy(delta);
       userPosed = true;

@@ -32,26 +32,35 @@ as the latest alone (a fix between iterations).
 
 ## Muse's hut: the interior (in progress)
 
-Started from ad37acf, on the branch `hut-interior` in a worktree of its own
+Started from eeda5d5, on the branch `hut-interior` in a worktree of its own
 (other sessions share the main checkout). Kai's brief (2026-11-01), with two
 references kept out of git: a mock-up of the hut with its roof off, seen from
 above at an angle with the room inside (reference/hut-interior/cutaway.jpg),
 and a red and cream rug (reference/hut-interior/rug.webp). With them, a
 library of Tripo models for the furniture, moved from the Desktop into the
-project.
+project (src/assets/interior; the display cabinet's first try is kept in
+reference/hut-interior).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | An interior for Muse's hut: cozy and lived in | |
-| 2 | A hearth or stove radiating warm light | |
-| 3 | Dark wooden floors and furniture | |
-| 4 | A large showpiece shelf holding Muse's favourites: favourite posts you can click and view, with the same glowing dot, line and card as the finds | |
-| 5 | You go in by clicking the door while Muse is inside or about the hut | |
-| 6 | The camera rises to reveal an almost orthographic cutaway of the room (as in the mock-up: the roof off, seen from above at an angle) | |
-| 7 | The interior's Tripo models move into the project | |
+| 1 | An interior for Muse's hut: cozy and lived in | The room inside the cottage's walls (life/hut.ts): a floor and the walls' inner faces fitted to the walls as props.ts builds them, nine pieces of Kai's furniture stood in their places (each model scaled to its height in meters, set square where Tripo made it askew, its picture drawn at 1024²), the rug cut out of Kai's picture. Muse stands in the room while you are there. |
+| 2 | A hearth or stove radiating warm light | The stove's fire lights the room (hut.frag.glsl): warm, flickering, falling off over a few meters and wrapped softly round what it lights, with a candle on the table and the lantern on the desk; daylight soft from above as if the roof were on, a warmer bounce from the floor; the corners, the walls' feet and the floor round what stands on it darker. |
+| 3 | Dark wooden floors and furniture | Dark staggered planks with their grain, seams and a worn path; ochre limewash over stone inside, the stones showing low down. The furniture is Kai's dark wood. |
+| 4 | A large showpiece shelf holding Muse's favourites, opened with the finds' glowing dot, line and card | One big display cabinet along the blind left wall (Kai's later notes). In the room it shows a single glowing dot; tap it and the camera turns to the cabinet (from the front of the room, not straight on) and comes in until it fills half the screen, whatever stands in front of it dissolving (life/occlude.glsl). There a small white dot stands on each favourite (fifteen places, three shelves of five): tap one and its line rises to its card beside the cabinet (the find's card: Muse's favourites, 3 of 15; ← → for the next). The favourites come from the source (`favourites` in the snapshot); without them the garden picks one a topic, newest first. |
+| 5 | You go in by clicking the door while Muse is inside or about the hut | The door is picked on screen (its outline projected, seen from in front); with Muse out, or out in the meadow, a line says so (and offers Find Muse). The cottage button's arrival says to tap the door. |
+| 6 | The camera rises to an almost orthographic cutaway (the roof off, seen from above at an angle) | view/cutaway.ts: from wherever you are, the camera rises and its view narrows to 15°, the roof lifting off and dissolving, until the room is seen as in the mock-up (from 39° round to the right, 69° down); clouds near the line of sight draw back; the tiny-planet warp eases out so the room stands square. Drag turns round the room, the wheel comes closer; Step outside (or Esc) goes back down the same way to exactly where you were, the roof settling on. |
+| 7 | The interior's Tripo models move into the project | src/assets/interior: nine models and the rug. |
 
-The meadow outside stays as it is (CLAUDE.md): outside the cutaway it must
-draw pixel for pixel as before.
+Kai's notes on the first pass (2026-11-01), done:
+
+- **The layout after Kai's second mock-up:** the hearth in the middle of the back wall under the chimney, the pots and pans hung high right over the stove, the dish cabinet beside it, the bed in the back corner on the right with its head against the back wall, the low shelf along the right end toward the front, the table on the rug in the middle, the desk under the front window, the armchair by the fire. The back window is closed from inside (the hearth stands in front of it); outside it is still a window.
+- **The chimney is not a solid block:** in the cutaway it settles onto the back wall over the hearth, its top a dark flue with soot round its mouth.
+- **The cut shows the walls' make:** the front and the right end are cut low and straight, just over the front's door and window, the back and the left end stand whole, each high wall's end standing upright where it meets a low one. The cut shows rubble stone in its mortar with the plaster's skin at each face, dark timber plates along the walls' tops and the lintels over the door and the window; the plaster along the cut is broken, its stones showing.
+- **The last step clipped with the grass and flickered:** it lay flush with the meadow (three risers and the ground). Now there are four equal risers, the last step a riser over the meadow, and the grass is kept a little farther from its foot; Muse walks down the four.
+
+The meadow outside the cutaway draws pixel for pixel as before in every standard view, at 2× and 1× (check-frames samecheck against eeda5d5), but for the steps in the cottage view (Kai's fix) and orbit, which differs against itself too (the Muse pin's pop-up). `npm run check` and `npm test` (758 tests, 8 of them new: hut.test.ts) pass.
+
+Known: the models are the stand-ins (see the pipeline test below), about 580k triangles and 28 MB together; the display cabinet is drawn out 1.4 times across to fill the wall, its things with it (a wide cabinet from Tripo would drop in). Muse is lit by the sun outside, not by the fire. The water's mirror still shows the roof. The cutaway's materials compile on the first knock (a hitch then).
 
 **A test of the 3D pipeline (2026-11-01).** Kai made the display cabinet
 twice. The second ("(1)") is properly built: square posts, flat panels,

@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix3, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type Texture, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix3, Matrix4, PerspectiveCamera, Ray, Scene, Vector2, Vector3, Vector4, type IUniform, type Texture, type WebGLRenderer } from 'three';
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
@@ -12,6 +12,7 @@ import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
+import { HutInterior } from './life/hut';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
@@ -86,6 +87,8 @@ export class World {
   readonly grass: Grass;
   readonly flowers: Flowers;
   homestead: Homestead;
+  /** Muse's hut inside, drawn only while the cutaway is open (view/cutaway.ts); it stands in the homestead's frame. */
+  readonly hut: HutInterior;
   readonly clouds: Clouds;
   readonly birds: Birds;
   readonly butterflies: Butterflies;
@@ -170,6 +173,9 @@ export class World {
       uMuseShadowSun: { value: new Vector4() },
       uMuseShadowWindow: { value: new Vector4() },
       uMuseShadowFeet: { value: new Vector3() },
+      // looking at Muse's shelf in the cutaway, what stands in front of it dissolves (view/cutaway.ts, life/occlude.glsl)
+      uOcclude: { value: new Vector4() },
+      uOccludeDepth: { value: new Vector2() },
     };
     this.sky = new Sky();
     this.field = new FieldMap(this.shared, tier.maps.field);
@@ -178,6 +184,8 @@ export class World {
     this.grass = new Grass(this.shared, POOL_PAGES.grass);
     this.flowers = new Flowers(this.shared, POOL_PAGES.flowers);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
+    this.hut = new HutInterior(this.shared, this.homestead.faces);
+    this.homestead.group.add(this.hut.group);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
@@ -329,6 +337,8 @@ export class World {
       this.terrain.setLayout(generateLayout(this.store.values.world.seed));
       this.scene.remove(this.homestead.group);
       this.homestead = new Homestead(this.shared, this.store.values.world.seed);
+      this.hut.refit(this.homestead.faces);
+      this.homestead.group.add(this.hut.group);
       this.scene.add(this.homestead.group);
     }
     for (const path of changed) {
@@ -391,7 +401,7 @@ export class World {
     // Warp: the meadow around the focus curves like a world of visualRadius.
     this.warp.focus.copy(rig.focus);
     this.warp.up.copy(rig.up);
-    this.warp.k = warpForZoom(rig.zoom, R, p.view.visualRadius);
+    this.warp.k = warpForZoom(rig.zoom, R, p.view.visualRadius) * rig.warpScale;
     const g = this.globals;
     g.uTime.value = clock.time;
     g.uRadius.value = R;
@@ -407,6 +417,7 @@ export class World {
 
     // The homestead sits on its clearing, facing its pond; its shadow sweeps away from the sun.
     this.homestead.place(this.tmp.copy(L.cottage).multiplyScalar(R + this.terrain.cottageGround), L.cottage, L.homeBearing);
+    this.hut.update(clock.time);
     // (down the sun the cottage sees, as its walls are lit: render/sun.ts)
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
     const sun = sunAt(p.light.timeOfDay);

@@ -405,6 +405,22 @@ click is what you see.
   view frames it as the painting does (from above the meadow in front and to
   the right, 26 m out): a named view may look up from the zoom's own tilt
   (`CameraRig.lookUp`), which eases away as soon as you drag, zoom or walk.
+- **Muse's hut inside** (hut.ts, view/cutaway.ts): tap the door while Muse
+  is in or about the hut and the camera rises off the meadow, its view
+  narrowing to 15° (almost orthographic), held off the room by the rig
+  (`CameraRig.held`) while the focus moves to the room, so the near field,
+  the light and the fog are the room's; the tiny-planet warp eases out so
+  the room stands square, and clouds near the line of sight draw back. The
+  roof lifts off and dissolves, the chimney settles onto the back wall over
+  the hearth, and the walls are cut straight: the front and the right end
+  low, over the front's lintels, the back and the left end whole. The
+  cottage draws with its own materials whenever the cutaway is shut, so the
+  meadow outside is untouched. Inside, Kai's Tripo furniture is fitted into
+  the room in meters and lit by the stove's fire, a candle and a lantern,
+  with soft daylight from above as if the roof were on. Muse's showpiece, a
+  display cabinet along the left wall, holds its favourites: its glowing dot
+  turns the camera to it, what stands in front dissolving, and a white dot on
+  each favourite opens its card as a find's does.
 - **Aerial perspective:** distance pales the meadow toward a grey-green haze,
   thicker as the camera comes down into the meadow (the far meadow reads like
   a painted distance); the planet's limb from orbit dissolves into the sky's
@@ -695,7 +711,11 @@ so any view can be shared.
         cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings
-        props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench
+        props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench;
+                           its CUTAWAY builds (the roof lifting off, the walls cut, the chimney onto the back wall)
+        hut.ts/.glsl       Muse's hut inside, drawn only in the cutaway: the room fitted to the cottage's walls, the
+                           cut through them (rubble, timber), Kai's furniture (src/assets/interior), the fire's light,
+                           the showpiece and its favourites' dots (hutDot); occlude.glsl dissolves what hides the shelf
         findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, planted from the middle out)
                            and their glowing spheres from high up; findTable.ts each find's state (planted, card,
                            hover, pulse, picked basket) in a float texture, any number of finds
@@ -712,7 +732,8 @@ so any view can be shared.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking,
+      view/                camera rig (Overview ↔ Wander, a view held off the focus), the cutaway into Muse's hut (cutaway.ts),
+                           the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking,
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,

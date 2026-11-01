@@ -5,6 +5,7 @@ const icon = (body: string, extra = ''): string =>
   `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${body}</svg>`;
 
 export const ICONS = {
+  door: icon('<path d="M6.8 20V4.6h8.4V20"/><path d="M4.4 20h15.2"/><circle cx="12.9" cy="12.4" r=".8" fill="currentColor"/><path d="M17.8 9.4 20.2 12l-2.4 2.6"/>'),
   house: icon('<path d="M3.4 11.2 12 4.6l8.6 6.6"/><path d="M5.6 9.8v9.7h12.8V9.8"/><path d="M10.4 19.5v-4.6h3.2v4.6"/><path d="M15.8 7.2V4.4h2v4.3"/><path d="M7.6 12.6h2.2v2H7.6z"/>'),
   find: icon(
     '<circle cx="12" cy="12" r="7.6"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2"/><path d="M9.2 14.8v-3.4a2.8 2.8 0 0 1 5.6 0v3.4a1 1 0 0 1-1 1h-3.6a1 1 0 0 1-1-1Z"/><circle cx="11" cy="12" r=".55" fill="currentColor"/><circle cx="13" cy="12" r=".55" fill="currentColor"/>',

@@ -22,6 +22,14 @@ varying vec4 vPaint;
 varying vec3 vPlanet;      // planet space, unwarped (the sun each place sees, the clouds' shadows)
 varying vec3 vPlanetNormal;
 varying vec3 vUp;          // the local up where this point stands, planet space
+#ifdef CUTAWAY
+// The cutaway into the hut (props.ts setCutaway): the roof lifts off and dissolves as it opens, and the
+// chimney settles onto the back wall's top, over the hearth inside.
+uniform int uKind;
+uniform float uCutaway;
+uniform vec3 uChimney;     // where the chimney goes (local m)
+varying float vLift;       // how far this point has gone with the roof (0: it stays)
+#endif
 
 vec3 turn(vec3 v, vec3 axis, float angle) {
   float c = cos(angle);
@@ -35,14 +43,23 @@ void main() {
   vec3 U = normalize(modelMatrix[1].xyz);
   vec3 Z = normalize(modelMatrix[2].xyz);
   float ground = length(modelMatrix[3].xyz);
+#ifdef CUTAWAY
+  // the roof rises as it goes; the chimney (the walls' plain plaster) moves back onto the back wall
+  vLift = uKind == 1 ? uCutaway : 0.0;
+  float chimney = uKind == 0 && aPaint.w > 0.5 ? smoothstep(0.0, 1.0, uCutaway) : 0.0;
+  vec3 placed = position + vec3(0.0, 1.6 * vLift * vLift, 0.0) + uChimney * chimney;
+  #define PLACED placed
+#else
+  #define PLACED position
+#endif
   // out over the surface toward the point, as far as the terrain's meters say, then up by its height
-  vec2 h = position.xz;
+  vec2 h = PLACED.xz;
   float d = length(h);
   float angle = asin(min(d / uRadius, 1.0));
   vec3 T = d > 1e-5 ? (X * h.x + Z * h.y) / d : X;
   vec3 axis = normalize(cross(U, T));
   vec3 up = U * cos(angle) + T * sin(angle);
-  vec3 world = up * (ground + position.y);
+  vec3 world = up * (ground + PLACED.y);
   vec3 n = turn(normalize(X * normal.x + U * normal.y + Z * normal.z), axis, angle);
   vec3 w = warpPosition(world);
   vNormal = warpNormal(world, n);

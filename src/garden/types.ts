@@ -145,6 +145,8 @@ export interface GardenSnapshot {
   baskets: readonly Basket[];
   finds: readonly Find[];
   postcards: readonly Postcard[];
+  /** Muse's favourite finds, kept on the showpiece shelf in its hut, in its order (find ids); without it the garden picks some (GardenState.favourites). */
+  favourites?: readonly string[];
 }
 
 /** What the backend pushes while the garden is open. */

@@ -48,6 +48,14 @@ const tmpF = new Vector3();
 
 export type GroundFn = (dir: Vector3) => number;
 
+/** The rig's own pose: its frame, its zoom and its look up (where it is and where it is headed), to come back to. */
+export interface RigPose {
+  readonly frame: Quaternion;
+  readonly zoom: number;
+  readonly pitch: number;
+  readonly pitchTarget: number;
+}
+
 export class CameraRig {
   readonly camera = new PerspectiveCamera(35, 1, 0.1, 1e5);
   /** Surface frame of the focus point (target and smoothed current). */
@@ -81,6 +89,17 @@ export class CameraRig {
   private pitchTarget = 0;
   /** Seconds since the last zoom by the wheel or the keys (Infinity: settled). */
   private zoomIdle = Number.POSITIVE_INFINITY;
+  /**
+   * A view held off the focus (the cutaway into Muse's hut, view/cutaway.ts):
+   * the camera at `position` looking at `target` (planet space), its up
+   * toward `up`, with a field of view of its own (°). The frame and the zoom
+   * still say where the focus is and how high the view stands over it, and
+   * the near field, the fog and the light follow them. Null: the rig places
+   * the camera itself.
+   */
+  held: { readonly position: Vector3; readonly target: Vector3; readonly up: Vector3; readonly fov: number } | null = null;
+  /** How much of the tiny-planet warp the view takes (1; the cutaway eases it out, so the room stands square). */
+  warpScale = 1;
 
   /** Altitude (m), tilt from straight down (rad) and vertical field of view (°) at zoom z. */
   framing(z: number): { altitude: number; tilt: number; fov: number } {
@@ -293,6 +312,53 @@ export class CameraRig {
 
     this.pitch += (this.pitchTarget - this.pitch) * damp(realDt, 0.25);
     this.place(this.camera, this.up, this.forward, this.zoom, this.pitch, radius, this.ground, aspect);
+    if (this.held) this.hold(this.camera, this.held, radius, aspect);
+  }
+
+  /** Place a camera as a held view has it. */
+  hold(out: PerspectiveCamera, view: NonNullable<CameraRig['held']>, radius: number, aspect: number): void {
+    out.position.copy(view.position);
+    out.up.copy(view.up);
+    out.lookAt(view.target);
+    out.fov = view.fov;
+    out.aspect = aspect;
+    const d = view.position.distanceTo(view.target);
+    out.near = clamp(d * 0.1, 0.05, 4);
+    out.far = d + radius * 3;
+    out.updateProjectionMatrix();
+    out.updateMatrixWorld();
+  }
+
+  /** The rig's pose as it is headed (the cutaway comes back to it). */
+  save(): RigPose {
+    return { frame: this.frameTarget.clone(), zoom: this.zoomTarget, pitch: this.pitch, pitchTarget: this.pitchTarget };
+  }
+
+  /** Back to a saved pose, at once. */
+  restore(pose: RigPose): void {
+    this.frameTarget.copy(pose.frame);
+    this.frame.copy(pose.frame);
+    this.axes(this.frame);
+    this.zoomTarget = this.zoom = pose.zoom;
+    this.pitch = pose.pitch;
+    this.pitchTarget = pose.pitchTarget;
+    this.glideT = 1;
+    // (the ground under it is taken afresh, as placeAt had it)
+    this.ground = Number.NaN;
+    this.changed = true;
+  }
+
+  /** The camera a saved pose places (as update() would, over ground `ground` m), into `out`. */
+  placeAt(out: PerspectiveCamera, pose: RigPose, radius: number, ground: number, aspect: number): PerspectiveCamera {
+    const up = tmpV.copy(Y).applyQuaternion(pose.frame).clone();
+    const forward = tmpF.copy(NZ).applyQuaternion(pose.frame).clone();
+    this.place(out, up, forward, pose.zoom, pose.pitch, radius, ground, aspect);
+    return out;
+  }
+
+  /** The smoothed ground under the focus (m over R), as the camera stands on it. */
+  get groundLevel(): number {
+    return this.ground;
   }
 
   /** True once after any pose change (for URL sync). */

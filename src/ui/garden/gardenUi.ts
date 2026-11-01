@@ -1,4 +1,4 @@
-import { Matrix4, Vector3 } from 'three';
+import { Matrix4, Vector3, type Vector4 } from 'three';
 import friendFace from '../../assets/garden/friend-face.jpg';
 import museFace from '../../assets/garden/muse-face.jpg';
 import { bedAt, layOut, type Bed, type GardenLayout } from '../../garden/placement';
@@ -9,16 +9,18 @@ import type { Basket, Postcard } from '../../garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
 import { MUSE_HEIGHT, type MuseDirection } from '../../life/muse';
 import { Pins, type PinSpec } from '../../life/pins';
+import { FLOOR, FRONT, OUTER } from '../../life/props';
 import type { ParamStore } from '../../params';
-import { tangentToward, travel } from '../../planet/geo';
+import { angleBetween, tangentToward, travel } from '../../planet/geo';
 import { createGroundSample, type Layout } from '../../planet/terrain';
 import { warpPoint } from '../../render/warp';
+import { Cutaway } from '../../view/cutaway';
 import { Flight, type Framing } from '../../view/flight';
 import type { World } from '../../world';
 import { BasketsSheet } from './baskets';
 import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
 import { button, dayName, el } from './dom';
-import { FindCard, topicColour } from './findCard';
+import { FindCard, topicColour, topicRgb } from './findCard';
 import './garden.css';
 import { ICONS } from './icons';
 import { Mail } from './mail';
@@ -29,10 +31,13 @@ import { TravelSheet, Visit } from './travel';
 // The garden's interface over the meadow: Muse's finds as patches of flowers
 // with their cards, the pins on the globe, the post box with Muse's postcards and
 // invitations, the ticket to other worlds, and a rail down the right: Muse
-// (its page), find Muse, its cottage, the baskets, the pins. Everything it
-// shows comes from a GardenSource (garden/source.ts) through GardenState.
-// main.ts calls update() before the world moves its camera, frame() after,
-// and offers it taps first.
+// (its page), find Muse, its cottage, the baskets, the pins. Tap the hut's
+// door while Muse is about and the cutaway opens the room (view/cutaway.ts);
+// a glowing dot on Muse's showpiece turns the camera to it, where a white dot
+// on each favourite opens its card as a find's does. Everything it shows
+// comes from a GardenSource
+// (garden/source.ts) through GardenState. main.ts calls update() before the
+// world moves its camera, frame() after, and offers it taps first.
 
 /** How a find is framed: the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
@@ -48,9 +53,18 @@ const OUT_OF_SIGHT: MuseDirection = { kind: 'hidden' };
 
 /** A tap or the pointer this near a find's sphere (px) picks it; the sphere stands this high over its bed (m). */
 const SPHERE = { slop: 16, height: 0.6 } as const;
+/** The hut's door (the homestead's local m: its sides, its sill and its head, the wall's face): tap it to go in. */
+const DOOR = { x0: -OUTER.x + FRONT.door[0], x1: -OUTER.x + FRONT.door[1], y0: FLOOR, y1: FLOOR + 2.15, z: OUTER.z } as const;
+/** At Muse's shelf: how near a tap must come to a favourite's dot, or in the room to the showpiece's (px); where a card stands up the screen (a share of its height). */
+const SHELF = { slop: 18, beacon: 26, cardFoot: 0.8 } as const;
+/** Nearer than this to the cottage (m) and lower than this (m), the hut's furniture is fetched ahead of a knock. */
+const NEAR_HUT = { distance: 70, altitude: 80 } as const;
+/** Where Muse stands in its hut (local m), facing the way the cutaway looks in from. */
+const INSIDE = { x: 0.95, z: 0.4 } as const;
 
 const sample = createGroundSample();
 const tmp = new Vector3();
+const tmpLocal = new Vector3();
 
 /** The finds' marks on the planet (their patches of flowers, and the glowing spheres seen from high up). */
 export interface FindMarks {
@@ -83,6 +97,15 @@ export class GardenUi {
   /** The finds' patches and spheres, once they are drawn. */
   marks: FindMarks | null = null;
   private readonly flight: Flight;
+  /** The cutaway into Muse's hut. */
+  private readonly cutaway: Cutaway;
+  /** Muse's favourites in the shelf's order (find ids), the one whose card is up (its place, -1: none), the one under the pointer. */
+  private favourites: string[] = [];
+  private favourite = -1;
+  private hoveredFavourite = -1;
+  private hoveredBeacon = false;
+  private readonly outside: HTMLButtonElement;
+  private hutFetched = false;
   private readonly basketFlight: BasketFlight;
   private readonly card: FindCard;
   private readonly postbox: PostBox;
@@ -135,6 +158,7 @@ export class GardenUi {
     this.marks = this.beds;
     world.scene.add(...this.beds.objects, this.pins.group);
     this.flight = new Flight(world.rig);
+    this.cutaway = new Cutaway(world);
     this.basketFlight = new BasketFlight(this.root, {
       project: (dir, height) => this.project(dir, height, window.innerWidth, window.innerHeight),
       cameraRemaining: () => this.flight.remaining,
@@ -194,6 +218,15 @@ export class GardenUi {
     this.toastEl = el('div', 'g-toast');
     this.toastEl.setAttribute('role', 'status');
     this.root.append(this.toastEl);
+    // the way out of the hut, while in it
+    this.outside = button('g-outside', 'Step outside', `${ICONS.door}<span>Step outside</span>`, () => {
+      // (at the shelf, back to the room first)
+      if (this.cutaway.atShelf) {
+        this.closeCard();
+        this.cutaway.fromShelf();
+      } else this.leaveHut();
+    });
+    this.root.append(this.outside);
 
     this.state.subscribe((change) => this.changed(change));
     this.state.start().catch((error: unknown) => {
@@ -234,6 +267,15 @@ export class GardenUi {
     }
     if (change === 'baskets' || change === 'snapshot') this.basketsSheet.render();
     if (change === 'interests' || change === 'snapshot' || change === 'status') this.museSheet.render();
+    if (change === 'snapshot' || change === 'baskets' || change === 'interests') this.refreshFavourites();
+  }
+
+  /** Muse's favourites on its shelf: their lights in their topics' colours. */
+  private refreshFavourites(): void {
+    const hut = this.world.hut;
+    this.favourites = this.state.favourites.slice(0, hut.slots);
+    hut.setFavourites(this.favourites.map((id) => ({ colour: topicRgb(this.state.interest(this.state.find(id)?.topic ?? '')) })));
+    if (this.favourite >= this.favourites.length) this.closeCard();
   }
 
   /** Muse's own planet, when the source names one: the finds were found on it. */
@@ -301,8 +343,20 @@ export class GardenUi {
   /** Before the world moves: a flight drives the camera, and Muse is told where to be. */
   update(dt: number): void {
     this.flight.update(dt);
-    const muse = this.visit.away ? OUT_OF_SIGHT : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
+    this.cutaway.update(dt);
+    const muse = this.visit.away ? OUT_OF_SIGHT : this.cutaway.entering ? this.inside() : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
     if (muse) this.world.muse.direct(muse);
+  }
+
+  /** Muse in its hut, standing on its floor and turned toward you. */
+  private inside(): MuseDirection {
+    const c = this.cutaway;
+    const dir = c.local(INSIDE.x, 0, INSIDE.z, new Vector3());
+    const ahead = c.local(INSIDE.x + 0.63, 0, INSIDE.z + 0.78, new Vector3());
+    const up = dir.clone().normalize();
+    const heading = ahead.sub(dir);
+    heading.addScaledVector(up, -heading.dot(up)).normalize();
+    return { kind: 'inside', dir: up, height: this.world.terrain.cottageGround + FLOOR, heading };
   }
 
   /** After the world's update: the beds' clock, the pins, the card over its bed. */
@@ -323,10 +377,26 @@ export class GardenUi {
     if (this.pointer && (this.pointerMoved || !w.rig.camera.matrixWorld.equals(this.pickedIn))) this.hover(this.pointer);
     this.beds.update(w.rig.altitude, !away);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
+    // the hut: its furniture fetched as you come near, the way out shown while in, its favourites' lights marked
+    if (!this.hutFetched && this.nearHut()) {
+      this.hutFetched = true;
+      w.hut.load().catch((error: unknown) => console.error('hut: could not load', error));
+    }
+    this.outside.classList.toggle('is-on', this.cutaway.entering);
+    this.labelOutside();
+    w.hut.mark(this.cutaway.atShelf ? this.hoveredFavourite : -1, this.favourite, this.hoveredBeacon && !this.cutaway.atShelf);
     const width = window.innerWidth;
     const height = window.innerHeight;
     const bed = this.current ? this.layout.beds.get(this.current) : undefined;
-    if (bed) {
+    if (!bed && this.favourite >= 0) {
+      // a favourite's card: beside the showpiece, on the side of the screen with more room, its line rising from its dot
+      const at = this.cutaway.active ? w.hut.slot(this.favourite, tmpLocal) : null;
+      const foot = at ? this.projectLocal(at, width, height) : null;
+      const shelf = w.shared.uOcclude.value as Vector4;
+      const right = 1 - shelf.z >= shelf.x;
+      const top = foot ? { x: width * (right ? (1 + shelf.z) / 2 : shelf.x / 2), y: height * SHELF.cardFoot } : null;
+      this.card.place(foot, top, dt, width, height);
+    } else if (bed) {
       const foot = this.project(bed.dir, bed.ground + 0.35, width, height);
       const top = this.project(bed.dir, bed.ground + STEM, width, height);
       const inView = foot !== null && foot.x > -40 && foot.x < width + 40 && foot.y > -40 && foot.y < height + 40;
@@ -337,6 +407,16 @@ export class GardenUi {
       this.offscreen = (inView && near) || this.flight.flying ? 0 : this.offscreen + dt;
       if (this.offscreen > 0.6 && this.card.shown) this.closeCard();
     } else this.card.place(null, null, dt, width, height);
+  }
+
+  /** A point in the homestead's local meters on screen (px), or null behind the camera. */
+  private projectLocal(local: Vector3, width: number, height: number): { x: number; y: number } | null {
+    const w = this.world;
+    this.cutaway.local(local.x, local.y, local.z, tmp);
+    warpPoint(w.warp, tmp, tmp);
+    tmp.project(w.rig.camera);
+    if (tmp.z < -1 || tmp.z > 1) return null;
+    return { x: ((tmp.x + 1) / 2) * width, y: ((1 - tmp.y) / 2) * height };
   }
 
   private project(dir: Vector3, height: number, width: number, h: number): { x: number; y: number } | null {
@@ -350,12 +430,33 @@ export class GardenUi {
 
   // ---- input ----------------------------------------------------------------------------
 
-  /** A tap on the canvas: a pin, or a find (its sphere from high up, its bed below). True when the garden took it. */
+  /** A tap on the canvas: in the hut, a favourite on the shelf; else a pin, the hut's door, or a find (its sphere from high up, its bed below). True when the garden took it. */
   tap(x: number, y: number, width: number, height: number): boolean {
+    if (this.cutaway.active) {
+      // (while the camera rises or comes down, taps wait)
+      if (!this.cutaway.open) return true;
+      if (this.cutaway.atShelf) {
+        // at the shelf: a favourite's dot opens its card; elsewhere a tap puts the card away, then goes back to the room
+        const i = this.favouriteAt(x, y, width, height);
+        if (i >= 0) this.openFavourite(i);
+        else if (this.card.shown) this.closeCard();
+        else this.cutaway.fromShelf();
+        return true;
+      }
+      if (this.onBeacon(x, y, width, height)) {
+        this.cutaway.toShelf();
+        return true;
+      }
+      return false;
+    }
     const pin = this.pins.pick(x, y, width, height, this.world.rig.camera);
     if (pin) {
       if (pin.kind === 'muse') this.findMuse();
       else this.openFind(pin.id.slice('liked:'.length));
+      return true;
+    }
+    if (this.doorAt(x, y, width, height)) {
+      this.knock();
       return true;
     }
     const bed = this.findAt(x, y, width, height);
@@ -408,11 +509,22 @@ export class GardenUi {
     this.pointerMoved = false;
     this.pickedIn.copy(this.world.rig.camera.matrixWorld);
     const { clientWidth: width, clientHeight: height } = at.canvas;
+    if (this.cutaway.active) {
+      const open = this.cutaway.open;
+      this.hoveredFavourite = open && this.cutaway.atShelf ? this.favouriteAt(at.x, at.y, width, height) : -1;
+      this.hoveredBeacon = open && !this.cutaway.atShelf && this.onBeacon(at.x, at.y, width, height);
+      this.setHovered(null);
+      at.canvas.style.cursor = this.hoveredFavourite >= 0 || this.hoveredBeacon ? 'pointer' : '';
+      return;
+    }
+    this.hoveredBeacon = false;
+    this.hoveredFavourite = -1;
     const pin = this.pins.pick(at.x, at.y, width, height, this.world.rig.camera);
     const bed = pin ? null : this.findAt(at.x, at.y, width, height);
     const shown = bed && this.state.visitedBasket(bed.basket) && !this.basketFlight.waiting(bed.find) ? bed.find : null;
     this.setHovered(shown);
-    at.canvas.style.cursor = pin || shown ? 'pointer' : '';
+    const door = !pin && !shown && this.doorAt(at.x, at.y, width, height);
+    at.canvas.style.cursor = pin || shown || door ? 'pointer' : '';
   }
 
   private setHovered(id: string | null): void {
@@ -426,11 +538,27 @@ export class GardenUi {
     this.flight.cancel();
   }
 
+  /** A drag while in the hut turns round the room (true: the garden took it). */
+  drag(dx: number, dy: number, width: number, height: number): boolean {
+    if (!this.cutaway.active) return false;
+    this.cutaway.drag(dx, dy, width, height);
+    return true;
+  }
+
+  /** The wheel or a pinch while in the hut comes closer to the room or stands back (true: the garden took it). */
+  zoom(delta: number): boolean {
+    if (!this.cutaway.active) return false;
+    this.cutaway.zoom(delta);
+    return true;
+  }
+
   private key(e: KeyboardEvent): void {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target instanceof HTMLInputElement) return;
     if (e.key === 'Escape') {
       if (this.mail.isOpen) this.mail.close();
       else if (this.card.shown) this.closeCard();
+      else if (this.cutaway.atShelf) this.cutaway.fromShelf();
+      else if (this.cutaway.entering) this.leaveHut();
     } else if (this.card.shown && !this.mail.isOpen && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -448,12 +576,17 @@ export class GardenUi {
 
   /** Fly to a find's bed and raise its card. */
   openFind(id: string, direction: 1 | -1 | 0 = 0): void {
+    if (this.cutaway.active) {
+      this.leaveHut(() => this.openFind(id, direction));
+      return;
+    }
     const bed = this.layout.beds.get(id);
     const find = this.state.find(id);
     if (!bed || !find) return;
     if (this.card.shown) this.card.hide(direction);
     this.basketFlight.finish();
     this.marks?.open(null);
+    this.favourite = -1;
     this.current = id;
     // look from the side the camera comes from, unless it is right over the bed
     this.flight.to(this.framing(bed, FIND_VIEW), this.world.growth.radius, this.ground, () => this.raise(id));
@@ -475,6 +608,11 @@ export class GardenUi {
   }
 
   private step(direction: 1 | -1): void {
+    if (this.favourite >= 0) {
+      const n = this.favourites.length;
+      if (n > 0) this.openFavourite((this.favourite + direction + n) % n, direction);
+      return;
+    }
     const order = this.state.browseOrder.filter((id) => this.state.visitedBasket(this.state.find(id)?.basket ?? ''));
     if (!this.current || order.length === 0) return;
     const i = order.indexOf(this.current);
@@ -483,8 +621,9 @@ export class GardenUi {
   }
 
   private like(): void {
-    if (!this.current) return;
-    const liked = this.state.toggleLike(this.current);
+    const id = this.current ?? this.favourites[this.favourite];
+    if (!id) return;
+    const liked = this.state.toggleLike(id);
     this.card.setLiked(liked);
     if (liked && this.state.likedFindIds.length === 1) this.toast('Liked. Muse will hear of it, and it’s pinned on your map.');
   }
@@ -494,6 +633,127 @@ export class GardenUi {
     this.basketFlight.finish();
     this.marks?.open(null);
     this.current = null;
+    this.favourite = -1;
+  }
+
+  // ---- Muse's hut ------------------------------------------------------------------------------
+
+  /** Whether the camera is near enough the hut that a knock may come (its furniture is fetched then). */
+  private nearHut(): boolean {
+    const w = this.world;
+    return w.rig.altitude < NEAR_HUT.altitude && angleBetween(w.rig.up, w.terrain.layout.cottage) * w.growth.radius < NEAR_HUT.distance;
+  }
+
+  /** Whether a point on the canvas (px) is on the hut's door, seen from in front and big enough to mean it. */
+  private doorAt(x: number, y: number, width: number, height: number): boolean {
+    if (this.visit.away) return false;
+    const corners: Array<{ x: number; y: number }> = [];
+    for (const [cx, cy] of [
+      [DOOR.x0, DOOR.y0],
+      [DOOR.x1, DOOR.y0],
+      [DOOR.x1, DOOR.y1],
+      [DOOR.x0, DOOR.y1],
+    ]) {
+      const p = this.projectLocal(tmpLocal.set(cx, cy, DOOR.z), width, height);
+      if (!p) return false;
+      corners.push(p);
+    }
+    const c = this.cutaway;
+    const mid = c.local((DOOR.x0 + DOOR.x1) / 2, (DOOR.y0 + DOOR.y1) / 2, DOOR.z, new Vector3());
+    const out = c.local((DOOR.x0 + DOOR.x1) / 2, (DOOR.y0 + DOOR.y1) / 2, DOOR.z + 1, new Vector3()).sub(mid);
+    if (out.dot(tmp.copy(this.world.rig.camera.position).sub(mid)) <= 0) return false;
+    // its area on screen (the shoelace), and the point inside its outline (same side of every edge)
+    let area = 0;
+    let sign = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = corners[i];
+      const b = corners[(i + 1) % 4];
+      area += a.x * b.y - b.x * a.y;
+      const side = Math.sign((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x));
+      if (side !== 0 && sign !== 0 && side !== sign) return false;
+      if (side !== 0) sign = side;
+    }
+    return Math.abs(area) / 2 > 90;
+  }
+
+  /** A knock on the door: in, if Muse is in or about the hut; if not, why not. */
+  private knock(): void {
+    const w = this.world;
+    if (!this.state.status.home || w.muse.away) {
+      this.toast('Muse is out exploring, and the door is shut. It’ll be back with a basket.');
+      return;
+    }
+    if (!w.muse.home) {
+      this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
+      return;
+    }
+    this.closeCard();
+    this.flight.cancel();
+    this.basketFlight.finish();
+    w.hut.load().catch((error: unknown) => console.error('hut: could not load', error));
+    this.cutaway.enter();
+  }
+
+  /** Step outside: the card put away, the camera back down to where it was before; `then` once it is there. */
+  leaveHut(then?: () => void): void {
+    this.closeCard();
+    this.cutaway.leave(then);
+  }
+
+  /** The way out says where it goes: back to the room from the shelf, outside from the room. */
+  private labelOutside(): void {
+    const label = this.cutaway.atShelf ? 'Back to the room' : 'Step outside';
+    if (this.outside.title === label) return;
+    this.outside.title = label;
+    this.outside.setAttribute('aria-label', label);
+    this.outside.innerHTML = `${this.cutaway.atShelf ? ICONS.left : ICONS.door}<span>${label}</span>`;
+  }
+
+  /** Whether a point on the canvas (px) is on the showpiece's glowing dot (in the room's view). */
+  private onBeacon(x: number, y: number, width: number, height: number): boolean {
+    const at = this.world.hut.beaconAt(tmpLocal);
+    const p = at && this.favourites.length > 0 ? this.projectLocal(at, width, height) : null;
+    return p !== null && Math.hypot(p.x - x, p.y - y) < SHELF.beacon;
+  }
+
+  /** The favourite whose light is under a point on the canvas (px), or -1. */
+  private favouriteAt(x: number, y: number, width: number, height: number): number {
+    let best = -1;
+    let bestD: number = SHELF.slop;
+    for (let i = 0; i < this.favourites.length; i++) {
+      const at = this.world.hut.slot(i, tmpLocal);
+      const p = at ? this.projectLocal(at, width, height) : null;
+      const d = p ? Math.hypot(p.x - x, p.y - y) : Infinity;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  /** Open a favourite's card on the shelf: the last one goes off to its side, then the line rises from this one's light. */
+  private openFavourite(i: number, direction: 1 | -1 | 0 = 0): void {
+    const id = this.favourites[i];
+    const find = id ? this.state.find(id) : undefined;
+    if (!find) return;
+    const wasUp = this.card.shown !== null;
+    if (wasUp) this.card.hide(direction);
+    this.current = null;
+    this.marks?.open(null);
+    this.favourite = i;
+    const show = (): void => {
+      if (this.favourite !== i || !this.cutaway.active) return;
+      this.card.show(find, this.state.interest(find.topic), {
+        basket: 'Muse’s favourites',
+        index: i,
+        total: this.favourites.length,
+        liked: this.state.liked(id),
+        shared: this.state.findShared(id),
+      });
+    };
+    if (wasUp) setTimeout(show, 240);
+    else show();
   }
 
   // ---- baskets ---------------------------------------------------------------------------
@@ -504,6 +764,10 @@ export class GardenUi {
    * not opened before plants its finds as they land; one opened before lights them up again.
    */
   goToBasket(id: string, from: DOMRect | null = null): void {
+    if (this.cutaway.active) {
+      this.leaveHut(() => this.goToBasket(id, from));
+      return;
+    }
     const basket = this.state.basket(id);
     const arrivals = (basket?.finds ?? []).flatMap((f): Arrival[] => {
       const bed = this.layout.beds.get(f);
@@ -554,6 +818,10 @@ export class GardenUi {
 
   /** Fly to Muse wherever it is, as the M key frames it (world.frameMuse): in front of it and a little to its left; at home, from out in front of the terrace. */
   findMuse(): void {
+    if (this.cutaway.active) {
+      this.leaveHut(() => this.findMuse());
+      return;
+    }
     this.closeCard();
     const place = this.musePlace();
     const status = this.state.status;
@@ -576,6 +844,10 @@ export class GardenUi {
   }
 
   goHome(): void {
+    if (this.cutaway.active) {
+      this.leaveHut(() => this.goHome());
+      return;
+    }
     this.closeCard();
     const R = this.world.growth.radius;
     const at = this.cottageLocal(HOME_VIEW.at[0], HOME_VIEW.at[2]);
@@ -584,6 +856,7 @@ export class GardenUi {
     this.flight.to({ dir: at, ground, distance: HOME_VIEW.distance, height: HOME_VIEW.height, aim: HOME_VIEW.at[1], from }, R, this.ground, () => {
       if (!this.state.status.home) this.toast('Muse is out exploring, and the door is shut. It’ll be back with a basket.');
       else if (!this.world.muse.home) this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
+      else this.toast('Muse is home. Tap the door to go in.');
     });
   }
 
@@ -598,6 +871,10 @@ export class GardenUi {
   // ---- travel ----------------------------------------------------------------------------------
 
   private board(invitationId: string): void {
+    if (this.cutaway.active) {
+      this.leaveHut(() => this.board(invitationId));
+      return;
+    }
     const card = this.state.postcards.find((p) => p.id === invitationId);
     if (!card?.invitation) return;
     this.mail.close();
@@ -658,6 +935,17 @@ export class GardenUi {
       travel: () => this.travelSheet.open(),
       home: (h: boolean) => this.setHome(h),
       flying: () => this.flight.flying,
+      /** Into the hut (as a knock on the door, whatever Muse is doing), out again, its state, a favourite's card. */
+      hut: () => {
+        void this.world.hut.load();
+        this.cutaway.enter();
+      },
+      outside: () => this.leaveHut(),
+      inHut: () => ({ active: this.cutaway.active, open: this.cutaway.open, shelf: this.cutaway.shelfAmount, loaded: this.world.hut.loaded, favourites: this.favourites.length }),
+      favourite: (i: number) => this.openFavourite(i),
+      shelf: () => this.cutaway.toShelf(),
+      room: () => this.cutaway.fromShelf(),
+      cutaway: this.cutaway,
       placeholder: placeholderSource,
       newest: (): Basket | undefined => this.state.baskets[0],
     };

@@ -76,12 +76,15 @@ const SHADOW = { size: 512, min: 0.9, step: 0.25, soft: 0.02 } as const;
 /**
  * What the garden's engine says Muse is doing, over its own life. `home` leaves it to its life by the hut, or, while
  * `busy` (working at home), sat on the bench with its head bowed; `out` stands it at a spot out on the planet (a unit
- * direction), stepping toward `toward` while `walk` is above 0, still with its head bowed while `busy`; `hidden` is
- * beyond the planet or away at a friend's (away: not drawn, its life keeps time). With no engine Muse lives its life.
+ * direction), stepping toward `toward` while `walk` is above 0, still with its head bowed while `busy`; `inside` stands
+ * it in its hut (the cutaway: view/cutaway.ts) on the floor there (its feet's height over R, m), facing along
+ * `heading`, looking about; `hidden` is beyond the planet or away at a friend's (away: not drawn, its life keeps time).
+ * With no engine Muse lives its life.
  */
 export type MuseDirection =
   | { readonly kind: 'home'; readonly busy: boolean }
   | { readonly kind: 'out'; readonly dir: Vector3; readonly toward: Vector3 | null; readonly walk: number; readonly busy: boolean }
+  | { readonly kind: 'inside'; readonly dir: Vector3; readonly height: number; readonly heading: Vector3 }
   | { readonly kind: 'hidden' };
 
 /** The gait out on the planet (cycles of two steps a second), at its life's pace. */
@@ -453,8 +456,20 @@ export class Muse {
     a.time = time;
     a.wave = -1;
     a.look = 1;
-    a.lookYaw = (d.busy ? 0.3 : 1) * (0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time));
-    a.lookPitch = d.busy ? BUSY_PITCH : -0.04 + 0.06 * Math.sin(0.37 * time + 2);
+    const busy = d.kind !== 'inside' && d.busy;
+    a.lookYaw = (busy ? 0.3 : 1) * (0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time));
+    a.lookPitch = busy ? BUSY_PITCH : -0.04 + 0.06 * Math.sin(0.37 * time + 2);
+    if (d.kind === 'inside') {
+      // in its hut: standing on its floor, looking about
+      r.dir.copy(d.dir);
+      r.height = d.height;
+      r.heading.copy(d.heading);
+      a.walk = 0;
+      a.stride = 1;
+      a.gait = 0;
+      r.home = true;
+      return r;
+    }
     if (d.kind === 'home') {
       // working at home: on the bench, still, head bowed over its lap
       const seat = roam.benchSeat();

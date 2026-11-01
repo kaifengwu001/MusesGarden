@@ -32,6 +32,17 @@ uniform float uRadius;
 #include <meadow_clouds>
 #include <meadow_muse_shadow>
 uniform int uKind; // 0 wall, 1 roof, 2 wood, 3 iron, 4 glass, 5 landing
+#ifdef CUTAWAY
+#include <meadow_occlude>
+uniform float uCutaway;
+varying float vLift; // gone with the roof this far (props.vert.glsl)
+
+// The cut's height over the clearing at a point of the walls (props.ts cutAt): the front and the right end low, over
+// the front's lintels; the back and the left end whole.
+float cutHeight(vec2 xz) {
+  return xz.x > -CUT_X + 0.01 && xz.y > -CUT_Z + 0.01 ? CUT_FRONT : CUT_BACK;
+}
+#endif
 
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -113,6 +124,14 @@ vec3 plaster(vec2 p, out float bloom) {
 }
 
 void main() {
+#ifdef CUTAWAY
+  // lifting off, the roof dissolves in brushed patches, and so do the walls over the cut: all gone once it is open
+  float overCut = uKind == 0 && vPaint.w < 0.5 && vLocal.y > cutHeight(vLocal.xz) ? uCutaway : 0.0;
+  float gone = max(vLift, overCut);
+  if (gone > 0.0 && 0.5 + 0.5 * gnoise(vLocal * 1.9, 990u) + 0.12 * gnoise(vLocal * 7.0, 991u) < gone * 1.45 - 0.08) discard;
+  // and what stands between the camera and Muse's shelf
+  if (screenDoor(occluded(vWorld))) discard;
+#endif
   vec3 n = normalize(vPlanetNormal);
   if (!gl_FrontFacing) n = -n;
   vec3 toCam = cameraPosition - vWorld;
@@ -133,6 +152,9 @@ void main() {
     if (!plain && !reveal) {
       // stones where the plaster has fallen away, near the corners and along the foot
       float near = 1.0 - smoothstep(0.1, 0.55, min(vPaint.y, height + 0.1) + 0.2 * brush);
+#ifdef CUTAWAY
+      near = max(near, uCutaway * (1.0 - smoothstep(0.05, 0.42, cutHeight(vLocal.xz) - vLocal.y + 0.12 * brush)));
+#endif
       float fallen = smoothstep(0.18, 0.3, gnoise(vec3(uv * 1.7, 9.3), 956u) + 0.35 * near - 0.15) * near;
       vec2 st = courses(uv, 0.22, 0.42);
       vec3 stone = mix(pal(ROW_STONE, 14), pal(ROW_STONE, 3), st.y);
@@ -155,6 +177,17 @@ void main() {
     // in shade the plaster goes an olive grey, the meadow's green bounced into it (as the painting's shaded end)
     vec3 shade = vec3(0.62, 0.68, 0.54) + pal(ROW_LIGHT, 2) * 0.08 * clamp(0.6 - dot(n, vUp), 0.0, 1.0);
     col = painted(base, sunlight(n, sun, shadow), shade);
+#ifdef CUTAWAY
+    if (plain && vLocalNormal.y > 0.7 && uCutaway > 0.0) {
+      // the chimney seen from above: hollow, its flue a dark mouth with soot round it (not a solid block)
+      vec2 q = abs(vLocal.xz - CHIMNEY_TOP.xy);
+      float edge = max(q.x, q.y);
+      float flue = 1.0 - smoothstep(CHIMNEY_TOP.z * 0.55, CHIMNEY_TOP.z * 0.6, edge);
+      float soot = 1.0 - smoothstep(CHIMNEY_TOP.z * 0.6, CHIMNEY_TOP.z * 1.05, edge + 0.04 * brush);
+      col = mix(col, col * vec3(0.42, 0.4, 0.38), soot * 0.7 * uCutaway);
+      col = mix(col, vec3(0.012, 0.01, 0.009) + vec3(0.03, 0.016, 0.006) * smoothstep(0.25, 0.0, edge / CHIMNEY_TOP.z), flue * uCutaway);
+    }
+#endif
     // the eaves' band an olive grey, deepest right under the roof, brushed along its lower edge
     float band = eave * (0.62 + 0.25 * smoothstep(EAVE.x - 0.35, EAVE.x + 0.1, height)) * (0.9 + 0.1 * gnoise(vec3(uv.x * 3.0, uv.y * 9.0, 2.2), 958u));
     col = mix(col, pal(ROW_STONE, 10) * (0.86 + 0.22 * luma(base)), band);

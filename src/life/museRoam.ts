@@ -301,7 +301,8 @@ export class MuseRoam {
   private deckAt(x: number, z: number): number | null {
     const inside = (r: { x0: number; x1: number; z0: number; z1: number }): boolean => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
     if (inside(TERRACE) || inside(PIER)) return FLOOR;
-    const run = STEPS.count * STEPS.tread;
+    // (four risers: down the three steps and off the last onto the meadow, a tread beyond it)
+    const run = (STEPS.count + 1) * STEPS.tread;
     if (x >= STEPS.x0 && x <= STEPS.x1 && z > TERRACE.z1 && z < TERRACE.z1 + run) return FLOOR * (1 - (z - TERRACE.z1) / run);
     return null;
   }

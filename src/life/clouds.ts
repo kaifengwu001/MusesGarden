@@ -448,9 +448,24 @@ interface Placed {
   distance: number;
 }
 
+/** Distance from a point to the segment a–b. */
+function segmentDistance(p: Vector3, a: Vector3, b: Vector3): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const abz = b.z - a.z;
+  const t = clamp(((p.x - a.x) * abx + (p.y - a.y) * aby + (p.z - a.z) * abz) / Math.max(abx * abx + aby * aby + abz * abz, 1e-9), 0, 1);
+  return Math.hypot(p.x - a.x - abx * t, p.y - a.y - aby * t, p.z - a.z - abz * t);
+}
+
 export class Clouds {
   /** The billboards; add to the scene. */
   readonly mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
+  /**
+   * The cutaway into Muse's hut (view/cutaway.ts): heaps within `radius` (m)
+   * of the line from the camera to the room draw back by `amount` (0 … 1), so
+   * none stands in the way while it is open. Null the rest of the time.
+   */
+  clearing: { readonly from: Vector3; readonly to: Vector3; radius: number; amount: number } | null = null;
   private readonly shadowCube: WebGLCubeRenderTarget;
   private readonly layerCube: WebGLCubeRenderTarget;
   /** The sharper window of the shadows (WINDOW), its face (-1: none yet) and size. */
@@ -764,6 +779,13 @@ export class Clouds {
       at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
       at.along.copy(slot.along).applyAxisAngle(windAxis, angle);
       at.along.addScaledVector(at.up, -at.along.dot(at.up)).normalize();
+      if (this.clearing) {
+        // the cutaway into Muse's hut: a heap near the line from the camera to the room draws back, out of the way
+        const c = this.clearing;
+        const middle = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size);
+        const reach = segmentDistance(middle, c.from, c.to) - 1.45 * at.size;
+        at.fade *= 1 - c.amount * (1 - smoothstep(c.radius, c.radius + 8, reach));
+      }
       at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
       this.order.push(at);
     }

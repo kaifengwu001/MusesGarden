@@ -17,6 +17,9 @@ export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'pins' | '
 type Flip = Extract<Reaction, { liked: boolean } | { shared: boolean }>;
 const FLIPS: readonly Flip['type'][] = ['like-find', 'like-postcard', 'share-find', 'share-interest'];
 
+/** At most this many favourites when the garden picks them itself. */
+const FAVOURITES = 12;
+
 interface Kept {
   likedFinds: string[];
   likedCards: string[];
@@ -220,6 +223,27 @@ export class GardenState {
   /** Every find in the order you browse them: newest basket first, each in Muse's order. */
   get browseOrder(): string[] {
     return this.baskets.flatMap((b) => b.finds.filter((id) => this.findIndex.has(id)));
+  }
+
+  /**
+   * Muse's favourites, on the shelf in its hut, in its order: the ones the
+   * source names; without them (no backend sends them yet) the finds Muse
+   * said something about, then one from each topic, newest first.
+   */
+  get favourites(): string[] {
+    const s = this.snapshot;
+    if (!s) return [];
+    if (s.favourites) return s.favourites.filter((id) => this.findIndex.has(id));
+    const order = this.browseOrder;
+    const picked = order.filter((id) => this.findIndex.get(id)?.note);
+    const topics = new Set(picked.map((id) => this.findIndex.get(id)?.topic));
+    for (const id of order) {
+      const topic = this.findIndex.get(id)?.topic;
+      if (picked.includes(id) || topics.has(topic)) continue;
+      topics.add(topic);
+      picked.push(id);
+    }
+    return picked.slice(0, FAVOURITES);
   }
 
   interest(id: string): Interest | undefined {
