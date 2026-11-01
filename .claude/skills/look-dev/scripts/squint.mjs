@@ -5,8 +5,9 @@
 //   node squint.mjs <reference> <render.png | target> [out.png]
 // render: a screenshot, or a target (a URL or a build name from build-at.sh) drawn at the reference's aspect from
 //   PRESET (default vista) or POSE (frame quaternion and zoom), with HASH added to "q=high&hud=0&t=12".
-// env: GRID (48x27), BANDS ("far meadow and clouds:0-9,lake and islands:9-18,near meadow:18-27", rows of the grid),
-//      W (1448, the render's width; its height follows the reference's aspect).
+// env: GRID (48x27, or 27x48 for a portrait reference), BANDS ("sky and far:0-9,middle:9-18,near:18-27", rows of
+//      the grid; thirds by default), W (the render's width: 1448, or 720 for a portrait reference; its height follows
+//      the reference's aspect).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { applyView, launch, openPage } from '../../drive-app/scripts/lib.mjs';
@@ -16,15 +17,6 @@ if (!refPath || !render) {
   console.error('usage: node squint.mjs <reference> <render.png | target> [out.png]');
   process.exit(2);
 }
-const [GW, GH] = (process.env.GRID ?? '48x27').split('x').map(Number);
-const third = Math.round(GH / 3);
-const BANDS = (process.env.BANDS ?? `far meadow and clouds:0-${third},lake and islands:${third}-${2 * third},near meadow:${2 * third}-${GH}`)
-  .split(',')
-  .map((b) => {
-    const [name, rows] = b.split(':');
-    const [y0, y1] = rows.split('-').map(Number);
-    return [name, y0, y1];
-  });
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 const dataUrl = (path) => `data:${MIME[extname(path).toLowerCase()] ?? 'image/png'};base64,${readFileSync(path).toString('base64')}`;
 
@@ -37,11 +29,22 @@ const [rw, rh] = await work.evaluate(async (src) => {
   await im.decode();
   return [im.naturalWidth, im.naturalHeight];
 }, ref);
+// the grid follows the reference's orientation (a portrait vista, like the terraces', is squinted 27 × 48)
+const portrait = rh > rw;
+const [GW, GH] = (process.env.GRID ?? (portrait ? '27x48' : '48x27')).split('x').map(Number);
+const third = Math.round(GH / 3);
+const BANDS = (process.env.BANDS ?? `top third:0-${third},middle third:${third}-${2 * third},bottom third:${2 * third}-${GH}`)
+  .split(',')
+  .map((b) => {
+    const [name, rows] = b.split(':');
+    const [y0, y1] = rows.split('-').map(Number);
+    return [name, y0, y1];
+  });
 
 let shot;
 if (existsSync(render)) shot = dataUrl(render);
 else {
-  const width = Number(process.env.W ?? 1448);
+  const width = Number(process.env.W ?? (portrait ? 720 : 1448));
   const height = Math.round((width * rh) / rw);
   const X = await openPage(browser, render, { hash: `q=high&hud=0&t=12${process.env.HASH ? `&${process.env.HASH}` : ''}`, width, height, dpr: 1 });
   await X.page.addStyleTag({ content: '#ui, .lil-gui { display: none !important; }' });

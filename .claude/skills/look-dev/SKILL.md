@@ -31,6 +31,7 @@ Kai checks closely: zoomed in, from the far side of the globe, on a 1× screen, 
 2. **Frame the comparable view.** The planet needs a camera that sees what the still sees: a `vista` preset and button.
    - Find it by search, not by hand. Rank candidate stands by how well the view's layout matches the still. The meadow casts view rays to the water table and compares water per row and per cell, then refines for clouds and flowers in frame (`src/view/vista.ts`).
    - Render it at the reference's aspect.
+   - A portrait still needs a portrait render, and often a wider field of view for that one view. On the terraces branch (not yet merged), `CameraRig.widenFov` gives a named view a wider FOV that eases away as you move, like `lookUp`. `terraces/vista.ts` searches for the terraces' vista.
 
 3. **Squint.** Shrink both to 48 × 27 cells, blur, and compare each cell in CIE Lab (mean ΔE76), overall and by band. Then read the heat map: it shows where the difference is (composition, or the colour of one material).
 
@@ -43,6 +44,8 @@ Kai checks closely: zoomed in, from the far side of the globe, on a 1× screen, 
    - The meadow's own test is `npm run squint`: goal 14, guard 26, its score in PROGRESS.md each iteration.
    - Give a new planet the same: a squint spec for its still, a goal, and a guard just above today's score, so it can't regress.
    - Put the score per band in PROGRESS.md each pass. The meadow went from 30.8 to 22.3 in the two rounds after it had the test.
+   - The script takes the grid's orientation from the reference: 48 × 27 for landscape, 27 × 48 for portrait.
+   - If the composition still and the colour reference are different pictures, squint against one target made from both: the composition still recoloured into the colour reference's palette, matching the Lab mean and spread per channel. The terraces do this (`reference/terraces/vista-target.png`, scored by `npm run squint:terraces` on their branch: goal 10, guard 18).
 
 4. **Measure colours.** Take median colours region by region from the colour reference, then grade the palette rows in linear light. Use regions that are one material each: a band of far meadow, the lake, a cloud's lit side.
 
