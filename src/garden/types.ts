@@ -131,6 +131,8 @@ export interface MuseProfile {
 
 /** Everything the garden shows, as of now. */
 export interface GardenSnapshot {
+  /** Muse's own planet, when the backend has one: its seed and growth (0..1), as the URL's `seed` and `g`. */
+  world?: { seed: number; g: number };
   muse: MuseProfile;
   interests: readonly Interest[];
   friends: readonly MuseFriend[];

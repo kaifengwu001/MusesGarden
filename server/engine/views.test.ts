@@ -16,6 +16,8 @@ const helpers: ViewHelpers = {
   soulSection: (s) => `## ${s.seed.name}`,
   journal: () => '',
   metrics: () => [],
+  localDay: (at) => new Date(at).toISOString().slice(0, 10),
+  soulBody: (soulMd) => soulMd,
 };
 
 async function setup() {

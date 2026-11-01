@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Instant, MuseId, MuseSeed, StoredEvent } from '../../src/muse/contract';
 import { openSqliteStore } from '../adapters/store/sqlite';
 import { Engine } from './engine';
@@ -122,6 +122,38 @@ describe('engine clock', () => {
         expect(open === 0 || open === 1, `${id} at seq ${e.seq}`).toBe(true);
       }
     }
+  });
+});
+
+describe('engine listeners', () => {
+  it('hear every stored event once the clock has reached it, and one that throws stops nothing', async () => {
+    const reference = await world(['moss', 'wren'], { introduce: true });
+    await reference.engine.advanceTo(at(12));
+
+    const { engine } = await world(['moss', 'wren'], { introduce: true });
+    const before = engine.log('moss' as MuseId).length;
+    const heard: StoredEvent[] = [];
+    const stopBroken = engine.subscribe(() => {
+      throw new Error('a broken listener');
+    });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const stop = engine.subscribe((events) => {
+      for (const e of events) expect(engine.now()).toBeGreaterThanOrEqual(e.event.at);
+      heard.push(...events);
+    });
+    await engine.advanceTo(at(12));
+    stop();
+    stopBroken();
+
+    expect(strip(engine.log('moss' as MuseId))).toEqual(strip(reference.engine.log('moss' as MuseId)));
+    const mossHeard = heard.filter((e) => e.museId === 'moss').map((e) => ({ seq: e.seq, ...e.event }));
+    expect(mossHeard).toEqual(strip(reference.engine.log('moss' as MuseId)).slice(before));
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
+
+    const count = heard.length;
+    await engine.advanceTo(at(24));
+    expect(heard.length, 'nothing after stop').toBe(count);
   });
 });
 

@@ -70,6 +70,7 @@ export class Engine {
   private readonly fold: Fold;
   private clockAt: Instant;
   private queue: Promise<unknown> = Promise.resolve();
+  private readonly listeners = new Set<(events: readonly StoredEvent[]) => void>();
 
   constructor(
     private readonly deps: EngineDeps,
@@ -94,6 +95,17 @@ export class Engine {
 
   log(id: MuseId): readonly StoredEvent[] {
     return this.deps.store.events(id);
+  }
+
+  /** SOUL.md as the Muse app last sent it. */
+  soulText(id: MuseId): string | null {
+    return this.deps.store.soulText(id);
+  }
+
+  /** Called after each commit with every event it stored (all Muses'), once the clock has moved; returns the way to stop. */
+  subscribe(listener: (events: readonly StoredEvent[]) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** Serializes everything that writes, so commands never interleave with the clock. */
@@ -265,9 +277,22 @@ export class Engine {
 
   private commit(tx: Tx): void {
     this.scheduleInvitationTimers(tx);
-    this.deps.store.commit(tx.batch());
+    const batch = tx.batch();
+    this.deps.store.commit(batch);
     for (const [id, s] of tx.touched()) this.states.set(id, s);
     if (tx.now > this.clockAt) this.clockAt = tx.now;
+    if (batch.events.length > 0) this.notify(batch.events);
+  }
+
+  /** The store has committed by now, so a listener that throws is logged and must not stop the clock. */
+  private notify(events: readonly StoredEvent[]): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(events);
+      } catch (err) {
+        console.error('a commit listener failed', err);
+      }
+    }
   }
 
   private async process(item: ScheduleItem): Promise<void> {

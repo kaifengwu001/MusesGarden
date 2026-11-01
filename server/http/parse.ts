@@ -1,6 +1,7 @@
 // Parsers for everything that enters over HTTP: path params, query strings and JSON bodies. Each one returns a
 // contract type or throws an HttpError with a short message. No message ever quotes the input it rejected.
 import type { IncomingMessage } from 'node:http';
+import type { Reaction } from '../../src/garden/types';
 import type { HiddenRef } from '../../src/muse/contract';
 
 export class HttpError extends Error {
@@ -106,6 +107,31 @@ function oneOf<const T extends readonly string[]>(name: string, values: T): (v: 
     if (typeof v === 'string' && values.includes(v)) return v;
     throw bad(`${name} must be one of: ${values.join(', ')}`);
   };
+}
+
+/** The Last-Event-ID an event stream reconnects with: the log seq of the last frame it read. */
+export function lastEventId(raw: string | string[] | undefined): number | null {
+  if (raw === undefined) return null;
+  if (typeof raw === 'string' && /^\d{1,15}$/.test(raw)) return Number(raw);
+  throw bad('Last-Event-ID must be a whole number');
+}
+
+const reactionType = oneOf('type', ['like-find', 'like-postcard', 'share-interest', 'use-invitation']);
+
+/** A reaction from the garden. Its id names a find, a postcard or an interest: any printable text, looked up, never parsed. */
+export function reaction(body: unknown): Reaction {
+  const type = reactionType(field(body, 'type'));
+  const raw = field(body, 'id');
+  if (typeof raw !== 'string' || !/^[^\p{Cc}]{1,256}$/u.test(raw)) throw bad('id must be text of at most 256 characters');
+  switch (type) {
+    case 'like-find':
+    case 'like-postcard':
+      return { type, id: raw, liked: flag(field(body, 'liked'), 'liked') };
+    case 'share-interest':
+      return { type, id: raw, shared: flag(field(body, 'shared'), 'shared') };
+    case 'use-invitation':
+      return { type, id: raw };
+  }
 }
 
 export const workState = oneOf('state', ['started', 'ended']);

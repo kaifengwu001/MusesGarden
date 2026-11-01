@@ -8,6 +8,7 @@ import type {
   Discovery,
   DiscoveryId,
   GardenCommands,
+  GardenFrame,
   GardenQueries,
   HiddenRef,
   Instant,
@@ -38,6 +39,7 @@ import type {
 } from '../../src/muse/contract';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { Engine } from './engine';
+import { gardenFrames, gardenSnapshot, topicLabel, type GardenInput } from './garden';
 
 /** Domain functions the views need, injected so this file depends only on the contract. */
 export interface ViewHelpers {
@@ -49,11 +51,13 @@ export interface ViewHelpers {
   readonly soulSection: (s: MuseState) => string;
   readonly journal: (s: MuseState, log: readonly StoredEvent[], day: string | null) => string;
   readonly metrics: (s: MuseState, log: readonly StoredEvent[]) => readonly MetricsRow[];
+  /** YYYY-MM-DD on the owner's clock. */
+  readonly localDay: (at: Instant, timezone: string) => string;
+  /** SOUL.md without its frontmatter. */
+  readonly soulBody: (soulMd: string) => string;
 }
 
 const SLEEP_MS = 90 * 60_000;
-
-export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
 
 export function shareCode(s: MuseState): string {
   const h = createHash('sha256').update(`share:${s.seed.id}`).digest('hex').slice(0, 4).toUpperCase();
@@ -120,8 +124,42 @@ export class Views implements GardenQueries {
     return this.engine.museIds().map((museId) => ({ museId, name: this.name(museId), role: this.roles.get(museId) ?? 'stranger' }));
   }
 
-  garden(): GardenSnapshot | null {
-    return null;
+  garden(museId: MuseId, at: Instant): GardenSnapshot | null {
+    const input = this.gardenInput(museId, at);
+    return input && gardenSnapshot(input);
+  }
+
+  /** Replays the garden events after log seq `after`, sends Muse's status, then sends what each commit brings; returns the way to stop. */
+  subscribeGarden(museId: MuseId, after: number | null, send: (frame: GardenFrame) => void): () => void {
+    const input = this.gardenInput(museId, this.engine.now());
+    if (!input) return () => undefined;
+    const missed = after === null ? [] : this.engine.log(museId).filter((e) => e.seq > after);
+    for (const frame of gardenFrames(input, missed, 'always')) send(frame);
+    return this.engine.subscribe((events) => {
+      const mine = events.filter((e) => e.museId === museId);
+      const latest = mine.length > 0 ? this.gardenInput(museId, this.engine.now()) : null;
+      if (latest) for (const frame of gardenFrames(latest, mine, 'if-moved')) send(frame);
+    });
+  }
+
+  private gardenInput(museId: MuseId, at: Instant): GardenInput | null {
+    const s = this.s(museId);
+    const now = this.now(museId, at);
+    if (!s || !now) return null;
+    const soul = this.engine.soulText(museId);
+    return {
+      s,
+      log: () => this.engine.log(museId),
+      soul: soul === null ? null : this.helpers.soulBody(soul),
+      now,
+      g: this.helpers.growth(s),
+      day: (t) => this.helpers.localDay(t, s.seed.timezone),
+      profile: (id) => {
+        const other = this.s(id);
+        return other ? this.social.publicProfile(other) : null;
+      },
+      salienceAt: this.helpers.salienceAt,
+    };
   }
 
   now(museId: MuseId, at: Instant): NowView | null {

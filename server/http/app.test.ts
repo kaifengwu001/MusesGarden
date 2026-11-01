@@ -27,6 +27,7 @@ async function serve(
     queries: { ...fakeQueries(), ...overrides.queries },
     commands: { ...fake, ...overrides.commands },
     now: overrides.now ?? (() => fake.clock().now),
+    subscribe: () => () => undefined,
   });
   const s = createServer(app);
   server = s;
