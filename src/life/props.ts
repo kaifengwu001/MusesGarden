@@ -85,6 +85,10 @@ const BASE = -(HOME_LEVEL + BANK.height + 1.8);
 type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
 /** Where the front's openings are, along it from its left end (m), the end window along the right end from its front corner. */
 const FRONT = { window: [1.32, 2.52], door: [4.6, 5.7] } as const;
+/** The bench against the front, between the window and the door (local m): its middle, its seat's half length and half depth, the seat's top over the floor. */
+export const BENCH = { x: -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12, z: OUTER.z + 0.22, half: 0.74, depth: 0.19, seat: 0.485 } as const;
+/** The house's front face (local m: z): what stands on the terrace stands clear of it. */
+export const FACE = OUTER.z;
 const END_WINDOW = [3.3, 3.85] as const;
 /** The chimney, just behind the ridge on the back slope, as in the painting: x, z (m) and half width. */
 export const CHIMNEY = { x: 0.1, z: -0.6, half: 0.29 } as const;
@@ -589,12 +593,12 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
     }
   }
   // the bench against the front, between the window and the door
-  const face = OUTER.z;
-  const bx = -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12;
-  wood.box(new Vector3(bx, FLOOR + 0.45, face + 0.22), new Vector3(0.74, 0.035, 0.19), null, FLOOR, 2);
-  wood.box(new Vector3(bx - 0.62, FLOOR + 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, FLOOR, 2);
-  wood.box(new Vector3(bx + 0.62, FLOOR + 0.23, face + 0.22), new Vector3(0.05, 0.21, 0.16), null, FLOOR, 2);
-  wood.box(new Vector3(bx, FLOOR + 0.14, face + 0.22), new Vector3(0.62, 0.025, 0.02), null, FLOOR, 2);
+  const bx = BENCH.x;
+  const bz = BENCH.z;
+  wood.box(new Vector3(bx, FLOOR + BENCH.seat - 0.035, bz), new Vector3(BENCH.half, 0.035, BENCH.depth), null, FLOOR, 2);
+  wood.box(new Vector3(bx - 0.62, FLOOR + 0.23, bz), new Vector3(0.05, 0.21, 0.16), null, FLOOR, 2);
+  wood.box(new Vector3(bx + 0.62, FLOOR + 0.23, bz), new Vector3(0.05, 0.21, 0.16), null, FLOOR, 2);
+  wood.box(new Vector3(bx, FLOOR + 0.14, bz), new Vector3(0.62, 0.025, 0.02), null, FLOOR, 2);
   // a wooden chair by the house's left corner, turned a little toward the pond
   const chair = new Matrix4().makeRotationY(0.5).setPosition(-OUTER.x - 0.55, 0, OUTER.z + 0.45);
   const part = (x: number, y: number, z: number, hx: number, hy: number, hz: number): void => {

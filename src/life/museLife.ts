@@ -18,7 +18,6 @@ import {
   WAKE,
   WAVE_LENGTH,
   YAWN_LENGTH,
-  gardenBeats,
   hopArc,
   perchBeats,
   type Move,
@@ -100,8 +99,6 @@ export interface Cues {
   /** Humming on the bench (0 … 1), being petted (s into it, < 0 for none). */
   hum: number;
   petted: number;
-  /** Each flower's bloom (0 a sprout … 1 open). */
-  bloom: number[];
 }
 
 /** Muse as its life has it at a time: where it is on the stage, which way it faces, its action for the rig, what it looks at, and the props' cues. */
@@ -137,7 +134,7 @@ function wrap(a: number): number {
 }
 
 /** ∫₀ᵘ smoothstep(a, b, x) dx. */
-function rampIntegral(u: number, a: number, b: number): number {
+export function rampIntegral(u: number, a: number, b: number): number {
   if (u <= a) return 0;
   if (u >= b) return (b - a) / 2 + (u - b);
   const x = (u - a) / (b - a);
@@ -160,7 +157,7 @@ function ease(s: number, time: number, edge = 0.7): number {
  * it goes back), the pocket's reach, and the tool in the mitten (from as it
  * comes out of the pocket until it goes back in).
  */
-function withTool(s: number, total: number): { time: number; ease: number; pocket: number; grip: number } {
+export function withTool(s: number, total: number): { time: number; ease: number; pocket: number; grip: number } {
   const back = total - s;
   const at = (x: number): number => smoothstep(0, POCKET.in, x) * (1 - smoothstep(POCKET.out, POCKET.time, x));
   return {
@@ -386,68 +383,36 @@ function headHeight(living: Living): number {
   return (seated ? 0.62 : 0.77) + living.y;
 }
 
-export class MuseLife {
-  private readonly day = buildDay();
-  /** Each segment's start in the day (s), and the gait there; the day's length. */
-  private readonly starts: number[] = [];
-  private readonly gaits: number[] = [];
-  readonly length: number;
-  /** Where the day's clock is from the caller's (s): seeking moves it. */
-  private shift = 0;
-  /** Your doings: the last tap's answer (and when), the hold (from, let go at, which side). */
+/**
+ * Your doings with Muse and its answers, layered over whatever its day has it
+ * doing (the lab's stage here, the planet in museRoam.ts). A tap and it waves
+ * (the first time in a while) or bounces for joy; a hold and it leans into
+ * your hand (held longer, its fur stands up, and it shakes it out when you
+ * let go); asleep, a tap only stirs it. While it answers it stops what it is
+ * doing, its day's clock held back (heldBack), and, standing or walking,
+ * turns to you (attending).
+ */
+export class Answers {
   private answer: { kind: 'wave' | 'bounce' | 'rouse'; at: number } | null = null;
   private lastWave = -Infinity;
   private press: { at: number; release: number; side: number } | null = null;
-  /**
-   * While it answers you it stops what it is doing (its day's clock held
-   * back) and, if it is standing or walking, turns to you: from when, until
-   * when (Infinity while you hold it); and the day it has lost to answers
-   * gone by (s).
-   */
+  /** Its attention to you: from when, until when (Infinity while you hold it); and the day it has lost to answers gone by (s). */
   private attention: { from: number; to: number } | null = null;
   private lost = 0;
-  private readonly living: Living = {
-    x: 0,
-    y: 0,
-    z: 0,
-    heading: 0,
-    action: { time: 0, walk: 0, stride: 1, gait: 0, wave: -1, lookYaw: 0, lookPitch: 0, look: 0, moves: [] },
-    lookAt: null,
-    cues: { water: null, fish: null, cook: null, sleep: null, hum: 0, petted: -1, bloom: Array.from({ length: BED.count }, () => 0) },
-  };
 
-  constructor() {
-    let t = 0;
-    let gait = 0;
-    for (const segment of this.day) {
-      this.starts.push(t);
-      this.gaits.push(gait);
-      t += segment.time;
-      gait += segment.gait;
-    }
-    this.length = t;
+  /** The day's time held back so far by answering you (s). */
+  heldBack(now: number): number {
+    return this.lost + this.attended(now);
   }
 
-  /** The day's segments by name, in order, with their starts (s): for seeking. */
-  get names(): { name: string; start: number }[] {
-    return this.day.map((s, k) => ({ name: s.name, start: this.starts[k] }));
-  }
-
-  /** Move the day on so that at time `now` it is `at` seconds into it. */
-  seek(now: number, at: number): void {
-    this.shift = at - now;
+  /** Forget the time held back (the day was moved on). */
+  reset(): void {
     this.lost = 0;
     this.attention = null;
   }
 
-  /** The day's clock at a time: the caller's, less what it has spent answering you. */
-  clock(now: number): number {
-    const t = now + this.shift - this.lost - this.attended(now);
-    return ((t % this.length) + this.length) % this.length;
-  }
-
   /** How much it is turned to you at a time (0 … 1). */
-  private attending(now: number): number {
+  attending(now: number): number {
     const a = this.attention;
     if (!a) return 0;
     return smoothstep(a.from, a.from + ATTEND.rise, now) * (1 - smoothstep(a.to - ATTEND.fall, a.to, now));
@@ -474,8 +439,7 @@ export class MuseLife {
   }
 
   /** You tapped it: asleep, it stirs; otherwise it waves if it has not for a while, else bounces for joy. */
-  tap(now: number): void {
-    const asleep = this.living.cues.sleep !== null;
+  tap(now: number, asleep: boolean): void {
     if (asleep) this.answer = { kind: 'rouse', at: now };
     else if (now - this.lastWave > WAVE_AGAIN) {
       this.answer = { kind: 'wave', at: now };
@@ -488,24 +452,127 @@ export class MuseLife {
   }
 
   /** You pressed on it (side: +1 toward its own left, where its head tilts), and let go. */
-  hold(now: number, side: number): void {
+  hold(now: number, side: number, asleep: boolean): void {
     this.press = { at: now, release: -1, side };
-    if (this.living.cues.sleep === null) this.attend(now, Infinity);
+    if (!asleep) this.attend(now, Infinity);
   }
 
-  letGo(now: number): void {
+  letGo(now: number, asleep: boolean): void {
     if (!this.press) return;
     const held = now - this.press.at;
     if (held < TAP) {
       this.press = null;
       if (this.attention && this.attention.to === Infinity) this.attention.to = now + ATTEND.rise + ATTEND.fall;
-      this.tap(now);
+      this.tap(now, asleep);
       return;
     }
     this.press.release = now;
     // (long enough for its fur to stand: it shakes it out before it turns back)
     const fluffed = held - TAP * 0.8 > PET.fluff;
     if (this.attention && this.attention.to === Infinity) this.attention.to = now + PET.out + (fluffed ? FLUFF.shake + FLUFF.settle : 0.2);
+  }
+
+  /** Close an attention that is over (each frame, after reading the clock). */
+  settle(now: number): void {
+    if (this.attention && now >= this.attention.to) {
+      this.lost += this.attended(this.attention.to);
+      this.attention = null;
+    }
+  }
+
+  /** Layer the answers over the action: the wave or the bounce for a tap, petting while you hold it, stirring in its sleep. Returns whether it looks at you. */
+  apply(now: number, a: MuseAction & { moves: Move[] }, cues: { sleep: { roused: number } | null; petted: number }): boolean {
+    const moves = a.moves;
+    let toYou = false;
+    if (this.answer) {
+      const t = now - this.answer.at;
+      // (its own wave, held back by the answer, gives way to it)
+      if (this.answer.kind !== 'rouse' && t < BOUNCE_LENGTH + WAVE_LENGTH) a.wave = -1;
+      if (this.answer.kind === 'wave' && t < WAVE_LENGTH) {
+        a.wave = t;
+        toYou = true;
+      } else if (this.answer.kind === 'bounce' && t < BOUNCE_LENGTH) {
+        moves.push({ kind: 'bounce', time: t, amount: 1 });
+        toYou = true;
+      } else if (this.answer.kind === 'rouse' && t < ROUSE) {
+        for (const m of moves) if (m.kind === 'sleep') m.roused = t;
+        if (cues.sleep) cues.sleep.roused = t;
+      }
+    }
+    if (this.press) {
+      const held = now - this.press.at;
+      const release = this.press.release >= 0 ? now - this.press.release : -1;
+      const over = release >= 0 && release > PET.out + FLUFF.shake + FLUFF.settle;
+      if (over) this.press = null;
+      else if (held > TAP * 0.8) {
+        moves.push({ kind: 'pet', time: held - TAP * 0.8, amount: 1, side: this.press.side, release });
+        cues.petted = held - TAP * 0.8;
+        toYou = !cues.sleep;
+      }
+    }
+    return toYou;
+  }
+}
+
+export class MuseLife {
+  private readonly day = buildDay();
+  /** Each segment's start in the day (s), and the gait there; the day's length. */
+  private readonly starts: number[] = [];
+  private readonly gaits: number[] = [];
+  readonly length: number;
+  /** Where the day's clock is from the caller's (s): seeking moves it. */
+  private shift = 0;
+  /** Your doings, and its answers. */
+  private readonly you = new Answers();
+  private readonly living: Living = {
+    x: 0,
+    y: 0,
+    z: 0,
+    heading: 0,
+    action: { time: 0, walk: 0, stride: 1, gait: 0, wave: -1, lookYaw: 0, lookPitch: 0, look: 0, moves: [] },
+    lookAt: null,
+    cues: { water: null, fish: null, cook: null, sleep: null, hum: 0, petted: -1 },
+  };
+
+  constructor() {
+    let t = 0;
+    let gait = 0;
+    for (const segment of this.day) {
+      this.starts.push(t);
+      this.gaits.push(gait);
+      t += segment.time;
+      gait += segment.gait;
+    }
+    this.length = t;
+  }
+
+  /** The day's segments by name, in order, with their starts (s): for seeking. */
+  get names(): { name: string; start: number }[] {
+    return this.day.map((s, k) => ({ name: s.name, start: this.starts[k] }));
+  }
+
+  /** Move the day on so that at time `now` it is `at` seconds into it. */
+  seek(now: number, at: number): void {
+    this.shift = at - now;
+    this.you.reset();
+  }
+
+  /** The day's clock at a time: the caller's, less what it has spent answering you. */
+  clock(now: number): number {
+    const t = now + this.shift - this.you.heldBack(now);
+    return ((t % this.length) + this.length) % this.length;
+  }
+
+  tap(now: number): void {
+    this.you.tap(now, this.living.cues.sleep !== null);
+  }
+
+  hold(now: number, side: number): void {
+    this.you.hold(now, side, this.living.cues.sleep !== null);
+  }
+
+  letGo(now: number): void {
+    this.you.letGo(now, this.living.cues.sleep !== null);
   }
 
   /**
@@ -536,9 +603,8 @@ export class MuseLife {
     const s = Math.min(this.day[k].time, u - this.starts[k]);
     a.gait = this.gaits[k];
     this.day[k].play(s, out, { camera, gait: this.gaits[k], start: this.starts[k] });
-    this.blooms(u);
     // turned to you while it answers you, if it is standing or walking (stepping round as it turns)
-    const w = this.attending(now);
+    const w = this.you.attending(now);
     if (w > 0 && a.moves.length === 0) {
       const toYou = Math.atan2(camera.x - out.x, camera.z - out.z);
       const turn = wrap(toYou - out.heading);
@@ -547,16 +613,13 @@ export class MuseLife {
       a.stride *= 1 - w;
       a.gait += w;
     }
-    if (this.attention && now >= this.attention.to) {
-      this.lost += this.attended(this.attention.to);
-      this.attention = null;
-    }
-    this.answers(now, out, camera);
+    this.you.settle(now);
+    if (this.you.apply(now, a, out.cues)) out.lookAt = [camera.x, camera.y, camera.z];
     // where it looks: its own way about, or at a point (its bearing from its heading, its height over its eyes)
     const idleYaw = 0.32 * Math.sin(0.47 * now + 1) + 0.14 * Math.sin(1.27 * now);
     const idlePitch = -0.04 + 0.06 * Math.sin(0.37 * now + 2);
     // (the segment and the answers set it: read afresh)
-    const look = out.lookAt as [number, number, number] | null;
+    const look = out.lookAt;
     if (look) {
       const [x, y, z] = look;
       const dx = x - out.x;
@@ -574,57 +637,5 @@ export class MuseLife {
     if (a.walk > 0.5) a.look = 0.4;
     if (out.cues.sleep || a.moves.some((m) => m.kind === 'lieBack' || m.kind === 'wake' || m.kind === 'yawn')) a.look = 0;
     return out;
-  }
-
-  /** Each flower's bloom: opened as it is watered, open after, closing for the night as Muse naps. */
-  private blooms(u: number): void {
-    const bloom = this.living.cues.bloom;
-    const garden = this.find('garden');
-    const nap = this.find('nap');
-    for (let i = 0; i < BED.count; i++) {
-      const into = u - garden.start - POCKET.time - i * GARDEN.period;
-      let b = into < 0 ? 0 : into >= GARDEN.period ? 1 : gardenBeats(into).bloom;
-      if (u > nap.start) b *= 1 - smoothstep(nap.start + 2, nap.start + nap.time - 2, u);
-      bloom[i] = b;
-    }
-  }
-
-  private find(name: string): { start: number; time: number } {
-    const k = this.day.findIndex((s) => s.name === name);
-    return { start: this.starts[k], time: this.day[k].time };
-  }
-
-  /** Your doings layered over its own: the wave or the bounce for a tap, petting while you hold it, stirring in its sleep. */
-  private answers(now: number, out: Living, camera: { x: number; y: number; z: number }): void {
-    const a = out.action;
-    const moves = a.moves;
-    let toYou = false;
-    if (this.answer) {
-      const t = now - this.answer.at;
-      // (its own wave, held back by the answer, gives way to it)
-      if (this.answer.kind !== 'rouse' && t < BOUNCE_LENGTH + WAVE_LENGTH) a.wave = -1;
-      if (this.answer.kind === 'wave' && t < WAVE_LENGTH) {
-        a.wave = t;
-        toYou = true;
-      } else if (this.answer.kind === 'bounce' && t < BOUNCE_LENGTH) {
-        moves.push({ kind: 'bounce', time: t, amount: 1 });
-        toYou = true;
-      } else if (this.answer.kind === 'rouse' && t < ROUSE) {
-        for (const m of moves) if (m.kind === 'sleep') m.roused = t;
-        if (out.cues.sleep) out.cues.sleep.roused = t;
-      }
-    }
-    if (this.press) {
-      const held = now - this.press.at;
-      const release = this.press.release >= 0 ? now - this.press.release : -1;
-      const over = release >= 0 && release > PET.out + FLUFF.shake + FLUFF.settle;
-      if (over) this.press = null;
-      else if (held > TAP * 0.8) {
-        moves.push({ kind: 'pet', time: held - TAP * 0.8, amount: 1, side: this.press.side, release });
-        out.cues.petted = held - TAP * 0.8;
-        toYou = !out.cues.sleep;
-      }
-    }
-    if (toYou) out.lookAt = [camera.x, camera.y, camera.z];
   }
 }

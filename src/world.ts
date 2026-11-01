@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, PerspectiveCamera, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
@@ -11,8 +11,8 @@ import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
-import { Muse, MUSE_HEIGHT } from './life/muse';
-import { FLOOR, Homestead } from './life/props';
+import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
+import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
 import { TerrainBake } from './planet/bake';
@@ -60,8 +60,8 @@ export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse';
  * bearing from the front toward the right end (rad).
  */
 const HOMESTEAD_VIEW = { height: 11, distance: 26, azimuth: 0.92, at: [-1.8, 2.6, 1.4] } as const;
-/** Muse's view: the camera's height over the floor Muse stands on (m), its distance (m), its bearing from straight out in front of the terrace (rad, + toward the steps), and the height it looks at (× Muse's). */
-const MUSE_VIEW = { height: 1.35, distance: 4.4, azimuth: 0.3, at: 0.55 } as const;
+/** Muse's view: the camera's height over the ground Muse stands on (m), its distance (m), its bearing round from in front of Muse (rad, + to its left; at home, from straight out in front of the terrace), and the height it looks at (× Muse's). */
+const MUSE_VIEW = { height: 1.23 * MUSE_HEIGHT, distance: 4 * MUSE_HEIGHT, azimuth: 0.3, at: 0.55 } as const;
 
 /**
  * The scene and every system in it. Each frame: growth → fade band → fields
@@ -161,6 +161,9 @@ export class World {
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
       uUserBloom: { value: this.userBlooms },
+      // Muse's body where it lies in the grass, pressing it down round it (muse.ts; grass.vert.glsl, flower.vert.glsl)
+      uMusePress: { value: Array.from({ length: PRESSES }, () => new Vector4()) },
+      uMusePressK: { value: 0 },
     };
     this.sky = new Sky();
     this.field = new FieldMap(this.shared, tier.maps.field);
@@ -177,7 +180,9 @@ export class World {
     this.muse.useModel(store.values.muse.model);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
     this.clouds.addShadowCaster(this.muse.shadowMesh);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
+    // (the float's rings on the water are the meadow's own ripples)
+    this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -241,21 +246,7 @@ export class World {
       const drop = V.height + this.terrain.height(focus) - this.terrain.cottageGround - V.at[1] + (V.distance * V.distance) / (2 * R);
       this.rig.lookUp(Math.atan2(V.distance, drop) - tilt);
     } else if (name === 'muse') {
-      // out in front of the terrace, a little toward the steps, looking at Muse's middle (where it is now on its day)
-      this.muse.update(this.clock?.time ?? 0, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, true);
-      const V = MUSE_VIEW;
-      const { x, z } = this.muse.spot;
-      const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
-      const target = travel(travel(L.cottage, across, x / R, new Vector3()), L.homeBearing, z / R, new Vector3());
-      const toCamera = L.homeBearing.clone().applyAxisAngle(L.cottage, V.azimuth);
-      const focus = travel(target, tangentToward(target, toCamera.add(target), new Vector3()), V.distance / R, new Vector3());
-      this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));
-      // (the camera's height is over Muse's floor, whatever the ground under the camera: the meadow, the bank or the pond)
-      const curve = (V.distance * V.distance) / (2 * R);
-      const zoom = this.rig.zoomForAltitude(Math.max(0.6, this.terrain.cottageGround + FLOOR + V.height + curve - this.terrain.height(focus)));
-      this.rig.setZoom(zoom, true);
-      const { tilt } = this.rig.framing(zoom);
-      this.rig.lookUp(Math.atan2(V.distance, V.height - V.at * MUSE_HEIGHT + curve) - tilt);
+      this.frameMuse();
     } else if (name === 'vista') {
       const vista = this.findVista();
       this.rig.lookAlong(vista.focus, vista.forward, immediate);
@@ -613,8 +604,40 @@ export class World {
     return Math.max(0, submitted - (this.grass.mesh.visible ? wasted : 0));
   }
 
+  /**
+   * Frame Muse (the M key): in front of it and a little to its left, wherever
+   * it is now (at home, from out in front of the terrace, a little toward the
+   * steps), looking at its middle; a view other than MUSE_VIEW's for checks.
+   */
+  frameMuse(view: Partial<typeof MUSE_VIEW> = {}): void {
+    const L = this.terrain.layout;
+    const R = this.terrain.radius;
+    this.muse.update(this.clock?.time ?? 0, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, true);
+    const V = { ...MUSE_VIEW, ...view };
+    const where = this.muse.where;
+    const target = where.dir.clone();
+    const front = this.muse.home ? tangentToward(target, L.homeBearing.clone().add(target), new Vector3()) : where.heading.clone();
+    const toCamera = front.applyAxisAngle(target, V.azimuth);
+    const focus = travel(target, toCamera, V.distance / R, new Vector3());
+    this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));
+    // (the camera's height is over the ground Muse stands on, whatever the ground under the camera: the meadow, the bank or the pond)
+    const curve = (V.distance * V.distance) / (2 * R);
+    const zoom = this.rig.zoomForAltitude(Math.max(0.6, where.height + V.height + curve - this.terrain.height(focus)));
+    this.rig.setZoom(zoom, true);
+    const { tilt } = this.rig.framing(zoom);
+    this.rig.lookUp(Math.atan2(V.distance, V.height - V.at * MUSE_HEIGHT + curve) - tilt);
+    this.posed = true;
+  }
+
   pick(ndcX: number, ndcY: number): Pick | null {
     return pickSurface(this.rig.camera, ndcX, ndcY, this.warp, this.terrain);
+  }
+
+  /** Whether a press at normalised device coordinates lands on Muse (only while it is drawn), and on which of its sides. */
+  pickMuse(ndcX: number, ndcY: number): { side: number } | null {
+    const cam = this.rig.camera;
+    const ray = new Ray(cam.position.clone(), new Vector3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize());
+    return this.muse.pick(ray, this.warp);
   }
 
   /** A gust ring bursting out from a point on the meadow. */

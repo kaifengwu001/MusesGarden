@@ -64,8 +64,8 @@ export const LIE_BACK = 1.9;
 export const WAKE = 3.6;
 /** Fishing, sitting at the water's edge (s into each catch): the cast lands, two nibbles, the bite and the yank, the fish flying out and hung, let go, waved off, the rod back. */
 export const FISH = { period: 15, cast: [0, 1.3], nibble: [6.4, 7.0], bite: 7.6, fly: [7.8, 8.6], cheer: [8.4, 10.0], free: 10.8, bye: [11.2, 12.6] } as const;
-/** Watering flowers (s into each): the can tipped and poured, the flower opening, the joy at it, a sniff. */
-export const GARDEN = { period: 12, pour: [0.7, 4.5], bloom: [4.4, 5.2], joy: [5.4, 7.2], smell: [7.7, 10.4] } as const;
+/** Watering (s into each pour): the can tipped and poured, then a content look at it. */
+export const GARDEN = { period: 7.5, pour: [0.6, 4.4], glad: [4.7, 6.6] } as const;
 /** Cooking (s into each taste): stirring (turns a second), the ladle up to its mouth, blown on, sipped, the yum, back to the pot. */
 export const COOK = { period: 12, rate: 0.7, lift: [6.8, 7.6], blow: [7.6, 8.5], sip: [8.5, 9.1], yum: [9.1, 10.8], back: [10.8, 11.6] } as const;
 
@@ -124,6 +124,8 @@ export interface Move {
   ease?: number;
   /** Asleep: how long since a tap stirred it (s; < 0 for none). */
   roused?: number;
+  /** Sitting down, fishing and getting up on a ledge's edge (the pier's) with the legs hanging over it, not on the ground with them out in front. */
+  edge?: boolean;
 }
 
 export interface MuseAction {
@@ -247,14 +249,13 @@ export function fishBeats(t: number): { cast: number; dip: number; yank: number;
   return { cast, dip, yank, fish, free: u < FISH.cast[1] ? 0 : free };
 }
 
-/** Where watering is at (s): the can tipped (0 … 1), water pouring, the flower opening (0 a sprout … 1 open), and which flower (the count of waterings). */
-export function gardenBeats(t: number): { tip: number; pour: number; bloom: number; flower: number } {
+/** Where watering is at (s): the can tipped (0 … 1), water pouring, and which pour (the count of them). */
+export function gardenBeats(t: number): { tip: number; pour: number; flower: number } {
   const n = Math.floor(t / GARDEN.period);
   const u = t - n * GARDEN.period;
   const tip = during(GARDEN.pour[0], GARDEN.pour[0] + 0.6, GARDEN.pour[1] - 0.4, GARDEN.pour[1] + 0.2, u);
   const pour = during(GARDEN.pour[0] + 0.4, GARDEN.pour[0] + 0.7, GARDEN.pour[1] - 0.4, GARDEN.pour[1], u);
-  const bloom = smoothstep(GARDEN.bloom[0], GARDEN.bloom[1], u);
-  return { tip, pour, bloom, flower: n };
+  return { tip, pour, flower: n };
 }
 
 /** Where cooking is at (s): the stirring's turn (rad), the ladle at its mouth (0 … 1), blowing on it. */
@@ -505,11 +506,11 @@ export class MuseRig {
       case 'hopDown':
         return this.hopDown(t, k);
       case 'plop':
-        return this.plop(t, k);
+        return this.plop(t, k, mv.edge === true);
       case 'sit':
         return this.sit(t, k, e);
       case 'rise':
-        return this.rise(t, k);
+        return this.rise(t, k, mv.edge === true);
       case 'lieBack':
         return this.lieBack(t, k);
       case 'sleep':
@@ -517,7 +518,7 @@ export class MuseRig {
       case 'wake':
         return this.wake(t, k);
       case 'fish':
-        return this.fish(t, k, e);
+        return this.fish(t, k, e, mv.edge === true);
       case 'water':
         return this.water(t, e);
       case 'stir':
@@ -855,11 +856,12 @@ export class MuseRig {
     for (const side of [1, -1]) this.armBy(side, -0.3 * lean * k, 0, (0.5 * air + 0.3 * land) * k, 0.2 * air * k);
   }
 
-  /** Down onto the ground: a little bob, the bottom dropping, the legs swinging out, a bump. */
-  private plop(t: number, k: number): void {
+  /** Down onto the ground (or a ledge's edge): a little bob, the bottom dropping, the legs swinging out (or over), a bump. */
+  private plop(t: number, k: number, edge: boolean): void {
     const J = JOINT;
     const s = Math.max(0, Math.min(1, (t - 0.3) / 0.32));
-    this.sitBase(s * s * k);
+    if (edge) this.perchBase(s * s * k);
+    else this.sitBase(s * s * k);
     const bob = hump(0, 0.3, t);
     const bump = hump(0.6, 0.8, t);
     this.stretch += (-0.05 * bob - 0.12 * bump + 0.03 * hump(0.78, PLOP, t)) * k;
@@ -874,11 +876,12 @@ export class MuseRig {
     this.addTurn(J.pelvis, 0, 0, 0.03 * Math.sin(TAU * 0.3 * t) * e);
   }
 
-  /** Up off the ground: leaning forward onto its hands, pushing up, a little hop onto its feet. */
-  private rise(t: number, k: number): void {
+  /** Up off the ground (or a ledge's edge): leaning forward onto its hands, pushing up, a little hop onto its feet. */
+  private rise(t: number, k: number, edge: boolean): void {
     const J = JOINT;
     const sat = 1 - smoothstep(0.35, 0.85, t);
-    this.sitBase(sat * k);
+    if (edge) this.perchBase(sat * k);
+    else this.sitBase(sat * k);
     const lean = during(0, 0.35, 0.7, 0.95, t);
     const hop = hump(0.8, 0.98, t);
     const land = hump(0.98, RISE, t);
@@ -935,10 +938,11 @@ export class MuseRig {
 
   // ---- its pastimes ----
 
-  /** Fishing from the ground: the rod in its right mitten, cast, the float watched, a bite yanked, the fish cheered and let go and waved off. */
-  private fish(t: number, k: number, e: number): void {
+  /** Fishing from the ground (or a ledge's edge, the legs hanging over): the rod in its right mitten, cast, the float watched, a bite yanked, the fish cheered and let go and waved off. */
+  private fish(t: number, k: number, e: number, edge: boolean): void {
     const J = JOINT;
-    this.sitBase(k);
+    if (edge) this.perchBase(k);
+    else this.sitBase(k);
     const u = ((t % FISH.period) + FISH.period) % FISH.period;
     const { yank, fish, dip } = fishBeats(t);
     // the cast: back over the shoulder, then forward
@@ -962,26 +966,19 @@ export class MuseRig {
     this.express(bye * e, { smile: 0.9, blush: 0.3 });
   }
 
-  /** Watering a flower with a can in its right mitten: poured, the flower opening, a little hop of joy, a sniff of it. */
+  /** Watering the meadow with a can in its right mitten: poured over the plants ahead of it, then a content look at them. */
   private water(t: number, e: number): void {
     const J = JOINT;
     const n = Math.floor(t / GARDEN.period);
     const u = t - n * GARDEN.period;
     const { tip } = gardenBeats(t);
-    const joy = during(GARDEN.joy[0], GARDEN.joy[0] + 0.2, GARDEN.joy[1] - 0.3, GARDEN.joy[1], u);
-    const smell = during(GARDEN.smell[0], GARDEN.smell[0] + 0.6, GARDEN.smell[1] - 0.6, GARDEN.smell[1], u);
-    const gasp = hump(GARDEN.bloom[0], GARDEN.bloom[1] + 0.3, u);
-    // the can held out over the flower, lifted a little as it pours
-    this.reachFor(-1, CAN.x, CAN.y + 0.04 * tip, CAN.z + 0.03 * tip, -1, e * (1 - 0.6 * smell));
-    this.addTurn(J.spine, (0.06 * tip + 0.16 * smell) * e, 0, 0);
-    this.addTurn(J.chest, (0.04 * tip + 0.14 * smell) * e, 0, 0);
-    this.addTurn(J.head, (0.06 * tip + 0.1 * smell - 0.12 * gasp) * e, 0, 0.05 * Math.sin(TAU * 2.5 * u) * smell * e);
-    // hopping for joy, the free arm flung up
-    this.addShift(J.root, 0, 0.05 * Math.abs(Math.sin(TAU * 1.6 * (u - GARDEN.joy[0]))) * joy * e, 0);
-    this.waveArm(1, 0.7 * joy * e, 0.5 * Math.sin(TAU * 3 * u) * joy);
-    this.express(gasp * e, { eyes: 1, smile: 0.2 });
-    this.express(joy * e, { squint: 1, smile: 1, blush: 0.5 });
-    this.express(smell * e, { squint: -1, smile: 0.8, blush: 0.6 });
+    const glad = during(GARDEN.glad[0], GARDEN.glad[0] + 0.4, GARDEN.glad[1] - 0.5, GARDEN.glad[1], u);
+    // the can held out over the plants, lifted a little as it pours
+    this.reachFor(-1, CAN.x, CAN.y + 0.04 * tip, CAN.z + 0.03 * tip, -1, e);
+    this.addTurn(J.spine, 0.06 * tip * e, 0, 0);
+    this.addTurn(J.chest, 0.04 * tip * e, 0, 0);
+    this.addTurn(J.head, (0.06 * tip + 0.04 * glad) * e, 0, 0.06 * glad * e);
+    this.express(glad * e, { squint: -1, smile: 0.7 });
   }
 
   /** Stirring a pot with a ladle in its right mitten, swaying with it; now and then a taste: the ladle to its mouth, blown on, sipped, and a shiver of yum. */

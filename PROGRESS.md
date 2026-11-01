@@ -35,13 +35,19 @@ the meadow. Kai's notes (2026-10-31); this table fills in as they are done.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Muse roams the planet at random and starts its activities where it is, more often close to its hut | |
-| 2 | Some things have fixed places, like the bench (the terrace's) | |
-| 3 | Watering plants anywhere about the meadow, not over a flower bed; no new flower growing, no sniffing it | |
-| 4 | Cooking on the hut's front porch, at a little stove kept there (for now; later the house gets an inside and a kitchen) | |
-| 5 | Fishing: usually off the pier's end, sometimes from a shore it has wandered to | |
-| 6 | As in the lab: asleep in the grass (pressing it down only where it lies), taps and holds on Muse | |
-| 7 | M frames Muse, as now (the camera does not follow it) | |
+| 1 | Muse roams the planet at random and starts its activities where it is, more often close to its hut | src/life/museRoam.ts: a life drawn from the planet's seed, outing after outing (wander and look about, sometimes sitting down in the grass; water the plants; the bench; the stove; fishing; a nap; resting on the porch), written out lazily as time runs on and read back by time, so a frozen time still finds one Muse. Places out in the meadow are random, most within 10–20 m of the hut (5 + 60·u³ m), dry, not steep, reachable. Walks go straight over the meadow (never through water or the homestead), up and down the porch steps, along the porch, out along the pier. Tested for an hour of it at R 40, 128 and 400: never in water or the house, no jumps, every pastime done, the same for the same planet and time. |
+| 2 | Some things have fixed places, like the bench (the terrace's) | The terrace's bench (props.ts now exports it): it walks up the steps and along the porch, hops up onto it with its back to the house, swings its legs and hums, hops down. |
+| 3 | Watering plants anywhere about the meadow, not over a flower bed; no new flower growing, no sniffing it | The watering move is now pour, then a content look (∪ eyes, a small nod), three times, shuffling along to its right between (or its left, or not at all, wherever the ground is dry); the water falls on the grass before it. The lab's flower bed no longer grows or sparkles either. |
+| 4 | Cooking on the hut's front porch, at a little stove kept there (for now; later the house gets an inside and a kitchen) | A little iron stove on the porch (in front of the window, by the front edge), its fire glowing through a window in front while Muse cooks (embers otherwise), a pot of soup on top, steam. Muse stands behind it facing out, the ladle out of its pocket, stirring and tasting. |
+| 5 | Fishing: usually off the pier's end, sometimes from a shore it has wandered to | Seven times in ten off the pier's front edge: it sits down on the edge with its legs over the water (new: the edge variants of sitting down, fishing and getting up). Otherwise from the home pond's bank, wherever it can be reached dry, sitting in the grass facing the water. The float's landing, the nibbles, the bite and the fish dropped back each make the meadow's own ripple rings. |
+| 6 | As in the lab: asleep in the grass (pressing it down only where it lies), taps and holds on Muse | Grass and flowers are pressed down and parted round its body only while it lies (musePress.glsl, read by grass.vert.glsl and flower.vert.glsl). A press on Muse, while it is drawn, is Muse's (main.ts): a tap answers, a hold pets it; double taps on it are taps; the meadow's click, double-click and hold go on everywhere else. While it answers, its life is held back and it turns to you. |
+| 7 | M frames Muse, as now (the camera does not follow it) | M frames Muse wherever it is: from in front of it and a little to its left, or at home from out in front of the terrace. World.frameMuse takes another view for checks. |
+| 8 | Muse looks a bit small in the meadow: 1.5 times larger | 1.65 m (was 1.1), its fur 6 cm (was 4): the same plush, scaled. Its pace is in its own heights, so it waddles at 0.54 m/s. |
+
+For the garden's interfaces (that session asked): world.muse.where (direction, height, heading, kept current while not drawn), world.muse.home, world.muse.away (not drawn, no shadow, not tappable; its life keeps time).
+
+Known: the GPU invariant "scrubbing growth in real time stays within the frame budget" fails on this machine now, frame p95 33.4 ms, exactly 30 fps. It fails the same way at 86dadbd, which passed it earlier the same day, so it is the machine (another session's GPU load), not this work. To run again on a quiet machine.
+
 
 ## The garden's interfaces (in progress, alongside iteration 16)
 

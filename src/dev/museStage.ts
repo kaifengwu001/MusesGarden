@@ -49,7 +49,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { smoothstep } from '../core/math';
 import { JOINT } from '../life/museBody';
 import { BED, BENCH, CAST, FIRE, MuseLife, POND, flowerAt, type Living } from '../life/museLife';
-import { COOK, FISH, GARDEN, POT, STIR, cookBeats, fishBeats, gardenBeats, sleepBeats, type MuseRig } from '../life/museRig';
+import { COOK, FISH, POT, STIR, cookBeats, fishBeats, gardenBeats, sleepBeats, type MuseRig } from '../life/museRig';
 
 // The Muse lab's stage (museLab.html#live=1&stage=1): a round lawn in a
 // pale sky where Muse lives its little day (museLife.ts) among the things
@@ -502,6 +502,14 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
       return p;
     });
     f.add(stem, ...leaves, head);
+    // grown and open (watering grows nothing)
+    stem.scale.set(1, 0.32, 1);
+    leaves[0].position.set(0.03, 0.08, 0);
+    leaves[0].rotation.z = 0.5;
+    leaves[1].position.set(-0.03, 0.11, 0);
+    leaves[1].rotation.z = -0.5;
+    leaves.forEach((leaf) => leaf.scale.setScalar(1.2));
+    head.position.y = 0.32;
     const at = flowerAt(i);
     f.position.set(at.x, SOIL, at.z);
     scene.add(f);
@@ -673,9 +681,7 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
   const hearts = Array.from({ length: 3 }, () => riser(heartMaterial, 0.13));
   const noteMaterial = new SpriteMaterial({ map: glyph('♪', '#8a6fd0'), transparent: true, depthWrite: false });
   const notes = Array.from({ length: 3 }, () => riser(noteMaterial, 0.14));
-  const sparkMaterial = new SpriteMaterial({ map: glyph('✦', '#ffd34d'), transparent: true, depthWrite: false });
-  const sparks = Array.from({ length: 5 }, () => riser(sparkMaterial, 0.08));
-  for (const s of [...zs, ...hearts, ...notes, ...sparks]) scene.add(s);
+  for (const s of [...zs, ...hearts, ...notes]) scene.add(s);
 
   // still props' shadows: the bench's seat, the bed, the pot
   const still: Vector4[] = [
@@ -854,34 +860,8 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
       drops.setMatrixAt(i, m);
     }
     drops.instanceMatrix.needsUpdate = true;
-    // the flowers: sprouts growing into flowers as they open
-    flowers.forEach((f, i) => {
-      const b = cues.bloom[i];
-      const g = 0.35 + 0.65 * smoothstep(0, 0.6, b);
-      f.stem.scale.set(1, 0.08 + 0.24 * g, 1);
-      f.leaves[0].position.set(0.03, 0.03 + 0.05 * g, 0);
-      f.leaves[0].rotation.z = 0.5;
-      f.leaves[1].position.set(-0.03, 0.05 + 0.06 * g, 0);
-      f.leaves[1].rotation.z = -0.5;
-      f.leaves.forEach((leaf) => leaf.scale.setScalar(0.6 + 0.6 * g));
-      f.head.position.y = 0.08 + 0.24 * g;
-      const open = smoothstep(0.3, 1, b);
-      f.head.scale.setScalar(0.3 + 0.7 * smoothstep(0, 0.5, b));
-      f.petals.forEach((p) => {
-        p.scale.setScalar(Math.max(0.001, open * (1 + 0.15 * Math.sin(Math.PI * smoothstep(0.6, 1, b)))));
-        p.rotation.z = (1 - open) * 1.2;
-      });
-      f.group.rotation.z = 0.04 * Math.sin(t * 1.3 + i * 2);
-    });
-    // sparkles round a flower as it opens
-    const opening = w ? smoothstep(GARDEN.bloom[0], GARDEN.bloom[1], w.time % GARDEN.period) * (1 - smoothstep(GARDEN.bloom[1] + 0.8, GARDEN.bloom[1] + 1.6, w.time % GARDEN.period)) : 0;
-    sparks.forEach((s, k) => {
-      const v = rise(t, k, sparks.length, 1.1);
-      const a = (k / sparks.length) * Math.PI * 2 + t;
-      s.visible = opening > 0.02;
-      s.position.set(flower.x + 0.12 * Math.cos(a), SOIL + 0.3 + 0.2 * v, flower.z + 0.12 * Math.sin(a));
-      s.material.opacity = opening * Math.sin(Math.PI * v);
-    });
+    // the flowers, swaying a little
+    flowers.forEach((f, i) => (f.group.rotation.z = 0.04 * Math.sin(t * 1.3 + i * 2)));
 
     // the ladle: out of its pocket into the right mitten while it cooks, its handle from the mitten down to its bowl going
     // round in the pot, or (tasting) up from the mitten to the bowl before its mouth; back into the pocket after

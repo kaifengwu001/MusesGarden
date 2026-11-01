@@ -12,6 +12,7 @@ uniform float uRadius;
 #include <meadow_rest>
 #include <meadow_field>
 #include <meadow_wind>
+#include <meadow_muse_press>
 
 attribute float aPart; // 0 stem, 1 petal, 2 centre
 attribute float aT;    // along the stem 0..1; 1 on the head
@@ -83,6 +84,8 @@ void main() {
   vec3 bend = windPlant(dir, wind.xyz, rnd(seed, 5.0), 1.1 + 0.4 * rnd(seed, 6.0));
   float stemTop = uFlowerFade.z;
   vec3 base = dir * (uRadius + f.x - 0.02);
+  // pressed down and parted where Muse lies in the grass
+  stemScale *= 1.0 - 0.6 * musePress(base, up, stemTop * stemScale, bend);
   vec3 local = position;
   vec3 world;
   if (aPart < 0.5) {

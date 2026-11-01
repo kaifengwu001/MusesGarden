@@ -10,6 +10,7 @@ uniform float uRadius;
 #include <meadow_rest>
 #include <meadow_field>
 #include <meadow_wind>
+#include <meadow_muse_press>
 
 uniform sampler2D uPool;     // per blade, a page a row: direction xyz, ln birth threshold
 uniform sampler2D uPoolRest; // per blade: its seed in [0, 1), four to a texel
@@ -81,6 +82,8 @@ void main() {
   vec3 bend = windPlant(dir, wind.xyz, rnd(seed, 3.0), 0.8 + 0.5 * rnd(seed, 4.0));
   vec3 lean = (t1 * (rnd(seed, 5.0) - 0.5) + t2 * (rnd(seed, 6.0) - 0.5)) * 0.35;
   vec3 tip = bend + lean;
+  // pressed down and parted where Muse lies in it
+  h *= 1.0 - 0.55 * musePress(base, up, h, tip);
   float bl = length(tip);
   vec3 p = base + up * (h * y * (1.0 - 0.32 * min(bl * bl, 1.2) * y)) + side * (w * position.x) + tip * (h * y * y);
 
