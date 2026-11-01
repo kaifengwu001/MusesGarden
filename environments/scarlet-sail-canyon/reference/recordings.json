@@ -1,0 +1,56 @@
+{
+  "recordedAt": "2026-11-01T08:02:50.906Z",
+  "baseURL": "http://localhost:5227",
+  "sourceRevision": "cd00b018c1b33947bdce427c66b48a32d205c7f3",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "quality": "high",
+  "frozenTime": false,
+  "captures": [
+    {
+      "file": "settlement-tour.mp4",
+      "durationSeconds": 20.0,
+      "chapters": [
+        {
+          "view": "Shelter",
+          "startSeconds": 0
+        },
+        {
+          "view": "Three Sails",
+          "startSeconds": 6.091
+        },
+        {
+          "view": "Whole planet",
+          "startSeconds": 12.179
+        }
+      ],
+      "browserErrors": []
+    },
+    {
+      "file": "native-life.mp4",
+      "durationSeconds": 26.96,
+      "chapters": [
+        {
+          "view": "Observe Chalkstep",
+          "startSeconds": 0
+        },
+        {
+          "view": "Observe Fern Sifter",
+          "startSeconds": 7.355
+        },
+        {
+          "view": "Observe Dewwing",
+          "startSeconds": 13.935
+        },
+        {
+          "view": "Meet Pip",
+          "startSeconds": 22.875
+        }
+      ],
+      "browserErrors": []
+    }
+  ],
+  "sourceNote": "Base commit plus byte-identical find shader isolation; captured before the media packaging commit."
+}

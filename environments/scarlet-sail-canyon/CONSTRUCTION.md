@@ -22,6 +22,8 @@ The [reference handoff](../../docs/planet-reference-handoff.md) records why the 
 
 Shared mathematical helpers, model assets, renderer services and the backend contract are imported from `src/`. Changing a world-specific use of those modules requires copying it into this environment first. Do not modify `src/` to tune the canyon.
 
+The saved-find renderer also keeps its four shader dependencies locally: `life/findForm.glsl`, `findForm.vert.glsl`, `findSphere.frag.glsl` and `findSphere.vert.glsl`. They match this environment's packed form attributes. The newer meadow uses a different find-table interface; mixing its shaders with the canyon's old buffers can compile TypeScript yet fail at runtime. Migrate that renderer as a complete interface if adopting the newer system.
+
 ## Ground contract
 
 Ground stays above the base sphere. `Terrain.sample()` returns a finite `water = 1000` sentinel, `depth = 0` and `wet = 0`; placement expects positive distance from water, so using zero would incorrectly reject dry sites. The sentinel is exactly representable by the half-float field maps.

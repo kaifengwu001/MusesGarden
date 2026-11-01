@@ -4,7 +4,7 @@ A standalone, playable world for Muse and three local neighbours: Pip, Juniper a
 
 This environment starts from `muse-agent` commit `fb21a13`. All world-specific rendering and behaviour live here; the shared meadow and other environments keep their own entry points. See [construction notes](CONSTRUCTION.md) and the [environment rules](../README.md).
 
-For another planet or a context reset, read [Building planets that match their concept art](../../docs/planet-reference-handoff.md). It records failed attempts, their causes, the corrective workflow and active issues. The [primary concept](reference/primary-concept.png) and [creature sheet](reference/creatures.png) are preserved with this environment.
+For another planet or a context reset, read [Building planets that match their concept art](../../docs/planet-reference-handoff.md). It records failed attempts, their causes, the corrective workflow and active issues. The [reference pack](reference/README.md) indexes the original concept, expanded world and creature sheets, actual screenshots, screen recordings and important documentation.
 
 ## Open
 
@@ -43,7 +43,8 @@ Invitation travel currently offers a clearly labelled **canyon route preview**. 
 
 ## Isolation
 
-This canyon is in the `planet/scarlet-standalone` branch at
+This canyon was developed in the `planet/scarlet-standalone` branch at
 `/Users/yimingguan/muse_garden_1031/scarlet-canyon-standalone-01a19427`.
 The original `scarlet-sail-canyon-worktree` checkout is also used by parallel planet chats and is not this delivery.
 The canyon has a separate Vite cache and port. Nothing under shared `src/` was changed.
+After integration into `main`, the same commands work from another isolated checkout. Use a different free port when the original preview is still running.

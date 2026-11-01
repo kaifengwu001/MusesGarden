@@ -13,6 +13,10 @@ Checked in the isolated `planet/scarlet-standalone` checkout on 1 November 2026.
 - Fresh actual-app captures are under `shots/scarlet-sail-canyon/`. Selected review checkpoints are preserved under `reference/` beside the original concept and creature sheet.
 - Shared `src/` has no changes. The environment, development port, storage keys, Vite cache and production output remain separate.
 
+## Saved review material
+
+The [reference pack](reference/README.md) includes the original concept, expanded world sheet, creature sheet, four actual-app screenshots and two live browser recordings. The settlement tour visits the shelter, Three Sails and globe; the ecology recording shows all three native animal families and Pip. Capture metadata is saved alongside them. Both recording sessions completed without captured runtime or shader errors. Their source is the corrected renderer plus byte-identical local copies of its four find shaders, isolated before integration with the newer meadow renderer.
+
 ## Rendering consistency and limits
 
 All three frozen-frame determinism checks pass after correcting derivative use in the chalk shader: repeated loads, consecutive frozen redraws, and growth 0.3 → 0.7 → 0.3. The original integrated run failed these checks because `fwidth` was evaluated inside non-uniform fracture branches. Computing the footprint before branching fixed the root cause without changing the tests. Together with terrain, residents and ecology, 15 focused browser checks pass.
