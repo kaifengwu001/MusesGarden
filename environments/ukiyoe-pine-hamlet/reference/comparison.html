@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ukiyo-e Hamlet — reference and app</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3eddd;color:#263e4d;font:16px/1.55 Georgia,serif}main{max-width:1500px;margin:auto;padding:36px 24px 70px}h1{font-weight:400;font-size:38px;line-height:1.15;margin:10px 0}h2{font-weight:400;margin-top:40px}p{max-width:850px}a{color:#335e79}nav{display:flex;gap:20px;margin:24px 0;font:14px system-ui}section{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{margin:0;background:#e8e1d0;border:1px solid #263e4d20}img{width:100%;display:block}figcaption{padding:10px 14px;font:13px/1.5 system-ui}.note{font:14px/1.6 system-ui;color:#53636b}.extra{grid-template-columns:repeat(3,1fr)}@media(max-width:800px){section,.extra{grid-template-columns:1fr}h1{font-size:30px}}
+</style>
+<main>
+<p class="note">MUSE’S UKIYO-E HAMLET · 1 NOVEMBER 2026</p>
+<h1>From the print to a living planet</h1>
+<p>A playable 3D interpretation of the approved snow and rain studies. The captures below come from the running app. The concept images are shown separately for comparison.</p>
+<nav><a href="http://localhost:5237/environments/ukiyoe-pine-hamlet/">Open the planet</a><a href="../VALIDATION.md">Validation record</a><a href="../CONSTRUCTION.md">Construction notes</a></nav>
+<h2>Snowy homestead</h2>
+<section><figure><img src="01-muse-snowy-homestead.png" alt="Approved snowy homestead concept"><figcaption>Reference · composition, materials and inhabitants</figcaption></figure><figure><img src="checkpoint-home.png" alt="Actual app snowy homestead"><figcaption>Actual app · Home view, frozen at t = 12</figcaption></figure></section>
+<h2>The same place in rain</h2>
+<section><figure><img src="03-muse-rainy-homestead.png" alt="Approved rainy homestead concept"><figcaption>Reference · rain study</figcaption></figure><figure><img src="checkpoint-rain.png" alt="Actual app hamlet in rain"><figcaption>Actual app · the same terrain, buildings and paths</figcaption></figure></section>
+<h2>Walkable world, recognisable Muse</h2>
+<section class="extra"><figure><img src="checkpoint-bridge.png" alt="Actual app bridge"><figcaption>Arched bridge with matching movement support</figcaption></figure><figure><img src="checkpoint-muse.png" alt="Actual app Muse"><figcaption>Muse and local neighbours</figcaption></figure><figure><img src="checkpoint-planet.png" alt="Actual app planet overview"><figcaption>Seeded forests extend around the sphere</figcaption></figure></section>
+<h2>What changed during the build</h2>
+<section><figure><img src="first-pass/home.png" alt="Failed first pass with sparse foliage and pale timber"><figcaption>First pass · sparse needles, floating snow plates, pale timber and jagged water</figcaption></figure><figure><img src="checkpoint-home-ui.png" alt="Latest actual app with controls"><figcaption>Current build · fuller pines, supported snow, darker timber, independent level water and functional controls</figcaption></figure></section>
+<p class="note">Remaining visual gap: this is stylised 3D, with simpler foliage, geology and line work than the illustration. Some small shoreline facets remain. The two neighbours are saved local inhabitants; live friend-account presence requires backend integration. Passing checks does not imply user acceptance of the art.</p>
+</main></html>
