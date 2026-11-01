@@ -1,6 +1,8 @@
+import { readdirSync, existsSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
 // MEADOW_PORT: a checkout of its own, so a server from another checkout on 5199 is never reused by mistake.
+const environments = existsSync('environments') ? readdirSync('environments').filter(name => existsSync(`environments/${name}/dev`)) : [];
 const PORT = Number(process.env.MEADOW_PORT ?? 5199);
 
 // Headless Chromium on macOS can render through the real GPU (ANGLE on Metal),
@@ -30,6 +32,7 @@ export default defineConfig({
     { name: 'shots', testMatch: /shots\.spec\.ts/ },
     { name: 'invariants', testMatch: /invariants\.spec\.ts/ },
     { name: 'squint', testMatch: /squint\.spec\.ts/ },
+    ...environments.flatMap(name => ['invariants', 'lock', 'residents', 'ecology'].map(suite => ({ name: `${name}:${suite}`, testDir: `./environments/${name}/dev`, testMatch: new RegExp(`${suite}\\.spec\\.ts$`) }))),
   ],
   webServer: {
     command: `npx vite --port ${PORT} --strictPort`,

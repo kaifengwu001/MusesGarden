@@ -1,0 +1,57 @@
+# Environments
+
+Each folder here is a world of its own, beside the meadow. The meadow, "Muse's
+Garden", lives in `src/` and stays exactly as it is: no world is made by editing
+or refactoring it.
+
+## How a world is made
+
+`npm run new-environment -- <name> --title "<Title>"` creates
+`environments/<name>/`. It holds:
+
+- **Copies of the meadow's world-specific modules.** These are modules that
+  hold the meadow's content (colours, field recipe, flowers, the cottage, Muse's
+  day on its terrace, parameters, wording), or that import one of those, even
+  only as a type. The list is `COPIED` in `scripts/new-environment.ts`. Files
+  keep their paths from `src/`, so imports between copies stay as written.
+- **Imports of everything else from `src/`, unchanged.** That covers the engine:
+  the cube-sphere, point sets, growth, CDLOD, the warp, scatter, clouds, post,
+  the camera, Muse's body and rig, and every shader file not copied. The
+  scaffolder rewrites those imports to point into `src/`.
+- **Its own page** (`index.html`), a build config (`vite.config.ts`), copies of
+  the meadow's tests that cover copied modules, and a `README.md`.
+
+A new world starts as a faithful copy: on the day it is made, its frames match
+the meadow's byte for byte. From then on, it changes only inside its folder.
+
+## Rules
+
+- Never edit `src/` for a world. When a world needs a shared file to differ,
+  copy that file into its folder at the same relative path and repoint the
+  import in the world's copy.
+- Shader chunks keep their `meadow_` names (`meadow_terrain`, `meadow_paint`,
+  `meadow_water`, `meadow_fields`, `meadow_toon`). The shared shader files in
+  `src/` include them by those names. Each world's `render/glsl.ts` registers
+  its own copies under the same names, so in that world's page the shared
+  shaders compile against the world's chunks.
+- The test harness global stays `window.__meadow`, so the copied specs work
+  unchanged.
+
+## Running, testing and building a world
+
+| | Command |
+|---|---|
+| Open | `npm run dev`, then `http://localhost:5173/environments/<name>/` |
+| Type check and lint | `npm run check` (covers `environments/`) |
+| CPU tests | `npm test` (covers `environments/**/*.test.ts`) |
+| Browser invariants | `npx playwright test --project=<name>:invariants` |
+| Frame lock | `npx playwright test --project=<name>:lock` (writes `shots/<name>/lock/`; set `LOCK_BASELINE=<hashes.json>` to compare) |
+| Build | `npx vite build --config environments/<name>/vite.config.ts` (to `dist-environments/<name>/`) |
+
+The meadow keeps its own commands (`npm run dev` at `/`, `npm run build`) and its own build output (`dist/`). Each world's `README.md`
+records the meadow commit it was copied from.
+
+
+## World in this checkout
+
+[Scarlet Sail Canyon](scarlet-sail-canyon/README.md) is served on port 5227. Its code, build output and resident storage are independent of the original meadow.
