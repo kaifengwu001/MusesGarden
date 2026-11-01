@@ -663,13 +663,33 @@ so any view can be shared.
 
 A second planet to visit (the Travel button, `pl=terraces` in the URL),
 built on the same foundations: rest space, growth, the bake, CDLOD, the
-warp, the painted light. Its own code is in `src/terraces/`. Hills of rice
-terraces, forest on the hilltops and in the gullies, small villages, karst
-peaks, fog in the valleys. The colours come from the blue ink painting of
-karst peaks in mist (reference/terraces/colour-blue.png); the vista is framed
-like, and squinted against, the green terraces painting
-(reference/terraces/vista-green.webp) recoloured into those colours
-(vista-target.png; references are kept out of git).
+warp, the painted light. Its own code is in `src/terraces/`. Gentle hills of
+rice terraces, a river winding round the planet with its valley's flat
+fields, trees in clumps on the hilltops and in the gullies, villages of
+Kai's house models, karst towers of Kai's mountain models, fog in the
+valleys. Since
+Kai's notes on the third pass the starting points are three paintings: the
+valley (reference/terraces/valley-painting.webp: towers in mist, a river
+between terraced hills, white houses), the planet from above
+(planet-painting.webp) and, for the paddies, a planet covered in terraces;
+the palette is measured from the first two (references are kept out of git).
+The vista is still framed like, and squinted against, the earlier green
+terraces painting recoloured (vista-target.png) until it is re-searched for
+the valley painting.
+
+Kai's models (scripts/terraces-models.mjs: five karst mountains and five
+houses, as sent under reference/terraces/models/) are simplified to two
+levels of detail (meshoptimizer, across their textures' seams: Tripo's many
+small islands lock the simplifier otherwise), stood on their base at a unit
+height, their colour textures resized to 1024², quantized and compressed
+(KHR_mesh_quantization, EXT_meshopt_compression): src/assets/terraces/,
+6 MB for all ten. `ModelSet` (models.ts) stands them on the planet rigid
+(not bent with it: a tower bent round a small planet flares at its top),
+turned about the site's up, stretched across, each in full detail near the
+camera and its lighter copy far off, lit softly by the planet's sun over
+their own painted texture, with the haze and the valley fog
+(model.vert/frag.glsl). `only=` in the URL (dev) shows one part of the
+planet at a time (terraces, rice, houses, towers, trees, birds, fog).
 
 ### Land use: forest above, villages, terraces, the valley floor
 
@@ -678,9 +698,19 @@ Every point of the planet is sorted the way the Hani terraces are laid out
 valley floor at the bottom), from fields baked in rest space
 (terraces/fields.*), in this order:
 
-1. **Peaks:** karst towers from a progressive point set (a constant number
-   per km² as the planet grows), kept where a macro range field allows them.
-   Forest on their flanks, ink-blue rock where they are too steep for it.
+0. **The river:** its course a circle round an axis swung either side by a
+   meandering offset in meters (fields.ts `riverOffset`); its distance is
+   the offset over its gradient. Its channel is cut 1.5 m down, its valley
+   floor kept flat 10 m either side of its middle, the hills risen in full
+   by 40 m. The bake's `flat` runs from 1 at the top of its bank to 2 in its
+   middle, so the plots end at the bank and the ground's paint draws its
+   water (silver, bluer and darker than a paddy's, its banks' darks along
+   its edges); no trees in the water.
+1. **Towers:** sites from a progressive point set (a constant number per
+   km² as the planet grows), kept where a macro range field allows them and
+   off the river; each one of Kai's mountain models (towers.ts), 26–78 m
+   tall, turned and stretched, standing on a low mound of the ground (12 %
+   of its height) with trees round its foot.
 2. **Too steep to terrace:** where a terrace would be narrower than about
    1.8 m (slope over 0.6): forest.
 3. **Crowns:** where the hills' finer octaves (their local relief) stand
@@ -691,10 +721,18 @@ valley floor at the bottom), from fields baked in rest space
    slope: a line of trees down the gully.
 5. **Woods:** stretches of whole hillside left to forest, by a macro noise
    (the Forest share).
-6. **Valley floors (flats):** the flat floors between the hills (a field of
-   its own, baked as `flat`), laid out as plots, not contour terraces.
+6. **Valley floors (flats):** the flat floors between the hills (the lowest
+   fifth of the hills, and the river's valley; a field of its own, baked as
+   `flat`), laid out as plots, not contour terraces.
 7. **Villages:** sites from a second point set on the flats near the foot of
-   the hills; houses on level ground, their ground courtyard, not paddy.
+   the hills; Kai's house models on level ground (houses.ts), each on its own
+   yard, the painted courtyard inside it, not paddy.
+
+The hills are round as they come (direction-space octaves with no twirl or
+grain: Kai found the swirled hills stretched and squeezed from above) and
+gentle (13 m: the bands are wide and sweep, as in Kai's paddy painting); at
+R 128 the planet is about 38 % terraced, 23 % flats, 37 % wild and 9 %
+river.
 8. **Everything else is terraced.**
 
 ### Terraces built on the hills
@@ -811,7 +849,7 @@ the band and the paddy's crop at a point, without a survey).
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      terraces/            the second planet: fields and bakes, cells, the survey (walls, lenses, cuts, paddies, flats), floors and meshes built round the camera, rice, villages, forest, birds, the vista search
+      terraces/            the second planet: fields and bakes (hills, river, towers' sites), cells, the survey (walls, lenses, cuts, paddies, flats), floors, meshes and paths built round the camera, rice, Kai's models (towers, houses), villages, forest, birds, the vista search
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
