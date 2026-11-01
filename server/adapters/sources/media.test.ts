@@ -148,10 +148,12 @@ describe('the recording', () => {
     for (const i of items) expect(i.id).toMatch(MEDIA_ID);
   });
 
-  it('has nothing from the topic map’s own site', () => {
+  it('has nothing from the topic map’s own site, and nothing that names it', () => {
     const mapSites = new Set(topicMap.pages.map((p) => siteOf(p.candidate.url)));
-    const held = LEANS.flatMap((l) => recording.unseen[l]);
-    expect([...items, ...held].filter((i) => mapSites.has(siteOf(i.candidate.url))).map((i) => i.candidate.url)).toEqual([]);
+    const name = new RegExp([...mapSites].map((s) => s.split('.')[0]).join('|'), 'i');
+    const all = [...items, ...LEANS.flatMap((l) => recording.unseen[l])].map((i) => i.candidate);
+    expect(all.filter((c) => mapSites.has(siteOf(c.url))).map((c) => c.url)).toEqual([]);
+    expect(all.filter((c) => name.test(`${c.title} ${c.summary} ${c.media.author ?? ''}`)).map((c) => c.url)).toEqual([]);
   });
 
   it('runs with the topic map: every item filed under its topics, every hero pool topic with at least 3', () => {

@@ -150,8 +150,9 @@ async function main(): Promise<void> {
   const curated = await pool(tasks, CONCURRENCY);
 
   const seen = new Set<string>();
-  /** The topic map's own site: a post may link to it, but nothing Muse finds comes from it. */
+  /** The topic map's own site: nothing Muse finds comes from it, links to it, or names it. */
   const mapSites = new Set(map.pages.map((p) => siteOf(p.candidate.url)));
+  const namesMap = new RegExp([...mapSites].map((s) => s.split('.')[0]).join('|'), 'i');
   let offTopic = 0;
   let onMap = 0;
   const filed: (MediaItemJson & { readonly fallback: boolean })[] = [];
@@ -162,7 +163,7 @@ async function main(): Promise<void> {
         if (o.topic !== undefined && have(o.topic, [raw.kind]) >= PER_KIND) continue;
         if (seen.has(raw.id)) continue;
         seen.add(raw.id);
-        if (mapSites.has(siteOf(raw.url))) {
+        if (mapSites.has(siteOf(raw.url)) || namesMap.test(`${raw.url} ${raw.title} ${raw.text} ${raw.author ?? ''}`)) {
           onMap++;
           continue;
         }
@@ -233,7 +234,7 @@ async function main(): Promise<void> {
   console.info(`  the hero's pools: ${pools.map((t) => `${t} ${perTopic.get(t) ?? 0}`).join(', ')}`);
   console.info(`  filed under the area's main topic for want of a match: ${filed.filter((x) => x.fallback).length}`);
   console.info(`  topic search results left out for not naming their topic: ${offTopic}`);
-  console.info(`  links to the topic map's own site left out: ${onMap}`);
+  console.info(`  items from, linking to or naming the topic map's own site left out: ${onMap}`);
   console.info(`  without a caption: ${count(parsed.items.filter((i) => i.candidate.summary === ''), (i) => i.candidate.media.network) || 'none'}`);
 
   if (values.dry || values.area !== undefined) {
