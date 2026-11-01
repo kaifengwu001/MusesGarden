@@ -19,5 +19,6 @@ reference/terraces/
 .*.mjs
 .*.py
 
-# Claude Code local config (the desktop preview launch.json), kept out of git
-.claude/
+# Claude Code local config (the desktop preview launch.json), kept out of git; the project's skills are kept
+.claude/*
+!.claude/skills/
