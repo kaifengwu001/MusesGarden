@@ -16,12 +16,13 @@ vec3 paddySky(float e) {
 }
 
 // The ground along a mirrored ray (view space) from the water at wp: how far
-// along it the ray meets the ground (1e9: never). rise: the ray's climb per
-// meter, to stop once it has cleared the highest ground.
+// along it the ray meets the ground (1e9: never), as far as the riser and
+// the bund round the paddy (the painting keeps its flooded fields white, a
+// darker band only along their inner edge: the riser behind, mirrored).
 float groundAlong(vec3 wp, vec3 r, float rise) {
   float t = 0.12;
   float dt = 0.2;
-  for (int i = 0; i < 22; i++) {
+  for (int i = 0; i < 12; i++) {
     float tn = t + dt;
     vec3 q = unwarpPosition(wp + r * tn);
     float len = length(q);
@@ -53,9 +54,9 @@ vec3 mirroredGround(vec3 q) {
   vec3 d = q / l;
   Terrace t = terraceAt(d);
   vec3 wild = mix(pal(TR_FOREST, 1), pal(TR_PEAK, 0), smoothstep(1.1, 1.8, t.slope));
-  vec3 tame = mix(pal(TR_RICE, 2), pal(TR_EARTH, 3), t.rise);
+  vec3 tame = mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), t.rise);
   vec3 c = mix(tame, wild, t.wild);
-  return mix(c, pal(TR_WATER, 5), 0.35) * 0.78;
+  return mix(c, pal(TR_WATER, 5), 0.3) * 0.9;
 }
 
 // dir: planet direction of the water; wp: the water's point in view space;
@@ -84,7 +85,9 @@ vec3 paddyWater(vec3 dir, vec3 wp, vec3 n, vec3 v, float b, float gust, float ti
   // the valley fog along the mirrored ray, as it lies over what the mirror shows
   float fog = valleyFog(q0, far);
   mirror = mix(mirror, fogColour(length(far) - uRadius), fog);
-  float reflectance = mix(0.42, 0.96, pow(1.0 - facing, 1.5)) * (1.0 - 0.2 * gust) * uPaddyWater.x;
+  // shallow water over mud under a bright sky: a mirror even looking down into it (the paintings lay the
+  // flooded fields near white)
+  float reflectance = mix(0.74, 0.97, pow(1.0 - facing, 1.5)) * (1.0 - 0.15 * gust) * uPaddyWater.x;
   vec3 col = mix(body * mix(0.75, 1.0, b), mirror, reflectance);
   // the wind's ruffles: faint pale streaks
   col = mix(col, pal(TR_WATER, 6), smoothstep(0.55, 0.95, gust) * 0.12 * uWindVec.w);

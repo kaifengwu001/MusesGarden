@@ -24,8 +24,10 @@ import { TERRACE_ROWS } from './palette';
 import surfaceFragment from './surface.frag.glsl?raw';
 import surfaceVertex from './surface.vert.glsl?raw';
 import { Houses } from './houses';
+import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
 import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
+import { findTerraceVista } from './vista';
 
 const NOON = new Palette(TERRACE_ROWS);
 const NOON_SUN = NOON.get(ROW.LIGHT, 0);
@@ -40,11 +42,15 @@ const FIELD_PATHS: ReadonlySet<string> = new Set(['terraces.hills', 'terraces.fo
  * banks' top and its softness (m), the clearing it leaves round the camera
  * (m), and its two layers' drift (m/s).
  */
-const FOG = { density: 0.16, top: 8, soft: 2.2, clearing: 28, drift: [0.55, 1.1] } as const;
+const FOG = { density: 0.24, top: 4.6, soft: 1.5, clearing: 24, drift: [0.55, 1.1] } as const;
 /** Heights of the named views (m): a bird's-eye view over the terraces, and standing on one. */
 const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
-/** The vista: the camera's height (m) and its tilt from straight down (rad). */
-const VISTA = { height: 34, tilt: (58 * Math.PI) / 180 } as const;
+/**
+ * The vista: the camera's height (m) and its tilt from straight down (rad). Low enough that the warp
+ * lays the ground out flat to a far horizon (zoom 0.55–0.6), as the meadow's vista does: higher up the
+ * small planet curves away and the sky shows, where the painting has none.
+ */
+const VISTA = { height: 24, tilt: (52 * Math.PI) / 180, widen: 28 } as const;
 
 /**
  * The terraces: a second planet to visit, built on the meadow's foundations
@@ -74,7 +80,10 @@ export class TerraceWorld implements PlanetWorld {
   lod: LodConfig = LOD_DEFAULT;
   nearFieldDrawn = false;
   readonly nearInstances = { grass: 0, flowers: 0 };
+  /** How long the last vista search took (ms; 0 when cached). */
+  vistaMs = 0;
   readonly houses: Houses;
+  readonly trees: Trees;
   /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
   villages: Village[] = [];
   private readonly villageUniforms = createVillageUniforms();
@@ -83,7 +92,7 @@ export class TerraceWorld implements PlanetWorld {
   private readonly atmosphere = {
     uValleyFog: { value: new Vector4(FOG.density, FOG.top, FOG.soft, FOG.clearing) },
     uFogDrift: { value: new Vector4(1, 0, 1, 0) },
-    uFogCover: { value: new Vector4(0.52, 0.16, 0.8, 0) },
+    uFogCover: { value: new Vector4(0.56, 0.16, 0.8, 0) },
     uPaddyWater: { value: new Vector4(0.85, 80, 0, 0) },
     uRiceLook: { value: new Vector4(0.6, 0, 0, 0) },
   };
@@ -126,7 +135,8 @@ export class TerraceWorld implements PlanetWorld {
     this.sky = new Sky();
     this.surface = new Surface(this.shared, tier.terrainGrid, { name: 'terraces ground', vertexShader: surfaceVertex, fragmentShader: surfaceFragment });
     this.houses = new Houses(this.shared);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.houses.mesh);
+    this.trees = new Trees(this.shared);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.houses.mesh, this.trees.mesh);
     this.applyTier(tier);
   }
 
@@ -170,10 +180,25 @@ export class TerraceWorld implements PlanetWorld {
     this.rig.lookAlong(stand.focus, stand.forward, immediate);
     if (name === 'vista') {
       // the painting's view (reference/terraces/vista-green.webp): high over the terraces, looking down
-      // across them to the forest and the terraced hills beyond, no sky
-      const zoom = this.rig.zoomForAltitude(VISTA.height);
+      // across them to the flooded fields and the forest, no sky (vista.ts searches the planet for it)
+      const R = this.growth.radius;
+      const rv = this.store.values.view.visualRadius;
+      // (a wide view, to take in a hillside of terraces in a portrait frame as the painting does)
+      const framing = (h: number): { fov: number; k: number } => {
+        const z = this.rig.zoomForAltitude(h);
+        return { fov: this.rig.framing(z).fov + VISTA.widen, k: warpForZoom(z, R, rv) };
+      };
+      const aspect = this.rig.camera.aspect;
+      const t0 = performance.now();
+      const v = findTerraceVista(this.terrain, framing, aspect, VISTA.height, VISTA.tilt, this.villages, FOG.top, `${this.fieldsKey}/${R}/${rv}/${aspect.toFixed(3)}/${this.terrain.seasonFront.toFixed(3)}`);
+      this.vistaMs = performance.now() - t0;
+      this.rig.lookAlong(v.focus, v.forward, immediate);
+      const zoom = this.rig.zoomForAltitude(v.height);
       this.rig.setZoom(zoom, immediate);
-      this.rig.lookUp(VISTA.tilt - this.rig.framing(zoom).tilt);
+      this.rig.lookUp(v.tilt - this.rig.framing(zoom).tilt);
+      this.rig.widenFov(VISTA.widen, immediate);
+      this.posed = true;
+      return;
     } else if (name === 'muse' || name === 'meadow') this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.standing), immediate);
     else this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.above), immediate);
     this.posed = true;
@@ -288,6 +313,7 @@ export class TerraceWorld implements PlanetWorld {
       this.refreshFields(false);
       this.fieldsStill = 0;
     } else if (!this.fieldsFull && ++this.fieldsStill >= 6) this.refreshFields(true);
+    this.trees.update(this.terrain.layout.noiseSeed, R);
     // the season is not baked: the bloom slider moves it live
     this.terrain.seasonFront = seasonFront(p.world.bloom);
     this.terrainUniforms.uPaddy.value.y = this.terrain.seasonFront;

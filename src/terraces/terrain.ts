@@ -21,13 +21,13 @@ import { gradientFrame, TerraceFields, type TerraceBase, type TerraceFieldParams
 
 export const R_REF = 128;
 /** Riser height (m), the riser's width (m), the bund's width (m) and height (m), the water in a paddy (m). */
-export const TERRACE = { step: 1.1, riser: 0.55, bund: 0.45, bundHeight: 0.22, water: 0.08 } as const;
+export const TERRACE = { step: 0.8, riser: 0.45, bund: 0.38, bundHeight: 0.2, water: 0.08 } as const;
 /** The cells that cut the bands are about this wide (m), the Voronoi tiling chosen per octave of R. */
 export const CELL_M = 48;
 /** Within a cell each level is cut every so many meters along the band (its own spacing, between these), and a share of paddies lie fallow. */
 export const PADDY = { cuts: [9, 22], fallow: 0.05 } as const;
 /** How the season spreads: the share of the season field in a paddy's delay (the rest its own chance), and its width. */
-export const SEASON = { field: 0.62, spread: 0.42 } as const;
+export const SEASON = { field: 0.3, spread: 0.42 } as const;
 /** The mesh keeps its terraces out to this distance (m), and has the hills' own shape from this one. */
 export const MESH_TERRACES = { near: 22, far: 46 } as const;
 

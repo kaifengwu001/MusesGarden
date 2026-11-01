@@ -17,23 +17,25 @@ export const TROW = {
 } as const;
 
 export const TERRACE_ROWS: Rows = {
-  // seedling, fresh, deep, yellow-green (heading), ripe gold, pale tip, shade, sheen, far green, jade (3), sage (3)
-  [TROW.RICE]: ['#A5C46A', '#7FAF3C', '#4F8D3B', '#A6BE56', '#C9BC5E', '#D3DE9C', '#2E6131', '#DDE7AC', '#7FA27A', '#4E8F6F', '#7DB296'],
-  // bund grass, bund shade, riser face, riser shade, wet mud, dark mud, dry path, pale bund (1, 8)
-  [TROW.EARTH]: ['#93AF62', '#5D7B3D', '#6F8650', '#3D5A36', '#6A6B4B', '#45493A', '#B5A77C', '#C9D3B3'],
-  // pale sky in the mirror, high sky in it, body looking down, shallow (mud through), glint, a bank in the mirror, ruffle,
-  // teal (5), white water (5)
-  [TROW.WATER]: ['#D5E3E4', '#9DBCCF', '#4C7A84', '#7B8E77', '#F7FBFA', '#2E4A40', '#C5D9DE', '#87BEA6', '#DCE3CB'],
-  // canopy light, canopy mid, canopy shade, deep shade, rim, trunk, forest floor, far blue-green, olive light (4)
-  [TROW.FOREST]: ['#5D8A47', '#2F663B', '#174D33', '#0C3A2E', '#8DB16C', '#4B3B2D', '#1D4630', '#2F5E55', '#7E9A55'],
-  // the peaks as the ink paintings lay them: teal, blue-grey, pale blue, deep teal, lit rock, moss
-  [TROW.PEAK]: ['#44798C', '#73909A', '#8AA2B7', '#1B4754', '#A5B3C5', '#4F7A5C'],
-  // fog in sun, fog in shade, deep fog, warm white (paper)
-  [TROW.FOG]: ['#F5F5EF', '#BCCAD4', '#9FB3C1', '#FBF6EA'],
-  // zenith, horizon, haze, sun glow, mid sky, haze over the far land: a paler, mistier sky than the meadow's
-  [ROW.SKY]: ['#6F9CC6', '#CCDEE8', '#E5EDEF', '#FFF5E0', '#98BAD6', '#BCCFCC'],
+  // the paddies' crop, in the ink painting's greens (its fields: teal-green #467F81, sage #7E9894), at the
+  // values of the vista's fields (vista-target.png: mid #90AAB2, light #C2CFD5, deep #698793):
+  // seedling, fresh, deep, heading, ripe straw, pale tip, shade, sheen, far, jade, sage
+  [TROW.RICE]: ['#A3C3B2', '#7AA497', '#5A8A84', '#B4C49B', '#CCC79E', '#D3DDD8', '#365F62', '#E3ECE8', '#8EA6AC', '#5F968A', '#8FA6A2'],
+  // bund grass (a pale line), bund shade, riser face, riser shade, wet mud, dark mud, courtyard (paper), pale bund
+  [TROW.EARTH]: ['#A4BDB2', '#5F807E', '#6D8F8A', '#3D5F66', '#7C8C88', '#55666A', '#D8D3C2', '#E0E7E3'],
+  // pale sky in the mirror, high sky in it, body looking down, shallow, glint (paper white), a bank in the mirror,
+  // ruffle, teal (the painting's water #88A3AC), white water: the flooded fields read near white (vista #EAECFF)
+  [TROW.WATER]: ['#E8EDF0', '#BCCBD8', '#7E9CA4', '#9DB0B0', '#FAF9F3', '#4A6A72', '#DDE5E8', '#9FB5BC', '#EEF0EE'],
+  // the forest as the painting's dark masses: canopy light, mid, shade, deep, rim, trunk, floor, far, olive light
+  [TROW.FOREST]: ['#5F8C88', '#3F6E74', '#2A4F5B', '#163B43', '#88AAA3', '#3E3A36', '#23464D', '#4F6B80', '#6F907E'],
+  // the peaks' ink: blue-teal, blue-grey, pale, deep, lit pale, moss
+  [TROW.PEAK]: ['#5380A2', '#7790B1', '#A6B3CE', '#2F6589', '#B9C4DB', '#4F7A6E'],
+  // the mist: in sun (paper white), in shade, deep, warm paper
+  [TROW.FOG]: ['#F9F8F4', '#CDD0DE', '#9BA9C2', '#FAF9F3'],
+  // zenith, horizon, haze, sun glow, mid sky, haze over the far land: the painting's pale paper sky
+  [ROW.SKY]: ['#94AACA', '#E2E5EC', '#EFEEEC', '#FFF8EC', '#B6C3D8', '#AEBBD6'],
   // the white birds read the cloud row: lit, shadowed, mid, rim, base
-  [ROW.CLOUD]: ['#F7FAFB', '#CAD7DF', '#E3EBEF', '#FFFFFF', '#B2C6C1'],
+  [ROW.CLOUD]: ['#FAF9F5', '#C8D2DD', '#E3E8EE', '#FFFFFF', '#B2C2C6'],
   // sun light, sky ambient, ground bounce, rim, shadow tint
-  [ROW.LIGHT]: ['#FFF3DE', '#C6DAEC', '#A7C27B', '#FFF5DA', '#7E92B8'],
+  [ROW.LIGHT]: ['#FFF5E6', '#C9D5E7', '#9FB8A8', '#FFF5E4', '#7E92B8'],
 };

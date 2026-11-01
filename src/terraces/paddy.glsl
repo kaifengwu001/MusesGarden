@@ -98,7 +98,9 @@ Paddy paddyAt(vec3 dir, float level) {
   p.variant = unitHash(p.id);
   p.rows = unitHash(p.id * 747796405u + 2891336453u);
   float chance = unitHash(p.id ^ 0x9e3779b9u);
-  float delay = clamp(0.62 * textureLod(uTerraceLife, p.centre, 0.0).b + 0.38 * chance, 0.0, 1.0);
+  // (mostly its own: neighbouring bands are at different stages, white flooded fields among the green, as
+  // in the painting; the season field only leans whole hillsides earlier or later)
+  float delay = clamp(0.3 * textureLod(uTerraceLife, p.centre, 0.0).b + 0.7 * chance, 0.0, 1.0);
   p.maturity = paddyMaturity(delay);
   p.fallow = step(unitHash(p.id ^ 0x85ebca6bu), PADDY_FALLOW);
   return p;

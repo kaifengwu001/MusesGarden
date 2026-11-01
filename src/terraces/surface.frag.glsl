@@ -77,6 +77,41 @@ vec3 cropColour(float m, float variant, float b) {
   return tone3(lit, mix(lit, shade, 0.4), shade, b);
 }
 
+// One octave of painted marks: in each cell of a jittered lattice (fill of
+// them), a mark drawn out `elong` times along `along`, its edge soft over
+// `aa` (cell units, a pixel). Returns its coverage; rnd: a random per mark.
+float markOctave(vec3 dir, float freq, vec3 along, float elong, float fill, float size, float aa, uint seed, out float rnd) {
+  vec3 p = dir * freq;
+  vec3 cell = floor(p);
+  uint h = meadowHash(ivec3(cell), seed);
+  vec3 j = vec3(float(h & 255u), float((h >> 8) & 255u), float((h >> 16) & 255u)) / 255.0;
+  float keep = float((h >> 24) & 255u) / 255.0;
+  rnd = fract(keep * 7.31 + j.x * 3.7);
+  if (keep > fill) return 0.0;
+  vec3 q = p - (cell + 0.3 + 0.4 * j);
+  float a = dot(q, along);
+  float r = length(vec2(a / elong, length(q - along * a)));
+  return 1.0 - smoothstep(size - aa, size + aa, r);
+}
+
+// Marks about `meters` apart, never closer than `minPixels` on screen: two
+// lattice octaves bracketing that spacing, cross-faded (as the meadow's
+// dabs), so the marks read the same from far off, only finer up close.
+float marks(vec3 dir, float meters, float pixelMeters, float minPixels, vec3 along, float elong, float fill, float size, uint seed, out float rnd) {
+  float spacing = max(meters, pixelMeters * minPixels);
+  float l = log2(uRadius / spacing);
+  float l0 = floor(l);
+  float f0 = exp2(l0);
+  float t = l - l0;
+  uint lv = uint(int(l0) + 64) * 2654435761u;
+  float r0;
+  float r1;
+  float a = markOctave(dir, f0, along, elong, fill, size, pixelMeters * f0 / uRadius, seed + lv, r0);
+  float b = markOctave(dir, 2.0 * f0, along, elong, fill, size, pixelMeters * 2.0 * f0 / uRadius, seed + lv + 1u, r1);
+  rnd = t < 0.5 ? r0 : r1;
+  return mix(a, b, t);
+}
+
 void main() {
   vec3 dir = normalize(vDir);
   vec3 nMesh = normalize(vNormal);
@@ -127,32 +162,27 @@ void main() {
     float covCross = (1.0 - smoothstep(CROSS_BUND - 0.5 * pixelMeters, CROSS_BUND + 0.5 * pixelMeters, pd.wall)) * covFloor;
     covFloor -= covCross;
 
-    // the floor: water showing between the rows until the crop closes over it. On a terrace the
-    // rows run along it (level lines of the hills, spaced by the slope at the paddy's middle); on a
-    // flat valley floor, straight across the paddy, each its own way
-    float slopeC = textureLod(uTerraceBake, pd.centre, 0.0).g;
-    float rowsAcross;
-    if (slopeC > 0.07) {
-      rowsAcross = t.x * uTerrace.x / (slopeC * ROW_M);
-    } else {
-      vec3 c1;
-      vec3 c2;
-      gradientFrame(pd.centre, c1, c2);
-      float th = pd.rows * MEADOW_PI;
-      rowsAcross = dot(dir - pd.centre, c1 * cos(th) + c2 * sin(th)) * uRadius / ROW_M;
-    }
-    float rowW = length(vec2(dFdx(rowsAcross), dFdy(rowsAcross)));
+    // the floor, painted as the green painting does (reference/terraces/vista-green.webp): water
+    // showing round the plants until the crop closes over it; seedlings as dots on it, the rice as
+    // short dashes standing up toward you (upright plants seen from above draw out toward the eye)
     float crop = smoothstep(0.02, 0.62, m);
-    float rowsSeen = 1.0 - smoothstep(0.35, 0.8, rowW);
-    float stripe = bandCover(fract(rowsAcross), 0.0, mix(0.18, 0.95, crop), rowW);
-    float cover = mix(mix(0.12, 1.0, crop) * step(0.01, m), stripe * step(0.01, m), rowsSeen);
-    cover = clamp(cover + smoothstep(0.7, 0.9, m), 0.0, 1.0);
+    vec3 eye = unwarpPosition(cameraPosition) - P;
+    vec3 toward = eye - dir * dot(eye, dir);
+    float graze = length(toward) / max(length(eye), 1e-4);
+    vec3 along = dot(toward, toward) > 1e-8 ? normalize(toward) : a1;
+    float rnd;
+    float young = 1.0 - smoothstep(0.25, 0.35, m);
+    float mk = m > 0.0 ? marks(dir, mix(0.42, 0.3, crop), pixelMeters, 4.5, along, 1.0 + mix(0.3, 2.4, 1.0 - young) * graze, mix(0.35 + 1.8 * m, 0.95, 1.0 - young), mix(0.2, 0.3, crop), uTerrainSeed + 920u, rnd) : 0.0;
+    // what lies between the marks: open water, then the crop's own green as it closes
+    float cover = m > 0.0 ? clamp(smoothstep(0.15, 0.5, m) + 0.45 * mk * young, 0.0, 1.0) : 0.0;
     vec3 cropCol = cropColour(m, pd.variant, bUp);
     // the wind runs over the crop as a swell: pale crests, dark troughs, the taller the more
     float tall = smoothstep(0.3, 1.0, m);
     cropCol = mix(cropCol, pal(TR_RICE, 7) * uSunTint, max(sheen, 0.0) * (0.25 + 0.5 * tall));
     cropCol *= mix(vec3(1.0), vec3(0.62, 0.72, 0.64), max(-sheen, 0.0) * (0.3 + 0.6 * tall));
 
+    // the marks: dark green seedlings on the water, then pale dashes on the crop, each a little its own
+    vec3 markCol = mix(tone3(pal(TR_RICE, 2), pal(TR_RICE, 6), pal(TR_RICE, 6) * 0.7, bUp), mix(cropCol, pal(TR_RICE, 5) * uSunTint, mix(0.35, 0.6, rnd)), 1.0 - young);
     vec3 floorCol = cropCol;
     if (pd.fallow > 0.5) {
       // fallow this season: bare, damp earth with a little grass coming
@@ -166,8 +196,13 @@ void main() {
       vec3 vw = normalize(cameraPosition - wp);
       float tint = smoothstep(0.3, 0.9, fract(pd.variant * 5.31));
       vec3 water = paddyWater(dir, wp, nUp, vw, bUp, waves.x, tint);
+      // the flooded fields' white glints, drawn out along the band (the painting's pale wavy strokes)
+      float gr;
+      float glint = marks(dir, 1.3, pixelMeters, 6.0, pd.along, 3.2, 0.32, 0.16, uTerrainSeed + 930u, gr) * (1.0 - crop);
+      water = mix(water, pal(TR_WATER, 4), glint * 0.7);
       floorCol = mix(water, cropCol, cover);
     }
+    if (pd.fallow < 0.5) floorCol = mix(floorCol, markCol, mk * (young > 0.5 ? 0.9 : 0.75));
     vec3 bundCol = tone3(pal(TR_EARTH, 0), mix(pal(TR_EARTH, 0), pal(TR_EARTH, 1), 0.5), pal(TR_EARTH, 1), bUp);
     // bunds round flooded paddies read pale, as in the ink paintings; among the crop, a darker green
     bundCol = mix(bundCol, tone3(pal(TR_EARTH, 7), pal(TR_EARTH, 0), pal(TR_EARTH, 1), bUp), (1.0 - crop) * 0.6);
@@ -187,10 +222,11 @@ void main() {
     tame = floorCol * covFloor + bundCol * covBund + mix(floorCol, bundCol, 0.6) * covCross + riserCol * covRiser;
   }
   if (wild > 0.001) {
-    // the forest floor under the trees, and the peaks' rock where it is too steep for them
-    float rock = smoothstep(1.15, 1.9, t.slope);
+    // the forest floor under the trees, and the peaks' rock where it is too steep for them: the ink's
+    // deep teal, as the painting lays its peaks (reference/terraces/colour-blue.png)
+    float rock = smoothstep(1.3, 2.4, t.slope);
     vec3 floorForest = tone3(pal(TR_FOREST, 1), pal(TR_FOREST, 6), pal(TR_FOREST, 3), bMesh);
-    vec3 cliff = tone3(pal(TR_PEAK, 2), pal(TR_PEAK, 0), pal(TR_PEAK, 3), bMesh);
+    vec3 cliff = tone3(pal(TR_PEAK, 0), mix(pal(TR_PEAK, 0), pal(TR_PEAK, 3), 0.5), pal(TR_PEAK, 3), bMesh);
     // brushed down the slope, the ink's strokes
     vec3 sp = dir * (uRadius / 2.5);
     sp -= downhill * dot(sp, downhill) * 0.75;

@@ -78,6 +78,13 @@ export class CameraRig {
    */
   private pitch = 0;
   private pitchTarget = 0;
+  /**
+   * A wider view (degrees added to the field of view) a named view may ask
+   * for to take in what it frames (the terraces' vista, in a portrait frame);
+   * it eases away with the look-up.
+   */
+  private widen = 0;
+  private widenTarget = 0;
   /** Seconds since the last zoom by the wheel or the keys (Infinity: settled). */
   private zoomIdle = Number.POSITIVE_INFINITY;
 
@@ -129,6 +136,7 @@ export class CameraRig {
    */
   drag(dx: number, dy: number, width: number, height: number): void {
     this.pitchTarget = 0;
+    this.widenTarget = 0;
     const t = this.tilt;
     const perPixel = (0.75 * (this.altitude + 8)) / (this.radius * height);
     this.axes(this.frameTarget);
@@ -150,6 +158,7 @@ export class CameraRig {
   walk(ahead: number, across: number): void {
     if (ahead === 0 && across === 0) return;
     this.pitchTarget = 0;
+    this.widenTarget = 0;
     this.axes(this.frameTarget);
     this.rotate(this.right, -ahead / this.radius);
     this.rotate(this.forward, across / this.radius);
@@ -161,6 +170,7 @@ export class CameraRig {
   turn(angle: number): void {
     if (angle === 0) return;
     this.pitchTarget = 0;
+    this.widenTarget = 0;
     this.axes(this.frameTarget);
     this.rotate(this.up, angle);
     this.glideT = 1;
@@ -169,6 +179,7 @@ export class CameraRig {
 
   zoomBy(delta: number): void {
     this.pitchTarget = 0;
+    this.widenTarget = 0;
     this.zoomTarget = clamp(this.zoomTarget + delta, 0, 1);
     this.zoomIdle = 0;
     this.changed = true;
@@ -194,6 +205,13 @@ export class CameraRig {
     this.changed = true;
   }
 
+  /** Widen the field of view by `degrees` until the next move (named views). */
+  widenFov(degrees: number, immediate = true): void {
+    this.widenTarget = degrees;
+    if (immediate) this.widen = degrees;
+    this.changed = true;
+  }
+
   /** Look up by `angle` (rad) from the zoom's tilt until the next move (named views). */
   lookUp(angle: number, immediate = true): void {
     this.pitchTarget = angle;
@@ -204,6 +222,7 @@ export class CameraRig {
   /** Glide the focus to a direction on the planet over ~1.6 s. */
   glideTo(dir: Vector3): void {
     this.pitchTarget = 0;
+    this.widenTarget = 0;
     this.axes(this.frameTarget);
     tmpQ.setFromUnitVectors(this.up, tmpV.copy(dir).normalize());
     this.glideStart.copy(this.frameTarget);
@@ -245,7 +264,7 @@ export class CameraRig {
     out.up.copy(forward).multiplyScalar(Math.cos(tilt)).addScaledVector(up, Math.sin(tilt));
     const look = forward.multiplyScalar(Math.sin(tilt)).addScaledVector(up, -Math.cos(tilt)).add(out.position);
     out.lookAt(look);
-    out.fov = lerp(35, 55, smoothstep(0.3, 1, z));
+    out.fov = lerp(35, 55, smoothstep(0.3, 1, z)) + this.widenTarget;
     out.aspect = this.camera.aspect;
     out.near = clamp(alt * 0.2, 0.05, 0.5 * radius);
     out.far = alt + radius * 3;
@@ -284,6 +303,7 @@ export class CameraRig {
     this.focus.copy(this.up).multiplyScalar(radius + this.ground);
 
     this.pitch += (this.pitchTarget - this.pitch) * damp(realDt, 0.25);
+    this.widen += (this.widenTarget - this.widen) * damp(realDt, 0.25);
     const alt = this.altitude;
     const tilt = Math.min(this.tiltAt(alt, this.zoom) + this.pitch, Math.PI / 2 - 0.02);
     const cam = this.camera;
@@ -291,7 +311,7 @@ export class CameraRig {
     cam.up.copy(this.forward).multiplyScalar(Math.cos(tilt)).addScaledVector(this.up, Math.sin(tilt));
     tmpV.copy(this.up).multiplyScalar(-Math.cos(tilt)).addScaledVector(this.forward, Math.sin(tilt));
     cam.lookAt(tmpV.add(cam.position));
-    cam.fov = lerp(35, 55, this.tilt);
+    cam.fov = lerp(35, 55, this.tilt) + this.widen;
     cam.aspect = aspect;
     cam.near = clamp(alt * 0.2, 0.05, 0.5 * radius);
     cam.far = alt + radius * 3;
@@ -319,6 +339,7 @@ export class CameraRig {
       this.zoomIdle = Number.POSITIVE_INFINITY;
     }
     this.zoom = this.zoomTarget;
+    this.widen = this.widenTarget;
     this.ground = Number.NaN;
   }
 
