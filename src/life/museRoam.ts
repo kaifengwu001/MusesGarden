@@ -27,7 +27,7 @@ import { BENCH, CHAIR, FACE, FLOOR, PIER, SIDE, STEPS, TERRACE } from './props';
 // Muse stands on the ground there.
 
 /** Its pace (Muse's heights a second), and the walk's share spent speeding up and slowing down at each end. */
-const PACE = 0.33;
+export const PACE = 0.33;
 const RAMP = 0.12;
 /** A turn on the spot: its least time (s) and the time it adds for a half turn; turns smaller than `least` (rad) are taken in its stride. */
 const TURN = { time: 0.35, half: 0.8, least: 0.12 } as const;
@@ -374,6 +374,12 @@ export class MuseRoam {
   /** A unit tangent at a spot toward a direction. */
   private toward(at: Spot, dir: Vector3): Vector3 {
     return tangentToward(at.dir, dir, new Vector3());
+  }
+
+  /** Its seat on the bench, facing out, for sitting there longer than its life would: working at home (muse.ts). */
+  benchSeat(): { dir: Vector3; height: number; heading: Vector3 } {
+    const seat = this.deckSpot(BENCH.x, BENCH.z + BENCH.depth + 0.02 * this.height);
+    return { dir: seat.dir, height: this.groundAt(seat.dir) + BENCH.seat, heading: this.out(seat) };
   }
 
   /** The heading for "facing +z" (toward the pond) at a spot on the homestead. */

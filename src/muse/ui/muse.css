@@ -1,0 +1,441 @@
+/* The Muse dev tools (?dev). Built on the tokens in src/ui/style.css: paper cards, serif italic labels, pill buttons. */
+
+.mu {
+  --mu-panel: rgba(251, 248, 238, 0.9);
+  --mu-shadow: 0 10px 34px rgba(28, 60, 96, 0.14);
+  --mu-blue: #2e6e9e;
+  --mu-green: #4f8f34;
+  --mu-line: rgba(62, 58, 54, 0.1);
+  /* Under the masthead: its title (font size × 0.9) and world line, then a little air. */
+  --mu-top: calc(var(--gutter) * 0.85 + clamp(44px, 6.6vw, 104px) * 0.9 + clamp(13px, 1.05vw, 16px) * 2.3 + 18px);
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.mu *,
+.mu *::before,
+.mu *::after {
+  box-sizing: border-box;
+}
+
+.mu [hidden] {
+  display: none !important;
+}
+
+body.postcard .mu {
+  display: none;
+}
+
+.mu-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(62, 58, 54, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.mu-btn:hover {
+  background: rgba(62, 58, 54, 0.12);
+}
+
+.mu-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mu-btn.mu-primary,
+.mu-btn[aria-pressed='true'] {
+  background: rgba(46, 110, 158, 0.16);
+  color: var(--mu-blue);
+}
+
+.mu-btn.mu-primary:hover,
+.mu-btn[aria-pressed='true']:hover {
+  background: rgba(46, 110, 158, 0.24);
+}
+
+.mu :focus-visible {
+  outline: 2px solid var(--mu-blue);
+  outline-offset: 2px;
+}
+
+.mu-input {
+  border: 1px solid rgba(62, 58, 54, 0.18);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.mu-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.mu-empty {
+  margin: 8px 18px 14px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-soft);
+  list-style: none;
+}
+
+.mu-error,
+.mu-fail {
+  color: var(--coral);
+}
+
+.mu-fail {
+  margin: 0 18px 10px;
+  font-size: 12px;
+}
+
+.mu-fail:empty {
+  display: none;
+}
+
+.mu-chip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(62, 58, 54, 0.07);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.mu-mono {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mu-bar {
+  position: relative;
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(62, 58, 54, 0.1);
+}
+
+.mu-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--mu-green);
+  transform: scaleX(var(--v, 0));
+  transform-origin: left;
+}
+
+.mu-panel-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 340;
+  font-size: 24px;
+  letter-spacing: -0.015em;
+}
+
+.mu-subhead {
+  margin: 12px 0 4px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.mu-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.mu-code {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(62, 58, 54, 0.06);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.mu-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.mu-time {
+  padding: 3px 6px;
+}
+
+.mu-note {
+  margin: 0;
+  padding: 0 18px 12px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.mu-note:empty {
+  display: none;
+}
+
+/* ---- dev tools ----------------------------------------------------------- */
+
+.mu-dev {
+  position: fixed;
+  left: var(--gutter);
+  top: var(--mu-top);
+  bottom: calc(var(--gutter) * 0.6 + 120px);
+  width: min(340px, calc(100vw - 2 * var(--gutter)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  background: var(--mu-panel);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: var(--mu-shadow);
+  font-size: 11.5px;
+  z-index: 2;
+}
+
+.mu-dev-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+
+.mu-dev-head .mu-panel-title {
+  font-size: 19px;
+}
+
+.mu-dev-section {
+  border-top: 1px solid var(--mu-line);
+  padding: 0 16px;
+}
+
+.mu-dev-section > summary {
+  padding: 9px 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mu-dev-section[open] > summary {
+  padding-bottom: 4px;
+}
+
+.mu-dev-section > :last-child {
+  padding-bottom: 12px;
+}
+
+.mu-dev-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mu-dev-line {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.mu-dev .mu-actions {
+  margin-top: 0;
+}
+
+.mu-dev .mu-note {
+  padding: 4px 16px 10px;
+}
+
+.mu-dev .mu-fail {
+  margin: 0 16px 10px;
+}
+
+.mu-introduce .mu-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mu-hours {
+  width: 64px;
+}
+
+.mu-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mu-area {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.mu-traits,
+.mu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mu-trait {
+  display: grid;
+  grid-template-columns: 1fr 96px 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.mu-trait .mu-mono {
+  text-align: right;
+}
+
+.mu-interests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mu-interest {
+  padding: 6px 0;
+  border-top: 1px solid var(--mu-line);
+}
+
+.mu-interest:first-child {
+  border-top: 0;
+}
+
+.mu-interest-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.mu-interest-head .mu-title {
+  font-size: 14px;
+  margin-right: auto;
+}
+
+.mu-chip.stage-hypothesis {
+  background: rgba(138, 111, 176, 0.14);
+  color: #6b5591;
+}
+
+.mu-chip.stage-emerging {
+  background: rgba(46, 110, 158, 0.13);
+  color: var(--mu-blue);
+}
+
+.mu-chip.stage-established {
+  background: rgba(79, 143, 52, 0.15);
+  color: #3f7529;
+}
+
+.mu-pair {
+  display: grid;
+  grid-template-columns: 52px 1fr 32px;
+  gap: 3px 8px;
+  align-items: center;
+}
+
+.mu-pair .mu-mono {
+  text-align: right;
+}
+
+.mu-bar.sal::after {
+  background: #d08a3c;
+}
+
+.mu-bar.aff::after {
+  background: var(--mu-green);
+}
+
+.mu-bar.neg::after {
+  background: var(--coral);
+}
+
+.mu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mu-table th {
+  font-weight: 400;
+  color: var(--ink-soft);
+  text-align: right;
+  padding: 2px 3px;
+}
+
+.mu-table td {
+  text-align: right;
+  padding: 2px 3px;
+  border-top: 1px solid var(--mu-line);
+}
+
+.mu-table th:first-child,
+.mu-table td:first-child {
+  text-align: left;
+}
+
+.mu-soul {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* ---- phones: clear of the garden's rail, ticket and post box on the right ---- */
+
+@media (max-width: 640px) {
+  .mu-dev {
+    right: 80px;
+    bottom: 300px;
+    width: auto;
+  }
+}

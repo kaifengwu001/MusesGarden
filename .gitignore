@@ -19,3 +19,7 @@ reference/muse/
 
 # Claude Code local config (the desktop preview launch.json), kept out of git
 .claude/
+
+# the Muse server's local garden (npm run serve)
+.muse/
+.muse-live-e2e/

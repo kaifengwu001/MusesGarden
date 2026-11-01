@@ -44,6 +44,7 @@ const Y = new Vector3(0, 1, 0);
 const NZ = new Vector3(0, 0, -1);
 const tmpQ = new Quaternion();
 const tmpV = new Vector3();
+const tmpF = new Vector3();
 
 export type GroundFn = (dir: Vector3) => number;
 
@@ -236,17 +237,24 @@ export class CameraRig {
   aim(radius: number, ground: GroundFn, out: PerspectiveCamera, up: Vector3): number {
     const q = this.glideT < 1 ? this.glideEnd : this.frameTarget;
     up.copy(Y).applyQuaternion(q);
-    const forward = tmpV.copy(NZ).applyQuaternion(q);
+    const forward = tmpF.copy(NZ).applyQuaternion(q);
+    return this.place(out, up, forward, this.zoomTarget, this.pitchTarget, radius, ground(up), this.camera.aspect);
+  }
+
+  /**
+   * Place a camera as update() does: over the focus frame (up, forward) at zoom z with a look up of
+   * `pitch` (rad), on a planet of `radius` whose ground under the focus is `ground` (m). Returns the altitude (m).
+   */
+  place(out: PerspectiveCamera, up: Vector3, forward: Vector3, z: number, pitch: number, radius: number, ground: number, aspect: number): number {
     const top = this.overviewAltitude * radius;
-    const z = this.zoomTarget;
     const alt = top * Math.pow(EYE_HEIGHT / top, z);
-    const tilt = Math.min(this.tiltAt(alt, z) + this.pitchTarget, Math.PI / 2 - 0.02);
-    out.position.copy(up).multiplyScalar(radius + ground(up) + alt);
+    const tilt = Math.min(this.tiltAt(alt, z) + pitch, Math.PI / 2 - 0.02);
+    out.position.copy(up).multiplyScalar(radius + ground + alt);
     out.up.copy(forward).multiplyScalar(Math.cos(tilt)).addScaledVector(up, Math.sin(tilt));
-    const look = forward.multiplyScalar(Math.sin(tilt)).addScaledVector(up, -Math.cos(tilt)).add(out.position);
-    out.lookAt(look);
+    tmpV.copy(up).multiplyScalar(-Math.cos(tilt)).addScaledVector(forward, Math.sin(tilt));
+    out.lookAt(tmpV.add(out.position));
     out.fov = lerp(35, 55, smoothstep(0.3, 1, z));
-    out.aspect = this.camera.aspect;
+    out.aspect = aspect;
     out.near = clamp(alt * 0.2, 0.05, 0.5 * radius);
     out.far = alt + radius * 3;
     out.updateProjectionMatrix();
@@ -284,19 +292,7 @@ export class CameraRig {
     this.focus.copy(this.up).multiplyScalar(radius + this.ground);
 
     this.pitch += (this.pitchTarget - this.pitch) * damp(realDt, 0.25);
-    const alt = this.altitude;
-    const tilt = Math.min(this.tiltAt(alt, this.zoom) + this.pitch, Math.PI / 2 - 0.02);
-    const cam = this.camera;
-    cam.position.copy(this.up).multiplyScalar(radius + this.ground + alt);
-    cam.up.copy(this.forward).multiplyScalar(Math.cos(tilt)).addScaledVector(this.up, Math.sin(tilt));
-    tmpV.copy(this.up).multiplyScalar(-Math.cos(tilt)).addScaledVector(this.forward, Math.sin(tilt));
-    cam.lookAt(tmpV.add(cam.position));
-    cam.fov = lerp(35, 55, this.tilt);
-    cam.aspect = aspect;
-    cam.near = clamp(alt * 0.2, 0.05, 0.5 * radius);
-    cam.far = alt + radius * 3;
-    cam.updateProjectionMatrix();
-    cam.updateMatrixWorld();
+    this.place(this.camera, this.up, this.forward, this.zoom, this.pitch, radius, this.ground, aspect);
   }
 
   /** True once after any pose change (for URL sync). */

@@ -691,6 +691,13 @@ so any view can be shared.
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings
         props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench
+        findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, planted from the middle out)
+                           and their glowing spheres from high up; findTable.ts each find's state (planted, card,
+                           hover, pulse, picked basket) in a float texture, any number of finds
+        pins.ts            pins in the globe from orbit: liked finds (hearts) and Muse (its face)
+      garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
+                           react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes, post
+                           read and put away, baskets visited), where the finds grow (placement.ts)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
@@ -700,6 +707,10 @@ so any view can be shared.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
+      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking,
+                           flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
+        garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
+                           baskets, pins), the post box (a model in its own canvas), postcards, the album and
+                           invitations (mail.ts), the sheets (baskets, Muse's page, travel), the visit stand-in
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
