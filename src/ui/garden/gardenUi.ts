@@ -42,6 +42,9 @@ const CARD_UNDER = 30;
 const HOME_VIEW = { distance: 26, height: 11, bearing: 0.92, at: [-1.8, 2.6, 1.4] } as const;
 const MUSE_VIEW = { distance: 4.6, height: 1.35, bearing: 0.3, aim: 0.62 } as const;
 
+/** A tap or the pointer this near a find's sphere (px) picks it; the sphere stands this high over its bed (m). */
+const SPHERE = { slop: 16, height: 1 } as const;
+
 const sample = createGroundSample();
 const tmp = new Vector3();
 
@@ -92,6 +95,10 @@ export class GardenUi {
   /** The find whose card is up (or rising), and the one being flown to. */
   private current: string | null = null;
   private offscreen = 0;
+  /** Hover, with a pointer that can: where it is over the canvas (px; null when off it), whether it moved since the last pick, and the find under it. */
+  private pointer: { x: number; y: number; canvas: HTMLCanvasElement } | null = null;
+  private pointerMoved = false;
+  private hovered: string | null = null;
   private readonly source: GardenSource;
 
   constructor(
@@ -172,6 +179,12 @@ export class GardenUi {
       this.toast('The garden could not be reached just now.');
     });
     window.addEventListener('keydown', (e) => this.key(e));
+    if (matchMedia('(hover: hover)').matches) {
+      window.addEventListener('pointermove', (e) => this.pointerAt(e), { passive: true });
+      window.addEventListener('pointerout', (e) => {
+        if (!e.relatedTarget) this.pointerAt(null);
+      });
+    }
     if (import.meta.env.DEV || import.meta.env.VITE_PROBE) this.installProbe();
   }
 
@@ -257,6 +270,8 @@ export class GardenUi {
     }
     const away = this.visit.away;
     this.basketFlight.update(dt);
+    // (picked when the pointer moved, or while a flight moves the view under it)
+    if (this.pointer && (this.pointerMoved || this.flight.flying)) this.hover(this.pointer);
     this.beds.update(away ? Infinity : w.rig.altitude);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     if (!this.state.status.home || away) {
@@ -290,23 +305,75 @@ export class GardenUi {
 
   // ---- input ----------------------------------------------------------------------------
 
-  /** A tap on the canvas: a pin, or a bed. True when the garden took it. */
+  /** A tap on the canvas: a pin, or a find (its sphere from high up, its bed below). True when the garden took it. */
   tap(x: number, y: number, width: number, height: number): boolean {
-    const w = this.world;
-    const pin = this.pins.pick(x, y, width, height, w.rig.camera);
+    const pin = this.pins.pick(x, y, width, height, this.world.rig.camera);
     if (pin) {
       if (pin.kind === 'muse') this.findMuse();
       else this.openFind(pin.id.slice('liked:'.length));
       return true;
     }
-    if (this.visit.away) return false;
-    const hit = w.pick((x / width) * 2 - 1, 1 - (y / height) * 2);
-    if (!hit) return false;
-    const bed = bedAt(this.layout, hit.dir, w.growth.radius);
+    const bed = this.findAt(x, y, width, height);
     if (!bed) return false;
     if (!this.state.visitedBasket(bed.basket)) this.goToBasket(bed.basket);
     else this.openFind(bed.find);
     return true;
+  }
+
+  /** The find under a point on the canvas (px): its sphere when the spheres show, else the bed the surface pick lands in. */
+  private findAt(x: number, y: number, width: number, height: number): Bed | null {
+    const w = this.world;
+    if (this.visit.away) return null;
+    if ((this.marks?.spheresShown() ?? 0) > 0.5) {
+      const R = w.growth.radius;
+      let best: Bed | null = null;
+      let bestD: number = SPHERE.slop;
+      for (const bed of this.layout.beds.values()) {
+        // only what is drawn: planted, and on this side of the horizon
+        if (!this.state.visitedBasket(bed.basket) || this.basketFlight.waiting(bed.find)) continue;
+        if (w.rig.camera.position.dot(bed.dir) <= R + bed.ground + SPHERE.height) continue;
+        const p = this.project(bed.dir, bed.ground + SPHERE.height, width, height);
+        const d = p ? Math.hypot(p.x - x, p.y - y) : Infinity;
+        if (d < bestD) {
+          bestD = d;
+          best = bed;
+        }
+      }
+      return best;
+    }
+    const hit = w.pick((x / width) * 2 - 1, 1 - (y / height) * 2);
+    return hit ? bedAt(this.layout, hit.dir, w.growth.radius) : null;
+  }
+
+  /** The pointer moved (null: it left the window). Picked at the next frame, so at most once a frame. */
+  private pointerAt(e: PointerEvent | null): void {
+    const canvas = e && e.pointerType !== 'touch' && e.buttons === 0 && e.target instanceof HTMLCanvasElement ? e.target : null;
+    if (e && canvas) {
+      const r = canvas.getBoundingClientRect();
+      this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top, canvas };
+      this.pointerMoved = true;
+      return;
+    }
+    this.pointer = null;
+    this.setHovered(null);
+    for (const c of document.getElementsByTagName('canvas')) c.style.cursor = '';
+  }
+
+  private hover(at: { x: number; y: number; canvas: HTMLCanvasElement }): void {
+    this.pointerMoved = false;
+    const { clientWidth: width, clientHeight: height } = at.canvas;
+    const pin = this.pins.pick(at.x, at.y, width, height, this.world.rig.camera);
+    const bed = pin ? null : this.findAt(at.x, at.y, width, height);
+    const shown = bed && this.state.visitedBasket(bed.basket) && !this.basketFlight.waiting(bed.find) ? bed.find : null;
+    this.setHovered(shown);
+    at.canvas.style.cursor = pin || shown ? 'pointer' : '';
+  }
+
+  private setHovered(id: string | null): void {
+    if (id === this.hovered) return;
+    this.hovered = id;
+    this.beds.hover(id);
+    this.marks?.hover(id);
   }
 
   /** You took the camera (a drag, the wheel, a key): any flight ends there. */
