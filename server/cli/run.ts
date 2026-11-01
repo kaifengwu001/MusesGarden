@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Instant, LifePolicy, MuseId, MuseState, StoredEvent } from '../../src/muse/contract';
+import type { CastFile, Discovery, Instant, LifePolicy, MediaKind, MuseId, MuseState, Network, StoredEvent } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
@@ -109,7 +109,33 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
 
   const reflections = all.reduce((n, { s }) => n + s.reflections.length, 0);
   out.push({ name: 'reflections committed', pass: reflections > 0, detail: `${reflections}` });
+
+  const finds = all.flatMap(({ s }) => [...s.discoveries.values()]);
+  const kinds = new Set(all.flatMap(({ s }) => delivered(s)).map((d) => d.media.kind));
+  const unknown = finds.filter((d) => !KINDS.includes(d.media.kind)).length;
+  out.push({
+    name: 'every find is a reel, post, article or video, and baskets hold all four',
+    pass: finds.length > 0 && unknown === 0 && kinds.size === KINDS.length,
+    detail: `${finds.length} finds, ${unknown} without a kind; kinds in baskets: ${[...kinds].sort().join(', ')}`,
+  });
   return out;
+}
+
+const KINDS: readonly MediaKind[] = ['reel', 'post', 'article', 'video'];
+
+/** The finds a Muse has handed over in baskets. */
+export function delivered(s: MuseState): Discovery[] {
+  return s.baskets.flatMap((b) => b.items.flatMap((id) => s.discoveries.get(id) ?? []));
+}
+
+/** Shares of kinds and networks among `finds`, as percentages. */
+export function mediaMix(finds: readonly Discovery[]): { kinds: Record<MediaKind, number>; networks: Partial<Record<Network, number>> } {
+  const pct = (n: number) => Math.round((100 * n) / Math.max(1, finds.length));
+  const kinds = Object.fromEntries(KINDS.map((k) => [k, pct(finds.filter((d) => d.media.kind === k).length)])) as Record<MediaKind, number>;
+  const networks: Partial<Record<Network, number>> = {};
+  for (const d of finds) networks[d.media.network] = (networks[d.media.network] ?? 0) + 1;
+  for (const n of Object.keys(networks) as Network[]) networks[n] = pct(networks[n] ?? 0);
+  return { kinds, networks };
 }
 
 /** Rest counted the way the engine counts it: each stretch to the day it ended, a pause for work ending a stretch. */

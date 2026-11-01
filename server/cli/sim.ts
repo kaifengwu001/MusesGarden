@@ -7,7 +7,7 @@ import { renderSoulSection } from '../domain/soul';
 import { localDay } from '../domain/time';
 import { buildGarden } from '../engine/compose';
 import { loadCast } from '../fixtures/cast';
-import { checks, run, seedCast } from './run';
+import { checks, delivered, mediaMix, run, seedCast } from './run';
 
 const { values } = parseArgs({
   options: {
@@ -91,6 +91,15 @@ for (const r of owner) {
 }
 const shares = [...weeks.entries()].sort(([a], [b]) => a - b).map(([w, xs]) => `week ${w + 1}: ${(xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2)}`);
 console.info(`Owner-driven trip share: ${shares.join('  ')}`);
+
+const states = garden.engine.museIds().flatMap((id) => garden.engine.state(id) ?? []);
+const show = (mix: ReturnType<typeof mediaMix>) =>
+  `${Object.entries(mix.kinds).map(([k, v]) => `${k} ${v}%`).join(' ')} | ${Object.entries(mix.networks).map(([k, v]) => `${k} ${v}%`).join(' ')}`;
+console.info(`\nIn baskets (kinds | networks), all Muses: ${show(mediaMix(states.flatMap(delivered)))}`);
+for (const s of states) {
+  const t = s.temperament;
+  console.info(`  ${s.seed.name.padEnd(8)} focus ${t.focus} curiosity ${t.curiosity} whimsy ${t.whimsy} novelty ${t.novelty}: ${show(mediaMix(delivered(s)))}`);
+}
 
 if (hero) {
   const s = garden.engine.state(hero);
