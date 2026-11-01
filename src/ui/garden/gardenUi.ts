@@ -17,7 +17,7 @@ import { Flight, type Framing } from '../../view/flight';
 import type { World } from '../../world';
 import { BasketsSheet } from './baskets';
 import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
-import { button, dayName, el } from './dom';
+import { button, chipNote, dayName, el } from './dom';
 import { FindCard, topicColour } from './findCard';
 import './garden.css';
 import { ICONS } from './icons';
@@ -185,7 +185,7 @@ export class GardenUi {
       travel: (id) => this.board(id),
     });
     this.basketsSheet = new BasketsSheet(this.root, this.state, (id, from) => this.goToBasket(id, from));
-    this.museSheet = new MuseSheet(this.root, this.state, { muse: museFace, friend: friendFace }, (home) => this.setHome(home));
+    this.museSheet = new MuseSheet(this.root, this.state, { muse: museFace, friend: friendFace });
     this.travelSheet = new TravelSheet(this.root, this.state, (id) => this.board(id));
 
     this.toastEl = el('div', 'g-toast');
@@ -221,7 +221,7 @@ export class GardenUi {
     this.pinsButton.setAttribute('aria-pressed', String(s.pins));
     const home = s.status.home;
     this.portrait.classList.toggle('is-out', !home);
-    this.status.innerHTML = `<i></i>${home ? 'at home' : 'out exploring'}`;
+    this.status.replaceChildren(el('i'), chipNote(s.statusNote, s.snapshot?.friends.map((f) => f.name) ?? []));
     this.sign.classList.toggle('is-on', !home);
     this.homeButton.title = home ? 'Muse’s cottage' : 'Muse’s cottage: Muse is out';
     if (change === 'snapshot' && s.freshBasket) {
@@ -233,7 +233,7 @@ export class GardenUi {
       this.travelSheet.render();
     }
     if (change === 'baskets' || change === 'snapshot') this.basketsSheet.render();
-    if (change === 'interests' || change === 'snapshot' || change === 'status') this.museSheet.render();
+    if (change === 'interests' || change === 'snapshot' || change === 'status' || change === 'friends') this.museSheet.render();
   }
 
   /** Muse's own planet, when the source names one: the finds were found on it. */
@@ -546,7 +546,7 @@ export class GardenUi {
       const from = tangentToward(place.dir, this.fromFront(MUSE_VIEW.bearing).add(place.dir), new Vector3());
       this.flight.to({ dir: place.dir, ground: place.ground, distance: MUSE_VIEW.distance, height: MUSE_VIEW.height, aim: MUSE_VIEW.aim, from }, R, this.ground);
     } else {
-      this.toast(this.state.status.note ?? 'Muse is out exploring. It’s somewhere round here.');
+      this.toast(this.state.statusNote);
       this.flight.to({ dir: place.dir, ground: place.ground, distance: 22, height: 26, aim: 0 }, R, this.ground);
     }
   }
@@ -563,9 +563,9 @@ export class GardenUi {
   }
 
   private setHome(home: boolean): void {
-    // (a stand-in for the backend's status, from Muse's page: see what the garden does when Muse is out)
+    // (a stand-in for the backend's status, for the probe: see what the garden does when Muse is out)
     const source = this.source as Partial<PlaceholderSource>;
-    const status = home ? { home: true, note: 'Pottering about on the terrace' } : { home: false, note: 'Out exploring past the hills. Back with a basket.' };
+    const status = home ? { home: true, note: 'At home' } : { home: false, note: 'Out exploring' };
     if (source.push) source.push({ type: 'status', status });
     else this.state.receive({ type: 'status', status });
   }

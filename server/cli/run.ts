@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Discovery, Instant, InvitationState, LifePolicy, MediaKind, MuseId, MuseState, Network, RelationshipOrigin, StoredEvent, TopicKey } from '../../src/muse/contract';
+import type { CastFile, Discovery, Instant, InvitationState, LifePolicy, MediaKind, MuseId, MuseState, Network, Reach, RelationshipOrigin, StoredEvent, TopicKey } from '../../src/muse/contract';
+import { bothInReach, layerOf } from '../domain/social/reach';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
@@ -113,11 +114,21 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
 
   const made = friendships(engine);
   const metBeyond = all.reduce((n, { log }) => n + log.filter((e) => e.event.kind === 'encounter' && e.event.where === 'beyond').length, 0) / 2;
+  const state = (id: MuseId) => engine.state(id) as MuseState;
+  // The layers some pair may make friends in, given both owners' friend groups.
+  const open = new Set<Reach>();
+  for (const a of all) for (const b of all) if (a.s.seed.id < b.s.seed.id && bothInReach(a.s, b.s)) open.add(layerOf(a.s, b.s.seed.id));
   out.push({
-    name: 'each path made a friend (strangers, rarer, at least met beyond)',
-    pass: made.introduced > 0 && made['known-on'] > 0 && made['met-beyond'] + metBeyond > 0,
-    detail: `shared ${made.introduced}, known online ${made['known-on']}, strangers ${made['met-beyond']} (${metBeyond} meetings beyond)`,
+    name: 'each path the friend groups allow made a friend (strangers, rarer, at least met beyond)',
+    pass: made.introduced > 0 && (!open.has('known') || made['known-on'] > 0) && (!open.has('everyone') || made['met-beyond'] + metBeyond > 0),
+    detail: `shared ${made.introduced}, known online ${made['known-on']}, strangers ${made['met-beyond']} (${metBeyond} meetings beyond); open: ${[...open].join(', ')}`,
   });
+  const outside = all.reduce(
+    (n, { s, log }) =>
+      n + log.filter((e) => (e.event.kind === 'encounter' || (e.event.kind === 'relationship.changed' && e.event.to === 'friends')) && s.seed.id < e.event.other && !bothInReach(s, state(e.event.other))).length,
+    0,
+  );
+  out.push({ name: 'no Muse meets or befriends outside both owners’ friend groups', pass: outside === 0, detail: `${outside} outside` });
 
   const invitations = (to: InvitationState) => new Set(all.flatMap(({ log }) => log.flatMap((e) => (e.event.kind === 'invitation' && e.event.to === to ? [e.event.id] : [])))).size;
   const [sent, used] = [invitations('sent'), invitations('used')];

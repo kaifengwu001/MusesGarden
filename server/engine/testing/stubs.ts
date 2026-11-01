@@ -39,6 +39,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     soulVersion: 0,
     basketTime: null,
     hidden: new Set(),
+    reach: 'shared',
     working: false,
     workSince: null,
     recentWork: [],
@@ -70,6 +71,8 @@ export const reduceCore: ReduceCore = (s, stored) => {
   switch (e.kind) {
     case 'soul.updated':
       return { ...base, temperament: e.temperament, soulVersion: e.version };
+    case 'owner.settings':
+      return { ...base, reach: e.reach ?? s.reach };
     case 'host.work':
       return { ...base, working: e.state === 'started' };
     case 'episode.started':
@@ -159,6 +162,7 @@ export const social: SocialPolicy = {
   invitationStep: () => ({ ok: false, status: 409, error: 'stub' }),
   visitUntil: () => null,
   photoSlotsLeft: () => 5,
+  inReach: () => true,
   publicProfile: (s) => ({ museId: s.seed.id, name: s.seed.name, worldSeed: s.seed.worldSeed, interests: [], discoveries: [] }),
   ownerLink: (a, b, op) => {
     const to = op === 'introduce' ? 'friends' : 'ended';

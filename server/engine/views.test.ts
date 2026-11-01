@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Dir, Instant, InvitationId, MuseEvent, MuseId, RegionKey } from '../../src/muse/contract';
+import type { Dir, EpisodePlan, Instant, InvitationId, MuseEvent, MuseEventBody, MuseId, RegionKey, TopicKey } from '../../src/muse/contract';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
 import { Engine } from './engine';
+import { museStatus } from './garden';
 import { memoryStore, stubDeps } from './testing/stubs';
 import { Commands, shareCode, Views, type ViewHelpers } from './views';
 
@@ -155,3 +156,77 @@ describe('views', () => {
     expect(engine.now()).toBe(T0 + 2 * H);
   });
 });
+
+/** An engine restarted on a store that holds these events, each Muse's in order, on the real social policy. */
+function restarted(events: readonly (readonly [MuseId, MuseEventBody])[]) {
+  const store = memoryStore();
+  for (const id of [MOSS, WREN, LARK]) store.addMuse({ id, name: id[0].toUpperCase() + id.slice(1), worldSeed: 7, timezone: 'UTC' });
+  const seq = new Map<MuseId, number>();
+  const stored = events.map(([museId, body]) => {
+    seq.set(museId, (seq.get(museId) ?? 0) + 1);
+    return { museId, seq: seq.get(museId)!, event: { ...body, at: T0 } };
+  });
+  store.commit({ remove: [], schedule: [], events: stored });
+  const engine = new Engine({ ...stubDeps(store), social: socialPolicy, reduceSocial }, T0);
+  return { engine, views: new Views(engine, socialPolicy, helpers, new Map()), commands: new Commands(engine, 'fast-forward') };
+}
+
+const LARK = 'lark' as MuseId;
+
+describe('what Muse is doing, in a few words', () => {
+  const until = (minutes: number) => (T0 + minutes * 60_000) as Instant;
+  const started = (plan: EpisodePlan): MuseEventBody => ({ kind: 'episode.started', n: 1, plan });
+  const work: MuseEventBody = { kind: 'host.work', state: 'started' };
+  const travel = started({ activity: 'travel', trip: { kind: 'revisit', topic: 'Pigment' as TopicKey, region: '0:1:1' as RegionKey, question: null } });
+  const beyond = started({ activity: 'beyond', until: until(60) });
+  const guest = started({ activity: 'visit', other: WREN, role: 'guest', until: until(60) });
+  const host = started({ activity: 'visit', other: WREN, role: 'host', until: until(60) });
+
+  it.each<[string, MuseEventBody[], string, string]>([
+    ['at home', [], 'At home', 'At home'],
+    ['working at home', [work], 'Working', 'Working'],
+    ['napping', [started({ activity: 'rest', until: until(30) })], 'Napping', 'Napping'],
+    ['asleep', [started({ activity: 'rest', until: until(120) })], 'Asleep', 'Asleep'],
+    ['out exploring', [travel], 'Exploring: Pigment', 'Out exploring'],
+    ['working while out exploring', [travel, work], 'Working', 'Working'],
+    ['outside the planet', [beyond], 'Traveling outside the planet', 'Traveling outside the planet'],
+    ['working outside the planet', [beyond, work], 'Working outside the planet', 'Working outside the planet'],
+    ['away at a friend’s planet', [guest], "Away at Wren's planet", "Away at Wren's planet"],
+    ['working at a friend’s planet', [guest, work], "Working at Wren's planet", "Working at Wren's planet"],
+    ['hosting', [host], 'Wren is visiting', 'Wren is visiting'],
+    ['working while hosting', [host, work], 'Working', 'Working'],
+  ])('%s: the engine says it, and the garden says it shorter', (_, events, label, note) => {
+    const { views } = restarted(events.map((e) => [MOSS, e] as const));
+    const now = views.now(MOSS, T0)!;
+    expect(now.label).toBe(label);
+    expect(museStatus(now).note).toBe(note);
+    expect(views.garden(MOSS, T0)?.muse.status.note).toBe(note);
+  });
+});
+
+describe('the friend group, through the commands', () => {
+  it('hides a friend outside the owner’s group from the garden without ending it, and widening brings it back', async () => {
+    const both = (a: MuseId, b: MuseId, body: (other: MuseId) => MuseEventBody) => [[a, body(b)], [b, body(a)]] as const;
+    const { engine, views, commands } = restarted([
+      ...both(MOSS, WREN, (other) => ({ kind: 'relationship.changed', other, to: 'friends', origin: 'introduced' })),
+      ...both(MOSS, LARK, (other) => ({ kind: 'owners.connected', other, on: 'instagram' })),
+      ...both(MOSS, LARK, (other) => ({ kind: 'relationship.changed', other, to: 'friends', origin: 'known-on' })),
+    ]);
+    const garden = () => views.garden(MOSS, engine.now())!;
+    expect(garden().muse.reach).toBe('shared');
+    expect(garden().friends.map((f) => f.id)).toEqual([WREN]);
+
+    expect(await commands.setReach(MOSS, 'known')).toEqual({ ok: true });
+    expect(garden().muse.reach).toBe('known');
+    expect(garden().friends.map((f) => [f.id, f.knownOn])).toEqual([
+      [WREN, undefined],
+      [LARK, 'instagram'],
+    ]);
+
+    expect(await commands.setReach(MOSS, 'shared')).toEqual({ ok: true });
+    expect(garden().friends.map((f) => f.id)).toEqual([WREN]);
+    expect(engine.state(MOSS)?.social.relationships.get(LARK)?.status, 'hidden, never ended').toBe('friends');
+    expect(await commands.setReach('nobody' as MuseId, 'known')).toMatchObject({ ok: false, status: 404 });
+  });
+});
+

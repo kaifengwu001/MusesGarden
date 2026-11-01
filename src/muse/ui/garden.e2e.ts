@@ -546,6 +546,11 @@ test('a card for each kind of find: reel, post, article and video', async ({ pag
 
 test('Muse’s page shows a friend tagged as a friend on Instagram or Facebook', async ({ page, request: api }) => {
   test.setTimeout(20 * 60_000);
+  // Both owners' friend groups must take in Instagram and Facebook friends.
+  for (const id of [HERO, 'clover', 'bramble', 'thistle']) {
+    const set = await api.post(`${API}/muses/${id}/garden/reactions`, { data: { type: 'set-reach', reach: 'known' } });
+    expect(set.status(), `${id}'s friend group`).toBe(200);
+  }
   const friend = await advanceUntil(api, 'a friend known on Instagram or Facebook', (s) => s.friends.find((f) => f.knownOn), 12 * 60_000);
   await openGarden(page);
   await page.evaluate(() => (window as unknown as Win).__garden.muse());

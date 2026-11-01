@@ -27,6 +27,7 @@ import type {
   PlantCard,
   PlantPin,
   PlantPreview,
+  Reach,
   RegionKey,
   RegionView,
   SharingView,
@@ -161,6 +162,7 @@ export class Views implements GardenQueries {
         return other ? this.social.publicProfile(other) : null;
       },
       salienceAt: this.helpers.salienceAt,
+      inReach: (id) => this.social.inReach(s, id),
     };
   }
 
@@ -171,17 +173,17 @@ export class Views implements GardenQueries {
     const ep = s.episode;
     const base = { museId, name: s.seed.name, at, working: s.working, companion: null, away: null } as const;
     if (!ep) {
-      return { ...base, activity: 'rest', sleeping: false, since: s.at, until: null, label: s.working ? 'Working (laptop out)' : 'At home', path: [{ dir: home, at }] };
+      return { ...base, activity: 'rest', sleeping: false, since: s.at, until: null, label: s.working ? 'Working' : 'At home', path: [{ dir: home, at }] };
     }
     const plan = ep.plan;
-    const working = (label: string) => (s.working ? `Working (laptop out)${label ? `, ${label}` : ''}` : null);
+    const working = (where: string) => (s.working ? `Working${where}` : null);
     switch (plan.activity) {
       case 'rest': {
         const sleeping = plan.until - ep.start >= SLEEP_MS;
         return { ...base, activity: 'rest', sleeping, since: ep.start, until: plan.until, label: working('') ?? (sleeping ? 'Asleep' : 'Napping'), path: [{ dir: home, at }] };
       }
       case 'beyond':
-        return { ...base, activity: 'beyond', sleeping: false, since: ep.start, until: plan.until, label: working('beyond the planet') ?? 'Gone beyond the planet', path: null, away: { kind: 'beyond' } };
+        return { ...base, activity: 'beyond', sleeping: false, since: ep.start, until: plan.until, label: working(' outside the planet') ?? 'Traveling outside the planet', path: null, away: { kind: 'beyond' } };
       case 'visit': {
         const other = { museId: plan.other, name: this.name(plan.other) };
         if (plan.role === 'host') {
@@ -193,7 +195,7 @@ export class Views implements GardenQueries {
           sleeping: false,
           since: ep.start,
           until: plan.until,
-          label: working(`away at ${other.name}'s planet`) ?? `Away at ${other.name}'s planet`,
+          label: working(` at ${other.name}'s planet`) ?? `Away at ${other.name}'s planet`,
           path: null,
           away: { kind: 'planet', of: plan.other, name: other.name },
         };
@@ -374,6 +376,12 @@ export class Commands implements GardenCommands {
   async setHidden(museId: MuseId, ref: HiddenRef, hidden: boolean): Promise<CommandResult> {
     if (!this.known(museId)) return fail(404, 'no such Muse');
     await this.engine.ownerSettings(museId, hidden ? { kind: 'owner.settings', hide: [ref] } : { kind: 'owner.settings', unhide: [ref] });
+    return ok;
+  }
+
+  async setReach(museId: MuseId, reach: Reach): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    await this.engine.ownerSettings(museId, { kind: 'owner.settings', reach });
     return ok;
   }
 

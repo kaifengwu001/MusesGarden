@@ -15,6 +15,7 @@ import { SOCIAL } from './constants';
 import { invite } from './invitations';
 import { photoSlotsLeft, photoTogether, whereIs } from './photos';
 import { compare, findOverlap, publicProfile, similarity, stretch } from './profile';
+import { bothInReach } from './reach';
 import { areFriends, chemistry, ending, isUnpleasant, relationshipWith } from './relationships';
 
 type Visit = ReturnType<SocialPolicy['chooseVisit']>;
@@ -40,14 +41,14 @@ function visitMs(draw: Draw): number {
 }
 
 /**
- * Free friends with a photo slot on both sides, since every hangout brings a photo. Friends never met yet are first:
- * they meet whatever social time is left. Everyone else needs social time on both sides.
+ * Free friends inside both owners' friend groups with a photo slot on both sides, since every hangout brings a photo.
+ * Friends never met yet are first: they meet whatever social time is left. Everyone else needs social time on both sides.
  */
 function visitable(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant): { readonly first: MuseState[]; readonly friends: MuseState[] } {
   if (photoSlotsLeft(s, now) <= 0) return { first: [], friends: [] };
   const ready = free
     .map((f) => f.state)
-    .filter((f) => areFriends(s, f) && photoSlotsLeft(f, now) > 0)
+    .filter((f) => areFriends(s, f) && bothInReach(s, f) && photoSlotsLeft(f, now) > 0)
     .sort((x, y) => compare(x.seed.id, y.seed.id));
   return {
     first: ready.filter((f) => relationshipWith(s, f.seed.id)?.lastMetAt === null),

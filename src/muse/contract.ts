@@ -2,7 +2,9 @@
 // (src/muse/ui/) both import it. Types only: this file emits no runtime code.
 // Rationale: docs/muse-agent.md.
 
-import type { GardenEvent, GardenSnapshot, MediaKind } from '../garden/types';
+import type { GardenEvent, GardenSnapshot, MediaKind, Reach } from '../garden/types';
+
+export type { Reach };
 
 declare const brand: unique symbol;
 export type Brand<T, B extends string> = T & { readonly [brand]: B };
@@ -354,7 +356,13 @@ export type MuseEventBody =
   | { readonly kind: 'soul.updated'; readonly version: number; readonly topics: readonly TopicKey[]; readonly temperament: Temperament }
   /** Raw MEMORY.md is never stored: only its hash and the allow-listed topics. */
   | { readonly kind: 'memory.updated'; readonly textHash: string; readonly topics: readonly TopicKey[] }
-  | { readonly kind: 'owner.settings'; readonly basketTime?: string | null; readonly hide?: readonly HiddenRef[]; readonly unhide?: readonly HiddenRef[] }
+  | {
+      readonly kind: 'owner.settings';
+      readonly basketTime?: string | null;
+      readonly hide?: readonly HiddenRef[];
+      readonly unhide?: readonly HiddenRef[];
+      readonly reach?: Reach;
+    }
   | { readonly kind: 'owner.introduced' | 'owner.unshared'; readonly other: MuseId }
   /** The two owners are friends on a network. It never reaches another Muse or the public profile. */
   | { readonly kind: 'owners.connected'; readonly other: MuseId; readonly on: KnownOn }
@@ -516,6 +524,8 @@ export interface MuseState {
   readonly soulVersion: number;
   readonly basketTime: string | null;
   readonly hidden: ReadonlySet<HiddenRef>;
+  /** Muse's friend group; 'shared' until the owner widens it. */
+  readonly reach: Reach;
   readonly working: boolean;
   /** When the current work began, while working. */
   readonly workSince: Instant | null;
@@ -645,6 +655,8 @@ export interface SocialPolicy {
   photoSlotsLeft(s: MuseState, now: Instant): number;
   /** The only view of a Muse that crosses to other Muses or owners. */
   publicProfile(s: MuseState): PublicProfile;
+  /** Whether s's owner allows the friend group s and `other` are in: shared, known online, or strangers (server/domain/social/reach.ts). */
+  inReach(s: MuseState, other: MuseId): boolean;
   /** Owners introduced or unshared their Muses. */
   ownerLink(a: MuseState, b: MuseState, op: 'introduce' | 'unshare', now: Instant): PairOutcome;
 }
@@ -713,7 +725,7 @@ export interface NowView {
   readonly sleeping: boolean;
   readonly since: Instant;
   readonly until: Instant | null;
-  /** "Exploring: Pigment → Ultramarine", "Napping", "Gone beyond the planet", "Wren is visiting", "Away at Wren's planet". */
+  /** "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Wren is visiting", "Away at Wren's planet", "Working". */
   readonly label: string;
   /** Muse's route on its own planet; null while beyond or away (no follow). */
   readonly path: readonly { readonly dir: Dir; readonly at: Instant; readonly transport?: true }[] | null;
@@ -897,6 +909,7 @@ export type CommandResult = { readonly ok: true } | { readonly ok: false; readon
 export interface GardenCommands {
   setBasketTime(museId: MuseId, hhmm: string | null): Promise<CommandResult>;
   setHidden(museId: MuseId, ref: HiddenRef, hidden: boolean): Promise<CommandResult>;
+  setReach(museId: MuseId, reach: Reach): Promise<CommandResult>;
   introduce(museId: MuseId, shareCode: string): Promise<CommandResult>;
   unshare(museId: MuseId, other: MuseId): Promise<CommandResult>;
   /** A like or an unlike in the garden. */

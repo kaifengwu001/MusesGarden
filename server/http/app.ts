@@ -183,6 +183,8 @@ function routesFor({ queries, commands, now, media, subscribe }: Garden): readon
           return result(await commands.setHidden(museId, `discovery:${r.id}`, !r.shared));
         case 'use-invitation':
           return result(await commands.useInvitation(museId, r.id as InvitationId));
+        case 'set-reach':
+          return result(await commands.setReach(museId, r.reach));
       }
     },
     media: async ({ params }) => {

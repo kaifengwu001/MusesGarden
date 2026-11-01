@@ -19,6 +19,11 @@ export function button(className: string, label: string, html = '', onClick?: (e
   return b;
 }
 
+/** Muse's status as the portrait's chip says it: in lower case, but a Muse's name at the start keeps its capital. */
+export function chipNote(note: string, names: readonly string[]): string {
+  return names.some((name) => note.startsWith(`${name} `)) ? note : note.charAt(0).toLowerCase() + note.slice(1);
+}
+
 /** A switch; with `words` ([on, off]) it shows the state in words beside it and keeps the label for screen readers. */
 export function toggle(label: string, on: boolean, onChange: (on: boolean) => void, words?: [string, string]): HTMLLabelElement {
   const row = el('label', 'g-toggle');

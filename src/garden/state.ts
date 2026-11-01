@@ -1,5 +1,5 @@
 import type { GardenSource } from './source';
-import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, MuseStatus, Postcard, Reaction } from './types';
+import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, MuseStatus, Postcard, Reach, Reaction } from './types';
 
 // The garden as the interface sees it: the snapshot from the source, kept
 // current by its events, and what you have done here: the finds you liked
@@ -11,7 +11,7 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, MuseStatus, P
 // turns it down). The rest of your side, and likes a source doesn't keep,
 // are remembered in this browser only (localStorage, where it is allowed).
 
-export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'pins' | 'interests' | 'finds' | 'status';
+export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'pins' | 'interests' | 'finds' | 'status' | 'friends';
 
 /** A reaction that flips a switch the source keeps. */
 type Flip = Extract<Reaction, { liked: boolean } | { shared: boolean }>;
@@ -49,6 +49,8 @@ export class GardenState {
   private readonly usedInvitations: Set<string>;
   /** What you flipped here that the source has not sent back yet, by switch and id. */
   private readonly pending = new Map(FLIPS.map((type) => [type, new Map<string, boolean>()]));
+  /** The friend group you picked here, until the source sends it back. */
+  private pendingReach: Reach | null = null;
   /** Whether the liked finds' and Muse's pins show in orbit. */
   pins: boolean;
   /** True for a visitor who has never opened the garden in this browser: the older postcards and baskets count as seen. */
@@ -334,6 +336,42 @@ export class GardenState {
 
   get status(): MuseStatus {
     return this.snapshot?.muse.status ?? { home: true };
+  }
+
+  /** What Muse is up to, in a few words: the source's line, or else at home or out exploring. */
+  get statusNote(): string {
+    const status = this.status;
+    return status.note ?? (status.home ? 'At home' : 'Out exploring');
+  }
+
+  get reach(): Reach {
+    return this.pendingReach ?? this.snapshot?.muse.reach ?? 'shared';
+  }
+
+  /**
+   * Show the new friend group at once, then read the friends it takes in back from the source. It holds until the
+   * source sends that group back; if the source turns it down, the page shows what the source holds again.
+   */
+  setReach(reach: Reach): void {
+    if (reach === this.reach) return;
+    this.pendingReach = reach;
+    const reread = (fresh: GardenSnapshot): void => {
+      const s = this.snapshot;
+      if (!s) return;
+      this.snapshot = { ...s, friends: fresh.friends, muse: { ...s.muse, reach: fresh.muse.reach } };
+      if (this.pendingReach === fresh.muse.reach) this.pendingReach = null;
+      this.emit('friends');
+    };
+    this.source.react({ type: 'set-reach', reach }).then(
+      () => this.source.load().then(reread, (error: unknown) => console.warn('garden: the friends could not be read again', error)),
+      (error: unknown) => {
+        console.warn('garden: a reaction could not be sent', error);
+        if (this.pendingReach !== reach) return;
+        this.pendingReach = null;
+        this.emit('friends');
+      },
+    );
+    this.emit('friends');
   }
 
   setPins(on: boolean): void {

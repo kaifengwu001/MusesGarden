@@ -51,6 +51,8 @@ export interface GardenInput {
   /** Any Muse's public profile, this one's included. */
   readonly profile: (id: MuseId) => PublicProfile | null;
   readonly salienceAt: (i: MuseInterest, at: Instant) => number;
+  /** Whether the owner's friend group takes in the Muse `other`. */
+  readonly inReach: (other: MuseId) => boolean;
 }
 
 export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
@@ -170,9 +172,11 @@ export function soulLine(soul: string | null): string {
   return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '')}…`;
 }
 
+/** The garden says what Muse is doing in a few words: the engine's label, without the trip's topics. */
 export function museStatus(now: NowView): MuseStatus {
   const out = now.activity === 'travel' || now.away !== null;
-  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note: now.label };
+  const note = now.activity === 'travel' && !now.working ? 'Out exploring' : now.label;
+  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note };
 }
 
 /** The flower an interest grows as, from its topic alone, so it never changes. */
@@ -240,7 +244,7 @@ function placeOf(input: GardenInput, p: PhotoSpec, moment: Moment | undefined): 
   const plan = moment?.plan;
   switch (plan?.activity) {
     case 'beyond':
-      return 'Beyond the planet';
+      return 'Outside the planet';
     case 'travel':
       return moment?.hop ? `Out exploring ${topicLabel(moment.hop)}` : 'Out exploring';
     case 'visit':
@@ -302,7 +306,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   ];
   return {
     world: { seed: s.seed.worldSeed, g: input.g },
-    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now) },
+    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now), reach: s.reach },
     interests: interests(input, finds, index),
     friends: friends(input, index),
     baskets: delivered.map(({ basket }) => basket),
@@ -328,11 +332,12 @@ function interests(input: GardenInput, finds: readonly Find[], index: LogIndex):
   }));
 }
 
+/** Muse's friends inside the owner's friend group. The rest stay friends, out of sight until the group takes them in again. */
 function friends(input: GardenInput, index: LogIndex): MuseFriend[] {
   const { s } = input;
   const mine = input.profile(s.seed.id)?.interests ?? [];
   return [...s.social.relationships.values()]
-    .filter((r) => r.status === 'friends')
+    .filter((r) => r.status === 'friends' && input.inReach(r.other))
     .map((r) => {
       const other = input.profile(r.other);
       const theirs = new Set(other?.interests.map((i) => i.topic));

@@ -7,7 +7,7 @@ import terraceUrl from '../assets/postcards/terrace.jpg';
 import { tangentToward, travel } from '../planet/geo';
 import { art, MOTIF_ASPECT, type Motif } from './art';
 import type { GardenSource } from './source';
-import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaKind, MuseFriend, Postcard } from './types';
+import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaKind, MuseFriend, Postcard, Reach } from './types';
 
 // The example gallery the garden shows until a backend is plugged in
 // (source.ts): ten interests, six baskets of finds over the last ten days
@@ -199,7 +199,8 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
     muse: {
       name: 'Muse',
       soul: 'Curious and a little shy. Likes things made slowly by hand, and anything that glows in the dark.',
-      status: { home: true, note: 'Pottering about on the terrace' },
+      status: { home: true, note: 'At home' },
+      reach: 'shared',
     },
     interests,
     friends: FRIENDS.map(({ metBack, ...f }) => ({ ...f, met: dayBefore(metBack, now) })),
@@ -216,13 +217,22 @@ export interface PlaceholderSource extends GardenSource {
 
 export function placeholderSource(): PlaceholderSource {
   const listeners = new Set<(event: GardenEvent) => void>();
+  // The friend group, kept as a backend keeps it: a friend tagged with a network stands for the Instagram and Facebook
+  // layer, the rest for the people the owner shared Muse with.
+  let reach: Reach = 'shared';
   return {
-    load: () => Promise.resolve(placeholderSnapshot()),
+    load: () => {
+      const s = placeholderSnapshot();
+      return Promise.resolve({ ...s, muse: { ...s.muse, reach }, friends: s.friends.filter((f) => reach !== 'shared' || !f.knownOn) });
+    },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    react: () => Promise.resolve(),
+    react: (reaction) => {
+      if (reaction.type === 'set-reach') reach = reaction.reach;
+      return Promise.resolve();
+    },
     push(event) {
       for (const listener of listeners) listener(event);
     },

@@ -287,7 +287,7 @@ test.describe('finds', () => {
 
   /** A garden with nothing in it yet, served in place of a backend. */
   const EMPTY = {
-    muse: { name: 'Muse', soul: 'Quiet.', status: { home: true } },
+    muse: { name: 'Muse', soul: 'Quiet.', status: { home: true }, reach: 'shared' },
     interests: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ id: `topic-${i}`, name: `Topic ${i}`, species: i % 4, variant: (i * 0.37) % 1, shared: true, since: '2026-10-01' })),
     friends: [],
     baskets: [],

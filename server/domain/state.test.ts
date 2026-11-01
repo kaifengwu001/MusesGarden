@@ -264,3 +264,15 @@ describe('the owner likes things in the garden', () => {
     expect(life.state.likes.size).toBe(0);
   });
 });
+
+describe('the friend group', () => {
+  it('starts at the Muses of people the owner shares with, and the owner’s settings move it', () => {
+    const life = new Life();
+    expect(life.state.reach).toBe('shared');
+    life.push(t('2026-11-03T09:00:00-08:00'), { kind: 'owner.settings', reach: 'everyone' });
+    life.push(t('2026-11-03T10:00:00-08:00'), { kind: 'owner.settings', basketTime: '18:30' });
+    expect(life.state.reach).toBe('everyone');
+    life.push(t('2026-11-03T11:00:00-08:00'), { kind: 'owner.settings', reach: 'known' });
+    expect(life.state.reach).toBe('known');
+  });
+});

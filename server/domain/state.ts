@@ -51,6 +51,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     soulVersion: 0,
     basketTime: null,
     hidden: new Set(),
+    reach: 'shared',
     working: false,
     episode: null,
     episodes: 0,
@@ -105,7 +106,7 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       const hidden = new Set(s.hidden);
       for (const r of e.hide ?? []) hidden.add(r);
       for (const r of e.unhide ?? []) hidden.delete(r);
-      return { ...s, hidden, basketTime: e.basketTime === undefined ? s.basketTime : e.basketTime };
+      return { ...s, hidden, basketTime: e.basketTime === undefined ? s.basketTime : e.basketTime, reach: e.reach ?? s.reach };
     }
     case 'episode.started':
       return startEpisode(s, e, at);

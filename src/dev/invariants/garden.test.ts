@@ -4,8 +4,9 @@ import { BED_RADIUS, bedAt, layOut, type PlacementGround } from '../../garden/pl
 import { dayBefore, placeholderSnapshot, placeholderSource } from '../../garden/placeholder';
 import { httpSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
-import type { Basket, Find, GardenSnapshot } from '../../garden/types';
+import type { Basket, Find, GardenSnapshot, Reach } from '../../garden/types';
 import { angleBetween } from '../../planet/geo';
+import { chipNote } from '../../ui/garden/dom';
 import type { FieldParams } from '../../planet/fields';
 import { createGroundSample, generateLayout, Terrain, type GroundSample } from '../../planet/terrain';
 
@@ -334,6 +335,91 @@ describe('likes and sharing, kept by the backend', () => {
     expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([false, true]);
     expect(changes).toEqual(['postcards', 'finds', 'postcards', 'finds']);
     vi.restoreAllMocks();
+  });
+});
+
+describe('the friend group', () => {
+  /** A backend that keeps the friend group: the placeholders' friends, all but Pip's inside the narrowest group. */
+  function keeping(): { source: ReturnType<typeof placeholderSource>; sent: unknown[] } {
+    const s = placeholderSnapshot(NOW);
+    let reach: Reach = 'shared';
+    const sent: unknown[] = [];
+    const source = placeholderSource();
+    source.load = () => Promise.resolve({ ...s, muse: { ...s.muse, reach }, friends: s.friends.filter((f) => reach !== 'shared' || f.id !== 'pip') });
+    source.react = (r) => {
+      sent.push(r);
+      if (r.type === 'set-reach') reach = r.reach;
+      return Promise.resolve();
+    };
+    return { source, sent };
+  }
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('shows the new group at once, tells the backend, and reads back the friends it takes in', async () => {
+    const { source, sent } = keeping();
+    const state = new GardenState(source);
+    await state.start();
+    const changes: string[] = [];
+    state.subscribe((c) => changes.push(c));
+    const friends = () => state.snapshot?.friends.map((f) => f.id);
+    expect(state.reach).toBe('shared');
+    expect(friends()).not.toContain('pip');
+
+    state.setReach('everyone');
+    expect(state.reach, 'at once').toBe('everyone');
+    expect(sent).toEqual([{ type: 'set-reach', reach: 'everyone' }]);
+    await settled();
+    expect(friends()).toContain('pip');
+    state.setReach('shared');
+    await settled();
+    expect([state.reach, friends()?.includes('pip')]).toEqual(['shared', false]);
+    expect(changes).toEqual(['friends', 'friends', 'friends', 'friends']);
+  });
+
+  it('the placeholders keep it too: friends known online show once the group takes them in', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    const known = () => state.snapshot?.friends.filter((f) => f.knownOn).length;
+    expect([state.reach, known()]).toEqual(['shared', 0]);
+    state.setReach('known');
+    await settled();
+    expect([state.reach, known()]).toEqual(['known', 2]);
+  });
+
+  it('holds the group a backend does not keep, and goes back when the backend turns it down', async () => {
+    const forgetful = placeholderSource();
+    forgetful.react = () => Promise.resolve();
+    const quiet = new GardenState(forgetful);
+    await quiet.start();
+    quiet.setReach('known');
+    await settled();
+    expect(quiet.reach, 'a backend that keeps nothing: the page still shows your pick').toBe('known');
+
+    const { source } = keeping();
+    source.react = () => Promise.reject(new Error('400'));
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const state = new GardenState(source);
+    await state.start();
+    state.setReach('everyone');
+    expect(state.reach).toBe('everyone');
+    await settled();
+    expect(state.reach).toBe('shared');
+    vi.restoreAllMocks();
+  });
+});
+
+describe('what Muse is doing, as the garden says it', () => {
+  it('falls back to at home or out exploring, and the portrait says it in lower case but keeps a Muse’s name', async () => {
+    const source = placeholderSource();
+    const state = new GardenState(source);
+    await state.start();
+    expect(state.statusNote).toBe('At home');
+    source.push({ type: 'status', status: { home: false } });
+    expect(state.statusNote).toBe('Out exploring');
+    source.push({ type: 'status', status: { home: false, note: 'Traveling outside the planet' } });
+    expect(chipNote(state.statusNote, ['Wren'])).toBe('traveling outside the planet');
+    expect(chipNote("Away at Wren's planet", ['Wren'])).toBe("away at Wren's planet");
+    expect(chipNote('Wren is visiting', ['Wren'])).toBe('Wren is visiting');
   });
 });
 

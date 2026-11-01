@@ -175,6 +175,7 @@ describe('reactions from the garden', () => {
     ['share-find', { type: 'share-find', id: 'd-pigment', shared: true }, { name: 'setHidden', args: ['hero', 'discovery:d-pigment', false] }],
     ['keep-find', { type: 'share-find', id: 'd-pigment', shared: false }, { name: 'setHidden', args: ['hero', 'discovery:d-pigment', true] }],
     ['use-invitation', { type: 'use-invitation', id: 'inv-wren-hero-1' }, { name: 'useInvitation', args: ['hero', 'inv-wren-hero-1'] }],
+    ['set-reach', { type: 'set-reach', reach: 'known' }, { name: 'setReach', args: ['hero', 'known'] }],
   ])('%s reaches its command', async (_, reaction, call) => {
     await serveFake();
     expect(await post('/api/muses/hero/garden/reactions', reaction)).toEqual({ status: 200, body: { ok: true } });
@@ -199,6 +200,8 @@ describe('reactions from the garden', () => {
     ['a like without liked', { type: 'like-find', id: 'd-pigment' }],
     ['a share without shared', { type: 'share-find', id: 'd-pigment', liked: true }],
     ['an empty id', { type: 'use-invitation', id: '' }],
+    ['a friend group that is not one of the three', { type: 'set-reach', reach: 'friends' }],
+    ['a friend group change without the group', { type: 'set-reach', id: 'everyone' }],
     ['not an object', [1, 2]],
   ])('refuses %s, and sends nothing on', async (_, reaction) => {
     await serveFake();

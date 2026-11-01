@@ -85,10 +85,10 @@ There is no fixed bedtime. Muse can travel at any hour, and sleep is a long rest
 | --- | --- | --- | --- |
 | `rest` | Lies in the grass, waters flowers, or naps. A rest of 90 min or more shows as sleep. | Muse near its house | Sometimes a photo. A due reflection runs at the start of a rest. |
 | `travel` on its planet | Explores the internet by exploring its planet. It transports to a region, old or new, then hops from spot to spot, looks at pages, and keeps the best. | Muse moves around the region. Fog lifts when a new area opens. Plants appear where finds are kept. | Hop records, finds planted where Muse found them, new areas, questions, photos |
-| `travel` beyond | Leaves its planet to roam the space between planets, where other Muses roam too | "Muse has gone beyond the planet", with no follow | Encounters with strangers, photos. No finds. |
+| `travel` beyond | Leaves its planet to roam the space between planets, where other Muses roam too | "Traveling outside the planet", with no follow | Encounters with strangers, photos. No finds. |
 | `visit` as host | A friend's Muse comes over | The friend's Muse on the owner's planet | A gift exchange and a photo together, every time, plus rapport |
 | `visit` as guest | Muse goes to a friend's planet | "Away at Wren's planet", with no follow | The same as for the host |
-| work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot, or "working" while beyond or away | Nothing collected. Rarely a photo. |
+| work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot ("Working"), or "Working outside the planet" or "Working at Wren's planet" while beyond or away | Nothing collected. Rarely a photo. |
 
 Work is not an activity the policy draws. Work time is exactly the busy time the Muse app reports. When work starts, the current episode pauses in place. When work ends, the episode resumes at the same spot. Nothing sends Muse home. Free time depends only on how much work the owner gives Muse.
 
@@ -320,6 +320,21 @@ Muse makes friends three ways, most likely first: its owner shares it with a fri
 | Owners share Muse | They are friends at once, and a first-meeting rule brings them together soon | Already friends | `introduced` |
 | Owners are friends on Instagram or Facebook | Online, while both Muses explore, wherever they are | Familiarity 1, then a draw at 0.5 + 0.5 × the lower sociability | `known-on` |
 | Strangers | Both beyond the planet | Familiarity on both sides, then both say yes | `met-beyond` |
+
+### The friend group
+
+Each owner picks how far out Muse makes friends: `owner.settings.reach`, folded into `MuseState.reach` (`server/domain/social/reach.ts`).
+
+| Reach | Muse makes and keeps friends with |
+| --- | --- |
+| `shared` (the default) | The Muses of people the owner shared Muse with |
+| `known` | Also the Muses of the owner's Instagram and Facebook friends |
+| `everyone` | Also strangers met beyond the planet |
+
+- **A pair's layer.** It is `shared` if either owner shared Muse with the other (the relationship's origin is `introduced`), else `known` if the owners are connected online, else `everyone`. Both logs hold what decides it, so the layer reads the same from either side.
+- **Both owners decide.** Two Muses meet, beyond or online, only when both owners' groups take in their layer. `encounterRate` is 0 otherwise, and the engine checks again when a meeting falls due, so one drawn before an owner narrowed the group never happens.
+- **Narrowing hides, never ends.** Friends visit only inside both owners' groups, and each owner's garden lists only the friends inside their own. The friendship stays as it was, so widening the group brings the friend back.
+- **The sim.** `npm run sim` keeps every owner at `shared`, and `--reach known` or `--reach everyone` sets them all. Two sim checks hold the rule: every path the groups allow makes a friend, and nobody meets or befriends outside both owners' groups.
 
 ### Owners who share Muse meet soon
 

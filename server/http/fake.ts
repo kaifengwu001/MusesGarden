@@ -85,7 +85,7 @@ function sampleGarden(): GardenSnapshot {
   ];
   return {
     world: { seed: sampleWorld.worldSeed, g: sampleWorld.g },
-    muse: { name: sampleNowExploring.name, soul: soulLine(sampleSoulMd), status: museStatus(sampleNowExploring) },
+    muse: { name: sampleNowExploring.name, soul: soulLine(sampleSoulMd), status: museStatus(sampleNowExploring), reach: 'shared' },
     interests: topics.map((topic) => ({
       id: topic,
       name: topicLabel(topic as TopicKey),
@@ -155,6 +155,7 @@ export function fakeCommands(): FakeCommands {
     calls,
     setBasketTime: (...args) => accept({ name: 'setBasketTime', args }),
     setHidden: (...args) => accept({ name: 'setHidden', args }),
+    setReach: (...args) => accept({ name: 'setReach', args }),
     introduce: (...args) => accept({ name: 'introduce', args }),
     unshare: (...args) => accept({ name: 'unshare', args }),
     like: (...args) => accept({ name: 'like', args }),
