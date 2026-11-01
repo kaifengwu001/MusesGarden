@@ -30,7 +30,6 @@ const cast = loadCast(values.cast);
 const hero = cast.members.find((m) => m.role === 'hero')?.id ?? null;
 const garden = buildGarden({
   db: values.db ?? null,
-  source: 'fixture',
   mind: values.mind === 'meta' ? 'meta' : 'heuristic',
   hero,
   start,

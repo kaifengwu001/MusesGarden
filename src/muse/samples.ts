@@ -30,7 +30,7 @@ const topic = (s: string) => s as TopicKey;
 const region = (s: string) => s as RegionKey;
 const plant = (s: string) => s as DiscoveryId;
 const at = (iso: string) => Date.parse(iso) as Instant;
-const wiki = (title: string) => `https://en.wikipedia.org/wiki/${title.replace(/ /g, '_')}` as CanonicalUrl;
+const link = (url: string) => url as CanonicalUrl;
 const dir = (x: number, y: number, z: number): Dir => {
   const n = Math.hypot(x, y, z);
   return [x / n, y / n, z / n];
@@ -45,32 +45,39 @@ const NOW = at('2026-11-04T15:20:00-08:00');
 export const sampleCards: readonly PlantCard[] = [
   {
     id: plant('d-botanical-illustration'),
-    title: 'Botanical illustration',
-    url: wiki('Botanical illustration'),
-    summary:
-      'Botanical illustration is the art of depicting the form, color, and details of plant species, frequently in watercolor paintings.',
-    thumb: 'https://upload.wikimedia.org/wikipedia/commons/thumb/sample-botanical.jpg/320px-sample-botanical.jpg',
+    title: 'How to Draw a Fall Leaf: A Botanical Art Tutorial',
+    url: link('https://drawbotanical.com/draw-fall-leaf/'),
+    summary: 'Paint Colorful Autumn Leaves with Watercolor & Colored Pencils Falling leaves are trees’ way to declare that summer is out and sweater season is in! Put down your pumpkin spice, pick up your art supplies, and create your own colorful leaf illustration to capture that fresh autumn feeling. Scroll through this post for basic … Continued',
+    thumb: 'https://drawbotanical.com/wp-content/uploads/vern_fannin_leaves_autumn_fall.jpg',
     reason: 'These drawings have to be true and beautiful at once. I want to know how they managed both.',
     foundAt: at('2026-11-02T10:40:00-08:00'),
     place: { dir: dir(0.42, 0.85, 0.31), region: region('2:1:2') },
+    media: { kind: 'article', network: 'web', author: 'Emet Lipson', image: 'https://drawbotanical.com/wp-content/uploads/vern_fannin_leaves_autumn_fall.jpg', minutes: 5, site: 'Draw Botanical LLC', published: '2026-10-01' },
+    pursuing: topic('Botanical illustration'),
   },
   {
     id: plant('d-pigment'),
-    title: 'Pigment',
-    url: wiki('Pigment'),
-    summary: 'A pigment is a powder used to add or alter color or change visual appearance.',
+    title: 'The Secret to Solvent-Free Oil Painting Glazes: Oleogel',
+    url: link('https://www.youtube.com/shorts/B3hw0bZpwVE'),
+    summary: 'The Secret to Solvent-Free Oil Painting Glazes: Oleogel',
+    thumb: 'https://i.ytimg.com/vi/B3hw0bZpwVE/hq2.jpg',
     reason: 'Every colour in those plates came from something ground up. I want to know what.',
     foundAt: at('2026-11-02T11:20:00-08:00'),
     place: { dir: dir(0.45, 0.83, 0.33), region: region('2:1:2') },
+    media: { kind: 'reel', network: 'youtube', author: 'Rublev Colours', image: 'https://i.ytimg.com/vi/B3hw0bZpwVE/hq2.jpg', aspect: 0.563, site: 'YouTube' },
+    pursuing: topic('Botanical illustration'),
   },
   {
     id: plant('d-ultramarine'),
-    title: 'Ultramarine',
-    url: wiki('Ultramarine'),
-    summary: 'Ultramarine is a deep blue color pigment originally made by grinding lapis lazuli into a powder.',
+    title: 'painting this tested my sanity. ultramarine ash is an unmixable pigment',
+    url: link('https://bsky.app/profile/katherinelam.bsky.social/post/3mu35m6r7kc2z'),
+    summary: 'painting this tested my sanity. ultramarine ash is an unmixable pigment',
+    thumb: 'https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:nmblou33nndqfd3tntl3qgbs/bafkreibseadzysmhfpbwuggoyli27wet3h765cow5sc2zfs3j6o4kweree',
     reason: 'The blue cost more than gold. Painters saved it for the robes that mattered most.',
     foundAt: at('2026-11-02T12:05:00-08:00'),
     place: { dir: dir(0.49, 0.8, 0.35), region: region('2:2:2') },
+    media: { kind: 'post', network: 'bluesky', author: '@katherinelam.bsky.social', image: 'https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:nmblou33nndqfd3tntl3qgbs/bafkreibseadzysmhfpbwuggoyli27wet3h765cow5sc2zfs3j6o4kweree', aspect: 1.222, site: 'Bluesky', published: '2026-08-27' },
+    pursuing: topic('Ultramarine'),
   },
 ];
 
@@ -244,8 +251,18 @@ export const sampleVisit: VisitWorldView = {
     {
       id: plant('w-lichen'),
       dir: dir(0.9, 0.2, 0.38),
-      preview: { title: 'Lichen', reason: 'Two living things sharing one body.' },
-      card: { ...sampleCards[0], id: plant('w-lichen'), title: 'Lichen', url: wiki('Lichen'), reason: 'Two living things sharing one body.' },
+      preview: { title: 'Stump', thumb: 'https://live.staticflickr.com/65535/55622570515_774b7b3658_b.jpg', reason: 'Two living things sharing one body.' },
+      card: {
+        ...sampleCards[0],
+        id: plant('w-lichen'),
+        title: 'Stump',
+        url: link('https://www.flickr.com/photos/ztf/55622570515/'),
+        summary: 'It\'s the stump of a fence post overgrown with lichen that I found today. 365/303 - Year 15 Photo 3590',
+        thumb: 'https://live.staticflickr.com/65535/55622570515_774b7b3658_b.jpg',
+        reason: 'Two living things sharing one body.',
+        media: { kind: 'post', network: 'flickr', author: 'Zog the Frog', image: 'https://live.staticflickr.com/65535/55622570515_774b7b3658_b.jpg', aspect: 1.364, site: 'Flickr', published: '2026-10-30' },
+        pursuing: topic('Lichen'),
+      },
     },
     { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), preview: null, card: null },
   ],
@@ -284,7 +301,7 @@ export const sampleMind: MindView = {
       salienceNow: 0.57,
       affinity: 0.35,
       stage: 'emerging',
-      sources: [wiki('Botanical illustration'), wiki('Herbarium')],
+      sources: [link('https://drawbotanical.com/draw-fall-leaf/'), link('https://lizzieharper.co.uk/2026/08/life-on-the-edge-illustrating-insects-on-the-south-devon-coastline/')],
       lastPursued: at('2026-11-04T12:00:00-08:00'),
       seededBy: 'owner-memory',
       ownerMentionAt: at('2026-11-02T08:00:00-08:00'),
@@ -297,7 +314,7 @@ export const sampleMind: MindView = {
       salienceNow: 0.79,
       affinity: 0.2,
       stage: 'hypothesis',
-      sources: [wiki('Ultramarine')],
+      sources: [link('https://bsky.app/profile/katherinelam.bsky.social/post/3mu35m6r7kc2z')],
       lastPursued: at('2026-11-04T15:00:00-08:00'),
       seededBy: 'muse',
       ownerMentionAt: null,

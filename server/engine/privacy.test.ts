@@ -20,7 +20,7 @@ const privateWords = memory
 
 describe('privacy, end to end through the engine', () => {
   it('a sensitive MEMORY.md yields only interest topics, and none of its private facts', async () => {
-    const garden = buildGarden({ db: null, source: 'fixture', mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
+    const garden = buildGarden({ db: null, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
     await garden.engine.addMuse({ id: 'owner' as MuseId, name: 'Owner', worldSeed: 412, timezone: 'UTC' }, soul, memory, START);
     const log = garden.engine.log('owner' as MuseId);
     const topics = log.flatMap((e) => (e.event.kind === 'memory.updated' ? e.event.topics : []));

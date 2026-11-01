@@ -15,9 +15,9 @@ export type QuestionId = Brand<string, 'QuestionId'>;
 export type InvitationId = Brand<string, 'InvitationId'>;
 /** A cell of the cube-sphere grid: `${face}:${i}:${j}`, face 0–5, i and j in [0, REGION_GRID) (server/domain/atlas.ts, 4 to start). */
 export type RegionKey = Brand<string, 'RegionKey'>;
-/** A canonical English Wikipedia title after redirects, e.g. "Ultramarine". */
+/** A topic of the topic map by its canonical name, e.g. "Ultramarine". */
 export type TopicKey = Brand<string, 'TopicKey'>;
-/** https, lowercase host, no query tracking params, no fragment. Wikipedia: https://en.wikipedia.org/wiki/<Title_With_Underscores>. */
+/** https, lowercase host, no query tracking params, no fragment. */
 export type CanonicalUrl = Brand<string, 'CanonicalUrl'>;
 /** Milliseconds since the Unix epoch on the sim clock. */
 export type Instant = Brand<number, 'Instant'>;
@@ -58,31 +58,39 @@ export interface MediaInfo {
   readonly duration?: number;
   /** Minutes to read an article. */
   readonly minutes?: number;
+  /** The site or app it lives on, as its own name: "YouTube", "Bluesky", a magazine's title. */
+  readonly site?: string;
+  /** When it was published online (ISO date). */
+  readonly published?: string;
 }
 
-/** One page Muse looked at. A Discovery can only be made from a Candidate, so every find has a real URL. */
+/** One real reel, post, article or video Muse looked at. A Discovery can only be made from a Candidate. */
 export interface Candidate {
-  readonly origin: 'wikipedia' | 'rss';
   readonly url: string;
   readonly canonicalUrl: CanonicalUrl;
   readonly title: string;
-  /** Plain text, at most 400 characters. */
+  /** Plain text, at most 400 characters: a caption, or an article's first lines. */
   readonly summary: string;
-  readonly thumb?: string;
-  /** topics[0] is the page's own topic; the rest are its non-hidden categories (at most 6). */
+  /** Topics of the topic map it was filed under, the main one first (at most 6). */
   readonly topics: readonly TopicKey[];
-  readonly media?: MediaInfo;
+  readonly media: MediaInfo;
 }
 
-/** Where pages come from. Implementations: live Wikipedia, live RSS, and a recorded offline corpus. */
+/**
+ * Where finds come from: the recorded reels, posts, articles and videos, each filed under topics of the topic map.
+ * The topic map only names topics and links them; nothing Muse finds comes from it.
+ */
 export interface Source {
-  /** The first hop of a trip: pages about `topic`, best first. */
-  search(topic: TopicKey, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]>;
-  /** Later hops: pages one link away from `from` (outgoing links, then "more like this"). */
-  next(from: Candidate, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]>;
+  /**
+   * The first hop of a trip: finds about `topic`, best first. `kinds` is what the hop looks for, the kind it drew
+   * first: finds of the first kind that has any, so a topic short of the drawn kind gives the next one.
+   */
+  search(topic: TopicKey, kinds: readonly MediaKind[], limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]>;
+  /** Later hops: finds about the topics `from`'s topic links to in the topic map, by `kinds` as in search. */
+  next(from: Candidate, kinds: readonly MediaKind[], limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]>;
   /** A wide pool unrelated to Muse's interests, for serendipity. Deterministic for a given seed offline. */
-  serendipity(limit: number, seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]>;
-  /** A free-text label to its canonical topic (Wikipedia redirects resolved), or null if there is no such page. */
+  serendipity(kinds: readonly MediaKind[], limit: number, seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]>;
+  /** A free-text label to its topic in the topic map (names and their aliases), or null if the map has none. */
   resolveTopic(label: string): Promise<TopicKey | null>;
 }
 
@@ -207,7 +215,6 @@ export interface Discovery {
   readonly canonicalUrl: CanonicalUrl;
   readonly title: string;
   readonly summary: string;
-  readonly thumb?: string;
   readonly topics: readonly TopicKey[];
   /** The events that led Muse here (the hop, and the seed or question behind the trip). */
   readonly because: readonly EventRef[];
@@ -218,9 +225,9 @@ export interface Discovery {
   /** Where Muse found it. A gift: where Muse received it on its own planet, or near home if received away. */
   readonly place: Place;
   readonly at: Instant;
-  readonly media?: MediaInfo;
-  /** The topic of the trip that found it: the interest it belongs to in the garden. */
-  readonly pursuing?: TopicKey | null;
+  readonly media: MediaInfo;
+  /** The topic of the trip that found it: the interest it belongs to in the garden. A gift keeps its giver's. */
+  readonly pursuing: TopicKey | null;
 }
 
 /** What other Muses may see of a find. No place, no provenance. */
@@ -230,8 +237,9 @@ export interface PublicDiscovery {
   readonly canonicalUrl: CanonicalUrl;
   readonly title: string;
   readonly summary: string;
-  readonly thumb?: string;
   readonly topics: readonly TopicKey[];
+  readonly media: MediaInfo;
+  readonly pursuing: TopicKey | null;
 }
 
 export type PhotoSubject = 'selfie' | 'scenery' | 'creature' | 'find' | 'friend' | 'new-friend';
@@ -541,6 +549,11 @@ export interface LifePolicy {
   beyondUntil(s: MuseState, now: Instant, draw: Draw): Instant;
   /** Decides beyond first (null = go beyond the planet), then new area vs revisit. */
   startTrip(s: MuseState, now: Instant, draw: Draw): TripStart | null;
+  /**
+   * What hop k of a trip looks for: the kind chance drew (tilted by temperament) first, then every other kind in the
+   * order this Muse's temperament favours them.
+   */
+  mediaFor(s: MuseState, k: number, draw: Draw): readonly MediaKind[];
   /** The serendipity topic's region once Source.serendipity has given a topic. */
   serendipityRegion(s: MuseState, topic: TopicKey, draw: Draw): RegionKey;
   hopMs(s: MuseState, draw: Draw): number;
@@ -737,6 +750,8 @@ export interface PlantCard {
   readonly reason: string;
   readonly foundAt: Instant;
   readonly place: Place;
+  readonly media: MediaInfo;
+  readonly pursuing: TopicKey | null;
 }
 
 export interface BasketView {

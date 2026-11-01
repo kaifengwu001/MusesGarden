@@ -66,7 +66,7 @@ const toItem = (r: ScheduleRow): ScheduleItem => ({
  * The shape of the stored events this build reads. Raise it whenever a stored event's shape changes: an older garden
  * file is then refused rather than replayed wrongly (the files are local and gitignored, so starting again is cheap).
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export function openSqliteStore(path: string): Store {
   const db = new DatabaseSync(path);

@@ -8,12 +8,12 @@ const KEEP = 0.75;
 const topic = (s: string) => s as TopicKey;
 const wiki = (title: string) => `https://en.wikipedia.org/wiki/${title.replaceAll(' ', '_')}` as CanonicalUrl;
 const page = (title: string, summary: string, categories: string[]): Candidate => ({
-  origin: 'wikipedia',
   url: wiki(title),
   canonicalUrl: wiki(title),
   title,
   summary,
   topics: [title, ...categories].map(topic),
+  media: { kind: 'article', network: 'web' },
 });
 
 const botanicalIllustration = page(

@@ -1,9 +1,22 @@
-import type { Candidate, CanonicalUrl, Source, TopicKey } from '../../../src/muse/contract';
+import type { CanonicalUrl, TopicKey } from '../../../src/muse/contract';
 import { arr, obj, optStr, str } from './json';
 import { clampSummary } from './text';
 
 const API = 'https://en.wikipedia.org/w/api.php';
 export const USER_AGENT = 'MusesGarden/0.1 (hackathon prototype)';
+
+/** A page of the topic map as recorded: its topic, its categories and its summary. Muse never finds one. */
+export interface TopicPage {
+  readonly origin: 'wikipedia' | 'rss';
+  readonly url: string;
+  readonly canonicalUrl: CanonicalUrl;
+  readonly title: string;
+  /** Plain text, at most 400 characters. */
+  readonly summary: string;
+  readonly thumb?: string;
+  /** topics[0] is the page's own topic; the rest are its non-hidden categories (at most 6). */
+  readonly topics: readonly TopicKey[];
+}
 /** MediaWiki's per-request title limit for non-bot clients. */
 const BATCH = 50;
 const MAX_CATEGORIES = 6;
@@ -167,7 +180,7 @@ function topicsOf(page: RawPage): TopicKey[] {
   return [page.title, ...topicCategories(page.categories)] as TopicKey[];
 }
 
-function toCandidate(page: RawPage): Candidate | null {
+function toCandidate(page: RawPage): TopicPage | null {
   if (page.disambiguation || page.extract === undefined) return null;
   const summary = clampSummary(page.extract);
   if (summary === '') return null;
@@ -183,9 +196,9 @@ function toCandidate(page: RawPage): Candidate | null {
   };
 }
 
-function dedupe(candidates: readonly (Candidate | null | undefined)[]): Candidate[] {
+function dedupe(candidates: readonly (TopicPage | null | undefined)[]): TopicPage[] {
   const seen = new Set<CanonicalUrl>();
-  const out: Candidate[] = [];
+  const out: TopicPage[] = [];
   for (const c of candidates) {
     if (c == null || seen.has(c.canonicalUrl)) continue;
     seen.add(c.canonicalUrl);
@@ -203,7 +216,7 @@ export interface WikipediaOptions {
 }
 
 /** Live English Wikipedia through the MediaWiki action API. */
-export class WikipediaSource implements Source {
+export class WikipediaSource {
   private readonly fetchImpl: typeof fetch;
   private readonly minIntervalMs: number;
   private gate: Promise<void> = Promise.resolve();
@@ -214,11 +227,11 @@ export class WikipediaSource implements Source {
     this.minIntervalMs = options.minIntervalMs ?? 500;
   }
 
-  async search(topic: TopicKey, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  async search(topic: TopicKey, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     return this.pick(await this.searchTitles(topic), limit, exclude);
   }
 
-  async next(from: Candidate, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  async next(from: TopicPage, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     const skip = new Set<CanonicalUrl>([...exclude, from.canonicalUrl]);
     const title = from.origin === 'wikipedia' ? from.topics[0] : undefined;
     const linked = title === undefined ? [] : ((await this.links([title])).get(title) ?? []);
@@ -230,7 +243,7 @@ export class WikipediaSource implements Source {
   }
 
   /** Live and therefore not reproducible: `seed` only matters offline. */
-  async serendipity(limit: number, _seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  async serendipity(limit: number, _seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     const body = await this.get({ action: 'query', list: 'random', rnnamespace: '0', rnlimit: String(limit + PAD) });
     const random = arr(obj(body.query, 'query').random, 'random').map((r) => str(obj(r, 'random').title, 'title'));
     return this.pick(random, limit, exclude);
@@ -243,14 +256,14 @@ export class WikipediaSource implements Source {
     return page == null || page.disambiguation ? null : topicsOf(page)[0];
   }
 
-  /** Each title (as normalized) to its page's Candidate after redirects, or null for missing pages and disambiguations. */
-  async lookup(titles: readonly string[]): Promise<Map<string, Candidate | null>> {
+  /** Each title (as normalized) to its page's TopicPage after redirects, or null for missing pages and disambiguations. */
+  async lookup(titles: readonly string[]): Promise<Map<string, TopicPage | null>> {
     const pages = await this.queryTitles(titles, DETAILS);
     return new Map([...pages].map(([title, page]) => [title, page && toCandidate(page)]));
   }
 
   /** Candidates for `titles` in order, redirects resolved and duplicates dropped. */
-  async candidates(titles: readonly string[]): Promise<Candidate[]> {
+  async candidates(titles: readonly string[]): Promise<TopicPage[]> {
     const found = await this.lookup(titles);
     return dedupe(titles.map((t) => found.get(normalizeTitle(t))));
   }
@@ -280,7 +293,7 @@ export class WikipediaSource implements Source {
     return arr(obj(body.query, 'query').search, 'search').map((r) => str(obj(r, 'search').title, 'title'));
   }
 
-  private async pick(titles: readonly string[], limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  private async pick(titles: readonly string[], limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     if (limit <= 0) return [];
     const fresh = titles.filter((t) => !exclude.has(wikipediaUrl(t))).slice(0, limit + PAD);
     const found = await this.candidates(fresh);

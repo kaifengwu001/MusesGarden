@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { Candidate, CanonicalUrl, TopicKey } from '../../../src/muse/contract';
+import type { CanonicalUrl, TopicKey } from '../../../src/muse/contract';
 import { FixtureSource, loadCorpus, loadHeroChain, loadUnseenPool, parseCandidate, type CorpusPage } from './corpus';
+import type { TopicPage } from './wikipedia';
 
 const corpus = loadCorpus();
 const none = new Set<CanonicalUrl>();
-const titles = (cs: readonly Candidate[]) => cs.map((c) => c.title);
+const titles = (cs: readonly TopicPage[]) => cs.map((c) => c.title);
 const page = (title: string): CorpusPage => {
   const p = corpus.pages.find((q) => q.candidate.title === title);
   if (p === undefined) throw new Error(`${title} is not in the corpus`);

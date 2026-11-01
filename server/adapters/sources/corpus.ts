@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { mix, salt } from '../../../src/core/hash';
-import type { Candidate, CanonicalUrl, Source, TopicKey } from '../../../src/muse/contract';
+import type { CanonicalUrl, TopicKey } from '../../../src/muse/contract';
 import { arr, obj, optStr, str, strs } from './json';
 import { mentions } from './text';
-import { normalizeTitle, topicCategories, wikipediaUrl } from './wikipedia';
+import { normalizeTitle, topicCategories, wikipediaUrl, type TopicPage } from './wikipedia';
 
 export const FIXTURES_DIR = fileURLToPath(new URL('../../fixtures/', import.meta.url));
 export const CORPUS_PATH = `${FIXTURES_DIR}corpus.json`;
@@ -19,7 +19,7 @@ export interface CorpusArea {
 export interface CorpusPage {
   /** The interest area whose crawl reached this page first. */
   readonly area: string;
-  readonly candidate: Candidate;
+  readonly candidate: TopicPage;
   /** In-corpus pages this page links to, in article order. */
   readonly links: readonly TopicKey[];
   /** Redirect titles that lead to this page. */
@@ -33,10 +33,10 @@ export interface Corpus {
 }
 
 export type Lean = 'botany' | 'jazz' | 'neutral';
-export type UnseenPool = Readonly<Record<Lean, readonly Candidate[]>>;
+export type UnseenPool = Readonly<Record<Lean, readonly TopicPage[]>>;
 
 /** The parse boundary for recorded pages: the only place fixture strings become TopicKey and CanonicalUrl. */
-export function parseCandidate(raw: unknown, what = 'candidate'): Candidate {
+export function parseCandidate(raw: unknown, what = 'candidate'): TopicPage {
   const o = obj(raw, what);
   const origin = str(o.origin, `${what}.origin`);
   if (origin !== 'wikipedia' && origin !== 'rss') throw new Error(`${what}.origin: unknown source ${origin}`);
@@ -90,7 +90,7 @@ export function parseCorpus(raw: unknown): Corpus {
   };
 }
 
-/** The on-disk form: each page is a flat Candidate plus its area, links and aliases. */
+/** The on-disk form: each page is a flat TopicPage plus its area, links and aliases. */
 export function corpusJson(corpus: Corpus): unknown {
   return {
     recordedAt: corpus.recordedAt,
@@ -108,7 +108,7 @@ export function loadCorpus(path = CORPUS_PATH): Corpus {
 }
 
 /** Botanical illustration → … → Ultramarine: each page links to the next. */
-export function loadHeroChain(path = HERO_CHAIN_PATH): Candidate[] {
+export function loadHeroChain(path = HERO_CHAIN_PATH): TopicPage[] {
   return arr(readJson(path), 'hero chain').map((c, i) => parseCandidate(c, `hero[${i}]`));
 }
 
@@ -119,8 +119,8 @@ export function loadUnseenPool(path = UNSEEN_PATH): UnseenPool {
   return { botany: lean('botany'), jazz: lean('jazz'), neutral: lean('neutral') };
 }
 
-/** The recorded corpus as a Source: offline, and the same answer for the same question every time. */
-export class FixtureSource implements Source {
+/** The topic map's own reader: its recorder builds the hero chain with it. Offline, and deterministic. */
+export class FixtureSource {
   private readonly pages: readonly CorpusPage[];
   private readonly byTitle = new Map<string, CorpusPage>();
   private readonly byUrl = new Map<CanonicalUrl, CorpusPage>();
@@ -142,7 +142,7 @@ export class FixtureSource implements Source {
   }
 
   /** The exact page first, then pages sharing its categories (most shared first), then pages that mention it. */
-  search(topic: TopicKey, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  search(topic: TopicKey, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     const self = this.byTitle.get(topic);
     const keys = new Set<string>([topic, ...(self?.candidate.topics.slice(1) ?? [])]);
     const ranked = this.pages
@@ -159,7 +159,7 @@ export class FixtureSource implements Source {
   }
 
   /** Recorded links in article order, then pages sharing a topic with `from` (most shared first). */
-  next(from: Candidate, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  next(from: TopicPage, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     const linked = (this.byUrl.get(from.canonicalUrl)?.links ?? []).flatMap((t) => this.byTitle.get(t) ?? []);
     const keys = new Set<string>(from.topics);
     const related = this.pages
@@ -172,7 +172,7 @@ export class FixtureSource implements Source {
   }
 
   /** The whole corpus in an order drawn from `seed`. A page's place depends only on its URL and the seed. */
-  serendipity(limit: number, seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
+  serendipity(limit: number, seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<TopicPage[]> {
     const shuffled = this.pages
       .map((p) => ({ p, key: mix(salt(p.candidate.canonicalUrl), seed) }))
       .sort((a, b) => a.key - b.key)
@@ -186,8 +186,8 @@ export class FixtureSource implements Source {
     return Promise.resolve(page === undefined ? null : page.candidate.topics[0]);
   }
 
-  private take(pages: readonly CorpusPage[], limit: number, exclude: ReadonlySet<CanonicalUrl>): Candidate[] {
-    const out: Candidate[] = [];
+  private take(pages: readonly CorpusPage[], limit: number, exclude: ReadonlySet<CanonicalUrl>): TopicPage[] {
+    const out: TopicPage[] = [];
     const seen = new Set<CanonicalUrl>();
     for (const { candidate } of pages) {
       if (out.length >= limit) break;

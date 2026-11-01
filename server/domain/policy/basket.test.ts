@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Discovery } from '../../../src/muse/contract';
 import { homePlace } from '../atlas';
 import { discoveryId, instant } from '../ids';
-import { Life, MOSS, t, topicsOf, wiki } from '../testing';
+import { ARTICLE, Life, MOSS, t, topicsOf, wiki } from '../testing';
 import { DAY_MS, HOUR_MS, localDay } from '../time';
 import { basket, nextBasketCheck } from './basket';
 
@@ -23,6 +23,8 @@ function find(k: number, at: number, keepScore: number): Discovery {
     provenance: 'own',
     place: homePlace(MOSS.worldSeed),
     at: instant(at),
+    media: ARTICLE,
+    pursuing: null,
   };
 }
 

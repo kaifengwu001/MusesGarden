@@ -5,7 +5,7 @@ import { discoveryId, eventRef, instant, topicKey } from '../ids';
 import { metrics } from '../metrics';
 import { drawFor } from '../rng';
 import { shelf } from '../shelf';
-import { Life, MOSS, t, TEMPERAMENTS, topicsOf, wiki } from '../testing';
+import { ARTICLE, Life, MOSS, t, TEMPERAMENTS, topicsOf, wiki } from '../testing';
 import { DAY_MS, localDay } from '../time';
 import { freshCandidates } from './travel';
 import { lifePolicy as life } from './index';
@@ -17,7 +17,7 @@ const OWNER = topicsOf('Botanical illustration', 'Jazz', 'Tide');
 function pages(topic: string): Candidate[] {
   return Array.from({ length: 8 }, (_, k) => {
     const title = `${topic} ${k}`;
-    return { origin: 'wikipedia', url: wiki(title), canonicalUrl: wiki(title), title, summary: '', topics: topicsOf(title, topic) };
+    return { url: wiki(title), canonicalUrl: wiki(title), title, summary: '', topics: topicsOf(title, topic), media: ARTICLE };
   });
 }
 const judge = (cs: readonly Candidate[]): Judgment[] => cs.map((c) => ({ canonicalUrl: c.canonicalUrl, score: unit(hash32(salt(c.title))), reason: 'good' }));
@@ -74,7 +74,7 @@ function aWeek(): Life {
       const hop = muse.push(now, { kind: 'trip.hop', n, k, topic, place, looked, kept: ids });
       kept.forEach((j, i) => {
         const c = pages(topic).find((p) => p.canonicalUrl === j.canonicalUrl)!;
-        const discovery = { ...c, id: ids[i], because: [eventRef(MOSS.id, hop.seq)], reason: j.reason, keepScore: j.score, provenance: 'own' as const, place, at: instant(now) };
+        const discovery = { ...c, id: ids[i], because: [eventRef(MOSS.id, hop.seq)], reason: j.reason, keepScore: j.score, provenance: 'own' as const, place, at: instant(now), pursuing: topic };
         muse.push(now, { kind: 'discovery.collected', discovery });
       });
       photos('travel', since, now, n);

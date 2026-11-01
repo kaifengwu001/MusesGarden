@@ -1,11 +1,11 @@
-// Records Muse's offline internet from live Wikipedia: the corpus, the hero chain, the unseen pool, and the HTTP
-// samples the source tests replay. With no step it re-records everything; `pools` and `samples` reuse corpus.json,
+// Records the topic map from its live API: the corpus, the hero chain, the unseen pool, and the HTTP samples the
+// source tests replay. Muse's finds are recorded by server/cli/record-media.ts instead. With no step it re-records everything; `pools` and `samples` reuse corpus.json,
 // and `topics` re-filters the recorded topics offline.
 //   npx tsx server/adapters/sources/record.ts [all|pools|samples|topics]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Candidate, CanonicalUrl, TopicKey } from '../../../src/muse/contract';
+import type { CanonicalUrl, TopicKey } from '../../../src/muse/contract';
 import {
   CORPUS_PATH,
   corpusJson,
@@ -22,7 +22,7 @@ import {
 } from './corpus';
 import { arr, obj, strs } from './json';
 import { recordingFetch, SAMPLE_BATCH, type Samples } from './samples';
-import { normalizeTitle, topicCategories, WikipediaSource } from './wikipedia';
+import { normalizeTitle, topicCategories, WikipediaSource, type TopicPage } from './wikipedia';
 
 interface Area {
   readonly name: string;
@@ -124,13 +124,13 @@ function writeJson(path: string, data: unknown): void {
   writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
 }
 
-function fits(area: Area, c: Candidate): boolean {
+function fits(area: Area, c: TopicPage): boolean {
   return !SKIP_TITLE.test(c.title) && area.keywords.test(`${c.title} | ${c.topics.slice(1).join(' | ')} | ${c.summary}`);
 }
 
 async function crawl(wiki: WikipediaSource): Promise<Corpus> {
-  const looked = new Map<string, Candidate | null>();
-  const taken = new Map<string, { area: string; candidate: Candidate; links: string[] }>();
+  const looked = new Map<string, TopicPage | null>();
+  const taken = new Map<string, { area: string; candidate: TopicPage; links: string[] }>();
   for (const area of AREAS) {
     const seeds = new Set(area.seeds.map(normalizeTitle));
     const queued = new Set<string>();
@@ -148,7 +148,7 @@ async function crawl(wiki: WikipediaSource): Promise<Corpus> {
       const batch = frontier.splice(0, 50);
       const unknown = batch.filter((t) => !looked.has(t));
       for (const [t, c] of await wiki.lookup(unknown)) looked.set(t, c);
-      const accepted: Candidate[] = [];
+      const accepted: TopicPage[] = [];
       for (const t of batch) {
         const c = looked.get(t);
         if (c == null || taken.has(c.title) || accepted.some((a) => a.title === c.title)) continue;
@@ -184,7 +184,7 @@ async function crawl(wiki: WikipediaSource): Promise<Corpus> {
 }
 
 /** Botanical illustration → X → Ultramarine where each page links to the next and each step is within one hop's look. */
-async function heroChain(corpus: Corpus): Promise<Candidate[]> {
+async function heroChain(corpus: Corpus): Promise<TopicPage[]> {
   const source = new FixtureSource(corpus);
   const page = (title: string) => {
     const p = corpus.pages.find((q) => q.candidate.title === title);
@@ -194,7 +194,7 @@ async function heroChain(corpus: Corpus): Promise<Candidate[]> {
   const start = page('Botanical illustration');
   const end = page('Ultramarine');
   const none = new Set<CanonicalUrl>();
-  let best: { rank: number; chain: Candidate[] } | undefined;
+  let best: { rank: number; chain: TopicPage[] } | undefined;
   for (const [i, mid] of (await source.next(start.candidate, HOP, none)).entries()) {
     if (!start.links.includes(mid.topics[0]) || !page(mid.title).links.includes(end.candidate.topics[0])) continue;
     const j = (await source.next(mid, HOP, none)).findIndex((c) => c.canonicalUrl === end.candidate.canonicalUrl);
@@ -205,9 +205,9 @@ async function heroChain(corpus: Corpus): Promise<Candidate[]> {
   return best.chain;
 }
 
-async function unseenPool(wiki: WikipediaSource, corpus: Corpus): Promise<Record<Lean, Candidate[]>> {
+async function unseenPool(wiki: WikipediaSource, corpus: Corpus): Promise<Record<Lean, TopicPage[]>> {
   const inCorpus = new Set(corpus.pages.map((p) => p.candidate.canonicalUrl));
-  const pool = {} as Record<Lean, Candidate[]>;
+  const pool = {} as Record<Lean, TopicPage[]>;
   for (const lean of Object.keys(UNSEEN) as Lean[]) {
     const found = await wiki.candidates(UNSEEN[lean]);
     if (found.length !== UNSEEN[lean].length) throw new Error(`unseen ${lean}: only ${found.map((c) => c.title).join(', ')} resolved`);

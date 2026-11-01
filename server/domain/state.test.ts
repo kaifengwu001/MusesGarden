@@ -3,7 +3,7 @@ import type { PublicDiscovery, RegionKey } from '../../src/muse/contract';
 import { angularDistance, homePlace, hopPlace, isDry, placeNow, regionForNewTopic } from './atlas';
 import { discoveryId, instant, museId, photoId } from './ids';
 import { drawFor } from './rng';
-import { Life, MOSS, t, topic, topicsOf, wiki } from './testing';
+import { ARTICLE, Life, MOSS, t, topic, topicsOf, wiki } from './testing';
 import { HOUR_MS, MINUTE_MS } from './time';
 
 const BI = 'Botanical illustration';
@@ -154,6 +154,8 @@ describe('owner seeds and gifts', () => {
       title: 'Lichen',
       summary: 'A lichen is a composite organism.',
       topics: topicsOf('Lichen'),
+      media: ARTICLE,
+      pursuing: null,
     };
     life.push(day, { kind: 'hangout', other: museId('wren'), role: 'host', pleasantness: 0.7, gave: discoveryId('d:x'), received, photo: photoId(MOSS.id, 1, day, 0) });
     const [gift] = [...life.state.discoveries.values()];
@@ -167,7 +169,7 @@ describe('owner seeds and gifts', () => {
 
   it('never makes a second find of a page Muse already has, from a trip or another gift', () => {
     const life = new Life();
-    const received: PublicDiscovery = { id: discoveryId('w-lichen'), url: wiki('Lichen'), canonicalUrl: wiki('Lichen'), title: 'Lichen', summary: '', topics: topicsOf('Lichen') };
+    const received: PublicDiscovery = { id: discoveryId('w-lichen'), url: wiki('Lichen'), canonicalUrl: wiki('Lichen'), title: 'Lichen', summary: '', topics: topicsOf('Lichen'), media: ARTICLE, pursuing: null };
     const hangout = (other: string, at: number): void => {
       life.push(at, { kind: 'hangout', other: museId(other), role: 'guest', pleasantness: 0.7, gave: discoveryId('d:x'), received, photo: photoId(MOSS.id, 1, at, 0) });
     };

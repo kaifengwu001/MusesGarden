@@ -2,7 +2,7 @@ import type { Candidate, MindContext, TopicKey } from '../../../../src/muse/cont
 import { object, persona, string, type Prompt } from './prompt';
 
 export function questionPrompt(ctx: MindContext, topic: TopicKey, recent: readonly Candidate[]): Prompt {
-  const seen = recent.map(({ title, summary }) => ({ title, summary }));
+  const seen = recent.map(({ title, summary, media }) => ({ kind: media.kind, title, caption: summary }));
   return {
     name: 'muse_question',
     effort: 'low',
@@ -12,7 +12,7 @@ export function questionPrompt(ctx: MindContext, topic: TopicKey, recent: readon
       JSON.stringify(seen, null, 2),
       '',
       `Ask the next open question you want to chase about ${topic}: one sentence in your own voice,`,
-      'specific enough that a single page could answer it, and different from the question you already carry.',
+      'specific enough that a single reel, post, article or video could answer it, and different from the question you already carry.',
     ].join('\n'),
     schema: object({ question: string }),
   };

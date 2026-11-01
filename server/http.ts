@@ -27,7 +27,6 @@ async function buildBackend(): Promise<Backend> {
   const start = (clock === 'live' ? Date.now() : Date.parse('2026-11-02T08:00:00-08:00')) as Instant;
   const garden = buildGarden({
     db: `${dir}/garden.db`,
-    source: process.env.MUSE_SOURCE === 'live' ? 'live' : 'fixture',
     mind: process.env.MODEL_API_KEY ? 'meta' : 'heuristic',
     hero,
     start,

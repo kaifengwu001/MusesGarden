@@ -157,7 +157,7 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 - At first only the house and garden are explored.
 - Regions are fixed cells on the planet's surface. They come from the cube-sphere grid the renderer already uses, in `src/planet/cubesphere.ts`, and they stay put as the planet grows.
 - Each topic lives in a region. Related topics share a region or sit in nearby ones.
-- A topic's identity is its canonical Wikipedia title. "Ultramarine" is one topic however Muse reached it.
+- A topic's identity is its name in the topic map, `server/fixtures/corpus.json`. "Ultramarine" is one topic however Muse reached it. The topic map only names topics and links them. Nothing Muse finds or shows comes from it.
 - Muse transports between regions, so the explored pockets need not connect.
 - Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
 - The planet's growth value `g` follows the explored area.
@@ -196,11 +196,24 @@ Revisits look only at pages Muse has not collected yet. The planet's seasons and
 
 A trip on the planet is a chain of hops. Each hop moves Muse to a new spot.
 
-- Each hop looks at 6 to 10 pages. The first hop runs a search on the topic. Later hops follow the links of the last kept find, or Wikipedia's "more like this".
-- The Mind scores each page. Muse keeps at most 2 pages per hop, and only pages that score at least θ = 0.75. The sim reports finds per day so that θ can be tuned.
+- Each hop looks for one kind of thing: a reel, a post, an article or a video (see "What Muse finds" below). It looks at up to 8 of them. The first hop takes finds filed under the trip's topic. Later hops follow the topic map's links from the last kept find's topic.
+- A topic with nothing of the drawn kind gives another kind, then something from the same area of the topic map. A trip comes back empty only when Muse has collected everything.
+- The Mind scores each find by its title and caption. Muse keeps at most 2 per hop, and only those that score at least θ = 0.75. The sim reports finds per day so that θ can be tuned.
 - After each hop, Muse continues with P = focus × the best score this hop. A focused Muse on a good trail keeps going. A distracted Muse, or a dull hop, ends the trip.
 - Muse plants each find at the spot where it stood. Every object keeps that place, gifts included.
 - Hop spots never land on water. The placement code checks the terrain with `Terrain.sample` and stores each spot in the event.
+
+### What Muse finds
+
+Every find is a real reel, post, article or video someone put on the internet.
+
+- `npm run record:media` reads the sources in `server/fixtures/media-sources.json` and writes `server/fixtures/media.json`. The sim and the tests replay that recording offline.
+- The sources are listed for each of the topic map's 14 areas: magazine and blog feeds, YouTube channels (videos, and Shorts as reels), Vimeo channels, Flickr tags and Bluesky accounts. A topic the sources leave with fewer than 3 items is filled from Bluesky posts that name it.
+- The recorder keeps an item only if its link answered. It files each item under the topics its title, caption and tags name, the item's own area first. An item that names none goes under its area's main topic.
+- Instagram joins once `META_IG_TOKEN` holds the owner's token. The recorder then reads the public business and creator accounts listed for each area through Business Discovery. Pictures from Instagram, Facebook and TikTok expire, so the server keeps them under `.muse/media/` and serves them from `/api/media/<id>`.
+- Chance picks each hop's kind. A Muse whose traits are all 0.5 looks for reels 25%, posts 25%, videos 15% and articles 35% of the time. Focus and curiosity tilt the mix toward articles and videos. Whimsy and novelty tilt it toward reels and posts. The weights are `MEDIUM_BASE` and `MEDIUM_TILT` in `server/domain/policy/constants.ts`.
+- When the recording holds Instagram or Facebook items of the drawn kind, about 65% of a hop's candidates come from them. Until then everything comes from the open web, in the same mix of kinds.
+- A find carries its kind, network, author, picture, aspect, length or reading time, site and date as `media`. It also carries `pursuing`, the topic of the trip that found it: the interest it belongs to in the garden.
 
 ### The hero chain: Botanical illustration → Pigment → Ultramarine
 
@@ -442,7 +455,7 @@ A log makes history into data, and the ablation test depends on that. Drop the e
 Each of these invariants is enforced by a type, the reducer, an access check, or a test:
 
 - A `Discovery` exists only from a fetched `Candidate`, so every find has a real URL. Every object has a place.
-- Topic identity is the canonical Wikipedia title.
+- Topic identity is the topic's name in the topic map.
 - Independent sources are counted by canonical URL.
 - The reducer enforces the evidence gate.
 - The privacy rules, the allow-list, the visibility rules, and the caps hold as described above.
@@ -492,9 +505,10 @@ server/domain/              pure: rng, state (reduce), interests, reflection, at
 server/domain/policy/       constants, life (next activity, rest budget, work pause), travel (trip start, topic pick, hops, keep), photo, basket
 server/domain/social/       relationships (statechart, familiarity, endings), encounters, hangouts (budget, closeness, gifts), invitations (statechart), access
 server/engine/              clock (advanceTo, schedule, pause/resume), ports (Mind, Source, Store)
-server/adapters/            store/{memory,sqlite}, minds/{heuristic,meta}, sources/{fixture,wikipedia,rss}
+server/adapters/            store/{memory,sqlite}, minds/{heuristic,meta}, sources/ (media: the recording as a Source; readers, instagram, filing: the recorder's; corpus: the topic map)
 server/http.ts              node:http, small hand-written parsers at the boundary
 server/cli/sim.ts           the sim CLI
+server/cli/record-media.ts  records the reels, posts, articles and videos Muse finds
 server/fixtures/            cast, work schedules, hero chain, page pools
 docs/muse-agent.md          this doc
 ```
@@ -511,13 +525,13 @@ The server runs on `node:sqlite` under Node 22.13, through `tsx`, with no web fr
 - `host_docs`, which holds `SOUL.md` only
 - `llm_cache`
 
-Pages for offline runs come from a recorded corpus file, so no table caches them.
+Finds come from the media recording, `server/fixtures/media.json`, so no table caches them.
 
 ### Two Minds sit behind one port
 
 - `MetaMind` calls OpenAI-style chat completions at `https://api.meta.ai/v1` with `MODEL_API_KEY` and the model `muse-spark-1.3`. Environment variables can override all three. It parses JSON by hand, retries once, and then falls back to `HeuristicMind`.
 - `HeuristicMind` is deterministic, so tests and fast-forward runs reproduce exactly.
-- Pages come from Wikipedia, curated RSS feeds, and a recorded fixture pool that replays offline.
+- Finds come from the media recording, which replays offline.
 - If `MODEL_API_KEY` is unset, the precomputed hero run uses `HeuristicMind` and says so.
 
 ## How we know it works

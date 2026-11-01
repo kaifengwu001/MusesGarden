@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Candidate, CanonicalUrl, Instant, MuseId, MuseSeed, MuseState, StoredEvent } from '../../src/muse/contract';
 import { HeuristicMind } from '../adapters/minds/heuristic';
-import { loadUnseenPool } from '../adapters/sources/corpus';
+import { loadMediaRecording } from '../adapters/sources/media';
 import { lifePolicy } from '../domain/policy/index';
 import { reduceSocial } from '../domain/social/state';
 import { emptyState, reduceCore } from '../domain/state';
@@ -16,21 +16,22 @@ import type { Engine } from './engine';
 
 const START = Date.parse('2026-11-02T08:00:00-08:00') as Instant;
 const H = 3_600_000;
-const pool = loadUnseenPool();
+const held = loadMediaRecording().unseen;
+const pool = { botany: held.botany.map((i) => i.candidate), jazz: held.jazz.map((i) => i.candidate), neutral: held.neutral.map((i) => i.candidate) };
 const unseen: readonly Candidate[] = [...pool.botany, ...pool.jazz, ...pool.neutral];
 const twinSoul = readFileSync(join(FIXTURES_DIR, 'divergence/a/SOUL.md'), 'utf8');
 const memory = (twin: 'a' | 'b') => readFileSync(join(FIXTURES_DIR, `divergence/${twin}/MEMORY.md`), 'utf8');
 const seed = (id: string): MuseSeed => ({ id: id as MuseId, name: id, worldSeed: 412, timezone: 'America/Los_Angeles' });
 
 async function twins(days: number, db: string | null = null) {
-  const garden = buildGarden({ db, source: 'fixture', mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
+  const garden = buildGarden({ db, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
   await garden.engine.addMuse(seed('twin-a'), twinSoul, memory('a'), START);
   await garden.engine.addMuse(seed('twin-b'), twinSoul, memory('b'), START);
   await garden.engine.advanceTo((START + days * 24 * H) as Instant);
   return garden;
 }
 
-/** What a Muse keeps from the same unseen pages: the Mind judges, the policy's keep rule decides. */
+/** What a Muse keeps from the same unseen finds: the Mind judges, the policy's keep rule decides. */
 async function decide(engine: Engine, s: MuseState): Promise<ReadonlySet<CanonicalUrl>> {
   const judged = await new HeuristicMind().judge(engine.mindContext(s, null), unseen);
   return new Set(lifePolicy.keep(judged).map((j) => j.canonicalUrl));
@@ -61,7 +62,7 @@ function replay(id: string, log: readonly StoredEvent[]): MuseState {
 }
 
 describe('divergence: history, not hidden parameters, drives what Muse keeps', () => {
-  it('identical Muses whose owners love botany and jazz keep different pages after a free week', async () => {
+  it('identical Muses whose owners love botany and jazz keep different finds after a free week', async () => {
     const { engine, store } = await twins(7);
     const a = await preferences(engine, engine.state('twin-a' as MuseId) as MuseState);
     const b = await preferences(engine, engine.state('twin-b' as MuseId) as MuseState);
@@ -101,7 +102,7 @@ describe('divergence: history, not hidden parameters, drives what Muse keeps', (
       const first = await twins(7, path);
       const before = await preferences(first.engine, first.engine.state('twin-b' as MuseId) as MuseState);
       first.store.close();
-      const reopened = buildGarden({ db: path, source: 'fixture', mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
+      const reopened = buildGarden({ db: path, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
       const after = await preferences(reopened.engine, reopened.engine.state('twin-b' as MuseId) as MuseState);
       expect([...after]).toEqual([...before]);
       reopened.store.close();
@@ -111,7 +112,7 @@ describe('divergence: history, not hidden parameters, drives what Muse keeps', (
   });
 
   it('friends shape interests: identical Muses introduced to a botany friend or a music friend end up with different top interests', async () => {
-    const garden = buildGarden({ db: null, source: 'fixture', mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
+    const garden = buildGarden({ db: null, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
     const blank = '# Memory\n\n## Interests\n\n## Routines\n- Waters the window boxes before work.\n';
     const botanist = readMemberDocs({ dir: 'divergence/a' });
     const musician = readMemberDocs({ dir: 'divergence/b' });

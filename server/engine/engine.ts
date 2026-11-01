@@ -56,6 +56,8 @@ interface HopPayload {
   readonly k: number;
   readonly since: number;
   readonly from: Candidate | null;
+  /** The trip's topic once a serendipity trip has found one. */
+  readonly pursuing?: TopicKey;
 }
 
 /**
@@ -318,17 +320,19 @@ export class Engine {
     const trip = ep.plan.trip;
     const draw = this.deps.drawFor(m, p.n);
     const exclude = s.collected;
+    const kinds = this.deps.life.mediaFor(s, p.k, draw);
     let topic: TopicKey | null = trip.kind === 'serendipity' ? null : trip.topic;
     let candidates: Candidate[];
     if (p.k === 0 && trip.kind === 'serendipity') {
-      candidates = await this.deps.source.serendipity(CANDIDATES_PER_HOP, Math.floor(draw('serendipity') * 2 ** 31), exclude);
+      candidates = await this.deps.source.serendipity(kinds, CANDIDATES_PER_HOP, Math.floor(draw('serendipity') * 2 ** 31), exclude);
       topic = candidates[0]?.topics[0] ?? null;
     } else if (p.k === 0 || !p.from) {
-      candidates = topic ? await this.deps.source.search(topic, CANDIDATES_PER_HOP, exclude) : [];
+      candidates = topic ? await this.deps.source.search(topic, kinds, CANDIDATES_PER_HOP, exclude) : [];
     } else {
-      candidates = await this.deps.source.next(p.from, CANDIDATES_PER_HOP, exclude);
+      candidates = await this.deps.source.next(p.from, kinds, CANDIDATES_PER_HOP, exclude);
       topic = p.from.topics[0] ?? topic;
     }
+    const pursuing = trip.kind === 'serendipity' ? (p.pursuing ?? topic) : trip.topic;
     if (!topic || candidates.length === 0) {
       tx.emit(m, { kind: 'episode.ended', n: p.n });
       await this.startNext(tx, m);
@@ -367,7 +371,6 @@ export class Engine {
         canonicalUrl: c.canonicalUrl,
         title: c.title,
         summary: c.summary,
-        ...(c.thumb ? { thumb: c.thumb } : {}),
         topics: c.topics,
         because: [hopRef],
         reason: j.reason,
@@ -375,6 +378,8 @@ export class Engine {
         provenance: 'own',
         place: this.deps.life.findPlace(s, place, i),
         at: tx.now,
+        media: c.media,
+        pursuing,
       };
       tx.emit(m, { kind: 'discovery.collected', discovery });
     });
@@ -388,7 +393,8 @@ export class Engine {
     const best = bestOf(judgments);
     const next = best ? byUrl.get(best.canonicalUrl) ?? null : null;
     if (next && p.k + 1 < MAX_HOPS && this.deps.life.continueTrip(tx.state(m), p.k, best?.score ?? 0, draw)) {
-      this.scheduleHop(tx, m, { n: p.n, k: p.k + 1, since: tx.now, from: next }, tx.now + this.deps.life.hopMs(tx.state(m), draw));
+      const hop: HopPayload = { n: p.n, k: p.k + 1, since: tx.now, from: next, ...(pursuing ? { pursuing } : {}) };
+      this.scheduleHop(tx, m, hop, tx.now + this.deps.life.hopMs(tx.state(m), draw));
     } else {
       tx.emit(m, { kind: 'episode.ended', n: p.n });
       await this.startNext(tx, m);
@@ -420,8 +426,9 @@ export class Engine {
     tx.emit(m, { kind: 'episode.resumed', n: ep.n });
     const at = (tx.now + (ep.remainingMs ?? 0)) as Instant;
     if (ep.plan.activity === 'travel') {
-      const from = ep.lastKept ? candidateOf(tx.state(m).discoveries.get(ep.lastKept)) : null;
-      this.scheduleHop(tx, m, { n: ep.n, k: ep.hops, since: tx.now, from }, at);
+      const last = ep.lastKept ? tx.state(m).discoveries.get(ep.lastKept) : undefined;
+      const from = last ? candidateOf(last) : null;
+      this.scheduleHop(tx, m, { n: ep.n, k: ep.hops, since: tx.now, from, ...(last?.pursuing ? { pursuing: last.pursuing } : {}) }, at);
     } else if (ep.plan.activity !== 'visit' || ep.plan.role === 'host') {
       this.scheduleEnd(tx, m, ep.n, at);
     }
@@ -657,17 +664,8 @@ function bestOf(judgments: readonly Judgment[]): Judgment | null {
   return best;
 }
 
-function candidateOf(d: Discovery | undefined): Candidate | null {
-  if (!d) return null;
-  return {
-    origin: d.url.includes('wikipedia.org') ? 'wikipedia' : 'rss',
-    url: d.url,
-    canonicalUrl: d.canonicalUrl,
-    title: d.title,
-    summary: d.summary,
-    ...(d.thumb ? { thumb: d.thumb } : {}),
-    topics: d.topics,
-  };
+function candidateOf(d: Discovery): Candidate {
+  return { url: d.url, canonicalUrl: d.canonicalUrl, title: d.title, summary: d.summary, topics: d.topics, media: d.media };
 }
 
 async function resolveAll(source: Source, labels: readonly string[]): Promise<TopicKey[]> {

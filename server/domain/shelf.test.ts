@@ -4,7 +4,7 @@ import { neighbours } from './atlas';
 import { discoveryId, museId, photoId } from './ids';
 import { validateReflection } from './reflection';
 import { shelf } from './shelf';
-import { Life, MOSS, t, topic, wiki } from './testing';
+import { ARTICLE, Life, MOSS, t, topic, wiki } from './testing';
 import { DAY_MS, HOUR_MS } from './time';
 
 const D1 = t('2026-11-02T09:00:00-08:00');
@@ -55,7 +55,7 @@ describe('the favorites shelf', () => {
   it('holds gifts from close friends a little dearer', () => {
     const life = new Life();
     const gift = (from: string, title: string): void => {
-      const received: PublicDiscovery = { id: discoveryId(title), url: wiki(title), canonicalUrl: wiki(title), title, summary: '', topics: [topic(title)] };
+      const received: PublicDiscovery = { id: discoveryId(title), url: wiki(title), canonicalUrl: wiki(title), title, summary: '', topics: [topic(title)], media: ARTICLE, pursuing: null };
       life.push(D1, { kind: 'hangout', other: museId(from), role: 'host', pleasantness: 0.8, gave: discoveryId('x'), received, photo: photoId(MOSS.id, 0, D1, 0) });
     };
     gift('wren', 'Lichen');
