@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Matrix4, Vector3 } from 'three';
 import friendFace from '../../assets/garden/friend-face.jpg';
 import museFace from '../../assets/garden/muse-face.jpg';
 import { bedAt, layOut, type Bed, type GardenLayout } from '../../garden/placement';
@@ -106,9 +106,10 @@ export class GardenUi {
   /** The find whose card is up (or rising), and the one being flown to. */
   private current: string | null = null;
   private offscreen = 0;
-  /** Hover, with a pointer that can: where it is over the canvas (px; null when off it), whether it moved since the last pick, and the find under it. */
+  /** Hover, with a pointer that can: where it is over the canvas (px; null when off it), whether it moved since the last pick, the view it was last picked in, and the find under it. */
   private pointer: { x: number; y: number; canvas: HTMLCanvasElement } | null = null;
   private pointerMoved = false;
+  private readonly pickedIn = new Matrix4();
   private hovered: string | null = null;
   private readonly source: GardenSource;
 
@@ -299,8 +300,8 @@ export class GardenUi {
     }
     const away = this.visit.away;
     this.basketFlight.update(dt);
-    // (picked when the pointer moved, or while a flight moves the view under it)
-    if (this.pointer && (this.pointerMoved || this.flight.flying)) this.hover(this.pointer);
+    // (picked when the pointer moved, or the view moved under it: a flight, a zoom still gliding)
+    if (this.pointer && (this.pointerMoved || !w.rig.camera.matrixWorld.equals(this.pickedIn))) this.hover(this.pointer);
     this.beds.update(w.rig.altitude, !away);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     const width = window.innerWidth;
@@ -386,6 +387,7 @@ export class GardenUi {
 
   private hover(at: { x: number; y: number; canvas: HTMLCanvasElement }): void {
     this.pointerMoved = false;
+    this.pickedIn.copy(this.world.rig.camera.matrixWorld);
     const { clientWidth: width, clientHeight: height } = at.canvas;
     const pin = this.pins.pick(at.x, at.y, width, height, this.world.rig.camera);
     const bed = pin ? null : this.findAt(at.x, at.y, width, height);
