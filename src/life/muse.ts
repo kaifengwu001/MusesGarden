@@ -1,6 +1,34 @@
 import type { Ray} from 'three';
-import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  CustomBlending,
+  DoubleSide,
+  FrontSide,
+  InstancedBufferGeometry,
+  LinearFilter,
+  Matrix3,
+  Matrix4,
+  MaxEquation,
+  Mesh,
+  OrthographicCamera,
+  RedFormat,
+  Scene,
+  ShaderMaterial,
+  Sphere,
+  UnsignedByteType,
+  Vector3,
+  Vector4,
+  WebGLRenderTarget,
+  type Frustum,
+  type IUniform,
+  type Texture,
+  type WebGLRenderer,
+} from 'three';
+import { gpuMemory } from '../core/gpuMemory';
 import type { Terrain } from '../planet/terrain';
+import { localSun } from '../render/sun';
 import { warpPoint, type WarpFrame } from '../render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from './museBody';
 import { SCULPTS, type SculptKind } from './museMesh';
@@ -18,8 +46,8 @@ import shadowVertex from './museShadow.vert.glsl?raw';
 // Tripo's sculpt rigged on the same skeleton, museMesh.ts), skinned on
 // thirteen joints and posed in closed form (museRig.ts), drawn as its skin
 // and SHELLS shells of fur in one instanced draw (muse.vert.glsl,
-// muse.frag.glsl), and casting its shadow into the clouds' map as the birds
-// do.
+// muse.frag.glsl), and casting its shadow into a map of its own about it
+// (museShadowMap.glsl), fine enough that its edge stays clean as it moves.
 //
 // It roams the planet on a life of its own (museRoam.ts): out over the
 // meadow and home again, perched on the bench, cooking at the porch's stove,
@@ -38,6 +66,12 @@ export const FUR_LENGTH = 0.06;
 export const SHELLS = 20;
 /** Farther than this from the camera (m) Muse is a pixel or two and is not drawn. */
 const SEEN = 160;
+/**
+ * Its shadow's map: `size` texels square about where its shadow reaches the water table, its half-width enough for
+ * its body's spheres' shadows (at least `min` m, in steps of `step` m, so the texels keep their size while it moves),
+ * and the soft edge's reach (m).
+ */
+const SHADOW = { size: 512, min: 0.9, step: 0.25, soft: 0.02 } as const;
 
 /**
  * What the garden's engine says Muse is doing, over its own life. `home` leaves it to its life by the hut, or, while
@@ -69,8 +103,19 @@ export type MuseModel = 'field' | SculptKind;
 
 const tmp = new Vector3();
 const tmp2 = new Vector3();
+const sun = new Vector3();
+const centre = new Vector3();
+const across = new Vector3();
+const upMap = new Vector3();
+const clearColour = new Color();
 const bounds = new Sphere();
 const frameTmp = new Matrix4();
+
+/** A point (planet space, m) carried on down the sun at Muse to the water table (R), in place: as museShadow.vert.glsl. */
+function down(p: Vector3, R: number): Vector3 {
+  const cl = p.dot(sun);
+  return p.addScaledVector(sun, -(cl - Math.sqrt(Math.max(cl * cl - p.lengthSq() + R * R, 0))));
+}
 
 /** Where Muse is: a unit direction on the planet, its feet's height over R (m), and the way it faces there (a unit tangent). */
 export interface MuseWhere {
@@ -130,6 +175,17 @@ export class Muse {
   private loaded = false;
   private readonly press: { value: Vector4[] } | null;
   private readonly pressK: { value: number } | null;
+  /** Its shadow's map, the pass that draws it, and what the ground and the plants read it by (world.ts's shared uniforms). */
+  private readonly shadowTarget: WebGLRenderTarget;
+  private readonly shadowScene: Scene;
+  private readonly shadowCamera = new OrthographicCamera();
+  private readonly shadowFrame: Matrix3;
+  private readonly shadowScale = new Vector3(0, 0, 1);
+  private readonly shadowSun: Vector4;
+  private readonly shadowWindow: Vector4;
+  private readonly shadowFeet: Vector3;
+  private readonly sunAngles: Vector4;
+  private readonly cloudLook: Vector4 | null;
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -139,21 +195,34 @@ export class Muse {
     );
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
+    // its shadow: a map of its own about it, the frame and scale the pass draws it in shared with those who read it
+    this.shadowFrame = (shared.uMuseShadowFrame as IUniform<Matrix3> | undefined)?.value ?? new Matrix3();
+    this.shadowSun = (shared.uMuseShadowSun as IUniform<Vector4> | undefined)?.value ?? new Vector4();
+    this.shadowWindow = (shared.uMuseShadowWindow as IUniform<Vector4> | undefined)?.value ?? new Vector4();
+    this.shadowFeet = (shared.uMuseShadowFeet as IUniform<Vector3> | undefined)?.value ?? new Vector3();
+    this.sunAngles = (shared.uSunAngles as IUniform<Vector4>).value;
+    this.cloudLook = (shared.uCloudLook as IUniform<Vector4> | undefined)?.value ?? null;
     this.shadowMesh = new Mesh(
       new BufferGeometry(),
       new ShaderMaterial({
         name: 'muse shadow',
         vertexShader: shadowVertex,
         fragmentShader: shadowFragment,
-        uniforms: { uCubeFace: shared.uCubeFace, uFaceWindow: shared.uFaceWindow, uRadius: shared.uRadius, uSunAngles: shared.uSunAngles, ...this.uniforms },
+        uniforms: { uCubeFace: { value: this.shadowFrame }, uFaceWindow: { value: this.shadowScale }, uRadius: shared.uRadius, uSunAngles: shared.uSunAngles, ...this.uniforms },
         side: DoubleSide,
-        blending: AdditiveBlending,
+        blending: CustomBlending,
+        blendEquation: MaxEquation,
         depthTest: false,
         depthWrite: false,
         transparent: true,
       }),
     );
     this.shadowMesh.frustumCulled = false;
+    this.shadowScene = new Scene().add(this.shadowMesh);
+    this.shadowTarget = new WebGLRenderTarget(SHADOW.size, SHADOW.size, { format: RedFormat, type: UnsignedByteType, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
+    gpuMemory.set('muse shadow', SHADOW.size * SHADOW.size);
+    const shadowMap = shared.uMuseShadow as IUniform<Texture | null> | undefined;
+    if (shadowMap) shadowMap.value = this.shadowTarget.texture;
     this.props = new MuseProps(shared);
     // (the grass's press, shared: world.ts makes it before the grass)
     this.press = (shared.uMusePress as { value: Vector4[] } | undefined) ?? null;
@@ -311,11 +380,60 @@ export class Muse {
     const seen = show && this.loaded && !this.away && far < SEEN;
     this.mesh.visible = seen;
     this.shadowMesh.visible = seen;
+    this.placeShadow(R, seen);
     // as many shells as the fur's length on screen in pixels
     const shells = Math.max(2, Math.min(SHELLS, Math.ceil(FUR_LENGTH / Math.max(far, 0.1) / Math.max(pixelAngle, 1e-6))));
     this.uniforms.uMuseSize.value.z = shells;
     (this.mesh.geometry as InstancedBufferGeometry).instanceCount = shells + 1;
     this.props.update(time, l, rig, this.place, terrain, MUSE_HEIGHT, seen);
+  }
+
+  /**
+   * Where its shadow falls, for its map: its body's spheres carried down the sun at Muse to the water table, the map
+   * centred among them (its frame turned toward the sun's bearing) and wide enough for each sphere's shadow, stretched
+   * along the sun as it gets low. Off (strength 0) while Muse isn't drawn.
+   */
+  private placeShadow(R: number, seen: boolean): void {
+    const a = this.sunAngles;
+    localSun(this.up, Math.atan2(a.x, a.y), Math.atan2(a.w, a.z), sun);
+    this.shadowWindow.y = 0;
+    if (!seen) return;
+    centre.set(0, 0, 0);
+    for (const s of this.spheres) centre.add(down(tmp.set(s.x, s.y, s.z), R));
+    centre.normalize();
+    across.copy(sun).addScaledVector(centre, -sun.dot(centre));
+    if (across.lengthSq() < 1e-8) across.copy(this.forward);
+    across.normalize();
+    upMap.crossVectors(centre, across);
+    const sinE = Math.max(sun.dot(this.up), 0.2);
+    let half: number = SHADOW.min;
+    for (const s of this.spheres) {
+      const g = down(tmp.set(s.x, s.y, s.z), R);
+      const out = g.dot(centre);
+      half = Math.max(half, (R * Math.abs(g.dot(across))) / out + s.w / sinE + SHADOW.soft, (R * Math.abs(g.dot(upMap))) / out + s.w + SHADOW.soft);
+    }
+    half = Math.ceil(half / SHADOW.step) * SHADOW.step;
+    this.shadowFrame.set(across.x, upMap.x, centre.x, across.y, upMap.y, centre.y, across.z, upMap.z, centre.z);
+    this.shadowScale.set(0, 0, R / half);
+    // (a point farther from its feet than the whole map's reach, past its height, can't be in its shadow)
+    const reach = 2 * Math.SQRT2 * half + MUSE_HEIGHT;
+    this.shadowSun.set(sun.x, sun.y, sun.z, reach * reach);
+    this.shadowFeet.copy(this.uniforms.uMusePos.value);
+    this.shadowWindow.set(R / half, this.cloudLook?.x ?? 0.7, SHADOW.soft / (2 * half * Math.SQRT2), 0);
+  }
+
+  /** Draw its shadow's map (after update, before the scene that reads it). */
+  renderShadow(renderer: WebGLRenderer): void {
+    if (this.shadowWindow.y <= 0) return;
+    const previous = renderer.getRenderTarget();
+    const clearAlpha = renderer.getClearAlpha();
+    renderer.getClearColor(clearColour);
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(this.shadowTarget);
+    renderer.clear(true, false, false);
+    renderer.render(this.shadowScene, this.shadowCamera);
+    renderer.setClearColor(clearColour, clearAlpha);
+    renderer.setRenderTarget(previous);
   }
 
   /** The engine's say over Muse's life (null-free: with no engine it stays home, living its life). */

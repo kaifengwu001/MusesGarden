@@ -355,7 +355,12 @@ click is what you see.
   projected), climbing to the zenith near the poles so the field stays smooth.
   It is fixed to the planet, so shadows stay put however the globe is turned.
   The view is lit by the sun at the focus; cloud and bird shadows, the
-  cottage and its ground shadow each use their own place's sun.
+  cottage and its ground shadow each use their own place's sun. Muse's
+  shadow has a map of its own (`muse.ts`, `museShadowMap.glsl`): its skin
+  carried down the sun at Muse to the water table, in about 5 mm texels over
+  the few meters round it, carried along with it, its edge a little soft;
+  the ground, the props, the grass, the flowers and the finds' patches read
+  it (the plants where they stand), Muse never does.
 - **No outlines:** everything keeps soft, painted edges, the cottage too.
 - **The cottage** is bent round the planet: each vertex is placed by the
   terrain's cottage-local meters (the sine map round the cottage) and

@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix3, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type Texture, type WebGLRenderer } from 'three';
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
@@ -164,6 +164,12 @@ export class World {
       // Muse's body where it lies in the grass, pressing it down round it (muse.ts; grass.vert.glsl, flower.vert.glsl)
       uMusePress: { value: Array.from({ length: PRESSES }, () => new Vector4()) },
       uMusePressK: { value: 0 },
+      // Muse's shadow, a map of its own about it (muse.ts; museShadowMap.glsl: the ground, the props, the grass, the flowers)
+      uMuseShadow: { value: null as Texture | null },
+      uMuseShadowFrame: { value: new Matrix3() },
+      uMuseShadowSun: { value: new Vector4() },
+      uMuseShadowWindow: { value: new Vector4() },
+      uMuseShadowFeet: { value: new Vector3() },
     };
     this.sky = new Sky();
     this.field = new FieldMap(this.shared, tier.maps.field);
@@ -179,7 +185,6 @@ export class World {
     this.muse = new Muse(this.shared);
     this.muse.useModel(store.values.muse.model);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
-    this.clouds.addShadowCaster(this.muse.shadowMesh);
     // (the float's rings on the water are the meadow's own ripples)
     this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
@@ -421,6 +426,7 @@ export class World {
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
+    this.muse.renderShadow(this.renderer);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;

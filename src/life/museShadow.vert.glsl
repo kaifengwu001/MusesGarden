@@ -1,8 +1,8 @@
 // Muse's shadow (muse.ts): its skin, skinned and set down as Muse is drawn,
-// each point carried on down the sun its place sees to the water table and
-// splatted into the clouds' shadow map a face (or the window of one) at a
-// time (cloudShadow.vert.glsl), as the birds are. The ground reads it
-// directly, the grass and the flowers through the field map.
+// each point carried on down the sun at Muse to the water table and splatted
+// into a map of its own about it (uCubeFace: the map's frame; uFaceWindow:
+// its scale). The ground, the props, the grass and the flowers read it
+// (museShadowMap.glsl).
 #include <meadow_sun>
 uniform float uRadius;
 uniform mat3 uCubeFace;

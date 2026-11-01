@@ -21,7 +21,7 @@
 // that wall, an olive grey), walls turned from the sun an olive grey with
 // the meadow's green bounced into them, the shaded
 // slopes of the roof a blue-grey, the bench's shadow on the wall, the
-// house's on its terrace, and the clouds' passing over. No outlines.
+// house's on its terrace, the clouds' passing over, and Muse's. No outlines.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
@@ -30,6 +30,7 @@ uniform float uRadius;
 #include <meadow_toon>
 #include <meadow_fog>
 #include <meadow_clouds>
+#include <meadow_muse_shadow>
 uniform int uKind; // 0 wall, 1 roof, 2 wood, 3 iron, 4 glass, 5 landing
 
 varying vec3 vNormal;
@@ -118,7 +119,7 @@ void main() {
   vec3 v = normalize(toCam);
   vec3 dir = normalize(vPlanet);
   vec3 sun = localSun(dir);
-  float cloud = 0.85 * cloudShadowAt(vPlanet, 0.0);
+  float cloud = 0.85 * max(cloudShadowAt(vPlanet, 0.0), museShadowAt(vPlanet));
   vec2 uv = vUv;
   float height = vPaint.z;
   bool upright = abs(dot(n, vUp)) < 0.5;

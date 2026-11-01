@@ -43,6 +43,34 @@ other worlds beside it. The rules are in [CLAUDE.md](CLAUDE.md), and `npm test` 
 (`params.test.ts`, `cast.test.ts`, `garden.test.ts`). A local garden seeded before this change (`.muse/`)
 has to be deleted and seeded again.
 
+## Muse's shadow, clean and still (2026-11-01)
+
+Kai's note: Muse's shadow could be very low-res and flickering, most of all on
+the terrace and over bare ground, with jagged edges on the ground and on Muse.
+Muse was splatted into the clouds' shadow maps: on the ground and the props it
+was read at the sharper window's texels (about 7–8 cm near the ground), its
+outline a staircase that crawled as Muse moved; the grass and the flowers read
+it through the field map (coarser, and a frame late); and Muse read the map a
+meter aside to miss its own shadow, which a wide pose didn't always.
+
+Now Muse has a map of its own: 512² over the few meters round it (about 5 mm a
+texel standing; its half-width in steps of 0.25 m from 0.9 m, so the texels
+keep their size as it moves), centred among its body's spheres carried down the
+sun, so it travels with Muse and its texels never crawl. The ground, the props,
+the grass, the flowers and the finds' patches read it (the plants where they
+stand, as the field map had them), its edge softened over about 2 cm; Muse
+never reads it, and reads the clouds' shadows where it stands. The shadow is
+as dark as before (0.920 of the lit terrace before, 0.921 now).
+
+Checked: outside Muse's shadow the meadow draws pixel for pixel as before in
+the standard views (the cottage view and bird's-eye differ only in Muse's
+shadow; orbit differs even against itself, by the Muse pin's pop-up). On the
+terrace with a still camera, one-frame flicker went from 47 px a frame (782 at
+worst) to 5 (39). `npm run check`, 750 tests, the GPU invariants (14 pass) and
+the live suite (11) pass. Cost: within the noise of a busy machine (best of 10
+alternating rounds at 2880×1800, at most about 0.3 ms a frame with Muse in
+view; turning it off at runtime moved frames both ways).
+
 ## Muse's life on the engine, in Kai's garden (muse-agent)
 
 The Muse agent's backend, designed in [docs/muse-agent.md](docs/muse-agent.md),
