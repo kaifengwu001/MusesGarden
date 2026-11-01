@@ -38,14 +38,14 @@ Started from eea900c (the fourth pass: Kai's models, the river, the gentler hill
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | The paddies' geometry can glitch when zoomed in | |
-| 2 | Some mountains are floating or have gaps at the bottom: move them lower | |
-| 3 | Too many houses, too dispersed: villages should group closer together, and houses certainly shouldn't sit on rivers | |
-| 4 | The cuts in the bands are not simply a curve across: observe the references for how a cut takes part in the shape of the banks | |
-| 5 | Odd small circle paddies (the screenshot): those should just merge with the larger paddies | |
-| 6 | The fog needs to be thicker and more volumetric | |
-| 7 | In wander mode distant mountains shouldn't become fully white: their peaks should keep their colour, a gradient; close-by mountains look good | |
-| 8 | A colour pass: deeper greens | |
+| 1 | The paddies' geometry can glitch when zoomed in | Found up close and fixed: the rice blades arched out over the bunds, risers and paths in a hairy fringe (a blade now grows only where its floor reaches a quarter meter out every way); a cut's ridge stood up to the next band's floor where it met a wall, a pale post (it keeps to its own band's floors now). Whether these were the glitches Kai saw is to confirm ([at 40 m](docs/checkpoints/terraces-3/round5-paddies-40m.jpg)). |
+| 2 | Some mountains are floating or have gaps at the bottom: move them lower | Each tower stands under the lowest ground round its foot (sampled on two rings out to near half its height), 5 % of its height lower still. |
+| 3 | Too many houses, too dispersed: villages should group closer together, and houses certainly shouldn't sit on rivers | Fewer villages (a site per 15000 m², at most 8), 3–6 houses each, huddled (their yards meeting); a house only where its middle and every corner of its yard are off the river and out of the woods. |
+| 4 | The cuts in the bands are not simply a curve across: observe the references for how a cut takes part in the shape of the banks | A cut leaves its lower bank along it, sweeps across the band and runs into the upper bank along it a band's width or two on, so a paddy ends in a long point on one side and a rounded shoulder on the other, as the paddies' ends do in the references. |
+| 5 | Odd small circle paddies (the screenshot): those should just merge with the larger paddies | A bump or dip whose ring would enclose under 300 m² is levelled into the band round it before the walls are traced, and a small closed lens is dropped. Some larger rings remain where the ring meets the woods or a cell's edge (Known issues). |
+| 6 | The fog needs to be thicker and more volumetric | The valley fog's banks stand 6.5 m tall (2.8 before), denser, their tops softer, fewer and more separate (so the paddies show between them from above), marched in twelve steps. |
+| 7 | In wander mode distant mountains shouldn't become fully white: their peaks should keep their colour, a gradient; close-by mountains look good | On the towers the haze lies thick low down and thin up high (to 40 % of it above 55 m): a far tower's foot fades into the mist, its peak keeps its colour. |
+| 8 | A colour pass: deeper greens | The crop's greens a step deeper throughout (fresh #7FA35B, grown #4C7447, lime #9DBA62). |
 
 ### Kai's notes on the third pass
 
@@ -97,6 +97,7 @@ Nothing in the look traded for performance. Kai's models are simplified (24–36
 ### Known issues (the fourth pass)
 
 - **Still too clean beside the paintings** (Kai's "early 2000s"): the paddies' shapes are smooth geometric curves of even width and their washes even; the painting's bands wobble, their edges are soft, their strokes and reflections are richer. The trees are the earlier round lumps, the rice blades near the camera hard-edged. The painterly finish is the next round's main work.
+- **Kai's notes on the fourth pass, still open:** rings round a bump that meet the woods or a cell's edge are not levelled (the ring is not closed in the survey); the wander view at 3 m can fog out to white toward the horizon where banks lie across it (the fog is taller now): to check against note 7 in Kai's own walk.
 - **The vista and the squint test** are still framed on, and scored against, the earlier green painting recoloured (vista-target.png): the vista is to be searched again for the valley painting, and the squint test pointed at it.
 - **The paddies:** a wall's pieces notch where two cells meet (a step of a few centimeters at the joint); the crop's rows read as a regular stripe more than the paintings' short strokes; colour runs along a band for shorter stretches than in Kai's paddy painting; paths only along walls (none across the bands, along the river or between villages); past 220 m the ground's paint draws the terraces without paths.
 - **The river** is painted on the ground (no water surface of its own, no bridge, no stone banks); a plain grass bank.
