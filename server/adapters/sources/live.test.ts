@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalUrl, TopicKey } from '../../../src/muse/contract';
 import { loadCorpus, loadHeroChain, loadUnseenPool } from './corpus';
-import { RssSource } from './rss';
 import { WikipediaSource } from './wikipedia';
 
 const none = new Set<CanonicalUrl>();
@@ -25,8 +24,4 @@ describe.runIf(process.env.MUSE_LIVE === '1')('live sources', () => {
     const drifted = recorded.filter((c) => found.get(c.title)?.canonicalUrl !== c.canonicalUrl).map((c) => c.title);
     expect(drifted).toEqual([]);
   }, 600_000);
-
-  it('each curated feed serves items', async () => {
-    expect((await new RssSource().serendipity(50, 0, none)).length).toBeGreaterThan(10);
-  }, 60_000);
 });

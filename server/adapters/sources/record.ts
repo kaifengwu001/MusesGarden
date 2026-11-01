@@ -20,10 +20,9 @@ import {
   type CorpusPage,
   type Lean,
 } from './corpus';
-import { FEEDS } from './rss';
 import { arr, obj, strs } from './json';
 import { recordingFetch, SAMPLE_BATCH, type Samples } from './samples';
-import { normalizeTitle, topicCategories, USER_AGENT, WikipediaSource } from './wikipedia';
+import { normalizeTitle, topicCategories, WikipediaSource } from './wikipedia';
 
 interface Area {
   readonly name: string;
@@ -219,7 +218,7 @@ async function unseenPool(wiki: WikipediaSource, corpus: Corpus): Promise<Record
   return pool;
 }
 
-/** Real responses for the calls wikipedia.test.ts makes, and the head of each curated feed for rss.test.ts. */
+/** Real responses for the calls wikipedia.test.ts makes. */
 async function samples(): Promise<void> {
   const recorded: Samples = {};
   const wiki = new WikipediaSource({ fetch: recordingFetch(recorded) });
@@ -231,14 +230,6 @@ async function samples(): Promise<void> {
   await wiki.candidates(SAMPLE_BATCH);
   await wiki.serendipity(4, 1, none);
   writeJson(`${SOURCES_DIR}samples/wikipedia.json`, recorded);
-
-  for (const feed of FEEDS) {
-    const res = await fetch(feed.url, { headers: { 'User-Agent': USER_AGENT } });
-    const xml = await res.text();
-    const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/g)].slice(0, 4).map((m) => m[0]);
-    const head = xml.slice(0, xml.search(/<item\b/));
-    writeFileSync(`${SOURCES_DIR}samples/${new URL(feed.url).hostname}.xml`, `${head}${items.join('\n')}\n</channel>\n</rss>\n`);
-  }
 }
 
 /**

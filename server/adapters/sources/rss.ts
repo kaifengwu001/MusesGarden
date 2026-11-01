@@ -1,20 +1,6 @@
-import { mix, salt } from '../../../src/core/hash';
-import type { Candidate, CanonicalUrl, Source, TopicKey } from '../../../src/muse/contract';
-import { clampSummary, mentions } from './text';
-import { USER_AGENT } from './wikipedia';
-
-export interface Feed {
-  readonly url: string;
-  /** The publication's canonical Wikipedia title, the topic of an item no interest matched. */
-  readonly topic: string;
-}
-
-/** RSS 2.0 feeds checked live on 2026-10-31. */
-export const FEEDS: readonly Feed[] = [
-  { url: 'https://publicdomainreview.org/rss.xml', topic: 'The Public Domain Review' },
-  { url: 'https://www.atlasobscura.com/feeds/latest', topic: 'Atlas Obscura' },
-  { url: 'https://daily.jstor.org/feed/', topic: 'JSTOR' },
-];
+// RSS 2.0 and Atom feeds: the items the media recorder reads from magazines, blogs and video channels.
+import type { CanonicalUrl } from '../../../src/muse/contract';
+import { clampSummary } from './text';
 
 export interface FeedItem {
   readonly url: string;
@@ -22,6 +8,17 @@ export interface FeedItem {
   readonly title: string;
   readonly summary: string;
   readonly thumb?: string;
+  /** ISO date. */
+  readonly published?: string;
+  readonly author?: string;
+  /** Words in the item's full text, when the feed carries it. */
+  readonly words?: number;
+}
+
+export interface Feed {
+  /** The publication's own name. */
+  readonly title: string;
+  readonly items: readonly FeedItem[];
 }
 
 /** https, lowercase host, no `utm_*` params, no fragment. */
@@ -39,7 +36,7 @@ const NAMED: Readonly<Record<string, string>> = {
   lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
 };
 
-function decode(s: string): string {
+export function decode(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code: string) => {
     if (code.startsWith('#x') || code.startsWith('#X')) return String.fromCodePoint(parseInt(code.slice(2), 16));
     if (code.startsWith('#')) return String.fromCodePoint(parseInt(code.slice(1), 10));
@@ -55,122 +52,76 @@ function element(item: string, tag: string): string | undefined {
   return cdata === null ? decode(m[1]) : cdata[1];
 }
 
-function plain(markup: string): string {
+/** An attribute of the first `tag` element (self-closing or not) that has it. */
+function attribute(item: string, tag: string, name: string, where: RegExp = /./): string | undefined {
+  for (const m of item.matchAll(new RegExp(`<${tag}\\b([^>]*)>`, 'gi'))) {
+    if (!where.test(m[1])) continue;
+    const value = new RegExp(`\\b${name}\\s*=\\s*"([^"]*)"|\\b${name}\\s*=\\s*'([^']*)'`, 'i').exec(m[1]);
+    if (value !== null) return decode(value[1] ?? value[2]);
+  }
+  return undefined;
+}
+
+export function plain(markup: string): string {
   return decode(markup.replace(/<[^>]*>/g, ' '))
     .replace(/The post .* appeared first on .*\.\s*$/s, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-/** Items of an RSS 2.0 document, in feed order. Items without a title or link are dropped. */
-export function parseRss(xml: string): FeedItem[] {
-  return [...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/g)].flatMap(([, item]) => {
-    const title = plain(element(item, 'title') ?? '');
-    const url = (element(item, 'link') ?? '').trim();
-    if (title === '' || !URL.canParse(url)) return [];
-    const description = element(item, 'description') ?? '';
-    const thumb = /<img\b[^>]*\bsrc="([^"]+)"/i.exec(`${description} ${element(item, 'content:encoded') ?? ''}`)?.[1];
-    return [{ url, link: canonicalLink(url), title, summary: clampSummary(plain(description)), ...(thumb === undefined ? {} : { thumb }) }];
-  });
+function isoDate(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined;
+  const t = Date.parse(raw.trim());
+  return Number.isNaN(t) ? undefined : new Date(t).toISOString().slice(0, 10);
 }
 
-interface Entry {
-  readonly feed: Feed;
-  readonly item: FeedItem;
+const IMAGE = /\.(?:jpe?g|png|webp|gif|avif)(?:[?#]|$)/i;
+
+function thumbOf(item: string, html: string): string | undefined {
+  return (
+    attribute(item, 'media:thumbnail', 'url') ??
+    attribute(item, 'media:content', 'url', /medium="image"|type="image/i) ??
+    attribute(item, 'media:content', 'url', IMAGE) ??
+    attribute(item, 'enclosure', 'url', /type="image/i) ??
+    /<img\b[^>]*\bsrc="([^"]+)"/i.exec(html)?.[1]
+  );
 }
 
-/** Brands the feed's own topic: Feed.topic is a canonical title by construction (checked live). */
-function toCandidate({ feed, item }: Entry, matched: readonly TopicKey[]): Candidate {
+function linkOf(item: string): string {
+  const rss = element(item, 'link')?.trim();
+  if (rss !== undefined && rss !== '' && URL.canParse(rss)) return rss;
+  return attribute(item, 'link', 'href', /rel="alternate"/i) ?? attribute(item, 'link', 'href', /^(?![^]*rel=)/) ?? '';
+}
+
+function parseItem(item: string): FeedItem | null {
+  const title = plain(element(item, 'title') ?? '');
+  const url = linkOf(item);
+  if (title === '' || !URL.canParse(url)) return null;
+  const full = element(item, 'content:encoded') ?? element(item, 'content') ?? '';
+  const description = element(item, 'description') ?? element(item, 'summary') ?? element(item, 'media:description') ?? '';
+  const summary = clampSummary(plain(description === '' ? full : description));
+  const thumb = thumbOf(item, `${description} ${full}`);
+  const published = isoDate(element(item, 'pubDate') ?? element(item, 'published') ?? element(item, 'updated') ?? element(item, 'dc:date'));
+  const author = plain(element(item, 'dc:creator') ?? element(element(item, 'author') ?? '', 'name') ?? element(item, 'author') ?? '');
+  const words = full === '' ? 0 : plain(full).split(' ').length;
   return {
-    origin: 'rss',
-    url: item.url,
-    canonicalUrl: item.link,
-    title: item.title,
-    summary: item.summary,
-    ...(item.thumb === undefined ? {} : { thumb: item.thumb }),
-    topics: [...new Set([...matched, feed.topic as TopicKey])],
+    url,
+    link: canonicalLink(url),
+    title,
+    summary,
+    ...(thumb === undefined ? {} : { thumb }),
+    ...(published === undefined ? {} : { published }),
+    ...(author === '' ? {} : { author }),
+    ...(words > 0 ? { words } : {}),
   };
 }
 
-export interface RssOptions {
-  readonly feeds?: readonly Feed[];
-  readonly fetch?: typeof fetch;
-  /** How long fetched feeds are reused before refetching. */
-  readonly ttlMs?: number;
-}
-
-/**
- * A small live source over curated feeds. Items match by topic label in their title or summary. RSS has no topic
- * namespace, so resolveTopic always returns null: resolve labels through Wikipedia.
- */
-export class RssSource implements Source {
-  private readonly feeds: readonly Feed[];
-  private readonly fetchImpl: typeof fetch;
-  private readonly ttlMs: number;
-  private cache: { readonly at: number; readonly entries: Promise<Entry[]> } | undefined;
-
-  constructor(options: RssOptions = {}) {
-    this.feeds = options.feeds ?? FEEDS;
-    this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-    this.ttlMs = options.ttlMs ?? 30 * 60 * 1000;
-  }
-
-  async search(topic: TopicKey, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
-    return (await this.entries())
-      .filter((e) => !exclude.has(e.item.link) && mentions(`${e.item.title} ${e.item.summary}`, topic))
-      .slice(0, limit)
-      .map((e) => toCandidate(e, [topic]));
-  }
-
-  async next(from: Candidate, limit: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
-    return (await this.entries())
-      .filter((e) => !exclude.has(e.item.link) && e.item.link !== from.canonicalUrl)
-      .map((e) => ({ e, matched: from.topics.filter((t) => mentions(`${e.item.title} ${e.item.summary}`, t)) }))
-      .filter(({ matched }) => matched.length > 0)
-      .sort((a, b) => b.matched.length - a.matched.length)
-      .slice(0, limit)
-      .map(({ e, matched }) => toCandidate(e, matched));
-  }
-
-  async serendipity(limit: number, seed: number, exclude: ReadonlySet<CanonicalUrl>): Promise<Candidate[]> {
-    return (await this.entries())
-      .filter((e) => !exclude.has(e.item.link))
-      .map((e) => ({ e, key: mix(salt(e.item.link), seed) }))
-      .sort((a, b) => a.key - b.key)
-      .slice(0, limit)
-      .map(({ e }) => toCandidate(e, []));
-  }
-
-  resolveTopic(_label: string): Promise<TopicKey | null> {
-    return Promise.resolve(null);
-  }
-
-  private entries(): Promise<Entry[]> {
-    if (this.cache === undefined || Date.now() - this.cache.at > this.ttlMs) {
-      this.cache = { at: Date.now(), entries: this.fetchAll() };
-    }
-    return this.cache.entries;
-  }
-
-  private async fetchAll(): Promise<Entry[]> {
-    const settled = await Promise.allSettled(
-      this.feeds.map(async (feed) => {
-        const res = await this.fetchImpl(feed.url, { headers: { 'User-Agent': USER_AGENT } });
-        if (!res.ok) throw new Error(`${feed.url}: HTTP ${res.status}`);
-        return parseRss(await res.text()).map((item) => ({ feed, item }));
-      }),
-    );
-    const seen = new Set<CanonicalUrl>();
-    return settled.flatMap((s) => {
-      if (s.status === 'rejected') {
-        console.warn(`rss: skipped a feed (${String(s.reason)})`);
-        return [];
-      }
-      return s.value.filter((e) => {
-        if (seen.has(e.item.link)) return false;
-        seen.add(e.item.link);
-        return true;
-      });
-    });
-  }
+/** An RSS 2.0 or Atom document, items in feed order. Items without a title or link are dropped. */
+export function parseFeed(xml: string): Feed {
+  const blocks = [...xml.matchAll(/<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/g)];
+  const head = xml.slice(0, blocks[0]?.index ?? xml.length);
+  return {
+    title: plain(element(head, 'title') ?? ''),
+    items: blocks.flatMap(([, , body]) => parseItem(body) ?? []),
+  };
 }
