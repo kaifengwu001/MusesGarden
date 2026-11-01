@@ -302,6 +302,8 @@ const fail = (status: 400 | 403 | 404 | 409, error: string): CommandResult => ({
 /** The write side of the HTTP API, over the engine. The clock mode decides whether wall time drives the engine. */
 export class Commands implements GardenCommands {
   private mode: 'live' | 'fast-forward';
+  /** The wall time at the last live tick: live mode moves the engine on by the wall time since, as it may be ahead of the wall clock after fast-forwarding. */
+  private lastWall: Instant | null = null;
 
   constructor(
     private readonly engine: Engine,
@@ -376,6 +378,7 @@ export class Commands implements GardenCommands {
 
   setClock(mode: 'live' | 'fast-forward'): Promise<CommandResult> {
     this.mode = mode;
+    this.lastWall = null;
     return Promise.resolve(ok);
   }
 
@@ -383,8 +386,21 @@ export class Commands implements GardenCommands {
     return { mode: this.mode, now: this.engine.now() };
   }
 
-  /** The live clock's tick: wall time drives the engine only in live mode. */
+  /**
+   * The live clock's tick: in live mode the engine moves on as much as the wall clock has since the last tick. The
+   * first tick catches an engine that is behind up to the wall clock (a restart) and leaves one that is ahead alone.
+   */
   async tick(wall: Instant): Promise<void> {
-    if (this.mode === 'live') await this.engine.advanceTo(wall);
+    if (this.mode !== 'live') {
+      this.lastWall = null;
+      return;
+    }
+    const last = this.lastWall;
+    this.lastWall = wall;
+    if (last === null) {
+      if (this.engine.now() < wall) await this.engine.advanceTo(wall);
+      return;
+    }
+    if (wall > last) await this.engine.advanceTo((this.engine.now() + (wall - last)) as Instant);
   }
 }

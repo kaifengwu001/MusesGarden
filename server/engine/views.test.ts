@@ -75,4 +75,25 @@ describe('views', () => {
     await commands.setClock('live');
     expect((await commands.advance(1)).ok).toBe(false);
   });
+
+  it('a live clock moves the engine on by the wall time passed, even when the engine is ahead of the wall', async () => {
+    const { engine, commands } = await setup();
+    await commands.advance(48);
+    const ahead = engine.now();
+    await commands.setClock('live');
+    const wall = (T0 + 1 * H) as Instant;
+    await commands.tick(wall);
+    expect(engine.now()).toBe(ahead);
+    await commands.tick((wall + 60_000) as Instant);
+    expect(engine.now()).toBe(ahead + 60_000);
+    await commands.tick((wall + 3 * 60_000) as Instant);
+    expect(engine.now()).toBe(ahead + 3 * 60_000);
+  });
+
+  it('a live clock first catches an engine that is behind up to the wall clock', async () => {
+    const { engine, commands } = await setup();
+    await commands.setClock('live');
+    await commands.tick((T0 + 2 * H) as Instant);
+    expect(engine.now()).toBe(T0 + 2 * H);
+  });
 });
