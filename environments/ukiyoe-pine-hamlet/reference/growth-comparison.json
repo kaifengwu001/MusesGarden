@@ -1,0 +1,64 @@
+{
+  "purpose": "Compare the inherited live-growth frame budget without changing its thresholds. Browser runs were sequential on the same machine.",
+  "baselineCommit": "36d10ac56fc407f01821e4e348fbef9f45e45623",
+  "thresholds": {
+    "p95FrameMsLessThan": 20,
+    "p95JsMsLessThan": 12.7,
+    "maximumBuildMsLessThan": 8.6
+  },
+  "runs": {
+    "baseline": {
+      "port": 5240,
+      "tests": [
+        {
+          "title": "growth scrub 0.3 \u2192 0.7 \u2192 0.3 returns the identical frame",
+          "status": "expected",
+          "annotations": []
+        },
+        {
+          "title": "scrubbing growth in real time stays within the frame budget",
+          "status": "unexpected",
+          "annotations": [
+            {
+              "type": "scrub",
+              "description": "frame p95 50.00 ms, JS p95 37.90 ms, max 85.90 ms, build slice max 0.10 ms"
+            }
+          ]
+        }
+      ]
+    },
+    "current": {
+      "port": 5237,
+      "tests": [
+        {
+          "title": "growth scrub 0.3 \u2192 0.7 \u2192 0.3 returns the identical frame",
+          "status": "expected",
+          "annotations": []
+        },
+        {
+          "title": "scrubbing growth in real time stays within the frame budget",
+          "status": "unexpected",
+          "annotations": [
+            {
+              "type": "scrub",
+              "description": "frame p95 50.00 ms, JS p95 37.10 ms, max 49.30 ms, build slice max 0.10 ms"
+            }
+          ]
+        },
+        {
+          "title": "draw calls stay within budget in Overview and Wander",
+          "status": "expected",
+          "annotations": []
+        }
+      ]
+    }
+  },
+  "intermittentRoundtrip": {
+    "initialExpectedHash": "b5c1fc0b:1600x1000",
+    "initialActualHash": "d03f8530:1600x1000",
+    "diagnosticRepeatsPassed": 10,
+    "unchangedSpecRepeatsPassed": 5,
+    "latestRecordedRunPassed": true,
+    "resolution": "Not reproduced or explained; assertion unchanged. No claim that the intermittent failure is fixed."
+  }
+}

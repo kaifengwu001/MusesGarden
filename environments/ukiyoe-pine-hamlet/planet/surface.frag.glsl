@@ -44,6 +44,11 @@ void main() {
   float viewDist = length(toCam);
   vec3 v = toCam / viewDist;
   float pixelMeters = viewDist * uPixelAngle / max(dot(n, v), 0.3);
+  // The angle estimate is bounded for the older paint systems. Snow grain
+  // must also respect the true footprint on a grazing bank/ground surface.
+  // Evaluate derivatives before any wet/material branch.
+  vec3 restMeters = dir * uRadius;
+  float snowPixelMeters = max(pixelMeters, max(length(dFdx(restMeters)), length(dFdy(restMeters))));
 
   // the ground here: per pixel from the bake, so shores are crisp at any mesh density (AWAY_FROM_HOME:
   // a node the homestead shapes and shades none of, surface.ts, drawn without its code)
@@ -99,7 +104,7 @@ void main() {
     m.sunlit = 1.0 - cloud;
     m.sheen = sheen;
     m.stroke = stroke;
-    m.pixelMeters = pixelMeters;
+    m.pixelMeters = snowPixelMeters;
     m.nearFade = nearFade;
     land = meadowPaint(m);
     // the bank's face: where the turf drops to the water it is steep, and in its own shade. The

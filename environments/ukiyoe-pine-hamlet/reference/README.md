@@ -26,6 +26,14 @@ Start with the [side-by-side comparison](comparison.html). Current checkpoints:
 [mobile neighbour](checkpoint-mobile-resident.png). These are actual app
 captures from the final verification pass on 1 November 2026.
 
+Material close-ups: [snow pine](checkpoint-pine-snow.png),
+[rain pine](checkpoint-pine-rain.png), [cedar](checkpoint-cedar-rain.png),
+[snow, plum and reeds](checkpoint-snow-detail.png). The
+[reported camera](checkpoint-reported-pose.png) matches the user's flicker-check
+view. [Frame stability evidence](frame-stability.json) records the tested source
+hashes, GPU, resolutions, frozen redraws and motion thresholds. Earlier Home and
+Rain captures remain in `pre-material-refinement/` for before/after comparison.
+
 [First-pass Home](first-pass/home.png), [Home with UI](first-pass/home-ui.png),
 [Bridge](first-pass/bridge.png), [Muse](first-pass/muse.png),
 [Whole planet](first-pass/planet.png) and [Rain](first-pass/rain.png) are captures

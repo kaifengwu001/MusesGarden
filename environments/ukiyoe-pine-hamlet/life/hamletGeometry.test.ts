@@ -67,6 +67,37 @@ describe('ukiyoe natural scenery', () => {
     scenery.dispose();
   });
 
+  it('draws botanical marks on one surface with continuous material charts and no duplicate faces', () => {
+    for (const coarse of [false, true]) {
+      const assets = createHamletAssets(coarse);
+      for (const [name, asset] of Object.entries(assets)) {
+        const geometry = asset.geometry, position = geometry.getAttribute('position');
+        const chart = geometry.getAttribute('uv'), style = geometry.getAttribute('aPrintStyle'), kind = geometry.getAttribute('aKind');
+        expect(chart.count).toBe(position.count);
+        expect(style.count).toBe(position.count);
+        expect(Array.from(chart.array).every(Number.isFinite)).toBe(true);
+        const faces = new Set<string>();
+        for (let i = 0; i < position.count; i += 3) {
+          const face = [i, i + 1, i + 2].map(j => [position.getX(j), position.getY(j), position.getZ(j)].map(n => n.toFixed(7)).join(',')).sort().join(';');
+          expect(faces.has(face), `${name}: duplicate surface at vertex ${i}`).toBe(false);
+          faces.add(face);
+        }
+        // A repeated (0,0)-(1,0)-(0,1) chart would put print seams along every
+        // triangle. Tube arc lengths and crown charts must carry real extent.
+        if (name === 'pine' || name === 'cedar') {
+          const family = name === 'pine' ? 0 : 1;
+          const needleStyles = new Set(Array.from({ length: kind.count }, (_, i) => kind.getX(i) === HAMLET_KIND.needle ? style.getX(i) : -1));
+          expect(needleStyles.has(family)).toBe(true);
+          expect(needleStyles.has(family + 10)).toBe(true);
+          expect(Math.max(...Array.from(chart.array))).toBeGreaterThan(5);
+        }
+        // Printed bark and snow lips have no coincident LineSegments pass.
+        expect(Array.from(asset.ink.getAttribute('aKind').array).every(k => k === HAMLET_KIND.slate)).toBe(true);
+        asset.geometry.dispose(); asset.ink.dispose();
+      }
+    }
+  });
+
   it('shares placement and season between colour and selected ink, including static rock snow', () => {
     const snow = { value: 1 }, terrain = terrainAt();
     const scenery = new HamletScenery({ uSnowAmount: snow }, terrain);

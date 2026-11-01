@@ -24,6 +24,7 @@ npm run check:ukiyoe
 npx vitest run environments/ukiyoe-pine-hamlet --maxWorkers=2 --testTimeout=60000
 MEADOW_PORT=5237 npx playwright test --project=ukiyoe-pine-hamlet:ecology
 MEADOW_PORT=5237 npx playwright test --project=ukiyoe-pine-hamlet:residents
+MEADOW_PORT=5237 npx playwright test --project=ukiyoe-pine-hamlet:flicker
 MEADOW_PORT=5237 npx playwright test --project=ukiyoe-pine-hamlet:invariants
 npm run build:ukiyoe
 ```

@@ -6,7 +6,7 @@ detail. No user visual acceptance is claimed.
 
 ## Evidence and reproducibility
 
-- Checkout: `ukiyoe-pine-hamlet-standalone-01a19573`, branch `planet/ukiyoe-pine-hamlet`.
+- Current checkout: `ukiyoe-pr-integration-01a19573`, branch `environment_ukiyo`.
 - URL: `http://localhost:5237/environments/ukiyoe-pine-hamlet/`.
 - Capture state: `#q=high&hud=0&t=12`; named Home, Bridge, Muse and Whole planet views.
 - Review [reference and actual app side by side](reference/comparison.html).
@@ -53,6 +53,52 @@ No universal 60 fps claim is made. The final ecology capture was refreshed after
 the mobile test so comparison images use the same clean capture workflow.
 
 ## Remaining limits
+
+### Surface and material refinement on 1 November 2026
+
+The current server on port 5237 runs the PR integration checkout. All runtime
+changes remain in this environment; the root Playwright config adds only its
+dedicated flicker project. Shared `src/` and other worlds remain untouched.
+
+- Shoji crossings and side plates now have single exposed face ownership;
+  side shoji are inset in actual wall openings. Bridge rails use joined swept
+  surfaces. Roof snow has one ridge cover without duplicate seam skirts.
+  All four new surface regressions fail against the previous geometry and pass
+  after the correction. Land/water have exclusive near/away node ownership and
+  meet through the depth buffer with matching grid/morph/warp contracts.
+- Snow has warm paper whites, blue shallow relief and sparse close pigment
+  grain shared across ground, roof and plants. Projected footprints fade detail
+  before it becomes unresolved; ground uses actual derivatives at grazing angles.
+- Pines have irregular needle fans and projecting whorls; cedars have paired
+  sprays; bark follows branch arcs with broken fissures; plum and reeds have
+  separate botanical marks. Foliage projection avoids crown-top stretching.
+  Coincident bark and snow ink overlays were removed.
+- Scoped TypeScript/lint, all **69 CPU tests** and the production build pass.
+  Scenery remains below 1.5M submitted colour triangles at radii 40/128/400.
+  Existing large-chunk build advisory remains.
+- The **4 flicker tests pass**: reported pose, Home and Bridge in snow/rain,
+  at DPR 1/2. **144 frozen comparisons have zero changed pixels**, including
+  repeats during 108 small-angle sweep frames. The largest isolated-frame
+  signal is 0.3875% (threshold 1.5%); this includes normal moving edges, not a
+  measured z-fighting count. Exact setup, source hashes and limits are in
+  [frame-stability.json](reference/frame-stability.json).
+- Ecology/material capture, all 7 resident checks, repeat-load/repeated-draw
+  determinism, draw-call budget and CPU/GPU terrain/picking checks pass. One combined run failed
+  the growth roundtrip image hash; it did not reproduce in 10 A/C diagnostic
+  runs or 5 repetitions of the unchanged test. Keep this as an intermittent
+  unexplained result, not a claimed fix or a relaxed assertion.
+- The extra inherited live-growth stress check misses its 20ms p95 target.
+  An untouched checkout at `36d10ac` also measures 50ms p95 and fails that same
+  target. Sequential comparison measured JS p95 37.9ms before and 37.1ms after;
+  the latest growth roundtrip and draw-call tests pass. The preserved
+  [growth comparison](reference/growth-comparison.json) contains these results
+  and the intermittent hash record. This is an existing limit, not evidence of
+  universal 60fps performance.
+
+Current actual captures include close pine/cedar/snow and the reported pose in
+the [comparison gallery](reference/comparison.html); Home/Rain before this pass
+are preserved in `reference/pre-material-refinement/`. Finite camera samples
+and exact redraws cannot prove absence of every possible overlapping surface.
 
 ### PR integration on 1 November 2026
 

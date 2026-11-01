@@ -5,6 +5,7 @@ uniform float uRadius;
 #include <meadow_terrain>
 #include <meadow_warp>
 #include <meadow_toon>
+#include <meadow_snow>
 #include <meadow_fog>
 #include <meadow_clouds>
 uniform int uKind;
@@ -38,6 +39,7 @@ vec2 mineral(vec2 p) {
   return vec2(1.0-smoothstep(0.018,0.042+fwidth(edge),edge),id);
 }
 void main() {
+  float pixelMeters=max(length(dFdx(vLocal)),length(dFdy(vLocal)));
   if(uKind==6 && uSnowAmount<0.5) discard;
   vec3 n=normalize(vPlanetNormal);
   if(!gl_FrontFacing)n=-n;
@@ -89,7 +91,7 @@ void main() {
     float detail=1.0-smoothstep(0.03,0.10,max(fwidth(p.x),fwidth(p.y)));
     col*=1.0+detail*(0.10*smoothstep(0.36,0.58,grain)-0.12*(1.0-smoothstep(-0.55,-0.35,grain)));
   }else{
-    col=mix(vec3(0.62,0.72,0.80),vec3(0.95,0.94,0.88),0.60+0.40*shade);
+    col=snowPrint(vLocal,pixelMeters,shade);
     edge=0.0;
   }
   col=mix(col,ink,edge*(uKind==0?0.32:0.60));

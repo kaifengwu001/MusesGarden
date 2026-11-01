@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Ray, Vector3, type BufferGeometry } from 'three';
-import { BRIDGE, COTTAGE, FLOOR, ROOF, STEPS, TERRACE, bridgeDeckHeight, createHouseGeometry, walkableHeightAt } from './props';
+import { BRIDGE, COTTAGE, FACE, FLOOR, ROOF, SIDE, STEPS, TERRACE, bridgeDeckHeight, createHouseGeometry, walkableHeightAt } from './props';
 
 const a=new Vector3(),b=new Vector3(),c=new Vector3(),point=new Vector3();
 function verticalHits(geometry:BufferGeometry,x:number,z:number):number[]{
@@ -11,6 +11,16 @@ function verticalHits(geometry:BufferGeometry,x:number,z:number):number[]{
     a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);
     if(b.clone().sub(a).cross(c.clone().sub(a)).y<=0)continue;
     if(ray.intersectTriangle(a,b,c,false,point))hits.push(point.y);
+  }
+  return hits;
+}
+
+/** Inspect every face on a ray, including hidden duplicate planes. */
+function rayHits(geometry:BufferGeometry,origin:Vector3,direction:Vector3):Vector3[]{
+  const hits:Vector3[]=[],p=geometry.getAttribute('position'),ray=new Ray(origin,direction);
+  for(let i=0;i<p.count;i+=3){
+    a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);
+    if(ray.intersectTriangle(a,b,c,false,point))hits.push(point.clone());
   }
   return hits;
 }
@@ -40,6 +50,34 @@ describe('Ukiyo-e home and timber bridge',()=>{
     geometry.forEach(g=>g.dispose());
   });
 
+  it('gives shoji lattice crossings and side plates one exposed face each',()=>{
+    const geometry=createHouseGeometry({bridge:false,furniture:false}),wood=geometry.get('wood')!;
+    for(const [x0,x1] of [[-3.7,-1.5],[1.4,3.7]]) for(let i=1;i<4;i++) for(let j=1;j<5;j++){
+      const x=x0+(x1-x0)*i/4+0.0031,y=1.28+(3.11-1.28)*j/5+0.0067;
+      const faces=rayHits(wood,new Vector3(x,y,10),new Vector3(0,0,-1)).filter(p=>Math.abs(p.z-(FACE+0.025))<1e-5);
+      expect(faces,`front lattice at ${x},${y}`).toHaveLength(1);
+    }
+    for(const side of [-1,1]) {
+      for(const z of [-0.48,0.48]) for(const y of [1.79,2.18,2.57]) {
+        const faces=rayHits(wood,new Vector3(side*10,y+0.0071,z+0.0033),new Vector3(-side,0,0)).filter(p=>Math.abs(p.x-side*(SIDE+0.045))<1e-5);
+        expect(faces,`side lattice ${side},${y},${z}`).toHaveLength(1);
+      }
+      const plate=rayHits(wood,new Vector3(side*10,3.407,0.017),new Vector3(-side,0,0)).filter(p=>Math.abs(p.x-side*(SIDE+0.09))<1e-5);
+      expect(plate,`side plate ${side}`).toHaveLength(1);
+    }
+    geometry.forEach(g=>g.dispose());
+  });
+
+  it('recesses side shoji into real wall openings',()=>{
+    const geometry=createHouseGeometry({bridge:false,furniture:false});
+    for(const side of [-1,1]) for(const z of [-0.73,-0.27,0.27,0.73]) {
+      const origin=new Vector3(side*10,2.319,z),direction=new Vector3(-side,0,0);
+      expect(rayHits(geometry.get('wall')!,origin,direction).filter(p=>Math.abs(p.x-side*SIDE)<1e-5)).toHaveLength(0);
+      expect(rayHits(geometry.get('shoji')!,origin,direction).filter(p=>Math.abs(p.x-side*(SIDE-0.035))<1e-5)).toHaveLength(1);
+    }
+    geometry.forEach(g=>g.dispose());
+  });
+
   it('builds a low arch matching its walking support all along the bridge',()=>{
     const geometry=createHouseGeometry({furniture:false});
     const wood=geometry.get('wood')!;
@@ -53,6 +91,22 @@ describe('Ukiyo-e home and timber bridge',()=>{
     expect(bridgeDeckHeight(8)).toBeCloseTo(0.1,8);
     expect(bridgeDeckHeight(12)).toBeCloseTo(0.65,8);
     expect(bridgeDeckHeight(16)).toBeCloseTo(0.1,8);
+    geometry.forEach(g=>g.dispose());
+  });
+
+  it('joins curved bridge rails without coplanar overlap wedges',()=>{
+    const geometry=createHouseGeometry({furniture:false}),wood=geometry.get('wood')!;
+    for(let i=1;i<32;i++) {
+      if(i%8===0)continue; // Structural posts intentionally enclose these joints.
+      const joint=BRIDGE.x0+(BRIDGE.x1-BRIDGE.x0)*i/32;
+      const step=(BRIDGE.x1-BRIDGE.x0)/32;
+      const slope=(bridgeDeckHeight(joint+step)-bridgeDeckHeight(joint-step))/(2*step);
+      // Sample below the neutral axis, where separate angled end sections
+      // cross. Their side-face overlap is offset from the nominal joint x.
+      const origin=new Vector3(joint+slope*0.045,bridgeDeckHeight(joint)+0.40-0.045,6);
+      const faces=rayHits(wood,origin,new Vector3(0,0,1)).filter(p=>Math.abs(p.z-(BRIDGE.z0-0.045))<1e-5);
+      expect(faces,`rail joint ${joint}`).toHaveLength(1);
+    }
     geometry.forEach(g=>g.dispose());
   });
 
@@ -84,7 +138,7 @@ describe('Ukiyo-e home and timber bridge',()=>{
     let contacts=0;
     for(let i=0;i<p.count;i++){
       const z=Math.abs(p.getZ(i)),y=p.getY(i);
-      if(z<0.25||z>ROOF.ez+1e-5||y<ROOF.eave-1e-5)continue;
+      if(z<0.42||z>ROOF.ez+1e-5||y<ROOF.eave-1e-5)continue;
       const roofY=ROOF.eave+ROOF.rise*(1-z/ROOF.ez);
       const clearance=y-roofY;
       expect(clearance).toBeGreaterThan(-1e-5);
@@ -96,6 +150,22 @@ describe('Ukiyo-e home and timber bridge',()=>{
       const x=-4.6+9.2*(i+0.137)/15;
       expect(verticalHits(snow,x,ROOF.ez*0.90).filter(y=>y>3.5)).toHaveLength(0);
       expect(verticalHits(snow,x,ROOF.ez*0.40).filter(y=>y>3.5)).toHaveLength(1);
+    }
+    geometry.forEach(g=>g.dispose());
+  });
+
+  it('has one connected snow cover across the ridge with no duplicate seam walls',()=>{
+    const geometry=createHouseGeometry({bridge:false,furniture:false}),snow=geometry.get('snow')!;
+    const p=snow.getAttribute('position');
+    for(let i=0;i<p.count;i+=3){
+      const ridge=[i,i+1,i+2].every(j=>Math.abs(p.getZ(j))<1e-6&&p.getY(j)>ROOF.top);
+      expect(ridge,'a ridge edge must not contain two coincident vertical skirt faces').toBe(false);
+    }
+    for(let i=0;i<15;i++)for(const z of [-0.137,-0.031,0.031,0.137]){
+      const x=-4.6+9.2*(i+0.137)/15;
+      const hits=rayHits(snow,new Vector3(x,15,z),new Vector3(0,-1,0)).filter(p=>p.y>ROOF.top);
+      expect(hits,`single ridge cover ${x},${z}`).toHaveLength(1);
+      expect(hits[0].y).toBeGreaterThan(5.72); // Clears the actual raised ridge tiles.
     }
     geometry.forEach(g=>g.dispose());
   });

@@ -32,6 +32,7 @@ export default defineConfig({
     { name: 'shots', testMatch: /shots\.spec\.ts/ },
     { name: 'invariants', testMatch: /invariants\.spec\.ts/ },
     { name: 'squint', testMatch: /squint\.spec\.ts/ },
+    { name: 'ukiyoe-pine-hamlet:flicker', testDir: './environments/ukiyoe-pine-hamlet/dev', testMatch: /flicker\.spec\.ts$/ },
     ...environments.flatMap(name => ['invariants', 'lock', 'residents', 'ecology'].map(suite => ({ name: `${name}:${suite}`, testDir: `./environments/${name}/dev`, testMatch: new RegExp(`${suite}\\.spec\\.ts$`) }))),
   ],
   webServer: {

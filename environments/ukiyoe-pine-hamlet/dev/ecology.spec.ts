@@ -28,5 +28,24 @@ test('reference views compile, expose Muse and preserve the seasonal layout', as
   await page.evaluate(()=>{const w=(window as unknown as {__world:World}).__world;w.setSeason('rain');w.cameraPreset('home');});
   await page.evaluate(async()=>window.__meadow?.settle());
   await page.screenshot({path:'shots/ukiyoe-pine-hamlet/rain.png'});
+  // Material evidence needs nearer views than the overall Home composition.
+  // These exercise real instanced plants, lighting and terrain, not asset previews.
+  const materials = [
+    { file: 'pine-snow', season: 'snow', at: [-9, 4.5, -3], height: 5, distance: 8, azimuth: -0.6 },
+    { file: 'pine-rain', season: 'rain', at: [-9, 4.5, -3], height: 5, distance: 8, azimuth: -0.6 },
+    { file: 'cedar-rain', season: 'rain', at: [25, 3.2, 0], height: 4, distance: 7, azimuth: 1.2 },
+    { file: 'snow-detail', season: 'snow', at: [-10, 1.0, 6], height: 2.8, distance: 5, azimuth: -0.5 },
+  ] as const;
+  for (const material of materials) {
+    await page.evaluate(view => {
+      const w = (window as unknown as { __world: World }).__world;
+      w.setSeason(view.season);
+      const capture = w as unknown as { frameLocal(view: { at: readonly number[]; height: number; distance: number; azimuth: number }, immediate: boolean): void };
+      capture.frameLocal(view, true);
+      w.markPosed();
+    }, material);
+    await page.evaluate(async()=>window.__meadow?.settle());
+    await page.screenshot({path:`shots/ukiyoe-pine-hamlet/${material.file}.png`});
+  }
   expect(errors).toEqual([]);
 });

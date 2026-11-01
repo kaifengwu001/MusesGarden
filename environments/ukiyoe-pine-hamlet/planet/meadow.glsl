@@ -3,6 +3,7 @@
 // its size in meters (and its pixel footprint), cross-faded continuously and
 // seeded by octave, so as R grows or the camera moves a pattern fades between
 // scales; it never slides or jumps. Requires noise, toon (palette), terrain.
+#include <meadow_snow>
 
 uniform vec4 uBloom;      // front angle (rad), front softness, -, -
 uniform vec4 uWindVec;    // rotation axis of the wind field (xyz), strength
@@ -192,7 +193,7 @@ float strokeAt(vec3 dir, float pixelMeters) {
 uniform float uSnowAmount;
 vec3 meadowPaint(Meadow m) {
   vec3 summer = tone3(pal(ROW_GRASS, 0), pal(ROW_GRASS, 1), pal(ROW_GRASS, 2), m.light);
-  vec3 snow = tone3(pal(ROW_SNOW, 0), pal(ROW_SNOW, 2), pal(ROW_SNOW, 1), 0.4 + 0.6 * m.light);
+  vec3 snow = snowPrint(m.dir * uRadius, m.pixelMeters, m.light);
   vec3 col = mix(summer, snow, uSnowAmount);
   // Narrow path relationships are authored in the home frame, not stamped over the globe.
   float dc = chordAngle(m.dir, uCottage.xyz) * uRadius;
