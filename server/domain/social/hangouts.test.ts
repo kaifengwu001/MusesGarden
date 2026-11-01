@@ -35,7 +35,7 @@ describe('every hangout', () => {
 
     const [hostPhoto] = ofKind(out.host, 'photo.taken');
     const [guestPhoto] = ofKind(out.guest, 'photo.taken');
-    expect(hostPhoto.photo).toMatchObject({ subject: 'friend', planetOf: a.seed.id, companions: [b.seed.id], at: now });
+    expect(hostPhoto.photo).toMatchObject({ subject: 'friend', context: 'planet', planetOf: a.seed.id, companions: [b.seed.id], at: now });
     expect(guestPhoto.photo).toEqual({ ...hostPhoto.photo, companions: [a.seed.id] });
 
     const [hostSide] = ofKind(out.host, 'hangout');

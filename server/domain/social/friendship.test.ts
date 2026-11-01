@@ -136,7 +136,7 @@ describe('becoming friends', () => {
           expect(ofKind(out.other, 'relationship.changed')).toEqual([{ kind: 'relationship.changed', other: a.seed.id, to: 'friends', origin: 'met-beyond' }]);
           const [mine] = ofKind(out.self, 'photo.taken');
           const [theirs] = ofKind(out.other, 'photo.taken');
-          expect(mine.photo).toMatchObject({ subject: 'new-friend', companions: [b.seed.id], at: now });
+          expect(mine.photo).toMatchObject({ subject: 'new-friend', context: 'beyond', companions: [b.seed.id], at: now });
           expect(theirs.photo).toMatchObject({ id: mine.photo.id, subject: 'new-friend', companions: [a.seed.id] });
           break;
         }

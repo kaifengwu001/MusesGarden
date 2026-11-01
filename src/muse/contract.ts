@@ -245,6 +245,8 @@ export interface PhotoSpec {
   readonly id: PhotoId;
   readonly at: Instant;
   readonly subject: PhotoSubject;
+  /** Where Muse took it: on planetOf's surface, or beyond the planet, looking back at planetOf from far out. */
+  readonly context: 'planet' | 'beyond';
   readonly planetOf: MuseId;
   readonly dir: Dir;
   readonly forward: Dir;

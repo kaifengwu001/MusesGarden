@@ -31,7 +31,7 @@ function befriendBeyond(a: MuseState, b: MuseState, similarity: number, now: Ins
   const yes = ready && draw('befriend', 0) < befriendChance(similarity, a.temperament) && draw('befriend', 1) < befriendChance(similarity, b.temperament);
   if (!yes) return null;
   const [first, second] = [a.seed.id, b.seed.id].sort(compare);
-  const where = { planetOf: first, dir: hashedDir(`${first}+${second}`), zoom: SOCIAL.beyondZoom };
+  const where = { context: 'beyond', planetOf: first, dir: hashedDir(`${first}+${second}`), zoom: SOCIAL.beyondZoom } as const;
   const photo = photoTogether('new-friend', a.seed.id, b.seed.id, where, now, draw);
   const made = befriended(a, b, 'met-beyond');
   return { self: [...made.self, photo.a], other: [...made.other, photo.b] };

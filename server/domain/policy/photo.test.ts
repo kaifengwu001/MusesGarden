@@ -58,6 +58,17 @@ describe('photos', () => {
     expect(Math.max(...perDay.values())).toBe(3);
   });
 
+  it('say they were taken beyond when Muse was beyond the planet', () => {
+    const life = new Life(MOSS, TEMPERAMENTS.shutterbug);
+    const now = t('2026-11-02T10:00:00-08:00');
+    const beyond = photosDuring(life.state, 'beyond', now, now + 6 * HOUR_MS, drawFor(MOSS.id, 1));
+    const resting = photosDuring(life.state, 'rest', now, now + 24 * HOUR_MS, drawFor(MOSS.id, 1));
+    expect(beyond.length).toBeGreaterThan(0);
+    expect(resting.length).toBeGreaterThan(0);
+    for (const p of beyond) expect(p).toMatchObject({ context: 'beyond', planetOf: MOSS.id });
+    for (const p of resting) expect(p.context).toBe('planet');
+  });
+
   it('scale with whimsy: a Muse with none takes none', () => {
     const perDay = threeDaysBeyond({ ...TEMPERAMENTS.shutterbug, whimsy: 0 }, false);
     expect(perDay.size).toBe(0);
@@ -72,6 +83,6 @@ describe('photos', () => {
     const photos = Array.from({ length: 40 }, (_, k) => photosDuring(life.state, 'travel', now + k * 6 * HOUR_MS, now + (k + 1) * 6 * HOUR_MS, drawFor(MOSS.id, 1))).flat();
     const ofFind = photos.filter((p) => p.subject === 'find');
     expect(ofFind.length).toBeGreaterThan(0);
-    for (const p of ofFind) expect(p).toMatchObject({ discoveryId: find.id, dir: find.place.dir, planetOf: MOSS.id });
+    for (const p of ofFind) expect(p).toMatchObject({ discoveryId: find.id, dir: find.place.dir, planetOf: MOSS.id, context: 'planet' });
   });
 });

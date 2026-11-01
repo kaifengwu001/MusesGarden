@@ -42,13 +42,13 @@ export function photoTogether(
   subject: 'friend' | 'new-friend',
   a: MuseId,
   b: MuseId,
-  where: { readonly planetOf: MuseId; readonly dir: Dir; readonly zoom: number },
+  where: Pick<PhotoSpec, 'context' | 'planetOf' | 'dir' | 'zoom'>,
   now: Instant,
   draw: Draw,
 ): { readonly id: PhotoId; readonly a: MuseEventBody; readonly b: MuseEventBody } {
   const pair = [a, b].sort(compare).join('+');
   const id = `photo:${subject}:${pair}:${now}` as PhotoId;
-  const base = { id, at: now, subject, planetOf: where.planetOf, dir: where.dir, forward: tangentAt(where.dir, draw), zoom: where.zoom };
+  const base = { id, at: now, subject, ...where, forward: tangentAt(where.dir, draw) };
   const taken = (companion: MuseId): MuseEventBody => ({ kind: 'photo.taken', photo: { ...base, companions: [companion] } satisfies PhotoSpec });
   return { id, a: taken(b), b: taken(a) };
 }

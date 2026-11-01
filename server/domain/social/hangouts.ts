@@ -120,7 +120,7 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const fromGuest = chooseGift(guestProfile, host, hostProfile);
   const { pleasantness } = chemistry(host, guest);
 
-  const where = { planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom };
+  const where = { context: 'planet', planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom } as const;
   const photo = photoTogether('friend', host.seed.id, guest.seed.id, where, now, draw);
   const hostLog: MuseEventBody[] = [photo.a, hangoutEvent(guest.seed.id, 'host', pleasantness, photo.id, fromHost, fromGuest)];
   const guestLog: MuseEventBody[] = [photo.b, hangoutEvent(host.seed.id, 'guest', pleasantness, photo.id, fromGuest, fromHost)];
