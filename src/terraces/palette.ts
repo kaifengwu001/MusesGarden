@@ -25,7 +25,7 @@ export const TERRACE_ROWS: Rows = {
   // sheen, far, jade, sage, lime, blue-green (each paddy leans a little toward jade, lime or blue-green)
   [TROW.RICE]: ['#93A673', '#86A65E', '#4E6E48', '#9AA85E', '#BDB57A', '#C6D09C', '#2A4632', '#D9E2C2', '#6B8779', '#557F5E', '#7E9472', '#A9BC6C', '#4C7462'],
   // bund grass (the paintings' lime rims), bund shade, riser face (grass on earth), riser shade, wet mud, dark mud, courtyard and path, lit bund
-  [TROW.EARTH]: ['#86A158', '#4F6A3A', '#4E6640', '#2C3F2A', '#6C6F5C', '#484B3F', '#C9C0A8', '#9DB769'],
+  [TROW.EARTH]: ['#9EB677', '#4F6A3A', '#4E6640', '#2C3F2A', '#6C6F5C', '#484B3F', '#C9C0A8', '#B9CC92'],
   // pale sky in the mirror, high sky in it, body looking down, shallow, glint, a bank in the mirror, ruffle, teal, white water:
   // the flooded fields silver (#B1BCBE, light #B8C2C4), the river a little bluer (#9EB0BC), its darks the banks (#7D9497)
   [TROW.WATER]: ['#CDD5D8', '#B3C1CA', '#7D9497', '#93A39B', '#EDF1F1', '#3C5446', '#B9C5C9', '#8EA4AA', '#D2D9DA'],

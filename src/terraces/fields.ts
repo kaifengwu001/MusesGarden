@@ -66,7 +66,7 @@ export const PEAKS = { density: 1 / 1800, ranges: 0.38, height: [18, 64], mound:
  * and the slope of its banks (m), how far its course swings either side (m, one spread), and its valley:
  * the floor kept flat this far either side of its middle (m), the hills risen in full by the second.
  */
-export const RIVER = { width: [7, 13], depth: 1.5, bank: 2.5, meander: 38, valley: [26, 80] } as const;
+export const RIVER = { width: [7, 13], depth: 1.5, bank: 2.5, meander: 38, valley: [10, 40] } as const;
 /** The finite-difference step (m) of the river's distance (its offset over its gradient). */
 const RIVER_STEP = 2;
 export const peakClass = { salt: salt('karst peaks'), jitter: 0.9 } as const;
@@ -245,8 +245,8 @@ export class TerraceFields {
     }
     this.hillStd = Math.max(NOISE_STD * Math.sqrt(var2), 1e-3);
     this.localStd = Math.max(NOISE_STD * Math.sqrt(var2 - this.hill[0] ** 2), 1e-3);
-    // the lowest third of the hills levels out into broad valley floors
-    this.floor = -0.42 * this.hillStd;
+    // the lowest fifth of the hills levels out into broad valley floors (the river's valley adds its own)
+    this.floor = -0.8 * this.hillStd;
     this.floorSoft = 0.3 * this.hillStd;
     this.forestThreshold = NOISE_STD * Math.hypot(1, FOREST_DETAIL) * normalQuantile(1 - clamp(p.forest, 0, 1));
     if (p.forest <= 0) this.forestThreshold = 9;
@@ -438,7 +438,7 @@ export class TerraceFields {
     const s = this.localStd;
     out.crown = smoothstep(WILD.crown[0] * s, WILD.crown[1] * s, local) * smoothstep(WILD.crownHeight[0], WILD.crownHeight[1], h);
     out.gully = smoothstep(WILD.gully[0] * s, WILD.gully[1] * s, local) * smoothstep(WILD.gullySlope[0], WILD.gullySlope[1], slope);
-    out.tower = smoothstep(0.12, 0.4, mound);
+    out.tower = smoothstep(0.4, 0.7, mound);
     return out;
   }
 

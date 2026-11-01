@@ -13,7 +13,7 @@ const float NOISE_STD = 0.27;
 const vec2 RIVER_WIDTH = vec2(7.0, 13.0);
 const float RIVER_DEPTH = 1.5;
 const float RIVER_BANK = 2.5;
-const vec2 RIVER_VALLEY = vec2(26.0, 80.0);
+const vec2 RIVER_VALLEY = vec2(10.0, 40.0);
 const float RIVER_STEP = 2.0;
 
 uniform uint uTSeed;
@@ -118,7 +118,7 @@ float wildAt(vec3 d, float h, float local, float mound, float slope) {
   float s = uTFloor.z;
   float crown = smoothstep(0.7 * s, 1.1 * s, local) * smoothstep(5.0, 9.0, h);
   float gully = smoothstep(-0.85 * s, -1.25 * s, local) * smoothstep(0.1, 0.22, slope);
-  float tower = smoothstep(0.12, 0.4, mound);
+  float tower = smoothstep(0.4, 0.7, mound);
   return max(max(max(woods, steep), max(crown, gully)), tower);
 }
 

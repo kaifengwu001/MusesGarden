@@ -162,7 +162,8 @@ export class TerraceTerrain {
 
 /** The season's front for the bloom slider: everything flooded at 0; at 1 (the default) about a quarter of the paddies flooded, the rest on their way or grown. */
 export function seasonFront(bloom: number): number {
-  return 0.62 * clamp(bloom, 0, 1);
+  // (about half the paddies flooded or just planted at the season's default, as Kai's paddy painting has them)
+  return 0.55 * clamp(bloom, 0, 1);
 }
 
 export interface TerrainUniforms {

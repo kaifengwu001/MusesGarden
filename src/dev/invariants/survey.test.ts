@@ -13,7 +13,7 @@ import { generateTerraceLayout, TerraceTerrain } from '../../terraces/terrain';
 // the same walls up to their shared edge (no fault lines between them).
 
 const terrain = new TerraceTerrain(generateTerraceLayout(7));
-terrain.update(128, { hills: 18, forest: 0.15 }, 1);
+terrain.update(128, { hills: 13, forest: 0.15 }, 1);
 const R = terrain.radius;
 const size = R / terrain.cells.frequency;
 const base = { natural: 0, slope: 0, wild: 0, flat: 0 };

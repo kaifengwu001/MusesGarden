@@ -132,7 +132,7 @@ export const schema = {
     shadow: num('csh', 'Shadow', 0.88, 0, 1, 0.01, 'live'),
   },
   terraces: {
-    hills: num('th', 'Hills', 18, 4, 36, 0.5, 'terrain', { unit: 'm' }),
+    hills: num('th', 'Hills', 13, 4, 36, 0.5, 'terrain', { unit: 'm' }),
     forest: num('tf', 'Woods', 0.15, 0, 0.9, 0.01, 'terrain'),
     fog: num('tfg', 'Valley fog', 0.55, 0, 1, 0.01, 'live'),
   },
