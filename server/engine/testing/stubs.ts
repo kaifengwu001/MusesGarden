@@ -58,7 +58,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     experiencesSinceReflection: 0,
     likes: new Map(),
     day: { day: '', restMs: 0, socialMs: 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
   };
 }
 
@@ -107,15 +107,18 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
     other: e.other,
     status: e.to,
     origin: e.origin,
+    friendsSince: e.to === 'friends' ? stored.event.at : null,
     familiarity: 0,
     rapport: 0,
     rapportSinceInvite: 0,
     unpleasantStreak: 0,
+    distance: 0,
     encounters: 0,
     hangouts: 0,
     lastRole: null,
     lastMetAt: null,
     lastInviteAt: null,
+    fondness: 0,
   });
   return { ...s, relationships };
 };
@@ -123,7 +126,7 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
 const at = (n: number) => n as Instant;
 
 export const life: LifePolicy = {
-  next: (_s, _now, draw, friendFree) => (friendFree && draw('visit') < 0.3 ? 'visit' : draw('next') < 0.4 ? 'rest' : 'travel'),
+  next: (_s, _now, draw, offer) => (offer !== 'none' && draw('visit') < 0.3 ? 'visit' : draw('next') < 0.4 ? 'rest' : 'travel'),
   restUntil: (_s, now) => at(now + 30 * MIN),
   beyondUntil: (_s, now) => at(now + 60 * MIN),
   startTrip: (_s, _now, draw) =>
@@ -145,13 +148,13 @@ export const life: LifePolicy = {
 };
 
 export const social: SocialPolicy = {
+  visitOffer: (_s, free) => (free.length > 0 ? 'friend' : 'none'),
   chooseVisit: (_s, free, now) => (free[0] ? { other: free[0].state.seed.id, role: 'host', until: at(now + 50 * MIN) } : null),
   encounterRate: () => 0,
   encounter: () => ({ self: [], other: [] }),
   hangout: () => ({ host: [], guest: [] }),
-  invitationStep: () => ({ ok: false, error: 'stub' }),
-  invitationTimers: () => [],
-  canVisit: () => false,
+  invitationStep: () => ({ ok: false, status: 409, error: 'stub' }),
+  visitUntil: () => null,
   photoSlotsLeft: () => 5,
   publicProfile: (s) => ({ museId: s.seed.id, name: s.seed.name, worldSeed: s.seed.worldSeed, interests: [], discoveries: [] }),
   ownerLink: (a, b, op) => {

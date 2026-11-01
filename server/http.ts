@@ -44,7 +44,7 @@ async function buildBackend(): Promise<Backend> {
   });
   if (garden.engine.museIds().length === 0) {
     const work = clock === 'live' ? null : `${FIXTURES_DIR}work-3weeks.json`;
-    await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start, hours: 0, owners: 'auto-accept' });
+    await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start, hours: 0 });
   }
   return {
     name: `engine (${clock}, ${process.env.MODEL_API_KEY ? 'MetaMind for the hero' : 'HeuristicMind'})`,

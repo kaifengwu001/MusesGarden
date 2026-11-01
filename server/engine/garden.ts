@@ -79,8 +79,8 @@ const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   find: 'cottage',
   invitation: 'pier',
 };
-/** Invitation states the guest's owner has received. */
-const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'accepted', 'open', 'closed']);
+/** Invitation states the guest's owner still holds: sent (kept for later) or used. A withdrawn one is gone. */
+const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used']);
 
 // ─── What the log adds to the state ─────────────────────────────────────────
 
@@ -259,14 +259,12 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
   };
 }
 
-// Dated from the log until the state carries Interest.since and Relationship.friendsSince.
-
 function interestSince(s: MuseState, topic: TopicKey, index: LogIndex): Instant {
   return s.interests.get(topic)?.since ?? index.firstSeen.get(topic) ?? s.at;
 }
 
 function friendsSince(s: MuseState, r: Relationship, index: LogIndex): Instant {
-  return index.friendsSince.get(r.other) ?? r.lastMetAt ?? s.at;
+  return r.friendsSince ?? index.friendsSince.get(r.other) ?? r.lastMetAt ?? s.at;
 }
 
 /** An invitation this Muse's owner received, as a postcard; null for any other invitation. */
@@ -280,9 +278,9 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
     world: inv.host,
     worldName: `${name}’s planet`,
     blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
-    used: inv.visited || inv.state === 'closed',
+    used: inv.state === 'used',
   };
-  return { id: inv.id, day: input.day(inv.proposedAt), image: postcardImage('invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
+  return { id: inv.id, day: input.day(inv.sentAt), image: postcardImage('invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
 }
 
 function list(items: readonly string[]): string {
@@ -342,6 +340,7 @@ function friends(input: GardenInput, index: LogIndex): MuseFriend[] {
         coat: coatOf(r.other),
         shared: mine.filter((i) => theirs.has(i.topic)).slice(0, SHARED_SHOWN).map((i) => topicLabel(i.topic)),
         met: input.day(friendsSince(s, r, index)),
+        ...(s.social.knownOn.has(r.other) ? { knownOn: s.social.knownOn.get(r.other) } : {}),
       };
     });
 }

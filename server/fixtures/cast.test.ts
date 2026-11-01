@@ -6,7 +6,7 @@ import type { CastMember, TopicKey } from '../../src/muse/contract';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
 import { HeuristicMind } from '../adapters/minds/heuristic';
 import { parseSoul } from '../domain/soul';
-import { FIXTURES_DIR, loadCast, readMemberDocs } from './cast';
+import { FIXTURES_DIR, loadCast, parseCastFile, readMemberDocs } from './cast';
 
 const TRAITS = ['curiosity', 'focus', 'sociability', 'whimsy', 'novelty'];
 const mind = new HeuristicMind();
@@ -23,14 +23,31 @@ async function interests(memory: string): Promise<(TopicKey | null)[]> {
 }
 
 describe('cast.json', () => {
-  it('has a hero, two friends introduced to the hero, and three strangers', () => {
+  it('has a hero, two friends introduced to the hero, three Muses whose owners know the hero\'s, and three strangers', () => {
     const roles = cast.members.map((m) => m.role).sort();
-    expect(roles).toEqual(['friend', 'friend', 'hero', 'stranger', 'stranger', 'stranger']);
+    expect(roles).toEqual(['friend', 'friend', 'hero', 'known', 'known', 'known', 'stranger', 'stranger', 'stranger']);
     const hero = cast.members.find((m) => m.role === 'hero');
     expect(hero?.dir).toBe('cast/hero');
     const friends = cast.members.filter((m) => m.role === 'friend').map((m) => m.id);
     const introducedToHero = cast.introductions.flatMap(([a, b]) => (a === hero?.id ? [b] : b === hero?.id ? [a] : []));
     expect(introducedToHero.sort()).toEqual(friends.sort());
+  });
+
+  it('knows the known Muses\' owners from the hero\'s: two on Instagram and one on Facebook, none introduced', () => {
+    const hero = cast.members.find((m) => m.role === 'hero')?.id;
+    const known = cast.members.filter((m) => m.role === 'known').map((m) => m.id);
+    expect(cast.knownOn.map((k) => (k.a === hero ? k.b : k.a)).sort()).toEqual([...known].sort());
+    expect(cast.knownOn.every((k) => k.a === hero || k.b === hero)).toBe(true);
+    expect(cast.knownOn.map((k) => k.on).sort()).toEqual(['facebook', 'instagram', 'instagram']);
+    expect(cast.introductions.flat().some((id) => known.includes(id))).toBe(false);
+  });
+
+  it('refuses a knownOn edge to someone outside the cast, or on another network', () => {
+    const members = cast.members.slice(0, 2);
+    const [a, b] = members.map((m) => m.id);
+    expect(() => parseCastFile({ members, introductions: [], knownOn: [{ a, b: 'nobody', on: 'instagram' }] })).toThrow(/two cast members/);
+    expect(() => parseCastFile({ members, introductions: [], knownOn: [{ a, b, on: 'myspace' }] })).toThrow(/\.on: myspace/);
+    expect(parseCastFile({ members, introductions: [] }).knownOn).toEqual([]);
   });
 
   it('gives each member a distinct world seed and its own time zone', () => {

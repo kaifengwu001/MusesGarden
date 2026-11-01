@@ -24,8 +24,8 @@ import { coatOf, flowerOf, museStatus, postcardImage, soulLine, topicLabel } fro
 
 const HOUR = 3_600_000;
 const JOURNAL_DAY = '2026-11-04';
-/** The hero is the guest of the sample invitation; the visit is open only inside its window. */
-const visitWindow = sampleInvitations.find((i) => i.id === sampleVisit.invitation)!.window;
+/** The hero is the guest of the sample invitation; its visit is readable from when it was used until the view's end. */
+const usedAt = sampleInvitations.find((i) => i.id === sampleVisit.invitation)!.usedAt!;
 
 function heroOnly<T>(museId: MuseId, value: T): T | null {
   return museId === HERO ? value : null;
@@ -76,7 +76,7 @@ function sampleGarden(): GardenSnapshot {
     })),
     {
       id: invitation.id,
-      day: day(invitation.window.start),
+      day: day(invitation.sentAt),
       image: postcardImage('invitation'),
       place: `From ${host.name}’s planet`,
       with: host.museId,
@@ -116,7 +116,7 @@ export function fakeQueries(): GardenQueries {
     shelf: (museId) => heroOnly(museId, sampleShelf),
     invitations: (museId) => heroOnly(museId, sampleInvitations) ?? [],
     visit: (invitation, requester, at) =>
-      invitation === sampleVisit.invitation && requester === HERO && at >= visitWindow.start && at < visitWindow.end
+      invitation === sampleVisit.invitation && requester === HERO && at >= usedAt && at < sampleVisit.until
         ? sampleVisit
         : 'forbidden',
     sharing: (museId) => heroOnly(museId, sampleSharing),
@@ -153,13 +153,13 @@ export function fakeCommands(): FakeCommands {
 
   return {
     calls,
-    invitation: (...args) => accept({ name: 'invitation', args }),
     setBasketTime: (...args) => accept({ name: 'setBasketTime', args }),
     setHidden: (...args) => accept({ name: 'setHidden', args }),
     introduce: (...args) => accept({ name: 'introduce', args }),
     unshare: (...args) => accept({ name: 'unshare', args }),
     like: (...args) => accept({ name: 'like', args }),
     useInvitation: (...args) => accept({ name: 'useInvitation', args }),
+    withdrawInvitation: (...args) => accept({ name: 'withdrawInvitation', args }),
     hostWork: (...args) => accept({ name: 'hostWork', args }),
     hostSoul: (...args) => accept({ name: 'hostSoul', args }),
     hostMemory: (...args) => accept({ name: 'hostMemory', args }),

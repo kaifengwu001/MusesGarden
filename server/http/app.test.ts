@@ -11,7 +11,8 @@ import type { FakeCommands } from './fake';
 const HOUR = 3_600_000;
 const SAMPLE_NOW = samples.sampleNowExploring.at;
 const INVITE = samples.sampleVisit.invitation;
-const WINDOW = samples.sampleInvitations.find((i) => i.id === INVITE)!.window;
+const USED_AT = samples.sampleInvitations.find((i) => i.id === INVITE)!.usedAt!;
+const VISIT_ENDS = samples.sampleVisit.until;
 
 let server: Server | undefined;
 let base = '';
@@ -143,7 +144,7 @@ describe('bad input', () => {
     ['an empty before', 'GET', '/api/muses/hero/photos?before='],
     ['a day', 'GET', '/api/dev/hero/journal.md?day=yesterday'],
     ['a visit without as', 'GET', `/api/visits/${INVITE}/world`],
-    ['an answer without as', 'POST', `/api/invitations/${INVITE}/accept`],
+    ['a withdrawal without as', 'POST', '/api/invitations/inv-hero-juniper-1/withdraw'],
     ['hhmm 24:00', 'POST', '/api/muses/hero/settings/basket-time', { hhmm: '24:00' }],
     ['hhmm 7:30', 'POST', '/api/muses/hero/settings/basket-time', { hhmm: '7:30' }],
     ['a missing hhmm', 'POST', '/api/muses/hero/settings/basket-time', {}],
@@ -193,9 +194,7 @@ describe('commands', () => {
     ],
     ['/api/muses/hero/settings/introductions', { shareCode: 'WREN-4F2A' }, { name: 'introduce', args: ['hero', 'WREN-4F2A'] }],
     ['/api/muses/hero/settings/unshare', { other: 'wren' }, { name: 'unshare', args: ['hero', 'wren'] }],
-    [`/api/invitations/${INVITE}/accept?as=hero`, undefined, { name: 'invitation', args: [INVITE, 'hero', 'accept'] }],
-    ['/api/invitations/inv-hero-juniper-1/approve?as=hero', undefined, { name: 'invitation', args: ['inv-hero-juniper-1', 'hero', 'approve'] }],
-    ['/api/invitations/inv-hero-juniper-1/decline?as=hero', undefined, { name: 'invitation', args: ['inv-hero-juniper-1', 'hero', 'decline'] }],
+    ['/api/invitations/inv-hero-juniper-1/withdraw?as=hero', undefined, { name: 'withdrawInvitation', args: ['hero', 'inv-hero-juniper-1'] }],
     ['/api/host/hero/work', { state: 'started' }, { name: 'hostWork', args: ['hero', 'started'] }],
     ['/api/host/hero/work', { state: 'ended' }, { name: 'hostWork', args: ['hero', 'ended'] }],
     ['/api/host/hero/soul', { text: '# Moss\n' }, { name: 'hostSoul', args: ['hero', '# Moss\n'] }],
@@ -212,22 +211,22 @@ describe('commands', () => {
   });
 
   it.each([400, 403, 404, 409] as const)('answers a command refused with %i with that status', async (status) => {
-    await serve({ commands: { invitation: () => Promise.resolve({ ok: false, status, error: 'already answered' }) } });
-    const res = await call('POST', `/api/invitations/${INVITE}/accept?as=hero`);
+    await serve({ commands: { withdrawInvitation: () => Promise.resolve({ ok: false, status, error: 'already used' }) } });
+    const res = await call('POST', '/api/invitations/inv-hero-juniper-1/withdraw?as=hero');
     expect(res.status).toBe(status);
-    expect(JSON.parse(res.text)).toEqual({ error: 'already answered' });
+    expect(JSON.parse(res.text)).toEqual({ error: 'already used' });
   });
 });
 
 describe('visits', () => {
   const visit = (as: string, invitation: string = INVITE) => call('GET', `/api/visits/${invitation}/world?as=${as}`);
 
-  it('opens only for the invited owner, from the window start up to its end', async () => {
-    let t = WINDOW.start - 1;
+  it('opens only for the guest, from when they used the invitation until 2 h on', async () => {
+    let t = USED_AT - 1;
     await serve({ now: () => t as Instant });
     expect((await visit('hero')).status).toBe(403);
 
-    t = WINDOW.start;
+    t = USED_AT;
     const open = await visit('hero');
     expect(open.status).toBe(200);
     expect(JSON.parse(open.text)).toEqual(wire(samples.sampleVisit));
@@ -235,9 +234,9 @@ describe('visits', () => {
     expect((await visit('juniper')).status).toBe(403);
     expect((await visit('hero', 'inv-nobody')).status).toBe(403);
 
-    t = WINDOW.end - 1;
+    t = VISIT_ENDS - 1;
     expect((await visit('hero')).status).toBe(200);
-    t = WINDOW.end;
+    t = VISIT_ENDS;
     expect((await visit('hero')).status).toBe(403);
   });
 
@@ -298,8 +297,8 @@ describe('error bodies', () => {
     [403, 'GET', `/api/visits/${INVITE}/world?as=wren`],
     [404, 'GET', '/api/muses/nobody/now'],
     [404, 'GET', '/api/nothing'],
-    [409, 'POST', `/api/invitations/${INVITE}/accept?as=hero`, undefined, {
-      commands: { invitation: () => Promise.resolve({ ok: false, status: 409, error: 'already answered' }) },
+    [409, 'POST', '/api/invitations/inv-hero-juniper-1/withdraw?as=hero', undefined, {
+      commands: { withdrawInvitation: () => Promise.resolve({ ok: false, status: 409, error: 'already used' }) },
     }],
     [413, 'POST', '/api/host/hero/soul', { text: 'a'.repeat(64 * 1024) }],
     [500, 'GET', '/api/muses/hero/world', undefined, { queries: { world: () => { throw new Error('store offline'); } } }],

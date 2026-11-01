@@ -28,8 +28,8 @@ async function seeded(hours: number): Promise<Garden> {
     roles: new Map(cast.members.map((m) => [m.id, m.role])),
   });
   const work = `${FIXTURES_DIR}work-3weeks.json`;
-  await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0, owners: 'auto-accept' });
-  await run(garden.engine, { cast: '', work: null, start: START, hours, owners: 'auto-accept' });
+  await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0 });
+  await run(garden.engine, { cast: '', work: null, start: START, hours });
   return garden;
 }
 
@@ -104,7 +104,7 @@ describe('the garden snapshot on a seeded engine', () => {
 
   it('sends every photo and every invitation the owner received as a postcard with an image the server has', () => {
     const s = garden.engine.state(HERO)!;
-    const received = [...s.social.invitations.values()].filter((inv) => inv.guest === HERO && inv.state !== 'proposed');
+    const received = [...s.social.invitations.values()].filter((inv) => inv.guest === HERO && inv.state !== 'withdrawn');
     expect(received.length, 'the run brought an invitation').toBeGreaterThan(0);
     expect(snap.postcards.map((p) => p.id).sort()).toEqual([...s.photos.map((p) => p.id), ...received.map((inv) => inv.id)].sort());
     for (const p of snap.postcards) {
@@ -165,7 +165,7 @@ describe('garden events', () => {
     const live: GardenFrame[] = [];
     const stop = garden.views.subscribeGarden(HERO, null, (f) => live.push(f));
     expect(live.map((f) => f.event.type)).toEqual(['status']);
-    await run(garden.engine, { cast: '', work: null, start: START, hours: 48, owners: 'auto-accept' });
+    await run(garden.engine, { cast: '', work: null, start: START, hours: 48 });
     stop();
 
     const ids = live.map((f) => f.id);

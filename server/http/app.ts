@@ -132,14 +132,10 @@ function routesFor({ queries, commands, now, subscribe }: Garden): readonly Rout
       result(await commands.setHidden(muse(params.id), hiddenRef(field(body, 'ref')), flag(field(body, 'hidden'), 'hidden'))),
     introduce: async ({ params, body }) => result(await commands.introduce(muse(params.id), shareCode(field(body, 'shareCode')))),
     unshare: async ({ params, body }) => result(await commands.unshare(muse(params.id), id<MuseId>(field(body, 'other'), 'other'))),
-    answer: async ({ params, query }) => {
-      const action = params.action;
-      if (action !== 'approve' && action !== 'decline' && action !== 'accept') throw new HttpError(404, 'no such route');
-      return result(await commands.invitation(id<InvitationId>(params.id, 'id'), requestingOwner(query), action));
-    },
+    withdraw: async ({ params, query }) => result(await commands.withdrawInvitation(requestingOwner(query), id<InvitationId>(params.id, 'id'))),
     visit: ({ params, query }) => {
       const view = queries.visit(id<InvitationId>(params.id, 'id'), requestingOwner(query), now());
-      if (view === 'forbidden') throw new HttpError(403, 'no open visit for you');
+      if (view === 'forbidden') throw new HttpError(403, 'no visit of yours is open');
       return json(view);
     },
     hostWork: async ({ params, body }) => result(await commands.hostWork(muse(params.id), workState(field(body, 'state')))),

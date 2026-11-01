@@ -200,7 +200,7 @@ describe('the owner likes things in the garden', () => {
     life.push(day, { kind: 'memory.updated', textHash: 'h', topics: topicsOf('Jazz') });
     const region = startTrip(life, day, 1, 'Pigment');
     const [pigment] = life.hop(day + HOUR_MS, 1, 0, 'Pigment', region, [{ title: 'Pigment', score: 0.9, kept: true, topics: ['Pigment', 'Inorganic pigments'] }]);
-    const photo: PhotoSpec = { id: photoId(MOSS.id, 1, day + HOUR_MS, 0), at: instant(day + HOUR_MS), subject: 'find', planetOf: MOSS.id, dir: pigment.place.dir, forward: pigment.place.dir, zoom: 0.95, companions: [], discoveryId: pigment.id };
+    const photo: PhotoSpec = { id: photoId(MOSS.id, 1, day + HOUR_MS, 0), at: instant(day + HOUR_MS), subject: 'find', planetOf: MOSS.id, dir: pigment.place.dir, forward: pigment.place.dir, zoom: 0.95, companions: [], discoveryId: pigment.id, context: 'planet' };
     life.push(day + HOUR_MS, { kind: 'photo.taken', photo });
     return { life, pigment, photo };
   }
@@ -244,7 +244,7 @@ describe('the owner likes things in the garden', () => {
 
   it('records a liked photo without a find, and changes no interest', () => {
     const { life } = lived();
-    const selfie: PhotoSpec = { id: photoId(MOSS.id, 2, later, 0), at: instant(later), subject: 'selfie', planetOf: MOSS.id, dir: [0, 0, 1], forward: [1, 0, 0], zoom: 0.9, companions: [] };
+    const selfie: PhotoSpec = { id: photoId(MOSS.id, 2, later, 0), at: instant(later), subject: 'selfie', planetOf: MOSS.id, dir: [0, 0, 1], forward: [1, 0, 0], zoom: 0.9, companions: [], context: 'planet' };
     life.push(later, { kind: 'photo.taken', photo: selfie });
     const before = life.state;
     life.push(later, { kind: 'owner.liked', target: { photo: selfie.id }, liked: true });

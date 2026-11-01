@@ -39,7 +39,7 @@ async function engineGarden(): Promise<Garden> {
   const cast = loadCast();
   const garden = buildGarden({ db: null, source: 'fixture', mind: 'heuristic', hero: HERO, start: START, clock: 'fast-forward', roles: new Map(cast.members.map((m) => [m.id, m.role])) });
   const work = `${FIXTURES_DIR}work-3weeks.json`;
-  await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0, owners: 'auto-accept' });
+  await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0 });
   return {
     queries: garden.views,
     commands: garden.commands,
@@ -92,7 +92,7 @@ async function post(path: string, body: unknown) {
 describe('the garden over HTTP on the engine', () => {
   it('serves the snapshot of a known Muse only', async () => {
     const garden = await engineGarden();
-    await garden.commands.advance(24);
+    await garden.commands.advance(48);
     await serve(garden);
     const res = await fetch(`${base}/api/muses/hero/garden`);
     expect(res.status).toBe(200);
@@ -107,7 +107,7 @@ describe('the garden over HTTP on the engine', () => {
     const [first] = await live.until((f) => f.length > 0);
     expect(first.event.type).toBe('status');
 
-    expect((await post('/api/dev/advance', { hours: 24 })).status).toBe(200);
+    expect((await post('/api/dev/advance', { hours: 48 })).status).toBe(200);
     const frames = await live.until((f) => f.some((x) => x.event.type === 'basket'));
     for (const f of frames) {
       expect(f.lines.every((l) => l.startsWith('id: ') || l.startsWith('data: ')), 'unnamed data frames').toBe(true);
@@ -125,7 +125,7 @@ describe('the garden over HTTP on the engine', () => {
 
   it('keeps likes and private finds: each shows in the next snapshot and reaches an open garden', async () => {
     const garden = await engineGarden();
-    await garden.commands.advance(24);
+    await garden.commands.advance(48);
     await serve(garden);
     const before = garden.queries.garden(HERO, garden.now())!;
     const [liked, hidden] = before.finds;

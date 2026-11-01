@@ -69,7 +69,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     experiencesSinceReflection: 0,
     likes: new Map(),
     day: freshDay(''),
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
     workSince: null,
     recentWork: [],
     lastReflectionAt: instant(0),
@@ -157,6 +157,7 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       return like(s, e.target, e.liked, at);
     case 'owner.introduced':
     case 'owner.unshared':
+    case 'owners.connected':
     case 'relationship.changed':
     case 'invitation':
       return s;
