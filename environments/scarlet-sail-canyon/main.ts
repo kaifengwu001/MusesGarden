@@ -127,7 +127,7 @@ async function boot(): Promise<void> {
   });
   if (world.needsDefaultPose) {
     world.defaultPose();
-    if (store.values.view.mode === 'overview') world.rig.setZoom(0, true);
+    if (store.values.view.mode === 'overview') { world.rig.lookUp(0); world.rig.setZoom(0, true); }
   }
 
   const postcard = new Postcard(uiRoot, store);
@@ -264,7 +264,7 @@ async function boot(): Promise<void> {
       post.bloomEnabled = quality.tier.bloom;
       resizePending = true;
     }
-    if (changed.has('view.mode') && !syncingMode) world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0);
+    if (changed.has('view.mode') && !syncingMode) { world.rig.lookUp(0); world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0); }
     world.onParams(changed);
     applyUi();
   });

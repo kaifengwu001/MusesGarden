@@ -164,6 +164,7 @@ float colonyVariant(float v) {
 // What the paint needs to know about a point of meadow.
 struct Meadow {
   vec3 dir;
+  float slope; // physical slope: expose cool rock faces between the shelves
   float lush;     // -1..1
   float wet;      // macro wetness 0..1
   float variant;  // colony colour variant 0..1
@@ -204,14 +205,26 @@ vec3 meadowPaint(Meadow m) {
   float close = 1.0 - smoothstep(0.08, 0.7, m.pixelMeters);
   float grain = close * gnoise(p * 7.0, uTerrainSeed + 711u);
   float layer = gnoise(vec3(p.x * 0.19, p.y * 0.75, p.z * 0.19), uTerrainSeed + 712u);
-  float h = textureLod(uTerrainBake, m.dir, 0.0).r;
-  float scree = (1.0 - smoothstep(1.0, 3.5, h)) * (0.65 + 0.35 * smoothstep(-0.2, 0.4, mineral));
+  float h = terrainFields(m.dir).r;
+  float face = smoothstep(0.22, 0.85, m.slope);
+  float scree = (1.0 - face) * (0.45 + 0.3 * smoothstep(-0.2, 0.4, mineral));
 
   // Blue-white chalk in full light; a cool, dry, opaque face in the shade.
   vec3 lit = mix(vec3(0.79, 0.86, 0.87), vec3(0.72, 0.69, 0.57), scree * 0.6);
   vec3 mid = mix(vec3(0.48, 0.60, 0.66), vec3(0.47, 0.49, 0.44), scree * 0.6);
   vec3 shade = vec3(0.23, 0.35, 0.43);
+  // Broad chalk tops and exposed blue-grey cliff faces remain distinct even
+  // under the same sunlight. This colour follows real slope, not painted hills.
+  lit = mix(lit, vec3(0.59, 0.70, 0.79), face * 0.75);
+  mid = mix(mid, vec3(0.32, 0.46, 0.59), face * 0.8);
+  shade = mix(shade, vec3(0.17, 0.27, 0.38), face * 0.6);
   vec3 col = tone3(lit, mid, shade, m.light);
+  // Low, matte lichen crusts occupy broken patches on shelf tops. The dense
+  // upright plants are separate meshes; these marks keep exposed rock alive.
+  float crust = (1.0 - face) * smoothstep(0.16, 0.43, mineral + 0.25 * layer);
+  col = mix(col, tone3(vec3(0.42, 0.48, 0.26), vec3(0.27, 0.36, 0.21), vec3(0.16, 0.24, 0.17), m.light), crust * 0.65);
+  float bedding = 1.0 - smoothstep(0.02, 0.11, abs(fract((h + 0.12) / uChalk.z) - 0.09));
+  col *= 1.0 - bedding * face * 0.1;
   col *= 1.0 + mineral * 0.09 + layer * 0.045 + grain * 0.075;
 
   // Hairline chips on occasional exposed chalk plates. Gravel routes stay

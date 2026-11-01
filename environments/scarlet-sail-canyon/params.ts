@@ -101,15 +101,15 @@ export const schema = {
     nearRadius: num('gr', 'Blade radius', 22, 6, 60, 0.5, 'life', { unit: 'm' }),
   },
   flowers: {
-    density: num('fd', 'Density', 0.7, 0, 40, 0.1, 'life', { unit: '/m²' }),
+    density: num('fd', 'Density', 0, 0, 40, 0.1, 'life', { unit: '/m²' }),
     patchiness: num('fpt', 'Patchiness', 0.95, 0, 1, 0.01, 'life'),
     patchSize: num('fps', 'Patch size', 13, 3, 40, 0.5, 'life', { unit: 'm' }),
     sizeVariation: num('fsv', 'Size variation', 0.6, 0, 1, 0.01, 'life'),
     colourVariation: num('fcv', 'Colour variation', 0.65, 0, 1, 0.01, 'life'),
-    pink: num('fp', 'Scarlet cups', 0.15, 0, 1, 0.01, 'life'),
-    star: num('fs', 'Ivory stars', 0.8, 0, 1, 0.01, 'life'),
-    yellow: num('fy', 'Seed heads', 0.05, 0, 1, 0.01, 'life'),
-    blue: num('fb', 'Blue clusters', 0, 0, 1, 0.01, 'life'),
+    pink: num('fp', 'Scarlet coral', 0.15, 0, 1, 0.01, 'life'),
+    star: num('fs', 'Ivory comb fronds', 0.8, 0, 1, 0.01, 'life'),
+    yellow: num('fy', 'Sage foliage', 0.05, 0, 1, 0.01, 'life'),
+    blue: num('fb', 'Young coral', 0, 0, 1, 0.01, 'life'),
   },
   water: {
     depthTint: num('dt', 'Depth tint', 0.65, 0, 1, 0.01, 'live'),
@@ -124,7 +124,7 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0.13, 0, 1, 0.01, 'life'),
+    coverage: num('cc', 'Coverage', 0.2, 0, 1, 0.01, 'life'),
     altitude: num('ca', 'Altitude', 24, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.35, 0, 1, 0.01, 'live'),
@@ -140,9 +140,9 @@ export const schema = {
   style: {
     toonBands: int('tb', 'Toon bands', 3, 2, 5, 'live'),
     bandSoftness: num('bs', 'Band softness', 0.08, 0, 0.3, 0.005, 'live'),
-    fogDensity: num('fog', 'Aerial haze', 0.28, 0, 1, 0.01, 'live'),
+    fogDensity: num('fog', 'Aerial haze', 0.16, 0, 1, 0.01, 'live'),
     grain: num('gn', 'Paper grain', 0.012, 0, 0.1, 0.001, 'live'),
-    contrast: num('ct', 'Contrast', 1.02, 0.8, 1.4, 0.01, 'live'),
+    contrast: num('ct', 'Contrast', 1.08, 0.8, 1.4, 0.01, 'live'),
     brightness: num('br', 'Brightness', 1.0, 0.7, 1.2, 0.01, 'live'),
   },
   quality: {

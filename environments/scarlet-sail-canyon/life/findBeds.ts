@@ -3,26 +3,21 @@ import { geometryBytes, gpuMemory } from '../../../src/core/gpuMemory';
 import { hash32, unit } from '../../../src/core/hash';
 import { BED_RADIUS, type Bed } from '../garden/placement';
 import { travel, tangentToward } from '../../../src/planet/geo';
-import vertexShader from '../../../src/life/findBed.vert.glsl?raw';
+import vertexShader from './findBed.vert.glsl?raw';
 import { SPECIES_MESH } from './flowerMeshes';
 import { HEADS } from './flowers';
 import fragmentShader from '../../../src/life/grass.frag.glsl?raw';
 
-// The finds' flower beds: each find Muse kept grows as a small bed of the
-// meadow's own flowers, its species the find's topic (Interest.species,
-// coloured by its variant), with a few companions of the meadow's other
-// species so it reads as a clump of the meadow rather than a planted
-// square. One instanced draw per species (findBed.vert.glsl), a few
-// thousand plants at most. A bed can be planted while you watch (it
-// blossoms from its middle out: ui/garden), the bed you are looking at is
-// lit a little brighter, and the one under the pointer lifts a little.
+// Each kept find grows a native canyon patch: coral, ivory fern or sage.
+// Topic channel IDs, planting timelines, highlights and hover lifts are unchanged.
+// The full botanical templates need fewer instances than meadow flowers.
 
 /** Plants per bed, the share of them that are companions, and their size against the meadow's flowers. */
-const PLANTS = 58;
-/** The smaller species grow bigger in a bed, so every bed reads at the same distance: pink cup, star, button, cluster. */
-const SPECIES_SIZE = [1.0, 1.12, 1.45, 1.4] as const;
-const COMPANIONS = 0.16;
-const SIZE = [1.25, 1.65] as const;
+export const BED_PLANTS = 14;
+/** Compact native plants fit the bed while leaving its saved specimen visible. */
+const SPECIES_SIZE = [1.0, 0.9, 1.0, 1.1] as const;
+const COMPANIONS = 0.28;
+const SIZE = [0.85, 1.1] as const;
 /** The bed's middle is left to the find's specimen (findForms.ts): no flower within this (m). */
 const HOLE = 0.25;
 /** Beds a draw can address (MAX_BEDS in the shader). */
@@ -114,7 +109,7 @@ export class FindBeds {
       const r = rand(idSeed(bed.find));
       const north = tangentToward(bed.dir, new Vector3(0, 1, 0), new Vector3());
       const east = new Vector3().crossVectors(bed.dir, north);
-      for (let k = 0; k < PLANTS; k++) {
+      for (let k = 0; k < BED_PLANTS; k++) {
         // denser in the middle, round the find's own specimen; companions toward the rim
         const companion = r() < COMPANIONS;
         const reach = HOLE + (BED_RADIUS - HOLE) * Math.pow(r(), companion ? 0.45 : 0.7);

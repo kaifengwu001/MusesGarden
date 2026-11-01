@@ -14,8 +14,8 @@ uniform float uRadius;
 #include <meadow_wind>
 #include <meadow_muse_press>
 
-attribute float aPart; // 0 stem, 1 petal, 2 centre
-attribute float aT;    // along the stem 0..1; 1 on the head
+attribute float aPart; // native foliage; retained for bed highlight compatibility
+attribute float aT;    // normalized root-to-tip height
 uniform sampler2D uPool;     // per flower, a page a row: direction xyz, ln birth threshold (at the local density)
 uniform sampler2D uPoolRest; // per flower: seed in [0, 1), size factor, colour variant
 uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four to a texel (scatter.ts)
@@ -28,11 +28,7 @@ float rnd(float s, float k) {
   return fract(sin(s * 78.233 + k * 12.9898) * 43758.5453);
 }
 
-vec3 rotateAxis(vec3 v, vec3 axis, float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
-}
+
 
 void main() {
   int perPage = int(uPageSize);
@@ -86,47 +82,25 @@ void main() {
   vec3 base = dir * (uRadius + f.x - 0.02);
   // pressed down and parted where Muse lies in the grass
   stemScale *= 1.0 - 0.6 * musePress(base, up, stemTop * stemScale, bend);
+  // A whole native plant unfurls from its root. No detached flower head or petal disc.
   vec3 local = position;
-  vec3 world;
-  if (aPart < 0.5) {
-    // stem: bend grows with height along the stem
-    float t = aT;
-    world = base + side * (local.x * stemScale) + fwd * (local.z * stemScale) + up * (local.y * stemScale * (1.0 - 0.25 * min(dot(bend, bend), 1.0) * t)) + bend * (stemTop * stemScale * t * t);
-  } else {
-    // head: relative to the stem top, opened by bloom, nodding and fluttering in the wind
-    vec3 head = vec3(local.x, local.y - stemTop, local.z) * mix(0.35, 1.0, open);
-    vec3 w = vec3(dot(bend, side), 0.0, dot(bend, fwd));
-    float wl = length(w);
-    vec3 axis = wl > 1e-4 ? normalize(vec3(w.z, 0.0, -w.x)) : vec3(1.0, 0.0, 0.0);
-    float flutter = sin(uGust.x * (7.0 + 3.0 * rnd(seed, 7.0)) + seed * 31.0) * 0.08 * (0.3 + uWindVec.w);
-    float nod = uFlowerFade.w * mix(0.4, 1.0, open) + 0.6 * wl + flutter;
-    head = rotateAxis(head, axis, nod);
-    vec3 top = base + up * (stemTop * stemScale * (1.0 - 0.25 * min(dot(bend, bend), 1.0))) + bend * (stemTop * stemScale);
-    world = top + side * (head.x * scale) + up * (head.y * scale) + fwd * (head.z * scale);
-  }
+  float t = aT;
+  float spread = mix(0.72, 1.0, open);
+  vec3 world = base + side * (local.x * stemScale * spread) + fwd * (local.z * stemScale * spread)
+    + up * (local.y * stemScale * (1.0 - 0.12 * min(dot(bend, bend), 1.0) * t))
+    + bend * (stemTop * stemScale * t * t * 0.55);
 
-  // colour by species, colony variant and part; cloud and cottage shadows
+  // Match the cliff plants: coral red, warm ivory and matte sage, without meadow petal colours.
   float shadow = max(meadow.z, 0.85 * cottageShadow(dir));
-  float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.9 * shadow);
+  vec3 facing = normalize(side * normal.x + up * normal.y + fwd * normal.z);
+  float b = max(0.4, toonLight(abs(dot(facing, uSunDir)))) * mix(0.8, 1.0, aT) * (1.0 - 0.55 * shadow);
   float v = look.y;
-  vec3 col;
-  if (aPart < 0.5) {
-    col = tone3(pal(ROW_PINK, 4), mix(pal(ROW_PINK, 4), pal(ROW_PINK, 5), 0.5), pal(ROW_PINK, 5), b * 0.85);
-  } else if (species == 0) {
-    float inner = smoothstep(stemTop + 0.05, stemTop + 0.0, local.y); // the cup's paler heart
-    float lipLight = smoothstep(stemTop + 0.065, stemTop + 0.103, local.y);
-    vec3 petal = tone3(floraColour(0, v, 1.0), floraColour(0, v, 0.55), floraColour(0, v, 0.0), b * mix(0.75, 1.0, lipLight));
-    col = mix(petal, tone3(pal(ROW_PINK, 2), pal(ROW_PINK, 2), floraColour(0, v, 0.4), b), inner * 0.6);
-  } else if (species == 1) {
-    col = aPart > 1.5 ? tone3(pal(ROW_STAR, 3), pal(ROW_STAR, 2), pal(ROW_SCATTER, 1), b) : tone3(floraColour(1, v, 1.0), floraColour(1, v, 0.6), floraColour(1, v, 0.0), b);
-  } else if (species == 2) {
-    col = tone3(floraColour(2, v, 1.0), floraColour(2, v, 0.6), floraColour(2, v, 0.0), b);
-    if (aPart > 1.5) col *= 0.85;
-  } else {
-    col = aPart > 1.5 ? pal(ROW_STAR, 0) : tone3(floraColour(3, v, 1.0), floraColour(3, v, 0.5), floraColour(3, v, 0.0), b);
-  }
-  // buds: green, tinted toward the bloom colour as they open
-  if (aPart > 0.5) col = mix(tone3(pal(ROW_BUD, 0), pal(ROW_BUD, 0), pal(ROW_GRASS, 2), b), col, smoothstep(0.15, 0.85, open));
+  vec3 pigment = species == 1 ? vec3(0.98, 0.97, 0.86)
+    : (species == 2 ? mix(vec3(0.29, 0.40, 0.26), vec3(0.52, 0.59, 0.37), 0.35 + 0.4 * v)
+    : mix(vec3(0.76, 0.27, 0.23), vec3(0.84, 0.34, 0.28), v));
+  pigment = pow(pigment, vec3(2.2));
+  vec3 col = tone3(pigment * 1.04, pigment * 0.92, pigment * vec3(0.59, 0.67, 0.8), b);
+  col *= mix(0.78, 1.0, open);
   // under a cloud the petals sink into the shade with the grass, keeping their
   // hue (a cooler tint than the grass's, which would turn the pinks purple)
   col *= mix(vec3(1.0), vec3(0.68, 0.7, 0.8), clamp(shadow, 0.0, 1.0));

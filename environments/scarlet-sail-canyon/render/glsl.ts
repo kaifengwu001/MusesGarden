@@ -1,4 +1,5 @@
 import { ShaderChunk } from 'three';
+import canyonGround from '../life/canyonGround.glsl?raw';
 import cloudLumps from '../life/cloudLumps.glsl?raw';
 import clouds from '../../../src/life/clouds.glsl?raw';
 import field from '../../../src/life/field.glsl?raw';
@@ -21,6 +22,7 @@ import warp from '../../../src/render/warp.glsl?raw';
 // Shared GLSL lives in its own files and is registered as three.js shader
 // chunks, so any ShaderMaterial can `#include <meadow_warp>` and friends.
 const chunks: Record<string, string> = {
+  canyon_ground: canyonGround,
   meadow_common: common,
   meadow_noise: noise,
   meadow_cubesphere: cubesphere,

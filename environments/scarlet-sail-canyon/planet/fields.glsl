@@ -114,11 +114,3 @@ vec4 floraAt(vec3 dir, float wet) {
   }
   return d;
 }
-
-// CPU mirror: chalkHeight(Fields.reliefTwirled(dir, 0), Fields.lift).
-float naturalAt(vec3 dir) {
-  float relief = reliefAt(dir, 0.0);
-  float bands = relief / 1.4;
-  float ledge = (floor(bands) + smoothstep(0.2, 0.8, fract(bands))) * 1.4;
-  return max(0.35, uWet.z + relief * 0.4 + ledge * 0.6);
-}

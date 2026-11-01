@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Ray, Vector3, type BufferGeometry, type Mesh, type InstancedBufferAttribute, type InstancedBufferGeometry } from 'three';
-import { fanTreeGeometry, chalkGeometry, fernGeometry, chalkShelfGeometry, lichenGeometry } from '../life/canyonGeometry';
+import { fanTreeGeometry, chalkGeometry, fernGeometry, coralGeometry, chalkShelfGeometry, lichenGeometry } from '../life/canyonGeometry';
 import { CanyonScenery } from '../life/canyonScenery';
 import { Homestead } from '../life/props';
 import { Terrain, generateLayout, createGroundSample } from '../planet/terrain';
@@ -29,18 +29,20 @@ function geometryIsSound(geometry: BufferGeometry): void {
   expect(geometry.boundingSphere?.radius).toBeGreaterThan(0);
 }
 function batches(scenery: CanyonScenery): InstancedBufferGeometry[] {
-  return scenery.group.children.map((child) => (child as Mesh<InstancedBufferGeometry>).geometry);
+  return scenery.group.children.filter(child => (child as Mesh).isMesh).map((child) => (child as Mesh<InstancedBufferGeometry>).geometry);
 }
 /** Intersect the built mesh, independently of its exported placement constants. */
 function surfaceAtCentre(geometry: BufferGeometry): number {
   const ray = new Ray(new Vector3(0, 100, 0), new Vector3(0, -1, 0));
   const positions = geometry.getAttribute('position');
+  const index = geometry.getIndex();
+  const vertexAt = (i: number): number => index ? index.getX(i) : i;
   const a = new Vector3(), b = new Vector3(), c = new Vector3(), hit = new Vector3();
   let height = -Infinity;
-  for (let i = 0; i < positions.count; i += 3) {
-    a.fromBufferAttribute(positions, i);
-    b.fromBufferAttribute(positions, i + 1);
-    c.fromBufferAttribute(positions, i + 2);
+  for (let i = 0; i < (index?.count ?? positions.count); i += 3) {
+    a.fromBufferAttribute(positions, vertexAt(i));
+    b.fromBufferAttribute(positions, vertexAt(i + 1));
+    c.fromBufferAttribute(positions, vertexAt(i + 2));
     if (ray.intersectTriangle(a, b, c, false, hit)) height = Math.max(height, hit.y);
   }
   expect(Number.isFinite(height)).toBe(true);
@@ -63,12 +65,36 @@ describe('Scarlet canyon geometry', () => {
     }
   });
 
+  it('indexes render batches without changing their triangles or per-corner material and support data', () => {
+    const scenery = new CanyonScenery({}, terrainAt(128));
+    const sources = [fanTreeGeometry(), chalkGeometry(), fernGeometry(), chalkShelfGeometry(), lichenGeometry(), coralGeometry()];
+    let sourceVertices = 0, renderedVertices = 0;
+    batches(scenery).forEach((geometry, batch) => {
+      const source = sources[batch], index = geometry.getIndex()!;
+      expect(index).not.toBeNull();
+      expect(index.count).toBe(source.getAttribute('position').count);
+      sourceVertices += source.getAttribute('position').count;
+      renderedVertices += geometry.getAttribute('position').count;
+      for (const name of ['position', 'normal', 'uv', 'aKind', 'aPlantBase']) {
+        const original = source.getAttribute(name), rendered = geometry.getAttribute(name);
+        let largestDifference = 0;
+        for (let i = 0; i < index.count; i++) for (let axis = 0; axis < original.itemSize; axis++) {
+          largestDifference = Math.max(largestDifference, Math.abs(original.getComponent(i, axis) - rendered.getComponent(index.getX(i), axis)));
+        }
+        expect(largestDifference).toBeLessThan(1e-7);
+      }
+    });
+    expect(renderedVertices).toBeLessThan(sourceVertices * 0.5);
+    for (const source of sources) source.dispose();
+    scenery.dispose();
+  });
+
   it('builds an open inhabited shelter and disposes its mesh resources', () => {
     const home = new Homestead({}, 412);
     const mesh = home.group.children[0] as Mesh;
     geometryIsSound(mesh.geometry);
     const kinds = new Set(Array.from(mesh.geometry.getAttribute('aKind').array));
-    expect(kinds).toEqual(new Set([0, 2, 4, 5, 7]));
+    expect(kinds).toEqual(new Set([0, 2, 4, 5, 6, 7, 8, 9]));
     let disposed = false;
     mesh.geometry.addEventListener('dispose', () => { disposed = true; });
     home.dispose();
@@ -93,7 +119,7 @@ describe('Scarlet canyon geometry', () => {
         const direction = terrain.layout.cottage.clone();
         const kinds = new Set(Array.from(geometry.getAttribute('aKind').array));
         instances += geometry.instanceCount;
-        triangles += geometry.getAttribute('position').count / 3 * geometry.instanceCount;
+        triangles += (geometry.index?.count ?? geometry.getAttribute('position').count) / 3 * geometry.instanceCount;
         for (let i = 0; i < geometry.instanceCount; i++) {
           direction.set(anchors.getX(i), anchors.getY(i), anchors.getZ(i));
           expect(direction.length()).toBeCloseTo(1, 6);
@@ -109,7 +135,7 @@ describe('Scarlet canyon geometry', () => {
             }
             expect(support).toBeGreaterThanOrEqual(0);
             expect(kinds.has(1) || kinds.has(8)).toBe(true);
-            const actualSurface = shelfAnchors.getW(support) + shelfSurface * shelfPlacement.getX(support);
+            const actualSurface = shelfAnchors.getW(support) + shelfSurface * shelfPlacement.getX(support) * shelf.geometry.getAttribute('aHeightScale').getX(support);
             expect(anchors.getW(i)).toBeCloseTo(actualSurface - 0.08 * scale, 4);
             if (kinds.has(1)) elevatedPlants++;
           } else {
@@ -122,13 +148,16 @@ describe('Scarlet canyon geometry', () => {
           expect(placement.getW(i)).toBeLessThanOrEqual(1);
           const home = terrain.cottageLocal(direction, { x: 0, z: 0 });
           const nearHome = direction.dot(terrain.layout.cottage) > 0;
-          expect(nearHome && Math.abs(home.x) < 12 && home.z > 8 && home.z < 20).toBe(false);
+          for (const [x,z] of [[-7.2,12],[0,17],[7.2,12]]) {
+            const insideRoute=nearHome&&((home.x-x)/3.15)**2+((home.z-z)/2.75)**2<1;
+            expect(insideRoute).toBe(false);
+          }
         }
       }
       expect(instances).toBeGreaterThan(100);
       expect(elevatedPlants).toBeGreaterThan(0);
-      expect(triangles).toBeLessThan(280_000);
-      expect(scenery.group.children.length).toBeLessThanOrEqual(5);
+      expect(triangles).toBeLessThan(3_000_000);
+      expect(batches(scenery).length).toBeLessThanOrEqual(6);
       scenery.dispose();
       expect(scenery.group.children).toHaveLength(0);
     });

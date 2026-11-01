@@ -18,12 +18,12 @@ import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterLook,
 // colour variant (set per colony, with a little spread of its own), so the
 // near flowers and the far paint tell the same story.
 
-/** Stem top (m) and resting nod (rad) per species. */
+/** Native plant height and zero nod: foliage bends continuously from its root. */
 export const HEADS: ReadonlyArray<readonly [number, number]> = [
-  [0.5, 0.35], // pink cup
-  [0.44, 0.08], // white star
-  [0.34, 0.05], // button
-  [0.38, 0.1], // blue cluster
+  [0.334, 0], // coral
+  [0.538, 0], // ivory comb fern
+  [0.214, 0], // sage
+  [0.232, 0], // young coral
 ];
 
 export const FLOWER_FADE = { fullRadius: 0.4, keepAtEdge: 0.3 };
@@ -38,7 +38,7 @@ interface TileFlora {
   level: number;
   i: number;
   j: number;
-  /** GRID² × (pink, star, yellow, blue) flowers per m². */
+  /** GRID² × four persistent topic channels; geometry maps them to native flora. */
   flora: Float32Array;
   lush: Float32Array;
   variant: Float32Array;

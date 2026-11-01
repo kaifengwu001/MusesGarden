@@ -1,14 +1,14 @@
 // Bakes the meadow fields into one cube-map face. Each texel's direction
 // follows the GL cube-map convention, so textureLod(bake, dir) reads back
 // what was written for dir.
-//   pass 0 (terrain): natural height (m), lushness, wetness, colour variant
+//   pass 0: smooth relief integer, lushness, relief fraction, colour variant
 //   pass 1 (flora):   flowers per m² for pink, star, yellow, blue
 #include <meadow_noise>
 #include <meadow_fields>
 uniform int uFace;
 uniform float uSize;
 uniform int uPass;
-uniform samplerCube uBakedTerrain; // pass 1 reads the wetness pass 0 wrote
+uniform samplerCube uBakedTerrain; // retained bake interface; this world is always dry
 
 vec3 faceDirection(int face, vec2 st) {
   if (face == 0) return vec3(1.0, -st.y, -st.x);
@@ -24,8 +24,11 @@ void main() {
   vec3 dir = normalize(faceDirection(uFace, st));
   vec3 t = twirl(dir);
   if (uPass == 0) {
-    gl_FragColor = vec4(naturalAt(t), lushAt(t), 0.0, variantAt(t));
+    // Interpolate the smooth geology before stepping it. Integer + fraction
+    // channels avoid half-float height rounding being magnified at cliff faces.
+    float relief = reliefAt(dir, 0.0);
+    gl_FragColor = vec4(floor(relief), lushAt(t), fract(relief), variantAt(t));
   } else {
-    gl_FragColor = floraAt(t, textureLod(uBakedTerrain, dir, 0.0).b);
+    gl_FragColor = floraAt(t, 0.0);
   }
 }

@@ -14,10 +14,11 @@ import { fullscreenMesh } from '../../../src/render/fullscreen';
 import fragmentShader from './bake.frag.glsl?raw';
 import { createFieldUniforms, type Fields, type FieldUniforms } from './fields';
 
-// The meadow fields baked into two direction-space cube maps, so the ground,
+// The canyon fields baked into two direction-space cube maps, so the ground,
 // the paint and the vegetation read them back with one fetch instead of
 // re-running the noise per vertex and per pixel:
-//   terrain  natural height (m), lushness, wetness, colour variant
+//   terrain  smooth relief integer / lushness / relief fraction / colour variant
+//            terrace shaping happens AFTER lookup so cliffs remain precise
 //   flora    flowers per m² for the four species, at half resolution
 //            (colonies are meters wide)
 // Re-baked only when the fields change: the seed, a parameter, or R while

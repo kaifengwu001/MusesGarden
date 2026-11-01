@@ -1,18 +1,24 @@
 # Validation
 
-Checked in the isolated `planet/scarlet-standalone` checkout on 31 October 2026.
+Checked in the isolated `planet/scarlet-standalone` checkout on 1 November 2026. The [reference handoff](../../docs/planet-reference-handoff.md) records the visual failures, corrections and remaining work.
 
-- Repository TypeScript checks and ESLint passed (`npm run check`). The standalone production build passed (`npm run build:scarlet`).
-- The built site was opened through Vite preview: the scene rendered, Pip could be selected and greeted, and no browser console errors were captured.
-- 59 environment CPU tests passed across parameters, growth, terrain, residents and scenery.
-- 14 browser checks passed: 5 terrain/renderer checks, 6 resident/navigation checks and 3 deterministic-frame checks.
-- Terrain height agreement stays below 2 cm at radii 40, 128 and 400 m; dry shore-distance agreement is exact.
-- Growing and shrinking releases the larger terrain allocation; repeated cycles do not accumulate textures.
-- Residents stay grounded through seed/radius changes. Greeting, following, stopping, garden navigation, saved names and narrow-screen controls were exercised.
-- Invitation previews leave invitations unused and restore the home seed.
-- Raised fan roots were checked against the actual chalk-shelf mesh, not just the underlying sphere.
-- Shared `src/` has no changes. Browser storage, development port, Vite cache and production output are separate.
+## Verified in the current correction pass
 
-The broad inherited suite was also attempted while several planet builds were running. Four unchanged shared tests exceeded their explicit 30-second limits under that load; HTTP tests passed when localhost access was available. This is not a claim that the entire legacy suite or its historical frame-rate budgets are green on this machine.
+- 87 environment CPU tests passed across terrain, residents, scenery, native fauna, floor topology, plant grounding, ink and garden plant lifecycle.
+- Scoped TypeScript and ESLint passed (`npm run check:scarlet`). The standalone production build passed (`npm run build:scarlet`). Repository-wide `npm run check` also passed earlier in this correction pass; the final additions were checked with the scoped command.
+- Five terrain browser checks passed: CPU/GPU height agreement below 2 cm at radii 40, 128 and 400 m; exact dry shore clearance; warp parity; large-bake allocation/release; and ground picking.
+- Six resident browser checks passed: grounded/visible neighbours, greeting and saved renaming, seed/radius changes, desktop/mobile navigation, stopping follow, and invitation previews that preserve the invitation and restore the home seed.
+- The ecology browser check passed with no captured shader errors. It verifies all three native species, the planted scenery, native garden-bed channel identities, and zero default ambient flower instances before and after Bloom. Dormant and blooming native foliage produce different frames.
+- The shelter floor now has one surface per point in the support union. A regression checks union area independently and more than 1,000 triangle-coverage samples. A fresh capture of the user's steep camera shows no overlapping brown strips.
+- Fresh actual-app captures are under `shots/scarlet-sail-canyon/`. Selected review checkpoints are preserved under `reference/` beside the original concept and creature sheet.
+- Shared `src/` has no changes. The environment, development port, storage keys, Vite cache and production output remain separate.
 
-Local inhabitants are not connected to account-backed friend agents. Remote world allocation and real cross-planet travel remain backend work; the UI identifies route previews as previews.
+## Rendering consistency and limits
+
+All three frozen-frame determinism checks pass after correcting derivative use in the chalk shader: repeated loads, consecutive frozen redraws, and growth 0.3 → 0.7 → 0.3. The original integrated run failed these checks because `fwidth` was evaluated inside non-uniform fracture branches. Computing the footprint before branching fixed the root cause without changing the tests. Together with terrain, residents and ecology, 15 focused browser checks pass.
+
+The high-quality settlement at 1600×1000 submits about 3.18 million triangles in 85 draws. Before indexing, browser snapshots reported about 48–50 ms GPU time. Indexing only the scenery batches preserved the frozen image hash exactly and improved a separate short GPU-synchronised benchmark from 45.67 to 21.74 ms/frame (30 renders after eight warmups). See `reference/render-benchmark.json`; its asynchronous HUD timer is not the synchronous benchmark metric. This is one local comparison, not a 60 fps guarantee. Distant planted cliffs and ink still need a future level-of-detail pass.
+
+The broad inherited legacy suite was not rerun for this visual correction. An earlier broad run had four unchanged shared tests exceed their 30-second limits under concurrent load; HTTP tests passed when localhost access was available. No claim is made that the entire legacy suite or its historical frame-rate budgets is green.
+
+Local inhabitants are not connected to account-backed friend agents. Remote world allocation and real cross-planet travel remain backend work. The UI labels route previews as previews. Decorative rock meshes do not provide general-purpose climbing or collision, and saved-find specimens remain a separate content system from native ambient plants.

@@ -1,7 +1,7 @@
 import { Vector3, Vector4, type Texture } from 'three';
 import { hash32, mix, unit } from '../../../src/core/hash';
 import { smoothstep } from '../../../src/core/math';
-import { DRY_SHORE, Fields, type FieldParams } from './fields';
+import { CHALK_STEP, DRY_SHORE, Fields, type FieldParams } from './fields';
 import { sunAt } from '../render/palette';
 import { localSun } from '../../../src/render/sun';
 import { angleBetween, tangentToward, travel } from '../../../src/planet/geo';
@@ -18,7 +18,7 @@ export const COTTAGE_FLAT = 7.5;
 export const COTTAGE_TO_POND = 4.3;
 export const POND_SHIFT = 7;
 /** The cottage clearing stands this high above the water (m): its landing is a terrace over the pond. */
-export const HOME_LEVEL = 1;
+export const HOME_LEVEL = 12;
 /** The house's footprint (half sizes, m), and its terrace with the steps and its pier (props.ts COTTAGE, TERRACE, STEPS, PIER: x0, x1, z0, z1): cleared of plants. */
 export const HOUSE_FOOTPRINT = { halfX: 4.45, halfZ: 2.75 } as const;
 export const TERRACE_AREA = [-4.5, 4.2, -0.2, 4.8] as const;
@@ -27,7 +27,9 @@ export const PIER_AREA = [-8.3, -3.3, 1.75, 5.7] as const;
 /** The channel cut under the pier's arch (props.ts ARCH), so the water runs in under its vault: centre x, z and half sizes (m). */
 export const CULVERT = { x: -7.2, z: 4.6, halfX: 0.5, halfZ: 1.3 } as const;
 /** Dry plateau around the homestead (m): full inside, none outside. */
-export const PLATEAU = { inner: 10, outer: 26 } as const;
+export const PLATEAU = { inner: 10, outer: 48 } as const;
+/** Flat shelter and resident lanes; the real rock rises just outside this footprint. */
+export const SETTLEMENT = { halfWidth: 14, back: -5, front: 24, blend: 8 } as const;
 /** Bank lip: height (m) and the distance (m) over which it rises from the waterline. */
 export const BANK = { height: 0.2, width: 0.3, minSlope: 0.04 } as const;
 
@@ -156,6 +158,7 @@ export class Terrain {
   pondCentre = 0;
   pondReach = 0;
   pondShapeReach = 0;
+  regionReach = 120;
   readonly cottageLevel = HOME_LEVEL;
   /** GPU normal-gradient step (m); at least a bake texel. */
   gradStep = 0.75;
@@ -181,7 +184,11 @@ export class Terrain {
     this.pondCentre = edge + COTTAGE_TO_POND;
     // The retained pond metadata only supports legacy camera framing.
     this.pondShapeReach = 0;
-    this.pondReach = PLATEAU.outer;
+    const homeCorner = Math.hypot(SETTLEMENT.halfWidth, SETTLEMENT.front);
+    const homeArc = Math.asin(Math.min(homeCorner / radius, 0.99)) * radius;
+    const span = Math.max(this.maxHeight - this.cottageLevel, this.cottageLevel - 0.35);
+    this.regionReach = Math.min(120, radius * 1.5);
+    this.pondReach = Math.max(this.regionReach, PLATEAU.outer, homeArc + (Math.ceil(span / CHALK_STEP) + 1) * 8);
     this.gradStep = Math.max(0.6, bakeTexelMeters);
   }
 
@@ -199,7 +206,7 @@ export class Terrain {
     const R = this.radius;
     const shadow = Math.min(60, Math.hypot(4.75, 3.08) + 6.2 * Math.hypot(sweepX, sweepZ) + 0.5);
     out[0].dir.copy(L.cottage);
-    out[0].reach = Math.max(PLATEAU.outer, shadow) + 2;
+    out[0].reach = Math.max(this.pondReach, shadow) + 2;
     tmpB.crossVectors(L.cottage, L.homeBearing);
     out[1].dir.copy(L.cottage).addScaledVector(tmpB, -POND_SHIFT / R).addScaledVector(L.homeBearing, this.pondCentre / R).normalize();
     out[1].reach = this.pondShapeReach + 2;
@@ -229,14 +236,37 @@ export class Terrain {
     return Math.max(sdf, -(Math.hypot(x - ix, y - iy) - ir) * r);
   }
 
-  /** Dry home plateau, including the existing cottage and terrace footprint. */
+  /** Shelter and resident lanes stay flat; broad access ledges replace a smooth bowl. */
   homestead(dir: Vector3, h: number): number {
     const dc = angleBetween(dir, this.layout.cottage) * this.radius;
-    if (dc >= PLATEAU.outer) return h;
-    const dry = smoothstep(PLATEAU.outer, PLATEAU.inner, dc);
-    h += (Math.max(h, 0.4) * 0.5 + 0.25 - h) * dry;
-    const flat = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
-    return h + (this.cottageLevel - h) * flat;
+    if (dc >= this.pondReach) return h;
+    const c = this.cottageLocal(dir, localTmp);
+    const length = Math.hypot(c.x, c.z);
+    const x = length > 1e-6 ? c.x / length : 1;
+    const z = length > 1e-6 ? c.z / length : 0;
+    // Distance to the rectangular settlement boundary along this bearing.
+    // The arc correction keeps the footprint exact even on a 40 m planet.
+    const boundary = Math.min(SETTLEMENT.halfWidth / Math.max(Math.abs(x), 1e-6), (z >= 0 ? SETTLEMENT.front : -SETTLEMENT.back) / Math.max(Math.abs(z), 1e-6));
+    const edge = dc - Math.asin(Math.min(boundary / this.radius, 0.999)) * this.radius;
+    if (edge <= 0) return this.cottageLevel;
+    // The shelter sits between a higher rear/left escarpment and an open
+    // right-hand valley. Apply this as bed-sized offsets to retain real flats.
+    const localX = x * dc;
+    const localZ = z * dc;
+    const fade = 1 - smoothstep(this.regionReach * 0.6, this.regionReach, dc);
+    // The overlook faces through the rear-right opening. Without this branch
+    // the rear uplift makes a 25 m mound directly across that view corridor.
+    const opening = smoothstep(8, 22, localX) * smoothstep(8, 26, -localZ);
+    const uphill = Math.max(smoothstep(14, 45, -localX), smoothstep(7, 40, -localZ) * (1 - opening));
+    const rise = CHALK_STEP * smoothstep(0.2, 0.7, uphill * fade);
+    const down = Math.max(2 * smoothstep(18, 54, localX), 3 * opening) * fade;
+    const downFloor = Math.floor(down);
+    const fall = CHALK_STEP * (downFloor + smoothstep(0.32, 0.68, down - downFloor));
+    h = Math.max(0.35, h + rise - fall);
+    const band = edge / 8;
+    const whole = Math.floor(band);
+    const steps = CHALK_STEP * (whole + smoothstep(0.25, 0.55, band - whole));
+    return Math.min(Math.max(h, this.cottageLevel - steps), this.cottageLevel + steps);
   }
 
   /** Ground height above the base sphere before the retained home offset. */
@@ -265,7 +295,7 @@ export class Terrain {
 
   /** Conservative height above the base sphere anywhere (m), for culling. */
   get maxHeight(): number {
-    return Math.max(this.fields.maxHeight, this.cottageLevel) + BANK.height + 0.5;
+    return Math.max(this.fields.maxHeight + CHALK_STEP, this.cottageLevel) + BANK.height + 0.5;
   }
 
   /** No grass, flowers or stones: inside the house and on the landing. */
@@ -284,6 +314,8 @@ export class Terrain {
   writeUniforms(u: TerrainUniforms): void {
     const L = this.layout;
     u.uTerrainSeed.value = L.noiseSeed;
+    u.uChalk.value.set(this.fields.lift, this.fields.maxHeight, CHALK_STEP, 0.06);
+    u.uCanyon.value.set(this.regionReach * 0.6, this.regionReach, 0, 0);
     u.uBank.value.set(BANK.height, BANK.width, this.gradStep, BANK.minSlope);
     u.uCottage.value.set(L.cottage.x, L.cottage.y, L.cottage.z, this.cottageLevel);
     u.uCottageB.value.set(L.homeBearing.x, L.homeBearing.y, L.homeBearing.z, 0);
@@ -302,7 +334,11 @@ const localTmp = { x: 0, z: 0 };
 
 export interface TerrainUniforms {
   uTerrainSeed: { value: number };
-  /** Natural height (m), lushness, wetness, colour variant (bake.ts). */
+  /** Relief lift, physical height cap, bedding height, residual shelf gradient. */
+  uChalk: { value: Vector4 };
+  /** Regional canyon fade inner/outer radii (metres). */
+  uCanyon: { value: Vector4 };
+  /** Encoded smooth relief integer/fraction in R/B, lushness G, colour variant A. */
   uTerrainBake: { value: Texture | null };
   /** Flowers per m²: pink, star, yellow, blue (bake.ts). */
   uFloraBake: { value: Texture | null };
@@ -325,6 +361,8 @@ export interface TerrainUniforms {
 export function createTerrainUniforms(): TerrainUniforms {
   return {
     uTerrainSeed: { value: 0 },
+    uChalk: { value: new Vector4(0, CHALK_STEP, CHALK_STEP, 0.06) },
+    uCanyon: { value: new Vector4(72, 120, 0, 0) },
     uTerrainBake: { value: null },
     uFloraBake: { value: null },
     uBank: { value: new Vector4(BANK.height, BANK.width, 0.75, BANK.minSlope) },

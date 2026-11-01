@@ -3,13 +3,15 @@ import { hash32, unit } from '../../../src/core/hash';
 import { clamp, smoothstep } from '../../../src/core/math';
 import { gnoise } from '../../../src/planet/noise';
 
-// Scarlet Sail Canyon's dry, softly stepped chalk relief. Direction-space
+// Scarlet Sail Canyon's dry, deeply stepped chalk relief. Direction-space
 // octaves retain the same positions while the planet grows. This is mirrored
 // by fields.glsl and baked into cube maps for the GPU; the CPU evaluates it
 // for picking and placement. Flora retains the shared colony contract.
 
 /** Height of a chalk bedding interval, in metres. */
-export const CHALK_STEP = 1.4;
+export const CHALK_STEP = 5.6;
+/** Convert the existing roll control into canyon-scale relief, not meadow hills. */
+export const CANYON_RELIEF = 4.8;
 /** Finite shore-distance sentinel: safe for half-float field maps and placement. */
 export const DRY_SHORE = 1000;
 
@@ -217,6 +219,7 @@ export class Fields {
   /** Half-width of the wetland margin in noise units: wide, so hills interlace with water across it. */
   wetSoftness = 0.2;
   lift = 0;
+  heightLimit = CHALK_STEP;
   drop = 0;
   level = 0;
   grainK = 0;
@@ -252,7 +255,7 @@ export class Fields {
     let var2 = 0;
     for (let k = 0; k < RELIEF_OCTAVES; k++) {
       const w = radius / (RELIEF_BASE_FREQ * 2 ** k);
-      this.relief[k] = p.roll * rollSpectrum(w);
+      this.relief[k] = p.roll * CANYON_RELIEF * rollSpectrum(w);
       this.hummock[k] = p.hummocks * hummockSpectrum(w);
       var2 += this.relief[k] ** 2 + this.hummock[k] ** 2;
     }
@@ -260,7 +263,10 @@ export class Fields {
     this.grainK = GRAIN_MAX * p.grain;
     // No wetland threshold or water-table control can flood this world.
     this.wetThreshold = 9;
-    this.lift = 1.4 + 1.2 * this.reliefStd;
+    this.lift = 2.5 + 1.6 * this.reliefStd;
+    // A physical summit cap makes the culling bound exact and useful. The
+    // uncommon clipped extremes become broad high mesas, not needle peaks.
+    this.heightLimit = this.lift + 2.8 * this.reliefStd + CHALK_STEP;
     this.drop = 0;
     this.level = 0;
     octavePair(radius, PATTERN.lush, this.lushPair);
@@ -303,7 +309,7 @@ export class Fields {
 
   /** Rolling hills plus hummocks, the hummocks raised by `wet` (m). */
   reliefAt(dir: Vector3, wet: number): number {
-    return this.reliefTwirled(twirl(this.twirls, dir, this.td), wet);
+    return this.reliefTwirled(dir, wet);
   }
 
   private reliefTwirled(dir: Vector3, wet: number): number {
@@ -342,17 +348,15 @@ export class Fields {
     return smoothstep(this.wetThreshold - this.wetSoftness, this.wetThreshold + this.wetSoftness, this.wetTwirled(dir));
   }
 
-  /** Dry chalk height above the base sphere, mirrored by naturalAt() in GLSL. */
+  /** Dry chalk height above the base sphere, mirrored by terrainFields() in terrain.glsl. */
   natural(dir: Vector3): number {
-    const t = twirl(this.twirls, dir, this.td);
-    return chalkHeight(this.reliefTwirled(t, 0), this.lift);
+    // Geology follows broad un-twirled grain: no coiled or marbled landforms.
+    return Math.min(this.heightLimit, chalkHeight(this.reliefTwirled(dir, 0), this.lift));
   }
 
-  /** Rigorous bound: each lattice-gradient contribution is at most 2 in magnitude. */
+  /** Exact physical cap used by both CPU and GPU, for useful conservative culling. */
   get maxHeight(): number {
-    let amplitude = 0;
-    for (let k = 0; k < RELIEF_OCTAVES; k++) amplitude += Math.abs(this.relief[k]) + Math.abs(this.hummock[k]);
-    return Math.max(0.35, this.lift + 2 * amplitude + CHALK_STEP);
+    return this.heightLimit;
   }
 
   lush(dir: Vector3): number {
@@ -395,7 +399,7 @@ export class Fields {
     u.uHummock.value.set(this.hummock);
     u.uGrain.value.set(this.grain.x, this.grain.y, this.grain.z, this.grainK);
     u.uWet.value.set(this.wetThreshold, this.wetSoftness, this.lift, this.drop);
-    u.uLevel.value.set(this.level, 0, 0, 0);
+    u.uLevel.value.set(this.level, 0, 0, this.heightLimit);
     u.uPatternA.value.set(this.lushPair.level, this.lushPair.t, this.variantPair.level, this.variantPair.t);
     u.uPatternB.value.set(this.richPair.level, this.richPair.t, 0, this.patchiness);
     u.uDrift.value.set(this.driftPair.level, this.driftPair.t, this.driftThreshold, 0);
@@ -449,12 +453,14 @@ export function clumps(c: ClumpSettings, dir: Vector3, out: Float32Array): Float
   return out;
 }
 
-/** Smooth bedding shelves, with low scree corridors between them. No overhangs. */
+/** Broad bedrock shelves with steep, continuous risers; no displaced-prop illusion. */
 export function chalkHeight(relief: number, lift: number): number {
-  const bands = relief / CHALK_STEP;
+  const bands = (lift + relief) / CHALK_STEP;
   const floor = Math.floor(bands);
-  const ledge = (floor + smoothstep(0.2, 0.8, bands - floor)) * CHALK_STEP;
-  return Math.max(0.35, lift + relief * 0.4 + ledge * 0.6);
+  const ledge = (floor + smoothstep(0.32, 0.68, bands - floor)) * CHALK_STEP;
+  // Shelf tops retain a slight drainage gradient; most height change happens
+  // in the risers. Smooth joins keep growth, picking and placement continuous.
+  return Math.max(0.35, (lift + relief) * 0.06 + ledge * 0.94);
 }
 
 /** How much each species likes damp ground (wetness 0..1); about 1 on average. */

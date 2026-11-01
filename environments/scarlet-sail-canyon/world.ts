@@ -4,7 +4,7 @@ import type { FrameClock } from '../../src/core/clock';
 import type { Globals } from '../../src/core/globals';
 import { POOL_PAGES, type Tier } from '../../src/core/quality';
 import { smoothstep } from '../../src/core/math';
-import { FieldMap } from '../../src/life/fieldMap';
+import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
 import { Butterflies } from './life/butterflies';
 import { Clouds, createCloudUniforms } from './life/clouds';
@@ -14,6 +14,7 @@ import { Petals } from '../../src/life/petals';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
 import { Residents } from './life/residents';
 import { CanyonScenery } from './life/canyonScenery';
+import { CanyonFauna } from './life/canyonFauna';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
@@ -61,7 +62,7 @@ export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse';
  * distance (m) from the point it looks at (cottage-local x, y, z, m), its
  * bearing from the front toward the right end (rad).
  */
-const HOMESTEAD_VIEW = { height: 11, distance: 32, azimuth: 0.65, at: [-4.5, 4.4, 1.4] } as const;
+const HOMESTEAD_VIEW = { height: 12, distance: 62, azimuth: 0.12, at: [12, 4, -12] } as const;
 /** Muse's view: the camera's height over the ground Muse stands on (m), its distance (m), its bearing round from in front of Muse (rad, + to its left; at home, from straight out in front of the terrace), and the height it looks at (× Muse's). */
 const MUSE_VIEW = { height: 1.23 * MUSE_HEIGHT, distance: 4 * MUSE_HEIGHT, azimuth: 0.3, at: 0.55 } as const;
 
@@ -94,6 +95,7 @@ export class World {
   readonly muse: Muse;
   readonly residents: Residents;
   readonly scenery: CanyonScenery;
+  readonly fauna: CanyonFauna;
   followingResident: string | null = null;
   private heldResident: string | null = null;
   readonly petals: Petals;
@@ -186,7 +188,9 @@ export class World {
     this.muse.useModel(store.values.muse.model);
     this.residents = new Residents(this.shared);
     this.scenery = new CanyonScenery(this.shared, this.terrain);
-    this.scene.add(this.scenery.group);
+    this.fauna = new CanyonFauna(this.shared, this.terrain);
+    this.scene.add(this.scenery.group, this.fauna.group);
+    for (const shadow of this.fauna.shadowMeshes) this.clouds.addShadowCaster(shadow);
     for (const resident of this.residents.members) {
       this.scene.add(resident.muse.mesh, resident.muse.props.group);
       this.clouds.addShadowCaster(resident.muse.shadowMesh);
@@ -221,28 +225,27 @@ export class World {
     this.cameraPreset('homestead');
   }
 
-  /**
-   * Named views: across the pond at the cottage, across the lakes, over the
-   * meadow, and the vista (the reference framing). Shots and tests cut to
-   * them; `immediate = false` moves the camera there smoothly.
-   */
+  /** Named settlement, canyon and globe views used by navigation and visual checks. */
   cameraPreset(name: CameraPreset, immediate = true): void {
     this.followingResident = null;
     const L = this.terrain.layout;
     const R = this.growth.radius;
     if (name === 'homestead') {
-      // the painting's view of the cottage: from above the meadow in front and to the right, the end wall nearest, the pier off to the left
+      // Keep the rock-backed shelter low on the left and the canyon opening
+      // to its right, close to the reference's ground-level composition.
       const V = HOMESTEAD_VIEW;
-      const zoom = this.rig.zoomForAltitude(V.height);
+
       const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
       const target = travel(travel(L.cottage, across, V.at[0] / R, new Vector3()), L.homeBearing, V.at[2] / R, new Vector3());
       const toCamera = L.homeBearing.clone().applyAxisAngle(L.cottage, V.azimuth);
       const focus = travel(target, tangentToward(target, toCamera.add(target), new Vector3()), V.distance / R, new Vector3());
+      const zoom = this.rig.zoomForAltitude(Math.max(1, this.terrain.cottageGround + V.height - this.terrain.height(focus)));
       this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));
       this.rig.setZoom(zoom, true);
-      // and look up from the zoom's tilt to the point: down by the camera's height over it, and the planet's curve between
+      // The nearby landscape is flattened by the camera warp, so aim using
+      // the physical height difference rather than adding sphere curvature.
       const { tilt } = this.rig.framing(zoom);
-      const drop = V.height + this.terrain.height(focus) - this.terrain.cottageGround - V.at[1] + (V.distance * V.distance) / (2 * R);
+      const drop = V.height - V.at[1];
       this.rig.lookUp(Math.atan2(V.distance, drop) - tilt);
     } else if (name === 'muse') {
       this.frameMuse();
@@ -280,8 +283,6 @@ export class World {
       this.terrain.setLayout(generateLayout(this.store.values.world.seed));
       this.scene.remove(this.homestead.group);
       this.homestead.dispose();
-      this.homestead.dispose();
-      this.homestead.dispose();
       this.homestead = new Homestead(this.shared, this.store.values.world.seed);
       this.scene.add(this.homestead.group);
     }
@@ -301,6 +302,8 @@ export class World {
     this.fieldsLayout = L;
     this.fieldsFull = full;
     this.terrain.update(R, this.fieldParams, this.bake.texelMeters(R, full));
+    this.scenery?.invalidate();
+    this.fauna?.invalidate();
     this.terrain.writeUniforms(this.terrainUniforms);
     this.bake.bake(this.renderer, this.terrain.fields, `${L.seed}/${R}/${this.fieldKey}`, full);
     this.terrainUniforms.uTerrainBake.value = this.bake.terrainTexture(full);
@@ -322,6 +325,7 @@ export class World {
     };
     this.fieldKey = JSON.stringify(this.fieldParams);
     this.scenery?.invalidate();
+    this.fauna?.invalidate();
   }
 
   update(clock: FrameClock, aspect: number, viewportHeight: number): void {
@@ -340,6 +344,7 @@ export class World {
     } else if (!this.fieldsFull && ++this.fieldsStill >= 6) this.refreshFields(true);
 
     this.scenery.update(clock.time, this.terrain);
+    this.fauna.update(clock.time, this.terrain, this.rig.camera.position);
     this.residents.update(clock.time, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     if (this.followingResident) this.frameResident(this.followingResident, false);
 
@@ -621,6 +626,23 @@ export class World {
     this.rig.setZoom(zoom, immediate);
     const { tilt } = this.rig.framing(zoom);
     this.rig.lookUp(Math.atan2(distance, 2.3 - 0.55 * MUSE_HEIGHT + distance * distance / (2 * R)) - tilt);
+    this.posed = true;
+  }
+
+  /** A close naturalist's view of a living animal in its own habitat. */
+  observeCreature(species: string): void {
+    this.followingResident = null;
+    const where = this.fauna.focus(species);
+    if (!where) return;
+    const R = this.terrain.radius;
+    const bearing = where.heading.clone().applyAxisAngle(where.dir, species === 'fern-sifter' ? 0.65 : 0.45);
+    const focus = travel(where.dir, bearing, where.distance / R, new Vector3());
+    const curve = where.distance * where.distance / (2 * R);
+    const eyeAbove = species === 'chalkstep' ? 0.55 : species === 'fern-sifter' ? 0.6 : 0.4;
+    const zoom = this.rig.zoomForAltitude(Math.max(0.65, where.height + eyeAbove + curve - this.terrain.height(focus)));
+    this.rig.lookAlong(focus, tangentToward(focus, where.dir, new Vector3()));
+    this.rig.setZoom(zoom, true);
+    this.rig.lookUp(Math.atan2(where.distance, eyeAbove + curve) - this.rig.framing(zoom).tilt);
     this.posed = true;
   }
 

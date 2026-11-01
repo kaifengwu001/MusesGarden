@@ -23,7 +23,7 @@ export class CanyonUi {
     const panel = this.panel;
     panel.setAttribute('aria-label', 'Canyon residents');
     const eyebrow = element('p', 'canyon-eyebrow', 'A place to belong');
-    const head = element('h2', '', 'The canyon residents');
+    const head = element('h2', '', 'Life among the sails');
     const places = element('nav', 'canyon-places');
     places.setAttribute('aria-label', 'Places');
     for (const [label, preset] of [['Shelter', 'homestead'], ['Three Sails', 'vista'], ['Whole planet', 'homestead']] as const) {
@@ -31,9 +31,25 @@ export class CanyonUi {
       button.addEventListener('click', () => {
         navigate();
         world.cameraPreset(preset);
-        if (label === 'Whole planet') world.rig.setZoom(0, true);
+        if (label === 'Whole planet') { world.rig.lookUp(0); world.rig.setZoom(0, true); }
       });
       places.append(button);
+    }
+    const wildlife = element('div', 'canyon-wildlife');
+    wildlife.setAttribute('aria-label', 'Native wildlife');
+    for (const species of world.fauna.species) {
+      const button = element('button', `canyon-species ${species.id}`, species.name);
+      button.setAttribute('aria-label', `Observe ${species.name}`);
+      button.title = species.description;
+      button.addEventListener('click', () => {
+        navigate();
+        this.selected = null;
+        this.detail.hidden = true;
+        world.observeCreature(species.id);
+        this.announcement.textContent = species.description;
+        this.update();
+      });
+      wildlife.append(button);
     }
     const residents = element('div', 'canyon-residents');
     for (const resident of world.residents.members) {
@@ -83,7 +99,7 @@ export class CanyonUi {
     this.detail.hidden = true;
     this.announcement.setAttribute('role', 'status');
     this.announcement.setAttribute('aria-live', 'polite');
-    panel.append(eyebrow, head, places, residents, this.detail, this.announcement);
+    panel.append(eyebrow, head, places, wildlife, residents, this.detail, this.announcement);
     parent.append(panel);
   }
 

@@ -4,7 +4,7 @@
 
 const float COTTAGE_FLAT = 7.5;
 const float PLATEAU_INNER = 10.0;
-const float PLATEAU_OUTER = 26.0;
+const float PLATEAU_OUTER = 48.0;
 const float POND_SLOPE = 0.3;
 const float POND_DEPTH = 1.4;
 const float POND_BANK = 0.9;
@@ -15,7 +15,9 @@ const vec4 PIER_AREA = vec4(-8.3, -3.3, 1.75, 5.7);
 const vec4 CULVERT = vec4(-7.2, 4.6, 0.5, 1.3); // the channel under the pier's arch: centre x, z, half sizes (m)
 
 uniform uint uTerrainSeed;
-uniform samplerCube uTerrainBake; // natural height (m), lushness, wetness, colour variant
+uniform vec4 uChalk; // relief lift, height cap, bedding height, residual shelf gradient
+uniform vec4 uCanyon; // regional canyon fade inner/outer radii
+uniform samplerCube uTerrainBake; // smooth relief integer R / fraction B, lushness G, colour variant A
 uniform samplerCube uFloraBake;   // flowers per m²: pink, star, yellow, blue
 uniform vec4 uBank;               // bank height (m), bank width (m), gradient step (m), minimum slope
 uniform vec4 uCottage;            // direction, clearing level (m)
@@ -55,15 +57,40 @@ float homePond(vec3 dir) {
   return max(sdf, -(length(q - uHomeIslet.xy) - uHomeIslet.z) * r);
 }
 
-// Dry home plateau, mirrored by Terrain.homestead. Pond metadata remains
-// available for the existing camera, but never cuts the ground.
+// Reconstruct smooth relief first, then cut the chalk beds. Baking the
+// already-stepped height would smear cliffs and disagree with CPU placement.
+vec4 terrainFields(vec3 dir) {
+  vec4 f = textureLod(uTerrainBake, dir, 0.0);
+  float raw = f.r + f.b + uChalk.x;
+  float bands = raw / uChalk.z;
+  float ledge = (floor(bands) + smoothstep(0.32, 0.68, fract(bands))) * uChalk.z;
+  f.r = min(uChalk.y, max(0.35, mix(ledge, raw, uChalk.w)));
+  f.b = 0.0;
+  return f;
+}
+
+// Shelter and resident lanes remain level. Outside them a sequence of broad
+// rock ledges rises to the natural terrain, instead of a continuous bowl wall.
 float homestead(vec3 dir, float h) {
   float dc = chordAngle(dir, uCottage.xyz) * uRadius;
-  if (dc >= PLATEAU_OUTER) return h;
-  float dry = smoothstep(PLATEAU_OUTER, PLATEAU_INNER, dc);
-  h += (max(h, 0.4) * 0.5 + 0.25 - h) * dry;
-  float flat_ = smoothstep(COTTAGE_FLAT + 3.5, COTTAGE_FLAT, dc);
-  return h + (uCottage.w - h) * flat_;
+  if (dc >= uHomePond.z) return h;
+  vec2 c = cottageLocal(dir);
+  float l = length(c);
+  vec2 ray = l > 1e-6 ? c / l : vec2(1.0, 0.0);
+  float boundary = min(14.0 / max(abs(ray.x), 1e-6), (ray.y >= 0.0 ? 24.0 : 5.0) / max(abs(ray.y), 1e-6));
+  float edge = dc - asin(min(boundary / uRadius, 0.999)) * uRadius;
+  if (edge <= 0.0) return uCottage.w;
+  vec2 local = ray * dc;
+  float fade = 1.0 - smoothstep(uCanyon.x, uCanyon.y, dc);
+  float opening = smoothstep(8.0, 22.0, local.x) * smoothstep(8.0, 26.0, -local.y);
+  float uphill = max(smoothstep(14.0, 45.0, -local.x), smoothstep(7.0, 40.0, -local.y) * (1.0 - opening));
+  float rise = uChalk.z * smoothstep(0.2, 0.7, uphill * fade);
+  float down = max(2.0 * smoothstep(18.0, 54.0, local.x), 3.0 * opening) * fade;
+  float fall = uChalk.z * (floor(down) + smoothstep(0.32, 0.68, fract(down)));
+  h = max(0.35, h + rise - fall);
+  float band = edge / 8.0;
+  float steps = uChalk.z * (floor(band) + smoothstep(0.25, 0.55, fract(band)));
+  return clamp(h, uCottage.w - steps, uCottage.w + steps);
 }
 
 // The homestead applied to a natural height h, or not at all where it reaches
@@ -78,7 +105,7 @@ float homeGround(vec3 dir, float h) {
 
 // Ground height before the bank lip (m above the water table).
 float height0(vec3 dir) {
-  return homeGround(dir, textureLod(uTerrainBake, dir, 0.0).r);
+  return homeGround(dir, terrainFields(dir).r);
 }
 
 // Retain the homestead's 0.2 m ground offset, with no shoreline distortion.
@@ -109,7 +136,7 @@ void gradientFrame(vec3 dir, out vec3 a, out vec3 b) {
 
 Ground sampleGround(vec3 dir) {
   Ground g;
-  g.fields = textureLod(uTerrainBake, dir, 0.0);
+  g.fields = terrainFields(dir);
   float h0 = homeGround(dir, g.fields.r);
   vec3 a, b;
   gradientFrame(dir, a, b);

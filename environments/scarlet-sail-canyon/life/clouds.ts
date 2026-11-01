@@ -215,14 +215,14 @@ function rng(seed: number): () => number {
 
 /** Wind-combed mist banks: low, elongated sheets with a quiet scalloped edge. */
 function makePuffs(rand: () => number): Puff[] {
-  const e = 1.25 + 0.35 * rand();
+  const e = 1.05 + 0.2 * rand();
   const puffs: Puff[] = [];
   for (let i = 0; i < 6; i++) {
     const t = i / 5;
-    const r = 0.12 + 0.055 * Math.sin(t * Math.PI) + rand() * 0.02;
-    puffs.push({ x: (t - 0.5) * 1.7 * e, y: r * 0.6, z: (rand() - 0.5) * 0.12, r, phase: rand() * Math.PI * 2 });
+    const r = 0.24 + 0.08 * Math.sin(t * Math.PI) + rand() * 0.025;
+    puffs.push({ x: (t - 0.5) * 1.5 * e, y: r * 0.6, z: (rand() - 0.5) * 0.12, r, phase: rand() * Math.PI * 2 });
   }
-  for (let i = 0; i < 2; i++) puffs.push({ x: (i - 0.5) * 0.45 * e, y: 0.16, z: 0.12, r: 0.17, phase: rand() * Math.PI * 2 });
+  for (let i = 0; i < 2; i++) puffs.push({ x: (i - 0.5) * 0.45 * e, y: 0.32, z: 0.08, r: 0.3, phase: rand() * Math.PI * 2 });
   return puffs;
 }
 

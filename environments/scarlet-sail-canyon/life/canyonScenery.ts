@@ -1,13 +1,15 @@
 import { DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector3, type BufferGeometry, type IUniform } from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { smoothstep } from '../../../src/core/math';
 import { hash32, unit } from '../../../src/core/hash';
 import { createGroundSample, type Terrain } from '../planet/terrain';
-import { CHALK_SHELF_CENTRE_HEIGHT, chalkGeometry, chalkShelfGeometry, fanTreeGeometry, fernGeometry, lichenGeometry } from './canyonGeometry';
+import { CHALK_SHELF_CENTRE_HEIGHT, chalkGeometry, chalkShelfGeometry, fanTreeGeometry, fernGeometry, coralGeometry, lichenGeometry } from './canyonGeometry';
+import { makeCanyonInk, type CanyonInk } from './canyonInk';
 import vertexShader from './canyonScenery.vert.glsl?raw';
 import fragmentShader from './canyonScenery.frag.glsl?raw';
 
 interface Anchor { direction: Vector3; local?: readonly [number, number]; scale: number; turn: number; phase: number; tint: number; threshold: number; height?: number; heightScale?: number; }
-interface Batch { mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>; anchors: Anchor[]; anchorData: InstancedBufferAttribute; acrossData: InstancedBufferAttribute; placementData: InstancedBufferAttribute; heightData: InstancedBufferAttribute; }
+interface Batch { ink: CanyonInk; mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>; anchors: Anchor[]; anchorData: InstancedBufferAttribute; acrossData: InstancedBufferAttribute; placementData: InstancedBufferAttribute; heightData: InstancedBufferAttribute; }
 const TAU=Math.PI*2;
 const GROUND_EMBED=0.08;
 
@@ -34,9 +36,16 @@ export class CanyonScenery {
   invalidate():void {this.dirty=true;}
 
   private batch(base:BufferGeometry,anchors:Anchor[],name:string):void{
+    // Weld identical full vertices only at the render boundary. Source templates
+    // remain non-indexed for mesh construction, support raycasts and source tests.
+    const indexed=mergeVertices(base,1e-8);
     const geometry=new InstancedBufferGeometry();
-    for(const name of Object.keys(base.attributes))geometry.setAttribute(name,base.getAttribute(name));
-    geometry.setIndex(base.index);
+    for(const name of Object.keys(indexed.attributes))geometry.setAttribute(name,indexed.getAttribute(name));
+    geometry.setIndex(indexed.index);
+    // Attributes now belong to the instanced geometry. Neither temporary was
+    // uploaded; disposing their wrappers leaves the transferred buffers intact.
+    indexed.dispose();
+    base.dispose();
     const anchorData=new InstancedBufferAttribute(new Float32Array(anchors.length*4),4);
     const acrossData=new InstancedBufferAttribute(new Float32Array(anchors.length*3),3);
     const placementData=new InstancedBufferAttribute(new Float32Array(anchors.length*4),4);
@@ -50,84 +59,133 @@ export class CanyonScenery {
     mesh.name=name;
     // Bounds in the shader follow radius, local relief and the camera warp.
     mesh.frustumCulled=false;
-    this.group.add(mesh);
-    this.batches.push({mesh,anchors,anchorData,acrossData,placementData,heightData});
+    const ink=makeCanyonInk(geometry,this.material.uniforms);
+    this.group.add(mesh,ink.mesh);
+    this.batches.push({ink,mesh,anchors,anchorData,acrossData,placementData,heightData});
   }
 
   private buildAnchors(terrain:Terrain):void{
-    for(const b of this.batches){this.group.remove(b.mesh);b.mesh.geometry.dispose();}
+    for(const b of this.batches){this.group.remove(b.mesh);b.ink.dispose();b.mesh.geometry.dispose();}
     this.batches.length=0;
     this.seed=terrain.layout.seed;
     let state=hash32(this.seed^0x51ca12);
     const rand=():number=>unit(state=hash32((state+0x9e3779b9)>>>0));
-    const trees:Anchor[]=[],rocks:Anchor[]=[],ferns:Anchor[]=[],shelves:Anchor[]=[],lichen:Anchor[]=[];
+    const trees:Anchor[]=[],rocks:Anchor[]=[],ferns:Anchor[]=[],corals:Anchor[]=[],shelves:Anchor[]=[],lichen:Anchor[]=[];
     const local=(x:number,z:number,scale:number,turn:number,heightScale=1):Anchor=>({direction:new Vector3(),local:[x,z],scale,turn,heightScale,phase:rand()*TAU,tint:rand(),threshold:0});
-    // Three Sails sit behind and left of the shelter. The resident foreground remains clear.
-    for(const [x,z,s,t] of [[-15,-6,1.3,-0.1],[-11,-10,1.58,0.42],[-19,-11,1.12,-0.55],[-25,1,0.78,0.2],[20,-8,0.72,-0.5],[-28,16,0.65,0.5],[27,15,0.73,-0.8],[-16,29,0.6,0.2],[18,31,0.6,-0.3]]){
-      trees.push(local(x,z,s,t));
-      lichen.push(local(x,z,2.1+rand()*0.9,rand()*TAU));
-      for(let i=0;i<8;i++){
-        const a=rand()*TAU,r=1.3+rand()*2.1;
-        ferns.push(local(x+Math.cos(a)*r,z+Math.sin(a)*r,0.75+rand()*0.8,rand()*TAU));
+    const safe=(x:number,z:number,margin=0):boolean=> {
+      if(x>-9-margin&&x<5.2+margin&&z>-6-margin&&z<8+margin)return false;
+      if(Math.abs(x)<2+margin&&z>5&&z<13)return false;
+      for(const [hx,hz] of [[-7.2,12],[0,17],[7.2,12]])if(((x-hx)/(3.2+margin))**2+((z-hz)/(2.8+margin))**2<1)return false;
+      for(const [fx,fz] of [[-12.2,15.5],[11.8,20.5],[4.5,24.5],[-12.2,7],[-12.8,19.5],[12.8,22]])if(Math.hypot(x-fx,z-fz)<1.15+margin)return false;
+      return true;
+    };
+    const pocket=(x:number,z:number,size=1):void=>{
+      if(!safe(x,z))return;
+      lichen.push(local(x,z,1.1*size,rand()*TAU));
+      for(let k=0;k<8;k++){
+        const a=rand()*TAU,r=(0.55+rand()*1.3)*size;
+        const fx=x+Math.cos(a)*r,fz=z+Math.sin(a)*r;
+        if(!safe(fx,fz))continue;
+        if(k<4)lichen.push(local(fx,fz,(0.65+rand()*0.55)*size,rand()*TAU));
+        else if(k<7)corals.push(local(fx,fz,(0.8+rand()*0.5)*size,rand()*TAU));
+        else ferns.push(local(fx,fz,(0.65+rand()*0.35)*size,rand()*TAU));
+      }
+    };
+    // One continuous canyon settlement: near ledges, middle terraces and high
+    // shoulders overlap in the view. The central walking corridor stays open.
+    const ledges=[
+      [-20,-12,2.0,-0.15,1.05],[-31,-16,2.5,0.24,1.6],[-42,-20,2.7,-0.18,1.2],
+      [-13,-14,1.5,0.08,0.9],[-3,-19,2.1,0.05,1.2],[11,-20,2.3,-0.15,1.25],[27,-16,2.5,-0.3,1.5],
+      [-22,0,1.8,0.26,0.65],[-34,3,2.3,0.15,1.3],[-45,8,2.8,0.28,1.7],
+      [23,-1,1.7,-0.35,0.65],[34,3,2.4,-0.18,1.3],[45,9,2.7,-0.25,1.6],
+      [-22,13,1.6,0.16,0.6],[-34,19,2.2,0.15,1.1],[-46,27,2.7,0.05,1.5],
+      [24,14,1.5,-0.2,0.65],[36,21,2.2,-0.22,1.1],[47,27,2.5,-0.3,1.45],
+      [-23,30,1.4,0.15,0.65],[-39,36,2.4,0.25,1.2],[24,32,1.5,-0.3,0.65],[40,37,2.6,-0.2,1.3],
+      [-32,-35,2.7,0.18,1.8],[-14,-36,2.6,-0.1,1.2],[5,-38,2.5,0.05,1.6],[27,-36,2.7,-0.2,1.5],
+      [-53,-12,2.8,0.3,1.9],[53,-14,2.7,-0.3,1.6],[-56,33,3.0,0.4,1.4],[57,36,2.8,-0.1,1.7]
+    ];
+    for(const [x,z,s,t,h0] of ledges){
+      if(x>5&&x<38&&z<-10)continue;
+      const h=h0*(x>8?0.42:0.88);
+      const shelf=local(x,z,s,t,h);
+      shelves.push(shelf);
+      // Tree and lichen share the actual central support of this cliff mesh.
+      const rootHeight=(CHALK_SHELF_CENTRE_HEIGHT*h-GROUND_EMBED)*s;
+      if(rand()>0.19 && !(x>8&&x<43&&z>12)){
+        trees.push({...local(x,z,1.05+rand()*1.0,t+(rand()-0.5)*0.45),height:rootHeight});
+        lichen.push({...local(x,z,s*0.9,t),height:rootHeight});
+      }
+      const bx=x+Math.sin(t)*s*2,bz=z+Math.cos(t)*s*2;
+      pocket(bx,bz,1.0+rand()*0.4);
+      for(let j=0;j<3;j++){
+        const rx=bx+(j-1)*s*1.1,rz=bz+0.5+rand();
+        if(safe(rx,rz,1.5))rocks.push(local(rx,rz,0.8+rand()*1.4,t+(rand()-0.5),0.35+rand()*0.5));
       }
     }
-    // Overlapping low fracture beds lead into the taller rear escarpment.
-    for(const [x,z,s,h] of [[-11,-8,3.4,0.62],[-16,-8,4.3,0.65],[-21,-10,4.3,0.77],[-27,-11,4.6,0.8],[18,-10,3.5,0.7],[23,-12,3.9,0.92],[-18,5,3.0,0.52],[18,6,3.0,0.55],[-19,12,3.2,0.6],[20,16,3.4,0.62],[-22,23,3.0,0.5],[23,26,3.2,0.65],[-28,13,3.2,0.7]]){
-      const turn=(rand()-0.5)*0.8;
-      rocks.push(local(x,z,s,turn,h));
-      for(let k=0;k<3;k++){
-        const offset=(k-1)*s*0.68;
-        const front=0.7+rand()*0.65;
-        const cx=x+offset*Math.cos(turn)+front*Math.sin(turn);
-        const cz=z-offset*Math.sin(turn)+front*Math.cos(turn);
-        const chip=local(cx,cz,s*(0.3+rand()*0.22),turn+(rand()-0.5)*0.35,0.3+rand()*0.35);
-        if(cz<6||Math.abs(cx)>14.5||cz>22)rocks.push(chip);
-      }
+    // The home is a lean-to at the foot of its own chalk face. Its rear
+    // edge is only a few decimetres from the rock; its front routes stay clear.
+    for(const [x,z,s,h] of [[1,-7.4,1.25,1.55],[-8,-8.5,1.3,1.0]]){
+      const cliff=local(x,z,s,0,h);
+      shelves.push(cliff);
+      lichen.push({...local(x,z,s*0.85,0),height:(CHALK_SHELF_CENTRE_HEIGHT*h-GROUND_EMBED)*s});
     }
-    for(const [x,z,s,t] of [[-20,-19,2.0,-0.25],[-20,-12,1.05,0.1],[-11,-15,0.8,-0.2],[-32,-6,1.7,0.65],[24,-17,1.9,-0.6],[32,18,1.6,0.7],[-30,30,1.5,-0.3]]){
-      shelves.push(local(x,z,s,t));
-      for(let i=0;i<3;i++)lichen.push(local(x-3+i*2.5,z+3,1.8,rand()*TAU));
+    // Larger fans lean over the inhabited path; young fans and drip gardens
+    // connect the high canopy to the ground instead of solitary tree stamps.
+    for(const [x,z,s,t] of [[-14,-5,1.9,0.1],[-18,-10,2.2,0.35],[-27,-7,1.6,-0.2],[40,-4,1.0,-0.15],[-19,7,1.25,0.25],[40,18,1.0,-0.3],[-20,23,1.15,0.15],[21,26,1.1,-0.3],[-30,27,1.5,0.1],[30,28,1.5,-0.4]]){
+      if(x>15&&z>18)continue;
+      trees.push(local(x,z,s,t));pocket(x,z,1.25);
+      const sx=x+(x<0?-3:3),sz=z+3;
+      trees.push(local(sx,sz,0.45+rand()*0.35,t+0.5));pocket(sx,sz,0.8);
     }
+    // Understory follows the edges of the routes, leaving room for all six
+    // ground creatures and the three Muse neighbours.
+    for(const [x,z] of [[-12.8,5],[-13.6,10],[-13.8,17],[-13.5,22],[13.7,10],[13.8,17],[14.4,22],[-8,-8],[7,-9],[-9,26],[9,27]])pocket(x,z,1.0);
+    for(const [x,z] of [[-3.6,10],[3.6,10],[-4.4,17.8],[4.4,17.8],[-8.5,20.5],[8.5,20.5],[-6.5,24],[2,25],[-8,29],[9,28]])pocket(x,z,0.7+rand()*0.25);
+    // The awning grows out of an inhabited planted crevice, rather than
+    // standing on an empty clearing. The right side has no lookout deck.
+    for(const [x,z] of [[6.3,-1],[7,2.5],[7.8,5.8],[-9.8,-3],[-10.5,0],[-10.4,4]])pocket(x,z,0.8+rand()*0.2);
     const home=terrain.layout.cottage;
     const forward=terrain.layout.homeBearing;
     const across=new Vector3().crossVectors(home,forward).normalize();
-    // Stable unit-direction anchors; growth changes neither their identity nor the mesh dimensions.
-    for(let i=0;i<128;i++){
-      const y=1-2*(i+0.5)/128;
+    // Staggered global terraces and groves continue the same silhouette around
+    // the globe, rather than concentrating all geology at one landmark.
+    const sites=384;
+    for(let i=0;i<sites;i++){
+      const y=1-2*(i+0.5)/sites;
       const a=i*2.399963229728653+this.seed*0.001;
       const r=Math.sqrt(1-y*y);
       const dir=home.clone().multiplyScalar(y).addScaledVector(across,Math.cos(a)*r).addScaledVector(forward,Math.sin(a)*r).normalize();
-      if(dir.dot(home)>Math.cos(0.36))continue;
-      const gate=rand();
-      const anchor:Anchor={direction:dir,scale:0.8+rand()*0.55,turn:rand()*TAU,phase:rand()*TAU,tint:rand(),threshold:gate};
-      const shelfScale=1.0+rand()*0.8;
-      if(i%3===0){
-        shelves.push({...anchor,scale:shelfScale,turn:anchor.turn});
-        // The shelf itself is embedded below the sampled ground. Place roots
-        // against its actual central face, then embed the plant independently.
-        anchor.height=(CHALK_SHELF_CENTRE_HEIGHT-GROUND_EMBED)*shelfScale;
+      const gate=rand()*0.55;
+      const anchor:Anchor={direction:dir,scale:1.0+rand()*0.85,turn:rand()*TAU,phase:rand()*TAU,tint:rand(),threshold:gate};
+      const shelfScale=1.65+rand()*1.5;
+      const shelfHeight=0.65+rand()*1.4;
+      if(i%4!==0){
+        shelves.push({...anchor,scale:shelfScale,heightScale:shelfHeight});
+        anchor.height=(CHALK_SHELF_CENTRE_HEIGHT*shelfHeight-GROUND_EMBED)*shelfScale;
       }
-      trees.push(anchor);
-      const lichenScale=2.1+rand()*1.3;
-      lichen.push({...anchor,scale:anchor.height===undefined?lichenScale:1.1*shelfScale,height:anchor.height});
+      if(i%5!==0)trees.push(anchor);
+      lichen.push({...anchor,scale:anchor.height===undefined?1.5:1.1*shelfScale,height:anchor.height});
       const tangent=new Vector3().crossVectors(dir,Math.abs(dir.y)<0.9?new Vector3(0,1,0):new Vector3(1,0,0)).normalize();
       const bitangent=new Vector3().crossVectors(tangent,dir).normalize();
       for(let k=0;k<2;k++){
         const angle=rand()*TAU;
-        const nearby=dir.clone().addScaledVector(tangent,Math.cos(angle)*0.018).addScaledVector(bitangent,Math.sin(angle)*0.018).normalize();
-        rocks.push({direction:nearby,scale:1.2+rand()*2.6,heightScale:0.45+rand()*0.8,turn:rand()*TAU,phase:0,tint:rand(),threshold:gate});
+        const nearby=dir.clone().addScaledVector(tangent,Math.cos(angle)*0.03).addScaledVector(bitangent,Math.sin(angle)*0.03).normalize();
+        rocks.push({direction:nearby,scale:1.2+rand()*2.6,heightScale:0.4+rand()*0.65,turn:rand()*TAU,phase:0,tint:rand(),threshold:gate});
       }
-      for(let k=0;k<4;k++){
+      if(i%3===0){
         const angle=rand()*TAU;
-        const nearby=dir.clone().addScaledVector(tangent,Math.cos(angle)*0.013).addScaledVector(bitangent,Math.sin(angle)*0.013).normalize();
-        ferns.push({direction:nearby,scale:0.8+rand()*0.65,turn:rand()*TAU,phase:rand()*TAU,tint:rand(),threshold:gate});
+        const nearby=dir.clone().addScaledVector(tangent,Math.cos(angle)*0.023).addScaledVector(bitangent,Math.sin(angle)*0.023).normalize();
+        const plant={direction:nearby,scale:0.8+rand()*0.65,turn:rand()*TAU,phase:rand()*TAU,tint:rand(),threshold:gate};
+        if(i%2===0)ferns.push(plant);else corals.push(plant);
+        lichen.push({...plant,scale:1.2+rand()*0.65,direction:nearby.clone().addScaledVector(tangent,0.008).normalize()});
       }
     }
     this.batch(fanTreeGeometry(),trees,'Persistent scarlet fan trees');
     this.batch(chalkGeometry(),rocks,'Fractured chalk slabs');
     this.batch(fernGeometry(),ferns,'Ivory comb-ferns');
     this.batch(chalkShelfGeometry(),shelves,'Connected chalk escarpments');
-    this.batch(lichenGeometry(),lichen,'Sage lichen mats');
+    this.batch(lichenGeometry(),lichen,'Sage leafy cushions');
+    this.batch(coralGeometry(),corals,'Scarlet lobed understory');
     this.dirty=true;
   }
 
@@ -142,7 +200,7 @@ export class CanyonScenery {
     const forward=terrain.layout.homeBearing;
     const right=new Vector3().crossVectors(home,forward).normalize();
     const dir=new Vector3(),x=new Vector3(),z=new Vector3(),turned=new Vector3();
-    const active=Math.min(1,0.32+R/128*0.48);
+    const active=Math.min(1,0.52+R/128*0.4);
     for(const batch of this.batches){
       let count=0;
       for(const a of batch.anchors){
@@ -157,7 +215,7 @@ export class CanyonScenery {
           // Physical home clearance survives a small planet: the foreground
           // resident lanes extend to 20 m and the widest slab adds another 5 m.
           const homeDistance = Math.acos(Math.max(-1, Math.min(1, dir.dot(home)))) * R;
-          presence *= smoothstep(32, 38, homeDistance);
+          presence *= smoothstep(Math.min(55,R*0.7), Math.min(64,R*0.85), homeDistance);
           if (presence === 0) continue;
         }
         terrain.sample(dir,this.ground);
@@ -181,7 +239,7 @@ export class CanyonScenery {
   }
 
   dispose():void{
-    for(const b of this.batches)b.mesh.geometry.dispose();
+    for(const b of this.batches){b.ink.dispose();b.mesh.geometry.dispose();}
     this.material.dispose();
     this.group.clear();
   }

@@ -45,7 +45,7 @@ void main() {
 
   // Ground from the bake at every pixel (AWAY_FROM_HOME:
   // a node the homestead shapes and shades none of, surface.ts, drawn without its code)
-  vec4 fields = textureLod(uTerrainBake, dir, 0.0);
+  vec4 fields = terrainFields(dir);
 #ifdef AWAY_FROM_HOME
   float h = fields.r;
 #else
@@ -74,6 +74,7 @@ void main() {
     float nearFade = uNearField.w > 0.01 ? (1.0 - smoothstep(uNearField.w * 0.55, uNearField.w, chordAngle(dir, uNearField.xyz) * uRadius)) * (1.0 - smoothstep(0.03, 0.07, pixelMeters)) * vFlowersBuilt : 0.0;
     Meadow m;
     m.dir = dir;
+    m.slope = vSlope;
     m.lush = fields.g;
     m.wet = fields.b;
     m.variant = fields.a;
