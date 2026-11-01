@@ -75,7 +75,7 @@ export class GardenUi {
   private readonly ticket: HTMLButtonElement;
   private readonly toastEl: HTMLElement;
   private toastTimer = 0;
-  private layout: GardenLayout = { beds: new Map(), patches: new Map() };
+  private layout: GardenLayout = { beds: new Map() };
   private laidFor: { radius: number; layout: Layout | null } = { radius: 0, layout: null };
   private relayoutAt = 0;
   /** The find whose card is up (or rising), and the one being flown to. */
@@ -390,7 +390,7 @@ export class GardenUi {
 
   // ---- Muse ---------------------------------------------------------------------------------
 
-  /** Where Muse is: on its terrace (where its day has it) when home; out, where the source says, or by the newest basket. */
+  /** Where Muse is: on its terrace (where its day has it) when home; out, where the source says, or by the newest find. */
   private musePlace(): { dir: Vector3; ground: number; home: boolean } {
     const w = this.world;
     const status = this.state.status;
@@ -399,9 +399,9 @@ export class GardenUi {
         const dir = new Vector3(...status.where).normalize();
         return { dir, ground: this.ground(dir), home: false };
       }
-      const newest = this.state.baskets[0];
-      const patch = newest && this.layout.patches.get(newest.id);
-      if (patch) return { dir: patch.dir.clone(), ground: this.ground(patch.dir), home: false };
+      const newest = this.state.baskets[0]?.finds[0];
+      const bed = newest ? this.layout.beds.get(newest) : undefined;
+      if (bed) return { dir: bed.dir.clone(), ground: bed.ground, home: false };
     }
     // at home: wherever its life has it about the hut (world.muse.where, kept current even while it isn't drawn)
     return { dir: w.muse.where.dir.clone(), ground: w.muse.where.height, home: true };
