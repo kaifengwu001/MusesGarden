@@ -34,6 +34,7 @@ uniform vec4 uLayoutInfo;    // how far in a cell is read near its edge (m), ban
 
 #define PLOT_TERRACE 0
 #define PLOT_FLAT 1
+const float CUT_REACH = 5.0; // a band's cuts are placed from its outer wall at most this far downhill (m)
 
 struct Plot {
   int kind;       // PLOT_TERRACE or PLOT_FLAT
@@ -59,6 +60,7 @@ struct Plot {
   float dCross;   // to the nearest (m)
   float crossTop; // its crest (m)
   float fl;       // across its band or row, 0 … 1
+  float edge;     // to its cell's edge (m)
 };
 
 float unitHash(uint h) {
@@ -232,7 +234,7 @@ void cellFrame(vec3 dir, vec4 lay, out vec3 tAlong, out vec3 tUp) {
 // The distance (m) to its cell's edge, from the baked one: interpolated between texels it never quite
 // falls to 0 on the edge (the bund along it would come and go), so less half a texel.
 float edgeDistance(float baked) {
-  return max(baked - uLayoutInfo.z, 0.0);
+  return max(baked - 0.7 * uLayoutInfo.z, 0.0);
 }
 
 // dir: where the plot is read; base, lay, life: the bakes there (lay and life from inside its cell);
@@ -245,6 +247,7 @@ Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life) {
   p.flatness = base.a;
   p.season = life.b;
   p.cell = cellKey(lay.r);
+  p.edge = edgeDistance(lay.a);
   float bh = uTerraceWall.z;
   p.dCross = 1e3;
   p.fl = 0.5;
@@ -281,7 +284,9 @@ Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life) {
     float c = 2.0 * p.fl - 1.0;
     float r = sqrt(max(1.0 - c * c, 0.0));
     float bow = 0.62 * gnoise(dir * (uRadius / 23.0), uTerrainSeed + uint(level + 4096) * 747796405u);
-    vec3 wallPoint = normalize(dir + (along * (bow * (1.0 - r) * p.band) - up * p.dOut) / uRadius);
+    // (no farther than a few meters downhill: in a hollow the slope's lines gather, and a wide band's far
+    // side would all fall on one stretch of its wall, its cuts fanning out wide)
+    vec3 wallPoint = normalize(dir + (along * (bow * (1.0 - r) * min(p.band, 2.0 * CUT_REACH)) - up * min(p.dOut, CUT_REACH)) / uRadius);
     // a gentle cell's wide bands are cut square-ish
     float spacing = mix(uTerraceLevels.z, uTerraceLevels.w, unitHash(plotHash(p.cell, 0, 0, 0, 43u)));
     float bandC = s / slopeC;

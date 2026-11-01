@@ -28,11 +28,13 @@ import { gradientFrame, type TerraceBase, type TerraceFields } from './fields';
  * `square` (m) cut square-ish; a riser's batter (m across per m of height), a
  * bund's width and height (m) and the share of it flat on top.
  */
-export const TERRACE = { band: 5.5, riser: [0.14, 1.4], spread: 0.22, jitter: 0.16, merge: 0.13, cuts: [22, 48], square: 9, batter: 0.24, bund: 0.3, bundHeight: 0.22, crest: 0.45 } as const;
+export const TERRACE = { band: 4.2, riser: [0.12, 1.3], spread: 0.22, jitter: 0.16, merge: 0.13, cuts: [22, 48], square: 9, batter: 0.24, bund: 0.3, bundHeight: 0.22, crest: 0.45 } as const;
 /** The flats' rows (m wide) and their plots (× the row long). */
 export const PLOTS = { width: [9, 16], length: [1, 2.3] } as const;
 /** A paddy's delay: its cell's season's share (the rest its own chance), and how far the season spreads. A share left fallow. */
 export const SEASON = { cell: 0.5, spread: 0.42, fallow: 0.05 } as const;
+/** A band's cuts are placed from its outer wall at most this far downhill (m). */
+export const CUT_REACH = 5;
 /** Near its cell's edge, a cell is read this far in (m) past the life bake's texel. */
 export const EDGE_READ = 0.8;
 
@@ -114,6 +116,18 @@ export class TerracePlots {
   riser(cellKey: number, slope: number): number {
     const s = clamp(slope * TERRACE.band, TERRACE.riser[0], TERRACE.riser[1]);
     return s * (1 + TERRACE.spread * (2 * unitHash(this.hash(cellKey, 0, 0, 0, 21)) - 1));
+  }
+
+  /** Wall k of a cell: its place across the levels (a level's index, a little off), and whether it is left out. */
+  wall(cellKey: number, k: number): { at: number; left: boolean } {
+    const flag = { v: false };
+    const at = this.wallAt(cellKey, k, flag);
+    return { at, left: flag.v };
+  }
+
+  /** A cell's level offset (its walls' heights: (at − offset) · riser). */
+  offset(cellKey: number): number {
+    return unitHash(this.hash(cellKey, 0, 0, 0, 22));
   }
 
   /** Wall k of a cell: its place across the levels, and whether it is left out (mirrors wallAt). */
@@ -303,8 +317,8 @@ export class TerracePlots {
       const R = this.fields.radius;
       wallPoint
         .copy(dir)
-        .addScaledVector(along, (bow * (1 - r) * out.band) / R)
-        .addScaledVector(up, -out.dOut / R)
+        .addScaledVector(along, (bow * (1 - r) * Math.min(out.band, 2 * CUT_REACH)) / R)
+        .addScaledVector(up, -Math.min(out.dOut, CUT_REACH) / R)
         .normalize();
       let spacing = TERRACE.cuts[0] + (TERRACE.cuts[1] - TERRACE.cuts[0]) * unitHash(this.hash(c.key, 0, 0, 0, 43));
       const bandC = s / slopeC;

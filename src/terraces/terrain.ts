@@ -147,6 +147,8 @@ export interface TerrainUniforms {
   uTerraceMesh: { value: Vector4 };
   /** -, the season's front, the cell's share of a paddy's delay. */
   uPaddy: { value: Vector4 };
+  /** The terraces as built: round this direction (xyz), out to this far (m; 0: none built); the ground sinks under them. */
+  uObjects: { value: Vector4 };
 }
 
 export function createTerrainUniforms(): TerrainUniforms {
@@ -162,5 +164,6 @@ export function createTerrainUniforms(): TerrainUniforms {
     uLayoutInfo: { value: new Vector4(1, TERRACE.square, 0, 0) },
     uTerraceMesh: { value: new Vector4(MESH.finest, MESH.perMeter, MESH.gather[0], MESH.gather[1]) },
     uPaddy: { value: new Vector4(0, 0.72, SEASON.cell, 0) },
+    uObjects: { value: new Vector4(0, 1, 0, 0) },
   };
 }

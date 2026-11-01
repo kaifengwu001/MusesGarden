@@ -31,6 +31,11 @@ import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
 import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
 import { findTerraceVista } from './vista';
+import { CubeReadback } from './bakeReader';
+import { createCellSample } from './cells';
+import { floorPieces, type FloorPiece } from './floors';
+import { TerraceObjects } from './objects';
+import { surveyCell, type CellSurvey } from './survey';
 
 const NOON = new Palette(TERRACE_ROWS);
 const NOON_SUN = NOON.get(ROW.LIGHT, 0);
@@ -45,7 +50,7 @@ const FIELD_PATHS: ReadonlySet<string> = new Set(['terraces.hills', 'terraces.fo
  * banks' top and its softness (m), the clearing it leaves round the camera
  * (m), and its two layers' drift (m/s).
  */
-const FOG = { density: 0.24, top: 4.6, soft: 1.5, clearing: 24, drift: [0.55, 1.1] } as const;
+const FOG = { density: 0.17, top: 2.8, soft: 1.1, clearing: 24, drift: [0.55, 1.1] } as const;
 /** Heights of the named views (m): a bird's-eye view over the terraces, and standing on one. */
 const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
 /**
@@ -92,6 +97,7 @@ export class TerraceWorld implements PlanetWorld {
   readonly houses: Houses;
   readonly trees: Trees;
   readonly rice: Rice;
+  readonly objects: TerraceObjects;
   readonly birds: TerraceBirds;
   /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
   villages: Village[] = [];
@@ -151,7 +157,8 @@ export class TerraceWorld implements PlanetWorld {
     this.trees = new Trees(this.shared);
     this.birds = new TerraceBirds(this.shared);
     this.rice = new Rice(this.shared, RICE_PAGES);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.rice.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
+    this.objects = new TerraceObjects(this.shared);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
     this.applyTier(tier);
   }
 
@@ -413,6 +420,11 @@ export class TerraceWorld implements PlanetWorld {
       },
       this.lod,
     );
+    // the terraces as built, round the focus, once the ground is baked in full (until then the paint)
+    if (this.fieldsFull) {
+      this.objects.update(this.terrain, this.bakesRead(), rig.up, `${this.fieldsR}/${this.fieldsKey}/${this.terrain.seasonFront.toFixed(3)}`);
+      this.terrainUniforms.uObjects.value.set(this.objects.centre.x, this.objects.centre.y, this.objects.centre.z, this.objects.reach);
+    } else this.terrainUniforms.uObjects.value.w = 0;
     // the rice near the focus, fewer as the camera rises, none from a bird's height
     const riceNear = RICE.near * smoothstep(60, 22, rig.altitude);
     this.nearFieldDrawn = riceNear > 0.5;
@@ -491,6 +503,50 @@ export class TerraceWorld implements PlanetWorld {
   /** A ripple on a paddy's water (rings come later; for now the wind's ring stirs it). */
   ripple(dir: Vector3, time: number): void {
     this.gust(dir, time);
+  }
+
+  private readback: { key: string; terrain: CubeReadback; layout: CubeReadback } | null = null;
+
+  /** The bakes read back to the CPU (the terraces' survey), once per full bake. */
+  private bakesRead(): { terrain: CubeReadback; layout: CubeReadback } {
+    const key = `${this.fieldsR}/${this.fieldsKey}/${this.fieldsFull}`;
+    if (this.readback?.key !== key) {
+      const t = this.bake.targets(this.fieldsFull);
+      if (!t.layout) throw new Error('the terraces bake has no layout');
+      this.readback = { key, terrain: CubeReadback.read(this.renderer, t.terrain), layout: CubeReadback.read(this.renderer, t.layout) };
+    }
+    return this.readback;
+  }
+
+  /** Dev: the terraces surveyed in the cells round a direction (within `reach` m). */
+  surveyNear(dir: Vector3, reach: number): CellSurvey[] {
+    this.prepare();
+    const rb = this.bakesRead();
+    const t = this.terrain;
+    const R = t.radius;
+    const size = R / t.cells.frequency;
+    const seen = new Set<string>();
+    const out: CellSurvey[] = [];
+    const a = new Vector3();
+    const b = new Vector3();
+    gradientFrame(dir, a, b);
+    const q = new Vector3();
+    for (let x = -reach; x <= reach; x += 8) {
+      for (let y = -reach; y <= reach; y += 8) {
+        q.copy(dir).multiplyScalar(R).addScaledVector(a, x).addScaledVector(b, y).normalize();
+        const c = t.cells.at(q, createCellSample());
+        const id = `${c.x},${c.y},${c.z}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront));
+      }
+    }
+    return out;
+  }
+
+  /** Dev: a surveyed cell's floor pieces. */
+  floors(s: CellSurvey, piece: (p: FloorPiece) => void, plain: (i: number, j: number, paddy: number) => void): void {
+    floorPieces(s, piece, plain);
   }
 
   settle(): void {

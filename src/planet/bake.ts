@@ -111,6 +111,12 @@ export class TerrainBake<U extends object = FieldUniforms> {
     return (full ? this.full : this.quick).flora.texture;
   }
 
+  /** The cubes themselves (to read back: the terraces' survey). */
+  targets(full: boolean): { terrain: WebGLCubeRenderTarget; flora: WebGLCubeRenderTarget; layout: WebGLCubeRenderTarget | null } {
+    const set = full ? this.full : this.quick;
+    return { terrain: set.terrain, flora: set.flora, layout: set.layout };
+  }
+
   /** The layout pass's cube (a program that asked for one). */
   layoutTexture(full: boolean): Texture | null {
     return (full ? this.full : this.quick).layout?.texture ?? null;

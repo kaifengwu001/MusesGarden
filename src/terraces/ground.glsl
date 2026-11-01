@@ -8,6 +8,18 @@
 // Requires: terraces_plots, terraces_paddy.
 
 uniform vec4 uTerraceMesh; // the finest grid (m), the grid's spacing per meter away (1 / it), the rows gathered by (spacing / band) start, all gone
+uniform vec4 uObjects;     // the terraces as built: round this direction, out to this far (m; 0: none)
+
+const float OBJECTS_SINK = 2.6; // the hills sink this far under the built terraces (terraceMesh.ts SINK)
+
+// How far the hills' own mesh is sunk at dir (m): under the terraced land (not wild, not a valley's flat floor)
+// where the terraces are built, all the way 1.5 m inside the land's edge.
+float objectsSink(vec3 dir, vec4 base) {
+  if (uObjects.w <= 0.0) return 0.0;
+  float land = min((0.5 - base.b) * 4.0, (0.5 - base.a) * 4.0);
+  float within = 1.0 - smoothstep(uObjects.w - 30.0, uObjects.w - 10.0, chordAngle(dir, uObjects.xyz) * uRadius);
+  return OBJECTS_SINK * smoothstep(0.0, 1.5, land) * within;
+}
 
 // A bund's rise d meters in from its outer edge (0 … 1): flat on top, rounding down to its foot at its width.
 float bundRise(float d) {
@@ -105,6 +117,11 @@ float meshSpacing(float dist) {
 // node, so the mesh stays watertight (the geomorph blends a vertex toward its neighbours' moved positions).
 // Returns the moved direction and the surface's height there.
 vec4 terraceVertex(vec3 dir, float dist) {
+  // where the terraces are built, the hills' own shape, sunk under them
+  if (uObjects.w > 0.0 && chordAngle(dir, uObjects.xyz) * uRadius < uObjects.w) {
+    vec4 base = textureLod(uTerraceBake, dir, 0.0);
+    return vec4(dir, base.r - objectsSink(dir, base));
+  }
   float spacing = meshSpacing(dist);
   Plot p = plotAt(dir);
   Crop c = cropOf(p);
@@ -112,7 +129,8 @@ vec4 terraceVertex(vec3 dir, float dist) {
   float g = plotGround(p);
   vec3 moved = dir;
   if (p.kind == PLOT_TERRACE && p.wild < 0.65) {
-    float gather = 1.0 - smoothstep(uTerraceMesh.z, uTerraceMesh.w, spacing / p.band);
+    // (not near its cell's edge, where the ground jumps to another cell's levels: the two sides would pull apart)
+    float gather = (1.0 - smoothstep(uTerraceMesh.z, uTerraceMesh.w, spacing / p.band)) * smoothstep(0.5 * spacing, 1.5 * spacing + 0.5, p.edge);
     if (gather > 0.0) {
       float slope;
       vec3 up = uphillAt(dir, p.natural, slope);
