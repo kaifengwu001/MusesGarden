@@ -1,10 +1,10 @@
-import { acrossOf, type CellSurvey } from './survey';
+import { acrossOf, lensSide, type CellSurvey } from './survey';
 
 // The paddies' floors of a surveyed cell (survey.ts), as pieces of the grid:
 // every square of the terraced land clipped exactly at the land's edge, at
-// the walls (a band's floor ends on its wall's contour) and along the cuts
-// crossing it (a paddy ends on its cut), so the paddies tile the land
-// without a gap or an overlap. Squares wholly inside one paddy, no cut
+// the walls (a band's floor ends on its wall's contour), at its lens's wall
+// and along the cuts crossing it (a paddy ends on its cut), so the paddies
+// tile the land without a gap or an overlap. Squares wholly inside one paddy, no cut
 // through them, are handed out whole (the mesh merges them).
 
 /** A floor piece: its paddy, its corners (x, y pairs in the chart), each corner's share across its band (0 the lower wall … 1 the upper). */
@@ -14,8 +14,8 @@ export interface FloorPiece {
   readonly across: number[];
 }
 
-/** Fields carried by a clipped vertex: x, y, hs, land, d (a cut's signed distance), side (into the cell). */
-const F = 6;
+/** Fields carried by a clipped vertex: x, y, hs, land, d (a cut's signed distance), side (into the cell), its side of the band's lens. */
+const F = 7;
 
 /** Sutherland–Hodgman: the part of a polygon (vertices of F fields each) where field `at` ≥ value (≤ when below). */
 function clip(poly: number[], at: number, value: number, below = false): number[] {
@@ -43,7 +43,7 @@ export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain
 
 /** The floor pieces of a surveyed cell, handed to `piece` one by one (a step every few rows); `plain` gets each square wholly inside one paddy. */
 export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, plain: (i: number, j: number, paddy: number) => void): Generator<void, void, void> {
-  const { n, g, half, hs, land, side, bands, levels, band, paddy, cuts, crossing } = s;
+  const { n, g, half, hs, land, side, bands, levels, band, paddy, cuts, crossing, sub, slope } = s;
   if (bands.length === 0) return;
   const bandOf = (H: number): number => {
     let a = 0;
@@ -55,8 +55,8 @@ export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, p
     }
     return a;
   };
-  /** A paddy of band b near grid point (i, j): the point's own, else the nearest within two squares. */
-  const paddyNear = (i: number, j: number, b: number, sideOk: (x: number, y: number) => boolean): number => {
+  /** A paddy of band b (in its lens or not) near grid point (i, j): the point's own, else the nearest within two squares. */
+  const paddyNear = (i: number, j: number, b: number, lens: number, sideOk: (x: number, y: number) => boolean): number => {
     for (let r = 0; r <= 2; r++) {
       for (let dj = -r; dj <= r + 1; dj++) {
         for (let di = -r; di <= r + 1; di++) {
@@ -64,7 +64,7 @@ export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, p
           const jj = j + dj;
           if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue;
           const k = jj * n + ii;
-          if (band[k] !== b || paddy[k] < 0) continue;
+          if (band[k] !== b || sub[k] !== lens || paddy[k] < 0) continue;
           if (!sideOk(-half + ii * g, -half + jj * g)) continue;
           return paddy[k];
         }
@@ -93,8 +93,8 @@ export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, p
         hmin = Math.min(hmin, hs[k]);
         hmax = Math.max(hmax, hs[k]);
       }
-      // the cuts through the square: a line each, through the cut's points in or by it
-      const lines: Array<[number, number, number, number]> = [];
+      // the cuts through the square: a line each, through the cut's points in or by it (each parts its own band only)
+      const lines: Array<[number, number, number, number, number]> = [];
       if (through) {
         const byCut = new Map<number, number[]>();
         for (let t = 0; t < through.length; t += 2) {
@@ -106,7 +106,7 @@ export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, p
           const p = cuts[ci].points;
           const a = Math.min(...segs);
           const b = Math.max(...segs) + 1;
-          lines.push([p[2 * a], p[2 * a + 1], p[2 * b], p[2 * b + 1]]);
+          lines.push([p[2 * a], p[2 * a + 1], p[2 * b], p[2 * b + 1], cuts[ci].band]);
         }
       }
       const ij = [
@@ -118,35 +118,50 @@ export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, p
       for (let b = bandOf(hmin); b <= bandOf(hmax); b++) {
         const B = bands[b];
         poly.length = 0;
-        ks.forEach((k, c) => poly.push(-half + ij[c][0] * g, -half + ij[c][1] * g, hs[k], land[k], 0, side[k]));
+        ks.forEach((k, c) => poly.push(-half + ij[c][0] * g, -half + ij[c][1] * g, hs[k], land[k], 0, side[k], lensSide(B, hs[k], slope[k])));
         let p = clip(poly, 3, 0);
         if (p.length >= 3 * F) p = clip(p, 5, -0.03);
         if (p.length >= 3 * F) p = clip(p, 2, B.lo);
         if (p.length >= 3 * F) p = clip(p, 2, B.hi, true);
         if (p.length < 3 * F) continue;
-        // split along the cuts: each part takes the paddy of the band's points on its side
-        let parts: Array<{ p: number[]; side: number[] }> = [{ p, side: [] }];
-        for (const [ax, ay, bx, by] of lines) {
+        // split at the lens's wall (each corner's side of it, as the survey traced it: carried linearly, so exactly)
+        let parts: Array<{ p: number[]; side: number[]; lens: number }> = [];
+        let lensy = false;
+        for (let v = 0; v < p.length; v += F) if (p[v + 6] < 0) lensy = true;
+        if (!lensy) parts.push({ p, side: [], lens: 0 });
+        else {
+          const above = clip(p, 6, 0);
+          const inLens = clip(p, 6, 0, true);
+          if (above.length >= 3 * F) parts.push({ p: above, side: [], lens: 0 });
+          if (inLens.length >= 3 * F) parts.push({ p: inLens, side: [], lens: 1 });
+        }
+        // split along the band's cuts: each part takes the paddy of the band's points on its side
+        const mine = lines.filter((l) => l[4] === b);
+        for (const [ax, ay, bx, by] of mine) {
           const len = Math.hypot(bx - ax, by - ay);
           if (len < 1e-6) continue;
-          const next: Array<{ p: number[]; side: number[] }> = [];
+          const next: Array<{ p: number[]; side: number[]; lens: number }> = [];
           for (const part of parts) {
             const q = part.p;
             for (let v = 0; v < q.length; v += F) q[v + 4] = ((bx - ax) * (q[v + 1] - ay) - (by - ay) * (q[v] - ax)) / len;
             const left = clip(q, 4, 0);
             const right = clip(q, 4, 0, true);
-            if (left.length >= 3 * F) next.push({ p: left, side: [...part.side, 1] });
-            if (right.length >= 3 * F) next.push({ p: right, side: [...part.side, -1] });
+            if (left.length >= 3 * F) next.push({ p: left, side: [...part.side, 1], lens: part.lens });
+            if (right.length >= 3 * F) next.push({ p: right, side: [...part.side, -1], lens: part.lens });
           }
           parts = next;
         }
         for (const part of parts) {
           const sideOk = (x: number, y: number): boolean =>
-            lines.every(([ax, ay, bx, by], li) => {
+            mine.every(([ax, ay, bx, by], li) => {
               const d = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
               return part.side[li] === undefined || Math.sign(d) === part.side[li] || Math.abs(d) < 1e-9;
             });
-          const pd = paddyNear(i, j, b, sideOk);
+          // (a sliver no point of its own lies by, where two cuts close in: the nearest paddy of its band, never a hole)
+          const any = (): boolean => true;
+          let pd = paddyNear(i, j, b, part.lens, sideOk);
+          if (pd < 0) pd = paddyNear(i, j, b, part.lens, any);
+          if (pd < 0) pd = paddyNear(i, j, b, 1 - part.lens, any);
           if (pd < 0) continue;
           const xy: number[] = [];
           const across: number[] = [];

@@ -2,8 +2,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { tangentToward } from '../planet/geo';
 import { unwarpPoint, type WarpFrame } from '../render/warp';
 import { gradientFrame } from './fields';
-import { PLOT_FLAT } from './plots';
-import { createTerraceSample, type TerraceTerrain } from './terrain';
+import { createBuiltSample, createTerraceSample, type TerraceTerrain } from './terrain';
 
 // The vista (the Vista button, the squint test): a stand and heading framed
 // like the green terraces painting (reference/terraces/vista-green.webp):
@@ -11,8 +10,9 @@ import { createTerraceSample, type TerraceTerrain } from './terrain';
 // pale bands, forest in dark masses, no sky. Searched as the meadow's is
 // (view/vista.ts): stands on terraced slopes, a few headings each, a coarse
 // grid of view rays marched through the warp to the ground, each hit sorted
-// into forest, open water or crop, the shares of each per row compared
-// with the painting's (measured once, below), the best few refined.
+// into forest, open water or crop as the terraces are built (their bands and
+// their paddies' crops: TerraceTerrain.builtAt), the shares of each per row
+// compared with the painting's (measured once, below), the best few refined.
 
 /** The painting squinted to 9 × 16: f forest (its dark masses), w open water (its pale fields), c crop. */
 const LAYOUT = ['ccccccccc', 'ccccccccc', 'ccccccccf', 'cccccccff', 'ffcccccww', 'ccccccwwc', 'cfffcccwc', 'cccccwcwc', 'fccwcwccc', 'cccwcwccc', 'ccccccwcc', 'fcccccwcw', 'fccccwwcw', 'fcccccccc', 'ccccccccc', 'ccccccccc'];
@@ -31,6 +31,7 @@ export interface TerraceVista {
 export type VistaFraming = (height: number) => { fov: number; k: number };
 
 const s = createTerraceSample();
+const built = createBuiltSample();
 const q = new Vector3();
 const p = new Vector3();
 const ray = new Vector3();
@@ -53,12 +54,12 @@ function classify(terrain: TerraceTerrain, origin: Vector3, dir: Vector3, warp: 
     const above = len - R;
     if (above < 0 || above < terrain.fields.natural(p.divideScalar(len))) {
       for (const v of avoid) if (p.distanceTo(v.dir) * R < v.radius + 12) return 'h';
-      terrain.terraceAt(p, s);
-      if (s.wild > 0.5) return 'f';
+      terrain.builtAt(p, built);
+      if (built.wild > 0.5) return 'f';
       // (the valleys' flat floors, their plots under the fog: the painting shows only the slopes)
-      if (s.kind === PLOT_FLAT) return 'v';
-      lastLevel = s.level;
-      return !s.crop.fallow && s.crop.maturity < 0.3 ? 'w' : 'c';
+      if (built.flat > 0.5) return 'v';
+      lastLevel = built.level;
+      return !built.crop.fallow && built.crop.maturity < 0.3 ? 'w' : 'c';
     }
     if (t > 700) break;
     t += Math.max(1.2, 0.045 * t, 0.5 * (above - terrain.maxHeight));

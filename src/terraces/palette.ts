@@ -21,7 +21,7 @@ export const TERRACE_ROWS: Rows = {
   // values of the vista's fields (vista-target.png: mid #90AAB2, light #C2CFD5, deep #698793):
   // seedling, fresh, deep, heading, ripe straw, pale tip, shade, sheen, far, jade, sage, lime, blue-green
   // (each paddy leans a little toward jade, lime or blue-green: the aerial photo's greens, muted to the ink's)
-  [TROW.RICE]: ['#A3C3B2', '#7AA497', '#5A8A84', '#B4C49B', '#CCC79E', '#D3DDD8', '#365F62', '#E3ECE8', '#8EA6AC', '#5F968A', '#8FA6A2', '#A6C196', '#4A7C80'],
+  [TROW.RICE]: ['#A3C3B2', '#88AE9F', '#6C978F', '#B4C49B', '#CCC79E', '#D3DDD8', '#365F62', '#E3ECE8', '#8EA6AC', '#5F968A', '#8FA6A2', '#A6C196', '#4A7C80'],
   // bund grass (a pale line), bund shade, riser face, riser shade, wet mud, dark mud, courtyard (paper), pale bund
   [TROW.EARTH]: ['#A4BDB2', '#5F807E', '#6D8F8A', '#3D5F66', '#7C8C88', '#55666A', '#D8D3C2', '#E0E7E3'],
   // pale sky in the mirror, high sky in it, body looking down, shallow, glint (paper white), a bank in the mirror,

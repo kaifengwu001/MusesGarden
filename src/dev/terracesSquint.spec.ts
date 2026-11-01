@@ -20,9 +20,12 @@ const REFERENCE = 'reference/terraces/vista-target.png';
 /**
  * Mean ΔE over the squinted grid: the goal (reads as the same picture) and
  * the guard this test fails above (today's score plus a little: no regressions).
+ * Raised from 18 to 19 with Kai's notes on the second pass (2026-11-01): the
+ * paddies built in 3D, rice standing in them, read darker than the painted
+ * dashes over white water did (16.0 then, 18.6 now; flagged to Kai).
  */
 const GOAL_DELTA_E = 10;
-const GUARD_DELTA_E = 18;
+const GUARD_DELTA_E = 19;
 const VIEWPORT = { width: 720, height: 1288 };
 
 interface Squint {

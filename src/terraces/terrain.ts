@@ -3,8 +3,9 @@ import { hash32, mix as hashMix } from '../core/hash';
 import { clamp } from '../core/math';
 import type { GroundSample } from '../planet/terrain';
 import { TerraceCells } from './cells';
-import { TerraceFields, type TerraceFieldParams } from './fields';
+import { TerraceFields, type TerraceBase, type TerraceFieldParams } from './fields';
 import { createCropSample, createPlotSample, PLOTS, SEASON, TERRACE, TerracePlots, type CropSample, type PlotSample } from './plots';
+import { CUTS } from './survey';
 
 // The terraced ground on the CPU: the camera's footing, picking, placement
 // and tests read it. Its twins on the GPU are plots.glsl, paddy.glsl and
@@ -52,6 +53,22 @@ export function createTerraceSample(): TerraceSample {
 
 const scratch = createTerraceSample();
 
+/** The built terraces at a point (TerraceTerrain.builtAt): the land's use there, the band's lower wall (a level of the planet's), its paddy's crop. */
+export interface BuiltSample {
+  wild: number;
+  flat: number;
+  level: number;
+  readonly crop: CropSample;
+}
+
+export function createBuiltSample(): BuiltSample {
+  return { wild: 0, flat: 0, level: 0, crop: createCropSample() };
+}
+
+const builtBase: TerraceBase = { natural: 0, slope: 0, wild: 0, flat: 0 };
+const builtWalls = { lo2: 0, lo: 0, hi: 0, hi2: 0 };
+const builtPlot = createPlotSample();
+
 export class TerraceTerrain {
   radius = R_REF;
   readonly fields: TerraceFields;
@@ -81,6 +98,25 @@ export class TerraceTerrain {
     out.ground = this.plots.ground(out);
     out.water = out.crop.water > 0 ? out.floorH + out.crop.water : -1e4;
     out.height = this.plots.surface(out, out.crop);
+    return out;
+  }
+
+  /**
+   * The built terraces at a direction as the survey lays them out (survey.ts), read without a survey: the
+   * planet's levels round the hills' own height, the band the ground stands in (by its lower wall's level), and
+   * the paddy of its stretch along that wall's cut field (read here: the wall's, near enough) with its crop. No
+   * lenses, cuts or bunds; the valleys' flats and the wild as the bake has them.
+   */
+  builtAt(dir: Vector3, out: BuiltSample): BuiltSample {
+    const b = this.fields.base(dir, builtBase);
+    out.wild = b.wild;
+    out.flat = b.flat;
+    const w = this.plots.walls(0, b.natural / TERRACE.step + this.plots.offset(0), builtWalls);
+    out.level = Math.round(w.lo);
+    const at = Math.floor(this.plots.cutField(dir, out.level) / CUTS.step);
+    builtPlot.id = this.plots.hash(0, out.level, at, 0, 47);
+    builtPlot.season = this.plots.seasonOf(out.level, at);
+    this.plots.cropOf(builtPlot, this.seasonFront, out.crop);
     return out;
   }
 
@@ -120,6 +156,7 @@ export class TerraceTerrain {
     u.uLayoutInfo.value.set(2 * texel, TERRACE.square, 0.5 * texel, 0);
     u.uTerraceMesh.value.set(MESH.finest, MESH.perMeter, MESH.gather[0], MESH.gather[1]);
     u.uPaddy.value.set(0, this.seasonFront, SEASON.cell, 0);
+    u.uLevels.value.set(TERRACE.step, this.plots.offset(0), 0, 0); // (the terraces' levels: survey.ts MODES)
   }
 }
 
@@ -149,6 +186,8 @@ export interface TerrainUniforms {
   uPaddy: { value: Vector4 };
   /** The terraces as built: round this direction (xyz), out to this far (m; 0: none built); the ground sinks under them. */
   uObjects: { value: Vector4 };
+  /** The planet's levels the terraces are built on (survey.ts): their step (m), their offset (a level's share). */
+  uLevels: { value: Vector4 };
 }
 
 export function createTerrainUniforms(): TerrainUniforms {
@@ -165,5 +204,6 @@ export function createTerrainUniforms(): TerrainUniforms {
     uTerraceMesh: { value: new Vector4(MESH.finest, MESH.perMeter, MESH.gather[0], MESH.gather[1]) },
     uPaddy: { value: new Vector4(0, 0.72, SEASON.cell, 0) },
     uObjects: { value: new Vector4(0, 1, 0, 0) },
+    uLevels: { value: new Vector4(TERRACE.step, 0, 0, 0) },
   };
 }

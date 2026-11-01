@@ -31,14 +31,6 @@ varying vec4 vPaddy;
 varying vec4 vFloor;
 varying float vHeight;
 
-// How much of a paddy's floor its crop hides from this view: plants h meters tall, looked at with
-// cosView between the view and straight down (more of the water between them shows from above).
-float cropCover(float h, float cosView) {
-  if (h <= 0.0) return 0.0;
-  float c0 = clamp(0.12 + 1.15 * h, 0.0, 0.97);
-  return 1.0 - pow(1.0 - c0, 1.0 / max(cosView, 0.18));
-}
-
 void main() {
   vec3 dir = normalize(vDir);
   vec3 n = normalize(vNormal);

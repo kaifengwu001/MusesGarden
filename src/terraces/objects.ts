@@ -16,8 +16,8 @@ import type { TerraceTerrain } from './terrain';
 // under them. Built again whenever the ground is baked anew (the planet's
 // size, a parameter), and as the camera moves on, the cells coming into reach.
 
-/** Cells are built out to this far from the focus (m), looked for every so far. */
-export const OBJECTS = { reach: 220, probe: 8 } as const;
+/** Cells are built out to this far from the focus (m), looked for every so far (m), and between, by their keys in the layout bake, every so far (m). */
+export const OBJECTS = { reach: 220, probe: 8, fine: 2 } as const;
 
 interface Pending {
   readonly id: string;
@@ -78,17 +78,29 @@ export class TerraceObjects {
     gradientFrame(focus, a, b);
     const q = new Vector3();
     const cell = createCellSample();
-    for (let x = -reach - size; x <= reach + size; x += OBJECTS.probe) {
-      for (let y = -reach - size; y <= reach + size; y += OBJECTS.probe) {
-        if (Math.hypot(x, y) > reach + size) continue;
-        q.copy(focus).multiplyScalar(R).addScaledVector(a, x).addScaledVector(b, y).normalize();
-        terrain.cells.at(q, cell);
-        for (const mode of ['terraces', 'flats'] as const) {
-          const id = `${mode}:${cell.x},${cell.y},${cell.z}`;
-          if (this.meshes.has(id) || this.pending.has(id)) continue;
-          const c: CellSample = { ...cell, centre: cell.centre.clone(), along: cell.along.clone(), up: cell.up.clone() };
-          this.pending.set(id, { id, centre: c.centre });
-          queue.add(`terraces:${id}`, Math.acos(Math.min(1, c.centre.dot(focus))) * R, this.job(id, c, R, size, bakes, terrain, mode, villages));
+    const keys = new Set<number>();
+    const add = (): void => {
+      terrain.cells.at(q, cell);
+      keys.add(cell.key);
+      for (const mode of ['terraces', 'flats'] as const) {
+        const id = `${mode}:${cell.x},${cell.y},${cell.z}`;
+        if (this.meshes.has(id) || this.pending.has(id)) continue;
+        const c: CellSample = { ...cell, centre: cell.centre.clone(), along: cell.along.clone(), up: cell.up.clone() };
+        this.pending.set(id, { id, centre: c.centre });
+        queue.add(`terraces:${id}`, Math.acos(Math.min(1, c.centre.dot(focus))) * R, this.job(id, c, R, size, bakes, terrain, mode, villages));
+      }
+    };
+    // the cells round a grid of probes, and any the layout's keys show between them (a small one can lie between probes)
+    for (const [step, fine] of [
+      [OBJECTS.probe, false],
+      [OBJECTS.fine, true],
+    ] as const) {
+      for (let x = -reach - size; x <= reach + size; x += step) {
+        for (let y = -reach - size; y <= reach + size; y += step) {
+          if (Math.hypot(x, y) > reach + size) continue;
+          q.copy(focus).multiplyScalar(R).addScaledVector(a, x).addScaledVector(b, y).normalize();
+          if (fine && keys.has(Math.floor(bakes.layout.nearest(q, 0) * 1024))) continue;
+          add();
         }
       }
     }
@@ -103,6 +115,7 @@ export class TerraceObjects {
     const geometry = yield* buildCellMeshJob(survey);
     const mesh = new Mesh(geometry ?? undefined, this.material);
     mesh.frustumCulled = false;
+    mesh.renderOrder = -10; // before the ground: early-z skips the shading of the ground sunk under them
     mesh.visible = geometry !== null;
     this.meshes.set(id, mesh);
     this.pending.delete(id);

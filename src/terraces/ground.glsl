@@ -64,24 +64,22 @@ float terraceHeight(vec3 dir) {
   return surfaceOf(p, cropOf(p));
 }
 
-// The ground, cheaper (the paddies' mirror, the trees' feet): the hills' levels and their walls, without
-// the cuts, the flats' plots or the water (a few centimeters it would add).
+// The ground, cheaper (the paddies' mirror, the trees' feet): the planet's levels the terraces are built on
+// (survey.ts: a step apart, the same everywhere), each band's floor halfway between its walls, a bund along
+// its outer edge, the riser up at its upper wall; without the cuts, the lenses, the flats' plots or the
+// water (a few centimeters each).
 float terraceHeightCoarse(vec3 dir) {
   vec4 base = textureLod(uTerraceBake, dir, 0.0);
   float wild = smoothstep(0.35, 0.65, base.b);
   if (base.a >= 0.5 || wild > 0.999) return base.r;
-  vec4 lay = textureLod(uTerraceLayout, dir, 0.0);
-  vec4 life = textureLod(uTerraceLife, dir, 0.0);
-  uint cell = cellKey(lay.r);
-  float slopeC = max(life.a, 0.004);
-  float s = cellRiser(cell, slopeC);
-  float phi = unitHash(plotHash(cell, 0, 0, 0, 22u));
+  float s = uLevels.x;
+  float phi = uLevels.y;
   float u = base.r / s + phi;
   float lo2;
   float lo;
   float hi;
   float hi2;
-  wallsRound(cell, u, lo2, lo, hi, hi2);
+  wallsRound(0u, u, lo2, lo, hi, hi2);
   float floorH = (0.5 * (lo + hi) - phi) * s;
   float top = (0.5 * (hi + hi2) - phi) * s + uTerraceWall.z;
   float perLevel = s / max(base.g, 0.004);

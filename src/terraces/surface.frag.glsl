@@ -59,14 +59,6 @@ vec3 faceColour(float f) {
   return vec3(0.4, 0.85, 0.85);
 }
 
-// How much of a paddy's floor its crop hides from this view: plants h meters tall, looked at with
-// cosView between the view and straight down (more of the water between them shows from above).
-float cropCover(float h, float cosView) {
-  if (h <= 0.0) return 0.0;
-  float c0 = clamp(0.12 + 1.15 * h, 0.0, 0.97);
-  return 1.0 - pow(1.0 - c0, 1.0 / max(cosView, 0.18));
-}
-
 void main() {
   vec3 dir = normalize(vDir);
   vec3 nMesh = normalize(vNormal);
@@ -75,7 +67,13 @@ void main() {
   vec3 v = toCam / viewDist;
   float pixelMeters = viewDist * uPixelAngle / max(dot(nMesh, v), 0.25);
 
-  Plot p = plotAt(dir);
+  // where the terraces are built (objects.ts) the ground under them is only seen at the land's edge: earth.
+  // Where it lies sunk all the way, out of sight under the floors, its plot is read only as far as its band
+  // (the paint's cuts and plots are for the land beyond them; not returned early: the derivatives below read
+  // the neighbouring pixels' values)
+  bool built = uObjects.w > 0.0 && chordAngle(dir, uObjects.xyz) * uRadius < uObjects.w && houseDistance(dir) > COURTYARD;
+  bool sunk = uDebug == 0 && objectsSink(dir, textureLod(uTerraceBake, dir, 0.0)) >= OBJECTS_SINK - 1e-3;
+  Plot p = plotAtFor(dir, sunk);
   Crop c = cropOf(p);
   float ground = plotGround(p);
   float water = plotWater(p, c);
@@ -140,8 +138,6 @@ void main() {
 
   vec3 col = vec3(0.0);
   vec3 tame = vec3(0.0);
-  // where the terraces are built (objects.ts) the ground under them is only seen at the land's edge: earth
-  bool built = uObjects.w > 0.0 && chordAngle(dir, uObjects.xyz) * uRadius < uObjects.w && houseDistance(dir) > COURTYARD;
   if (built && wild < 0.999) {
     tame = tone3(pal(TR_EARTH, 2), mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), 0.5), pal(TR_EARTH, 3), bMesh);
   } else if (wild < 0.999) {

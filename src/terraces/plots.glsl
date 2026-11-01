@@ -31,6 +31,7 @@ uniform vec4 uTerraceLevels; // each wall's jitter (a level's share), the share 
 uniform vec4 uTerraceWall;   // a riser's batter (m per m of height), a bund's width (m), its height (m), its flat top's share
 uniform vec4 uPlots;         // the flats' rows between (m) wide; their plots between (× the row) long
 uniform vec4 uLayoutInfo;    // how far in a cell is read near its edge (m), bands wider than this (m) cut square-ish, half the layout's texel (m)
+uniform vec4 uLevels;        // the planet's levels the built terraces stand on (survey.ts): their step (m), their offset (a level's share)
 
 #define PLOT_TERRACE 0
 #define PLOT_FLAT 1
@@ -239,7 +240,8 @@ float edgeDistance(float baked) {
 
 // dir: where the plot is read; base, lay, life: the bakes there (lay and life from inside its cell);
 // inside: a point well inside its cell (for the flats' frame).
-Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life) {
+// (bands: only as far as its band, its walls and floor; no cuts, no flats' plots)
+Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life, bool bands) {
   Plot p;
   p.natural = base.r;
   p.slope = max(base.g, 0.004);
@@ -277,6 +279,9 @@ Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life) {
     int level = int(floor(p.lo + 0.5));
     p.level = float(level);
     p.fl = clamp((p.u - p.lo) / (p.hi - p.lo), 0.0, 1.0);
+    p.id = 0u;
+    p.crossTop = p.floorH + bh;
+    if (bands) return p;
     // the point of its outer wall straight downhill, moved along the wall toward the band's edges
     float slope;
     vec3 up = uphillAt(dir, base.r, slope);
@@ -302,6 +307,13 @@ Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life) {
   } else {
     // a valley's flat floor: rows along the cell's way, cut into plots
     p.kind = PLOT_FLAT;
+    p.level = 0.0;
+    p.id = 0u;
+    p.floorH = base.r;
+    p.crossTop = p.floorH + bh;
+    p.below = p.floorH;
+    p.above = p.floorH;
+    if (bands) return p;
     float W = mix(uPlots.x, uPlots.y, unitHash(plotHash(p.cell, 0, 0, 0, 51u)));
     float phase = unitHash(plotHash(p.cell, 0, 0, 0, 52u));
     float v = lay.g;
@@ -351,7 +363,8 @@ Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life) {
   return p;
 }
 
-Plot plotAt(vec3 dir) {
+// The plot at a direction, or (bands) only as far as its band: plotFrom.
+Plot plotAtFor(vec3 dir, bool bands) {
   vec4 base = textureLod(uTerraceBake, dir, 0.0);
   vec4 lay = textureLod(uTerraceLayout, dir, 0.0);
   vec3 inside = dir;
@@ -368,5 +381,10 @@ Plot plotAt(vec3 dir) {
     inside = normalize(dir + inward * ((uLayoutInfo.x - lay.a + 0.8) / uRadius));
     lay = vec4(textureLod(uTerraceLayout, inside, 0.0).rgb, lay.a);
   }
-  return plotFrom(dir, inside, base, lay, textureLod(uTerraceLife, inside, 0.0));
+  return plotFrom(dir, inside, base, lay, textureLod(uTerraceLife, inside, 0.0), bands);
+}
+
+// The plot at a direction.
+Plot plotAt(vec3 dir) {
+  return plotAtFor(dir, false);
 }

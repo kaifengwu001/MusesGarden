@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { clamp } from '../core/math';
+import { clamp, smoothstep } from '../core/math';
 import type { CubeReadback } from './bakeReader';
 import type { CellSample } from './cells';
 import { createCropSample, createPlotSample, TERRACE, type CropSample, type TerracePlots } from './plots';
@@ -27,19 +27,38 @@ import { createCropSample, createPlotSample, TERRACE, type CropSample, type Terr
 // The meshes are built from this (floors.ts, terraceMesh.ts): each grid
 // square clipped exactly at the walls, the cuts and the land's edge.
 
-/** The planet's cuts: a cut wherever a wall's cut field (plots.ts cutField, a noise so many meters across) crosses a step. */
-export const CUTS = { step: 0.24 } as const;
+/** The planet's cuts: a cut wherever a wall's cut field (plots.ts cutField, a noise so many meters across) crosses a step; at most this long across its band (m), drawn at this spacing (m), heading at least this much up the slope (the cosine). */
+export const CUTS = { step: 0.24, reach: 30, spacing: 0.25, uphill: 0.6 } as const;
 
 /**
  * What a survey lays out: the terraces on the hills (their riser, their cuts' field this many meters
- * across, how far the cuts lean round), or the plots on the valleys' flat floors (strips along their gentle
+ * across, how far the cuts bow to one side, a share of their length), or the plots on the valleys' flat floors (strips along their gentle
  * contours a low riser apart, cut square-ish and nearly straight; the villages' courtyards left out).
  */
 export const MODES = {
-  terraces: { riser: TERRACE.step, offsetKey: 0, cutMeters: TERRACE.cutMeters, bow: [0.15, 0.6], levelKey: 0, merges: true },
+  terraces: { riser: TERRACE.step, offsetKey: 0, cutMeters: TERRACE.cutMeters, bow: [0.06, 0.26], levelKey: 0, merges: true },
   flats: { riser: 0.2, offsetKey: 1, cutMeters: 17, bow: [0.02, 0.1], levelKey: 100000, merges: false },
 } as const;
 export type SurveyMode = keyof typeof MODES;
+
+/**
+ * A wide band's lens (Kai: paddies all of a width, now and then a wider one): where a band is wider than `wide`
+ * (m, from none to full; its slope read smoothed over σ `smooth` m), a lower terrace grows inside it along its
+ * lower wall, up to `share` of the way across; where the band narrows again its wall meets the lower one at an
+ * angle (`lead`). Its floor stands `floor` of the way up the band.
+ */
+export const LENS = { smooth: 2, wide: [6.5, 10], share: 0.5, lead: 0.06, floor: 0.2 } as const;
+
+/** A lens's share across a band D meters tall where the hills' smoothed slope is `slope` (≤ 0: none there). */
+export function lensShare(D: number, slope: number): number {
+  return LENS.share * smoothstep(LENS.wide[0], LENS.wide[1], D / Math.max(slope, 1e-3)) - LENS.lead;
+}
+
+/** Where a point of height H lies against band B's lens: < 0 inside it (linear in H, so clipped exactly). */
+export function lensSide(B: Band, H: number, slope: number): number {
+  const D = B.hi - B.lo;
+  return (H - B.lo) / D - lensShare(D, slope);
+}
 
 export const SURVEY = {
   /** The grid the hills are read on (m), and how far the reading is smoothed (σ, m). */
@@ -47,6 +66,13 @@ export const SURVEY = {
   smooth: 1.1,
   /** Wild and flat (0..1) count this many meters per unit in the land's signed distance. */
   softness: 4,
+  /** The cell's extent is found on a grid this coarse (m), out to this many cell sizes from its site. */
+  scan: 4,
+  reach: 1.7,
+  /** Read this far round the cell (m): the smoothings' reach (3σ each, the hills' and the lenses' slope), so its own part reads as its neighbours read it. */
+  frame: 10,
+  /** A step of the survey's work takes about this many grid points (its job yields between). */
+  slice: 25000,
 } as const;
 
 /** A wall: a contour of the smoothed hills at a level, uphill on its left (x, y pairs in the chart, m). */
@@ -75,15 +101,21 @@ export interface Paddy {
   readonly id: number;
   readonly band: number;
   readonly crop: CropSample;
-  /** Its own floor (m): a flats' plot, level with the ground under its middle (a terraced paddy's is its band's). */
+  /** Its own floor (m): a lens's, or a flats' plot, level with the ground under its middle (a terraced paddy's is its band's). */
   readonly floorH?: number;
 }
 
-/** A cut across a band: its points (x, y pairs in the chart, m) from one wall toward the other; open where it does not part two paddies (no ridge then). */
+/** A lens's wall: a contour across its band (x, y pairs in the chart, m), uphill on its left, from the band's lower wall back to it (or round). */
+export interface LensWall {
+  readonly band: number;
+  readonly points: Float64Array;
+  readonly closed: boolean;
+}
+
+/** A cut across a band: its points (x, y pairs in the chart, m) from one wall to the other (or to the land's edge). */
 export interface Cut {
   readonly band: number;
   readonly points: Float64Array;
-  open?: boolean;
 }
 
 export interface CellSurvey {
@@ -111,6 +143,10 @@ export interface CellSurvey {
   readonly band: Int32Array;
   readonly paddy: Int32Array;
   readonly paddies: Paddy[];
+  /** Per grid point: in its band's lens (1) or not; the hills' slope smoothed (the lenses grow where it is gentle). Its lenses' walls. */
+  readonly sub: Uint8Array;
+  readonly slope: Float32Array;
+  readonly lensWalls: LensWall[];
   readonly cuts: Cut[];
   /** The cuts' segments through each grid square (square index → [cut, segment] pairs). */
   readonly crossing: Map<number, number[]>;
@@ -123,29 +159,26 @@ export function chartDir(t: { centre: Vector3; e1: Vector3; e2: Vector3 }, R: nu
   return out.copy(t.centre).multiplyScalar(R).addScaledVector(t.e1, x).addScaledVector(t.e2, y).normalize();
 }
 
-function gaussian(src: Float32Array, n: number, sigma: number): Float32Array {
-  const r = Math.ceil(3 * sigma);
-  const w = new Float32Array(2 * r + 1);
-  let sum = 0;
-  for (let k = -r; k <= r; k++) sum += w[k + r] = Math.exp(-(k * k) / (2 * sigma * sigma));
-  for (let k = 0; k < w.length; k++) w[k] /= sum;
-  const tmp = new Float32Array(n * n);
-  const out = new Float32Array(n * n);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      let a = 0;
-      for (let k = -r; k <= r; k++) a += w[k + r] * src[j * n + clamp(i + k, 0, n - 1)];
-      tmp[j * n + i] = a;
+/** A field blurred as a Gaussian of σ grid squares would blur it, near enough (three box passes each way, their widths odd): as fast for a wide σ as a narrow one. */
+function boxBlur(src: Float32Array, n: number, sigma: number): Float32Array {
+  const r = Math.max(1, Math.round(0.5 * (Math.sqrt(4 * sigma * sigma + 1) - 1)));
+  const w = 2 * r + 1;
+  let a = Float32Array.from(src);
+  let b = new Float32Array(n * n);
+  for (let pass = 0; pass < 6; pass++) {
+    // along rows on the even passes, down columns on the odd: (i, j) → index
+    const at = pass % 2 === 0 ? (line: number, x: number): number => line * n + x : (line: number, x: number): number => x * n + line;
+    for (let line = 0; line < n; line++) {
+      let sum = 0;
+      for (let x = -r - 1; x < r; x++) sum += a[at(line, clamp(x, 0, n - 1))];
+      for (let x = 0; x < n; x++) {
+        sum += a[at(line, Math.min(x + r, n - 1))] - a[at(line, Math.max(x - r - 1, 0))];
+        b[at(line, x)] = sum / w;
+      }
     }
+    [a, b] = [b, a];
   }
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      let a = 0;
-      for (let k = -r; k <= r; k++) a += w[k + r] * tmp[clamp(j + k, 0, n - 1) * n + i];
-      out[j * n + i] = a;
-    }
-  }
-  return out;
+  return a;
 }
 
 /**
@@ -153,7 +186,15 @@ function gaussian(src: Float32Array, n: number, sigma: number): Float32Array {
  * (marching squares), chained into polylines with the higher side on their
  * left. inside(k): whether grid point k counts.
  */
-export function contour(field: Float32Array, n: number, g: number, half: number, H: number, inside: (k: number) => boolean): Array<{ points: number[]; closed: boolean }> {
+export function contour(
+  field: Float32Array,
+  n: number,
+  g: number,
+  half: number,
+  H: number,
+  inside: (k: number) => boolean,
+  box: readonly [number, number, number, number] = [0, 0, n - 1, n - 1],
+): Array<{ points: number[]; closed: boolean }> {
   const v = (k: number): number => field[k] - H;
   const cross = (e: number): [number, number] => {
     const k = e >> 1;
@@ -169,8 +210,8 @@ export function contour(field: Float32Array, n: number, g: number, half: number,
   };
   const next = new Map<number, number>();
   const into = new Set<number>();
-  for (let j = 0; j < n - 1; j++) {
-    for (let i = 0; i < n - 1; i++) {
+  for (let j = box[1]; j < box[3]; j++) {
+    for (let i = box[0]; i < box[2]; i++) {
       const k = j * n + i;
       if (!(inside(k) && inside(k + 1) && inside(k + n) && inside(k + n + 1))) continue;
       const a = v(k);
@@ -340,12 +381,27 @@ export function* surveyCellJob(
   yard: (dir: Vector3) => number = () => 1e9,
 ): Generator<void, CellSurvey, void> {
   const M = MODES[mode];
-  const centre = cell.centre.clone();
-  const e1 = cell.along.clone();
+  // the chart round the cell itself (its site can lie off to one side of it: the cells are a warped Voronoi of
+  // points in space), wide enough to take all of it and the frame
+  const site = { centre: cell.centre, e1: cell.along, e2: new Vector3().crossVectors(cell.centre, cell.along).normalize() };
+  const box = [Infinity, Infinity, -Infinity, -Infinity];
+  const reach = SURVEY.reach * cellSize;
+  for (let y = -reach; y <= reach; y += SURVEY.scan) {
+    for (let x = -reach; x <= reach; x += SURVEY.scan) {
+      if (Math.floor(layout.nearest(chartDir(site, R, x, y, dir), 0) * 1024) !== cell.key) continue;
+      box[0] = Math.min(box[0], x);
+      box[1] = Math.min(box[1], y);
+      box[2] = Math.max(box[2], x);
+      box[3] = Math.max(box[3], y);
+    }
+  }
+  if (!(box[2] >= box[0])) box.fill(0);
+  const centre = chartDir(site, R, 0.5 * (box[0] + box[2]), 0.5 * (box[1] + box[3]), new Vector3());
+  const e1 = cell.along.clone().addScaledVector(centre, -cell.along.dot(centre)).normalize();
   const e2 = new Vector3().crossVectors(centre, e1).normalize();
   const chart = { centre, e1, e2 };
   const g = SURVEY.spacing;
-  const half = Math.ceil((0.85 * cellSize + 4) / g) * g;
+  const half = Math.ceil((0.5 * Math.max(box[2] - box[0], box[3] - box[1]) + SURVEY.scan + SURVEY.frame) / g) * g;
   const n = Math.round((2 * half) / g) + 1;
   const N = n * n;
   const h = new Float32Array(N);
@@ -366,12 +422,12 @@ export function* surveyCellJob(
       // the hills' terraces, or the valleys' plots (but a village's courtyards)
       land[k] = mode === 'terraces' ? Math.min(wild, -flat) : Math.min(wild, flat, yard(dir) - 2.4);
     }
-    if (j % 48 === 47) yield;
+    if (j % 16 === 15) yield;
   }
-  const hs = gaussian(h, n, SURVEY.smooth / g);
+  const hs = boxBlur(h, n, SURVEY.smooth / g);
   yield;
   const inLand = (k: number): boolean => land[k] >= 0;
-  if (mode === 'flats') return flatsLayout(cell, chart, R, n, g, half, h, hs, land, side, plots, front);
+  if (mode === 'flats') return yield* flatsLayout(cell, chart, R, n, g, half, h, hs, land, side, plots, front);
 
   // the planet's levels (the same everywhere, so the walls run on from cell to cell): their heights, those
   // left out skipped (a band two levels wide, its walls half again as tall)
@@ -404,6 +460,9 @@ export function* surveyCellJob(
     band: new Int32Array(0),
     paddy: new Int32Array(0),
     paddies: [],
+    sub: new Uint8Array(N),
+    slope: new Float32Array(N),
+    lensWalls: [],
     cuts: [],
     crossing: new Map(),
   };
@@ -452,9 +511,10 @@ export function* surveyCellJob(
         closed: line.closed,
       });
     }
-    if (w % 4 === 3) yield;
+    if (w % 2 === 1) yield;
   }
 
+  yield;
   const band = new Int32Array(N).fill(-1);
   for (let k = 0; k < N; k++) if (inLand(k)) band[k] = bandOf(hs[k]);
   const wallsBy = new Map<number, number[]>();
@@ -464,16 +524,80 @@ export function* surveyCellJob(
     wallsBy.set(w.index, list);
   });
 
-  // the cuts: along each band's lower wall (its upper one where it has none here), wherever the planet's cut
-  // field for that wall crosses a step (the same wherever the wall is traced: the paddies run on from cell to
-  // cell), each traced up the slope across the band, leaning round toward both ends. Each stretch between
-  // two cuts is a paddy: its id from its wall's level and its step
-  const cuts: Cut[] = [];
-  const grad = { x: 0, y: 0 };
-  const G = { n, g, half, hs };
+  // the lenses: where a band gets wide (the hills gentle), a lower terrace inside it along its lower wall; its
+  // wall a contour of the share across the band less the lens's share there (read the same in every cell: it
+  // runs on), meeting the lower wall where the band narrows again
+  const slope = new Float32Array(N);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const k = j * n + i;
+      const i0 = Math.max(i - 1, 0);
+      const i1 = Math.min(i + 1, n - 1);
+      const j0 = Math.max(j - 1, 0);
+      const j1 = Math.min(j + 1, n - 1);
+      slope[k] = Math.hypot((hs[j * n + i1] - hs[j * n + i0]) / ((i1 - i0) * g), (hs[j1 * n + i] - hs[j0 * n + i]) / ((j1 - j0) * g));
+    }
+  }
+  yield;
+  const gentle = boxBlur(slope, n, LENS.smooth / g);
+  yield;
+  const sub = new Uint8Array(N);
+  const lensBands = new Set<number>();
+  for (let k = 0; k < N; k++) {
+    if (band[k] < 0) continue;
+    if (lensSide(bands[band[k]], hs[k], gentle[k]) < 0) {
+      sub[k] = 1;
+      lensBands.add(band[k]);
+    }
+  }
+  // (each band's lens traced on the grid round the band alone)
+  const boxes = new Map<number, [number, number, number, number]>();
+  for (let k = 0; k < N; k++) {
+    if (!lensBands.has(band[k])) continue;
+    const i = k % n;
+    const j = (k - i) / n;
+    const box = boxes.get(band[k]) ?? [i, j, i, j];
+    box[0] = Math.min(box[0], i);
+    box[1] = Math.min(box[1], j);
+    box[2] = Math.max(box[2], i);
+    box[3] = Math.max(box[3], j);
+    boxes.set(band[k], box);
+  }
+  yield;
+  const lensWalls: LensWall[] = [];
+  const E = new Float32Array(N);
+  const G = { n, g, half, hs, land };
+  let done = 0;
+  for (const [b, box] of boxes) {
+    const B = bands[b];
+    const i0 = Math.max(box[0] - 2, 0);
+    const j0 = Math.max(box[1] - 2, 0);
+    const i1 = Math.min(box[2] + 2, n - 1);
+    const j1 = Math.min(box[3] + 2, n - 1);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) E[j * n + i] = lensSide(B, hs[j * n + i], gentle[j * n + i]);
+    for (const line of contour(E, n, g, half, 0, inLand, [i0, j0, i1, j1])) {
+      for (const part of withinBand(G, B, line.points, line.closed)) {
+        const rs = resample(part.points, part.closed, 0.5);
+        lensWalls.push({ band: b, points: rs.p, closed: part.closed });
+      }
+    }
+    done += (i1 - i0 + 1) * (j1 - j0 + 1);
+    if (done > SURVEY.slice) {
+      done = 0;
+      yield;
+    }
+  }
+
+  // the cuts: along each band's lower wall, wherever the planet's cut field for that wall crosses a step (the
+  // same wherever the wall is traced: the paddies run on from cell to cell), each a gentle arc across the band
+  // the shortest way, to the nearest point of its upper wall (up the slope where it has none in reach); a cut
+  // that meets another of its band ends on it. Each stretch between two cuts is a paddy: its id from its
+  // wall's level and its step
+  const traced: Array<{ band: number; points: Float64Array; rank: [number, number, number] }> = [];
   const stretches: Array<{ wall: number; step: Int32Array }> = [];
   const pd = new Vector3();
   for (const [wi, w] of walls.entries()) {
+    if (wi % 16 === 15) yield;
     const B = bands[w.index];
     const m = w.s.length;
     const step = new Int32Array(m);
@@ -482,53 +606,17 @@ export function* surveyCellJob(
     if (!B) continue;
     for (let c = 0; c + 1 < m; c++) {
       if (step[c] === step[c + 1]) continue;
-      let x = 0.5 * (w.points[2 * c] + w.points[2 * c + 2]);
-      let y = 0.5 * (w.points[2 * c + 1] + w.points[2 * c + 3]);
-      const pts: number[] = [x, y];
-      for (let d = 0; d < 40; d += 0.25) {
-        gradAt(G, x, y, grad);
-        const len = Math.hypot(grad.x, grad.y);
-        if (len < 1e-4) break;
-        const nx = x + (grad.x * 0.25) / len;
-        const ny = y + (grad.y * 0.25) / len;
-        if (landAt(n, g, half, land, nx, ny) < 0) break;
-        pts.push(nx, ny);
-        x = nx;
-        y = ny;
-        if (heightAt(G, nx, ny) >= B.hi) break;
-      }
-      if (pts.length < 4) continue;
-      // its lean: along the band (across the slope), most at its ends
-      const hb = plots.hash(0, w.level, Math.max(step[c], step[c + 1]), 0, 42);
-      const bandW = Math.max((B.hi - B.lo) / Math.max(Math.hypot(grad.x, grad.y), 0.02), 1);
-      const bow = (M.bow[0] + (M.bow[1] - M.bow[0]) * unit(hb)) * ((hb & 256) === 0 ? 1 : -1) * Math.min(bandW, 8);
-      const k2 = pts.length / 2;
-      const bent = new Float64Array(pts.length);
-      for (let k = 0; k < k2; k++) {
-        const px = pts[2 * k];
-        const py = pts[2 * k + 1];
-        gradAt(G, px, py, grad);
-        const len = Math.max(Math.hypot(grad.x, grad.y), 1e-6);
-        const tx = -grad.y / len;
-        const ty = grad.x / len;
-        const shift = bow * leanOf(acrossOf(B, heightAt(G, px, py)));
-        bent[2 * k] = px + tx * shift;
-        bent[2 * k + 1] = py + ty * shift;
-      }
-      // (only where it lies in its band: leaning round, its ends must not climb a wall)
-      const kept: number[] = [];
-      for (let k = 0; k < k2; k++) {
-        const H = heightAt(G, bent[2 * k], bent[2 * k + 1]);
-        if (H < B.lo - 0.02 || H > B.hi + 0.02) {
-          if (kept.length >= 4) break;
-          kept.length = 0;
-          continue;
-        }
-        kept.push(bent[2 * k], bent[2 * k + 1]);
-      }
-      if (kept.length >= 4) cuts.push({ band: B.index, points: Float64Array.from(kept) });
+      const x0 = 0.5 * (w.points[2 * c] + w.points[2 * c + 2]);
+      const y0 = 0.5 * (w.points[2 * c + 1] + w.points[2 * c + 3]);
+      const at = Math.max(step[c], step[c + 1]);
+      const hb = plots.hash(0, w.level, at, 0, 42);
+      const points = cutAcross(G, B, x0, y0, (wallsBy.get(w.index + 1) ?? []).map((u) => walls[u].points), hb, M.bow) ?? cutUphill(G, B, x0, y0);
+      chartDir(chart, R, x0, y0, pd);
+      if (points) traced.push({ band: B.index, points, rank: [w.level, at, pd.x + 3 * pd.y] });
     }
   }
+  yield;
+  const cuts = endOnEachOther(traced);
 
   yield;
   // the cuts as fences on the grid: each grid edge they cross is closed; and each square's segments
@@ -584,13 +672,13 @@ export function* surveyCellJob(
   const paddies: Paddy[] = [];
   const byKey = new Map<string, number>();
   const plot = createPlotSample();
-  const paddyOf = (key: string, id: number, b: number, season: number): number => {
+  const paddyOf = (key: string, id: number, b: number, season: number, floorH?: number): number => {
     const known = byKey.get(key);
     if (known !== undefined) return known;
     plot.id = id;
     plot.season = season;
     const index = paddies.length;
-    paddies.push({ id, band: b, crop: plots.cropOf(plot, front, createCropSample()) });
+    paddies.push({ id, band: b, crop: plots.cropOf(plot, front, createCropSample()), floorH });
     byKey.set(key, index);
     return index;
   };
@@ -613,12 +701,37 @@ export function* surveyCellJob(
       }
     }
   }
+  // (and the part of a band above its lens, by the stretches along the lens's wall: the same field as its lower wall's)
+  for (const lw of lensWalls) {
+    const level = levelIndex[lw.band];
+    for (let c = 0; c < lw.points.length / 2; c++) {
+      const st = Math.floor(plots.cutField(chartDir(chart, R, lw.points[2 * c], lw.points[2 * c + 1], pd), level) / CUTS.step);
+      const fi = Math.floor((lw.points[2 * c] + half) / g);
+      const fj = Math.floor((lw.points[2 * c + 1] + half) / g);
+      for (let dj = 0; dj <= 1; dj++) {
+        for (let di = 0; di <= 1; di++) {
+          const i = fi + di;
+          const j = fj + dj;
+          if (i < 0 || j < 0 || i >= n || j >= n) continue;
+          const k = j * n + i;
+          if (band[k] === lw.band && sub[k] === 0 && !stretchAt.has(k)) stretchAt.set(k, [level, st]);
+        }
+      }
+    }
+  }
+  yield;
   const part = new Int32Array(N).fill(-1);
   const queue: number[] = [];
   const members: number[] = [];
+  let filled = 0;
   for (let k0 = 0; k0 < N; k0++) {
     if (band[k0] < 0 || part[k0] >= 0) continue;
+    if (filled > SURVEY.slice) {
+      filled = 0;
+      yield;
+    }
     const b = band[k0];
+    const sb = sub[k0];
     part[k0] = k0;
     queue.length = 0;
     members.length = 0;
@@ -634,19 +747,19 @@ export function* surveyCellJob(
       }
       const i = k % n;
       const j = (k - i) / n;
-      if (i + 1 < n && !closedEdge[2 * k] && band[k + 1] === b && part[k + 1] < 0) {
+      if (i + 1 < n && !closedEdge[2 * k] && band[k + 1] === b && sub[k + 1] === sb && part[k + 1] < 0) {
         part[k + 1] = k0;
         queue.push(k + 1);
       }
-      if (i > 0 && !closedEdge[2 * (k - 1)] && band[k - 1] === b && part[k - 1] < 0) {
+      if (i > 0 && !closedEdge[2 * (k - 1)] && band[k - 1] === b && sub[k - 1] === sb && part[k - 1] < 0) {
         part[k - 1] = k0;
         queue.push(k - 1);
       }
-      if (j + 1 < n && !closedEdge[2 * k + 1] && band[k + n] === b && part[k + n] < 0) {
+      if (j + 1 < n && !closedEdge[2 * k + 1] && band[k + n] === b && sub[k + n] === sb && part[k + n] < 0) {
         part[k + n] = k0;
         queue.push(k + n);
       }
-      if (j > 0 && !closedEdge[2 * (k - n) + 1] && band[k - n] === b && part[k - n] < 0) {
+      if (j > 0 && !closedEdge[2 * (k - n) + 1] && band[k - n] === b && sub[k - n] === sb && part[k - n] < 0) {
         part[k - n] = k0;
         queue.push(k - n);
       }
@@ -663,32 +776,19 @@ export function* surveyCellJob(
     let idx: number;
     if (best) {
       const [level, step] = best.split('/').map(Number);
-      idx = paddyOf(best, plots.hash(0, level, step, 0, 47), b, plots.seasonOf(level, step));
+      // (a lens its own paddy, lower, its season a little its own)
+      const lens = sb === 1 ? bands[b].lo + LENS.floor * (bands[b].hi - bands[b].lo) : undefined;
+      idx = paddyOf(`${best}/${sb}`, plots.hash(0, level, step, sb, 47), b, plots.seasonOf(level + 0.5 * sb, step), lens);
     } else {
       const i0 = k0 % n;
       const j0 = (k0 - i0) / n;
       const q = chartDir(chart, R, -half + i0 * g, -half + j0 * g, pd);
       const id = plots.hash(0, levelIndex[b], Math.round((q.x * R) / 6), Math.round((q.y * R) / 6) * 7919 + Math.round((q.z * R) / 6), 48);
-      idx = paddyOf(`loose/${id}`, id, b, plots.seasonAt(q));
+      const lens = sb === 1 ? bands[b].lo + LENS.floor * (bands[b].hi - bands[b].lo) : undefined;
+      idx = paddyOf(`loose/${id}/${sb}`, plots.hash(0, id, sb, 0, 49), b, plots.seasonAt(q), lens);
     }
     for (const k of members) paddy[k] = idx;
-  }
-  // a cut that does not part two paddies (it stopped short of the far wall) is open: no ridge along it
-  for (const cut of cuts) {
-    const p = cut.points;
-    const m = p.length / 2;
-    const c = Math.floor(m / 2);
-    const tx = p[2 * Math.min(c + 1, m - 1)] - p[2 * Math.max(c - 1, 0)];
-    const ty = p[2 * Math.min(c + 1, m - 1) + 1] - p[2 * Math.max(c - 1, 0) + 1];
-    const tl = Math.hypot(tx, ty) || 1;
-    const at = (o: number): number => {
-      const i = Math.round((p[2 * c] - (ty / tl) * o + half) / g);
-      const j = Math.round((p[2 * c + 1] + (tx / tl) * o + half) / g);
-      return i < 0 || j < 0 || i >= n || j >= n ? -1 : paddy[j * n + i];
-    };
-    const a = at(0.6);
-    const b = at(-0.6);
-    cut.open = a >= 0 && a === b;
+    filled += members.length;
   }
   return {
     ...survey,
@@ -698,6 +798,9 @@ export function* surveyCellJob(
     band,
     paddy,
     paddies,
+    sub,
+    slope: gentle,
+    lensWalls,
     cuts,
     crossing,
   };
@@ -713,7 +816,7 @@ export const FLATS = { width: [9, 16], length: [1, 2.3], bow: [0.3, 2.2] } as co
  * 1–2.3 rows long, a little askew; each plot level with the ground under its middle (to 5 cm). Each cell's
  * block of plots is its own (the painting's blocks, each its own way); its edges are its roads.
  */
-function flatsLayout(
+function* flatsLayout(
   cell: CellSample,
   chart: { centre: Vector3; e1: Vector3; e2: Vector3 },
   R: number,
@@ -726,7 +829,7 @@ function flatsLayout(
   side: Float32Array,
   plots: TerracePlots,
   front: number,
-): CellSurvey {
+): Generator<void, CellSurvey, void> {
   const N = n * n;
   const key = cell.key;
   const W = FLATS.width[0] + (FLATS.width[1] - FLATS.width[0]) * unit(plots.hash(key, 0, 0, 0, 51));
@@ -776,6 +879,7 @@ function flatsLayout(
   };
   const rows = new Set<number>();
   for (let k = 0; k < N; k++) {
+    if (k % (48 * n) === 48 * n - 1) yield;
     if (land[k] < 0) continue;
     const i = k % n;
     const x = -half + i * g;
@@ -817,6 +921,7 @@ function flatsLayout(
       cuts.push({ band: 0, points: Float64Array.from(across) });
     }
   }
+  yield;
   const { closedEdge, crossing } = fences(cuts, n, g, half);
   void closedEdge;
   const levels = Float64Array.from([-1e9, 1e9]);
@@ -840,6 +945,9 @@ function flatsLayout(
     band,
     paddy,
     paddies,
+    sub: new Uint8Array(N),
+    slope: new Float32Array(N),
+    lensWalls: [],
     cuts,
     crossing,
   };
@@ -941,8 +1049,162 @@ export function acrossOf(B: Band, H: number): number {
   return clamp((H - B.lo) / Math.max(B.hi - B.lo, 1e-6), 0, 1);
 }
 
-/** How far a cut leans along the band at a share across it: none in the middle, its full turn at the walls (a gentle C). */
-export function leanOf(f: number): number {
-  const c = 2 * f - 1;
-  return c * c;
+type Grid = { n: number; g: number; half: number; hs: Float32Array; land: Float32Array };
+
+const inBand = (G: Grid, B: Band, x: number, y: number): boolean => {
+  const H = heightAt(G, x, y);
+  return H >= B.lo - 0.03 && H <= B.hi + 0.03 && landAt(G.n, G.g, G.half, G.land, x, y) >= 0;
+};
+
+/** The parts of a polyline within band B (its smoothed height between the band's walls), cut exactly where it crosses out. */
+function withinBand(G: Grid, B: Band, points: number[], closed: boolean): Array<{ points: number[]; closed: boolean }> {
+  const inside = (x: number, y: number): number => {
+    const H = heightAt(G, x, y);
+    return Math.min(H - B.lo, B.hi - H);
+  };
+  const m = points.length / 2;
+  const count = closed ? m + 1 : m;
+  const parts: Array<{ points: number[]; closed: boolean }> = [];
+  let run: number[] = [];
+  let prev = 0;
+  for (let c = 0; c < count; c++) {
+    const k = c % m;
+    const x = points[2 * k];
+    const y = points[2 * k + 1];
+    const v = inside(x, y);
+    if (c > 0 && v >= 0 !== prev >= 0) {
+      const kp = (c - 1) % m;
+      const t = prev / (prev - v);
+      run.push(points[2 * kp] + (x - points[2 * kp]) * t, points[2 * kp + 1] + (y - points[2 * kp + 1]) * t);
+      if (v < 0) {
+        if (run.length >= 4) parts.push({ points: run, closed: false });
+        run = [];
+      }
+    }
+    if (v >= 0) run.push(x, y);
+    prev = v;
+  }
+  if (run.length >= 4) parts.push({ points: run, closed: false });
+  // (a loop wholly inside stays one)
+  if (closed && parts.length === 1 && parts[0].points.length === 2 * count) return [{ points: points.slice(), closed: true }];
+  return parts;
+}
+
+/**
+ * A cut across band B from (x0, y0) on its lower wall: a gentle arc to the nearest point of the upper walls
+ * (bowed to one side by a share of its length, `bow`), ended where it leaves the band near its end; null with
+ * no upper wall in reach up the slope, or where the arc leaves the band early (it would cross a spur or a hollow).
+ */
+function cutAcross(G: Grid, B: Band, x0: number, y0: number, upper: readonly Float64Array[], hb: number, bow: readonly [number, number]): Float64Array | null {
+  let best = CUTS.reach * CUTS.reach;
+  let x1 = Number.NaN;
+  let y1 = Number.NaN;
+  for (const p of upper) {
+    for (let k = 0; k < p.length; k += 2) {
+      const d = (p[k] - x0) ** 2 + (p[k + 1] - y0) ** 2;
+      if (d < best) {
+        best = d;
+        x1 = p[k];
+        y1 = p[k + 1];
+      }
+    }
+  }
+  if (Number.isNaN(x1)) return null;
+  const len = Math.sqrt(best);
+  if (len < 0.3) return null;
+  // (roughly up the slope: not to where an upper wall ends, off to one side)
+  const grad = { x: 0, y: 0 };
+  gradAt(G, x0, y0, grad);
+  if ((x1 - x0) * grad.x + (y1 - y0) * grad.y < CUTS.uphill * len * Math.hypot(grad.x, grad.y)) return null;
+  const share = (bow[0] + (bow[1] - bow[0]) * unit(hb)) * ((hb & 256) === 0 ? 1 : -1);
+  const cx = 0.5 * (x0 + x1) - ((y1 - y0) / len) * share * len;
+  const cy = 0.5 * (y0 + y1) + ((x1 - x0) / len) * share * len;
+  const count = Math.max(2, Math.ceil((len * (1 + 2 * Math.abs(share))) / CUTS.spacing));
+  const out: number[] = [];
+  for (let i = 0; i <= count; i++) {
+    const t = i / count;
+    const x = (1 - t) * (1 - t) * x0 + 2 * t * (1 - t) * cx + t * t * x1;
+    const y = (1 - t) * (1 - t) * y0 + 2 * t * (1 - t) * cy + t * t * y1;
+    if (i > 0 && i < count && !inBand(G, B, x, y)) {
+      if (t < 0.6) return null;
+      break;
+    }
+    out.push(x, y);
+  }
+  return out.length >= 4 ? Float64Array.from(out) : null;
+}
+
+/** A cut traced up the slope from (x0, y0) to the band's upper level or the land's edge (where the band has no upper wall in reach); null where it gets to neither (it would part nothing). */
+function cutUphill(G: Grid, B: Band, x0: number, y0: number): Float64Array | null {
+  const grad = { x: 0, y: 0 };
+  const out: number[] = [x0, y0];
+  let x = x0;
+  let y = y0;
+  for (let d = 0; d < CUTS.reach; d += CUTS.spacing) {
+    gradAt(G, x, y, grad);
+    const len = Math.hypot(grad.x, grad.y);
+    if (len < 1e-4) return null;
+    x += (grad.x * CUTS.spacing) / len;
+    y += (grad.y * CUTS.spacing) / len;
+    if (heightAt(G, x, y) >= B.hi || landAt(G.n, G.g, G.half, G.land, x, y) < 0) return out.length >= 4 ? Float64Array.from(out) : null;
+    if (!inBand(G, B, x, y)) return null;
+    out.push(x, y);
+  }
+  return null;
+}
+
+/** The cuts, each ending on the first of its band it meets that ranks before it (by its wall's level, its step, where it starts): the same whichever cell traces the two. */
+function endOnEachOther(traced: Array<{ band: number; points: Float64Array; rank: [number, number, number] }>): Cut[] {
+  const order = traced.map((_, i) => i);
+  order.sort((a, b) => traced[a].rank[0] - traced[b].rank[0] || traced[a].rank[1] - traced[b].rank[1] || traced[a].rank[2] - traced[b].rank[2]);
+  const kept: Array<{ band: number; points: Float64Array; box: [number, number, number, number] }> = [];
+  for (const i of order) {
+    let p = traced[i].points;
+    for (const other of kept) {
+      if (other.band !== traced[i].band) continue;
+      const box = boxOf(p);
+      if (box[0] > other.box[2] || box[2] < other.box[0] || box[1] > other.box[3] || box[3] < other.box[1]) continue;
+      const q = other.points;
+      let cut = -1;
+      let hx = 0;
+      let hy = 0;
+      for (let a = 0; a + 3 < p.length && cut < 0; a += 2) {
+        for (let b = 0; b + 3 < q.length; b += 2) {
+          const t = segmentHit(p[a], p[a + 1], p[a + 2], p[a + 3], q[b], q[b + 1], q[b + 2], q[b + 3]);
+          if (t < 0) continue;
+          cut = a;
+          hx = p[a] + (p[a + 2] - p[a]) * t;
+          hy = p[a + 1] + (p[a + 3] - p[a + 1]) * t;
+          break;
+        }
+      }
+      if (cut >= 0) p = Float64Array.from([...p.subarray(0, cut + 2), hx, hy]);
+    }
+    if (p.length >= 4 && Math.hypot(p[p.length - 2] - p[0], p[p.length - 1] - p[1]) >= 0.4) kept.push({ band: traced[i].band, points: p, box: boxOf(p) });
+  }
+  return kept.map(({ band, points }) => ({ band, points }));
+}
+
+function boxOf(p: Float64Array): [number, number, number, number] {
+  const box: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let k = 0; k < p.length; k += 2) {
+    box[0] = Math.min(box[0], p[k]);
+    box[1] = Math.min(box[1], p[k + 1]);
+    box[2] = Math.max(box[2], p[k]);
+    box[3] = Math.max(box[3], p[k + 1]);
+  }
+  return box;
+}
+
+/** Where segment a–b crosses segment c–d, as a share along a–b (−1: it does not; past its start, so a cut never ends where it begins). */
+function segmentHit(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): number {
+  const rx = bx - ax;
+  const ry = by - ay;
+  const sx = dx - cx;
+  const sy = dy - cy;
+  const den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-12) return -1;
+  const t = ((cx - ax) * sy - (cy - ay) * sx) / den;
+  const u = ((cx - ax) * ry - (cy - ay) * rx) / den;
+  return t > 1e-6 && t <= 1 && u >= 0 && u <= 1 ? t : -1;
 }

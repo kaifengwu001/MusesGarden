@@ -1,7 +1,7 @@
 import { BufferAttribute, BufferGeometry, Vector3 } from 'three';
 import { floorPiecesJob } from './floors';
 import { TERRACE } from './plots';
-import { acrossOf, chartDir, contour, resample, type CellSurvey } from './survey';
+import { acrossOf, chartDir, contour, LENS, lensSide, resample, type Band, type CellSurvey } from './survey';
 
 // A surveyed cell's terraces as one mesh (survey.ts lays them out): its
 // paddies' floors, level, each at its own water's height where flooded; the
@@ -189,7 +189,7 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
       const y0 = -half + j * g - 0.03;
       const x1 = -half + (i1 + 1) * g + 0.03;
       const y1 = -half + (j1 + 1) * g + 0.03;
-      const fl = (x: number, y: number): number[] => [B.floorH, s.paddies[pd].crop.fallow ? 1 : 0, acrossOf(B, s.hs[Math.round((y + half) / g) * n + Math.round((x + half) / g)]), 0];
+      const fl = (x: number, y: number): number[] => [h, s.paddies[pd].crop.fallow ? 1 : 0, acrossOf(B, s.hs[Math.round((y + half) / g) * n + Math.round((x + half) / g)]), 0];
       const a = b.vertex(x0, y0, h, PART.floor, paddyData[pd], fl(x0, y0));
       const c1 = b.vertex(x1, y0, h, PART.floor, paddyData[pd], fl(x1, y0));
       const c2 = b.vertex(x1, y1, h, PART.floor, paddyData[pd], fl(x1, y1));
@@ -224,70 +224,100 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
     return Number.NaN;
   };
 
-  // 2. walls: a riser from the floor below up to the bund along the edge of the floor above
+  // a point of band B at height H: in its lens? (survey.ts LENS; the hills' smoothed slope read at the point); a lens's floor
+  const inLens = (B: Band, H: number, x: number, y: number): boolean => {
+    const fx = Math.min(Math.max((x + half) / g, 0), n - 1.0001);
+    const fy = Math.min(Math.max((y + half) / g, 0), n - 1.0001);
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    const tx = fx - i;
+    const ty = fy - j;
+    const t = s.slope;
+    const slope = (t[j * n + i] * (1 - tx) + t[j * n + i + 1] * tx) * (1 - ty) + (t[(j + 1) * n + i] * (1 - tx) + t[(j + 1) * n + i + 1] * tx) * ty;
+    return lensSide(B, H, slope) < 0;
+  };
+  const lensFloor = (B: Band): number => B.lo + LENS.floor * (B.hi - B.lo);
+
+  // 2. walls: a riser from the floor below up to the bund along the edge of the floor above, each floor read
+  // where the wall stands (its band's, or its lens's); along the levels' contours and along the lenses'. A bund
+  // stands its band's height over its band's floor even where a lens lies beyond it (only its inner side
+  // falls to the lens): where a lens's wall joins it, the two bunds meet level
+  const wall = (p: Float64Array, closed: boolean, belowAt: (x: number, y: number) => number, aboveAt: (x: number, y: number) => number, crest: number): void => {
+    const m = p.length / 2;
+    const ring: number[][] = [];
+    for (let k = 0; k < m; k++) {
+      // uphill: the polyline's left
+      const a = Math.max(k - 1, 0);
+      const c = Math.min(k + 1, m - 1);
+      let tx = p[2 * c] - p[2 * a];
+      let ty = p[2 * c + 1] - p[2 * a + 1];
+      if (closed && (k === 0 || k === m - 1)) {
+        const kp = (k - 1 + m) % m;
+        const kn = (k + 1) % m;
+        tx = p[2 * kn] - p[2 * kp];
+        ty = p[2 * kn + 1] - p[2 * kp + 1];
+      }
+      const tl = Math.hypot(tx, ty) || 1;
+      const ux = -ty / tl;
+      const uy = tx / tl;
+      const x = p[2 * k];
+      const y = p[2 * k + 1];
+      const lowerH = belowAt(x, y);
+      const upperH = aboveAt(x, y);
+      const top = crest + bh;
+      // down past the floor below into the sunk ground (hidden under the floor where there is one), at a
+      // steady batter: it stands as steep over the floor below wherever that floor ends
+      const shown = top - lowerH;
+      const below = Math.min(lowerH, natural(x, y)) - SINK - 0.3;
+      const batter = TERRACE.batter * (top - below);
+      const fl = [upperH, 0, 0, 0];
+      // the riser's face leans back uphill as steep as it stands; the bund rounds over to the floor above
+      const face: [number, number, number] = [-ux * shown, -uy * shown, TERRACE.batter * shown];
+      const v0 = b.vertex(x - ux * batter, y - uy * batter, below, PART.riser, NONE, fl, face);
+      const v1 = b.vertex(x, y, top, PART.riser, NONE, fl, face);
+      const v2 = b.vertex(x, y, top, PART.bundTop, NONE, fl);
+      const v3 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundTop, NONE, fl);
+      const side: [number, number, number] = [ux * bh, uy * bh, (1 - TERRACE.crest) * bw];
+      const v4 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundSide, NONE, fl, side);
+      const v5 = b.vertex(x + ux * bw, y + uy * bw, upperH - 0.12, PART.bundSide, NONE, fl, side);
+      ring.push([v0, v1, v2, v3, v4, v5]);
+    }
+    const count = closed ? m : m - 1;
+    for (let k = 0; k < count; k++) {
+      const r0 = ring[k];
+      const r1 = ring[(k + 1) % m];
+      // (uphill on the left: the faces' winding)
+      b.quad(r0[0], r1[0], r1[1], r0[1]);
+      b.quad(r0[2], r1[2], r1[3], r0[3]);
+      b.quad(r0[4], r1[4], r1[5], r0[5]);
+    }
+  };
   for (const w0 of s.walls) {
     const lower = s.bands[w0.index - 1];
     const upper = s.bands[w0.index];
     if (!lower || !upper) continue;
-    for (const p of inCell(s, w0.points, w0.closed)) {
-      const w = { closed: w0.closed && p === w0.points };
-      const m = p.length / 2;
-      const ring: number[][] = [];
-      for (let k = 0; k < m; k++) {
-        // uphill: the polyline's left
-        const a = Math.max(k - 1, 0);
-        const c = Math.min(k + 1, m - 1);
-        let tx = p[2 * c] - p[2 * a];
-        let ty = p[2 * c + 1] - p[2 * a + 1];
-        if (w.closed && (k === 0 || k === m - 1)) {
-          const kp = (k - 1 + m) % m;
-          const kn = (k + 1) % m;
-          tx = p[2 * kn] - p[2 * kp];
-          ty = p[2 * kn + 1] - p[2 * kp + 1];
-        }
-        const tl = Math.hypot(tx, ty) || 1;
-        const ux = -ty / tl;
-        const uy = tx / tl;
-        const x = p[2 * k];
-        const y = p[2 * k + 1];
-        const top = upper.floorH + bh;
-        // down past the floor below into the sunk ground (hidden under the floor where there is one), at a
-        // steady batter: it stands as steep over the floor below wherever that floor ends
-        const shown = top - lower.floorH;
-        const below = Math.min(lower.floorH, natural(x, y)) - SINK - 0.3;
-        const batter = TERRACE.batter * (top - below);
-        const fl = [upper.floorH, 0, 0, 0];
-        // the riser's face leans back uphill as steep as it stands; the bund rounds over to the floor above
-        const face: [number, number, number] = [-ux * shown, -uy * shown, TERRACE.batter * shown];
-        const v0 = b.vertex(x - ux * batter, y - uy * batter, below, PART.riser, NONE, fl, face);
-        const v1 = b.vertex(x, y, top, PART.riser, NONE, fl, face);
-        const v2 = b.vertex(x, y, top, PART.bundTop, NONE, fl);
-        const v3 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundTop, NONE, fl);
-        const side: [number, number, number] = [ux * bh, uy * bh, (1 - TERRACE.crest) * bw];
-        const v4 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundSide, NONE, fl, side);
-        const v5 = b.vertex(x + ux * bw, y + uy * bw, upper.floorH - 0.12, PART.bundSide, NONE, fl, side);
-        ring.push([v0, v1, v2, v3, v4, v5]);
-      }
-      const count = w.closed ? m : m - 1;
-      for (let k = 0; k < count; k++) {
-        const r0 = ring[k];
-        const r1 = ring[(k + 1) % m];
-        // (uphill on the left: the faces' winding)
-        b.quad(r0[0], r1[0], r1[1], r0[1]);
-        b.quad(r0[2], r1[2], r1[3], r0[3]);
-        b.quad(r0[4], r1[4], r1[5], r0[5]);
-      }
-    }
+    // (the floor above a wall is its band's lens where the band has one there: none of the band above it)
+    for (const p of inCell(s, w0.points, w0.closed)) wall(p, w0.closed && p === w0.points, () => lower.floorH, (x, y) => (inLens(upper, upper.lo, x, y) ? lensFloor(upper) : upper.floorH), upper.floorH);
+  }
+  for (const lw of s.lensWalls) {
+    const B = s.bands[lw.band];
+    for (const p of inCell(s, lw.points, lw.closed)) wall(p, lw.closed && p === lw.points, () => lensFloor(B), () => B.floorH, B.floorH);
   }
 
   yield;
-  // 3. the cuts' ridges: a low bund along each, over the higher of the floors either side
+  // 3. the cuts' ridges: a low bund along each, over the higher of the floors either side, wherever it parts
+  // two paddies (not where it runs on into one: a lens's end, a cut stopped short)
+  const paddyAt = (x: number, y: number): number => {
+    const i = Math.round((x + half) / g);
+    const j = Math.round((y + half) / g);
+    return i < 0 || j < 0 || i >= n || j >= n ? -1 : s.paddy[j * n + i];
+  };
   for (const cut of s.cuts) {
-    if (cut.open) continue;
     for (const p of inCell(s, cut.points, false)) {
       const m = p.length / 2;
       if (m < 2) continue;
       const ring: number[][] = [];
+      const parts: boolean[] = [];
       for (let k = 0; k < m; k++) {
         const a = Math.max(k - 1, 0);
         const c = Math.min(k + 1, m - 1);
@@ -299,6 +329,9 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
         const x = p[2 * k];
         const y = p[2 * k + 1];
         const half = 0.5 * bw;
+        const pl = paddyAt(x - sx * 0.6, y - sy * 0.6);
+        const pr = paddyAt(x + sx * 0.6, y + sy * 0.6);
+        parts.push(pl >= 0 && pr >= 0 && pl !== pr);
         let left = floorAt(x - sx * 0.6, y - sy * 0.6);
         let right = floorAt(x + sx * 0.6, y + sy * 0.6);
         if (Number.isNaN(left)) left = right;
@@ -314,6 +347,7 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
         ]);
       }
       for (let k = 0; k + 1 < m; k++) {
+        if (!parts[k] && !parts[k + 1]) continue;
         const r0 = ring[k];
         const r1 = ring[k + 1];
         b.quad(r0[0], r1[0], r1[1], r0[1]);
@@ -352,9 +386,10 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
         }
         let bi = 0;
         while (bi + 1 < s.bands.length && s.bands[bi + 1].lo <= H) bi++;
-        // (a flats' plot has its own floor)
+        // (a flats' plot has its own floor; so has a lens)
         const own = floorAt(x, y);
-        const floorH = s.walls.length === 0 && !Number.isNaN(own) ? own : s.bands[bi].floorH;
+        const B = s.bands[bi];
+        const floorH = s.walls.length === 0 && !Number.isNaN(own) ? own : inLens(B, H, x, y) ? lensFloor(B) : B.floorH;
         const top = floorH + 0.02;
         const fl = [floorH, 0, 0, 0];
         ring.push([b.vertex(x, y, top, PART.skirt, NONE, fl), b.vertex(x, y, Math.min(top, natural(x, y)) - SINK - 0.3, PART.skirt, NONE, fl)]);

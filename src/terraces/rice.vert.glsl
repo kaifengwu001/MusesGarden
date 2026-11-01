@@ -43,10 +43,11 @@ void main() {
   vec3 dir = blade.xyz;
   float seed = texelFetch(uPoolRest, ivec2(slot >> 2, page), 0)[slot & 3];
   float d = chordAngle(dir, uRiceNear.xyz) * uRadius;
-  // thinning by rank toward the edge (a blue-noise subset), and at the very edge each at a distance of its own
-  float keep = mix(1.0, uRiceFade.y, smoothstep(uRiceFade.x, uRice.y, d));
-  float born = presence(0.5 * (blade.w - uRice.z - log(keep))) * step(rnd(seed, 9.0), 1.0 - smoothstep(uRice.y * 0.78, uRice.y, d));
   vec4 crop = texelFetch(uRiceCrop, ivec2(slot, drawn), 0);
+  // thinning by rank toward the edge (a blue-noise subset), and at the very edge each at a distance of its own;
+  // seedlings stand sparse in their water, in even rows of clumps (the same subset), a grown crop dense
+  float keep = mix(1.0, uRiceFade.y, smoothstep(uRiceFade.x, uRice.y, d)) * mix(0.14, 1.0, smoothstep(0.12, 0.7, crop.r));
+  float born = presence(0.5 * (blade.w - uRice.z - log(keep))) * step(rnd(seed, 9.0), 1.0 - smoothstep(uRice.y * 0.78, uRice.y, d));
   if (born <= 0.002 || crop.r <= 0.01) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
@@ -82,7 +83,7 @@ void main() {
   vec3 lit = riceLit(crop.a, crop.b);
   vec3 shade = riceShade(lit);
   float b = toonLight(dot(up, uSunDir));
-  float light = mix(0.15, 1.0, smoothstep(0.0, 0.85, y)) * b;
+  float light = mix(0.3, 1.0, smoothstep(0.0, 0.85, y)) * b;
   vec3 col = tone3(mix(lit, pal(TR_RICE, 5), 0.12 * y * y), mix(lit, shade, 0.4), shade, light);
   col *= 0.9 + 0.2 * rnd(seed, 8.0);
   // (the wind's sheen as the paint lays it on the crop, a little stronger toward the tips)

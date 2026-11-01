@@ -2,7 +2,8 @@
 // (seedlings a pale yellow-green, then fresh, then deep green, heading out
 // yellow-green at the tips, a few turning gold), each paddy its own shade of
 // green, slightly: lighter or darker, toward jade, lime or blue-green; the
-// taller and denser, the deeper its shade.
+// taller and denser, the deeper its shade. And how much of a floor the crop
+// hides (the built paddies' paint and the far field's).
 // Requires: meadow_toon, terraces_common, terraces_paddy.
 
 vec3 riceLit(float maturity, float variant) {
@@ -26,5 +27,14 @@ vec3 riceShade(vec3 lit) {
 vec3 riceColour(Crop c, float b) {
   vec3 lit = riceLit(c.maturity, c.variant);
   vec3 shade = riceShade(lit);
-  return tone3(lit, mix(lit, shade, 0.35 + 0.25 * smoothstep(0.3, 0.9, c.height)), shade, b);
+  return tone3(lit, mix(lit, shade, 0.3 + 0.2 * smoothstep(0.3, 0.9, c.height)), shade, b);
+}
+
+// How much of a paddy's floor its crop hides from this view: plants h meters tall, looked at with
+// cosView between the view and straight down (more of the water between them shows from above). Seedlings
+// a hand high are dots on their water (the aerial photo's white bands), a grown crop closes over it.
+float cropCover(float h, float cosView) {
+  if (h <= 0.0) return 0.0;
+  float c0 = 0.97 * smoothstep(0.1, 0.9, h);
+  return 1.0 - pow(1.0 - c0, 1.0 / max(cosView, 0.18));
 }

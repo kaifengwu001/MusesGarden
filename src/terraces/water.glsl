@@ -15,17 +15,70 @@ vec3 paddySky(float e) {
   return mix(pal(TR_WATER, 0), pal(TR_WATER, 1), smoothstep(0.02, 0.6, e));
 }
 
+// The planet's walls round the march's level (wallsRound in plots.glsl reads ten hashes a call): sixteen
+// read once and kept while the march climbs within them. The same walls, so the same ground.
+float marchWall[16];
+bool marchLeft[16];
+int marchFrom = -1000000;
+
+void marchWalls(float u, out float lo, out float hi, out float hi2) {
+  int f = int(floor(u));
+  if (f - 4 < marchFrom || f + 5 > marchFrom + 15) {
+    marchFrom = f - 7;
+    for (int i = 0; i < 16; i++) marchWall[i] = wallAt(0u, marchFrom + i, marchLeft[i]);
+  }
+  // (the walls lie in order, each within a sixth of a level of its own, never two left out in a row: the last
+  // one at or below u is one of the four round floor(u), the next ones one or two on)
+  int i0 = f - marchFrom;
+  int ilo = i0 - 2;
+  if (!marchLeft[i0 - 1]) ilo = i0 - 1;
+  if (!marchLeft[i0] && marchWall[i0] <= u) ilo = i0;
+  if (!marchLeft[i0 + 1] && marchWall[i0 + 1] <= u) ilo = i0 + 1;
+  int ihi = marchLeft[ilo + 1] ? ilo + 2 : ilo + 1;
+  int ihi2 = marchLeft[ihi + 1] ? ihi + 2 : ihi + 1;
+  lo = marchWall[ilo];
+  hi = marchWall[ihi];
+  hi2 = marchWall[ihi2];
+}
+
+// The ground coarse (terraceHeightCoarse in ground.glsl, its walls from the march's), and the bake's wild there.
+float marchGround(vec3 d, out float wildBake) {
+  vec4 base = textureLod(uTerraceBake, d, 0.0);
+  wildBake = base.b;
+  float wild = smoothstep(0.35, 0.65, base.b);
+  if (base.a >= 0.5 || wild > 0.999) return base.r;
+  float s = uLevels.x;
+  float phi = uLevels.y;
+  float u = base.r / s + phi;
+  float lo;
+  float hi;
+  float hi2;
+  marchWalls(u, lo, hi, hi2);
+  float floorH = (0.5 * (lo + hi) - phi) * s;
+  float top = (0.5 * (hi + hi2) - phi) * s + uTerraceWall.z;
+  float perLevel = s / max(base.g, 0.004);
+  float g = max(floorH + uTerraceWall.z * bundRise((u - lo) * perLevel), mix(floorH, top, clamp(1.0 - (hi - u) * perLevel / riserWidth(floorH, top), 0.0, 1.0)));
+  return mix(g, base.r, wild);
+}
+
 // What the mirror meets standing on the ground: the terraces' walls, the
 // forest's crowns over the wild.
 float mirrorGround(vec3 d) {
-  return terraceHeightCoarse(d) + 5.0 * smoothstep(0.35, 0.65, textureLod(uTerraceBake, d, 0.0).b);
+  float wildBake;
+  float g = marchGround(d, wildBake);
+  return g + 5.0 * smoothstep(0.35, 0.65, wildBake);
 }
 
 // The ground along a mirrored ray (view space) from the water at wp: how far
 // along it the ray meets the ground (1e9: never), as far as the riser and
 // the bund round the paddy (the painting keeps its flooded fields white, a
-// darker band only along their inner edge: the riser behind, mirrored).
+// darker band only along their inner edge: the riser behind, mirrored). The
+// ground is read against the paddy's own floor: where the coarse levels stand
+// over its water (a lens, a flats' plot), they are lowered to it.
 float groundAlong(vec3 wp, vec3 r, float rise) {
+  vec3 q0 = unwarpPosition(wp);
+  float l0 = length(q0);
+  float bias = clamp(mirrorGround(q0 / l0) - (l0 - uRadius), 0.0, 1.0);
   float t = 0.12;
   float dt = 0.2;
   for (int i = 0; i < 12; i++) {
@@ -34,14 +87,14 @@ float groundAlong(vec3 wp, vec3 r, float rise) {
     float len = length(q);
     float above = len - uRadius;
     if (above > uPaddyWater.y) break;
-    if (above < mirrorGround(q / len)) {
+    if (above + bias < mirrorGround(q / len)) {
       float lo = t;
       float hi = tn;
       for (int k = 0; k < 4; k++) {
         float mid = 0.5 * (lo + hi);
         vec3 m = unwarpPosition(wp + r * mid);
         float ml = length(m);
-        if (ml - uRadius < mirrorGround(m / ml)) hi = mid;
+        if (ml - uRadius + bias < mirrorGround(m / ml)) hi = mid;
         else lo = mid;
       }
       return hi;
@@ -61,7 +114,8 @@ vec3 mirroredGround(vec3 q) {
   vec4 base = textureLod(uTerraceBake, d, 0.0);
   float wild = smoothstep(0.35, 0.65, base.b);
   vec3 forest = mix(pal(TR_FOREST, 1), pal(TR_PEAK, 0), smoothstep(1.1, 1.8, base.g));
-  float onWall = smoothstep(0.1, 0.35, terraceHeightCoarse(d) - (l - uRadius) + 0.4);
+  float wildBake;
+  float onWall = smoothstep(0.1, 0.35, marchGround(d, wildBake) - (l - uRadius) + 0.4);
   vec3 tame = mix(mix(pal(TR_RICE, 2), pal(TR_EARTH, 2), 0.35), pal(TR_EARTH, 3), onWall);
   vec3 c = mix(tame, forest, wild);
   return mix(c, pal(TR_WATER, 5), 0.3) * 0.9;
