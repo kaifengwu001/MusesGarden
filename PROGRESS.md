@@ -38,13 +38,13 @@ Started from 6c6768e (Kai's eight notes on the fourth pass answered). Kai (2026-
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | There are still numerous geometry glitches when zoomed in | |
-| 2 | The lines on the paddies' edges and cuts are often broken | |
-| 3 | Some mountains are still floating | |
-| 4 | The mountains are slightly too tall: perhaps scale them down vertically | |
-| 5 | Groups of mountains look better than a single mountain | |
-| 6 | The fog can be deeper vertically, cover a higher range of heights, and be more volumetric; perhaps some of the meadow planet's clouds too | |
-| 7 | The paddies' steps are too coarse: the dams are too tall, the bands too wide, and the cuts too far apart | |
+| 1 | There are still numerous geometry glitches when zoomed in | Looked for up close with the terraces alone ([before and after, zoomed](docs/checkpoints/terraces-3/round6-close-before-after.jpg)): the bunds notched at every cell edge, cut ridges stood up as pale ticks against the risers, the risers' grass streaks read as ticks from a distance; all three fixed. Still there: sharp wedges where a lens's wall joins its band's wall, and small islands of woods' ground among the floors that show as dark mounds when the trees are hidden. |
+| 2 | The lines on the paddies' edges and cuts are often broken | Each cell's piece of a wall now runs 30 cm on past its edge under its neighbour's (the two last cross-sections at the edge came out turned against each other: a notch); a cut's ridge stops 25 cm short of the walls it runs into. |
+| 3 | Some mountains are still floating | Each tower stands under the lowest ground round its foot on three rings out to 0.62 of its height (twelve points each, its stretch counted), sunk 8 % of its height. |
+| 4 | The mountains are slightly too tall: perhaps scale them down vertically | Four fifths as tall, their footprints kept (ModelSet's squash). |
+| 5 | Groups of mountains look better than a single mountain | Each site a group: the tallest tower at the site, up to three smaller ones (0.42–0.82 of its height) round it, 0.38–0.8 of its height out; half as many sites. |
+| 6 | The fog can be deeper vertically, cover a higher range of heights, and be more volumetric; perhaps some of the meadow planet's clouds too | The banks 14 m deep (6.5 before), thinner per meter, white at their tops to a deeper blue-grey low in them, marched in sixteen steps, clear 45 m round the camera. Not done: the meadow's clouds (their shadows, mirror and uniforms are the meadow's own; a piece of work of its own). |
+| 7 | The paddies' steps are too coarse: the dams are too tall, the bands too wide, and the cuts too far apart | The step 0.42 m (0.62 before): lower walls, narrower bands; the cuts' pattern 15 m (34 before), about twice as close; lenses where a band passes 4.6–7.2 m. The bunds stay 19 cm over their floor (the water stands up to 16 cm). |
 
 ### Kai's notes on the fourth pass
 
