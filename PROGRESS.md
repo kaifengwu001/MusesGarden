@@ -8,6 +8,7 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
+| 17 | https://muses-garden-iteration-17.vercel.app | 0924020 |
 | 15 | https://muses-garden-iteration-15.vercel.app | 74926b7 |
 | 14 | https://muses-garden-iteration-14.vercel.app | 89b493a |
 | 13 | https://muses-garden-iteration-13.vercel.app | d5107a0 |
@@ -21,12 +22,56 @@ next. Each iteration has its own page, kept for comparison (Versions).
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
-The latest is also at https://the-meadow-omega.vercel.app (iteration 15).
+The latest is also at https://the-meadow-omega.vercel.app (iteration 17).
+Iteration 16 was built in the lab and has no page of its own: it is in 17.
 Each iteration is its own Vercel project, so its production address
 is public and stays put. `scripts/publish.sh N --latest` publishes the
 checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
+
+## Iteration 17: Muse lives on the planet (in progress)
+
+Started from 86dadbd: iteration 16's interactions, built in the lab, go into
+the meadow. Kai's notes (2026-10-31); this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Muse roams the planet at random and starts its activities where it is, more often close to its hut | src/life/museRoam.ts: a life drawn from the planet's seed, outing after outing (wander and look about, sometimes sitting down in the grass; water the plants; the bench; the stove; fishing; a nap; resting on the porch), written out lazily as time runs on and read back by time, so a frozen time still finds one Muse. Places out in the meadow are random, most within 10–20 m of the hut (5 + 60·u³ m), dry, not steep, reachable. Walks go straight over the meadow (never through water or the homestead), up and down the porch steps, along the porch, out along the pier. Tested for an hour of it at R 40, 128 and 400: never in water or the house, no jumps, every pastime done, the same for the same planet and time. |
+| 2 | Some things have fixed places, like the bench (the terrace's) | The terrace's bench (props.ts now exports it): it walks up the steps and along the porch, hops up onto it with its back to the house, swings its legs and hums, hops down. |
+| 3 | Watering plants anywhere about the meadow, not over a flower bed; no new flower growing, no sniffing it | The watering move is now pour, then a content look (∪ eyes, a small nod), three times, shuffling along to its right between (or its left, or not at all, wherever the ground is dry); the water falls on the grass before it. The lab's flower bed no longer grows or sparkles either. |
+| 4 | Cooking on the hut's front porch, at a little stove kept there (for now; later the house gets an inside and a kitchen) | A little iron stove on the porch (in front of the window, by the front edge), its fire glowing through a window in front while Muse cooks (embers otherwise), a pot of soup on top, steam. Muse stands behind it facing out, the ladle out of its pocket, stirring and tasting. |
+| 5 | Fishing: usually off the pier's end, sometimes from a shore it has wandered to | Seven times in ten off the pier's front edge: it sits down on the edge with its legs over the water (new: the edge variants of sitting down, fishing and getting up). Otherwise from the home pond's bank, wherever it can be reached dry, sitting in the grass facing the water. The float's landing, the nibbles, the bite and the fish dropped back each make the meadow's own ripple rings. |
+| 6 | As in the lab: asleep in the grass (pressing it down only where it lies), taps and holds on Muse | Grass and flowers are pressed down and parted round its body only while it lies (musePress.glsl, read by grass.vert.glsl and flower.vert.glsl). A press on Muse, while it is drawn, is Muse's (main.ts): a tap answers, a hold pets it; double taps on it are taps; the meadow's click, double-click and hold go on everywhere else. While it answers, its life is held back and it turns to you. |
+| 7 | M frames Muse, as now (the camera does not follow it) | M frames Muse wherever it is: from in front of it and a little to its left, or at home from out in front of the terrace. World.frameMuse takes another view for checks. |
+| 8 | Muse looks a bit small in the meadow: 1.5 times larger | 1.65 m (was 1.1), its fur 6 cm (was 4): the same plush, scaled. Its pace is in its own heights, so it waddles at 0.54 m/s. |
+
+For the garden's interfaces (that session asked): world.muse.where (direction, height, heading, kept current while not drawn), world.muse.home, world.muse.away (not drawn, no shadow, not tappable; its life keeps time).
+
+Kai's review of iteration 17's page (2026-10-31), done:
+
+- **Sudden turns, and turning round and back within a few frames.** Reproduced by scanning its heading frame by frame: every one was in the last frame or two of a walk, where it aimed at the point it was standing on (a direction from nearly nothing, noise), then snapped back as the next turn began. Walks now follow a path and take their heading from it (smoothed over 0.6 m), so this cannot happen. A test checks 20 minutes at 60 frames a second for any turn faster than a half turn on the spot. Turns on the spot now take time by how far they go (0.35 s plus 0.8 s for a half turn), slight ones are taken in its stride, and turning to you when you tap keeps to one side once started.
+- **Robotic, rectilinear paths.** It used to stop at every corner, turn on the spot and walk straight on. Now each walk is one smooth path:
+  - It turns into the path as it sets off (on the spot first only if it faced well away), and comes round to its facing as it arrives.
+  - Corners out on the meadow are wide sweeping curves (up to 5 m either side, checked against water and the homestead); long walks wander off the straight line once or twice.
+  - It goes round the house by its corners, so it now goes behind the house and past the pond, where before every outing fanned out to one quarter.
+  - On the porch (the most robotic part) the fixed lane is gone. It walks straight across wherever the way is clear of the bench, the stove, the chair and the wall, by a few places round them where not (behind the stove, between it and the house), with rounded corners.
+- **Watering, more organic.** Two to four pours, each its own length and tilt, now and then swept over the plants; a content look only sometimes; between pours, a shuffle aside, a turn, a few steps on, or a look about.
+- **Longer at each thing.** Asleep 45–95 s, on the bench 30–75 s, fishing 3–5 catches (45–75 s), cooking 3–4 tastes, sitting in the grass 15–40 s, resting on the porch 10–22 s. Each catch has its own timing and is not always lucky: some bites get away, with a little droop.
+- **Petting.** It keeps its full height (no squash, the head not squished): the head tilt, > < eyes, blush, hearts and its fur standing up.
+
+Known: the GPU invariant "scrubbing growth in real time stays within the frame budget" fails on this machine now, frame p95 33.4 ms, exactly 30 fps. It fails the same way at 86dadbd, which passed it earlier the same day, so it is the machine (another session's GPU load), not this work. To run again on a quiet machine.
+
+
+## The garden's interfaces (in progress, alongside iteration 16)
+
+Started from 73de432, in the same folder as iteration 16's work on Muse
+(that session builds in the lab; this one adds files of its own and only
+hooks into main.ts). Kai's brief (2026-10-31), with the ideas doc (MG1, the
+brainstorm with Tracy) and the backend plan as references. Two corrections
+to the backend plan: what grows on the planet is only what Muse chose to
+keep or gave you in a basket; and finds are not only Instagram reels, but
+posts, news articles and the like too.
 
 ## The garden's interfaces (alongside iteration 16)
 
@@ -80,7 +125,7 @@ The beds over a planted patch, frames back to back (High, 1440×900): 0.4–1.6 
 - Muse's whereabouts and the privacy preferences are placeholders until the backend sends them.
 - The interface is in English only, and the backend plan is still unread (above).
 
-## Iteration 16: Muse's interactions (in progress)
+## Iteration 16: Muse's interactions (in the lab)
 
 Started from iteration 15 (74926b7). Since then Muse has come to the meadow
 (e2de5cf, 02a9840, 2fb02be, a7f6349): Tripo3D's sculpt rigged on a
@@ -91,16 +136,41 @@ fills in as they are done.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Idle: walk around | |
-| 2 | Idle: sit on the bench (port the meadow's bench to the lab) | |
-| 3 | Idle: fall asleep in the grass (belly up, a snore bubble, a Zzz sign; push the grass away) | |
-| 4 | Idle: fishing (a fishing rod) | |
-| 5 | Idle: gardening (garden tools) | |
-| 6 | Idle: cooking (a stretch goal; props) | |
-| 7 | Click: wave | |
-| 8 | Click: a happy bounce up and down, arms flapping | |
-| 9 | Long hold: petting; the head tilts, the eyes squint | |
-| 10 | The fur stands up in a wave while it squints, the neck tucks in (it has no neck, so maybe the whole body gets shorter) (a stretch goal) | |
+| 1 | Idle: walk around | A stage of its own in the lab (`museLab.html#model=tpose6&live=1`, src/dev/museStage.ts): a round lawn of about 25,000 blades in a pale sky. Muse lives a ~4-minute day on it in closed form (src/life/museLife.ts): it wanders and looks about, then walks between its pastimes (turn, waddle, turn), waving at you on the way out. Keys 1–7 go to each part; the camera follows it (G). |
+| 2 | Idle: sit on the bench (port the meadow's bench to the lab) | The meadow's bench (props.ts) in Muse's heights. Muse turns its back to it, crouches and hops up onto the seat's front edge, swings its legs in turns, now and then hums with its eyes shut (notes float up), and hops down. It sits upright: the hips roll back under it with the legs and the waist and chest bring it upright over them, so its bottom sits flat and the legs hang in front of the seat. |
+| 3 | Idle: fall asleep in the grass (belly up, a snore bubble, a Zzz sign; push the grass away) | It yawns and stretches, plops down, lies back onto its back, flattened a little by its weight, legs bent back toward the ground, arms out. It breathes slowly (the belly swells), a snore bubble grows and shrinks at its nose, Zzz rise; now and then it stirs. The grass is pressed down and parted round it (its body's spheres push the blades), and its soft shadow falls on the lawn. Then it wakes, sits up, rubs an eye and gets up. A tap while it sleeps pops the bubble and only half wakes it. |
+| 4 | Idle: fishing (a fishing rod) | It sits at the pond's edge, takes a rod out of its belly pocket, casts, watches the float, leans in to two nibbles, yanks the bite: the fish flies out on the line and hangs wriggling; it cheers, drops the fish back in (rings on the water) and waves it off; twice, then the rod goes back in the pocket. |
+| 5 | Idle: gardening (garden tools) | A flower bed of three sprouts, a trowel in the soil. It takes a watering can out of its pocket and waters each in turn, stepping along: the sprout grows and opens with sparkles, it hops for joy, leans in for a sniff. The flowers close as it naps. |
+| 6 | Idle: cooking (a stretch goal; props) | A campfire (stones, logs, flickering flames, a glow) with a pot of soup on a trivet, steam rising. It takes a ladle out of its pocket and stirs, arm held out over the pot, the ladle from its mitten down to the bowl going round in the soup; now and then it tastes (ladle up to its mouth, blown on, sipped), and its fur shivers up with a "yum". |
+| 7 | Click: wave | A tap stops whatever it is doing (its day is held back while it answers), turns it to you if it is standing or walking, and it waves (the first time in a while). |
+| 8 | Click: a happy bounce up and down, arms flapping | Further taps: three hops with squash and stretch, eyes shut in happy arcs, blushing. The arms are only carried by the hops: pressed down as it lands and springs off, floating up through the flight. |
+| 9 | Long hold: petting; the head tilts, the eyes squint | Hold it: the head tilts into your hand (toward where you press) and squishes a little, eyes squeezed shut (> <), blushing, paws up, hearts. Asleep, it smiles in its sleep. |
+| 10 | The fur stands up in a wave while it squints, the neck tucks in (it has no neck, so maybe the whole body gets shorter) (a stretch goal) | Held longer than 1.3 s: the whole body scrunches shorter and rounder (the head sinks, the shoulders rise) while the fur stands up in a wave from its feet to its head (longer, standing straight, each tuft its own); let go, it shakes it out and pops back up to its height. Also on its own as a move (`pose=fluff`). |
+
+Kai's review of the first pass (2026-10-31), done:
+
+- No mouth animations (the laugh and the "o" did not look good): the face changes by its eyes alone; the mouth only smiles.
+- (> <) eyes while it is petted.
+- The arms in the bounce follow the hops instead of flapping on their own.
+- On the bench: no legs through the seat; hips in contact, the body upright instead of leaning back as if to fall.
+- Asleep: flattened a little by its weight, the legs bent back.
+- The watering can no longer through the mitten; cooking: the bent wrist gone (the forearm's twist limited), the pot further off and the arm and ladle reaching out, so the fur clears the pot.
+- Tools come out of a belly pocket (the tool appears in the mitten as it comes out) and go back into it after, instead of flying in from the ground.
+
+Kai's second review (2026-10-31), done:
+
+- Walking about leaves the grass standing; only lying down presses a hollow into it (as in his reference of a white creature asleep in long grass). The grass shader's push is scaled by how far Muse is lying (`MuseRig.lying`).
+- The can, the rod and the ladle are held with the arm out to the side and forward, as it hangs when idle, not drawn in across the body. The pot and the flowers moved out to match.
+- The pocket is a quick dip in and out (0.75 s, the tool there by 0.38 s) with a glance down: no rummaging back and forth, no second paw.
+
+How it is built:
+
+- **Rig** (museRig.ts): the whole body squashes and stretches about its feet (keeping its volume), a joint can swell on its own (a breath, a squished head), and a mitten can be sent to a point: the arm's turns, its elbow and the forearm's twist are solved each frame from the arm as it hangs (damped steps, preferring small turns, the shoulder's share counted). Moves (bounce, pet, fluff, yawn, the hops, sitting, lying, sleeping, waking, fishing, watering, stirring, the pocket) are closed-form functions of their own time.
+- **Face**: the squint shuts the eyes into arcs (∩ happy, ∪ content), the squeeze into > <, the blush deepens with strokes. The fur stands up behind a front running up the body (uMuseFluff).
+- **Shoulder correctives**: the wave's corrective is now mirrored onto the right shoulder (either arm or both can go up), and each side's hung and raised correctives are weighed by where its upper arm points along the arc from hanging, through the sculpt's own pose, to the top of a wave, giving way off that arc. Reaching forward, half-applied correctives had torn a spike at the armpit.
+- **Lab**: `pose=<move>` plays any move on the turntable, `view=cam:…` frames any still, `day=` and `pause=1` hold a moment of the stage, `hide=1` hides Muse to see the grass and shadows round it.
+
+Known: seen exactly from the side, sitting still shows a soft crease where the legs meet the belly (the fur mostly hides it; a sitting corrective like the shoulders' would fix it). The arms are too short to cup its cheeks, so the petting paws come up before its chest. Not yet in the meadow.
 
 ## Iteration 15: specks on the blue flowers on 1× screens
 

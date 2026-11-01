@@ -7,7 +7,6 @@ import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
-import { FLOOR } from '../../life/props';
 import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
 import { tangentToward, travel } from '../../planet/geo';
@@ -404,8 +403,8 @@ export class GardenUi {
       const patch = newest && this.layout.patches.get(newest.id);
       if (patch) return { dir: patch.dir.clone(), ground: this.ground(patch.dir), home: false };
     }
-    const { x, z } = w.muse.spot;
-    return { dir: this.cottageLocal(x, z), ground: w.terrain.cottageGround + FLOOR, home: true };
+    // at home: wherever its life has it about the hut (world.muse.where, kept current even while it isn't drawn)
+    return { dir: w.muse.where.dir.clone(), ground: w.muse.where.height, home: true };
   }
 
   /** Cottage-local meters (x along the front, z out toward the pond) as a planet direction. */

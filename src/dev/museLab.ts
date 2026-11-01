@@ -31,7 +31,7 @@ import { SCULPTS, type SculptKind } from '../life/museMesh';
 import { loadTripo } from '../life/museTripo';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
-import { MuseRig, WAVE_LENGTH } from '../life/museRig';
+import { BOUNCE_LENGTH, FISH, FLUFF_LENGTH, GARDEN, COOK, HOP, LIE_BACK, MuseRig, PET, PLOP, RISE, WAKE, WAVE_LENGTH, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
 import { registerShaderChunks } from '../render/glsl';
 
 // The Muse lab (dev only, served at /src/dev/museLab.html): Muse alone on
@@ -46,14 +46,18 @@ import { registerShaderChunks } from '../render/glsl';
 //                           how much each part of the skin is stretched (red) or squashed (blue) in the pose;
 //                           how far each normal of the posed skin turns from its neighbours' (bumps, creases: red))
 //   wire=1 (the triangles over it)
-//   view=front|left|back|turn:<deg>|persp:<deg>   pose=idle|walk|wave|hang   t=<s>   gait=<cycles>   fur=0|1   bones=0|1
+//   view=front|left|back|turn:<deg>|persp:<deg>   pose=idle|walk|wave|hang|<move>   t=<s>   gait=<cycles>   fur=0|1   bones=0|1
+//   (a move, on the spot: bounce|pet|fluff|yawn|hopup|perch|hopdown|plop|sit|rise|lie|sleep|wake|fish|water|stir; pet is held 3.5 s, then let go)
 //   size=<px> (Muse this many pixels tall, as if seen from further off)
 //   skin=lbs|dqs (the joints blended as matrices, as Muse is drawn, or as dual quaternions)   raise=0 (without the correctives)
 //   hang=<z>,<x>  wave=<z>,<fore>[,<x>,<y>] (other arm angles on the body's fit, rad)   reach=<H> (arms drawn longer)   comb=0 (the fur standing straight)
-//   live=1: Muse played over and over, the window filled, the camera on a turntable (drag to turn, wheel to come
-//           close, right-drag to slide); pose=day plays a little day (stands, waves, waddles on the spot). Keys: 1 idle,
-//           2 walk, 3 wave, 4 day, 0 arms hung; space pauses, ← → step (shift: half a second); F fur, C clay,
-//           T the triangles as drawn, R rough, S stretch, W weights; X the wire, B the bones
+//   live=1: Muse living its day on its stage (museStage.ts: a lawn with a bench, a pond, flowers and a fire; click it,
+//           hold it), the window filled, the camera following it (drag to turn, wheel to come close, right-drag to
+//           slide; G stops following). Keys: 1–7 go to a part of its day; space pauses, ← → step (shift: half a
+//           second); F fur, C clay, T the triangles as drawn, R rough, S stretch, W weights; X the wire, B the bones.
+//           day=<s> starts at that moment of its day, pause=1 holds it there.
+//           With a pose (or stage=0), Muse alone on a turntable, the pose played over and over; pose=day plays a little
+//           day (stands, waves, waddles on the spot). Keys: 1 idle, 2 walk, 3 wave, 4 day, 0 arms hung
 // Muse is one meter tall here; everything is in its heights.
 
 const REF = { width: 1504, height: 1680, tall: 1261, feet: 1438, middle: 799.5 } as const;
@@ -101,11 +105,38 @@ const rig = new MuseRig({
   reach: params.has('reach') ? Number(params.get('reach')) : baseFit.reach,
 });
 
+/** The moves on the spot (museRig.ts), each played over and over live (this long, s); pet is held PET_HOLD s, then let go. */
+const PET_HOLD = 3.5;
+const MOVES: Record<string, { kind: MoveKind; length: number }> = {
+  bounce: { kind: 'bounce', length: BOUNCE_LENGTH + 0.8 },
+  pet: { kind: 'pet', length: PET_HOLD + PET.out + 2 },
+  fluff: { kind: 'fluff', length: FLUFF_LENGTH + 0.8 },
+  yawn: { kind: 'yawn', length: YAWN_LENGTH + 0.8 },
+  hopup: { kind: 'hopUp', length: HOP.up + 0.8 },
+  perch: { kind: 'perch', length: 15 },
+  hopdown: { kind: 'hopDown', length: HOP.down + 0.8 },
+  plop: { kind: 'plop', length: PLOP + 0.8 },
+  sit: { kind: 'sit', length: 8 },
+  rise: { kind: 'rise', length: RISE + 0.8 },
+  lie: { kind: 'lieBack', length: LIE_BACK + 0.8 },
+  sleep: { kind: 'sleep', length: 13 },
+  wake: { kind: 'wake', length: WAKE + 0.8 },
+  fish: { kind: 'fish', length: FISH.period },
+  water: { kind: 'water', length: GARDEN.period },
+  stir: { kind: 'stir', length: COOK.period },
+};
+
 /** Pose Muse at a time: a still's moment from the hash; live, its pose played over and over. */
 function act(t: number): void {
   let walk = 0;
   let gait = Number(params.get('gait') ?? 0.25);
   let wave = -1;
+  const moves: Move[] = [];
+  const loop = MOVES[pose];
+  if (loop) {
+    const u = live ? t % loop.length : t;
+    moves.push({ kind: loop.kind, time: u, amount: 1, side: 1, release: loop.kind === 'pet' ? (u > PET_HOLD ? u - PET_HOLD : -1) : undefined });
+  }
   if (pose === 'walk') {
     walk = 1;
     if (live) gait = t * GAIT;
@@ -121,7 +152,7 @@ function act(t: number): void {
       gait = walking * GAIT;
     }
   }
-  rig.pose({ time: t, walk, stride: 1, gait, wave, lookYaw: 0, lookPitch: 0, look: 0 });
+  rig.pose({ time: t, walk, stride: 1, gait, wave, lookYaw: 0, lookPitch: 0, look: 0, moves });
   // (the arms hung and nothing else moving, to compare the two arms)
   if (pose === 'hang') rig.hang();
 }
@@ -194,16 +225,19 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
       // turns from its neighbours' (bumps and creases): white none … red 25° and more
       // (with the hung corrective as the shader takes it: full, but on the left as the arm rises)
       const rest = Float32Array.from(b.position);
-      if (hung && b.hang) for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) rest[i * 3 + a] += b.hang[i * 3 + a] * (b.position[i * 3] > 0 ? 1 - rig.raised : 1);
+      const raisedAt = (i: number): number => (b.position[i * 3] > 0 ? rig.raised : rig.raisedRight);
+      const hungAt = (i: number): number => (b.position[i * 3] > 0 ? rig.hung : rig.hungRight);
+      if (hung && b.hang) for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) rest[i * 3 + a] += b.hang[i * 3 + a] * hungAt(i);
       const posed = rig.deform(rest, b.skinIndex, b.skinWeight, new Float32Array(n * 3), dual);
       if (raised && b.raise) {
         // with the wave's corrective, as the shader adds it (in the chest's frame)
         const e = rig.skin[3].elements;
         for (let i = 0; i < n; i++) {
           const [x, y, z] = [b.raise[i * 3], b.raise[i * 3 + 1], b.raise[i * 3 + 2]];
-          posed[i * 3] += rig.raised * (e[0] * x + e[4] * y + e[8] * z);
-          posed[i * 3 + 1] += rig.raised * (e[1] * x + e[5] * y + e[9] * z);
-          posed[i * 3 + 2] += rig.raised * (e[2] * x + e[6] * y + e[10] * z);
+          const r = raisedAt(i);
+          posed[i * 3] += r * (e[0] * x + e[4] * y + e[8] * z);
+          posed[i * 3 + 1] += r * (e[1] * x + e[5] * y + e[9] * z);
+          posed[i * 3 + 2] += r * (e[2] * x + e[6] * y + e[10] * z);
         }
       }
       let worst = 0;
@@ -301,9 +335,11 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
       uMuseFrame: { value: new Matrix3() },
       uMuseSize: { value: new Vector4(1, FUR_LENGTH / MUSE_HEIGHT, SHELLS, 0) },
       uMuseWind: { value: new Vector4() },
-      uMuseFace: { value: new Vector4(rig.eyes, rig.smile, 0, 0) },
+      uMuseFace: { value: new Vector4(rig.eyes, rig.smile, rig.squint, rig.squeeze) },
+      uMuseMood: { value: new Vector4(rig.blush, 0, 0, 0) },
+      uMuseFluff: { value: rig.fluff },
       uMuseGrade: { value: grade },
-      uMuseRaise: { value: rig.raised },
+      uMuseRaise: { value: new Vector4(rig.raised, rig.raisedRight, rig.hung, rig.hungRight) },
       uStudioSun: { value: sun },
       uSunDir: { value: sun },
       uSunTint: { value: new Color(1, 1, 1) },
@@ -318,6 +354,8 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
   });
   const mesh = new Mesh(g, material);
   mesh.frustumCulled = false;
+  // (hide=1: Muse not drawn, all else as it is: the stage's grass and shadows round it)
+  mesh.visible = params.get('hide') !== '1';
   scene.add(mesh);
   // the triangles, drawn over the skin
   const wireMaterial = material.clone();
@@ -376,12 +414,21 @@ const s = REF.tall;
 const ortho = new OrthographicCamera(-REF.middle / s, (REF.width - REF.middle) / s, REF.feet / s, -(REF.height - REF.feet) / s, 0.1, 20);
 const turn = view === 'left' ? Math.PI / 2 : view === 'right' ? -Math.PI / 2 : view === 'back' ? Math.PI : view.startsWith('turn:') ? (Number(view.slice(5)) * Math.PI) / 180 : 0;
 let camera: OrthographicCamera | PerspectiveCamera = ortho;
-if (view.startsWith('persp:') || live) {
-  // a three-quarter view through a lens, as the reference photographs are (live: from the view's side, on a turntable)
+if (view.startsWith('persp:') || view.startsWith('cam:') || live) {
+  // a three-quarter view through a lens, as the reference photographs are (live: from the view's side, on a turntable);
+  // cam:<deg round>,<deg up>,<distance>,<height looked at>[,<depth looked at>] for any other
   const a = view.startsWith('persp:') ? (Number(view.slice(6)) * Math.PI) / 180 : turn;
   const p = new PerspectiveCamera(30, live ? innerWidth / innerHeight : REF.width / REF.height, 0.05, 40);
   p.position.set(3.2 * Math.sin(a), 0.75, 3.2 * Math.cos(a));
   p.lookAt(0, 0.5, 0);
+  if (view.startsWith('cam:')) {
+    const [round, up, far, y, z] = view.slice(4).split(',').map(Number);
+    const r = (round * Math.PI) / 180;
+    const e = (up * Math.PI) / 180;
+    const at = new Vector3(0, y, z || 0);
+    p.position.set(at.x + far * Math.cos(e) * Math.sin(r), at.y + far * Math.sin(e), at.z + far * Math.cos(e) * Math.cos(r));
+    p.lookAt(at);
+  }
   camera = p;
 } else {
   ortho.position.set(5 * Math.sin(turn), 0, 5 * Math.cos(turn));
@@ -397,6 +444,15 @@ if (!live) {
   controls.target.set(0, 0.5, 0);
   controls.enableDamping = true;
   controls.update();
+  // Muse's life on its stage (museStage.ts), unless a pose is asked for or stage=0: the bare turntable
+  const stage = rigged && params.get('stage') !== '0' && !params.has('pose') ? (await import('./museStage')).buildStage(scene, lens, canvas, controls, { rig, uniforms: rigged.material.uniforms }) : null;
+  if (stage) {
+    skeleton.matrixAutoUpdate = dots.matrixAutoUpdate = false;
+    skeleton.matrix = dots.matrix = stage.place;
+    // (day=<s>: that moment of its day; pause=1: held there)
+    if (params.has('day')) stage.seek(time, Number(params.get('day')));
+    (window as unknown as { museStage: unknown }).museStage = stage;
+  }
   addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
     lens.aspect = innerWidth / innerHeight;
@@ -407,15 +463,17 @@ if (!live) {
   legend.style.cssText = 'position:fixed;left:12px;bottom:10px;font:12px/1.5 ui-monospace,Menlo,monospace;color:#555;white-space:pre;pointer-events:none';
   document.body.append(legend);
   let t = time;
-  let paused = false;
+  let paused = params.get('pause') === '1';
   const tell = (): void => {
-    legend.textContent = `${model} · ${pose} · ${look}${paused ? ' · paused' : ''}   t ${t.toFixed(2)} s\n1 idle  2 walk  3 wave  4 day  0 arms hung   space pause  ← → step\nF fur  C clay  T triangles  R rough  S stretch  W weights   X wire  B bones   drag to turn, wheel to come close`;
+    const keys = stage ? stage.legend() : `${model} · ${pose} · ${look}${paused ? ' · paused' : ''}   t ${t.toFixed(2)} s\n1 idle  2 walk  3 wave  4 day  0 arms hung`;
+    legend.textContent = `${keys}${stage && paused ? ' · paused' : ''}\nspace pause  ← → step   F fur  C clay  T triangles  R rough  S stretch  W weights   X wire  B bones   drag to turn, wheel to come close`;
   };
   const poses: Record<string, string> = { '1': 'idle', '2': 'walk', '3': 'wave', '4': 'day', '0': 'hang' };
   const looks: Record<string, string> = { f: 'muse', c: 'clay', t: 'facet', r: 'rough', s: 'stretch', w: 'weights' };
   addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
-    if (key in poses) {
+    if (stage?.key(event, t)) event.preventDefault();
+    else if (!stage && key in poses) {
       pose = poses[key];
       t = 0;
     } else if (key in looks && rigged) rigged.setLook(looks[key]);
@@ -428,13 +486,16 @@ if (!live) {
   });
   let last = performance.now();
   renderer.setAnimationLoop((now) => {
-    if (!paused) t += Math.min(0.1, (now - last) / 1000);
+    const dt = paused ? 0 : Math.min(0.1, (now - last) / 1000);
+    t += dt;
     last = now;
-    act(t);
+    if (stage) stage.update(t, dt);
+    else act(t);
     if (rigged) {
       const u = rigged.material.uniforms;
-      (u.uMuseFace.value as Vector4).set(rig.eyes, rig.smile, 0, 0);
-      u.uMuseRaise.value = rig.raised;
+      (u.uMuseFace.value as Vector4).set(rig.eyes, rig.smile, rig.squint, rig.squeeze);
+      (u.uMuseMood.value as Vector4).set(rig.blush, 0, 0, 0);
+      (u.uMuseRaise.value as Vector4).set(rig.raised, rig.raisedRight, rig.hung, rig.hungRight);
       u.uTime.value = t;
       if (look === 'stretch' || look === 'rough') rigged.paint();
     }

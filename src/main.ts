@@ -143,10 +143,15 @@ async function boot(): Promise<void> {
     },
   });
 
-  // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden): it sees taps first.
+  // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
+  // Muse's; the garden sees every other tap before the meadow does.
   // `?muse` shows the engine's own overlay instead (muse/ui), until the engine feeds this interface.
   const garden = new URLSearchParams(location.search).has('muse') ? null : new GardenUi(uiRoot, world, store);
 
+  // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
+  // click, double-click and hold go on everywhere else
+  const onMuse = (x: number, y: number): { side: number } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+  let pettingMuse = false;
   attachInput(canvas, {
     drag: (dx, dy) => {
       garden?.interrupt();
@@ -159,6 +164,10 @@ async function boot(): Promise<void> {
       userPosed = true;
     },
     tap: (x, y) => {
+      if (onMuse(x, y)) {
+        world.muse.tap(clock.time);
+        return;
+      }
       if (garden?.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
         userPosed = true;
         return;
@@ -169,6 +178,10 @@ async function boot(): Promise<void> {
       else world.gust(hit.dir, clock.time);
     },
     doubleTap: (x, y) => {
+      if (onMuse(x, y)) {
+        world.muse.tap(clock.time);
+        return;
+      }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) {
         garden?.interrupt();
@@ -177,11 +190,24 @@ async function boot(): Promise<void> {
       }
     },
     holdStart: (x, y) => {
+      const touch = onMuse(x, y);
+      if (touch) {
+        pettingMuse = true;
+        world.muse.hold(clock.time, touch.side);
+        return;
+      }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit && hit.water >= 0) world.bloomStart(hit.dir);
     },
     holdMove: () => undefined,
-    holdEnd: () => world.bloomEnd(),
+    holdEnd: () => {
+      if (pettingMuse) {
+        pettingMuse = false;
+        world.muse.letGo(clock.time);
+        return;
+      }
+      world.bloomEnd();
+    },
   });
 
   // The canvas and the targets sized with it (bufferSize), and the part of them drawn (viewSize):
