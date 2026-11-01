@@ -511,7 +511,7 @@ export class Engine {
     if (!still(as, p.n) || !still(bs, p.otherN)) return;
     // Drawn while both friend groups allowed it; either owner may have narrowed theirs since.
     if (!this.deps.social.inReach(as, p.other) || !this.deps.social.inReach(bs, a)) return;
-    const k =as.social.relationships.get(p.other)?.encounters ?? 0;
+    const k = as.social.relationships.get(p.other)?.encounters ?? 0;
     const out = this.deps.social.encounter(as, bs, p.where, tx.now, this.deps.drawFor(a, p.n * 64 + 1 + k));
     tx.emitAll(a, out.self);
     tx.emitAll(p.other, out.other);
