@@ -55,9 +55,9 @@ pins, the post and the basket.
 ### Measured (the garden's controls)
 
 - **Cost with the basket away.** A/B of f51a9e2 against 578fb83 in one browser, 8 alternating rounds at 2880×1800: every view within 0.2 ms at High and at Medium, best and median (noise here is about 0.4 ms). Orbit 9.60 against 9.63 ms, meadow 1.6 m 15.83 against 15.91, cottage 24.14 against 24.21 (High, best).
-- **Cost with the basket out.** Its own canvas adds 14 draw calls and 5,200 triangles; the planet's own pass keeps its draw calls (22 in orbit, 31 standing, 30 in the meadow, open or closed). A frame costs 0.4 to 0.7 ms more on the planet's sync and about 0.5 ms on both canvases' (High, 2880×1800). It draws only while the basket is out.
+- **Cost with the basket out.** Its own canvas adds 14 draw calls and 5,200 triangles; the planet's own pass keeps its draw calls (22 in orbit, 31 standing, 30 in the meadow, open or closed). A frame costs 0.4 to 0.7 ms more on the planet's sync and 0.5 to 0.75 ms on both canvases' (High, 2880×1800). It draws only while the basket is out. The canvas itself is 0.13 ms (0.087 at DPR 1: a quarter of the pixels saves a third of the time, so it is the draws, not the fill); the rest is a second WebGL context presenting each frame on ANGLE over Metal, and about 0.1 ms of JS. The browser compositing the extra layer isn't in these numbers.
 - **The meadow is untouched.** With the opened baskets the same in both builds and the pins held back (they pop in on the wall clock), 36 of 36 frames identical to 1041343: 9 views at High and Medium, DPR 1 and 2; the shader change on its own 18 of 18. On a first visit only the orbit view differs, where today's basket now shows as its five spheres, since every patch stands grown. The post box draws the same in four states at DPR 1 and 2.
-- **The handoff.** For each of 5 flowers, 49 frames filmed round its head as it lands: none with the flower missing or doubled. Colour across the handoff, ΔE76 between the basket's flower just before and its hero just after: 5.0, 4.2 and 4.8 on heads of 48 to 116 px (High, DPR 2); a fourth sample, 24.3, compared only 3 px of head and says little.
+- **The handoff.** For each of 5 flowers, 49 frames filmed round its head as it lands: none with the flower missing or doubled. Colour across the handoff, ΔE76 between the basket's flower just before and its hero just after: 5.0, 4.2 and 4.8 on heads of 48 to 116 px (High, DPR 2), and 3.1 for the first at Low, which has no bloom: the rest of the gap at High is the frame's bloom, which a flower's own paint can't carry. The blue cluster and the pink cup can't be measured this way, since their heroes stand before patch-mates of nearly their colour (a fourth sample, 24.3, compared only 3 px of head); their close-up crops look continuous.
 - **Checks.** npm run check clean; 891 unit tests pass, 3 skipped; npm run test:gpu 15 pass, 1 skipped; npm run shots 15 pass and read; the live e2e's 11 pass against the engine, the basket's rewritten.
 - **Recordings** of the whole basket at 1440×900, 390×844 and with reduced motion: open, hover, pick and land, reopen, drag the timeline, swap days, send all, close.
 
@@ -74,6 +74,10 @@ pins, the post and the basket.
 - Tickets from hosts outside the friend group still show: the engine doesn't yet filter invitations by reach.
 - On a phone the "Muse brought you a basket" toast stays over the open basket.
 - Where baskets crowd (a run of days in October in the fixture), the timeline's dots overlap until the pointer or the selection comes near; the bulge spreads only round those two.
+- A hero in focus is subtle on the small species (the blue and lilac clusters) in a still, and drawn nearer it shows its whole stem over its patch. The flower meshes are low in detail at the basket's size. For Kai's eye.
+- A flower lands where its hero stands in still air, so with wind it can shift a few pixels at touch-down.
+- The find shader's planting code (the rise, the buds, the planted field) no longer runs, since every patch stands grown. Removing it wants its own samecheck.
+- The pins pop in on the wall clock, so orbit samechecks differ at Muse's pin unless the pins are held back (in the base build too).
 - Photo captions such as "Out exploring Drink" read oddly (from before this round).
 - The post's day names ("Today", "Tuesday") and the basket's follow the browser's clock, while From today follows the engine's day (from before this round).
 - `environments/scarlet-sail-canyon/ui/garden/` is a copy of the old garden interface and was left as it was.
