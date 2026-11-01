@@ -141,7 +141,7 @@ void main() {
   vec3 col = vec3(0.0);
   vec3 tame = vec3(0.0);
   // where the terraces are built (objects.ts) the ground under them is only seen at the land's edge: earth
-  bool built = uObjects.w > 0.0 && chordAngle(dir, uObjects.xyz) * uRadius < uObjects.w;
+  bool built = uObjects.w > 0.0 && chordAngle(dir, uObjects.xyz) * uRadius < uObjects.w && p.kind == PLOT_TERRACE;
   if (built && wild < 0.999) {
     tame = tone3(pal(TR_EARTH, 2), mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), 0.5), pal(TR_EARTH, 3), bMesh);
   } else if (wild < 0.999) {

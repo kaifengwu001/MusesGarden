@@ -35,6 +35,7 @@ import { CubeReadback } from './bakeReader';
 import { createCellSample } from './cells';
 import { floorPieces, type FloorPiece } from './floors';
 import { TerraceObjects } from './objects';
+import { PaddyMap } from './paddyMap';
 import { surveyCell, type CellSurvey } from './survey';
 
 const NOON = new Palette(TERRACE_ROWS);
@@ -98,6 +99,7 @@ export class TerraceWorld implements PlanetWorld {
   readonly trees: Trees;
   readonly rice: Rice;
   readonly objects: TerraceObjects;
+  readonly paddyMap: PaddyMap;
   readonly birds: TerraceBirds;
   /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
   villages: Village[] = [];
@@ -156,6 +158,8 @@ export class TerraceWorld implements PlanetWorld {
     this.houses = new Houses(this.shared);
     this.trees = new Trees(this.shared);
     this.birds = new TerraceBirds(this.shared);
+    this.paddyMap = new PaddyMap(this.shared);
+    Object.assign(this.shared, this.paddyMap.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceObjects(this.shared);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
@@ -422,8 +426,11 @@ export class TerraceWorld implements PlanetWorld {
     );
     // the terraces as built, round the focus, once the ground is baked in full (until then the paint)
     if (this.fieldsFull) {
-      this.objects.update(this.terrain, this.bakesRead(), rig.up, `${this.fieldsR}/${this.fieldsKey}/${this.terrain.seasonFront.toFixed(3)}`);
+      const key = `${this.fieldsR}/${this.fieldsKey}`;
+      this.objects.update(this.terrain, this.bakesRead(), rig.up, key, this.queue);
       this.terrainUniforms.uObjects.value.set(this.objects.centre.x, this.objects.centre.y, this.objects.centre.z, this.objects.reach);
+      // the rice reads the built paddies round the focus from their map
+      this.paddyMap.render(this.renderer, this.objects.group, rig.up, rig.forward, R, `${key}/${this.objects.group.children.length}/${this.terrain.seasonFront.toFixed(3)}`);
     } else this.terrainUniforms.uObjects.value.w = 0;
     // the rice near the focus, fewer as the camera rises, none from a bird's height
     const riceNear = RICE.near * smoothstep(60, 22, rig.altitude);

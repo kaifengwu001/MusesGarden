@@ -1,10 +1,11 @@
 import { DoubleSide, Group, Mesh, ShaderMaterial, Vector3, type IUniform } from 'three';
+import type { BuildQueue } from '../core/buildQueue';
 import type { CubeReadback } from './bakeReader';
-import { createCellSample } from './cells';
+import { createCellSample, type CellSample } from './cells';
 import { gradientFrame } from './fields';
-import { surveyCell } from './survey';
+import { surveyCellJob } from './survey';
 import fragmentShader from './terrace.frag.glsl?raw';
-import { buildCellMesh } from './terraceMesh';
+import { buildCellMeshJob } from './terraceMesh';
 import vertexShader from './terrace.vert.glsl?raw';
 import type { TerraceTerrain } from './terrain';
 
@@ -14,44 +15,63 @@ import type { TerraceTerrain } from './terrain';
 // under them. Built again whenever the ground is baked anew (the planet's
 // size, a parameter), and as the camera moves on, the cells coming into reach.
 
-/** Cells are built out to this far from the focus (m), surveyed on the way every so far. */
+/** Cells are built out to this far from the focus (m), looked for every so far. */
 export const OBJECTS = { reach: 220, probe: 8 } as const;
+
+interface Pending {
+  readonly id: string;
+  readonly centre: Vector3;
+}
 
 export class TerraceObjects {
   readonly group = new Group();
   private readonly material: ShaderMaterial;
   private readonly meshes = new Map<string, Mesh>();
+  private readonly pending = new Map<string, Pending>();
   private builtFor = '';
   /** Out to here round `centre` (m) every cell is built (the ground sinks only inside it). */
   reach = 0;
   readonly centre = new Vector3(0, 1, 0);
+  private planned = 0;
+  private cellSize = 64;
 
   constructor(shared: Record<string, IUniform>) {
     this.material = new ShaderMaterial({ name: 'terraces', vertexShader, fragmentShader, uniforms: { ...shared }, side: DoubleSide });
   }
 
-  /** Drop every mesh (the ground was baked anew). */
-  clear(): void {
+  /** Drop every mesh and every build under way (the ground was baked anew). */
+  clear(queue?: BuildQueue): void {
     for (const m of this.meshes.values()) {
       m.geometry.dispose();
       this.group.remove(m);
     }
     this.meshes.clear();
+    for (const id of this.pending.keys()) queue?.cancel(`terraces:${id}`);
+    this.pending.clear();
     this.reach = 0;
+    this.planned = 0;
     this.builtFor = '';
   }
 
-  /** Build the cells within reach of `focus` that are not built yet (key: everything the meshes depend on). */
-  update(terrain: TerraceTerrain, bakes: { terrain: CubeReadback; layout: CubeReadback }, focus: Vector3, key: string): void {
+  /**
+   * Queue the cells within reach of `focus` that are not built yet, nearest first, each surveyed and built
+   * a few milliseconds a step (key: everything the meshes depend on); the reach the ground may sink in is
+   * as far as every cell is built.
+   */
+  update(terrain: TerraceTerrain, bakes: { terrain: CubeReadback; layout: CubeReadback }, focus: Vector3, key: string, queue: BuildQueue): void {
     if (key !== this.builtFor) {
-      this.clear();
+      this.clear(queue);
       this.builtFor = key;
     }
     const R = terrain.radius;
-    // (moved on less than a few meters: nothing new in reach)
-    if (this.reach > 0 && focus.distanceTo(this.centre) * R < 12) return;
     const size = R / terrain.cells.frequency;
+    this.cellSize = size;
     const reach = Math.min(OBJECTS.reach, 0.5 * Math.PI * R);
+    // (moved on a few meters: look again for cells coming into reach)
+    if (this.planned > 0 && focus.distanceTo(this.centre) * R < 12) {
+      this.reach = this.builtReach(focus, R);
+      return;
+    }
     const a = new Vector3();
     const b = new Vector3();
     gradientFrame(focus, a, b);
@@ -63,18 +83,33 @@ export class TerraceObjects {
         q.copy(focus).multiplyScalar(R).addScaledVector(a, x).addScaledVector(b, y).normalize();
         terrain.cells.at(q, cell);
         const id = `${cell.x},${cell.y},${cell.z}`;
-        if (this.meshes.has(id)) continue;
-        const survey = surveyCell(cell, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront);
-        const geometry = buildCellMesh(survey);
-        const mesh = new Mesh(geometry ?? undefined, this.material);
-        mesh.frustumCulled = false;
-        mesh.visible = geometry !== null;
-        this.meshes.set(id, mesh);
-        if (geometry) this.group.add(mesh);
+        if (this.meshes.has(id) || this.pending.has(id)) continue;
+        const c: CellSample = { ...cell, centre: cell.centre.clone(), along: cell.along.clone(), up: cell.up.clone() };
+        this.pending.set(id, { id, centre: c.centre });
+        queue.add(`terraces:${id}`, Math.acos(Math.min(1, c.centre.dot(focus))) * R, this.job(id, c, R, size, bakes, terrain));
       }
     }
     this.centre.copy(focus);
-    this.reach = reach;
+    this.planned = reach;
+    this.reach = this.builtReach(focus, R);
+  }
+
+  private *job(id: string, cell: CellSample, R: number, size: number, bakes: { terrain: CubeReadback; layout: CubeReadback }, terrain: TerraceTerrain): Generator<void, void, void> {
+    const survey = yield* surveyCellJob(cell, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront);
+    const geometry = yield* buildCellMeshJob(survey);
+    const mesh = new Mesh(geometry ?? undefined, this.material);
+    mesh.frustumCulled = false;
+    mesh.visible = geometry !== null;
+    this.meshes.set(id, mesh);
+    this.pending.delete(id);
+    if (geometry) this.group.add(mesh);
+  }
+
+  /** How far round the focus every cell is built (m): short of the nearest cell still to build. */
+  private builtReach(focus: Vector3, R: number): number {
+    let reach = this.planned;
+    for (const p of this.pending.values()) reach = Math.min(reach, Math.acos(Math.min(1, p.centre.dot(focus))) * R - 1.2 * this.cellSize);
+    return Math.max(reach, 0);
   }
 
   get triangles(): number {

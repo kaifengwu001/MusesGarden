@@ -3,28 +3,35 @@
 // vertex is (a floor, a riser, a bund, a skirt, a ridge) and its paddy.
 #include <meadow_common>
 #include <meadow_warp>
+#include <meadow_noise>
 uniform float uRadius;
+#include <terraces_common>
+#include <terraces_plots>
+#include <terraces_paddy>
 
 attribute float aPart;
-attribute vec4 aPaddy; // its paddy's colour, stage, plants' height (m), water depth (m)
+attribute vec4 aPaddy; // its paddy's constants: colour, place in the season, its plants' and its water's own share
 attribute vec4 aFloor; // its floor (m), fallow, share across its band, -
 
 varying vec3 vDir;
 varying vec3 vWarped;
 varying vec3 vNormal;
 varying float vPart;
-varying vec4 vPaddy;
+varying vec4 vPaddy; // its crop now: colour, stage, plants' height (m), water depth (m)
 varying vec4 vFloor;
 varying float vHeight;
 
 void main() {
-  vec3 w = warpPosition(position);
-  vDir = normalize(position);
+  // a floor lies under its water, at its own level this season
+  Crop c = cropFrom(aPaddy.x, aPaddy.y, aPaddy.z, aPaddy.w, aFloor.y);
+  vec3 p = aPart < 0.5 ? position + normalize(position) * c.water : position;
+  vec3 w = warpPosition(p);
+  vDir = normalize(p);
   vWarped = w;
-  vNormal = warpNormal(position, normal);
+  vNormal = warpNormal(p, normal);
   vPart = aPart;
-  vPaddy = aPaddy;
+  vPaddy = vec4(c.variant, c.maturity, c.height, c.water);
   vFloor = aFloor;
-  vHeight = length(position) - uRadius;
+  vHeight = length(p) - uRadius;
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }

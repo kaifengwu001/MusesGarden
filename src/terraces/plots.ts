@@ -28,7 +28,7 @@ import { gradientFrame, type TerraceBase, type TerraceFields } from './fields';
  * `square` (m) cut square-ish; a riser's batter (m across per m of height), a
  * bund's width and height (m) and the share of it flat on top.
  */
-export const TERRACE = { band: 4.2, riser: [0.12, 1.3], spread: 0.22, jitter: 0.16, merge: 0.13, cuts: [22, 48], square: 9, batter: 0.24, bund: 0.3, bundHeight: 0.22, crest: 0.45 } as const;
+export const TERRACE = { step: 0.85, cutMeters: 34, band: 4.2, riser: [0.12, 1.3], spread: 0.22, jitter: 0.16, merge: 0.13, cuts: [22, 48], square: 9, batter: 0.24, bund: 0.3, bundHeight: 0.22, crest: 0.45 } as const;
 /** The flats' rows (m wide) and their plots (× the row long). */
 export const PLOTS = { width: [9, 16], length: [1, 2.3] } as const;
 /** A paddy's delay: its cell's season's share (the rest its own chance), and how far the season spreads. A share left fallow. */
@@ -78,10 +78,14 @@ export interface CropSample {
   height: number;
   water: number;
   rows: number;
+  /** The paddy's own constants, its crop at any season worked out from them (paddy.glsl cropFrom): its place in the season (0 planted first … 1 last), its plants' and its water's own share. */
+  delay: number;
+  hv: number;
+  wv: number;
 }
 
 export function createCropSample(): CropSample {
-  return { variant: 0, maturity: 0, fallow: false, height: 0, water: 0, rows: 0 };
+  return { variant: 0, maturity: 0, fallow: false, height: 0, water: 0, rows: 0, delay: 0, hv: 0, wv: 0 };
 }
 
 const unitHash = (h: number): number => (h >>> 8) / 16777216;
@@ -107,6 +111,26 @@ export class TerracePlots {
     private readonly cells: TerraceCells,
     private readonly seed: number,
   ) {}
+
+  /** A wall's cut field at a direction (the cuts along it fall where it crosses a step: survey.ts). */
+  cutField(dir: Vector3, level: number): number {
+    const k = this.fields.radius / TERRACE.cutMeters;
+    return gnoise(dir.x * k, dir.y * k, dir.z * k, (this.seed + 31 * level + 7) >>> 0);
+  }
+
+  /** The season's spread over the hillsides at a direction (0 planted first … 1 last). */
+  seasonAt(dir: Vector3): number {
+    return this.fields.season(dir);
+  }
+
+  /**
+   * A paddy's lean in the season (0 planted first … 1 last) from its wall's level and its step along it: a slow
+   * noise over the two, so neighbours along a wall and up the hillside lean alike (whole stretches of
+   * hillside flooded or green together), the same whichever cell builds it.
+   */
+  seasonOf(level: number, step: number): number {
+    return clamp(0.5 + 1.6 * gnoise(level * 0.31 + 0.5, step * 0.37 + 0.5, 0.5, (this.seed + 703) >>> 0), 0, 1);
+  }
 
   hash(cellKey: number, a: number, b: number, c: number, salt: number): number {
     return latticeHash(a, b, c, ((this.seed ^ Math.imul(cellKey, 2654435761)) + salt) >>> 0);
@@ -375,14 +399,11 @@ export class TerracePlots {
     out.rows = unitHash(nextHash(p.id));
     const chance = unitHash((p.id ^ 0x9e3779b9) >>> 0);
     const delay = clamp(SEASON.cell * p.season + (1 - SEASON.cell) * chance, 0, 1);
-    out.maturity = clamp((front - delay) / SEASON.spread, 0, 1);
     out.fallow = unitHash((p.id ^ 0x85ebca6b) >>> 0) < SEASON.fallow;
-    const hv = unitHash((p.id ^ 0x632be5ab) >>> 0);
-    out.height = out.maturity > 0 && !out.fallow ? (0.12 + 0.83 * smoothstep(0.05, 0.85, out.maturity)) * (0.8 + 0.4 * hv) : 0;
-    const wv = unitHash((p.id ^ 0x2545f491) >>> 0);
-    const full = 0.06 + 0.1 * wv;
-    out.water = out.fallow ? (wv < 0.3 ? 0.025 : 0) : full * (1 - smoothstep(0.55, 0.95, out.maturity)) * (1 - 0.55 * smoothstep(0.05, 0.5, out.maturity) * hv);
-    return out;
+    out.delay = delay;
+    out.hv = unitHash((p.id ^ 0x632be5ab) >>> 0);
+    out.wv = unitHash((p.id ^ 0x2545f491) >>> 0);
+    return cropAt(out, front);
   }
 
   /** A plot's ground (m) at its point: floor, bunds and walls, without the water (mirrors plotGround). */
@@ -404,6 +425,15 @@ export class TerracePlots {
     const h = Math.max(this.ground(p), water);
     return h + (p.natural - h) * smoothstep(0.35, 0.65, p.wild);
   }
+}
+
+/** A paddy's crop at the season's front, from its constants (mirrors cropFrom in paddy.glsl). */
+export function cropAt(c: CropSample, front: number): CropSample {
+  c.maturity = clamp((front - c.delay) / SEASON.spread, 0, 1);
+  c.height = c.maturity > 0 && !c.fallow ? (0.12 + 0.83 * smoothstep(0.05, 0.85, c.maturity)) * (0.8 + 0.4 * c.hv) : 0;
+  const full = 0.06 + 0.1 * c.wv;
+  c.water = c.fallow ? (c.wv < 0.3 ? 0.025 : 0) : full * (1 - smoothstep(0.55, 0.95, c.maturity)) * (1 - 0.55 * smoothstep(0.05, 0.5, c.maturity) * c.hv);
+  return c;
 }
 
 /** A bund's rise d meters in from its outer edge (mirrors bundRise). */

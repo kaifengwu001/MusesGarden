@@ -1,4 +1,4 @@
-import { acrossOf, type CellSurvey } from './survey';
+import { acrossOf, type CellSurvey } from "./survey";
 
 // The paddies' floors of a surveyed cell (survey.ts), as pieces of the grid:
 // every square of the terraced land clipped exactly at the land's edge, at
@@ -14,11 +14,16 @@ export interface FloorPiece {
   readonly across: number[];
 }
 
-/** Fields carried by a clipped vertex: x, y, hs, land, d (a cut's signed distance). */
-const F = 5;
+/** Fields carried by a clipped vertex: x, y, hs, land, d (a cut's signed distance), side (into the cell). */
+const F = 6;
 
 /** Sutherland–Hodgman: the part of a polygon (vertices of F fields each) where field `at` ≥ value (≤ when below). */
-function clip(poly: number[], at: number, value: number, below = false): number[] {
+function clip(
+  poly: number[],
+  at: number,
+  value: number,
+  below = false,
+): number[] {
   const out: number[] = [];
   const m = poly.length / F;
   const sign = below ? -1 : 1;
@@ -30,15 +35,42 @@ function clip(poly: number[], at: number, value: number, below = false): number[
     if (va >= 0) for (let f = 0; f < F; f++) out.push(poly[a + f]);
     if (va >= 0 !== vb >= 0) {
       const t = va / (va - vb);
-      for (let f = 0; f < F; f++) out.push(poly[a + f] + (poly[b + f] - poly[a + f]) * t);
+      for (let f = 0; f < F; f++)
+        out.push(poly[a + f] + (poly[b + f] - poly[a + f]) * t);
     }
   }
   return out;
 }
 
-/** The floor pieces of a surveyed cell, handed to `piece` one by one; `plain` gets each square wholly inside one paddy. */
-export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain: (i: number, j: number, paddy: number) => void): void {
-  const { n, g, half, hs, land, bands, levels, band, paddy, cuts, crossing } = s;
+/** The floor pieces of a surveyed cell at once (dev): floorPiecesJob run through. */
+export function floorPieces(
+  s: CellSurvey,
+  piece: (p: FloorPiece) => void,
+  plain: (i: number, j: number, paddy: number) => void,
+): void {
+  for (const _ of floorPiecesJob(s, piece, plain)) void _;
+}
+
+/** The floor pieces of a surveyed cell, handed to `piece` one by one (a step every few rows); `plain` gets each square wholly inside one paddy. */
+export function* floorPiecesJob(
+  s: CellSurvey,
+  piece: (p: FloorPiece) => void,
+  plain: (i: number, j: number, paddy: number) => void,
+): Generator<void, void, void> {
+  const {
+    n,
+    g,
+    half,
+    hs,
+    land,
+    side,
+    bands,
+    levels,
+    band,
+    paddy,
+    cuts,
+    crossing,
+  } = s;
   if (bands.length === 0) return;
   const bandOf = (H: number): number => {
     let a = 0;
@@ -51,7 +83,12 @@ export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain
     return a;
   };
   /** A paddy of band b near grid point (i, j): the point's own, else the nearest within two squares. */
-  const paddyNear = (i: number, j: number, b: number, sideOk: (x: number, y: number) => boolean): number => {
+  const paddyNear = (
+    i: number,
+    j: number,
+    b: number,
+    sideOk: (x: number, y: number) => boolean,
+  ): number => {
     for (let r = 0; r <= 2; r++) {
       for (let dj = -r; dj <= r + 1; dj++) {
         for (let di = -r; di <= r + 1; di++) {
@@ -69,13 +106,34 @@ export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain
   };
   const poly: number[] = [];
   for (let j = 0; j < n - 1; j++) {
+    if (j % 32 === 31) yield;
     for (let i = 0; i < n - 1; i++) {
       const k0 = j * n + i;
       const ks = [k0, k0 + 1, k0 + n + 1, k0 + n];
-      if (land[ks[0]] < 0 && land[ks[1]] < 0 && land[ks[2]] < 0 && land[ks[3]] < 0) continue;
+      if (
+        land[ks[0]] < 0 &&
+        land[ks[1]] < 0 &&
+        land[ks[2]] < 0 &&
+        land[ks[3]] < 0
+      )
+        continue;
+      // (only this cell's part: its neighbours build theirs, a hair over the edge so the two meet)
+      if (
+        side[ks[0]] < -0.6 &&
+        side[ks[1]] < -0.6 &&
+        side[ks[2]] < -0.6 &&
+        side[ks[3]] < -0.6
+      )
+        continue;
       const through = crossing.get(k0);
       const p0 = paddy[ks[0]];
-      if (!through && p0 >= 0 && ks.every((k) => paddy[k] === p0 && band[k] === band[ks[0]])) {
+      if (
+        !through &&
+        p0 >= 0 &&
+        ks.every(
+          (k) => paddy[k] === p0 && band[k] === band[ks[0]] && side[k] >= 0,
+        )
+      ) {
         plain(i, j, p0);
         continue;
       }
@@ -110,8 +168,18 @@ export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain
       for (let b = bandOf(hmin); b <= bandOf(hmax); b++) {
         const B = bands[b];
         poly.length = 0;
-        ks.forEach((k, c) => poly.push(-half + ij[c][0] * g, -half + ij[c][1] * g, hs[k], land[k], 0));
+        ks.forEach((k, c) =>
+          poly.push(
+            -half + ij[c][0] * g,
+            -half + ij[c][1] * g,
+            hs[k],
+            land[k],
+            0,
+            side[k],
+          ),
+        );
         let p = clip(poly, 3, 0);
+        if (p.length >= 3 * F) p = clip(p, 5, -0.03);
         if (p.length >= 3 * F) p = clip(p, 2, B.lo);
         if (p.length >= 3 * F) p = clip(p, 2, B.hi, true);
         if (p.length < 3 * F) continue;
@@ -123,11 +191,15 @@ export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain
           const next: Array<{ p: number[]; side: number[] }> = [];
           for (const part of parts) {
             const q = part.p;
-            for (let v = 0; v < q.length; v += F) q[v + 4] = ((bx - ax) * (q[v + 1] - ay) - (by - ay) * (q[v] - ax)) / len;
+            for (let v = 0; v < q.length; v += F)
+              q[v + 4] =
+                ((bx - ax) * (q[v + 1] - ay) - (by - ay) * (q[v] - ax)) / len;
             const left = clip(q, 4, 0);
             const right = clip(q, 4, 0, true);
-            if (left.length >= 3 * F) next.push({ p: left, side: [...part.side, 1] });
-            if (right.length >= 3 * F) next.push({ p: right, side: [...part.side, -1] });
+            if (left.length >= 3 * F)
+              next.push({ p: left, side: [...part.side, 1] });
+            if (right.length >= 3 * F)
+              next.push({ p: right, side: [...part.side, -1] });
           }
           parts = next;
         }
@@ -135,7 +207,11 @@ export function floorPieces(s: CellSurvey, piece: (p: FloorPiece) => void, plain
           const sideOk = (x: number, y: number): boolean =>
             lines.every(([ax, ay, bx, by], li) => {
               const d = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
-              return part.side[li] === undefined || Math.sign(d) === part.side[li] || Math.abs(d) < 1e-9;
+              return (
+                part.side[li] === undefined ||
+                Math.sign(d) === part.side[li] ||
+                Math.abs(d) < 1e-9
+              );
             });
           const pd = paddyNear(i, j, b, sideOk);
           if (pd < 0) continue;

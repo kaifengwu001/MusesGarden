@@ -67,11 +67,14 @@ void main() {
     // the view from above the floor: more of the water between the plants shows looking down
     vec3 eye = unwarpPosition(cameraPosition) - P;
     float cosView = clamp(dot(normalize(eye), dir), 0.0, 1.0);
-    // inside the blades' reach they stand there themselves (rice.ts), the paint keeping to what lies under them
+    // inside the blades' reach they stand there themselves (rice.ts), over the crop's own depth (the
+    // blades are fewer than a paddy's leaves: the paint keeps most of the crop under them)
     float near = chordAngle(dir, uRiceNear.xyz) * uRadius;
     float blades = uRiceNear.w > 0.5 ? mix(1.0, 0.24, smoothstep(0.45 * uRiceNear.w, uRiceNear.w, near)) * (1.0 - smoothstep(0.78 * uRiceNear.w, uRiceNear.w, near)) : 0.0;
-    float cover = cropCover(c.height, cosView) * (1.0 - blades);
-    vec3 rice = riceColour(c, bUp);
+    float cover = cropCover(c.height, cosView) * (1.0 - 0.45 * blades);
+    // (the crop under the blades: their shade)
+    float shaded = blades * smoothstep(0.1, 0.4, c.height);
+    vec3 rice = riceColour(c, bUp * (1.0 - 0.45 * shaded));
     vec3 sp = dir * uRadius;
     float mottle = 0.6 * gnoise(sp * 0.7, uTerrainSeed + 931u) + 0.4 * gnoise(sp * 2.3, uTerrainSeed + 932u) * (1.0 - smoothstep(0.08, 0.3, pixelMeters));
     rice *= 1.0 + 0.09 * mottle;
