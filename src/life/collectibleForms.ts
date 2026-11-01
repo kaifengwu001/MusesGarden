@@ -669,7 +669,8 @@ function fern(p: Piece, f: Form, kin: Dice, me: Dice): void {
     const len = full * (j === 0 ? 1 : 1 - 0.18 * me.next());
     const up = rise + me.wobble(0.08);
     const bow = droop + me.wobble(0.15);
-    const t = (s: number): number => (s * len) / f.height;
+    // along the frond, base to tip, whatever its length: fronds both grow and sway from the base out
+    const t = (s: number): number => s;
     if (f.open) frond(p, curve(mul(d, 0.015), d, UP, len, (s) => up - bow * s ** style.bend), style.leaflets, leaflet * len, PART.petal, t);
     else frond(p, curve(mul(d, 0.015), d, UP, len, coil), style.leaflets, leaflet * len * 0.2, PART.bud, t);
   }
