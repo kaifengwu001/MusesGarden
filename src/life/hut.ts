@@ -1,6 +1,7 @@
 import {
   Box3,
   BufferGeometry,
+  Matrix3,
   CustomBlending,
   Float32BufferAttribute,
   Matrix4,
@@ -342,6 +343,8 @@ export class HutInterior {
   private readonly showpiece: Array<{ raw: Box3; matrix: Matrix4 }> = [];
   /** The favourites' places on the shelves, in order along them (local m), once the showpiece is in. */
   private places: Vector3[] = [];
+  /** Every piece and the rug as stood, with its handle for the layout editor. */
+  private readonly placed: Placed[] = [];
   private favourites: readonly Favourite[] = [];
   private hovered = -1;
   private opened = -1;
@@ -393,7 +396,7 @@ export class HutInterior {
       name: `hut ${kind}`,
       vertexShader,
       fragmentShader,
-      uniforms: { ...this.uniforms, uKind: { value: kind }, uMap: { value: map }, uShowpiece: { value: showpiece ? 1 : 0 } },
+      uniforms: { ...this.uniforms, uKind: { value: kind }, uMap: { value: map }, uShowpiece: { value: showpiece ? 1 : 0 }, uPlace: { value: new Matrix4() }, uPlaceNormal: { value: new Matrix3() } },
       defines: {
         RESTS,
         ROOM_X: ROOM.x.toFixed(4),
@@ -412,10 +415,7 @@ export class HutInterior {
   }
 
   private async loadAll(): Promise<void> {
-    const rests: Vector4[] = [];
     let bytes = 0;
-    const lamps = this.uniforms.uLamps.value as Vector4[];
-    let lamp = 0;
     // (a model used twice is fetched once)
     const fetched = new Map<string, ReturnType<typeof loadModel>>();
     const fitted = await Promise.all(
@@ -425,25 +425,20 @@ export class HutInterior {
         const geometry = source.clone();
         geometry.computeBoundingBox();
         const raw = geometry.boundingBox!.clone();
-        const { matrix, footprint } = fit(piece, geometry);
+        const { matrix } = fit(piece, geometry);
         geometry.applyMatrix4(matrix);
         if (piece.mirror) rewind(geometry);
-        return { piece, geometry, map, raw, matrix, footprint };
+        return { piece, geometry, map, raw, matrix };
       }),
     );
     const textures = new Set<Texture>();
-    for (const { piece, geometry, map, raw, matrix, footprint } of fitted) {
-      if (piece.rests) rests.push(footprint);
-      if (piece.glow) {
-        const at = onModel(raw, matrix, piece.glow.at, new Vector3());
-        if (piece.glow.kind === 'fire') (this.uniforms.uFire.value as Vector4).set(at.x, at.y, at.z, piece.glow.strength);
-        else if (lamp < lamps.length) lamps[lamp++].set(at.x, at.y, at.z, piece.glow.strength);
-      }
-      if (piece.showpiece) this.showpiece.push({ raw, matrix });
-      const mesh = new Mesh(geometry, this.material(3, map, {}, piece.showpiece));
-      mesh.frustumCulled = false;
-      mesh.name = piece.name;
-      this.group.add(mesh);
+    for (const { piece, geometry, map, raw, matrix } of fitted) {
+      const scale = piece.height / (raw.max.y - raw.min.y);
+      const across = piece.width ? piece.width / (raw.max.x - raw.min.x) : scale;
+      const size = new Vector3((raw.max.x - raw.min.x) * across, piece.height, (raw.max.z - raw.min.z) * scale);
+      // (the handle stands as the piece faces in the room, square to the hut: not turned by what sets a model square)
+      const turn = 'wall' in piece.place ? FACING[piece.place.wall] : piece.place.turn;
+      this.stand(piece.name, piece, geometry, this.material(3, map, { PLACED: '' }, piece.showpiece), size, turn, raw, matrix);
       bytes += geometryBytes(geometry);
       if (map) textures.add(map);
     }
@@ -458,17 +453,88 @@ export class HutInterior {
     g.setAttribute('position', new Float32BufferAttribute([x0, y, z1, x1, y, z1, x1, y, z0, x0, y, z1, x1, y, z0, x0, y, z0], 3));
     g.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: 6 }, () => [0, 1, 0]).flat(), 3));
     g.setAttribute('uv', new Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
-    const rugMesh = new Mesh(g, this.material(4, rug, { RUG: '' }));
-    rugMesh.frustumCulled = false;
-    this.group.add(rugMesh);
+    this.stand('rug', null, g, this.material(4, rug, { RUG: '', PLACED: '' }), new Vector3(RUG.length, 0, width), 0, null, null);
     bytes += 1024 * 594 * 4 * 1.34;
+    gpuMemory.set('hut', bytes);
+    this.loaded = true;
+    this.refresh();
+  }
+
+  /** Stand a piece (or the rug) in the room: its mesh, and its handle at its foot's middle, turned as the piece faces. */
+  private stand(name: string, piece: Piece | null, geometry: BufferGeometry, material: ShaderMaterial, size: Vector3, turn: number, raw: Box3 | null, matrix: Matrix4 | null): void {
+    const mesh = new Mesh(geometry, material);
+    mesh.frustumCulled = false;
+    mesh.name = name;
+    this.group.add(mesh);
+    const box = new Box3().setFromBufferAttribute(geometry.attributes.position as Float32BufferAttribute);
+    const handle = new Object3D();
+    handle.name = name;
+    handle.position.set((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2);
+    handle.rotation.y = turn;
+    handle.updateMatrix();
+    this.group.add(handle);
+    const home = handle.matrix.clone();
+    this.placed.push({ name, piece, handle, home, homeInverse: home.clone().invert(), box, size, raw, matrix, place: material.uniforms.uPlace as IUniform<Matrix4>, placeNormal: material.uniforms.uPlaceNormal as IUniform<Matrix3> });
+  }
+
+  /**
+   * Read the pieces' handles again (the layout editor moved one, or they were just stood): each piece drawn where
+   * its handle has it, its light with it, its shadow on the floor, and the favourites' places on the showpiece.
+   */
+  refresh(): void {
+    const lamps = this.uniforms.uLamps.value as Vector4[];
+    let lamp = 0;
+    const rests: Vector4[] = [];
+    this.showpiece.length = 0;
+    const corner = new Vector3();
+    const box = new Box3();
+    for (const p of this.placed) {
+      p.handle.updateMatrix();
+      const delta = p.place.value.multiplyMatrices(p.handle.matrix, p.homeInverse);
+      p.placeNormal.value.getNormalMatrix(delta);
+      if (!p.piece || !p.raw || !p.matrix) continue;
+      const now = delta.clone().multiply(p.matrix);
+      if (p.piece.rests) {
+        box.makeEmpty();
+        for (let k = 0; k < 8; k++) box.expandByPoint(corner.set(k & 1 ? p.box.max.x : p.box.min.x, k & 2 ? p.box.max.y : p.box.min.y, k & 4 ? p.box.max.z : p.box.min.z).applyMatrix4(delta));
+        rests.push(new Vector4((box.min.x + box.max.x) / 2, (box.min.z + box.max.z) / 2, (box.max.x - box.min.x) / 2, (box.max.z - box.min.z) / 2));
+      }
+      if (p.piece.glow) {
+        const at = onModel(p.raw, now, p.piece.glow.at, new Vector3());
+        if (p.piece.glow.kind === 'fire') (this.uniforms.uFire.value as Vector4).set(at.x, at.y, at.z, p.piece.glow.strength);
+        else if (lamp < lamps.length) lamps[lamp++].set(at.x, at.y, at.z, p.piece.glow.strength);
+      }
+      if (p.piece.showpiece) this.showpiece.push({ raw: p.raw, matrix: now });
+    }
     const rest = this.uniforms.uRest.value as Vector4[];
     rests.slice(0, RESTS).forEach((r, k) => rest[k].copy(r));
     this.uniforms.uRests.value = Math.min(rests.length, RESTS);
-    gpuMemory.set('hut', bytes);
     this.placeFavourites();
-    this.loaded = true;
     this.layDots();
+  }
+
+  /** The pieces and the rug as they stand, for the layout editor (ui/garden/hutEditor.ts). */
+  get pieces(): readonly Placed[] {
+    return this.placed;
+  }
+
+  /**
+   * The layout as it stands, for pasting back (the editor's Export): each piece's foot's middle in the room (m: x
+   * to the right, its lift off the floor, z toward the front), its turn (° about up as it faces in the room; 0 faces
+   * the front, 90 the right end), its width, height and depth (m), and its scale from as laid out.
+   */
+  layout(): Array<{ name: string; at: [number, number, number]; turn: number; size: [number, number, number]; scale: [number, number, number] }> {
+    const r = (v: number, d = 2): number => Number(v.toFixed(d));
+    return this.placed.map((p) => {
+      const h = p.handle;
+      return {
+        name: p.name,
+        at: [r(h.position.x), r(h.position.y - ROOM.floor), r(h.position.z)],
+        turn: r(((((h.rotation.y * 180) / Math.PI) % 360) + 540) % 360 - 180, 1),
+        size: [r(p.size.x * h.scale.x), r(p.size.y * h.scale.y), r(p.size.z * h.scale.z)],
+        scale: [r(h.scale.x, 3), r(h.scale.y, 3), r(h.scale.z, 3)],
+      };
+    });
   }
 
   /** The favourites' places along the showpiece's shelves: shelf by shelf, top first, from the back of the room to the front. */
@@ -586,6 +652,23 @@ export class HutInterior {
     });
     return out;
   }
+}
+
+/** A piece (or the rug) as it stands, for the layout editor: its handle, where it stood as laid out, its box and size then, and its model's box and transform (its light and the favourites' places are read off them). */
+export interface Placed {
+  readonly name: string;
+  readonly piece: Piece | null;
+  /** In the room at the piece's foot's middle, turned as it faces: move, turn or scale it and the piece goes with it (refresh). */
+  readonly handle: Object3D;
+  readonly home: Matrix4;
+  readonly homeInverse: Matrix4;
+  /** Its box as laid out (local m), its width, height and depth then (m). */
+  readonly box: Box3;
+  readonly size: Vector3;
+  readonly raw: Box3 | null;
+  readonly matrix: Matrix4 | null;
+  readonly place: IUniform<Matrix4>;
+  readonly placeNormal: IUniform<Matrix3>;
 }
 
 export interface Favourite {

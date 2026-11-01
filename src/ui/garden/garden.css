@@ -1060,6 +1060,155 @@ body.garden-on .hud {
   }
 }
 
+/* ---- the hut's layout editor (temporary: ?edit) ----------------------------- */
+
+.g-edit-open {
+  appearance: none;
+  position: fixed;
+  left: calc(50% + 92px);
+  bottom: calc(var(--gutter) * 0.6 + 70px);
+  height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #2f4a3a;
+  color: #f4efe2;
+  box-shadow: var(--shadow-soft);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 6;
+}
+
+.g-edit-open.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.g-editor {
+  position: fixed;
+  left: calc(var(--gutter) * 0.6);
+  top: 50%;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 14px 14px 12px;
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow-soft);
+  color: var(--ink);
+  font-size: 13px;
+  transform: translate(-12px, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s ease;
+  z-index: 8;
+}
+
+.g-editor.is-on {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, -50%);
+}
+
+.g-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.g-editor-head h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 17px;
+}
+
+.g-editor-close {
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.g-editor-list {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(62, 58, 54, 0.2);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+
+.g-editor-modes,
+.g-editor-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.g-editor-mode,
+.g-editor-action,
+.g-editor-export {
+  appearance: none;
+  flex: 1;
+  padding: 7px 6px;
+  border: 1px solid rgba(62, 58, 54, 0.2);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.g-editor-mode.is-on {
+  background: #2f4a3a;
+  border-color: #2f4a3a;
+  color: #f4efe2;
+}
+
+.g-editor-export {
+  background: #b5532f;
+  border-color: #b5532f;
+  color: #fff;
+}
+
+.g-editor-snap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.g-editor-note {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.g-editor-out {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(62, 58, 54, 0.2);
+  border-radius: 8px;
+  font: 11px/1.4 ui-monospace, Menlo, monospace;
+  resize: vertical;
+}
+
 /* ---- sheets: the baskets, Muse's page, travel ------------------------------ */
 
 .g-scrim {

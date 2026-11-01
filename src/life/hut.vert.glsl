@@ -9,6 +9,11 @@ uniform float uRadius;
 #ifdef SHELL
 attribute vec4 aPaint; // the room's paint data (hut.ts Shell)
 #endif
+#ifdef PLACED
+// a piece moved, turned or scaled in the layout editor (ui/garden/hutEditor.ts) from where hut.ts stood it
+uniform mat4 uPlace;
+uniform mat3 uPlaceNormal;
+#endif
 
 varying vec3 vNormal;      // warped world
 varying vec3 vWorld;
@@ -30,20 +35,27 @@ void main() {
   vec3 U = normalize(modelMatrix[1].xyz);
   vec3 Z = normalize(modelMatrix[2].xyz);
   float ground = length(modelMatrix[3].xyz);
-  vec2 h = position.xz;
+#ifdef PLACED
+  vec3 pos = (uPlace * vec4(position, 1.0)).xyz;
+  vec3 nrm = normalize(uPlaceNormal * normal);
+#else
+  vec3 pos = position;
+  vec3 nrm = normal;
+#endif
+  vec2 h = pos.xz;
   float d = length(h);
   float angle = asin(min(d / uRadius, 1.0));
   vec3 T = d > 1e-5 ? (X * h.x + Z * h.y) / d : X;
   vec3 axis = normalize(cross(U, T));
   vec3 up = U * cos(angle) + T * sin(angle);
-  vec3 world = up * (ground + position.y);
-  vec3 n = turn(normalize(X * normal.x + U * normal.y + Z * normal.z), axis, angle);
+  vec3 world = up * (ground + pos.y);
+  vec3 n = turn(normalize(X * nrm.x + U * nrm.y + Z * nrm.z), axis, angle);
   vec3 w = warpPosition(world);
   vNormal = warpNormal(world, n);
   vWorld = w;
   vUv = uv;
-  vLocal = position;
-  vLocalNormal = normal;
+  vLocal = pos;
+  vLocalNormal = nrm;
 #ifdef SHELL
   vPaint = aPaint;
 #else

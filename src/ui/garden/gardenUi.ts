@@ -21,6 +21,7 @@ import { BasketsSheet } from './baskets';
 import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
 import { button, dayName, el } from './dom';
 import { FindCard, topicColour, topicRgb } from './findCard';
+import { HutEditor } from './hutEditor';
 import './garden.css';
 import { ICONS } from './icons';
 import { Mail } from './mail';
@@ -106,6 +107,9 @@ export class GardenUi {
   private hoveredBeacon = false;
   private readonly outside: HTMLButtonElement;
   private hutFetched = false;
+  /** The hut's layout editor (temporary: ?edit in the address), and its button in the room. */
+  private readonly editor: HutEditor | null;
+  private readonly editOpen: HTMLButtonElement | null;
   private readonly basketFlight: BasketFlight;
   private readonly card: FindCard;
   private readonly postbox: PostBox;
@@ -227,6 +231,14 @@ export class GardenUi {
       } else this.leaveHut();
     });
     this.root.append(this.outside);
+    // (the layout editor, while the room is being laid out: ?edit in the address)
+    const scene = document.querySelector<HTMLCanvasElement>('#scene');
+    this.editor = new URLSearchParams(location.search).has('edit') && scene ? new HutEditor(this.root, world, scene, () => undefined) : null;
+    this.editOpen = this.editor ? button('g-edit-open', 'Edit the layout', '', () => void this.editor?.open()) : null;
+    if (this.editOpen) {
+      this.editOpen.textContent = 'Edit layout';
+      this.root.append(this.editOpen);
+    }
 
     this.state.subscribe((change) => this.changed(change));
     this.state.start().catch((error: unknown) => {
@@ -384,6 +396,7 @@ export class GardenUi {
     }
     this.outside.classList.toggle('is-on', this.cutaway.entering);
     this.labelOutside();
+    this.editOpen?.classList.toggle('is-on', this.cutaway.open && !this.cutaway.atShelf && !this.editor?.active);
     w.hut.mark(this.cutaway.atShelf ? this.hoveredFavourite : -1, this.favourite, this.hoveredBeacon && !this.cutaway.atShelf);
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -432,6 +445,11 @@ export class GardenUi {
 
   /** A tap on the canvas: in the hut, a favourite on the shelf; else a pin, the hut's door, or a find (its sphere from high up, its bed below). True when the garden took it. */
   tap(x: number, y: number, width: number, height: number): boolean {
+    if (this.editor?.active) {
+      // laying the room out: a tap picks the piece under it (one on the gizmo is the gizmo's)
+      if (!this.editor.busy) this.editor.pick(x, y, width, height);
+      return true;
+    }
     if (this.cutaway.active) {
       // (while the camera rises or comes down, taps wait)
       if (!this.cutaway.open) return true;
@@ -509,6 +527,10 @@ export class GardenUi {
     this.pointerMoved = false;
     this.pickedIn.copy(this.world.rig.camera.matrixWorld);
     const { clientWidth: width, clientHeight: height } = at.canvas;
+    if (this.editor?.active) {
+      at.canvas.style.cursor = '';
+      return;
+    }
     if (this.cutaway.active) {
       const open = this.cutaway.open;
       this.hoveredFavourite = open && this.cutaway.atShelf ? this.favouriteAt(at.x, at.y, width, height) : -1;
@@ -538,6 +560,11 @@ export class GardenUi {
     this.flight.cancel();
   }
 
+  /** Whether the layout editor's gizmo has the pointer (main.ts leaves drags, taps and holds to it then). */
+  get gizmo(): boolean {
+    return this.editor?.busy ?? false;
+  }
+
   /** A drag while in the hut turns round the room (true: the garden took it). */
   drag(dx: number, dy: number, width: number, height: number): boolean {
     if (!this.cutaway.active) return false;
@@ -555,7 +582,8 @@ export class GardenUi {
   private key(e: KeyboardEvent): void {
     if (e.metaKey || e.ctrlKey || e.altKey || e.target instanceof HTMLInputElement) return;
     if (e.key === 'Escape') {
-      if (this.mail.isOpen) this.mail.close();
+      if (this.editor?.active) this.editor.close();
+      else if (this.mail.isOpen) this.mail.close();
       else if (this.card.shown) this.closeCard();
       else if (this.cutaway.atShelf) this.cutaway.fromShelf();
       else if (this.cutaway.entering) this.leaveHut();
@@ -697,6 +725,7 @@ export class GardenUi {
   /** Step outside: the card put away, the camera back down to where it was before; `then` once it is there. */
   leaveHut(then?: () => void): void {
     this.closeCard();
+    this.editor?.close();
     this.cutaway.leave(then);
   }
 
@@ -945,6 +974,7 @@ export class GardenUi {
       favourite: (i: number) => this.openFavourite(i),
       shelf: () => this.cutaway.toShelf(),
       room: () => this.cutaway.fromShelf(),
+      editor: this.editor,
       cutaway: this.cutaway,
       placeholder: placeholderSource,
       newest: (): Basket | undefined => this.state.baskets[0],
