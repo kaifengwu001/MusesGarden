@@ -189,13 +189,14 @@ export function postcardImage(subject: PhotoSubject | 'invitation'): string {
   return `/api/postcards/${POSTCARD_IMAGES[subject]}.jpg`;
 }
 
+/** Kai's card for a find: its own network's name, or an article site's own name, and the picture the server can show. */
 function mediaOf(d: Discovery): Media {
-  const info = d.media ?? { kind: 'article', network: 'web' };
+  const info = d.media;
   const titled = info.kind === 'article' || info.kind === 'video';
   return {
     kind: info.kind,
     url: d.url,
-    source: info.network === 'web' ? new URL(d.url).hostname.replace(/^www\./, '') : NETWORKS[info.network],
+    source: info.site ?? (info.network === 'web' ? new URL(d.url).hostname.replace(/^www\./, '') : NETWORKS[info.network]),
     author: info.author,
     title: titled ? d.title : undefined,
     text: titled ? d.summary : d.summary || d.title,
@@ -203,6 +204,7 @@ function mediaOf(d: Discovery): Media {
     aspect: info.aspect,
     duration: info.duration,
     minutes: info.minutes,
+    published: info.published,
   };
 }
 

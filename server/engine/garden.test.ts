@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { GardenFrame, Instant, MuseId } from '../../src/muse/contract';
+import { loadCorpus } from '../adapters/sources/corpus';
+import { siteOf } from '../adapters/sources/media';
 import { run, seedCast } from '../cli/run';
 import { lifePolicy } from '../domain/policy/index';
 import { FIXTURES_DIR, loadCast, readMemberDocs } from '../fixtures/cast';
@@ -61,6 +63,23 @@ describe('the garden snapshot on a seeded engine', () => {
       expect(f.note?.length).toBeGreaterThan(0);
     }
     expect(snap.interests.length).toBeGreaterThanOrEqual(Math.min(12, s.interests.size));
+  });
+
+  it('shows each find as the real reel, post, article or video it is, named by its network or its site', () => {
+    const s = garden.engine.state(HERO)!;
+    const names: Record<string, string> = { instagram: 'Instagram', youtube: 'YouTube', vimeo: 'Vimeo', flickr: 'Flickr', bluesky: 'Bluesky' };
+    const mapSites = new Set(loadCorpus().pages.map((p) => siteOf(p.candidate.url)));
+    for (const f of snap.finds) {
+      const { network } = s.discoveries.get(f.id as never)!.media;
+      expect(['reel', 'post', 'article', 'video']).toContain(f.media.kind);
+      expect(mapSites.has(siteOf(f.media.url)), f.media.url).toBe(false);
+      if (network === 'web') expect(f.media.source.length, f.media.url).toBeGreaterThan(0);
+      else expect(f.media.source).toBe(names[network]);
+      if (f.media.image === undefined) continue;
+      if (network === 'instagram') expect(f.media.image).toMatch(/^\/api\/media\/[^/]+$/);
+      else expect(f.media.image).toMatch(/^https:\/\//);
+    }
+    expect(new Set(snap.finds.map((f) => f.media.kind)).size, 'kinds among the finds').toBeGreaterThan(1);
   });
 
   it('a trip’s finds grow as the interest Muse set out after', () => {
@@ -128,7 +147,9 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.muse.soul).not.toMatch(/^#|---|curiosity:/);
     expect(snap.muse.soul).toMatch(/[.!?…]$/);
     expect(snap.world).toEqual({ seed: 1031, g: expect.any(Number) as number });
-    expect(snap.friends.map((f) => f.id).sort()).toEqual(['juniper', 'wren']);
+    const friendIds = [...garden.engine.state(HERO)!.social.relationships.values()].filter((r) => r.status === 'friends').map((r) => r.other);
+    expect(snap.friends.map((f) => f.id).sort()).toEqual(friendIds.sort());
+    expect(friendIds, 'the cast introduces juniper and wren').toEqual(expect.arrayContaining(['juniper', 'wren']));
     for (const f of snap.friends) {
       expect(f.name).toBe(garden.engine.state(f.id as MuseId)!.seed.name);
       expect(f.coat).toMatch(/^#[0-9a-f]{6}$/);
@@ -185,7 +206,13 @@ describe('garden events', () => {
     const replayed: GardenFrame[] = [];
     garden.views.subscribeGarden(HERO, after, (f) => replayed.push(f))();
     const items = (frames: GardenFrame[]) => frames.filter((f) => f.event.type !== 'status' && f.id > after);
-    expect(JSON.parse(JSON.stringify(items(replayed)))).toEqual(JSON.parse(JSON.stringify(items(live))));
+    // An invitation postcard shows its host's garden and whether it was used as they are now, so those may have moved on since it was sent.
+    const sent = (frames: GardenFrame[]) =>
+      (JSON.parse(JSON.stringify(items(frames))) as GardenFrame[]).map((f) =>
+        f.event.type === 'postcard' && f.event.postcard.invitation ? { ...f, event: { ...f.event, postcard: { ...f.event.postcard, invitation: { ...f.event.postcard.invitation, blurb: '', used: false } } } } : f,
+      );
+    expect(sent(replayed)).toEqual(sent(live));
+    for (const f of items(replayed)) if (f.event.type === 'postcard' && f.event.postcard.invitation) expect(snap.postcards).toContainEqual(JSON.parse(JSON.stringify(f.event.postcard)));
     expect(replayed.at(-1)).toEqual({ id: garden.engine.state(HERO)!.seq, event: { type: 'status', status: snap.muse.status } });
     expect(replayed.filter((f) => f.event.type === 'status').length).toBe(1);
   });
