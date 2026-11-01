@@ -7,7 +7,7 @@ import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
-import type { MuseDirection } from '../../life/muse';
+import { MUSE_HEIGHT, type MuseDirection } from '../../life/muse';
 import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
 import { tangentToward, travel } from '../../planet/geo';
@@ -39,9 +39,10 @@ const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
 /** The line from a bed up to its card (m); higher than this (m) a card is put away. */
 const STEM = 1.9;
 const CARD_UNDER = 30;
-/** The cottage's view and Muse's (as world.ts's named views): distance, height, bearing from the front (rad), looked-at point (cottage-local x, y, z, m). */
+/** The cottage's view (as world.ts's named view): distance, height, bearing from the front (rad), looked-at point (cottage-local x, y, z, m). */
 const HOME_VIEW = { distance: 26, height: 11, bearing: 0.92, at: [-1.8, 2.6, 1.4] } as const;
-const MUSE_VIEW = { distance: 4.6, height: 1.35, bearing: 0.3, aim: 0.62 } as const;
+/** Muse's, as the M key frames it (world.ts's MUSE_VIEW): distance and height (m), bearing round from in front of Muse (rad), looked-at height (m). */
+const MUSE_VIEW = { distance: 4 * MUSE_HEIGHT, height: 1.23 * MUSE_HEIGHT, bearing: 0.3, aim: 0.55 * MUSE_HEIGHT } as const;
 const AT_HOME: MuseDirection = { kind: 'home', busy: false };
 const OUT_OF_SIGHT: MuseDirection = { kind: 'hidden' };
 
@@ -111,6 +112,8 @@ export class GardenUi {
   private pointerMoved = false;
   private readonly pickedIn = new Matrix4();
   private hovered: string | null = null;
+  /** Where Muse was last shown to be (at home, in the meadow, out exploring), and whether it was drawn. */
+  private whereabouts = '';
   private readonly source: GardenSource;
 
   /**
@@ -219,11 +222,8 @@ export class GardenUi {
     this.ticket.classList.toggle('has-invite', s.invitations.length > 0);
     this.basketDot.classList.toggle('is-on', s.freshBasket !== undefined);
     this.pinsButton.setAttribute('aria-pressed', String(s.pins));
-    const home = s.status.home;
-    this.portrait.classList.toggle('is-out', !home);
-    this.status.innerHTML = `<i></i>${home ? 'at home' : 'out exploring'}`;
-    this.sign.classList.toggle('is-on', !home);
-    this.homeButton.title = home ? 'Muse’s cottage' : 'Muse’s cottage: Muse is out';
+    this.whereabouts = '';
+    this.refreshWhereabouts();
     if (change === 'snapshot' && s.freshBasket) {
       const fresh = s.freshBasket;
       setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', (from) => this.goToBasket(fresh.id, from)), 1800);
@@ -276,8 +276,24 @@ export class GardenUi {
       if (bed) specs.push({ id: `liked:${id}`, kind: 'liked', dir: bed.dir, ground: bed.ground });
     }
     const muse = this.musePlace();
-    specs.push({ id: 'muse', kind: 'muse', dir: muse.dir, ground: muse.ground });
+    if (muse) specs.push({ id: 'muse', kind: 'muse', dir: muse.dir, ground: muse.ground });
     this.pins.set(specs);
+  }
+
+  /** Where Muse is, in a word: at home, in the meadow (on the planet, away from its hut), or out exploring (as the source says). */
+  private refreshWhereabouts(): void {
+    const w = this.world;
+    const word = !this.state.status.home ? 'out exploring' : w.muse.home ? 'at home' : 'in the meadow';
+    // (drawn or not decides where its pin stands, so a change of that alone stands the pins again)
+    const now = w.muse.away ? `${word}, unseen` : word;
+    if (now === this.whereabouts) return;
+    this.whereabouts = now;
+    const home = word === 'at home';
+    this.portrait.classList.toggle('is-out', !home);
+    this.status.innerHTML = `<i></i>${word}`;
+    this.sign.classList.toggle('is-on', !home);
+    this.homeButton.title = home ? 'Muse’s cottage' : 'Muse’s cottage: Muse is out';
+    this.refreshPins();
   }
 
   // ---- each frame ------------------------------------------------------------------------
@@ -299,6 +315,9 @@ export class GardenUi {
       this.relayout();
     }
     const away = this.visit.away;
+    // Muse's whereabouts as it goes about, and its pin where it is now while it is drawn on the planet
+    this.refreshWhereabouts();
+    if (!w.muse.away) this.pins.move('muse', w.muse.where.dir, w.muse.where.height);
     this.basketFlight.update(dt);
     // (picked when the pointer moved, or the view moved under it: a flight, a zoom still gliding)
     if (this.pointer && (this.pointerMoved || !w.rig.camera.matrixWorld.equals(this.pickedIn))) this.hover(this.pointer);
@@ -505,21 +524,17 @@ export class GardenUi {
 
   // ---- Muse ---------------------------------------------------------------------------------
 
-  /** Where Muse is: on its terrace (where its day has it) when home; out, where the source says, or by the newest find. */
-  private musePlace(): { dir: Vector3; ground: number; home: boolean } {
+  /**
+   * Where Muse is: where it is drawn on the planet (world.muse.where, kept up by its life or the engine); out of sight,
+   * where the source says it is; or null when it is out exploring nowhere the source says.
+   */
+  private musePlace(): { dir: Vector3; ground: number; heading: Vector3 } | null {
     const w = this.world;
-    const status = this.state.status;
-    if (!status.home) {
-      if (status.where) {
-        const dir = new Vector3(...status.where).normalize();
-        return { dir, ground: this.ground(dir), home: false };
-      }
-      const newest = this.state.baskets[0]?.finds[0];
-      const bed = newest ? this.layout.beds.get(newest) : undefined;
-      if (bed) return { dir: bed.dir.clone(), ground: bed.ground, home: false };
-    }
-    // at home: wherever its life has it about the hut (world.muse.where, kept current even while it isn't drawn)
-    return { dir: w.muse.where.dir.clone(), ground: w.muse.where.height, home: true };
+    if (!w.muse.away) return { dir: w.muse.where.dir.clone(), ground: w.muse.where.height, heading: w.muse.where.heading.clone() };
+    const where = this.state.status.where;
+    if (!where) return null;
+    const dir = new Vector3(...where).normalize();
+    return { dir, ground: this.ground(dir), heading: tangentToward(dir, w.rig.forward, new Vector3()) };
   }
 
   /** Cottage-local meters (x along the front, z out toward the pond) as a planet direction. */
@@ -537,18 +552,27 @@ export class GardenUi {
     return L.homeBearing.clone().applyAxisAngle(L.cottage, bearing);
   }
 
+  /** Fly to Muse wherever it is, as the M key frames it (world.frameMuse): in front of it and a little to its left; at home, from out in front of the terrace. */
   findMuse(): void {
     this.closeCard();
     const place = this.musePlace();
+    const status = this.state.status;
     const R = this.world.growth.radius;
-    if (place.home) {
-      // out in front of the terrace, a little toward the steps (as the named view)
-      const from = tangentToward(place.dir, this.fromFront(MUSE_VIEW.bearing).add(place.dir), new Vector3());
-      this.flight.to({ dir: place.dir, ground: place.ground, distance: MUSE_VIEW.distance, height: MUSE_VIEW.height, aim: MUSE_VIEW.aim, from }, R, this.ground);
-    } else {
-      this.toast(this.state.status.note ?? 'Muse is out exploring. It’s somewhere round here.');
-      this.flight.to({ dir: place.dir, ground: place.ground, distance: 22, height: 26, aim: 0 }, R, this.ground);
+    if (!place) {
+      this.toast(status.note ?? 'Muse is out exploring. It’ll be back with a basket.');
+      return;
     }
+    if (this.world.muse.away) {
+      // out of sight, though the source says where: from high over the place
+      this.toast(status.note ?? 'Muse is out exploring. It’s somewhere round here.');
+      this.flight.to({ dir: place.dir, ground: place.ground, distance: 22, height: 26, aim: 0 }, R, this.ground);
+      return;
+    }
+    // (out on a trip the engine walks it about the planet: what it is up to, as it goes)
+    if (!status.home && status.note) this.toast(status.note);
+    const front = this.world.muse.home ? tangentToward(place.dir, this.world.terrain.layout.homeBearing.clone().add(place.dir), new Vector3()) : place.heading;
+    const from = front.applyAxisAngle(place.dir, MUSE_VIEW.bearing);
+    this.flight.to({ dir: place.dir, ground: place.ground, distance: MUSE_VIEW.distance, height: MUSE_VIEW.height, aim: MUSE_VIEW.aim, from }, R, this.ground);
   }
 
   goHome(): void {
@@ -558,7 +582,8 @@ export class GardenUi {
     const from = tangentToward(at, this.fromFront(HOME_VIEW.bearing).add(at), new Vector3());
     const ground = this.world.terrain.cottageGround;
     this.flight.to({ dir: at, ground, distance: HOME_VIEW.distance, height: HOME_VIEW.height, aim: HOME_VIEW.at[1], from }, R, this.ground, () => {
-      if (!this.state.status.home) this.toast('Muse is out, and the door is shut. It’ll be back with a basket.');
+      if (!this.state.status.home) this.toast('Muse is out exploring, and the door is shut. It’ll be back with a basket.');
+      else if (!this.world.muse.home) this.toast('Muse is out in the meadow, and the door is shut.', 'Find Muse', () => this.findMuse());
     });
   }
 

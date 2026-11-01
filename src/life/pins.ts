@@ -140,7 +140,7 @@ export class Pins {
     const keep = new Set(specs.map((s) => s.id));
     for (const [id, pin] of this.pins) {
       if (!keep.has(id)) {
-        this.group.remove(pin.group);
+        this.group.remove(pin.group, pin.head);
         this.pins.delete(id);
       }
     }
@@ -159,8 +159,15 @@ export class Pins {
       group.matrixAutoUpdate = false;
       head.matrixAutoUpdate = false;
       this.group.add(group, head);
-      this.pins.set(spec.id, { spec, group, head, shown: 0, target: 0, delay: STAGGER * k++ });
+      // (one that arrives while the pins show pops up at once)
+      this.pins.set(spec.id, { spec, group, head, shown: 0, target: this.visible ? 1 : 0, delay: STAGGER * k++ });
     }
+  }
+
+  /** Move a pin that walks about (Muse's) to where it is now: its direction and its ground's height (m). */
+  move(id: string, dir: Vector3, ground: number): void {
+    const pin = this.pins.get(id);
+    if (pin && !(pin.spec.ground === ground && pin.spec.dir.equals(dir))) pin.spec = { ...pin.spec, dir: dir.clone(), ground };
   }
 
   /** Each frame: show from orbit when on, keep their size on screen, turn their heads to you. */

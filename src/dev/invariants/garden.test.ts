@@ -1,13 +1,15 @@
-import { Vector3 } from 'three';
+import { PerspectiveCamera, Vector3 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { BED_RADIUS, bedAt, layOut, type PlacementGround } from '../../garden/placement';
 import { dayBefore, placeholderSnapshot, placeholderSource } from '../../garden/placeholder';
 import { httpSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Find, GardenSnapshot } from '../../garden/types';
+import { Pins, type PinSpec } from '../../life/pins';
 import { angleBetween } from '../../planet/geo';
 import type { FieldParams } from '../../planet/fields';
 import { createGroundSample, generateLayout, Terrain, type GroundSample } from '../../planet/terrain';
+import type { WarpFrame } from '../../render/warp';
 
 // The garden's data side: where the finds grow (placement.ts), the
 // placeholder gallery, the state the interface reads, and the hook a backend
@@ -353,5 +355,48 @@ describe('the hook a backend fills', () => {
     expect(calls[1][0]).toBe('https://muse.example/api/garden/reactions');
     expect(JSON.parse(calls[1][1]?.body as string)).toEqual({ type: 'like-find', id: 'x', liked: true });
     vi.unstubAllGlobals();
+  });
+});
+
+describe('the pins on the globe', () => {
+  const R = 128;
+  const camera = new PerspectiveCamera(35, 1.6, 0.1, 5000);
+  camera.position.set(0, 0, 600);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const flat: WarpFrame = { focus: new Vector3(0, 0, R), up: new Vector3(0, 0, 1), k: 0 };
+  const spec = (id: string, kind: PinSpec['kind'], dir: Vector3): PinSpec => ({ id, kind, dir, ground: 1 });
+  /** Frames from orbit with the pins on, long enough for every pop. */
+  const settle = (pins: Pins): void => {
+    for (let i = 0; i < 20; i++) pins.update(0.1, true, 0, camera, flat, R);
+  };
+
+  it('takes a pin out whole, its head with its needle', () => {
+    const pins = new Pins();
+    pins.set([spec('muse', 'muse', new Vector3(0, 0, 1)), spec('liked:a', 'liked', new Vector3(0.1, 0, 1).normalize())]);
+    expect(pins.group.children).toHaveLength(4);
+    pins.set([spec('muse', 'muse', new Vector3(0, 0, 1))]);
+    expect(pins.group.children).toHaveLength(2);
+  });
+
+  it('pops up a pin that arrives while the pins show, as Muse’s does when the page opens in orbit', () => {
+    const pins = new Pins();
+    settle(pins);
+    pins.set([spec('muse', 'muse', new Vector3(0, 0, 1))]);
+    settle(pins);
+    expect(pins.group.children.filter((c) => c.visible)).toHaveLength(2);
+  });
+
+  it('moves Muse’s pin to where it is told, keeping its own copy of the place', () => {
+    const pins = new Pins();
+    pins.set([spec('muse', 'muse', new Vector3(0, 0, 1))]);
+    settle(pins);
+    const moved = new Vector3(0.2, 0, 1).normalize();
+    const where = moved.clone();
+    pins.move('muse', where, 2.5);
+    where.set(0, 1, 0);
+    settle(pins);
+    const head = new Vector3().setFromMatrixPosition(pins.group.children[1].matrix);
+    expect(head.normalize().angleTo(moved)).toBeLessThan(1e-6);
   });
 });
