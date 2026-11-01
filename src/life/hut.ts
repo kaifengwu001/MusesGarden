@@ -136,6 +136,8 @@ const BACK = 2;
 /** The timber in the cut (m): the plates along the tops of the back and end walls (width, height), the lintels over the front's door and window (depth, and how far each bears on the wall either side). */
 const PLATE = { width: 0.17, height: 0.13 } as const;
 const LINTEL = { depth: 0.15, bearing: 0.22 } as const;
+/** The door in the cut: how far in from the wall's face the cottage's door stands (its outside face, m: props.ts sets it 0.6 of the wall in, 3 cm either side), and how thick the door shows cut through (m). */
+const DOOR = { face: COTTAGE.thickness * 0.6 - 0.03, depth: 0.12 } as const;
 
 /** The room's shell: the floor, the walls' inner faces (their openings cut through), the walls' cut tops, and the timber in the cut. */
 function shell(faces: readonly WallFace[]): { floor: BufferGeometry; walls: BufferGeometry; tops: BufferGeometry; timber: BufferGeometry } {
@@ -219,6 +221,16 @@ function shell(faces: readonly WallFace[]): { floor: BufferGeometry; walls: Buff
   plate(new Vector3(ROOM.x + w + 0.01, CUT.front + h, 0), new Vector3(w, h, ROOM.z));
   const front = faces[0];
   for (const o of front.openings) {
+    if (o.door && o.bottom < CUT.front && o.top > CUT.front) {
+      // the door, where the cut crosses it: a thick plank door in section (DOOR.depth), its outside face just behind
+      // the cottage's own door's (which shows outside) and its top in the cut (paint flag 3)
+      const x0 = front.start.x + o.from + 0.005;
+      const x1 = front.start.x + o.to - 0.005;
+      const zOut = OUTER.z - DOOR.face - 0.002;
+      const zIn = zOut - DOOR.depth;
+      const top = CUT.front + 0.003;
+      timber.box(new Vector3((x0 + x1) / 2, (o.bottom + top) / 2, (zOut + zIn) / 2), new Vector3((x1 - x0) / 2, (top - o.bottom) / 2, (zOut - zIn) / 2), null, ROOM.floor, 3);
+    }
     // (a lintel shows in the cut only where the cut runs over its opening)
     if (o.top + 0.15 > CUT.front + 0.01) continue;
     const x0 = front.start.x + o.from - LINTEL.bearing;

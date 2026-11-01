@@ -43,36 +43,26 @@ float cutHeight(vec2 xz) {
   return xz.x > -ROOM_X + 0.01 && xz.y > -ROOM_Z + 0.01 ? CUT_FRONT : CUT_BACK;
 }
 
-// Rubble stone cut through (p: meters in the cut): stones of every size and shade, set in pale mortar.
-vec3 rubble(vec2 p) {
-  vec2 q = p / 0.16;
-  vec2 cell = floor(q);
-  vec2 f = q - cell;
-  float d1 = 8.0;
-  float d2 = 8.0;
-  vec2 id = vec2(0.0);
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      vec2 g = vec2(float(i), float(j));
-      vec2 o = vec2(hash12(cell + g), hash12(cell + g + 17.3)) * 0.8 + 0.1;
-      float d = length(g + o - f);
-      if (d < d1) {
-        d2 = d1;
-        d1 = d;
-        id = cell + g;
-      } else if (d < d2) {
-        d2 = d;
-      }
-    }
-  }
-  float joint = 1.0 - smoothstep(0.04, 0.16, d2 - d1);
-  float h = hash12(id * 1.7 + 3.1);
-  vec3 stone = mix(pal(ROW_STONE, 3) * 0.86, pal(ROW_STONE, 0), 0.25 + 0.75 * h);
-  stone = mix(stone, pal(ROW_STONE, 14), step(0.75, hash12(id + 9.1)) * 0.6);
-  stone = mix(stone, pal(ROW_STONE, 7), step(0.85, hash12(id + 4.4)) * 0.5);
-  // each stone a little rounded: lighter toward its middle, its edges in shadow where the mortar is set back
-  stone *= 0.82 + 0.26 * smoothstep(0.65, 0.0, d1);
-  return mix(stone, pal(ROW_STONE, 5) * 0.62, joint);
+// Irregular courses of stones, as the cottage's walls show them (props.frag.glsl courses): p meters along and up the
+// courses; a joint mask (1 on a joint) and a random per stone.
+vec2 courses(vec2 p, float course, float len) {
+  float y = p.y / course + 0.2 * gnoise(vec3(p.x * 0.9, 0.0, 7.0), 960u);
+  float row = floor(y);
+  float h = hash12(vec2(row, 3.1));
+  float x = p.x / (len * (0.75 + 0.5 * h)) + h * 5.3;
+  float dx = min(fract(x), 1.0 - fract(x)) * len;
+  float dy = min(fract(y), 1.0 - fract(y)) * course;
+  float d = min(dx, dy) + 0.006 * gnoise(vec3(p * 9.0, 4.0), 961u);
+  return vec2(1.0 - smoothstep(0.006, 0.02 + fwidth(d), d), hash12(vec2(row, floor(x) + 17.0)));
+}
+
+// The wall cut through: its stones in courses, as on the cottage outside where the plaster has fallen away, but
+// pale as the cut catches the light, their joints soft; p as courses() takes it, the course's height (m).
+vec3 cutStone(vec2 p, float course) {
+  vec2 st = courses(p, course, 0.42);
+  vec3 stone = mix(pal(ROW_STONE, 14), pal(ROW_STONE, 3), st.y);
+  stone = mix(stone, mix(pal(ROW_STONE, 0), pal(ROW_STONE, 8), 0.5), 0.5);
+  return mix(stone, pal(ROW_STONE, 5), st.x * 0.4);
 }
 
 // Sun on something outside in the cut, facing up: lit and shaded as the cottage's walls are.
@@ -176,17 +166,27 @@ void main() {
   if (uKind != 0 && uKind != 4 && uShowpiece < 0.5 && screenDoor(occluded(vWorld))) discard;
   vec3 col;
   if (uKind == 2) {
-    // the cut: rubble stone in its mortar, the plaster's skin at each face (v: m in from the outer face); the high
-    // walls' ends where they meet the low ones stand upright
+    // the cut: the wall's stones in their courses, the plaster's skin at each face (uv: along the wall and in from its
+    // outer face, m; on the high walls' upright ends where they meet the low ones, up them and in): on top, two
+    // courses across the wall's thickness, each stone running along it; upright, the courses as on the walls' faces
+    bool top = abs(n.y) > 0.5;
     float skin = max(1.0 - smoothstep(0.018, 0.03, vUv.y), smoothstep(0.33, 0.342, vUv.y));
-    vec2 q = abs(n.x) > 0.5 ? p.zy : abs(n.z) > 0.5 ? p.xy : p.xz;
-    vec3 base = mix(rubble(q), mix(pal(ROW_STONE, 0), pal(ROW_STONE, 8), 0.4), skin);
-    col = sunlit(base, dir) * (abs(n.y) > 0.5 ? 1.0 : 0.85);
+    vec3 stone = top ? cutStone(vUv, 0.18) : cutStone(vec2(vUv.y, vUv.x), 0.22);
+    vec3 base = mix(stone, mix(pal(ROW_STONE, 0), pal(ROW_STONE, 8), 0.4), skin);
+    col = sunlit(base, dir) * (top ? 1.0 : 0.88);
   } else if (uKind == 5) {
-    // the timber: dark oak, its grain drawn out along the beam, the lintels' ends in the light
+    // the timber: dark oak, its grain drawn out along the beam, the lintels' ends in the light; the door cut
+    // through, plank by plank, warm as the door is outside, dark seams between
     float along = vPaint.w > 1.5 ? p.x : (abs(p.x) > ROOM_X - 0.05 ? p.z : p.x);
     float grain = gnoise(vec3(along * 1.6, p.y * 24.0 + p.z * 9.0, 3.3), 1131u) + 0.5 * gnoise(vec3(along * 7.0, p.y * 60.0, 1.1), 1132u);
     vec3 base = mix(vec3(0.13, 0.075, 0.04), vec3(0.24, 0.15, 0.08), 0.45 + 0.35 * grain);
+    if (vPaint.w > 2.5) {
+      float px = p.x / 0.13 + 0.5;
+      float plank = floor(px);
+      float seam = smoothstep(0.0, 0.08 + fwidth(px), abs(fract(px) - 0.5) * 2.0);
+      float t = hash12(vec2(plank, 1.3));
+      base = mix(pal(ROW_ROOF, 2), pal(ROW_ROOF, 3), 0.2 + 0.35 * t + 0.25 * grain) * mix(0.55, 1.0, seam);
+    }
     float face = n.y > 0.7 ? 1.0 : 0.7;
     col = sunlit(base * face, dir);
   } else {

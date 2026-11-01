@@ -71,7 +71,7 @@ const MUSE_NEAR = 30;
  * (m: so its head lies on the pillow, not over the headboard); and how often a visit finds it cooking, greeting you,
  * asleep.
  */
-const INSIDE = { x: 0.6, z: 0.75, facing: 0.68, stove: 0.96, toFoot: 0.25 } as const;
+const INSIDE = { x: 0.6, z: 0.75, facing: 0.68, stove: 0.96, toFoot: 0.55, sink: 0.12 } as const;
 const VISITS: ReadonlyArray<readonly [Indoors, number]> = [
   ['cook', 0.4],
   ['greet', 0.35],
@@ -397,7 +397,7 @@ export class GardenUi {
       [x, z, aheadX, aheadZ] = [pot.x - (lx * POT[0] + fx * POT[2]) * MUSE_HEIGHT, pot.z - (lz * POT[0] + fz * POT[2]) * MUSE_HEIGHT, fx, fz];
     } else if (bed) {
       // facing the bed's foot, so that lying back its head goes to the pillow
-      [x, y, z, aheadX, aheadZ] = [bed.at.x + bed.foot.x * INSIDE.toFoot, bed.at.y, bed.at.z + bed.foot.z * INSIDE.toFoot, bed.foot.x, bed.foot.z];
+      [x, y, z, aheadX, aheadZ] = [bed.at.x + bed.foot.x * INSIDE.toFoot, bed.at.y - INSIDE.sink, bed.at.z + bed.foot.z * INSIDE.toFoot, bed.foot.x, bed.foot.z];
     }
     const dir = c.local(x, 0, z, new Vector3());
     const ahead = c.local(x + aheadX, 0, z + aheadZ, new Vector3());
