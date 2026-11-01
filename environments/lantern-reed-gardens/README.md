@@ -79,11 +79,13 @@ MEADOW_PORT=5225 npx playwright test \
   --grep-invert 'scrubbing growth in real time|first frame within|draw calls stay|no LOD rings'
 ```
 
-The draw-call budget passes. **The full-resolution High performance targets remain open.** The final budget run measured growth frame p95 **50.0 ms** against the unchanged 20 ms target, JavaScript p95 **21.4 ms** against 12.7 ms, and first frame **2402.5 ms** against 2000 ms. Build slices stayed at 0 ms. During growth, nonhero plants distribute grounding work over eight frames and the basin uses the cheaper sky/bank reflection. The first stationary frame restores exact placements, and the detailed terrain bake restores the geometry mirror. Auto remains available for responsiveness; High prioritizes resolution. The inherited dolly/LOD visual test is still marked unautomated.
+Startup and draw-call budgets pass in the final isolated run. **The full-resolution High growth frame target remains open:** frame p95 is **50.1 ms** against the unchanged 20 ms target. JavaScript p95 is **9.8 ms**, below its 12.7 ms target, and build slices stay at 0 ms. A preceding run during other checks exceeded both startup and JavaScript budgets, so simultaneous work can worsen these timings. During growth, nonhero plants distribute grounding work over eight frames and the basin uses the cheaper sky/bank reflection. The first stationary frame restores exact placements, and the detailed terrain bake restores the geometry mirror. Auto remains available for responsiveness; High prioritizes resolution. The inherited dolly/LOD visual test is still marked unautomated.
 
 The visual revision also verifies six habitat-supported animals, the live local reflection, selected lantern lights, and removal of native meadow birds/butterflies. Exact frame comparison after a growth round trip passes: explicit settling now resets the local shadow-grid hysteresis while live navigation keeps that hysteresis to prevent shimmer.
 
 The scenery test regenerates `shots/lantern-reed-gardens/reference-vista.png`, `scenery-home.png` and `scenery-day.png`. The final dusk postcard was inspected against the world reference: dense reeds, mineral shelves, the leaf-roof home, visible wildlife and reflected lantern light are present. Cliffs and canopies remain simplified procedural forms compared with the illustration. Use **Causeway → Dusk → Postcard** for the broad basin view; a close shelter view intentionally fades the planar reflection.
+
+The [reference pack](reference/README.md) keeps the world concept and the final rendered checkpoint beside the implementation. The local find shaders preserve the `fb21a13` renderer used by this world, independently of main's newer `FindTable` implementation.
 
 ## Task list handoff
 

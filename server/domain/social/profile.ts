@@ -1,10 +1,10 @@
 import type { Discovery, Interest, MuseState, PublicDiscovery, PublicProfile, TopicKey } from '../../../src/muse/contract';
 import { SOCIAL } from './constants';
 
-// Owner- and soul-seeded interests reveal the owner, so they stay private until Muse has made them its own.
+// Every interest is shared until the owner hides it, whatever seeded it: topics from MEMORY.md and SOUL.md
+// have already passed the privacy filter on their way into the garden.
 function isPublicInterest(s: MuseState, i: Interest): boolean {
-  if (s.hidden.has(`topic:${i.topic}`)) return false;
-  return i.seededBy === 'muse' ? i.sources.length >= 1 : i.stage === 'established';
+  return !s.hidden.has(`topic:${i.topic}`);
 }
 
 function weight(s: MuseState, i: Interest): number {
@@ -24,9 +24,10 @@ function isPublicFind(s: MuseState, d: Discovery, publicTopics: ReadonlySet<Topi
   return touches;
 }
 
-function toPublic(d: Discovery): PublicDiscovery {
-  const { id, url, canonicalUrl, title, summary, thumb, topics } = d;
-  return thumb === undefined ? { id, url, canonicalUrl, title, summary, topics } : { id, url, canonicalUrl, title, summary, thumb, topics };
+/** The trip's topic travels with the find only when it is public too: a walk can start from a private interest. */
+function toPublic(d: Discovery, publicTopics: ReadonlySet<TopicKey>): PublicDiscovery {
+  const { id, url, canonicalUrl, title, summary, topics, media, pursuing } = d;
+  return { id, url, canonicalUrl, title, summary, topics, media, pursuing: pursuing !== null && publicTopics.has(pursuing) ? pursuing : null };
 }
 
 export function publicProfile(s: MuseState): PublicProfile {
@@ -38,7 +39,7 @@ export function publicProfile(s: MuseState): PublicProfile {
   const discoveries = [...s.discoveries.values()]
     .filter((d) => isPublicFind(s, d, publicTopics))
     .sort((a, b) => b.at - a.at || compare(a.id, b.id))
-    .map(toPublic);
+    .map((d) => toPublic(d, publicTopics));
   return { museId: s.seed.id, name: s.seed.name, worldSeed: s.seed.worldSeed, interests, discoveries };
 }
 

@@ -4,9 +4,9 @@ import { smoothstep } from '../../../src/core/math';
 import { createGroundSample, type Terrain } from '../planet/terrain';
 import { buildMesh, formOf, type CollectibleMesh, type Family, type Form, type Ground } from './collectibleForms';
 import { MAX_BEDS, type BedLook, type FindBeds } from './findBeds';
-import vertexShader from '../../../src/life/findForm.vert.glsl?raw';
-import sphereFragment from '../../../src/life/findSphere.frag.glsl?raw';
-import sphereVertex from '../../../src/life/findSphere.vert.glsl?raw';
+import vertexShader from './findForm.vert.glsl?raw';
+import sphereFragment from './findSphere.frag.glsl?raw';
+import sphereVertex from './findSphere.vert.glsl?raw';
 import fragmentShader from '../../../src/life/grass.frag.glsl?raw';
 
 // Each find's own specimen, standing in the middle of its bed (findBeds.ts),

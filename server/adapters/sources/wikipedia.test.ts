@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Candidate, CanonicalUrl, TopicKey } from '../../../src/muse/contract';
+import type { CanonicalUrl, TopicKey } from '../../../src/muse/contract';
 import { replayFetch, SAMPLE_BATCH, urlOf, type Samples } from './samples';
 import { clampSummary } from './text';
-import { normalizeTitle, USER_AGENT, WikipediaSource, wikipediaUrl, wikitextLinks } from './wikipedia';
+import { normalizeTitle, USER_AGENT, WikipediaSource, wikipediaUrl, wikitextLinks, type TopicPage } from './wikipedia';
 
 const samples = JSON.parse(readFileSync(new URL('./samples/wikipedia.json', import.meta.url), 'utf8')) as Samples;
 const none = new Set<CanonicalUrl>();
@@ -21,7 +21,7 @@ function replayed() {
   return { source, requests };
 }
 
-function expectContractShape(c: Candidate): void {
+function expectContractShape(c: TopicPage): void {
   expect(c.origin).toBe('wikipedia');
   expect(c.url, 'MediaWiki’s canonical URL matches ours').toBe(c.canonicalUrl);
   expect(c.canonicalUrl).toBe(wikipediaUrl(c.title));

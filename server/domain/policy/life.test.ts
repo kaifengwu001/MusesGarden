@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Draw, Instant, Interest, MuseState, Temperament } from '../../../src/muse/contract';
+import type { Draw, Instant, Interest, MuseState, Temperament, VisitOffer } from '../../../src/muse/contract';
 import { instant } from '../ids';
 import { newInterest } from '../interests';
 import { drawFor } from '../rng';
@@ -12,9 +12,9 @@ import { startTrip } from './travel';
 const N = 20_000;
 const draws = (salt: number): Draw[] => Array.from({ length: N }, (_, n) => drawFor(MOSS.id, salt * N + n));
 
-function frequencies(s: MuseState, now: Instant, friendFree: boolean, salt = 0): Record<'travel' | 'rest' | 'visit', number> {
+function frequencies(s: MuseState, now: Instant, offer: VisitOffer, salt = 0): Record<'travel' | 'rest' | 'visit', number> {
   const out = { travel: 0, rest: 0, visit: 0 };
-  for (const draw of draws(salt)) out[next(s, now, draw, friendFree)]++;
+  for (const draw of draws(salt)) out[next(s, now, draw, offer)]++;
   return out;
 }
 
@@ -39,7 +39,7 @@ describe('the next activity', () => {
 
   it('follows the stated weights (plan example: travel 61%, rest 9%, visit 30%)', () => {
     const s = withSalience(emptyState(MOSS, TEMPERAMENTS.hero), 0.4, now);
-    const f = frequencies(s, now, true);
+    const f = frequencies(s, now, 'friend');
     // travel = 1 + 0.6 + 0.4, rest = 0.3 + 1.5·0, visit = 2·0.5·(1.5 h ÷ 1.5 h)
     expectWithin3Sigma(f.travel, 2.0 / 3.3);
     expectWithin3Sigma(f.rest, 0.3 / 3.3);
@@ -48,21 +48,28 @@ describe('the next activity', () => {
 
   it('follows the weights after a 6 h work stretch (travel 42%, rest 38%, visit 21%)', () => {
     const s = withSalience(afterWork(TEMPERAMENTS.hero, 6, now), 0.4, now);
-    const f = frequencies(s, now, true, 1);
+    const f = frequencies(s, now, 'friend', 1);
     expectWithin3Sigma(f.travel, 2.0 / 4.8);
     expectWithin3Sigma(f.rest, 1.8 / 4.8);
     expectWithin3Sigma(f.visit, 1.0 / 4.8);
   });
 
   it('never picks a visit with no friend free, nor for a Muse with no social budget', () => {
-    expect(frequencies(emptyState(MOSS, TEMPERAMENTS.hero), now, false).visit).toBe(0);
-    expect(frequencies(emptyState(MOSS, TEMPERAMENTS.loner), now, true).visit).toBe(0);
+    expect(frequencies(emptyState(MOSS, TEMPERAMENTS.hero), now, 'none').visit).toBe(0);
+    expect(frequencies(emptyState(MOSS, TEMPERAMENTS.loner), now, 'friend').visit).toBe(0);
+  });
+
+  it('offers a first meeting as if the day\'s social time were untouched, even once it has run out', () => {
+    const fresh = withSalience(emptyState(MOSS, TEMPERAMENTS.hero), 0.4, now);
+    const spent = { ...fresh, day: { ...fresh.day, day: localDay(now, MOSS.timezone), socialMs: 3 * HOUR_MS } };
+    expect(frequencies(spent, now, 'friend').visit).toBe(0);
+    expectWithin3Sigma(frequencies(spent, now, 'first-meeting').visit, 1.0 / 3.3);
   });
 
   it('makes rest likelier the more Muse has worked in the last 12 hours', () => {
-    const rests = [0, 2, 4, 6].map((h) => frequencies(afterWork(TEMPERAMENTS.hero, h, now), now, false, 2).rest);
+    const rests = [0, 2, 4, 6].map((h) => frequencies(afterWork(TEMPERAMENTS.hero, h, now), now, 'none', 2).rest);
     for (let k = 1; k < rests.length; k++) expect(rests[k]).toBeGreaterThan(rests[k - 1]);
-    const longAgo = frequencies(afterWork(TEMPERAMENTS.hero, 6, instant(now - 13 * HOUR_MS)), now, false, 2).rest;
+    const longAgo = frequencies(afterWork(TEMPERAMENTS.hero, 6, instant(now - 13 * HOUR_MS)), now, 'none', 2).rest;
     expect(longAgo).toBe(rests[0]);
   });
 
@@ -70,9 +77,9 @@ describe('the next activity', () => {
     const night = t('2026-11-04T03:00:00-08:00');
     const afternoon = t('2026-11-04T15:00:00-08:00');
     const s = emptyState(MOSS, TEMPERAMENTS.hero);
-    const atNight = draws(3).map((d) => next(s, night, d, false));
+    const atNight = draws(3).map((d) => next(s, night, d, 'none'));
     expect(atNight.filter((c) => c === 'travel').length).toBeGreaterThan(N / 2);
-    expect(atNight).toEqual(draws(3).map((d) => next(s, afternoon, d, false)));
+    expect(atNight).toEqual(draws(3).map((d) => next(s, afternoon, d, 'none')));
     expect(draws(3).slice(0, 50).some((d) => startTrip(s, night, d) !== null)).toBe(true);
   });
 });
@@ -90,7 +97,7 @@ describe('rest', () => {
       life.push(now, { kind: 'host.work', state: 'ended' });
       while (now < start + (day + 1) * 24 * HOUR_MS) {
         const draw = drawFor(MOSS.id, ++n);
-        const rest = next(life.state, instant(now), draw, false) === 'rest';
+        const rest = next(life.state, instant(now), draw, 'none') === 'rest';
         const until = rest ? restUntil(life.state, instant(now), draw) : instant(now + 40 * MINUTE_MS);
         life.push(now, { kind: 'episode.started', n, plan: rest ? { activity: 'rest', until } : { activity: 'beyond', until } });
         life.push(until, { kind: 'episode.ended', n });

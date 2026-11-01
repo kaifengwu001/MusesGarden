@@ -9,7 +9,6 @@ import type {
   Temperament,
 } from '../../../src/muse/contract';
 import { SOCIAL } from './constants';
-import { withdrawAll } from './invitations';
 import { overlap, publicProfile, similarity, stretch } from './profile';
 
 export function relationshipWith(s: MuseState, other: MuseId): Relationship | undefined {
@@ -39,15 +38,15 @@ export function befriendChance(sim: number, t: Temperament): number {
 
 /**
  * Unpleasant means worse than this pair usually is, not merely different: friends with unrelated interests stay
- * friends, and a friendship ends only when it drifts (Kai: interests and personality change over time).
+ * friends. Unpleasant hangouts make a pair distant; only a long unbroken run of them ends it.
  */
 export function isUnpleasant(pleasantness: number, r: Pick<Relationship, 'rapport' | 'hangouts'> | undefined): boolean {
   if (!r || r.hangouts < SOCIAL.unpleasantAfterHangouts) return false;
   return pleasantness < SOCIAL.unpleasantVsAverage * (r.rapport / r.hangouts);
 }
 
-export function toleratedStreak(rapport: number): number {
-  return SOCIAL.streakBase + Math.floor(rapport / SOCIAL.streakRapportStep);
+export function distanceAfter(distance: number, unpleasant: boolean): number {
+  return unpleasant ? distance + SOCIAL.distantStep * (SOCIAL.distanceMax - distance) : distance * SOCIAL.closerKeep;
 }
 
 function changed(other: MuseId, to: 'friends' | 'ended', origin: RelationshipOrigin, reason?: 'drifted-apart' | 'owner-unshared'): MuseEventBody {
@@ -57,18 +56,14 @@ function changed(other: MuseId, to: 'friends' | 'ended', origin: RelationshipOri
 
 export function ending(a: MuseState, b: MuseState, reason: 'drifted-apart' | 'owner-unshared'): PairOutcome {
   const origin = relationshipWith(a, b.seed.id)?.origin ?? 'met-beyond';
-  const withdrawn = withdrawAll(a, b.seed.id);
-  return {
-    self: [changed(b.seed.id, 'ended', origin, reason), ...withdrawn],
-    other: [changed(a.seed.id, 'ended', origin, reason), ...withdrawn],
-  };
+  return { self: [changed(b.seed.id, 'ended', origin, reason)], other: [changed(a.seed.id, 'ended', origin, reason)] };
 }
 
 export function befriended(a: MuseState, b: MuseState, origin: RelationshipOrigin): PairOutcome {
   return { self: [changed(b.seed.id, 'friends', origin)], other: [changed(a.seed.id, 'friends', origin)] };
 }
 
-// Unsharing ends a friendship of either origin: it is the owner's privacy control.
+// Unsharing ends a friendship of any origin: it is the owner's privacy control.
 export function ownerLink(a: MuseState, b: MuseState, op: 'introduce' | 'unshare', _now: Instant): PairOutcome {
   const status = relationshipWith(a, b.seed.id)?.status;
   const record: MuseEventBody = { kind: op === 'introduce' ? 'owner.introduced' : 'owner.unshared', other: b.seed.id };

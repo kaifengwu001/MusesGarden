@@ -1,15 +1,18 @@
 import { createHash } from 'node:crypto';
 import type {
   Candidate,
+  CommandResult,
   Discovery,
   DiscoveryId,
   Draw,
+  EncounterPlace,
   EpisodePlan,
   Instant,
   Interest,
   Invitation,
   InvitationId,
   Judgment,
+  KnownOn,
   LifePolicy,
   LikeTarget,
   Mind,
@@ -50,14 +53,36 @@ const CANDIDATES_PER_HOP = 8;
 const MAX_HOPS = 4;
 const HOUR = 3_600_000;
 
-type InvitationAction = Parameters<SocialPolicy['invitationStep']>[1];
-
 interface HopPayload {
   readonly n: number;
   readonly k: number;
   readonly since: number;
   readonly from: Candidate | null;
+  /** The trip's topic once a serendipity trip has found one. */
+  readonly pursuing?: TopicKey;
 }
+
+/** An encounter holds only while both Muses are still in the episodes it was drawn in. */
+interface EncounterPayload {
+  readonly other: MuseId;
+  readonly where: EncounterPlace;
+  readonly n: number;
+  readonly otherN: number;
+}
+
+/**
+ * Where two Muses can meet. Beyond: both out there. Online: Muse explores while the other is free, and a free Muse is
+ * exploring too, since resting, working, hosting and being away all keep it busy.
+ */
+const CAN_MEET: Readonly<Record<EncounterPlace, (s: MuseState) => boolean>> = {
+  beyond: (s) => s.episode?.plan.activity === 'beyond' && s.episode.pausedAt === null,
+  online: (s) => !s.working && s.episode?.plan.activity === 'travel' && s.episode.pausedAt === null,
+};
+/** Draw kinds and schedule ids per place; beyond keeps the names it always had, so earlier runs replay the same. */
+const ENCOUNTER_KEY: Readonly<Record<EncounterPlace, { readonly draw: string; readonly id: string }>> = {
+  beyond: { draw: 'encounter', id: 'enc' },
+  online: { draw: 'online', id: 'online' },
+};
 
 /**
  * The one clock for every Muse: a discrete-event simulation over the store's persisted schedule. Each due item is
@@ -157,6 +182,17 @@ export class Engine {
     });
   }
 
+  /** Owners who are friends on Instagram or Facebook. Recorded once, in both logs, and never in a public profile. */
+  connectOwners(a: MuseId, b: MuseId, on: KnownOn, at: Instant): Promise<void> {
+    return this.exclusive(() => {
+      const tx = this.tx(at);
+      if (tx.state(a).social.knownOn.has(b)) return;
+      tx.emit(a, { kind: 'owners.connected', other: b, on });
+      tx.emit(b, { kind: 'owners.connected', other: a, on });
+      this.commit(tx);
+    });
+  }
+
   unshare(a: MuseId, b: MuseId): Promise<void> {
     return this.exclusive(() => {
       const tx = this.tx(this.clockAt);
@@ -230,22 +266,20 @@ export class Engine {
     });
   }
 
-  /** An owner answers an invitation. `as` is the Muse whose owner is answering. */
-  answerInvitation(id: InvitationId, as: MuseId, answer: 'approve' | 'decline' | 'accept'): Promise<{ ok: boolean; error?: string }> {
-    return this.exclusive(() => {
+  /** The guest's owner uses an invitation, or the host's owner withdraws it. `as` is the Muse whose owner acts. */
+  invitationAction(id: InvitationId, as: MuseId, action: 'use' | 'withdraw'): Promise<CommandResult> {
+    return this.exclusive((): CommandResult => {
       const inv = this.invitation(id);
-      if (!inv) return { ok: false, error: 'no such invitation' };
-      const isHost = inv.host === as;
-      const isGuest = inv.guest === as;
-      let action: InvitationAction | null = null;
-      if (answer === 'approve' && isHost) action = 'approve';
-      if (answer === 'accept' && isGuest) action = 'accept';
-      if (answer === 'decline') action = isHost ? 'decline-send' : isGuest ? 'decline' : null;
-      if (!action) return { ok: false, error: 'not yours to answer' };
-      const tx = this.tx(this.clockAt);
-      const r = this.stepInvitation(tx, inv, action);
-      if (r.ok) this.commit(tx);
-      return r;
+      if (!inv) return { ok: false, status: 404, error: 'no such invitation' };
+      const r = this.deps.social.invitationStep(inv, action, as, this.clockAt);
+      if (!r.ok) return r;
+      if (r.event) {
+        const tx = this.tx(this.clockAt);
+        tx.emit(inv.host, r.event);
+        tx.emit(inv.guest, r.event);
+        this.commit(tx);
+      }
+      return { ok: true };
     });
   }
 
@@ -276,7 +310,6 @@ export class Engine {
   }
 
   private commit(tx: Tx): void {
-    this.scheduleInvitationTimers(tx);
     const batch = tx.batch();
     this.deps.store.commit(batch);
     for (const [id, s] of tx.touched()) this.states.set(id, s);
@@ -313,13 +346,8 @@ export class Engine {
         this.scheduleBasketCheck(tx, item.museId);
         break;
       case 'encounter':
-        this.onEncounter(tx, item.museId, item.payload.other as MuseId);
+        this.onEncounter(tx, item.museId, item.payload as unknown as EncounterPayload);
         break;
-      case 'invitation.timer': {
-        const inv = this.invitation(item.payload.invitation as InvitationId);
-        if (inv) this.stepInvitation(tx, inv, item.payload.action as InvitationAction);
-        break;
-      }
     }
     this.commit(tx);
   }
@@ -362,17 +390,19 @@ export class Engine {
     const trip = ep.plan.trip;
     const draw = this.deps.drawFor(m, p.n);
     const exclude = s.collected;
+    const kinds = this.deps.life.mediaFor(s, p.k, draw);
     let topic: TopicKey | null = trip.kind === 'serendipity' ? null : trip.topic;
     let candidates: Candidate[];
     if (p.k === 0 && trip.kind === 'serendipity') {
-      candidates = await this.deps.source.serendipity(CANDIDATES_PER_HOP, Math.floor(draw('serendipity') * 2 ** 31), exclude);
+      candidates = await this.deps.source.serendipity(kinds, CANDIDATES_PER_HOP, Math.floor(draw('serendipity') * 2 ** 31), exclude);
       topic = candidates[0]?.topics[0] ?? null;
     } else if (p.k === 0 || !p.from) {
-      candidates = topic ? await this.deps.source.search(topic, CANDIDATES_PER_HOP, exclude) : [];
+      candidates = topic ? await this.deps.source.search(topic, kinds, CANDIDATES_PER_HOP, exclude) : [];
     } else {
-      candidates = await this.deps.source.next(p.from, CANDIDATES_PER_HOP, exclude);
+      candidates = await this.deps.source.next(p.from, kinds, CANDIDATES_PER_HOP, exclude);
       topic = p.from.topics[0] ?? topic;
     }
+    const pursuing = trip.kind === 'serendipity' ? (p.pursuing ?? topic) : trip.topic;
     if (!topic || candidates.length === 0) {
       tx.emit(m, { kind: 'episode.ended', n: p.n });
       await this.startNext(tx, m);
@@ -411,7 +441,6 @@ export class Engine {
         canonicalUrl: c.canonicalUrl,
         title: c.title,
         summary: c.summary,
-        ...(c.thumb ? { thumb: c.thumb } : {}),
         topics: c.topics,
         because: [hopRef],
         reason: j.reason,
@@ -419,6 +448,8 @@ export class Engine {
         provenance: 'own',
         place: this.deps.life.findPlace(s, place, i),
         at: tx.now,
+        media: c.media,
+        pursuing,
       };
       tx.emit(m, { kind: 'discovery.collected', discovery });
     });
@@ -432,7 +463,8 @@ export class Engine {
     const best = bestOf(judgments);
     const next = best ? byUrl.get(best.canonicalUrl) ?? null : null;
     if (next && p.k + 1 < MAX_HOPS && this.deps.life.continueTrip(tx.state(m), p.k, best?.score ?? 0, draw)) {
-      this.scheduleHop(tx, m, { n: p.n, k: p.k + 1, since: tx.now, from: next }, tx.now + this.deps.life.hopMs(tx.state(m), draw));
+      const hop: HopPayload = { n: p.n, k: p.k + 1, since: tx.now, from: next, ...(pursuing ? { pursuing } : {}) };
+      this.scheduleHop(tx, m, hop, tx.now + this.deps.life.hopMs(tx.state(m), draw));
     } else {
       tx.emit(m, { kind: 'episode.ended', n: p.n });
       await this.startNext(tx, m);
@@ -464,38 +496,39 @@ export class Engine {
     tx.emit(m, { kind: 'episode.resumed', n: ep.n });
     const at = (tx.now + (ep.remainingMs ?? 0)) as Instant;
     if (ep.plan.activity === 'travel') {
-      const from = ep.lastKept ? candidateOf(tx.state(m).discoveries.get(ep.lastKept)) : null;
-      this.scheduleHop(tx, m, { n: ep.n, k: ep.hops, since: tx.now, from }, at);
+      const last = ep.lastKept ? tx.state(m).discoveries.get(ep.lastKept) : undefined;
+      const from = last ? candidateOf(last) : null;
+      this.scheduleHop(tx, m, { n: ep.n, k: ep.hops, since: tx.now, from, ...(last?.pursuing ? { pursuing: last.pursuing } : {}) }, at);
     } else if (ep.plan.activity !== 'visit' || ep.plan.role === 'host') {
       this.scheduleEnd(tx, m, ep.n, at);
     }
   }
 
-  private onEncounter(tx: Tx, a: MuseId, b: MuseId): void {
+  private onEncounter(tx: Tx, a: MuseId, p: EncounterPayload): void {
     const as = tx.state(a);
-    const bs = tx.state(b);
-    const beyond = (s: MuseState) => s.episode?.plan.activity === 'beyond' && s.episode.pausedAt === null;
-    if (!beyond(as) || !beyond(bs)) return;
-    const k = as.social.relationships.get(b)?.encounters ?? 0;
-    const out = this.deps.social.encounter(as, bs, tx.now, this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 1 + k));
+    const bs = tx.state(p.other);
+    const still = (s: MuseState, n: number) => s.episode?.n === n && CAN_MEET[p.where](s);
+    if (!still(as, p.n) || !still(bs, p.otherN)) return;
+    const k = as.social.relationships.get(p.other)?.encounters ?? 0;
+    const out = this.deps.social.encounter(as, bs, p.where, tx.now, this.deps.drawFor(a, p.n * 64 + 1 + k));
     tx.emitAll(a, out.self);
-    tx.emitAll(b, out.other);
-    this.scheduleNextEncounter(tx, a, b, k + 1);
+    tx.emitAll(p.other, out.other);
+    const u = this.deps.drawFor(a, p.n * 64 + 2)(`${ENCOUNTER_KEY[p.where].draw}.next`, k + 1);
+    this.scheduleEncounter(tx, a, p.other, p.where, u, `:${k + 1}`);
   }
 
-  /** Encounters are a Poisson process while both Muses stay beyond: each one schedules the next arrival. */
-  private scheduleNextEncounter(tx: Tx, a: MuseId, b: MuseId, k: number): void {
+  /** Encounters are a Poisson process while both Muses stay where they can meet: each one schedules the next arrival. */
+  private scheduleEncounter(tx: Tx, a: MuseId, b: MuseId, where: EncounterPlace, u: number, idSuffix: string): void {
     const as = tx.state(a);
     const bs = tx.state(b);
-    const pa = as.episode?.plan;
-    const pb = bs.episode?.plan;
-    if (pa?.activity !== 'beyond' || pb?.activity !== 'beyond') return;
-    const rate = this.deps.social.encounterRate(as, bs);
+    if (!as.episode || !bs.episode || !CAN_MEET[where](as) || !CAN_MEET[where](bs)) return;
+    const rate = this.deps.social.encounterRate(as, bs, where);
     if (rate <= 0) return;
-    const u = this.deps.drawFor(a, (as.episode?.n ?? 0) * 64 + 2)('encounter.next', k);
     const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
-    if (at >= Math.min(pa.until, pb.until)) return;
-    tx.schedule({ id: `enc:${a}:${b}:${as.episodes}:${k}`, at: Math.floor(at) as Instant, museId: a, kind: 'encounter', payload: { other: b } });
+    const [pa, pb] = [as.episode.plan, bs.episode.plan];
+    if (pa.activity === 'beyond' && pb.activity === 'beyond' && at >= Math.min(pa.until, pb.until)) return;
+    const payload: EncounterPayload = { other: b, where, n: as.episode.n, otherN: bs.episode.n };
+    tx.schedule({ id: `${ENCOUNTER_KEY[where].id}:${a}:${b}:${as.episodes}${idSuffix}`, at: Math.floor(at) as Instant, museId: a, kind: 'encounter', payload: { ...payload } });
   }
 
   /** Picks and starts Muse's next episode. Does nothing while Muse works or is mid-episode. */
@@ -505,15 +538,15 @@ export class Engine {
     const n = s.episodes + 1;
     const draw = this.deps.drawFor(m, n);
     const { life, social } = this.deps;
-    const free = this.freeFriends(tx, s);
-    let choice = life.next(s, tx.now, draw, free.length > 0);
+    const free = this.freeFriends(tx, s).map((state) => ({ state }));
+    let choice = life.next(s, tx.now, draw, social.visitOffer(s, free, tx.now));
     if (choice === 'visit') {
-      const v = social.chooseVisit(s, free.map((state) => ({ state })), tx.now, draw);
+      const v = social.chooseVisit(s, free, tx.now, draw);
       if (v) {
         this.startVisit(tx, m, v.other, v.role, v.until);
         return;
       }
-      choice = life.next(s, tx.now, this.deps.drawFor(m, n + 1_000_000), false);
+      choice = life.next(s, tx.now, this.deps.drawFor(m, n + 1_000_000), 'none');
     }
     if (choice === 'rest') {
       if (life.reflectionDue(s, tx.now)) await this.reflect(tx, m);
@@ -527,26 +560,21 @@ export class Engine {
       const until = Math.floor(life.beyondUntil(s, tx.now, draw)) as Instant;
       tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'beyond', until } });
       this.scheduleEnd(tx, m, n, until);
-      this.scheduleEncounters(tx, m, until, draw);
+      this.scheduleEncounters(tx, m, 'beyond', draw);
       return;
     }
     tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'travel', trip } });
     this.scheduleHop(tx, m, { n, k: 0, since: tx.now, from: null }, tx.now + life.hopMs(tx.state(m), draw));
+    this.scheduleEncounters(tx, m, 'online', draw);
   }
 
-  private startVisit(tx: Tx, m: MuseId, other: MuseId, role: 'host' | 'guest', until: Instant, invitation?: InvitationId): void {
+  private startVisit(tx: Tx, m: MuseId, other: MuseId, role: 'host' | 'guest', until: Instant): void {
     const os = tx.state(other);
     if (os.episode) {
       for (const i of this.deps.store.pending(other)) if (i.kind === 'episode.end' || i.kind === 'trip.hop') tx.remove(i.id);
       tx.emit(other, { kind: 'episode.ended', n: os.episode.n });
     }
-    const plan = (who: MuseId, r: 'host' | 'guest'): EpisodePlan => ({
-      activity: 'visit',
-      other: who,
-      role: r,
-      until,
-      ...(invitation ? { invitation } : {}),
-    });
+    const plan = (who: MuseId, r: 'host' | 'guest'): EpisodePlan => ({ activity: 'visit', other: who, role: r, until });
     const n = tx.state(m).episodes + 1;
     tx.emit(m, { kind: 'episode.started', n, plan: plan(other, role) });
     const on = tx.state(other).episodes + 1;
@@ -567,20 +595,11 @@ export class Engine {
     return out;
   }
 
-  private scheduleEncounters(tx: Tx, m: MuseId, until: Instant, draw: Draw): void {
-    const s = tx.state(m);
-    for (const other of this.states.keys()) {
-      if (other === m) continue;
-      const os = tx.state(other);
-      const ep = os.episode;
-      if (!ep || ep.plan.activity !== 'beyond' || ep.pausedAt !== null) continue;
-      const rate = this.deps.social.encounterRate(s, os);
-      if (rate <= 0) continue;
-      const end = Math.min(until, ep.plan.until);
-      const u = draw('encounter', hashId(other));
-      const at = tx.now + (-Math.log(1 - u) / rate) * HOUR;
-      if (at >= end) continue;
-      tx.schedule({ id: `enc:${m}:${other}:${s.episodes}`, at: Math.floor(at) as Instant, museId: m, kind: 'encounter', payload: { other } });
+  /** Muse just went beyond or set off exploring: anyone already there may be met. Online, only those its owner knows. */
+  private scheduleEncounters(tx: Tx, m: MuseId, where: EncounterPlace, draw: Draw): void {
+    const others = where === 'online' ? tx.state(m).social.knownOn.keys() : this.states.keys();
+    for (const other of others) {
+      if (other !== m && this.states.has(other)) this.scheduleEncounter(tx, m, other, where, draw(ENCOUNTER_KEY[where].draw, hashId(other)), '');
     }
   }
 
@@ -606,40 +625,6 @@ export class Engine {
 
   private emitPhotos(tx: Tx, m: MuseId, photos: readonly PhotoSpec[]): void {
     for (const photo of photos) tx.emit(m, { kind: 'photo.taken', photo });
-  }
-
-  private stepInvitation(tx: Tx, inv: Invitation, action: InvitationAction): { ok: boolean; error?: string } {
-    const r = this.deps.social.invitationStep(inv, action, tx.now);
-    if (!r.ok) return { ok: false, error: r.error };
-    tx.emitAll(inv.host, r.host);
-    tx.emitAll(inv.guest, r.guest);
-    if (action === 'window-start') {
-      const host = tx.state(inv.host);
-      const guest = tx.state(inv.guest);
-      const social = this.deps.social;
-      const canPhoto = social.photoSlotsLeft(host, tx.now) > 0 && social.photoSlotsLeft(guest, tx.now) > 0;
-      if (!host.working && !guest.working && canPhoto) this.startVisit(tx, inv.guest, inv.host, 'guest', inv.window.end, inv.id);
-    }
-    return { ok: true };
-  }
-
-  /** Every invitation event in this tx gets its deadlines and window edges on the schedule. Stale timers are no-ops. */
-  private scheduleInvitationTimers(tx: Tx): void {
-    for (const e of tx.emitted()) {
-      if (e.event.kind !== 'invitation' || e.museId !== e.event.host) continue;
-      const inv = tx.state(e.event.host).social.invitations.get(e.event.id);
-      if (!inv) continue;
-      for (const t of this.deps.social.invitationTimers(inv)) {
-        if (t.at < tx.now) continue;
-        tx.schedule({
-          id: `inv:${inv.id}:${t.action}`,
-          at: t.at,
-          museId: inv.host,
-          kind: 'invitation.timer',
-          payload: { invitation: inv.id, action: t.action },
-        });
-      }
-    }
   }
 
   private scheduleEnd(tx: Tx, m: MuseId, n: number, at: Instant): void {
@@ -701,17 +686,8 @@ function bestOf(judgments: readonly Judgment[]): Judgment | null {
   return best;
 }
 
-function candidateOf(d: Discovery | undefined): Candidate | null {
-  if (!d) return null;
-  return {
-    origin: d.url.includes('wikipedia.org') ? 'wikipedia' : 'rss',
-    url: d.url,
-    canonicalUrl: d.canonicalUrl,
-    title: d.title,
-    summary: d.summary,
-    ...(d.thumb ? { thumb: d.thumb } : {}),
-    topics: d.topics,
-  };
+function candidateOf(d: Discovery): Candidate {
+  return { url: d.url, canonicalUrl: d.canonicalUrl, title: d.title, summary: d.summary, topics: d.topics, media: d.media };
 }
 
 async function resolveAll(source: Source, labels: readonly string[]): Promise<TopicKey[]> {

@@ -16,7 +16,7 @@ or refactoring it.
   keep their paths from `src/`, so imports between copies stay as written.
 - **Imports of everything else from `src/`, unchanged.** That covers the engine:
   the cube-sphere, point sets, growth, CDLOD, the warp, scatter, clouds, post,
-  the camera, Muse's body and rig, and every shader file not copied. The
+  the camera, Muse's body and rig, the finds' `FindTable` state, and every shader file not copied. The
   scaffolder rewrites those imports to point into `src/`.
 - **Its own page** (`index.html`), a build config (`vite.config.ts`), copies of
   the meadow's tests that cover copied modules, and a `README.md`.

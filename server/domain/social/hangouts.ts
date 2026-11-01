@@ -8,13 +8,14 @@ import type {
   PublicDiscovery,
   PublicProfile,
   SocialPolicy,
+  VisitOffer,
 } from '../../../src/muse/contract';
 import { localClock } from './clock';
 import { SOCIAL } from './constants';
-import { propose } from './invitations';
+import { invite } from './invitations';
 import { photoSlotsLeft, photoTogether, whereIs } from './photos';
 import { compare, findOverlap, publicProfile, similarity, stretch } from './profile';
-import { areFriends, chemistry, ending, isUnpleasant, relationshipWith, toleratedStreak } from './relationships';
+import { areFriends, chemistry, ending, isUnpleasant, relationshipWith } from './relationships';
 
 type Visit = ReturnType<SocialPolicy['chooseVisit']>;
 
@@ -38,28 +39,48 @@ function visitMs(draw: Draw): number {
   return SOCIAL.visitMedianMs * Math.exp(SOCIAL.visitSigma * z);
 }
 
-export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant, draw: Draw): Visit {
-  const left = socialLeftMs(s, now);
-  if (left <= 0 || photoSlotsLeft(s, now) <= 0) return null;
-  const friends = free
+/**
+ * Free friends with a photo slot on both sides, since every hangout brings a photo. Friends never met yet are first:
+ * they meet whatever social time is left. Everyone else needs social time on both sides.
+ */
+function visitable(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant): { readonly first: MuseState[]; readonly friends: MuseState[] } {
+  if (photoSlotsLeft(s, now) <= 0) return { first: [], friends: [] };
+  const ready = free
     .map((f) => f.state)
-    .filter((f) => areFriends(s, f) && socialLeftMs(f, now) > 0 && photoSlotsLeft(f, now) > 0)
+    .filter((f) => areFriends(s, f) && photoSlotsLeft(f, now) > 0)
     .sort((x, y) => compare(x.seed.id, y.seed.id));
+  return {
+    first: ready.filter((f) => relationshipWith(s, f.seed.id)?.lastMetAt === null),
+    friends: socialLeftMs(s, now) > 0 ? ready.filter((f) => socialLeftMs(f, now) > 0) : [],
+  };
+}
+
+export function visitOffer(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant): VisitOffer {
+  const { first, friends } = visitable(s, free, now);
+  return first.length > 0 ? 'first-meeting' : friends.length > 0 ? 'friend' : 'none';
+}
+
+export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant, draw: Draw): Visit {
+  const { first, friends } = visitable(s, free, now);
+  const role = (lastRole: 'host' | 'guest' | null | undefined) =>
+    draw('visit.direction') < (lastRole === 'guest' ? SOCIAL.goAfterBeingGuest : SOCIAL.goUsually) ? 'guest' : 'host';
+  if (first.length > 0) return { other: first[0].seed.id, role: role(null), until: (now + SOCIAL.firstMeetingMs) as Instant };
   if (friends.length === 0) return null;
+  const left = socialLeftMs(s, now);
 
   const rapport = friends.map((f) => relationshipWith(s, f.seed.id)?.rapport ?? 0);
   const closest = Math.max(...rapport);
   const mine = publicProfile(s);
   const weights = friends.map((f, i) => {
     const closeness = (closest > 0 ? rapport[i] / closest : 0) * similarity(mine, publicProfile(f));
-    return Math.exp(closeness / SOCIAL.closenessTemperature);
+    const fondness = relationshipWith(s, f.seed.id)?.fondness ?? 0;
+    return Math.exp((closeness + (SOCIAL.fondnessPull * fondness) / (fondness + SOCIAL.fondnessHalf)) / SOCIAL.closenessTemperature);
   });
   const friend = pick(friends, weights, draw('visit.friend'));
+  if (draw('visit.distant') < (relationshipWith(s, friend.seed.id)?.distance ?? 0)) return null;
 
-  const wasGuest = relationshipWith(s, friend.seed.id)?.lastRole === 'guest';
-  const role = draw('visit.direction') < (wasGuest ? SOCIAL.goAfterBeingGuest : SOCIAL.goUsually) ? 'guest' : 'host';
   const length = Math.min(visitMs(draw), left, socialLeftMs(friend, now));
-  return { other: friend.seed.id, role, until: (now + Math.floor(length)) as Instant };
+  return { other: friend.seed.id, role: role(relationshipWith(s, friend.seed.id)?.lastRole), until: (now + Math.floor(length)) as Instant };
 }
 
 export function chooseGift(giver: PublicProfile, receiver: MuseState, receiverProfile: PublicProfile): PublicDiscovery | null {
@@ -99,14 +120,13 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const fromGuest = chooseGift(guestProfile, host, hostProfile);
   const { pleasantness } = chemistry(host, guest);
 
-  const where = { planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom };
+  const where = { context: 'planet', planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom } as const;
   const photo = photoTogether('friend', host.seed.id, guest.seed.id, where, now, draw);
   const hostLog: MuseEventBody[] = [photo.a, hangoutEvent(guest.seed.id, 'host', pleasantness, photo.id, fromHost, fromGuest)];
   const guestLog: MuseEventBody[] = [photo.b, hangoutEvent(host.seed.id, 'guest', pleasantness, photo.id, fromGuest, fromHost)];
 
   const rel = relationshipWith(host, guest.seed.id);
-  const rapport = (rel?.rapport ?? 0) + pleasantness;
-  if (isUnpleasant(pleasantness, rel) && (rel?.unpleasantStreak ?? 0) + 1 >= toleratedStreak(rapport)) {
+  if (isUnpleasant(pleasantness, rel) && (rel?.unpleasantStreak ?? 0) + 1 >= SOCIAL.endingStreak) {
     const ended = ending(host, guest, 'drifted-apart');
     return { host: [...hostLog, ...ended.self], guest: [...guestLog, ...ended.other] };
   }
@@ -114,6 +134,6 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const sinceInvite = (rel?.rapportSinceInvite ?? 0) + pleasantness;
   const needed = SOCIAL.inviteRapportBase + SOCIAL.inviteRapportSpan * (1 - host.temperament.sociability);
   const cooled = rel?.lastInviteAt == null || now - rel.lastInviteAt >= SOCIAL.inviteCooldownMs;
-  const invitation = sinceInvite >= needed && cooled ? propose(host, guest, now) : null;
+  const invitation = sinceInvite >= needed && cooled ? invite(host, guest, now) : null;
   return invitation ? { host: [...hostLog, invitation], guest: [...guestLog, invitation] } : { host: hostLog, guest: guestLog };
 }

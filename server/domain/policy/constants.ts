@@ -125,6 +125,15 @@ export const DRY_MARGIN_M = 1;
 /** How far apart two finds kept on the same hop are planted (radians on the unit sphere). */
 export const FIND_SPACING_RAD = 0.02;
 
+// ── What a hop looks for ───────────────────────────────────────────────────
+/** The mix of kinds for a Muse whose traits are all 0.5. */
+export const MEDIUM_BASE = { reel: 0.25, post: 0.25, video: 0.15, article: 0.35 } as const;
+/**
+ * lean = (focus + curiosity − whimsy − novelty) / 2, in [−1, 1]. Articles and videos weigh 1 + MEDIUM_TILT · lean,
+ * reels and posts 1 − MEDIUM_TILT · lean, then the mix is normalised.
+ */
+export const MEDIUM_TILT = 0.8;
+
 // ── Photos ─────────────────────────────────────────────────────────────────
 /** Photos per hour while doing each activity, times whimsy. Hangout photos come from the social policy. */
 export const PHOTO_RATE_PER_HOUR = { beyond: 0.4, travel: 0.3, rest: 0.1, work: 0.02, visit: 0 } as const;

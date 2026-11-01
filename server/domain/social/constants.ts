@@ -9,6 +9,13 @@ export const SOCIAL = {
   familiaritySpan: 3,
   befriendBase: 0.5,
 
+  /** Online, between Muses whose owners know each other: knownPerHour · sociability · sociability · (knownBase + similarity). */
+  knownPerHour: 0.3,
+  knownBase: 0.5,
+  /** They may become friends once this familiar, with chance knownBefriendBase + (1 − knownBefriendBase) · the lower sociability. */
+  knownFamiliarity: 1,
+  knownBefriendBase: 0.5,
+
   /** Share of pleasantness that comes from both Muses' warmth (mean sociability), whatever their interests. */
   pleasantWarmth: 0.3,
   pleasantSimilarity: 0.6,
@@ -17,26 +24,33 @@ export const SOCIAL = {
   unpleasantVsAverage: 0.7,
   /** The pair needs this many hangouts before a drop can count against them. */
   unpleasantAfterHangouts: 3,
-  streakBase: 2,
-  streakRapportStep: 2,
+  /** A friendship ends only after this many unpleasant hangouts in a row; before that the pair just grows distant. */
+  endingStreak: 6,
+  /** Each unpleasant hangout moves distance this share of the way to distanceMax... */
+  distantStep: 0.4,
+  /** ...and each pleasant one keeps this share of it, so coming back takes longer than drifting. */
+  closerKeep: 0.8,
+  /** Below 1, so a distant pair still meets now and then. */
+  distanceMax: 0.9,
 
   budgetMsAtFullSociability: 3 * HOUR,
   closenessTemperature: 0.2,
+  /** Liked photos of a friend add up to this much closeness when choosing whom to visit... */
+  fondnessPull: 0.3,
+  /** ...half of it at this many likes. */
+  fondnessHalf: 2,
   goUsually: 0.5,
   goAfterBeingGuest: 0.3,
   visitMedianMs: 50 * MINUTE,
   visitSigma: 0.4,
+  /** Two friends' first visit, uncut by the day's social time. */
+  firstMeetingMs: 45 * MINUTE,
 
   inviteRapportBase: 1,
   inviteRapportSpan: 2,
   inviteCooldownMs: 14 * DAY,
-  windowMs: 2 * HOUR,
-  windowLeadMs: 2 * HOUR,
-  windowSearchMs: 3 * DAY,
-  windowStepMs: 15 * MINUTE,
-  windowDayStart: 9 * 60,
-  windowDayEnd: 21 * 60,
-  hostAnswerBeforeStartMs: HOUR,
+  /** The guest's visit view stays readable this long after they use the invitation, so a reload still works. */
+  visitViewMs: 2 * HOUR,
 
   weightFloor: 0.2,
   weightAffinity: 0.5,

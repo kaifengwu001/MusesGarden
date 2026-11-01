@@ -12,6 +12,7 @@ import type {
   MuseId,
   PhotoId,
 } from '../../src/muse/contract';
+import type { MediaImages } from './media';
 import { ROUTES, type RouteName } from '../../src/muse/routes';
 import { requestingOwner } from './owner';
 import {
@@ -40,6 +41,8 @@ export interface Garden {
   readonly commands: GardenCommands;
   /** The sim clock's instant, for /now, /invitations and /visits. */
   readonly now: () => Instant;
+  /** Pictures of finds whose own links expire; absent where nothing is cached. */
+  readonly media?: MediaImages;
   /** The garden's events for one Muse: those after log seq `after`, then Muse's status, then each as it happens. Returns the way to stop. */
   readonly subscribe: (museId: MuseId, after: number | null, send: (frame: GardenFrame) => void) => () => void;
 }
@@ -109,7 +112,7 @@ async function postcard(name: string): Promise<Reply> {
   return { status: 200, type: 'image/jpeg', headers: { 'cache-control': 'public, max-age=86400' }, body };
 }
 
-function routesFor({ queries, commands, now, subscribe }: Garden): readonly Route[] {
+function routesFor({ queries, commands, now, media, subscribe }: Garden): readonly Route[] {
   const muse = (raw: string): MuseId => {
     const museId = id<MuseId>(raw, 'id');
     if (!queries.muses().some((m) => m.museId === museId)) throw new HttpError(404, 'no such Muse');
@@ -132,14 +135,10 @@ function routesFor({ queries, commands, now, subscribe }: Garden): readonly Rout
       result(await commands.setHidden(muse(params.id), hiddenRef(field(body, 'ref')), flag(field(body, 'hidden'), 'hidden'))),
     introduce: async ({ params, body }) => result(await commands.introduce(muse(params.id), shareCode(field(body, 'shareCode')))),
     unshare: async ({ params, body }) => result(await commands.unshare(muse(params.id), id<MuseId>(field(body, 'other'), 'other'))),
-    answer: async ({ params, query }) => {
-      const action = params.action;
-      if (action !== 'approve' && action !== 'decline' && action !== 'accept') throw new HttpError(404, 'no such route');
-      return result(await commands.invitation(id<InvitationId>(params.id, 'id'), requestingOwner(query), action));
-    },
+    withdraw: async ({ params, query }) => result(await commands.withdrawInvitation(requestingOwner(query), id<InvitationId>(params.id, 'id'))),
     visit: ({ params, query }) => {
       const view = queries.visit(id<InvitationId>(params.id, 'id'), requestingOwner(query), now());
-      if (view === 'forbidden') throw new HttpError(403, 'no open visit for you');
+      if (view === 'forbidden') throw new HttpError(403, 'no visit of yours is open');
       return json(view);
     },
     hostWork: async ({ params, body }) => result(await commands.hostWork(muse(params.id), workState(field(body, 'state')))),
@@ -186,8 +185,10 @@ function routesFor({ queries, commands, now, subscribe }: Garden): readonly Rout
           return result(await commands.useInvitation(museId, r.id as InvitationId));
       }
     },
-    media: () => {
-      throw new HttpError(404, 'no such route');
+    media: async ({ params }) => {
+      const image = media === undefined ? null : await media(params.mid);
+      if (image === null) throw new HttpError(404, 'not found');
+      return { status: 200, type: image.type, body: image.body };
     },
     postcardImage: ({ params }) => postcard(params.name),
   };

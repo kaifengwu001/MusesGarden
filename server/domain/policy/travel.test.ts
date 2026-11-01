@@ -5,7 +5,7 @@ import { instant } from '../ids';
 import { newInterest } from '../interests';
 import { drawFor } from '../rng';
 import { emptyState } from '../state';
-import { Life, MOSS, t, TEMPERAMENTS, topic, topicsOf, wiki } from '../testing';
+import { ARTICLE, Life, MOSS, t, TEMPERAMENTS, topic, topicsOf, wiki } from '../testing';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../time';
 import { continueTrip, freshCandidates, keep, startTrip } from './travel';
 
@@ -152,7 +152,7 @@ describe('revisits', () => {
     life.push(START + HOUR_MS, { kind: 'episode.ended', n: 1 });
     const back = startTrip(life.state, START + 2 * HOUR_MS, drawFor(MOSS.id, 2));
     expect(back).toMatchObject({ kind: 'revisit', topic: topic('Pigment'), region: r });
-    const page = (title: string): Candidate => ({ origin: 'wikipedia', url: wiki(title), canonicalUrl: wiki(title), title, summary: '', topics: [topic(title)] });
+    const page = (title: string): Candidate => ({ url: wiki(title), canonicalUrl: wiki(title), title, summary: '', topics: [topic(title)], media: ARTICLE });
     expect(freshCandidates(life.state, [page('Pigment'), page('Ultramarine')]).map((c) => c.title)).toEqual(['Ultramarine']);
   });
 });

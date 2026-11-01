@@ -3,8 +3,8 @@
 import type { CastMember, Instant, Mind, MuseId, MuseState, Source, Store } from '../../src/muse/contract';
 import { HeuristicMind } from '../adapters/minds/heuristic';
 import { MetaMind } from '../adapters/minds/meta';
-import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
-import { WikipediaSource } from '../adapters/sources/wikipedia';
+import { loadCorpus } from '../adapters/sources/corpus';
+import { loadMediaRecording, MediaSource, type MediaRecording } from '../adapters/sources/media';
 import { openMemoryStore } from '../adapters/store/memory';
 import { openSqliteStore } from '../adapters/store/sqlite';
 import { REGIONS, regionCentre } from '../domain/atlas';
@@ -25,7 +25,6 @@ import { Commands, Views, type ViewHelpers } from './views';
 export interface GardenOptions {
   /** A SQLite file, or null for memory only. */
   readonly db: string | null;
-  readonly source: 'fixture' | 'live';
   /** 'meta' gives the hero MetaMind (falling back to HeuristicMind without a key); everyone else stays heuristic. */
   readonly mind: 'heuristic' | 'meta';
   readonly hero: MuseId | null;
@@ -42,6 +41,8 @@ export interface Garden {
   readonly commands: Commands;
   readonly store: Store;
   readonly heroMind: Mind;
+  /** The recorded reels, posts, articles and videos every find comes from. */
+  readonly recording: MediaRecording;
 }
 
 /** Explored area drives the planet's growth slider: home alone is small, about forty regions is full size. */
@@ -64,7 +65,8 @@ export const viewHelpers: ViewHelpers = {
 
 export function buildGarden(opts: GardenOptions): Garden {
   const store = opts.db ? openSqliteStore(opts.db) : openMemoryStore();
-  const source: Source = opts.source === 'live' ? new WikipediaSource() : new FixtureSource(loadCorpus());
+  const recording = loadMediaRecording();
+  const source: Source = new MediaSource(recording, loadCorpus());
   const heuristic = new HeuristicMind();
   const heroMind: Mind = opts.mind === 'meta' ? new MetaMind({ cache: store.llmCache, fallback: heuristic }) : heuristic;
   const deps: EngineDeps = {
@@ -82,5 +84,5 @@ export function buildGarden(opts: GardenOptions): Garden {
   const engine = new Engine(deps, opts.start);
   const views = new Views(engine, socialPolicy, viewHelpers, opts.roles ?? new Map());
   const commands = new Commands(engine, opts.clock);
-  return { engine, views, commands, store, heroMind };
+  return { engine, views, commands, store, heroMind, recording };
 }

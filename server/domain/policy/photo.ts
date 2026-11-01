@@ -90,6 +90,7 @@ export function photosDuring(s: MuseState, context: Context, from: number, to: n
       id: photoId(s.seed.id, s.episode?.n ?? 0, when, k),
       at: instant(when),
       subject,
+      context: context === 'beyond' ? 'beyond' : 'planet',
       planetOf: s.seed.id,
       dir: place.dir,
       forward: tangent(place.dir, 2 * Math.PI * draw(`${kind}.facing`, k)),

@@ -8,6 +8,7 @@ import type {
   EventRef,
   Instant,
   LifePolicy,
+  MediaKind,
   Mind,
   MuseId,
   MuseSeed,
@@ -24,6 +25,7 @@ import { openMemoryStore } from '../../adapters/store/memory';
 import type { EngineDeps } from '../engine';
 
 const MIN = 60_000;
+const KINDS: readonly MediaKind[] = ['article', 'reel', 'post', 'video'];
 
 export const drawFor = (museId: MuseId, n: number): Draw => (kind, k = 0) =>
   unit(mix(mix(mix(salt(museId), n), salt(kind)), k));
@@ -58,7 +60,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     experiencesSinceReflection: 0,
     likes: new Map(),
     day: { day: '', restMs: 0, socialMs: 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
   };
 }
 
@@ -107,15 +109,18 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
     other: e.other,
     status: e.to,
     origin: e.origin,
+    friendsSince: e.to === 'friends' ? stored.event.at : null,
     familiarity: 0,
     rapport: 0,
     rapportSinceInvite: 0,
     unpleasantStreak: 0,
+    distance: 0,
     encounters: 0,
     hangouts: 0,
     lastRole: null,
     lastMetAt: null,
     lastInviteAt: null,
+    fondness: 0,
   });
   return { ...s, relationships };
 };
@@ -123,12 +128,13 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
 const at = (n: number) => n as Instant;
 
 export const life: LifePolicy = {
-  next: (_s, _now, draw, friendFree) => (friendFree && draw('visit') < 0.3 ? 'visit' : draw('next') < 0.4 ? 'rest' : 'travel'),
+  next: (_s, _now, draw, offer) => (offer !== 'none' && draw('visit') < 0.3 ? 'visit' : draw('next') < 0.4 ? 'rest' : 'travel'),
   restUntil: (_s, now) => at(now + 30 * MIN),
   beyondUntil: (_s, now) => at(now + 60 * MIN),
   startTrip: (_s, _now, draw) =>
     draw('beyond') < 0.1 ? null : { kind: 'revisit', topic: 'Pigment' as TopicKey, region: '0:1:1' as RegionKey, question: null },
   serendipityRegion: () => '5:3:3' as RegionKey,
+  mediaFor: (_s, k) => [KINDS[k % KINDS.length]],
   hopMs: () => 20 * MIN,
   hopPlace: (_s, region) => ({ dir: [0, 1, 0], region }),
   findPlace: (_s, hop) => hop,
@@ -145,13 +151,13 @@ export const life: LifePolicy = {
 };
 
 export const social: SocialPolicy = {
+  visitOffer: (_s, free) => (free.length > 0 ? 'friend' : 'none'),
   chooseVisit: (_s, free, now) => (free[0] ? { other: free[0].state.seed.id, role: 'host', until: at(now + 50 * MIN) } : null),
   encounterRate: () => 0,
   encounter: () => ({ self: [], other: [] }),
   hangout: () => ({ host: [], guest: [] }),
-  invitationStep: () => ({ ok: false, error: 'stub' }),
-  invitationTimers: () => [],
-  canVisit: () => false,
+  invitationStep: () => ({ ok: false, status: 409, error: 'stub' }),
+  visitUntil: () => null,
   photoSlotsLeft: () => 5,
   publicProfile: (s) => ({ museId: s.seed.id, name: s.seed.name, worldSeed: s.seed.worldSeed, interests: [], discoveries: [] }),
   ownerLink: (a, b, op) => {
@@ -163,23 +169,23 @@ export const social: SocialPolicy = {
   },
 };
 
-const page = (title: string): Candidate => ({
-  origin: 'wikipedia',
-  url: `https://en.wikipedia.org/wiki/${title}`,
-  canonicalUrl: `https://en.wikipedia.org/wiki/${title}` as CanonicalUrl,
+const page = (title: string, kind: MediaKind): Candidate => ({
+  url: `https://example.org/finds/${title}`,
+  canonicalUrl: `https://example.org/finds/${title}` as CanonicalUrl,
   title,
   summary: `About ${title}.`,
   topics: [title as TopicKey],
+  media: { kind, network: 'web' },
 });
 
-const pages = (titles: readonly string[], exclude: ReadonlySet<CanonicalUrl>) =>
-  Promise.resolve(titles.map(page).filter((c) => !exclude.has(c.canonicalUrl)));
+const pages = (titles: readonly string[], [kind]: readonly MediaKind[], exclude: ReadonlySet<CanonicalUrl>) =>
+  Promise.resolve(titles.map((t) => page(t, kind)).filter((c) => !exclude.has(c.canonicalUrl)));
 const range = (n: number, name: (i: number) => string) => Array.from({ length: n }, (_, i) => name(i));
 
 export const source: Source = {
-  search: (topic, limit, exclude) => pages(range(limit, (i) => `${topic}_${i}`), exclude),
-  next: (from, limit, exclude) => pages(range(limit, (i) => `${from.title}_n${i}`), exclude),
-  serendipity: (limit, seed, exclude) => pages(range(limit, (i) => `Wander_${seed % 97}_${i}`), exclude),
+  search: (topic, kinds, limit, exclude) => pages(range(limit, (i) => `${topic}_${i}`), kinds, exclude),
+  next: (from, kinds, limit, exclude) => pages(range(limit, (i) => `${from.title}_n${i}`), kinds, exclude),
+  serendipity: (kinds, limit, seed, exclude) => pages(range(limit, (i) => `Wander_${seed % 97}_${i}`), kinds, exclude),
   resolveTopic: (label) => Promise.resolve(label as TopicKey),
 };
 

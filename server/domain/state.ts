@@ -69,7 +69,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     experiencesSinceReflection: 0,
     likes: new Map(),
     day: freshDay(''),
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
     workSince: null,
     recentWork: [],
     lastReflectionAt: instant(0),
@@ -157,6 +157,7 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       return like(s, e.target, e.liked, at);
     case 'owner.introduced':
     case 'owner.unshared':
+    case 'owners.connected':
     case 'relationship.changed':
     case 'invitation':
       return s;
@@ -330,7 +331,6 @@ function gift(s: MuseState, stored: StoredEvent, e: Extract<MuseEventBody, { kin
     canonicalUrl: g.canonicalUrl,
     title: g.title,
     summary: g.summary,
-    ...(g.thumb ? { thumb: g.thumb } : {}),
     topics: g.topics,
     because: [eventRef(s.seed.id, stored.seq)],
     reason: 'A gift from a friend.',
@@ -338,6 +338,8 @@ function gift(s: MuseState, stored: StoredEvent, e: Extract<MuseEventBody, { kin
     provenance: 'gift',
     place: nearHome(s.seed.worldSeed, drawFor(s.seed.id, stored.seq)),
     at,
+    media: g.media,
+    pursuing: g.pursuing,
   };
   return collect(met, d, BOOST_GIFT);
 }

@@ -25,7 +25,7 @@ This table lists everything that crosses the plugin boundary.
 | Direction | What crosses | What never crosses |
 | --- | --- | --- |
 | Muse app to garden | When Muse is busy with a task, as times only. `SOUL.md`. Interest topics distilled from `MEMORY.md`. The owner's timezone. | Chat, task content, raw `MEMORY.md`, people, health, money, relationship or place facts, owner names |
-| Garden to owner | Baskets with full history. Photos. The roamable planet, with fog over unexplored areas and an optional follow. Muse's favorites shelf. Invitations to answer, and visits inside accepted windows. Sharing settings. | Friends' planets outside a window. What is inside fog. Which like or mention moved which interest. |
+| Garden to owner | Baskets with full history. Photos. The roamable planet, with fog over unexplored areas and an optional follow. Muse's favorites shelf. Invitations to use once, whenever the owner likes. Sharing settings. | Friends' planets, except for 2 h after using an invitation. What is inside fog. Who influenced which interest. |
 | Owner to garden | Likes of finds and photos. Sharing settings. | Nothing leaves the planet: likes stay on it |
 | Garden to other Muses | Only `PublicProfile`, which holds Muse's name, its public interests, and its public finds, minus anything the owner hid | Anything about the owner, likes included |
 | Garden to Muse app | The garden-owned "interests" section of `SOUL.md` | Anything about friends or strangers. Likes. |
@@ -117,7 +117,7 @@ When an episode ends and Muse is not working, the policy draws `travel`, `rest`,
 | --- | --- | --- |
 | `travel` | 1 + curiosity + top salience | A hot interest pulls Muse out |
 | `rest` | (0.3 + 1.5 × recentWork) × [rest today < 4 h], where recentWork = min(1, work hours in the last 12 h / 6) | Muse is tired after a lot of work, and never rests more than 4 h a day |
-| `visit` | 2 × sociability × (social time left today / daily budget) × [some friend is free] | Visits spend a finite social budget. See [Social time is a fixed daily budget](#social-time-is-a-fixed-daily-budget). |
+| `visit` | 2 × sociability × (social time left today / daily budget) × [some friend is free to visit] | Visits spend a finite social budget. See [Social time is a fixed daily budget](#social-time-is-a-fixed-daily-budget). A first meeting with a friend never met counts the social time left as the whole budget. See [Owners who share Muse meet soon](#owners-who-share-muse-meet-soon). |
 
 Take a Muse with curiosity 0.6, top salience 0.4, and sociability 0.5. A friend is free, and the Muse has used none of today's social time.
 
@@ -158,7 +158,7 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 - At first only the house and garden are explored.
 - Regions are fixed cells on the planet's surface. They come from the cube-sphere grid the renderer already uses, in `src/planet/cubesphere.ts`, and they stay put as the planet grows.
 - Each topic lives in a region. Related topics share a region or sit in nearby ones.
-- A topic's identity is its canonical Wikipedia title. "Ultramarine" is one topic however Muse reached it.
+- A topic's identity is its name in the topic map, `server/fixtures/corpus.json`. "Ultramarine" is one topic however Muse reached it. The topic map only names topics and links them. Nothing Muse finds or shows comes from it.
 - Muse transports between regions, so the explored pockets need not connect.
 - Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
 - The planet's growth value `g` follows the explored area.
@@ -198,11 +198,24 @@ Revisits look only at pages Muse has not collected yet. The planet's seasons and
 
 A trip on the planet is a chain of hops. Each hop moves Muse to a new spot.
 
-- Each hop looks at 6 to 10 pages. The first hop runs a search on the topic. Later hops follow the links of the last kept find, or Wikipedia's "more like this".
-- The Mind scores each page. Muse keeps at most 2 pages per hop, and only pages that score at least θ = 0.75. The sim reports finds per day so that θ can be tuned.
+- Each hop looks for one kind of thing: a reel, a post, an article or a video (see "What Muse finds" below). It looks at up to 8 of them. The first hop takes finds filed under the trip's topic. Later hops follow the topic map's links from the last kept find's topic.
+- A topic with nothing of the drawn kind gives another kind, then something from the same area of the topic map. A trip comes back empty only when Muse has collected everything.
+- The Mind scores each find by its title and caption. Muse keeps at most 2 per hop, and only those that score at least θ = 0.75. The sim reports finds per day so that θ can be tuned.
 - After each hop, Muse continues with P = focus × the best score this hop. A focused Muse on a good trail keeps going. A distracted Muse, or a dull hop, ends the trip.
 - Muse plants each find at the spot where it stood. Every object keeps that place, gifts included.
 - Hop spots never land on water. The placement code checks the terrain with `Terrain.sample` and stores each spot in the event.
+
+### What Muse finds
+
+Every find is a real reel, post, article or video someone put on the internet.
+
+- `npm run record:media` reads the sources in `server/fixtures/media-sources.json` and writes `server/fixtures/media.json`, keeping two items of each kind per area (`--per-kind` changes that) and at least three for each pool topic. The sim and the tests replay that recording offline.
+- The sources are listed for each of the topic map's 14 areas: magazine and blog feeds, YouTube channels (videos, and Shorts as reels), Vimeo channels, Flickr tags and Bluesky accounts. A topic the sources leave with fewer than 3 items is filled from Bluesky posts that name it.
+- The recorder keeps an item only if its link answered. It files each item under the topics its title, caption and tags name, the item's own area first. An item that names none goes under its area's main topic.
+- Instagram joins once `META_IG_TOKEN` holds the owner's token. The recorder then reads the public business and creator accounts listed for each area through Business Discovery. Pictures from Instagram, Facebook and TikTok expire, so the server keeps them under `.muse/media/` and serves them from `/api/media/<id>`.
+- Chance picks each hop's kind. A Muse whose traits are all 0.5 looks for reels 25%, posts 25%, videos 15% and articles 35% of the time. Focus and curiosity tilt the mix toward articles and videos. Whimsy and novelty tilt it toward reels and posts. The weights are `MEDIUM_BASE` and `MEDIUM_TILT` in `server/domain/policy/constants.ts`.
+- When the recording holds Instagram or Facebook items of the drawn kind, about 65% of a hop's candidates come from them. Until then everything comes from the open web, in the same mix of kinds.
+- A find carries its kind, network, author, picture, aspect, length or reading time, site and date as `media`. It also carries `pursuing`, the topic of the trip that found it: the interest it belongs to in the garden.
 
 ### The hero chain: Botanical illustration → Pigment → Ultramarine
 
@@ -299,40 +312,67 @@ Limits:
 
 ## Friends, strangers, and invitations
 
-Muse meets strangers beyond its planet, keeps friends on a fixed daily budget, and sometimes invites a friend's owner over. Each social rule takes both Muses' temperaments and their interests as input.
+Muse makes friends three ways, most likely first: its owner shares it with a friend's owner, it finds the Muses of its owner's Instagram and Facebook friends, or it meets a stranger beyond the planet. Friends share a fixed daily budget, rarely stop being friends, and sometimes invite each other's owners over. Each social rule takes both Muses' temperaments and their interests as input.
+
+| Path | How they meet | To become friends | Origin |
+| --- | --- | --- | --- |
+| Owners share Muse | They are friends at once, and a first-meeting rule brings them together soon | Already friends | `introduced` |
+| Owners are friends on Instagram or Facebook | Online, while both Muses explore, wherever they are | Familiarity 1, then a draw at 0.5 + 0.5 × the lower sociability | `known-on` |
+| Strangers | Both beyond the planet | Familiarity on both sides, then both say yes | `met-beyond` |
+
+### Owners who share Muse meet soon
+
+- Owners share Muse with a share code. The two Muses are friends at once, and the owners expect them to find time to meet.
+- Until the two first meet, the social policy offers `life.next` a first meeting whenever the friend is free and both still have a photo slot today. The visit is weighed as if the day's social time were untouched, so it is offered even after the budget has run out.
+- A first meeting comes before any other friend and lasts 45 minutes.
+- Over 20 run seeds × 3 weeks, every shared pair first met within 10 h. Before this rule the slowest took 45 h over the same seeds, and 70 h over 60.
+
+### Owners who know each other online
+
+- The cast's `knownOn` edges are owners who are friends on Instagram or Facebook. The platforms give no such list, so the graph is simulated.
+- The sim records each edge as `owners.connected` in both Muses' logs. Social state keeps the edges in a map of their own. They never enter a relationship or the public profile.
+- While both Muses explore their planets, they meet online at λ = 0.3 × sociability_A × sociability_B × (0.5 + similarity) per hour. No shared interest is needed. A Muse that is resting, working, hosting or away is not free to talk.
+- Once their familiarity reaches 1, each online meeting befriends them with P = 0.5 + 0.5 × the lower sociability. No photo is taken, since they met online.
+- Over 20 run seeds, 45 of the 60 known-online pairs became friends within 3 weeks (75%), and 129 of 180 over 60 seeds (72%). The rate, 0.3, was tuned to land near 70%.
 
 ### Strangers meet only beyond the planet
 
 - While two Muses that are not friends are both beyond, they meet at a rate of λ = 8 × sociability_A × sociability_B × similarity per hour. The 8 is a unit, not a cap. Encounters form a Poisson process over the whole time both are beyond. The plan gave no unit, and a cast of six needed one to meet at all.
 - Each encounter or hangout has a pleasantness p = 0.3 × warmth + 0.7 × (0.6 × similarity + 0.4 × stretch), where warmth is the two Muses' mean sociability.
 - stretch = 4 × overlap × (1 − overlap). It is 0 when two Muses share no interests or all of them, and 1 when they share half. The best encounters are with a Muse that is similar overall and still offers new topics.
-- An encounter can produce a photo.
+- An encounter can produce a photo. It says it was taken beyond the planet.
+- On the six-Muse cast these rules started from, 160 run seeds give 0.28 stranger friendships a run, before and after the rules for the other two paths. The three Muses known online add pairs that can meet beyond, so the nine-Muse cast makes about 0.95 a run over 20 seeds, and 1.08 over 60.
 
-### Friendship needs familiarity on both sides
+### Friendship beyond needs familiarity on both sides
 
 - Muse i needs familiarity F_i = 1 + 3 × (1 − sociability_i) before it considers friendship. Familiarity is the summed pleasantness of its encounters with the other Muse. F runs from 1 for the most sociable Muse to 4 for the least sociable. If each meeting is close to fully pleasant, an extrovert needs about one good meeting and an introvert needs three or four. See [Open questions](#open-questions), item 5.
 - Once both thresholds are met, each Muse decides at their next encounter. It says yes with P_i = similarity × (0.5 + 0.5 × sociability_i).
 - If both say yes, they become friends with origin `met-beyond`, and a photo of the two goes to both owners.
-- Owners can also introduce their Muses with a share code. Introduced Muses are friends at once, with origin `introduced`.
 
-In the statechart, `strangers` means the two Muses have no relationship record yet. The other states are the values that a `relationship.changed` event can set.
+In the statechart, `strangers` means the two Muses have no relationship record yet. Distance is a matter of degree; `close` and `distant` name its two ends.
 
 ```mermaid
 stateDiagram-v2
     [*] --> strangers
-    strangers --> acquainted: they meet beyond
-    acquainted --> acquainted: each encounter adds familiarity
-    acquainted --> friends: both thresholds met and both say yes
-    [*] --> friends: owners introduce them with a share code
-    friends --> ended: k unpleasant hangouts in a row
-    friends --> ended: an owner unshares, introduced friends only
+    strangers --> acquainted: they meet beyond, or online if their owners know each other
+    acquainted --> acquainted: each meeting adds familiarity
+    acquainted --> friends: familiar enough, and they say yes
+    [*] --> friends: owners share Muse with each other
+    state friends {
+        [*] --> close
+        close --> distant: unpleasant hangouts
+        distant --> close: pleasant hangouts, more slowly
+    }
+    friends --> ended: 6 unpleasant hangouts in a row
+    friends --> ended: an owner unshares
     ended --> [*]
 ```
 
 ### Social time is a fixed daily budget
 
 - Each Muse has a daily social budget B_i = 3 h × sociability_i. At sociability 0.5 that is 90 min, enough for about two visits.
-- A visit picks friend j with P ∝ exp(closeness_ij / 0.2), where closeness = normalized rapport × current similarity.
+- A visit picks friend j with P ∝ exp((closeness_ij + fondness term) / 0.2), where closeness = normalized rapport × current similarity. The fondness term is 0.3 × n / (n + 2), where n counts the photos of the two that the owner liked, each once.
+- A distant friend, once picked, is skipped with P = distance, so the pair spends less time together.
 - More friends share the same budget. Close friends get more of it and others get less, so total social time per day stays steady. A sim check holds social hours within ±25% as friends grow from 1 to 6.
 - A goes to B's planet with P = 0.5, or with P = 0.3 if A was the guest last time.
 
@@ -346,61 +386,46 @@ A hangout always happens on the host's planet. In every hangout:
 
 Gifts come from the giver's public finds, because anything social sees only `PublicProfile`. A gift keeps a place like any other object. It sits where Muse received it on its own planet, or near home if Muse received it away.
 
-### Friendships end only after repeated bad hangouts
+### Friendships rarely end
 
-Time apart never ends a friendship. A test checks that a 30-day gap leaves a friendship intact.
+Drifting apart means spending less time together, not an ending. Time apart never ends a friendship. A test checks that a 30-day gap leaves a friendship intact.
 
-- A hangout is unpleasant when it falls below 0.7 × the pair's own average pleasantness, after at least 3 hangouts. A friendship ends only when it drifts, never for being different. Friends with unrelated hobbies stay friends. The plan's fixed threshold (p < 0.3) ended every such friendship within days in simulation.
-- A friendship ends after k unpleasant hangouts in a row, with k = 2 + floor(rapport / 2). Close friends survive longer bad patches. The ending reason is `drifted-apart`.
-- An owner who unshares ends an introduced friendship at once, with the reason `owner-unshared`. That is a privacy control, not a social rule.
-
-| Rapport | Unpleasant hangouts in a row that end the friendship |
-| --- | --- |
-| Below 2 | 2 |
-| 2 to below 4 | 3 |
-| 4 to below 6 | 4 |
+- A hangout is unpleasant when it falls below 0.7 × the pair's own average pleasantness, after at least 3 hangouts. Friends with unrelated hobbies stay friends. The plan's fixed threshold (p < 0.3) ended every such friendship within days in simulation.
+- Unpleasant hangouts make a pair distant. Each one moves their distance 40% of the way to 0.9, and each pleasant one keeps 80% of it, so coming back takes longer than drifting. Distance never reaches 1, so a distant pair still meets now and then.
+- A friendship ends only after 6 unpleasant hangouts in a row, however close the pair was. The ending reason is `drifted-apart`.
+- An owner who unshares ends the friendship at once, whatever its origin, with the reason `owner-unshared`. That is a privacy control, not a social rule.
+- Over 20 run seeds × 3 weeks, none of 104 friendships ended without an unshare. Unpleasant hangouts are rare in the cast: 5 in about 1,270. One pair grew distant, met 3 times while distant, and was still distant when the run ended.
 
 ### Muse can invite a friend's owner over
 
-An invitation lets a friend's owner roam the host's planet for a short window. It moves through these steps:
+An invitation lets a friend's owner travel to the host's planet once, whenever they like.
 
-1. **Muse proposes.** After a hangout, the host of that hangout checks two conditions. The rapport gained since the last invitation must be at least 1 + 2 × (1 − sociability_host). No invitation may have passed between the two in the last 14 days. If both hold, the host proposes. The window is the earliest 2-hour slot in the next 3 days that falls between 09:00 and 21:00 for both owners.
-2. **The host's owner approves sending it.** A decline ends the invitation. If there is no answer by 1 hour before the window, it expires.
-3. **The guest's owner accepts.** Accepting grants access only. Showing up is optional. A decline ends the invitation. If there is no answer by the window start, it expires.
-4. **The window opens.** The guest Muse visits. The invited owner can roam the host planet read-only.
-5. **The window closes.** Access ends whether or not the owner visited. Another visit needs a new invitation.
+1. **Muse sends it.** After a hangout, the host of that hangout checks two conditions. The rapport gained since the last invitation must be at least 1 + 2 × (1 − sociability_host). No invitation may have passed between the two in the last 14 days. If both hold, the invitation goes straight to the guest's owner. There is no approval step and no time slot.
+2. **Travel now, or keep for later.** "Travel now" uses the invitation. "Keep for later" sends nothing, and a kept invitation never expires.
+3. **The visit.** The owner travels and Muse stays home. The visit stays readable for 2 h after use, so a reload works. A second use inside those 2 h is the same visit. After that, using it again answers 409.
+4. **Withdrawing.** Only the host's owner withdraws an invitation, and only before it is used. Nothing withdraws one automatically, not even a friendship ending.
 
-Every transition is written to both Muses' logs.
+Every step is written to both Muses' logs.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> proposed: host Muse proposes after a hangout
-    proposed --> sent: host owner approves
-    proposed --> declined: host owner declines
-    proposed --> expired: no answer by 1 h before the window
-    sent --> accepted: guest owner accepts
-    sent --> declined: guest owner declines
-    sent --> expired: no answer by the window start
-    accepted --> open: the window starts
-    open --> closed: the window ends
-    declined --> [*]
-    expired --> [*]
-    closed --> [*]
+    [*] --> sent: the host Muse invites after a hangout
+    sent --> sent: Keep for later
+    sent --> used: Travel now
+    sent --> withdrawn: the host's owner withdraws it
+    used --> [*]
+    withdrawn --> [*]
 ```
 
 ### Visit access is checked on every request
 
-`GET /api/visits/:id/world` returns 403 unless all of these hold:
+`GET /api/visits/:id/world` returns 403 unless the requester is the guest's owner and used the invitation less than 2 h ago.
 
-- The requester is the invited owner.
-- The invitation is `open`.
-- The current time is inside the window.
-
-Inside the window, the visitor sees the host planet with its fog. Public finds show their cards. Private finds show as plain plants with no card. The house stays closed, so a visitor never sees the favorites shelf.
+The visitor sees the host planet with its fog. Public finds show their cards. Private finds show as plain plants with no card. The house stays closed, so a visitor never sees the favorites shelf.
 
 ## What the owner sees and does
 
-Every collected object has one physical anchor on Muse's planet: the spot where Muse found it. On the planet it is a unique flower, plant or stone that blends into its surroundings. Hovering it shows a preview (title, thumbnail and Muse's one-line reason). Clicking it opens a small panel that links to the page Muse collected. A basket card and the object on the planet are the same object.
+Every collected object has one physical anchor on Muse's planet: the spot where Muse found it. On the planet it is a small patch of flowers in its interest's species and colour, a clump of the meadow round it; from high up, a glowing sphere. The patches of the basket last opened stand larger, in a gentle tint, until another basket is opened. Hovering it shows a preview (title, thumbnail and Muse's one-line reason). Clicking it opens a small panel that links to the page Muse collected. A basket card and the object on the planet are the same object.
 
 
 The owner watches, receives and likes. Only a like moves Muse's interests, as [Likes nudge Muse](#likes-nudge-muse) describes. None of the other actions does.
@@ -411,7 +436,7 @@ The owner watches, receives and likes. Only a like moves Muse's interests, as [L
 | Baskets with history | Delivered when at least 3 finds are waiting, or when at least 1 is waiting and 3 days have passed. Delivered at the owner's chosen time if set, otherwise as soon as the criteria are met. At most 1 a day, with at most 7 items, Muse's best by keep score. The rest live only on the planet. Every basket is stored. | `GET /baskets?before=` |
 | Photos | At most 5 a day, counted on the day the owner receives them. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Every hangout and every new friendship comes with a photo, so neither starts unless both Muses still have a photo slot that day. | `GET /photos?before=` |
 | Favorites shelf | Muse's top 10 objects, always on display at home. fondness = 0.5 × keep score + 0.5 × the current pull of its topics, which is affinity plus salience. Gifts from close friends get a small bonus. The shelf shifts as Muse's interests change. Only the owner sees it. | `GET /home/shelf` |
-| Invitations | Approve or decline sending. Accept or decline. The owner may visit inside the window. | `POST /api/invitations/:id/approve`, `/decline`, `/accept`, then `GET /api/visits/:id/world` |
+| Invitations | "Travel now" uses one, once, whenever the owner likes; "Keep for later" keeps it. Only the sender's owner withdraws one. | `use-invitation` in the garden's reactions, `POST /api/invitations/:id/withdraw`, then `GET /api/visits/:id/world` |
 | Likes | Like or unlike any find or photo. The first like of a thing nudges Muse toward the find's topics; see [Likes nudge Muse](#likes-nudge-muse). | `POST /api/muses/:id/garden/reactions` (`like-find`, `like-postcard`) |
 | Sharing settings | Introduce a friend's Muse with a share code, or unshare it. "What Muse shares" lists every public interest and find with a hide toggle. Pick the basket time. | `/settings/sharing`, `/settings/introductions`, `/settings/basket-time` |
 
@@ -423,12 +448,10 @@ Each photo is stored as a subject and a camera pose, not as an image. It maps on
 
 Encounters, hangouts, gifts, and visits see only `PublicProfile`. It holds Muse's name, its public interests, and its public finds. These rules decide what is public:
 
-- An interest seeded by `MEMORY.md` or `SOUL.md` becomes public only at `established`, and only through Muse's own finds.
-- A `muse`-seeded interest becomes public once it has an independent source.
+- Every interest is public until the owner hides it, whatever seeded it. Topics from `MEMORY.md` and `SOUL.md` have already passed the allow-list below, so they get no extra wait.
+- A find is public when Muse found it itself, it belongs to at least one interest, and none of its interests is hidden. Gifts Muse received are never public.
 - Anything the owner hid is never public.
 - No owner name crosses.
-
-The first rule exists because an interest can itself be private. An owner's interest reaches other Muses only after Muse has backed it with at least 4 independent sources from its own trips.
 
 ### `MEMORY.md` passes through an allow-list
 
@@ -447,7 +470,7 @@ The first rule exists because an interest can itself be private. An owner's inte
 
 ### Owners decide what Muse shares
 
-The "What Muse shares" page lists every public interest and every public find, each with a hide toggle. Hiding an item removes it from `PublicProfile`. Owners also introduce Muses with a share code, and they can unshare a Muse, which ends an introduced friendship.
+The "What Muse shares" page lists every public interest and every public find, each with a hide toggle. Hiding an item removes it from `PublicProfile`. Owners also introduce Muses with a share code, and they can unshare a Muse, which ends the friendship whatever its origin.
 
 ## Architecture
 
@@ -462,7 +485,7 @@ The contract, `src/muse/contract.ts`, defines the events as types only. They fal
 
 | Group | Event kinds |
 | --- | --- |
-| From the Muse app and the owner | `host.work`, `soul.updated`, `memory.updated`, `owner.settings`, `owner.introduced`, `owner.unshared` |
+| From the Muse app and the owner | `host.work`, `soul.updated`, `memory.updated`, `owner.settings`, `owner.introduced`, `owner.unshared`, `owners.connected` |
 | Life | `episode.started`, `episode.paused`, `episode.resumed`, `episode.ended`, `trip.hop`, `region.revealed`, `discovery.collected`, `question.opened`, `question.closed`, `photo.taken`, `basket.delivered`, `reflection.committed`, `reflection.no-change` |
 | Social, written to both logs | `encounter`, `hangout`, `relationship.changed`, `invitation` |
 
@@ -471,14 +494,14 @@ A log makes history into data, and the ablation test depends on that. Drop the e
 Each of these invariants is enforced by a type, the reducer, an access check, or a test:
 
 - A `Discovery` exists only from a fetched `Candidate`, so every find has a real URL. Every object has a place.
-- Topic identity is the canonical Wikipedia title.
+- Topic identity is the topic's name in the topic map.
 - Independent sources are counted by canonical URL.
 - The reducer enforces the evidence gate.
 - The privacy rules, the allow-list, the visibility rules, and the caps hold as described above.
 
 ### One clock drives every Muse
 
-The engine is a discrete-event simulation over a persisted `schedule` table. The table holds every pending item: episode ends, next hops, host inputs, basket checks, reflection checks, invitation deadlines, and window starts and ends.
+The engine is a discrete-event simulation over a persisted `schedule` table. The table holds every pending item: episode ends, next hops, host inputs, basket checks, reflection checks, and encounters beyond and online.
 
 `advanceTo(T)` pops due items in (time, museId, kind) order and processes each one in a single transaction.
 
@@ -504,10 +527,10 @@ The clock runs in two modes:
 - **Live.** A 1-minute timer calls `advanceTo(now)`, and so does every request.
 - **Fast-forward.** `POST /api/dev/advance {hours}` jumps ahead.
 
-A host simulator stands in for the Muse app. It sends work, `SOUL.md` and `MEMORY.md` edits, and the owners' answers and settings. A 3-week run looks like this:
+A host simulator stands in for the Muse app. It sends work, `SOUL.md` and `MEMORY.md` edits, and the owners' settings, and each guest's owner uses a kept invitation two days after it arrives. A 3-week run looks like this:
 
 ```sh
-npm run sim -- --hours 504 --cast fixtures/cast.json --work fixtures/work-3weeks.json --owners auto-accept
+npm run sim -- --hours 504 --cast fixtures/cast.json --work fixtures/work-3weeks.json
 ```
 
 ### Modules follow the domain
@@ -519,11 +542,12 @@ src/muse/contract.ts        types only: events, state, plans, social states, Can
 src/muse/ui/                dev tools (?dev) and the engine's hold on the 3D Muse; the garden's interface is src/ui/garden/
 server/domain/              pure: rng, state (reduce), interests, reflection, atlas (topics → regions, fog, unlocks), shelf, profile, renders
 server/domain/policy/       constants, life (next activity, rest budget, work pause), travel (trip start, topic pick, hops, keep), photo, basket
-server/domain/social/       relationships (statechart, familiarity, endings), encounters, hangouts (budget, closeness, gifts), invitations (statechart), access
+server/domain/social/       relationships (statechart, familiarity, distance, endings), encounters (beyond and online), hangouts (budget, closeness, first meetings, gifts), invitations (statechart, visit access)
 server/engine/              clock (advanceTo, schedule, pause/resume), ports (Mind, Source, Store)
-server/adapters/            store/{memory,sqlite}, minds/{heuristic,meta}, sources/{fixture,wikipedia,rss}
+server/adapters/            store/{memory,sqlite}, minds/{heuristic,meta}, sources/ (media: the recording as a Source; readers, instagram, filing: the recorder's; corpus: the topic map)
 server/http.ts              node:http, small hand-written parsers at the boundary
 server/cli/sim.ts           the sim CLI
+server/cli/record-media.ts  records the reels, posts, articles and videos Muse finds
 server/fixtures/            cast, work schedules, hero chain, page pools
 docs/muse-agent.md          this doc
 ```
@@ -540,13 +564,13 @@ The server runs on `node:sqlite` under Node 22.13, through `tsx`, with no web fr
 - `host_docs`, which holds `SOUL.md` only
 - `llm_cache`
 
-Pages for offline runs come from a recorded corpus file, so no table caches them.
+Finds come from the media recording, `server/fixtures/media.json`, so no table caches them.
 
 ### Two Minds sit behind one port
 
 - `MetaMind` calls OpenAI-style chat completions at `https://api.meta.ai/v1` with `MODEL_API_KEY` and the model `muse-spark-1.3`. Environment variables can override all three. It parses JSON by hand, retries once, and then falls back to `HeuristicMind`.
 - `HeuristicMind` is deterministic, so tests and fast-forward runs reproduce exactly.
-- Pages come from Wikipedia, curated RSS feeds, and a recorded fixture pool that replays offline.
+- Finds come from the media recording, which replays offline.
 - If `MODEL_API_KEY` is unset, the precomputed hero run uses `HeuristicMind` and says so.
 
 ## How we know it works
@@ -569,9 +593,9 @@ All four must still hold after the SQLite database is closed and reopened. Toget
 - Rest stays at most 4 h per owner-day, and rises after recent work.
 - Photos stay at most 5 a day. Baskets stay at most 1 a day, with at most 7 items. The shelf holds at most 10 objects and changes when affinities change.
 - Social hours per day stay within ±25% as friends grow from 1 to 6.
-- Encounters happen only while both Muses are beyond. An introvert pair needs more encounters than an extrovert pair to become friends.
-- A 30-day gap never ends a friendship. A run of k unpleasant hangouts does, and k grows with rapport.
-- Visit access returns 403 outside the window and for the wrong owner. It never returns the house or private cards.
+- Strangers meet only while both Muses are beyond, and Muses whose owners know each other meet online only while both explore. An introvert pair needs more encounters than an extrovert pair to become friends.
+- A 30-day gap never ends a friendship. Unpleasant hangouts make a pair distant, and only 6 in a row end it.
+- Visit access returns 403 for anyone but the guest, and more than 2 h after use. It never returns the house or private cards.
 - Hidden items never reach `PublicProfile`.
 - The allow-list test drops every sensitive fact.
 - The engine matches host work to the minute. A shuffled cast gives an identical log. A killed and restarted run converges.
@@ -583,11 +607,11 @@ A 3-week sim with the fixture cast must also read as believable, with its metric
 The plan leaves these points open. Each one needs a decision before or during implementation.
 
 1. **What raises salience.** The plan gives salience a 3-day decay but no rule for how it rises.
-2. **What work does to wall-clock items.** Work start removes all of a Muse's pending items and shifts them back afterward. The same table holds invitation deadlines, window starts and ends, and basket checks, which follow the owners' clocks.
+2. **What work does to wall-clock items.** Work start removes all of a Muse's pending items and shifts them back afterward. The same table holds basket checks, which follow the owners' clocks.
 3. **Where a rabbit hole lands.** A hop can follow links to a topic that has no region yet, such as `Pigment`. The plan does not say whether that hop opens a region in the middle of a trip.
 4. **When Muses become `acquainted`.** The contract has the state, but the plan does not say which event enters it, or whether an ended pair can become friends again.
 5. **Whether similarity and overlap are one measure.** If they are, pleasantness peaks near 0.76, so even the most sociable Muse needs two encounters to reach F = 1, not one.
-6. **Guaranteed photos against the cap.** Resolved: a hangout, a new friendship, or an invitation's joint visit starts only if both Muses still have a photo slot that day, so both rules hold.
+6. **Guaranteed photos against the cap.** Resolved: a hangout or a new friendship beyond starts only if both Muses still have a photo slot that day, so both rules hold.
 7. **How a visit starts for the other Muse.** The visit weight needs "some friend is free". The plan does not define free, or say whether a visit spends both Muses' budgets.
 8. **What the owner-spark Jaccard compares.** The test sets a bound of 0.34 without naming the two sets.
 9. **What fatigue is.** The topic pick subtracts 0.25 × fatigue, and the plan does not define fatigue.

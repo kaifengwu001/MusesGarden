@@ -13,7 +13,7 @@ const B = 'twin-b' as MuseId;
 
 /** Two introduced Muses after four days: finds, photos, and hangouts with each other's photos. */
 async function garden() {
-  const g = buildGarden({ db: null, source: 'fixture', mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
+  const g = buildGarden({ db: null, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
   const soul = readFileSync(join(FIXTURES_DIR, 'divergence/a/SOUL.md'), 'utf8');
   const seed = (id: MuseId) => ({ id, name: id, worldSeed: 412, timezone: 'America/Los_Angeles' });
   await g.engine.addMuse(seed(A), soul, readMemberDocs({ dir: 'divergence/a' }).memory, START);

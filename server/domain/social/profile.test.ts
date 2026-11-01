@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { MuseState, TopicKey } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
 import { HOUR, T0, apply, at, draws, find, interest, muse, ofKind, topics, wiki } from './testkit';
 
@@ -15,8 +16,8 @@ const ada = muse('ada', {
   ],
   hidden: ['topic:Fern', 'discovery:Lichen secrets'],
   discoveries: [
-    find('Lichen dyes', ['Lichen']),
-    find('Sail knots', ['Knot']),
+    find('Lichen dyes', ['Lichen'], { pursuing: 'Fern' as TopicKey }),
+    find('Sail knots', ['Knot'], { pursuing: 'Sailing' as TopicKey }),
     find('Lichen secrets', ['Lichen']),
     find('Tide tables', ['Tide']),
     find('Harbour walk', ['Walk']),
@@ -28,27 +29,33 @@ const ada = muse('ada', {
 });
 
 describe('what a Muse shares', () => {
-  it('shares Muse-grown interests with a source, and owner or soul interests only once established', () => {
-    expect(policy.publicProfile(ada).interests.map((i) => i.topic).sort()).toEqual(['Ink', 'Lichen', 'Sailing']);
+  it('shares every interest the owner has not hidden, whatever seeded it and however few its sources', () => {
+    expect(policy.publicProfile(ada).interests.map((i) => i.topic).sort()).toEqual(['Ink', 'Lichen', 'Moss', 'Poetry', 'Sailing', 'Tide']);
   });
 
   it('shares only its own finds whose every topic is public, never hidden ones or gifts', () => {
-    expect(policy.publicProfile(ada).discoveries.map((d) => d.title).sort()).toEqual(['Lichen dyes', 'Sail knots']);
+    expect(policy.publicProfile(ada).discoveries.map((d) => d.title).sort()).toEqual(['Harbour walk', 'Lichen dyes', 'Lichen tides', 'Sail knots', 'Tide tables']);
+  });
+
+  it('tells which trip found a shared find only when that trip’s topic is not hidden', () => {
+    const shared = new Map(policy.publicProfile(ada).discoveries.map((d) => [d.title, d.pursuing]));
+    expect(shared).toEqual(new Map([['Harbour walk', null], ['Lichen dyes', null], ['Lichen tides', null], ['Sail knots', 'Sailing'], ['Tide tables', null]]));
   });
 
   it('carries only the public fields, and nothing about the owner', () => {
     const profile = policy.publicProfile(ada);
     expect(Object.keys(profile).sort()).toEqual(['discoveries', 'interests', 'museId', 'name', 'worldSeed']);
-    for (const d of profile.discoveries) expect(Object.keys(d).sort()).toEqual(['canonicalUrl', 'id', 'summary', 'title', 'topics', 'url']);
+    for (const d of profile.discoveries) expect(Object.keys(d).sort()).toEqual(['canonicalUrl', 'id', 'media', 'pursuing', 'summary', 'title', 'topics', 'url']);
     for (const i of profile.interests) expect(Object.keys(i).sort()).toEqual(['topic', 'weight']);
     const json = JSON.stringify(profile);
-    for (const secret of ['Lisbon', 'Tide', 'Poetry', 'Fern', 'Moss', 'secrets', 'gift', 'Opera', 'reason', 'place']) expect(json).not.toContain(secret);
+    for (const secret of ['Lisbon', 'Fern', 'secrets', 'gift', 'Opera', 'reason', 'place']) expect(json).not.toContain(secret);
   });
 
   it('never gives a hidden or private find as a gift, even the one that would stretch the friend most', () => {
-    // "Lichen tides" would stretch bo most, but Tide is ada's owner's private interest.
+    // "Lichen tides" would stretch bo most, but ada's owner hid Tide.
+    const giver: MuseState = { ...ada, hidden: new Set([...ada.hidden, 'topic:Tide']) };
     const bo = muse('bo', { interests: topics('Tide') });
-    const [a, b] = apply(ada, bo, policy.ownerLink(ada, bo, 'introduce', T0), T0);
+    const [a, b] = apply(giver, bo, policy.ownerLink(giver, bo, 'introduce', T0), T0);
     const [received] = ofKind(policy.hangout(a, b, at(T0 + HOUR), draws(1)).guest, 'hangout');
     expect(['Lichen dyes', 'Sail knots']).toContain(received.received?.title);
   });

@@ -55,6 +55,8 @@ export function find(id: string, topics: readonly string[], over: Partial<Discov
     provenance: 'own',
     place: { dir: [0, 1, 0], region: HOME },
     at: T0,
+    media: { kind: 'article', network: 'web' },
+    pursuing: null,
     ...over,
   };
 }
@@ -113,7 +115,7 @@ export const constant = (u: number): Draw => () => u;
 
 export function pastHangout(other: MuseState, role: 'host' | 'guest', pleasantness: number): MuseEventBody {
   const gift = find(`${other.seed.id}-gift`, []);
-  const received = { id: gift.id, url: gift.url, canonicalUrl: gift.canonicalUrl, title: gift.title, summary: gift.summary, topics: gift.topics };
+  const received = { id: gift.id, url: gift.url, canonicalUrl: gift.canonicalUrl, title: gift.title, summary: gift.summary, topics: gift.topics, media: gift.media, pursuing: gift.pursuing };
   return { kind: 'hangout', other: other.seed.id, role, pleasantness, gave: 'given' as DiscoveryId, received, photo: 'photo' as PhotoId };
 }
 

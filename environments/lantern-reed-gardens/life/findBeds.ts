@@ -3,7 +3,7 @@ import { geometryBytes, gpuMemory } from '../../../src/core/gpuMemory';
 import { hash32, unit } from '../../../src/core/hash';
 import { BED_RADIUS, type Bed } from '../garden/placement';
 import { travel, tangentToward } from '../../../src/planet/geo';
-import vertexShader from '../../../src/life/findBed.vert.glsl?raw';
+import vertexShader from './findBed.vert.glsl?raw';
 import { SPECIES_MESH } from './flowerMeshes';
 import { HEADS } from './flowers';
 import fragmentShader from '../../../src/life/grass.frag.glsl?raw';

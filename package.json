@@ -19,7 +19,8 @@
     "serve": "tsx --no-warnings server/http.ts",
     "new-environment": "node --experimental-strip-types scripts/new-environment.ts",
     "dev:lantern": "vite --port 5225 --strictPort",
-    "build:lantern": "tsc -p tsconfig.json && vite build --config environments/lantern-reed-gardens/vite.config.ts"
+    "build:lantern": "tsc -p tsconfig.json && vite build --config environments/lantern-reed-gardens/vite.config.ts",
+    "record:media": "tsx --no-warnings server/cli/record-media.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

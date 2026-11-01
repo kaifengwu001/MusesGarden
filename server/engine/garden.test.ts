@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { GardenFrame, Instant, MuseId } from '../../src/muse/contract';
+import { loadCorpus } from '../adapters/sources/corpus';
+import { siteOf } from '../adapters/sources/media';
 import { run, seedCast } from '../cli/run';
 import { lifePolicy } from '../domain/policy/index';
 import { FIXTURES_DIR, loadCast, readMemberDocs } from '../fixtures/cast';
@@ -20,7 +22,6 @@ async function seeded(hours: number): Promise<Garden> {
   const cast = loadCast();
   const garden = buildGarden({
     db: null,
-    source: 'fixture',
     mind: 'heuristic',
     hero: HERO,
     start: START,
@@ -28,8 +29,8 @@ async function seeded(hours: number): Promise<Garden> {
     roles: new Map(cast.members.map((m) => [m.id, m.role])),
   });
   const work = `${FIXTURES_DIR}work-3weeks.json`;
-  await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0, owners: 'auto-accept' });
-  await run(garden.engine, { cast: '', work: null, start: START, hours, owners: 'auto-accept' });
+  await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0 });
+  await run(garden.engine, { cast: '', work: null, start: START, hours });
   return garden;
 }
 
@@ -62,6 +63,23 @@ describe('the garden snapshot on a seeded engine', () => {
       expect(f.note?.length).toBeGreaterThan(0);
     }
     expect(snap.interests.length).toBeGreaterThanOrEqual(Math.min(12, s.interests.size));
+  });
+
+  it('shows each find as the real reel, post, article or video it is, named by its network or its site', () => {
+    const s = garden.engine.state(HERO)!;
+    const names: Record<string, string> = { instagram: 'Instagram', youtube: 'YouTube', vimeo: 'Vimeo', flickr: 'Flickr', bluesky: 'Bluesky' };
+    const mapSites = new Set(loadCorpus().pages.map((p) => siteOf(p.candidate.url)));
+    for (const f of snap.finds) {
+      const { network } = s.discoveries.get(f.id as never)!.media;
+      expect(['reel', 'post', 'article', 'video']).toContain(f.media.kind);
+      expect(mapSites.has(siteOf(f.media.url)), f.media.url).toBe(false);
+      if (network === 'web') expect(f.media.source.length, f.media.url).toBeGreaterThan(0);
+      else expect(f.media.source).toBe(names[network]);
+      if (f.media.image === undefined) continue;
+      if (network === 'instagram') expect(f.media.image).toMatch(/^\/api\/media\/[^/]+$/);
+      else expect(f.media.image).toMatch(/^https:\/\//);
+    }
+    expect(new Set(snap.finds.map((f) => f.media.kind)).size, 'kinds among the finds').toBeGreaterThan(1);
   });
 
   it('a trip’s finds grow as the interest Muse set out after', () => {
@@ -103,22 +121,26 @@ describe('the garden snapshot on a seeded engine', () => {
   });
 
   it('sends every photo and every invitation the owner received as a postcard with an image the server has', () => {
-    const s = garden.engine.state(HERO)!;
-    const received = [...s.social.invitations.values()].filter((inv) => inv.guest === HERO && inv.state !== 'proposed');
-    expect(received.length, 'the run brought an invitation').toBeGreaterThan(0);
-    expect(snap.postcards.map((p) => p.id).sort()).toEqual([...s.photos.map((p) => p.id), ...received.map((inv) => inv.id)].sort());
-    for (const p of snap.postcards) {
-      expect(p.image).toMatch(/^\/api\/postcards\/[a-z]+\.jpg$/);
-      expect(existsSync(POSTCARDS + p.image.split('/').at(-1)), p.image).toBe(true);
-      expect(p.place.length).toBeGreaterThan(0);
+    const received = (id: MuseId) => [...garden.engine.state(id)!.social.invitations.values()].filter((inv) => inv.guest === id && inv.state !== 'withdrawn');
+    const guest = garden.engine.museIds().find((id) => received(id).length > 0);
+    expect(guest, 'the run brought an invitation').toBeDefined();
+    for (const id of new Set([HERO, guest!])) {
+      const s = garden.engine.state(id)!;
+      const cards = (JSON.parse(JSON.stringify(garden.views.garden(id, garden.engine.now()))) as GardenSnapshot).postcards;
+      expect(cards.map((p) => p.id).sort()).toEqual([...s.photos.map((p) => p.id), ...received(id).map((inv) => inv.id)].sort());
+      for (const p of cards) {
+        expect(p.image).toMatch(/^\/api\/postcards\/[a-z]+\.jpg$/);
+        expect(existsSync(POSTCARDS + p.image.split('/').at(-1)), p.image).toBe(true);
+        expect(p.place.length).toBeGreaterThan(0);
+      }
+      for (const inv of received(id)) {
+        const card = cards.find((p) => p.id === inv.id);
+        expect(card?.invitation).toMatchObject({ from: inv.host, world: inv.host });
+        expect(card?.invitation?.worldName).toContain(garden.engine.state(inv.host)!.seed.name);
+      }
+      const away = s.photos.find((p) => p.planetOf !== id);
+      if (away) expect(cards.find((p) => p.id === away.id)?.place).toContain(garden.engine.state(away.planetOf)!.seed.name);
     }
-    for (const inv of received) {
-      const card = snap.postcards.find((p) => p.id === inv.id);
-      expect(card?.invitation).toMatchObject({ from: inv.host, world: inv.host });
-      expect(card?.invitation?.worldName).toContain(garden.engine.state(inv.host)!.seed.name);
-    }
-    const away = s.photos.find((p) => p.planetOf !== HERO);
-    if (away) expect(snap.postcards.find((p) => p.id === away.id)?.place).toContain(garden.engine.state(away.planetOf)!.seed.name);
   });
 
   it('describes Muse from SOUL.md in a line, on its own planet, with its friends', () => {
@@ -129,7 +151,9 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.muse.soul).not.toMatch(/^#|---|curiosity:/);
     expect(snap.muse.soul).toMatch(/[.!?…]$/);
     expect(snap.world).toEqual({ seed: 1031, g: expect.any(Number) as number });
-    expect(snap.friends.map((f) => f.id).sort()).toEqual(['juniper', 'wren']);
+    const friendIds = [...garden.engine.state(HERO)!.social.relationships.values()].filter((r) => r.status === 'friends').map((r) => r.other);
+    expect(snap.friends.map((f) => f.id).sort()).toEqual(friendIds.sort());
+    expect(friendIds, 'the cast introduces juniper and wren').toEqual(expect.arrayContaining(['juniper', 'wren']));
     for (const f of snap.friends) {
       expect(f.name).toBe(garden.engine.state(f.id as MuseId)!.seed.name);
       expect(f.coat).toMatch(/^#[0-9a-f]{6}$/);
@@ -165,7 +189,7 @@ describe('garden events', () => {
     const live: GardenFrame[] = [];
     const stop = garden.views.subscribeGarden(HERO, null, (f) => live.push(f));
     expect(live.map((f) => f.event.type)).toEqual(['status']);
-    await run(garden.engine, { cast: '', work: null, start: START, hours: 48, owners: 'auto-accept' });
+    await run(garden.engine, { cast: '', work: null, start: START, hours: 48 });
     stop();
 
     const ids = live.map((f) => f.id);
@@ -186,7 +210,13 @@ describe('garden events', () => {
     const replayed: GardenFrame[] = [];
     garden.views.subscribeGarden(HERO, after, (f) => replayed.push(f))();
     const items = (frames: GardenFrame[]) => frames.filter((f) => f.event.type !== 'status' && f.id > after);
-    expect(JSON.parse(JSON.stringify(items(replayed)))).toEqual(JSON.parse(JSON.stringify(items(live))));
+    // An invitation postcard shows its host's garden and whether it was used as they are now, so those may have moved on since it was sent.
+    const sent = (frames: GardenFrame[]) =>
+      (JSON.parse(JSON.stringify(items(frames))) as GardenFrame[]).map((f) =>
+        f.event.type === 'postcard' && f.event.postcard.invitation ? { ...f, event: { ...f.event, postcard: { ...f.event.postcard, invitation: { ...f.event.postcard.invitation, blurb: '', used: false } } } } : f,
+      );
+    expect(sent(replayed)).toEqual(sent(live));
+    for (const f of items(replayed)) if (f.event.type === 'postcard' && f.event.postcard.invitation) expect(snap.postcards).toContainEqual(JSON.parse(JSON.stringify(f.event.postcard)));
     expect(replayed.at(-1)).toEqual({ id: garden.engine.state(HERO)!.seq, event: { type: 'status', status: snap.muse.status } });
     expect(replayed.filter((f) => f.event.type === 'status').length).toBe(1);
   });

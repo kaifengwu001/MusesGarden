@@ -1,12 +1,14 @@
-// The finds' flower beds (findBeds.ts): the meadow's own flowers, bunched
-// into a small bed per find, a little taller than the meadow's and of one
-// species (the find's topic) with a few companions. Shaded as the meadow's
-// flowers are (flower.vert.glsl). Inside the near field a plant reads its
+// The finds' patches (findBeds.ts): the meadow's own flowers, bunched into a
+// small patch per find, a little taller than the meadow's and of one species
+// (the find's topic) with a few companions. Shaded as the meadow's flowers
+// are (flower.vert.glsl). Inside the near field a plant reads its
 // wind and its cloud shadow from the field maps, as the meadow's flowers do;
 // a bed beyond them (a few pixels across) sways in the steady wind alone and
 // looks its cloud shadow up in the cube map.
-// A bed planted while you watch blossoms from its middle outward: each
-// flower's stem rises with a little overshoot, then its head opens.
+// A patch planted while you watch blossoms from its middle outward: each
+// flower's stem rises with a little overshoot, then its head opens. The
+// picked basket's patches grow larger and take a cool tint; the one under the
+// pointer lifts and glows; the one whose card is up is a touch brighter.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -19,15 +21,14 @@ uniform float uRadius;
 #include <meadow_field>
 #include <meadow_wind>
 #include <meadow_clouds>
+#include <meadow_find>
 
-#define MAX_BEDS 64
 attribute float aPart; // 0 stem, 1 petal, 2 centre
 attribute float aT;    // along the stem 0..1; 1 on the head
 attribute vec4 aPlace; // the plant's direction (unit), its ground's height over R (m)
-attribute vec4 aLook;  // seed in [0, 1), size factor, colour variant, bed index
-attribute float aDelay; // s after its bed is planted before this plant starts to rise (its distance from the bed's middle)
-uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, lift under the pointer 0..1, pulsed at (s; findForms.ts)
-uniform float uPlantClock;
+attribute vec4 aLook;  // seed in [0, 1), size factor, colour variant, the find's index (findState)
+attribute float aDelay; // s after its patch is planted before this plant starts to rise (its distance from the patch's middle)
+uniform float uPixelAngle;
 uniform int uSpecies;
 uniform vec4 uBedLook; // stem top (m), nod, -, -
 centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
@@ -49,9 +50,15 @@ float rise(float age, float span) {
 }
 
 void main() {
-  vec4 bed = uBeds[int(aLook.w + 0.5)];
-  float age = uPlantClock - bed.x - aDelay;
-  if (age <= 0.0) {
+  FindState find = findState(aLook.w);
+  float age = uPlantClock - find.planted - aDelay;
+  // past the horizon, or a few pixels across: thinned (the picked basket's kept whole), then not drawn
+  vec3 ground = aPlace.xyz * (uRadius + aPlace.w);
+  vec3 seen = warpPosition(ground);
+  float pixels = BED_SPAN / max(length(cameraPosition - seen) * uPixelAngle, 1e-6);
+  float keep = max(mix(0.4, 1.0, smoothstep(6.0, 40.0, pixels)), find.mark) * step(1.5, pixels);
+  float facing = dot(warpNormal(ground, aPlace.xyz), normalize(cameraPosition - seen));
+  if (age <= 0.0 || facing < -0.05 || rnd(aLook.x, 9.0) >= keep) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
@@ -59,7 +66,7 @@ void main() {
   float open = smoothstep(0.45, 1.5, age);
   vec3 dir = aPlace.xyz;
   float seed = aLook.x;
-  float scale = aLook.y * (0.85 + 0.3 * rnd(seed, 3.0)) * grow;
+  float scale = aLook.y * (0.85 + 0.3 * rnd(seed, 3.0)) * grow * mix(1.0, MARK_SIZE, find.mark);
   float stemScale = scale * mix(0.7, 1.0, open);
 
   // local frame: up = surface normal, random yaw
@@ -80,7 +87,7 @@ void main() {
   vec3 shared = inside > 0.5 ? wind.xyz : windDir(dir) * strength * (0.18 + 0.42 * strength);
   vec3 bend = windPlant(dir, shared, rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
   float stemTop = uBedLook.x;
-  vec3 base = dir * (uRadius + aPlace.w - 0.02 + 0.22 * bed.z);
+  vec3 base = dir * (uRadius + aPlace.w - 0.02 + 0.22 * find.lift);
   vec3 local = position;
   vec3 world;
   if (aPart < 0.5) {
@@ -124,9 +131,12 @@ void main() {
   col *= mix(vec3(1.0), vec3(0.68, 0.7, 0.8), clamp(shadow, 0.0, 1.0));
   vec3 toCam = cameraPosition - world;
   col += pal(ROW_LIGHT, 3) * aT * clamp(dot(-normalize(toCam), uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.12 * uToon.z * (1.0 - shadow);
-  // the bed you are looking at: its heads a touch brighter; the one under the pointer, brighter still
-  col = mix(col, col * 1.12 + 0.025, bed.y * step(0.5, aPart));
-  col = mix(col, col * 1.3 + 0.06, bed.z * step(0.5, aPart));
+  float head = step(0.5, aPart);
+  col = mix(col, col * 0.85 + findMarkTint() * 0.22, find.mark * mix(0.3, 0.5, head));
+  col = mix(col, col * 1.12 + 0.025, find.open * head);
+  // under the pointer or coming home: glowing in the warm light, the heads most
+  float lit = max(find.lift, findPulse(find));
+  col = mix(col, mix(col * 1.35 + 0.08, findGlow(), 0.45), lit * mix(0.45, 1.0, head));
 
   vec3 wp = warpPosition(world);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);
