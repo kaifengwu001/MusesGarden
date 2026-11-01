@@ -31,6 +31,8 @@ export interface GardenOptions {
   readonly start: Instant;
   readonly clock: 'live' | 'fast-forward';
   readonly roles?: ReadonlyMap<MuseId, CastMember['role']>;
+  /** The run's seed for every draw (0, the default, is every earlier run). */
+  readonly seed?: number;
 }
 
 export interface Garden {
@@ -69,7 +71,7 @@ export function buildGarden(opts: GardenOptions): Garden {
     reduceCore,
     reduceSocial,
     emptyState: (seed) => emptyState(seed),
-    drawFor,
+    drawFor: (id, n) => drawFor(id, n, opts.seed ?? 0),
     salienceAt,
     source,
     mindFor: (id) => (id === opts.hero ? heroMind : heuristic),

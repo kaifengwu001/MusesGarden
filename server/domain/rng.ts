@@ -1,9 +1,10 @@
-// Seeded randomness. Every draw is a hash of (museId, episode n, kind, k), so a replay draws the same values.
+// Seeded randomness. Every draw is a hash of (museId, episode n, kind, k), and of the run's seed when it isn't 0, so a
+// replay draws the same values and the sim can run the same cast on other seeds (run seed 0 is every earlier run).
 import type { Draw, MuseId } from '../../src/muse/contract';
 import { mix, salt, unit } from '../../src/core/hash';
 
-export function drawFor(museId: MuseId, n: number): Draw {
-  const base = mix(salt(museId), n);
+export function drawFor(museId: MuseId, n: number, run = 0): Draw {
+  const base = mix(run === 0 ? salt(museId) : mix(salt(museId), run), n);
   return (kind, k = 0) => unit(mix(mix(base, salt(kind)), k));
 }
 

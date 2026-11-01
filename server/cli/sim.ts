@@ -1,4 +1,4 @@
-// npm run sim -- --hours 504 --work server/fixtures/work-3weeks.json --owners auto-accept [--db garden.db] [--mind meta]
+// npm run sim -- --hours 504 --work server/fixtures/work-3weeks.json --owners auto-accept [--db garden.db] [--mind meta] [--seed 7]
 // Simulates the cast on the real engine, prints what each Muse did, and checks the plan's promises against the logs.
 import { parseArgs } from 'node:util';
 import type { Instant, MuseId, MuseState } from '../../src/muse/contract';
@@ -19,6 +19,7 @@ const { values } = parseArgs({
     mind: { type: 'string', default: 'heuristic' },
     start: { type: 'string', default: '2026-11-01T13:00:00Z' },
     journal: { type: 'string' },
+    seed: { type: 'string', default: '0' },
   },
 });
 
@@ -35,6 +36,7 @@ const garden = buildGarden({
   start,
   clock: 'fast-forward',
   roles: new Map(cast.members.map((m) => [m.id, m.role])),
+  seed: Number(values.seed),
 });
 const opts = { cast: values.cast, work: values.work === 'none' ? null : values.work, start, hours, owners } as const;
 
