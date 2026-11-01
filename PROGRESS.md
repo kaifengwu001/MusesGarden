@@ -30,7 +30,7 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
-## The garden's controls (in progress)
+## The garden's controls (2026-11-01)
 
 Started from f51a9e2 (Fern lives on the first planet). The review notes (2026-11-01), with screenshots of the rail and
 the post, and a sketch of the basket; this table fills in as they are done. The plan: the Muse page first, then the
@@ -38,19 +38,45 @@ pins, the post and the basket.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Muse's status: "Gone beyond the planet" reads "Traveling outside the planet"; "Working" without "(laptop out)"; drop "Exploring: Botanical illustration" from the Muse page | |
-| 2 | Interests: say plainly that interests grow as Muse explores, go into its soul.md, and that only shared ones reach other Muses | |
-| 3 | Friends: no intro line | |
-| 4 | Privacy card: every line clear and true. Muse does take memory.md, through a filter that keeps only interests | |
-| 5 | Muse's friend group: the three layers (Muses you share with each other; your Instagram and Facebook friends' Muses; everyone) as one control, the first layer by default. Narrowing hides friends from the layers turned off, and widening brings them back | |
-| 6 | No "Preview: Muse is out exploring" on the Muse page | |
-| 7 | Pins: no button, always shown; anchoring bubbles rather than pushpins; Muse's pin shows its profile photo | |
-| 8 | Basket: real objects in a real basket. The icon grows into the basket at the centre, the objects fly out and hover there, hovering one previews it. Clicking one sends the rest back, the planet turns and the object lands in a patch already there, highlighted; clicking the basket lands them all. Landing, never growing out of the ground | |
-| 9 | Basket timeline: drag to a day's basket; it zooms where the days are dense and labels the dates; switching makes the objects vanish and the day's objects appear and fly out | |
-| 10 | Post: no pile view, the mailbox opens on the card; no control bar; swipe to the next card, looping; tap to flip; a heart and a star beside the card, labelled on hover, filled pink and yellow | |
-| 11 | Post: From today / Favorite / Album, From today on every open; Favorite and Album as a board; liked cards carry a small heart | |
-| 12 | Travel: invitations live in the mailbox as tickets under the switch, each with its own look and where it is from; a new one flies there when first opened; no Travel button outside | |
-| 13 | (added) The first-run review of what memory.md gives the garden is tracked for later; the privacy card doesn't promise it | |
+| 1 | Muse's status: "Gone beyond the planet" reads "Traveling outside the planet"; "Working" without "(laptop out)"; drop "Exploring: Botanical illustration" from the Muse page | Muse's status reads in a few honest words, the same on the portrait's chip, the Muse page's subtitle and the Find Muse toast: at home, napping, asleep, Juniper is visiting, out exploring, traveling outside the planet, away at Wren's planet, working (working outside the planet, working at Wren's planet). The chip used to say "out exploring" while Muse was beyond the planet or at a friend's; the topic trail ("Exploring: Botanical illustration") stays in the engine's label for the dev overlay only. Postcards taken there say "Outside the planet" (0cdb708). |
+| 2 | Interests: say plainly that interests grow as Muse explores, go into its soul.md, and that only shared ones reach other Muses | "Muse picks up interests as it explores and writes them into its soul.md. Other Muses see the Shared ones, and Muse makes friends through them. Private ones stay between you and Muse." (0cdb708) |
+| 3 | Friends: no intro line | Gone; the list shows only friends inside Muse's friend group, and says so when there are none yet (0cdb708). |
+| 4 | Privacy card: every line clear and true. Muse does take memory.md, through a filter that keeps only interests | Two short lists, each line true to docs/muse-agent.md. What the garden gets from Muse: its soul.md; topics from its memory.md (a filter keeps only interests, the file stays in the Muse app); when Muse is busy and your timezone (times only); never your chats. What other Muses see: Muse's name, its Shared interests and the finds in them, never your name, nothing marked Private (0cdb708). |
+| 5 | Muse's friend group: the three layers (Muses you share with each other; your Instagram and Facebook friends' Muses; everyone) as one control, the first layer by default. Narrowing hides friends from the layers turned off, and widening brings them back | One three-step control on the privacy tab: People I share with (the default), + Instagram & Facebook, Everyone. The engine keeps it (server/domain/social/reach.ts): a pair's layer comes from how the owners know each other, and two Muses meet, and friends visit, only when both owners' groups take that layer in; a meeting drawn before a narrowing never happens. Friends outside the group leave the list and stop visiting, and come back on widening; nothing ends. Over 3 weeks of the sim, friendships by origin (shared, Instagram/Facebook, met beyond): 2/0/0 at the default, 2/2/1 at + Instagram & Facebook (the one met beyond is a pair whose owners know each other), 2/2/10 at Everyone, none outside the groups (0cdb708). |
+| 6 | No "Preview: Muse is out exploring" on the Muse page | Gone, with the three toggles that saved to the browser and nothing read (0cdb708). |
+| 7 | Pins: no button, always shown; anchoring bubbles rather than pushpins; Muse's pin shows its profile photo | The button is gone and the pins always show from orbit, each a round bubble with a cream rim and a short tail down to a dot on its place: Muse's with the rail portrait's photo, a liked find's with a pink heart. On the way, Muse's pin now shows when the garden opens in orbit (it never popped up before). The meadow's frames are identical with the pins out (3440f60). |
+| 8 | Basket: real objects in a real basket. The icon grows into the basket at the centre, the objects fly out and hover there, hovering one previews it. Clicking one sends the rest back, the planet turns and the object lands in a patch already there, highlighted; clicking the basket lands them all. Landing, never growing out of the ground | The rail's icon grows into a wicker basket that flies to the middle, and the day's finds rise out of it as the meadow's own flower meshes, painted as their patches paint them (flowerPaint.ts, a port of floraColour, the toon light, the haze and the grade). Hover a flower for its find's card in small, or the basket for its day; a finger's first tap previews and its second sends. Pick a flower and the rest drop back in, the basket goes home and the camera turns the planet to its patch; the flower comes down just as the camera stops, at its hero's size, turn and colour, and the patch takes over in one frame: the hero stands lifted, larger and lit, a sway runs out through the plants round it, and its card rises after. Pick the basket and they all go home one by one as the camera nears, each into its own patch. Every patch stands grown now (no sprouting); a basket opened only loses its dot on the rail and its ring on the timeline. The baskets sheet, the old flight of tiles and the replant probe are gone (2bf4718, 05707ce, 230f037, 93a089b, af30eeb). |
+| 9 | Basket timeline: drag to a day's basket; it zooms where the days are dense and labels the dates; switching makes the objects vanish and the day's objects appear and fly out | A track of the baskets by day under the open basket, oldest on the left, month ticks under it and the selected or hovered day written over its dot ("Wed 21 Oct · Ferns and ink"). It bulges round the pointer and the selected day so dots near them stand at least 28 px apart while its ends stay put; drag, click, or the arrow keys. Unopened baskets carry a coral ring. Another day makes the flowers out vanish in a sparkle while the day's flowers appear in the basket and rise (93a089b, af30eeb). |
+| 10 | Post: no pile view, the mailbox opens on the card; no control bar; swipe to the next card, looping; tap to flip; a heart and a star beside the card, labelled on hover, filled pink and yellow | The mailbox opens on today's top card, two peeking under it; swipe it away in any direction for the next, round and round; tap it to turn it over (Space too). The heart and the star sit beside the card, their words on hover, filling pink and yellow. No pile, no bar (5e0bf24). |
+| 11 | Post: From today / Favorite / Album, From today on every open; Favorite and Album as a board; liked cards carry a small heart | A switch top right, on From today at every opening. Favorite and Album are boards of cards; a liked card's caption ends with a small heart. Stars are kept by the engine like likes (owner.favorited) and never nudge Muse (f88dda7, 5e0bf24). |
+| 12 | Travel: invitations live in the mailbox as tickets under the switch, each with its own look and where it is from; a new one flies there when first opened; no Travel button outside | Every unused invitation is a ticket in a column under the switch, in its host's coat colour, with the host's name and world and a little planet drawn for that host. A new invitation arrives as a sealed envelope in today's deck; tapped, its ticket rises out and flies to the column. Boarding is from a ticket. The Travel button and its sheet are gone (5e0bf24). |
+| 13 | (added) The first-run review of what memory.md gives the garden is tracked for later; the privacy card doesn't promise it | Tracked as "First-run review of the topics memory.md yields" (Agent backend). |
+
+### Measured (the garden's controls)
+
+- **Cost with the basket away.** A/B of f51a9e2 against 578fb83 in one browser, 8 alternating rounds at 2880×1800: every view within 0.2 ms at High and at Medium, best and median (noise here is about 0.4 ms). Orbit 9.60 against 9.63 ms, meadow 1.6 m 15.83 against 15.91, cottage 24.14 against 24.21 (High, best).
+- **Cost with the basket out.** Its own canvas adds 14 draw calls and 5,200 triangles; the planet's own pass keeps its draw calls (22 in orbit, 31 standing, 30 in the meadow, open or closed). A frame costs 0.4 to 0.7 ms more on the planet's sync and about 0.5 ms on both canvases' (High, 2880×1800). It draws only while the basket is out.
+- **The meadow is untouched.** With the opened baskets the same in both builds and the pins held back (they pop in on the wall clock), 36 of 36 frames identical to 1041343: 9 views at High and Medium, DPR 1 and 2; the shader change on its own 18 of 18. On a first visit only the orbit view differs, where today's basket now shows as its five spheres, since every patch stands grown. The post box draws the same in four states at DPR 1 and 2.
+- **The handoff.** For each of 5 flowers, 49 frames filmed round its head as it lands: none with the flower missing or doubled. Colour across the handoff, ΔE76 between the basket's flower just before and its hero just after: 5.0, 4.2 and 4.8 on heads of 48 to 116 px (High, DPR 2); a fourth sample, 24.3, compared only 3 px of head and says little.
+- **Checks.** npm run check clean; 891 unit tests pass, 3 skipped; npm run test:gpu 15 pass, 1 skipped; npm run shots 15 pass and read; the live e2e's 11 pass against the engine, the basket's rewritten.
+- **Recordings** of the whole basket at 1440×900, 390×844 and with reduced motion: open, hover, pick and land, reopen, drag the timeline, swap days, send all, close.
+
+### Trades (the garden's controls)
+
+- Every patch stands grown from the start, so a basket not opened yet is already on the planet. Its news is the rail's dot and the timeline's ring, and its flowers coming home to it, not its patches appearing.
+- The basket's flowers are painted on the CPU from a port of the meadow's flower colour and grade. It matches at the handoff (ΔE under 5), but a change to floraColour, the toon bands or the grade now has a twin to keep in step (flowerPaint.test.ts pins it).
+- The hero in focus or landing is drawn 1.2 m nearer than it stands so its patch never swallows it. It can show through a near plant in front of it for as long as it is lit.
+- Friends outside the friend group are hidden, never ended: widening brings them back with their history.
+- Postcards' stars are kept by the engine like likes, and never reach Muse's choices.
+
+### Known issues
+
+- Tickets from hosts outside the friend group still show: the engine doesn't yet filter invitations by reach.
+- On a phone the "Muse brought you a basket" toast stays over the open basket.
+- Where baskets crowd (a run of days in October in the fixture), the timeline's dots overlap until the pointer or the selection comes near; the bulge spreads only round those two.
+- Photo captions such as "Out exploring Drink" read oddly (from before this round).
+- The post's day names ("Today", "Tuesday") and the basket's follow the browser's clock, while From today follows the engine's day (from before this round).
+- `environments/scarlet-sail-canyon/ui/garden/` is a copy of the old garden interface and was left as it was.
 
 ## Fern lives on the first planet (2026-11-01)
 
