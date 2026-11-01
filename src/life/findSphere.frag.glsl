@@ -1,5 +1,5 @@
 // A find's sphere (findSphere.vert.glsl): a soft halo in its colour round a
-// near-white core, added to what is behind it.
+// near-white core, screened onto what is behind it.
 varying vec3 vColour;
 varying float vCore;
 

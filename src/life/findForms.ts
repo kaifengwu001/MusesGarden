@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, Mesh, Points, ShaderMaterial, Vector4, type IUniform, type Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, CustomBlending, DoubleSide, Mesh, OneFactor, OneMinusSrcColorFactor, Points, ShaderMaterial, Vector4, type IUniform, type Vector3 } from 'three';
 import { gpuMemory } from '../core/gpuMemory';
 import { smoothstep } from '../core/math';
 import { createGroundSample, type Terrain } from '../planet/terrain';
@@ -170,7 +170,19 @@ export class FindForms {
     this.specimens.visible = false;
     this.spheres = new Points(
       new BufferGeometry(),
-      new ShaderMaterial({ name: 'find spheres', vertexShader: sphereVertex, fragmentShader: sphereFragment, uniforms, defines, transparent: true, depthWrite: false, blending: AdditiveBlending }),
+      // screened onto what is behind (src + dst · (1 − src)): a patch of finds glows brighter without burning out to white
+      new ShaderMaterial({
+        name: 'find spheres',
+        vertexShader: sphereVertex,
+        fragmentShader: sphereFragment,
+        uniforms,
+        defines,
+        transparent: true,
+        depthWrite: false,
+        blending: CustomBlending,
+        blendSrc: OneFactor,
+        blendDst: OneMinusSrcColorFactor,
+      }),
     );
     this.spheres.frustumCulled = false;
     this.spheres.visible = false;
