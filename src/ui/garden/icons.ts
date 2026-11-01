@@ -10,7 +10,6 @@ export const ICONS = {
     '<circle cx="12" cy="12" r="7.6"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2"/><path d="M9.2 14.8v-3.4a2.8 2.8 0 0 1 5.6 0v3.4a1 1 0 0 1-1 1h-3.6a1 1 0 0 1-1-1Z"/><circle cx="11" cy="12" r=".55" fill="currentColor"/><circle cx="13" cy="12" r=".55" fill="currentColor"/>',
   ),
   basket: icon('<path d="M7.2 10.2a4.8 4.8 0 0 1 9.6 0"/><path d="M3.6 10.2h16.8l-1.7 8.4a2 2 0 0 1-2 1.6H7.3a2 2 0 0 1-2-1.6Z"/><path d="M8.6 13v4.6M12 13v4.6M15.4 13v4.6M4.6 13.6h14.8"/>'),
-  pin: icon('<circle cx="12" cy="8.4" r="4.4"/><path d="M12 12.8v8"/><path d="M10.4 7.2a1.6 1.6 0 0 1 1.6-1.4"/>'),
   heart: icon('<path d="M12 19.6s-7.4-4.4-7.4-9.7A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.4 2.3c0 5.3-7.4 9.7-7.4 9.7Z"/>'),
   heartFilled: icon('<path d="M12 19.6s-7.4-4.4-7.4-9.7A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.4 2.3c0 5.3-7.4 9.7-7.4 9.7Z" fill="currentColor"/>'),
   left: icon('<path d="M14.6 5.6 8.2 12l6.4 6.4"/>'),

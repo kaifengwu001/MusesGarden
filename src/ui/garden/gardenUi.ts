@@ -29,7 +29,7 @@ import { TravelSheet, Visit } from './travel';
 // The garden's interface over the meadow: Muse's finds as patches of flowers
 // with their cards, the pins on the globe, the post box with Muse's postcards and
 // invitations, the ticket to other worlds, and a rail down the right: Muse
-// (its page), find Muse, its cottage, the baskets, the pins. Everything it
+// (its page), find Muse, its cottage, the baskets. Everything it
 // shows comes from a GardenSource (garden/source.ts) through GardenState.
 // main.ts calls update() before the world moves its camera, frame() after,
 // and offers it taps first.
@@ -94,7 +94,6 @@ export class GardenUi {
   private readonly status: HTMLElement;
   private readonly homeButton: HTMLButtonElement;
   private readonly basketsButton: HTMLButtonElement;
-  private readonly pinsButton: HTMLButtonElement;
   private readonly sign: HTMLElement;
   private readonly basketDot: HTMLElement;
   private readonly ticket: HTMLButtonElement;
@@ -165,9 +164,7 @@ export class GardenUi {
     this.basketsButton.dataset.label = 'Baskets';
     this.basketDot = el('span', 'g-dot');
     this.basketsButton.append(this.basketDot);
-    this.pinsButton = button('g-railbtn', 'Pins', ICONS.pin, () => this.state.setPins(!this.state.pins));
-    this.pinsButton.dataset.label = 'Pins on the globe';
-    rail.append(this.portrait, find, this.homeButton, this.basketsButton, this.pinsButton);
+    rail.append(this.portrait, find, this.homeButton, this.basketsButton);
     this.root.append(rail);
 
     // the post box and the ticket beside it
@@ -213,12 +210,11 @@ export class GardenUi {
     const s = this.state;
     if (change === 'snapshot') this.applyWorld();
     if (change === 'snapshot' || change === 'baskets') this.relayout(true);
-    if (change === 'snapshot' || change === 'likes' || change === 'pins' || change === 'status') this.refreshPins();
+    if (change === 'snapshot' || change === 'likes' || change === 'status') this.refreshPins();
     const unread = s.unread.length;
     this.postbox.setMail(unread, s.invitations.filter((p) => !s.isRead(p.id)).length);
     this.ticket.classList.toggle('has-invite', s.invitations.length > 0);
     this.basketDot.classList.toggle('is-on', s.freshBasket !== undefined);
-    this.pinsButton.setAttribute('aria-pressed', String(s.pins));
     const home = s.status.home;
     this.portrait.classList.toggle('is-out', !home);
     this.status.innerHTML = `<i></i>${home ? 'at home' : 'out exploring'}`;
@@ -303,7 +299,7 @@ export class GardenUi {
     // (picked when the pointer moved, or the view moved under it: a flight, a zoom still gliding)
     if (this.pointer && (this.pointerMoved || !w.rig.camera.matrixWorld.equals(this.pickedIn))) this.hover(this.pointer);
     this.beds.update(w.rig.altitude, !away);
-    this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
+    this.pins.update(dt, !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     const width = window.innerWidth;
     const height = window.innerHeight;
     const bed = this.current ? this.layout.beds.get(this.current) : undefined;
@@ -633,6 +629,8 @@ export class GardenUi {
       travel: () => this.travelSheet.open(),
       home: (h: boolean) => this.setHome(h),
       flying: () => this.flight.flying,
+      /** Take the pins off the globe, or put them back (a frame or a draw count without them). */
+      pins: (shown: boolean) => (shown ? this.world.scene.add(this.pins.group) : this.pins.group.removeFromParent()),
       placeholder: placeholderSource,
       newest: (): Basket | undefined => this.state.baskets[0],
     };

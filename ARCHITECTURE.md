@@ -694,7 +694,7 @@ so any view can be shared.
         findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, planted from the middle out)
                            and their glowing spheres from high up; findTable.ts each find's state (planted, card,
                            hover, pulse, picked basket) in a float texture, any number of finds
-        pins.ts            pins in the globe from orbit: liked finds (hearts) and Muse (its face)
+        pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo)
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
                            react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes, post
                            read and put away, baskets visited), where the finds grow (placement.ts)
@@ -711,6 +711,6 @@ so any view can be shared.
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
-                           baskets, pins), the post box (a model in its own canvas), postcards, the album and
+                           baskets), the post box (a model in its own canvas), postcards, the album and
                            invitations (mail.ts), the sheets (baskets, Muse's page, travel), the visit stand-in
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

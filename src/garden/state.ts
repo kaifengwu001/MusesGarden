@@ -4,14 +4,14 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, MuseStatus, P
 // The garden as the interface sees it: the snapshot from the source, kept
 // current by its events, and what you have done here: the finds you liked
 // or made public or private, the postcards you read, liked or put away, the
-// baskets you have visited, whether the pins show. Everything you do that
+// baskets you have visited. Everything you do that
 // Muse should hear about goes back through the source as a reaction. Likes
 // and sharing are the source's to keep when it sends them: a switch you
 // flip shows at once and holds until the source sends that value back (or
 // turns it down). The rest of your side, and likes a source doesn't keep,
 // are remembered in this browser only (localStorage, where it is allowed).
 
-export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'pins' | 'interests' | 'finds' | 'status';
+export type Change = 'snapshot' | 'likes' | 'postcards' | 'baskets' | 'interests' | 'finds' | 'status';
 
 /** A reaction that flips a switch the source keeps. */
 type Flip = Extract<Reaction, { liked: boolean } | { shared: boolean }>;
@@ -24,7 +24,6 @@ interface Kept {
   awayCards: string[];
   visited: string[];
   usedInvitations: string[];
-  pins: boolean;
 }
 
 const KEY = 'muses-garden.garden.v1';
@@ -49,8 +48,6 @@ export class GardenState {
   private readonly usedInvitations: Set<string>;
   /** What you flipped here that the source has not sent back yet, by switch and id. */
   private readonly pending = new Map(FLIPS.map((type) => [type, new Map<string, boolean>()]));
-  /** Whether the liked finds' and Muse's pins show in orbit. */
-  pins: boolean;
   /** True for a visitor who has never opened the garden in this browser: the older postcards and baskets count as seen. */
   private readonly firstVisit: boolean;
   private findIndex = new Map<string, Find>();
@@ -65,7 +62,6 @@ export class GardenState {
     this.awayCards = new Set(kept.awayCards);
     this.visited = new Set(kept.visited);
     this.usedInvitations = new Set(kept.usedInvitations);
-    this.pins = kept.pins ?? true;
   }
 
   /** Read everything from the source and listen for what arrives. */
@@ -93,7 +89,6 @@ export class GardenState {
       awayCards: [...this.awayCards],
       visited: [...this.visited],
       usedInvitations: [...this.usedInvitations],
-      pins: this.pins,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(kept));
@@ -334,10 +329,5 @@ export class GardenState {
 
   get status(): MuseStatus {
     return this.snapshot?.muse.status ?? { home: true };
-  }
-
-  setPins(on: boolean): void {
-    this.pins = on;
-    this.emit('pins');
   }
 }
