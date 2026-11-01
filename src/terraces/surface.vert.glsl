@@ -12,6 +12,7 @@ uniform float uRadius;
 #include <terraces_common>
 #include <terraces_plots>
 #include <terraces_paddy>
+#include <terraces_village>
 #include <terraces_ground>
 
 attribute vec4 aNode; // u0, v0, size (uv), face

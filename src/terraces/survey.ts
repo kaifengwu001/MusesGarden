@@ -1,14 +1,8 @@
-import { Vector3 } from "three";
-import { clamp } from "../core/math";
-import type { CubeReadback } from "./bakeReader";
-import type { CellSample } from "./cells";
-import {
-  createCropSample,
-  createPlotSample,
-  TERRACE,
-  type CropSample,
-  type TerracePlots,
-} from "./plots";
+import { Vector3 } from 'three';
+import { clamp } from '../core/math';
+import type { CubeReadback } from './bakeReader';
+import type { CellSample } from './cells';
+import { createCropSample, createPlotSample, TERRACE, type CropSample, type TerracePlots } from './plots';
 
 // The terraces surveyed, cell by cell (ARCHITECTURE.md, "Terraces built on
 // the hills"). A cell is read on a grid in its own tangent chart (its middle
@@ -33,8 +27,19 @@ import {
 // The meshes are built from this (floors.ts, terraceMesh.ts): each grid
 // square clipped exactly at the walls, the cuts and the land's edge.
 
-/** The planet's cuts: a cut wherever a wall's cut field (plots.ts cutField, a noise this many meters across) crosses a step. */
+/** The planet's cuts: a cut wherever a wall's cut field (plots.ts cutField, a noise so many meters across) crosses a step. */
 export const CUTS = { step: 0.24 } as const;
+
+/**
+ * What a survey lays out: the terraces on the hills (their riser, their cuts' field this many meters
+ * across, how far the cuts lean round), or the plots on the valleys' flat floors (strips along their gentle
+ * contours a low riser apart, cut square-ish and nearly straight; the villages' courtyards left out).
+ */
+export const MODES = {
+  terraces: { riser: TERRACE.step, offsetKey: 0, cutMeters: TERRACE.cutMeters, bow: [0.15, 0.6], levelKey: 0, merges: true },
+  flats: { riser: 0.2, offsetKey: 1, cutMeters: 17, bow: [0.02, 0.1], levelKey: 100000, merges: false },
+} as const;
+export type SurveyMode = keyof typeof MODES;
 
 export const SURVEY = {
   /** The grid the hills are read on (m), and how far the reading is smoothed (σ, m). */
@@ -70,6 +75,8 @@ export interface Paddy {
   readonly id: number;
   readonly band: number;
   readonly crop: CropSample;
+  /** Its own floor (m): a flats' plot, level with the ground under its middle (a terraced paddy's is its band's). */
+  readonly floorH?: number;
 }
 
 /** A cut across a band: its points (x, y pairs in the chart, m) from one wall toward the other; open where it does not part two paddies (no ridge then). */
@@ -112,43 +119,29 @@ export interface CellSurvey {
 const dir = new Vector3();
 
 /** A point of the chart as a direction. */
-export function chartDir(
-  t: { centre: Vector3; e1: Vector3; e2: Vector3 },
-  R: number,
-  x: number,
-  y: number,
-  out: Vector3,
-): Vector3 {
-  return out
-    .copy(t.centre)
-    .multiplyScalar(R)
-    .addScaledVector(t.e1, x)
-    .addScaledVector(t.e2, y)
-    .normalize();
+export function chartDir(t: { centre: Vector3; e1: Vector3; e2: Vector3 }, R: number, x: number, y: number, out: Vector3): Vector3 {
+  return out.copy(t.centre).multiplyScalar(R).addScaledVector(t.e1, x).addScaledVector(t.e2, y).normalize();
 }
 
 function gaussian(src: Float32Array, n: number, sigma: number): Float32Array {
   const r = Math.ceil(3 * sigma);
   const w = new Float32Array(2 * r + 1);
   let sum = 0;
-  for (let k = -r; k <= r; k++)
-    sum += w[k + r] = Math.exp(-(k * k) / (2 * sigma * sigma));
+  for (let k = -r; k <= r; k++) sum += w[k + r] = Math.exp(-(k * k) / (2 * sigma * sigma));
   for (let k = 0; k < w.length; k++) w[k] /= sum;
   const tmp = new Float32Array(n * n);
   const out = new Float32Array(n * n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       let a = 0;
-      for (let k = -r; k <= r; k++)
-        a += w[k + r] * src[j * n + clamp(i + k, 0, n - 1)];
+      for (let k = -r; k <= r; k++) a += w[k + r] * src[j * n + clamp(i + k, 0, n - 1)];
       tmp[j * n + i] = a;
     }
   }
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       let a = 0;
-      for (let k = -r; k <= r; k++)
-        a += w[k + r] * tmp[clamp(j + k, 0, n - 1) * n + i];
+      for (let k = -r; k <= r; k++) a += w[k + r] * tmp[clamp(j + k, 0, n - 1) * n + i];
       out[j * n + i] = a;
     }
   }
@@ -160,14 +153,7 @@ function gaussian(src: Float32Array, n: number, sigma: number): Float32Array {
  * (marching squares), chained into polylines with the higher side on their
  * left. inside(k): whether grid point k counts.
  */
-export function contour(
-  field: Float32Array,
-  n: number,
-  g: number,
-  half: number,
-  H: number,
-  inside: (k: number) => boolean,
-): Array<{ points: number[]; closed: boolean }> {
+export function contour(field: Float32Array, n: number, g: number, half: number, H: number, inside: (k: number) => boolean): Array<{ points: number[]; closed: boolean }> {
   const v = (k: number): number => field[k] - H;
   const cross = (e: number): [number, number] => {
     const k = e >> 1;
@@ -186,14 +172,12 @@ export function contour(
   for (let j = 0; j < n - 1; j++) {
     for (let i = 0; i < n - 1; i++) {
       const k = j * n + i;
-      if (!(inside(k) && inside(k + 1) && inside(k + n) && inside(k + n + 1)))
-        continue;
+      if (!(inside(k) && inside(k + 1) && inside(k + n) && inside(k + n + 1))) continue;
       const a = v(k);
       const b = v(k + 1);
       const c = v(k + n + 1);
       const d = v(k + n);
-      const code =
-        (a > 0 ? 1 : 0) | (b > 0 ? 2 : 0) | (c > 0 ? 4 : 0) | (d > 0 ? 8 : 0);
+      const code = (a > 0 ? 1 : 0) | (b > 0 ? 2 : 0) | (c > 0 ? 4 : 0) | (d > 0 ? 8 : 0);
       if (code === 0 || code === 15) continue;
       const bottom = 2 * k;
       const right = 2 * (k + 1) + 1;
@@ -280,34 +264,18 @@ export function contour(
     }
     if (points.length >= 4) lines.push({ points, closed });
   };
-  for (const from of next.keys())
-    if (!into.has(from) && !used.has(from)) walk(from);
+  for (const from of next.keys()) if (!into.has(from) && !used.has(from)) walk(from);
   for (const from of next.keys()) if (!used.has(from)) walk(from);
   return lines;
 }
 
 /** A polyline resampled every `step` m along it: points and arc lengths. */
-export function resample(
-  points: number[],
-  closed: boolean,
-  step: number,
-): { p: Float64Array; s: Float64Array } {
+export function resample(points: number[], closed: boolean, step: number): { p: Float64Array; s: Float64Array } {
   const m = points.length / 2;
   const cum = [0];
-  for (let k = 1; k < m; k++)
-    cum.push(
-      cum[k - 1] +
-        Math.hypot(
-          points[2 * k] - points[2 * k - 2],
-          points[2 * k + 1] - points[2 * k - 1],
-        ),
-    );
+  for (let k = 1; k < m; k++) cum.push(cum[k - 1] + Math.hypot(points[2 * k] - points[2 * k - 2], points[2 * k + 1] - points[2 * k - 1]));
   let total = cum[m - 1];
-  if (closed)
-    total += Math.hypot(
-      points[0] - points[2 * m - 2],
-      points[1] - points[2 * m - 1],
-    );
+  if (closed) total += Math.hypot(points[0] - points[2 * m - 2], points[1] - points[2 * m - 1]);
   const count = Math.max(2, Math.round(total / step) + (closed ? 0 : 1));
   const ds = total / (closed ? count : count - 1);
   const p = new Float64Array(2 * count);
@@ -349,8 +317,10 @@ export function surveyCell(
   layout: CubeReadback,
   plots: TerracePlots,
   front: number,
+  mode: SurveyMode = 'terraces',
+  yard: (dir: Vector3) => number = () => 1e9,
 ): CellSurvey {
-  const job = surveyCellJob(cell, R, cellSize, terrain, layout, plots, front);
+  const job = surveyCellJob(cell, R, cellSize, terrain, layout, plots, front, mode, yard);
   for (;;) {
     const r = job.next();
     if (r.done) return r.value;
@@ -366,7 +336,10 @@ export function* surveyCellJob(
   layout: CubeReadback,
   plots: TerracePlots,
   front: number,
+  mode: SurveyMode = 'terraces',
+  yard: (dir: Vector3) => number = () => 1e9,
 ): Generator<void, CellSurvey, void> {
+  const M = MODES[mode];
   const centre = cell.centre.clone();
   const e1 = cell.along.clone();
   const e2 = new Vector3().crossVectors(centre, e1).normalize();
@@ -388,21 +361,22 @@ export function* surveyCellJob(
       const mine = Math.floor(layout.nearest(dir, 0) * 1024) === cell.key;
       const edge = layout.sample(dir, 3);
       side[k] = mine ? edge : -edge;
-      land[k] = Math.min(
-        (0.5 - terrain.sample(dir, 2)) * SURVEY.softness,
-        (0.5 - terrain.sample(dir, 3)) * SURVEY.softness,
-      );
+      const wild = (0.5 - terrain.sample(dir, 2)) * SURVEY.softness;
+      const flat = (terrain.sample(dir, 3) - 0.5) * SURVEY.softness;
+      // the hills' terraces, or the valleys' plots (but a village's courtyards)
+      land[k] = mode === 'terraces' ? Math.min(wild, -flat) : Math.min(wild, flat, yard(dir) - 2.4);
     }
     if (j % 48 === 47) yield;
   }
   const hs = gaussian(h, n, SURVEY.smooth / g);
   yield;
   const inLand = (k: number): boolean => land[k] >= 0;
+  if (mode === 'flats') return flatsLayout(cell, chart, R, n, g, half, h, hs, land, side, plots, front);
 
   // the planet's levels (the same everywhere, so the walls run on from cell to cell): their heights, those
   // left out skipped (a band two levels wide, its walls half again as tall)
-  const riser = TERRACE.step;
-  const phi = plots.offset(0);
+  const riser = M.riser;
+  const phi = plots.offset(M.offsetKey);
   let lo = Infinity;
   let hi = -Infinity;
   for (let k = 0; k < N; k++) {
@@ -436,15 +410,11 @@ export function* surveyCellJob(
   if (!(hi > lo)) return survey;
   const levelList: number[] = [];
   const levelIndex: number[] = [];
-  for (
-    let k = Math.floor(lo / riser + phi) - 2;
-    k <= Math.ceil(hi / riser + phi) + 2;
-    k++
-  ) {
-    const w = plots.wall(0, k);
-    if (!w.left) {
+  for (let k = Math.floor(lo / riser + phi) - 2; k <= Math.ceil(hi / riser + phi) + 2; k++) {
+    const w = plots.wall(M.offsetKey, k);
+    if (!w.left || !M.merges) {
       levelList.push((w.at - phi) * riser);
-      levelIndex.push(k);
+      levelIndex.push(k + M.levelKey);
     }
   }
   const levels = Float64Array.from(levelList);
@@ -507,13 +477,7 @@ export function* surveyCellJob(
     const B = bands[w.index];
     const m = w.s.length;
     const step = new Int32Array(m);
-    for (let c = 0; c < m; c++)
-      step[c] = Math.floor(
-        plots.cutField(
-          chartDir(chart, R, w.points[2 * c], w.points[2 * c + 1], pd),
-          w.level,
-        ) / CUTS.step,
-      );
+    for (let c = 0; c < m; c++) step[c] = Math.floor(plots.cutField(chartDir(chart, R, w.points[2 * c], w.points[2 * c + 1], pd), w.level) / CUTS.step);
     stretches.push({ wall: wi, step });
     if (!B) continue;
     for (let c = 0; c + 1 < m; c++) {
@@ -536,14 +500,8 @@ export function* surveyCellJob(
       if (pts.length < 4) continue;
       // its lean: along the band (across the slope), most at its ends
       const hb = plots.hash(0, w.level, Math.max(step[c], step[c + 1]), 0, 42);
-      const bandW = Math.max(
-        (B.hi - B.lo) / Math.max(Math.hypot(grad.x, grad.y), 0.02),
-        1,
-      );
-      const bow =
-        (0.15 + 0.45 * unit(hb)) *
-        ((hb & 256) === 0 ? 1 : -1) *
-        Math.min(bandW, 8);
+      const bandW = Math.max((B.hi - B.lo) / Math.max(Math.hypot(grad.x, grad.y), 0.02), 1);
+      const bow = (M.bow[0] + (M.bow[1] - M.bow[0]) * unit(hb)) * ((hb & 256) === 0 ? 1 : -1) * Math.min(bandW, 8);
       const k2 = pts.length / 2;
       const bent = new Float64Array(pts.length);
       for (let k = 0; k < k2; k++) {
@@ -609,8 +567,7 @@ export function* surveyCellJob(
             closedEdge[2 * (j * n + i + 1) + 1] = 1;
             any = true;
           }
-          if (!any && !(ax >= i && ax <= i + 1 && ay >= j && ay <= j + 1))
-            continue;
+          if (!any && !(ax >= i && ax <= i + 1 && ay >= j && ay <= j + 1)) continue;
           const list = crossing.get(sq) ?? [];
           list.push(ci, k / 2);
           crossing.set(sq, list);
@@ -748,12 +705,195 @@ export function* surveyCellJob(
 
 const unit = (h: number): number => (h >>> 8) / 16777216;
 
+/** The flats' plots: rows (m wide), plots (× the row long), as Kai's references 12 and 13 lay them. */
+export const FLATS = { width: [9, 16], length: [1, 2.3], bow: [0.3, 2.2] } as const;
+
+/**
+ * A valley's flat floor in a cell: rows along the cell's way, 9–16 m wide and gently bowed, cut into plots
+ * 1–2.3 rows long, a little askew; each plot level with the ground under its middle (to 5 cm). Each cell's
+ * block of plots is its own (the painting's blocks, each its own way); its edges are its roads.
+ */
+function flatsLayout(
+  cell: CellSample,
+  chart: { centre: Vector3; e1: Vector3; e2: Vector3 },
+  R: number,
+  n: number,
+  g: number,
+  half: number,
+  h: Float32Array,
+  hs: Float32Array,
+  land: Float32Array,
+  side: Float32Array,
+  plots: TerracePlots,
+  front: number,
+): CellSurvey {
+  const N = n * n;
+  const key = cell.key;
+  const W = FLATS.width[0] + (FLATS.width[1] - FLATS.width[0]) * unit(plots.hash(key, 0, 0, 0, 51));
+  const phase = unit(plots.hash(key, 0, 0, 0, 52));
+  const rowEdge = (r: number, x: number): number => {
+    const hr = plots.hash(key, r, 0, 0, 53);
+    const h2 = (Math.imul(hr, 747796405) + 2891336453) >>> 0;
+    const bow = (FLATS.bow[0] + (FLATS.bow[1] - FLATS.bow[0]) * unit(hr)) * Math.sin(x / (9 + 6 * unit(h2)) + 2 * Math.PI * unit((h2 ^ 0x9e3779b9) >>> 0));
+    return (r - phase + 0.28 * (2 * unit((hr ^ 0x85ebca6b) >>> 0) - 1)) * W + bow;
+  };
+  const rowLength = (r: number): { L: number; ph: number } => {
+    const hr = plots.hash(key, r, 0, 0, 54);
+    return { L: W * (FLATS.length[0] + (FLATS.length[1] - FLATS.length[0]) * unit(hr)), ph: unit((Math.imul(hr, 747796405) + 2891336453) >>> 0) };
+  };
+  const plotEdge = (r: number, j: number, y: number, yMid: number): number => {
+    const { L, ph } = rowLength(r);
+    const hp = plots.hash(key, r, j, 0, 56);
+    const lean = 0.25 * (2 * unit((Math.imul(hp, 747796405) + 2891336453) >>> 0) - 1);
+    return (j - ph + 0.3 * (2 * unit(hp) - 1)) * L + lean * (y - yMid);
+  };
+  const rowOf = (x: number, y: number): number => {
+    let r = Math.floor(y / W + phase) - 1;
+    while (rowEdge(r + 1, x) <= y) r++;
+    while (rowEdge(r, x) > y) r--;
+    return r;
+  };
+  const rowMid = (r: number): number => 0.5 * ((r - phase) * W + (r + 1 - phase) * W);
+  const plotOf = (r: number, x: number, y: number): number => {
+    const { L, ph } = rowLength(r);
+    const yMid = rowMid(r);
+    let j = Math.floor(x / L + ph) - 1;
+    while (plotEdge(r, j + 1, y, yMid) <= x) j++;
+    while (plotEdge(r, j, y, yMid) > x) j--;
+    return j;
+  };
+  // every land point's plot; the plots' floors, from the ground under their middles
+  const band = new Int32Array(N).fill(-1);
+  const paddy = new Int32Array(N).fill(-1);
+  const paddies: Paddy[] = [];
+  const byKey = new Map<string, number>();
+  const plot = createPlotSample();
+  const pd = new Vector3();
+  const heightUnder = (x: number, y: number): number => {
+    const i = Math.min(Math.max(Math.round((x + half) / g), 0), n - 1);
+    const j = Math.min(Math.max(Math.round((y + half) / g), 0), n - 1);
+    return h[j * n + i];
+  };
+  const rows = new Set<number>();
+  for (let k = 0; k < N; k++) {
+    if (land[k] < 0) continue;
+    const i = k % n;
+    const x = -half + i * g;
+    const y = -half + ((k - i) / n) * g;
+    const r = rowOf(x, y);
+    const j = plotOf(r, x, y);
+    rows.add(r);
+    const name = `${r}/${j}`;
+    let idx = byKey.get(name);
+    if (idx === undefined) {
+      const { L, ph } = rowLength(r);
+      const xm = (j - ph + 0.5) * L;
+      const ym = rowMid(r);
+      plot.id = plots.hash(key, r, j, 1, 58);
+      plot.season = plots.seasonAt(chartDir(chart, R, xm, ym, pd));
+      idx = paddies.length;
+      paddies.push({ id: plot.id, band: 0, crop: plots.cropOf(plot, front, createCropSample()), floorH: Math.round(heightUnder(xm, ym) / 0.05) * 0.05 });
+      byKey.set(name, idx);
+    }
+    band[k] = 0;
+    paddy[k] = idx;
+  }
+  // the plots' edges as cuts: the rows' edges along the way, the plots' across each row
+  const cuts: Cut[] = [];
+  for (const r of rows) {
+    const pts: number[] = [];
+    for (let x = -half; x <= half; x += 0.5) pts.push(x, rowEdge(r, x));
+    cuts.push({ band: 0, points: Float64Array.from(pts) });
+    const { L } = rowLength(r);
+    const yMid = rowMid(r);
+    for (let j = Math.floor(-half / L) - 2; j <= Math.ceil(half / L) + 2; j++) {
+      const across: number[] = [];
+      const y0 = rowEdge(r, plotEdge(r, j, yMid, yMid));
+      const y1 = rowEdge(r + 1, plotEdge(r, j, yMid, yMid));
+      for (let t = 0; t <= 1.0001; t += 0.1) {
+        const y = y0 + (y1 - y0) * t;
+        across.push(plotEdge(r, j, y, yMid), y);
+      }
+      cuts.push({ band: 0, points: Float64Array.from(across) });
+    }
+  }
+  const { closedEdge, crossing } = fences(cuts, n, g, half);
+  void closedEdge;
+  const levels = Float64Array.from([-1e9, 1e9]);
+  return {
+    cell,
+    centre: chart.centre,
+    e1: chart.e1,
+    e2: chart.e2,
+    R,
+    riser: 0,
+    n,
+    g,
+    half,
+    h,
+    hs,
+    land,
+    side,
+    levels,
+    walls: [],
+    bands: [{ index: 0, lo: -1e9, hi: 1e9, floorH: 0 }],
+    band,
+    paddy,
+    paddies,
+    cuts,
+    crossing,
+  };
+}
+
+/** Cuts as fences on the grid: each grid edge a cut crosses is closed; and each square's cut segments (cut, segment). */
+function fences(cuts: Cut[], n: number, g: number, half: number): { closedEdge: Uint8Array; crossing: Map<number, number[]> } {
+  const closedEdge = new Uint8Array(2 * n * n);
+  const crossing = new Map<number, number[]>();
+  const fx = (x: number): number => (x + half) / g;
+  cuts.forEach((cut, ci) => {
+    const p = cut.points;
+    for (let k = 0; k + 3 < p.length; k += 2) {
+      const ax = fx(p[k]);
+      const ay = fx(p[k + 1]);
+      const bx = fx(p[k + 2]);
+      const by = fx(p[k + 3]);
+      const i0 = Math.max(Math.floor(Math.min(ax, bx)), 0);
+      const i1 = Math.min(Math.floor(Math.max(ax, bx)), n - 2);
+      const j0 = Math.max(Math.floor(Math.min(ay, by)), 0);
+      const j1 = Math.min(Math.floor(Math.max(ay, by)), n - 2);
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          let any = false;
+          if (crosses(ax, ay, bx, by, i, j, i + 1, j)) {
+            closedEdge[2 * (j * n + i)] = 1;
+            any = true;
+          }
+          if (crosses(ax, ay, bx, by, i, j + 1, i + 1, j + 1)) {
+            closedEdge[2 * ((j + 1) * n + i)] = 1;
+            any = true;
+          }
+          if (crosses(ax, ay, bx, by, i, j, i, j + 1)) {
+            closedEdge[2 * (j * n + i) + 1] = 1;
+            any = true;
+          }
+          if (crosses(ax, ay, bx, by, i + 1, j, i + 1, j + 1)) {
+            closedEdge[2 * (j * n + i + 1) + 1] = 1;
+            any = true;
+          }
+          if (!any && !(ax >= i && ax <= i + 1 && ay >= j && ay <= j + 1)) continue;
+          const sq = j * n + i;
+          const list = crossing.get(sq) ?? [];
+          list.push(ci, k / 2);
+          crossing.set(sq, list);
+        }
+      }
+    }
+  });
+  return { closedEdge, crossing };
+}
+
 /** The smoothed height at a chart point (bilinear). */
-function heightAt(
-  G: { n: number; g: number; half: number; hs: Float32Array },
-  x: number,
-  y: number,
-): number {
+function heightAt(G: { n: number; g: number; half: number; hs: Float32Array }, x: number, y: number): number {
   const fxx = clamp((x + G.half) / G.g, 0, G.n - 1.0001);
   const fyy = clamp((y + G.half) / G.g, 0, G.n - 1.0001);
   const i = Math.floor(fxx);
@@ -767,26 +907,14 @@ function heightAt(
 }
 
 /** The smoothed hills' slope at a chart point. */
-function gradAt(
-  G: { n: number; g: number; half: number; hs: Float32Array },
-  x: number,
-  y: number,
-  out: { x: number; y: number },
-): void {
+function gradAt(G: { n: number; g: number; half: number; hs: Float32Array }, x: number, y: number, out: { x: number; y: number }): void {
   const e = 0.5 * G.g;
   out.x = (heightAt(G, x + e, y) - heightAt(G, x - e, y)) / (2 * e);
   out.y = (heightAt(G, x, y + e) - heightAt(G, x, y - e)) / (2 * e);
 }
 
 /** The land's signed distance at a chart point (bilinear). */
-function landAt(
-  n: number,
-  g: number,
-  half: number,
-  land: Float32Array,
-  x: number,
-  y: number,
-): number {
+function landAt(n: number, g: number, half: number, land: Float32Array, x: number, y: number): number {
   const fxx = (x + half) / g;
   const fyy = (y + half) / g;
   if (fxx < 0 || fyy < 0 || fxx >= n - 1 || fyy >= n - 1) return -1;
@@ -800,16 +928,7 @@ function landAt(
 }
 
 /** Whether segment a–b crosses segment c–d (grid units). */
-function crosses(
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  cx: number,
-  cy: number,
-  dx: number,
-  dy: number,
-): boolean {
+function crosses(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): boolean {
   const d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
   const d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
   const d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);

@@ -113,8 +113,8 @@ export class TerracePlots {
   ) {}
 
   /** A wall's cut field at a direction (the cuts along it fall where it crosses a step: survey.ts). */
-  cutField(dir: Vector3, level: number): number {
-    const k = this.fields.radius / TERRACE.cutMeters;
+  cutField(dir: Vector3, level: number, meters: number = TERRACE.cutMeters): number {
+    const k = this.fields.radius / meters;
     return gnoise(dir.x * k, dir.y * k, dir.z * k, (this.seed + 31 * level + 7) >>> 0);
   }
 

@@ -116,7 +116,7 @@ function housesAt(terrain: TerraceTerrain, site: Vector3, seed: number): House[]
     const clear = houses.every((o) => angleBetween(o.dir, c) * R > 0.5 * (Math.max(o.length, o.depth) + Math.max(length, depth)) + VILLAGES.spacing);
     if (!clear) continue;
     dirTo.copy(c);
-    houses.push({ dir: dirTo.clone(), along, front, floor: s.floorH, length, depth, wall, seed: hash32(h ^ k) });
+    houses.push({ dir: dirTo.clone(), along, front, floor: s.natural, length, depth, wall, seed: hash32(h ^ k) });
   }
   return houses;
 }
@@ -149,6 +149,23 @@ export function placeVillages(terrain: TerraceTerrain): Village[] {
     villages.push({ dir: spot.clone(), radius: reach, houses });
   }
   return villages;
+}
+
+const off = new Vector3();
+
+/** Distance (m) from a direction to the nearest house's footprint, 1e9 in no village (village.glsl houseDistance's twin). */
+export function houseDistance(villages: readonly Village[], dir: Vector3, R: number): number {
+  let best = 1e9;
+  for (const v of villages) {
+    if (angleBetween(dir, v.dir) * R > v.radius) continue;
+    for (const h of v.houses) {
+      off.subVectors(dir, h.dir).multiplyScalar(R);
+      const qx = Math.abs(off.dot(h.along)) - 0.5 * h.length;
+      const qy = Math.abs(off.dot(h.front)) - 0.5 * h.depth;
+      best = Math.min(best, Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0));
+    }
+  }
+  return best;
 }
 
 /** The villages for the ground shader: discs (direction, reach in m) and each one's houses (first, count), and the houses' texture. */

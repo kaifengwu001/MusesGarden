@@ -29,7 +29,7 @@ import { Houses } from './houses';
 import { Rice, RICE } from './rice';
 import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
-import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
+import { createVillageUniforms, houseDistance, placeVillages, writeVillageUniforms, type Village } from './villages';
 import { findTerraceVista } from './vista';
 import { CubeReadback } from './bakeReader';
 import { createCellSample } from './cells';
@@ -427,7 +427,7 @@ export class TerraceWorld implements PlanetWorld {
     // the terraces as built, round the focus, once the ground is baked in full (until then the paint)
     if (this.fieldsFull) {
       const key = `${this.fieldsR}/${this.fieldsKey}`;
-      this.objects.update(this.terrain, this.bakesRead(), rig.up, key, this.queue);
+      this.objects.update(this.terrain, this.bakesRead(), this.villages, rig.up, `${key}/${this.villages.length}`, this.queue);
       this.terrainUniforms.uObjects.value.set(this.objects.centre.x, this.objects.centre.y, this.objects.centre.z, this.objects.reach);
       // the rice reads the built paddies round the focus from their map
       this.paddyMap.render(this.renderer, this.objects.group, rig.up, rig.forward, R, `${key}/${this.objects.group.children.length}/${this.terrain.seasonFront.toFixed(3)}`);
@@ -526,7 +526,7 @@ export class TerraceWorld implements PlanetWorld {
   }
 
   /** Dev: the terraces surveyed in the cells round a direction (within `reach` m). */
-  surveyNear(dir: Vector3, reach: number): CellSurvey[] {
+  surveyNear(dir: Vector3, reach: number, mode: 'terraces' | 'flats' = 'terraces'): CellSurvey[] {
     this.prepare();
     const rb = this.bakesRead();
     const t = this.terrain;
@@ -545,7 +545,7 @@ export class TerraceWorld implements PlanetWorld {
         const id = `${c.x},${c.y},${c.z}`;
         if (seen.has(id)) continue;
         seen.add(id);
-        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront));
+        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront, mode, (d) => houseDistance(this.villages, d, R)));
       }
     }
     return out;

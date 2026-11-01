@@ -14,6 +14,7 @@ uniform float uPixelAngle;
 #include <meadow_wind>
 #include <terraces_plots>
 #include <terraces_paddy>
+#include <terraces_village>
 #include <terraces_ground>
 #include <terraces_rice>
 #include <terraces_fog>

@@ -12,11 +12,11 @@ uniform vec4 uObjects;     // the terraces as built: round this direction, out t
 
 const float OBJECTS_SINK = 2.6; // the hills sink this far under the built terraces (terraceMesh.ts SINK)
 
-// How far the hills' own mesh is sunk at dir (m): under the terraced land (not wild, not a valley's flat floor)
-// where the terraces are built, all the way 1.5 m inside the land's edge.
+// How far the hills' own mesh is sunk at dir (m): under the terraces and the valleys' plots (not wild, not a
+// village's courtyard) where they are built, all the way 1.5 m inside the land's edge.
 float objectsSink(vec3 dir, vec4 base) {
   if (uObjects.w <= 0.0) return 0.0;
-  float land = min((0.5 - base.b) * 4.0, (0.5 - base.a) * 4.0);
+  float land = min((0.5 - base.b) * 4.0, houseDistance(dir) - 2.4);
   float within = 1.0 - smoothstep(uObjects.w - 30.0, uObjects.w - 10.0, chordAngle(dir, uObjects.xyz) * uRadius);
   return OBJECTS_SINK * smoothstep(0.0, 1.5, land) * within;
 }

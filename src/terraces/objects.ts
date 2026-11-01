@@ -3,7 +3,8 @@ import type { BuildQueue } from '../core/buildQueue';
 import type { CubeReadback } from './bakeReader';
 import { createCellSample, type CellSample } from './cells';
 import { gradientFrame } from './fields';
-import { surveyCellJob } from './survey';
+import { surveyCellJob, type SurveyMode } from './survey';
+import { houseDistance, type Village } from './villages';
 import fragmentShader from './terrace.frag.glsl?raw';
 import { buildCellMeshJob } from './terraceMesh';
 import vertexShader from './terrace.vert.glsl?raw';
@@ -58,7 +59,7 @@ export class TerraceObjects {
    * a few milliseconds a step (key: everything the meshes depend on); the reach the ground may sink in is
    * as far as every cell is built.
    */
-  update(terrain: TerraceTerrain, bakes: { terrain: CubeReadback; layout: CubeReadback }, focus: Vector3, key: string, queue: BuildQueue): void {
+  update(terrain: TerraceTerrain, bakes: { terrain: CubeReadback; layout: CubeReadback }, villages: readonly Village[], focus: Vector3, key: string, queue: BuildQueue): void {
     if (key !== this.builtFor) {
       this.clear(queue);
       this.builtFor = key;
@@ -82,11 +83,13 @@ export class TerraceObjects {
         if (Math.hypot(x, y) > reach + size) continue;
         q.copy(focus).multiplyScalar(R).addScaledVector(a, x).addScaledVector(b, y).normalize();
         terrain.cells.at(q, cell);
-        const id = `${cell.x},${cell.y},${cell.z}`;
-        if (this.meshes.has(id) || this.pending.has(id)) continue;
-        const c: CellSample = { ...cell, centre: cell.centre.clone(), along: cell.along.clone(), up: cell.up.clone() };
-        this.pending.set(id, { id, centre: c.centre });
-        queue.add(`terraces:${id}`, Math.acos(Math.min(1, c.centre.dot(focus))) * R, this.job(id, c, R, size, bakes, terrain));
+        for (const mode of ['terraces', 'flats'] as const) {
+          const id = `${mode}:${cell.x},${cell.y},${cell.z}`;
+          if (this.meshes.has(id) || this.pending.has(id)) continue;
+          const c: CellSample = { ...cell, centre: cell.centre.clone(), along: cell.along.clone(), up: cell.up.clone() };
+          this.pending.set(id, { id, centre: c.centre });
+          queue.add(`terraces:${id}`, Math.acos(Math.min(1, c.centre.dot(focus))) * R, this.job(id, c, R, size, bakes, terrain, mode, villages));
+        }
       }
     }
     this.centre.copy(focus);
@@ -94,8 +97,9 @@ export class TerraceObjects {
     this.reach = this.builtReach(focus, R);
   }
 
-  private *job(id: string, cell: CellSample, R: number, size: number, bakes: { terrain: CubeReadback; layout: CubeReadback }, terrain: TerraceTerrain): Generator<void, void, void> {
-    const survey = yield* surveyCellJob(cell, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront);
+  private *job(id: string, cell: CellSample, R: number, size: number, bakes: { terrain: CubeReadback; layout: CubeReadback }, terrain: TerraceTerrain, mode: SurveyMode, villages: readonly Village[]): Generator<void, void, void> {
+    const yard = (dir: Vector3): number => houseDistance(villages, dir, R);
+    const survey = yield* surveyCellJob(cell, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront, mode, yard);
     const geometry = yield* buildCellMeshJob(survey);
     const mesh = new Mesh(geometry ?? undefined, this.material);
     mesh.frustumCulled = false;

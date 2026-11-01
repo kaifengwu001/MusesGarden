@@ -1,13 +1,7 @@
-import { BufferAttribute, BufferGeometry, Vector3 } from "three";
-import { floorPiecesJob } from "./floors";
-import { TERRACE } from "./plots";
-import {
-  acrossOf,
-  chartDir,
-  contour,
-  resample,
-  type CellSurvey,
-} from "./survey";
+import { BufferAttribute, BufferGeometry, Vector3 } from 'three';
+import { floorPiecesJob } from './floors';
+import { TERRACE } from './plots';
+import { acrossOf, chartDir, contour, resample, type CellSurvey } from './survey';
 
 // A surveyed cell's terraces as one mesh (survey.ts lays them out): its
 // paddies' floors, level, each at its own water's height where flooded; the
@@ -51,15 +45,7 @@ class Builder {
   ) {}
 
   /** A vertex at chart (x, y), height h (m); normal: up, or a tangent lean (nx, ny in the chart) blended with up by `steep`. */
-  vertex(
-    x: number,
-    y: number,
-    h: number,
-    part: number,
-    data: readonly number[],
-    fl: readonly number[],
-    lean?: [number, number, number],
-  ): number {
+  vertex(x: number, y: number, h: number, part: number, data: readonly number[], fl: readonly number[], lean?: [number, number, number]): number {
     const d = chartDir(this.s, this.R, x, y, this.d);
     const r = this.R + h;
     this.pos.push(d.x * r, d.y * r, d.z * r);
@@ -83,32 +69,13 @@ class Builder {
 
   geometry(): BufferGeometry {
     const g = new BufferGeometry();
-    g.setAttribute(
-      "position",
-      new BufferAttribute(new Float32Array(this.pos), 3),
-    );
-    g.setAttribute(
-      "normal",
-      new BufferAttribute(new Float32Array(this.nrm), 3),
-    );
-    g.setAttribute(
-      "aPart",
-      new BufferAttribute(new Float32Array(this.part), 1),
-    );
-    g.setAttribute(
-      "aPaddy",
-      new BufferAttribute(new Float32Array(this.paddy), 4),
-    );
-    g.setAttribute(
-      "aFloor",
-      new BufferAttribute(new Float32Array(this.floor), 4),
-    );
+    g.setAttribute('position', new BufferAttribute(new Float32Array(this.pos), 3));
+    g.setAttribute('normal', new BufferAttribute(new Float32Array(this.nrm), 3));
+    g.setAttribute('aPart', new BufferAttribute(new Float32Array(this.part), 1));
+    g.setAttribute('aPaddy', new BufferAttribute(new Float32Array(this.paddy), 4));
+    g.setAttribute('aFloor', new BufferAttribute(new Float32Array(this.floor), 4));
     const vertices = this.pos.length / 3;
-    g.setIndex(
-      vertices > 65535
-        ? new BufferAttribute(new Uint32Array(this.index), 1)
-        : new BufferAttribute(new Uint16Array(this.index), 1),
-    );
+    g.setIndex(vertices > 65535 ? new BufferAttribute(new Uint32Array(this.index), 1) : new BufferAttribute(new Uint16Array(this.index), 1));
     return g;
   }
 }
@@ -116,11 +83,7 @@ class Builder {
 const NONE = [0, 0, 0, 0] as const;
 
 /** The parts of a polyline (x, y pairs) inside the cell (its side field ≥ 0), cut exactly where it crosses out. */
-function inCell(
-  s: CellSurvey,
-  points: Float64Array,
-  closed: boolean,
-): Float64Array[] {
+function inCell(s: CellSurvey, points: Float64Array, closed: boolean): Float64Array[] {
   const { n, g, half, side } = s;
   const at = (x: number, y: number): number => {
     const fx = Math.min(Math.max((x + half) / g, 0), n - 1.0001);
@@ -146,10 +109,7 @@ function inCell(
     if (c > 0 && v >= 0 !== prev >= 0) {
       const kp = (c - 1) % m;
       const t = prev / (prev - v);
-      run.push(
-        points[2 * kp] + (x - points[2 * kp]) * t,
-        points[2 * kp + 1] + (y - points[2 * kp + 1]) * t,
-      );
+      run.push(points[2 * kp] + (x - points[2 * kp]) * t, points[2 * kp + 1] + (y - points[2 * kp + 1]) * t);
       if (v < 0) {
         if (run.length >= 4) parts.push(Float64Array.from(run));
         run = [];
@@ -160,8 +120,7 @@ function inCell(
   }
   if (run.length >= 4) parts.push(Float64Array.from(run));
   // (a loop wholly inside the cell stays one)
-  if (closed && parts.length === 1 && parts[0].length === 2 * count)
-    return [points];
+  if (closed && parts.length === 1 && parts[0].length === 2 * count) return [points];
   return parts;
 }
 
@@ -175,9 +134,7 @@ export function buildCellMesh(s: CellSurvey): BufferGeometry | null {
 }
 
 /** The terraces of a surveyed cell as one geometry (null where it has none), a few milliseconds a step. */
-export function* buildCellMeshJob(
-  s: CellSurvey,
-): Generator<void, BufferGeometry | null, void> {
+export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry | null, void> {
   if (s.paddies.length === 0) return null;
   const R = s.R;
   const b = new Builder(s, R);
@@ -185,11 +142,9 @@ export function* buildCellMeshJob(
   const bh = TERRACE.bundHeight;
   const bw = TERRACE.bund;
   // a paddy's constants; its floor (the shader lifts it to its water)
-  const paddyData = s.paddies.map(
-    (p) => [p.crop.variant, p.crop.delay, p.crop.hv, p.crop.wv] as const,
-  );
-  const surface = (pd: number): number => s.bands[s.paddies[pd].band].floorH;
-  const floorOf = (pd: number): number => s.bands[s.paddies[pd].band].floorH;
+  const paddyData = s.paddies.map((p) => [p.crop.variant, p.crop.delay, p.crop.hv, p.crop.wv] as const);
+  const surface = (pd: number): number => s.paddies[pd].floorH ?? s.bands[s.paddies[pd].band].floorH;
+  const floorOf = surface;
 
   // 1. floors: whole squares merged into rectangles (by paddy, along rows then down), the clipped pieces as fans
   const plain = new Int32Array(n * n).fill(-1);
@@ -202,17 +157,9 @@ export function* buildCellMeshJob(
       const first = b.pos.length / 3;
       for (let v = 0; v < pc.xy.length / 2; v++) {
         fl[2] = pc.across[v];
-        b.vertex(
-          pc.xy[2 * v],
-          pc.xy[2 * v + 1],
-          h,
-          PART.floor,
-          paddyData[pd],
-          fl,
-        );
+        b.vertex(pc.xy[2 * v], pc.xy[2 * v + 1], h, PART.floor, paddyData[pd], fl);
       }
-      for (let v = 1; v + 1 < pc.xy.length / 2; v++)
-        b.index.push(first, first + v, first + v + 1);
+      for (let v = 1; v + 1 < pc.xy.length / 2; v++) b.index.push(first, first + v, first + v + 1);
     },
     (i, j, pd) => {
       plain[j * n + i] = pd;
@@ -225,24 +172,16 @@ export function* buildCellMeshJob(
       if (pd < 0 || usedSq[j * n + i]) continue;
       // grow a rectangle: along the row, then down while every square of the next row matches
       let i1 = i;
-      while (
-        i1 + 1 < n - 1 &&
-        i1 + 1 - i < MERGE &&
-        plain[j * n + i1 + 1] === pd &&
-        !usedSq[j * n + i1 + 1]
-      )
-        i1++;
+      while (i1 + 1 < n - 1 && i1 + 1 - i < MERGE && plain[j * n + i1 + 1] === pd && !usedSq[j * n + i1 + 1]) i1++;
       let j1 = j;
       for (;;) {
         if (j1 + 1 >= n - 1 || j1 + 1 - j >= MERGE) break;
         let ok = true;
-        for (let ii = i; ii <= i1 && ok; ii++)
-          ok = plain[(j1 + 1) * n + ii] === pd && !usedSq[(j1 + 1) * n + ii];
+        for (let ii = i; ii <= i1 && ok; ii++) ok = plain[(j1 + 1) * n + ii] === pd && !usedSq[(j1 + 1) * n + ii];
         if (!ok) break;
         j1++;
       }
-      for (let jj = j; jj <= j1; jj++)
-        for (let ii = i; ii <= i1; ii++) usedSq[jj * n + ii] = 1;
+      for (let jj = j; jj <= j1; jj++) for (let ii = i; ii <= i1; ii++) usedSq[jj * n + ii] = 1;
       const h = surface(pd);
       const B = s.bands[s.paddies[pd].band];
       // (a hair larger than its squares: its long edges are chords, its neighbours' vertices lie on the planet's curve)
@@ -250,15 +189,7 @@ export function* buildCellMeshJob(
       const y0 = -half + j * g - 0.03;
       const x1 = -half + (i1 + 1) * g + 0.03;
       const y1 = -half + (j1 + 1) * g + 0.03;
-      const fl = (x: number, y: number): number[] => [
-        B.floorH,
-        s.paddies[pd].crop.fallow ? 1 : 0,
-        acrossOf(
-          B,
-          s.hs[Math.round((y + half) / g) * n + Math.round((x + half) / g)],
-        ),
-        0,
-      ];
+      const fl = (x: number, y: number): number[] => [B.floorH, s.paddies[pd].crop.fallow ? 1 : 0, acrossOf(B, s.hs[Math.round((y + half) / g) * n + Math.round((x + half) / g)]), 0];
       const a = b.vertex(x0, y0, h, PART.floor, paddyData[pd], fl(x0, y0));
       const c1 = b.vertex(x1, y0, h, PART.floor, paddyData[pd], fl(x1, y0));
       const c2 = b.vertex(x1, y1, h, PART.floor, paddyData[pd], fl(x1, y1));
@@ -275,6 +206,24 @@ export function* buildCellMeshJob(
   };
 
   yield;
+  // the floor (m) of the paddy at a chart point, or the nearest one within a meter; NaN off the land
+  const floorAt = (x: number, y: number): number => {
+    const i0 = Math.round((x + half) / g);
+    const j0 = Math.round((y + half) / g);
+    for (let r = 0; r <= 2; r++) {
+      for (let dj = -r; dj <= r; dj++) {
+        for (let di = -r; di <= r; di++) {
+          const i = i0 + di;
+          const j = j0 + dj;
+          if (i < 0 || j < 0 || i >= n || j >= n) continue;
+          const pdx = s.paddy[j * n + i];
+          if (pdx >= 0) return surface(pdx);
+        }
+      }
+    }
+    return Number.NaN;
+  };
+
   // 2. walls: a riser from the floor below up to the bund along the edge of the floor above
   for (const w0 of s.walls) {
     const lower = s.bands[w0.index - 1];
@@ -309,53 +258,14 @@ export function* buildCellMeshJob(
         const batter = TERRACE.batter * (top - below);
         const fl = [upper.floorH, 0, 0, 0];
         // the riser's face leans back uphill as steep as it stands; the bund rounds over to the floor above
-        const face: [number, number, number] = [
-          -ux * shown,
-          -uy * shown,
-          TERRACE.batter * shown,
-        ];
-        const v0 = b.vertex(
-          x - ux * batter,
-          y - uy * batter,
-          below,
-          PART.riser,
-          NONE,
-          fl,
-          face,
-        );
+        const face: [number, number, number] = [-ux * shown, -uy * shown, TERRACE.batter * shown];
+        const v0 = b.vertex(x - ux * batter, y - uy * batter, below, PART.riser, NONE, fl, face);
         const v1 = b.vertex(x, y, top, PART.riser, NONE, fl, face);
         const v2 = b.vertex(x, y, top, PART.bundTop, NONE, fl);
-        const v3 = b.vertex(
-          x + ux * TERRACE.crest * bw,
-          y + uy * TERRACE.crest * bw,
-          top,
-          PART.bundTop,
-          NONE,
-          fl,
-        );
-        const side: [number, number, number] = [
-          ux * bh,
-          uy * bh,
-          (1 - TERRACE.crest) * bw,
-        ];
-        const v4 = b.vertex(
-          x + ux * TERRACE.crest * bw,
-          y + uy * TERRACE.crest * bw,
-          top,
-          PART.bundSide,
-          NONE,
-          fl,
-          side,
-        );
-        const v5 = b.vertex(
-          x + ux * bw,
-          y + uy * bw,
-          upper.floorH - 0.12,
-          PART.bundSide,
-          NONE,
-          fl,
-          side,
-        );
+        const v3 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundTop, NONE, fl);
+        const side: [number, number, number] = [ux * bh, uy * bh, (1 - TERRACE.crest) * bw];
+        const v4 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundSide, NONE, fl, side);
+        const v5 = b.vertex(x + ux * bw, y + uy * bw, upper.floorH - 0.12, PART.bundSide, NONE, fl, side);
         ring.push([v0, v1, v2, v3, v4, v5]);
       }
       const count = w.closed ? m : m - 1;
@@ -371,10 +281,9 @@ export function* buildCellMeshJob(
   }
 
   yield;
-  // 3. the cuts' ridges: a low bund along each, on its band's floor
+  // 3. the cuts' ridges: a low bund along each, over the higher of the floors either side
   for (const cut of s.cuts) {
     if (cut.open) continue;
-    const B = s.bands[cut.band];
     for (const p of inCell(s, cut.points, false)) {
       const m = p.length / 2;
       if (m < 2) continue;
@@ -389,44 +298,19 @@ export function* buildCellMeshJob(
         const sy = tx / tl;
         const x = p[2 * k];
         const y = p[2 * k + 1];
-        const crest = B.floorH + 0.8 * bh;
         const half = 0.5 * bw;
-        const fl = [B.floorH, 0, 0, 0];
+        let left = floorAt(x - sx * 0.6, y - sy * 0.6);
+        let right = floorAt(x + sx * 0.6, y + sy * 0.6);
+        if (Number.isNaN(left)) left = right;
+        if (Number.isNaN(right)) right = left;
+        if (Number.isNaN(left)) left = right = natural(x, y);
+        const crest = Math.max(left, right) + 0.8 * bh;
+        const fl = [Math.max(left, right), 0, 0, 0];
         ring.push([
-          b.vertex(
-            x - sx * half,
-            y - sy * half,
-            B.floorH - 0.08,
-            PART.ridge,
-            NONE,
-            fl,
-            [-sx * 0.8 * bh, -sy * 0.8 * bh, 0.3 * half],
-          ),
-          b.vertex(
-            x - sx * 0.3 * half,
-            y - sy * 0.3 * half,
-            crest,
-            PART.ridge,
-            NONE,
-            fl,
-          ),
-          b.vertex(
-            x + sx * 0.3 * half,
-            y + sy * 0.3 * half,
-            crest,
-            PART.ridge,
-            NONE,
-            fl,
-          ),
-          b.vertex(
-            x + sx * half,
-            y + sy * half,
-            B.floorH - 0.08,
-            PART.ridge,
-            NONE,
-            fl,
-            [sx * 0.8 * bh, sy * 0.8 * bh, 0.3 * half],
-          ),
+          b.vertex(x - sx * half, y - sy * half, left - 0.08, PART.ridge, NONE, fl, [-sx * 0.8 * bh, -sy * 0.8 * bh, 0.3 * half]),
+          b.vertex(x - sx * 0.3 * half, y - sy * 0.3 * half, crest, PART.ridge, NONE, fl),
+          b.vertex(x + sx * 0.3 * half, y + sy * 0.3 * half, crest, PART.ridge, NONE, fl),
+          b.vertex(x + sx * half, y + sy * half, right - 0.08, PART.ridge, NONE, fl, [sx * 0.8 * bh, sy * 0.8 * bh, 0.3 * half]),
         ]);
       }
       for (let k = 0; k + 1 < m; k++) {
@@ -468,25 +352,57 @@ export function* buildCellMeshJob(
         }
         let bi = 0;
         while (bi + 1 < s.bands.length && s.bands[bi + 1].lo <= H) bi++;
-        const top = s.bands[bi].floorH + 0.02;
-        const fl = [s.bands[bi].floorH, 0, 0, 0];
-        ring.push([
-          b.vertex(x, y, top, PART.skirt, NONE, fl),
-          b.vertex(
-            x,
-            y,
-            Math.min(top, natural(x, y)) - SINK - 0.3,
-            PART.skirt,
-            NONE,
-            fl,
-          ),
-        ]);
+        // (a flats' plot has its own floor)
+        const own = floorAt(x, y);
+        const floorH = s.walls.length === 0 && !Number.isNaN(own) ? own : s.bands[bi].floorH;
+        const top = floorH + 0.02;
+        const fl = [floorH, 0, 0, 0];
+        ring.push([b.vertex(x, y, top, PART.skirt, NONE, fl), b.vertex(x, y, Math.min(top, natural(x, y)) - SINK - 0.3, PART.skirt, NONE, fl)]);
       }
       const count = closedHere ? m : m - 1;
       for (let k = 0; k < count; k++) {
         const r0 = ring[k];
         const r1 = ring[(k + 1) % m];
         b.quad(r0[0], r1[0], r1[1], r0[1]);
+      }
+    }
+  }
+  // 5. on the flats, the cell's edge is a road between its block of plots and the next: a raised path,
+  // this cell's half of it (the next cell builds the other)
+  if (s.riser === 0) {
+    for (const line of contour(s.side, n, g, half, 0, (k) => s.land[k] >= 0)) {
+      const rs = resample(line.points, line.closed, 0.5);
+      const m = rs.s.length;
+      const ring: number[][] = [];
+      for (let k = 0; k < m; k++) {
+        const a = Math.max(k - 1, 0);
+        const c = Math.min(k + 1, m - 1);
+        const tx = rs.p[2 * c] - rs.p[2 * a];
+        const ty = rs.p[2 * c + 1] - rs.p[2 * a + 1];
+        const tl = Math.hypot(tx, ty) || 1;
+        // into the cell: the side field's high side, the line's left
+        const ux = -ty / tl;
+        const uy = tx / tl;
+        const x = rs.p[2 * k];
+        const y = rs.p[2 * k + 1];
+        let own = floorAt(x + ux * 1.2, y + uy * 1.2);
+        if (Number.isNaN(own)) own = natural(x, y);
+        const top = own + 1.1 * bh;
+        const fl = [own, 0, 0, 0];
+        ring.push([
+          b.vertex(x, y, own - SINK, PART.skirt, NONE, fl),
+          b.vertex(x, y, top, PART.bundTop, NONE, fl),
+          b.vertex(x + ux * 0.3, y + uy * 0.3, top, PART.bundTop, NONE, fl),
+          b.vertex(x + ux * 0.55, y + uy * 0.55, own - 0.08, PART.bundSide, NONE, fl, [ux * bh, uy * bh, 0.25]),
+        ]);
+      }
+      const count = line.closed ? m : m - 1;
+      for (let k = 0; k < count; k++) {
+        const r0 = ring[k];
+        const r1 = ring[(k + 1) % m];
+        b.quad(r0[0], r1[0], r1[1], r0[1]);
+        b.quad(r0[1], r1[1], r1[2], r0[2]);
+        b.quad(r0[2], r1[2], r1[3], r0[3]);
       }
     }
   }
