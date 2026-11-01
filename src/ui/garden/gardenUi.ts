@@ -107,6 +107,7 @@ export class GardenUi {
 
     this.card = new FindCard(this.root, {
       like: () => this.like(),
+      share: (id, shared) => this.state.shareFind(id, shared),
       step: (d) => this.step(d),
       close: () => this.closeCard(),
     });
@@ -352,6 +353,7 @@ export class GardenUi {
       index,
       total: basket.finds.length,
       liked: this.state.liked(id),
+      shared: this.state.findShared(id),
     });
     this.beds.highlight(id);
   }
