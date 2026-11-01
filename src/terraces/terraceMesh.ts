@@ -1,4 +1,7 @@
 import { BufferAttribute, BufferGeometry, Vector3 } from 'three';
+import { hash32, unit } from '../core/hash';
+import { smoothstep } from '../core/math';
+import { gnoise } from '../planet/noise';
 import { floorPiecesJob } from './floors';
 import { TERRACE } from './plots';
 import { acrossOf, chartDir, contour, LENS, lensSide, resample, type Band, type CellSurvey } from './survey';
@@ -26,6 +29,12 @@ export const PART = {
   skirt: 4,
   ridge: 5,
 } as const;
+/**
+ * Paths along the walls (Kai's paddy painting: pale paths along some of the bunds): a share of the
+ * planet's levels carries one, on the stretches a pattern of its own picks (planet-wide, in meters, so a
+ * path runs on across cells), its top this wide (m) where it runs, narrowing to a bund at its ends.
+ */
+export const PATHS = { share: 0.16, width: 1.25, pattern: 46 } as const;
 /** How far the hills' own mesh is sunk under the terraces (m): the skirts reach this far down. */
 export const SINK = 2.6;
 /** Floors are merged into rectangles at most this many grid squares wide (the planet curves under a long one). */
@@ -247,7 +256,17 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
   // where the wall stands (its band's, or its lens's); along the levels' contours and along the lenses'. A bund
   // stands its band's height over its band's floor even where a lens lies beyond it (only its inner side
   // falls to the lens): where a lens's wall joins it, the two bunds meet level
-  const wall = (p: Float64Array, closed: boolean, belowAt: (x: number, y: number) => number, aboveAt: (x: number, y: number) => number, crest: number): void => {
+  // how much of a path the wall at a level carries at a chart point (0 none … 1 a path its full width)
+  const pd = new Vector3();
+  const pathAt = (level: number): ((x: number, y: number) => number) => {
+    if (unit(hash32((level * 2654435761) ^ 0x51a7)) >= PATHS.share) return () => 0;
+    const f = R / PATHS.pattern;
+    return (x, y) => {
+      chartDir(s, R, x, y, pd);
+      return smoothstep(-0.05, 0.12, gnoise(pd.x * f, pd.y * f, pd.z * f, 0x7a75 + level));
+    };
+  };
+  const wall = (p: Float64Array, closed: boolean, belowAt: (x: number, y: number) => number, aboveAt: (x: number, y: number) => number, crest: number, path: (x: number, y: number) => number = () => 0): void => {
     const m = p.length / 2;
     const ring: number[][] = [];
     for (let k = 0; k < m; k++) {
@@ -275,16 +294,20 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
       const shown = top - lowerH;
       const below = Math.min(lowerH, natural(x, y)) - SINK - 0.3;
       const batter = TERRACE.batter * (top - below);
-      const fl = [upperH, 0, 0, 0];
+      // (a path: the bund widened, its top flat almost to its edge; fl[1] tells the paint)
+      const pw = path(x, y);
+      const w = bw + (PATHS.width - bw) * pw;
+      const cr = TERRACE.crest + (0.85 - TERRACE.crest) * pw;
+      const fl = [upperH, pw, 0, 0];
       // the riser's face leans back uphill as steep as it stands; the bund rounds over to the floor above
       const face: [number, number, number] = [-ux * shown, -uy * shown, TERRACE.batter * shown];
       const v0 = b.vertex(x - ux * batter, y - uy * batter, below, PART.riser, NONE, fl, face);
       const v1 = b.vertex(x, y, top, PART.riser, NONE, fl, face);
       const v2 = b.vertex(x, y, top, PART.bundTop, NONE, fl);
-      const v3 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundTop, NONE, fl);
-      const side: [number, number, number] = [ux * bh, uy * bh, (1 - TERRACE.crest) * bw];
-      const v4 = b.vertex(x + ux * TERRACE.crest * bw, y + uy * TERRACE.crest * bw, top, PART.bundSide, NONE, fl, side);
-      const v5 = b.vertex(x + ux * bw, y + uy * bw, upperH - 0.12, PART.bundSide, NONE, fl, side);
+      const v3 = b.vertex(x + ux * cr * w, y + uy * cr * w, top, PART.bundTop, NONE, fl);
+      const side: [number, number, number] = [ux * bh, uy * bh, (1 - cr) * w];
+      const v4 = b.vertex(x + ux * cr * w, y + uy * cr * w, top, PART.bundSide, NONE, fl, side);
+      const v5 = b.vertex(x + ux * w, y + uy * w, upperH - 0.12, PART.bundSide, NONE, fl, side);
       ring.push([v0, v1, v2, v3, v4, v5]);
     }
     const count = closed ? m : m - 1;
@@ -302,7 +325,8 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
     const upper = s.bands[w0.index];
     if (!lower || !upper) continue;
     // (the floor above a wall is its band's lens where the band has one there: none of the band above it)
-    for (const p of inCell(s, w0.points, w0.closed)) wall(p, w0.closed && p === w0.points, () => lower.floorH, (x, y) => (inLens(upper, upper.lo, x, y) ? lensFloor(upper) : upper.floorH), upper.floorH);
+    const path = pathAt(w0.level);
+    for (const p of inCell(s, w0.points, w0.closed)) wall(p, w0.closed && p === w0.points, () => lower.floorH, (x, y) => (inLens(upper, upper.lo, x, y) ? lensFloor(upper) : upper.floorH), upper.floorH, path);
   }
   for (const lw of s.lensWalls) {
     const B = s.bands[lw.band];

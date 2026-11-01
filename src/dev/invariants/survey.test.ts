@@ -33,11 +33,11 @@ const bakes = {
 
 const survey = (c: CellSample): CellSurvey => {
   const own = createCellSample();
-  const isCell = (d: Vector3): boolean => {
+  const inCell = (d: Vector3): number => {
     terrain.cells.at(d, own);
-    return own.x === c.x && own.y === c.y && own.z === c.z;
+    return own.x === c.x && own.y === c.y && own.z === c.z ? own.edge : -own.edge;
   };
-  return surveyCell(c, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront, 'terraces', () => 1e9, isCell);
+  return surveyCell(c, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront, 'terraces', () => 1e9, inCell);
 };
 
 /** Terraced hillsides: a cell at each of a few spots of tame, sloping ground, and its neighbour across the slope. */

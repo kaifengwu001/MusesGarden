@@ -564,11 +564,11 @@ export class TerraceWorld implements PlanetWorld {
         if (seen.has(id)) continue;
         seen.add(id);
         const at = createCellSample();
-        const isCell = (d: Vector3): boolean => {
+        const inCell = (d: Vector3): number => {
           t.cells.at(d, at);
-          return at.x === c.x && at.y === c.y && at.z === c.z;
+          return at.x === c.x && at.y === c.y && at.z === c.z ? at.edge : -at.edge;
         };
-        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront, mode, (d) => houseDistance(this.villages, d, R), isCell));
+        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront, mode, (d) => houseDistance(this.villages, d, R), inCell));
       }
     }
     return out;

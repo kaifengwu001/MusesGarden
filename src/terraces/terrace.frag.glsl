@@ -111,6 +111,12 @@ void main() {
     // a bund's top and sides, a ridge along a cut: grass over earth, catching the light as pale lines
     col = tone3(pal(TR_EARTH, 7), mix(pal(TR_EARTH, 0), pal(TR_EARTH, 7), 0.4), pal(TR_EARTH, 1), b);
     col *= 0.94 + 0.08 * tuft;
+    // a path along it (vFloor.y: how much of one there): packed earth, pale, worn, grass at its edges
+    if (vFloor.y > 0.01) {
+      vec3 path = tone3(pal(TR_EARTH, 6), mix(pal(TR_EARTH, 6), pal(TR_EARTH, 4), 0.4), pal(TR_EARTH, 4), b);
+      path *= 0.92 + 0.1 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u);
+      col = mix(col, path, smoothstep(0.3, 0.75, vFloor.y) * (part == 2 ? 1.0 : 0.3));
+    }
   }
   col = applyAerial(col, viewDist, dir);
   col = applyValleyFog(col, P);

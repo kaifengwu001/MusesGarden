@@ -28,7 +28,7 @@ import { gradientFrame, type TerraceBase, type TerraceFields } from './fields';
  * `square` (m) cut square-ish; a riser's batter (m across per m of height), a
  * bund's width and height (m) and the share of it flat on top.
  */
-export const TERRACE = { step: 0.85, cutMeters: 34, band: 4.2, riser: [0.12, 1.3], spread: 0.22, jitter: 0.16, merge: 0.13, cuts: [22, 48], square: 9, batter: 0.45, bund: 0.24, bundHeight: 0.2, crest: 0.45 } as const;
+export const TERRACE = { step: 0.62, cutMeters: 34, band: 4.2, riser: [0.12, 1.3], spread: 0.22, jitter: 0.16, merge: 0.13, cuts: [22, 48], square: 9, batter: 0.45, bund: 0.24, bundHeight: 0.2, crest: 0.45 } as const;
 /** The flats' rows (m wide) and their plots (× the row long). */
 export const PLOTS = { width: [9, 16], length: [1, 2.3] } as const;
 /** A paddy's delay: its cell's season's share (the rest its own chance), and how far the season spreads. A share left fallow. */

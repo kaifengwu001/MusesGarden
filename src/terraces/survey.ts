@@ -388,9 +388,9 @@ export function surveyCell(
   front: number,
   mode: SurveyMode = 'terraces',
   yard: (dir: Vector3) => number = () => 1e9,
-  isCell: (dir: Vector3) => boolean = () => true,
+  inCell: (dir: Vector3) => number = () => Number.NaN,
 ): CellSurvey {
-  const job = surveyCellJob(cell, R, cellSize, terrain, layout, plots, front, mode, yard, isCell);
+  const job = surveyCellJob(cell, R, cellSize, terrain, layout, plots, front, mode, yard, inCell);
   for (;;) {
     const r = job.next();
     if (r.done) return r.value;
@@ -408,9 +408,11 @@ export function* surveyCellJob(
   front: number,
   mode: SurveyMode = 'terraces',
   yard: (dir: Vector3) => number = () => 1e9,
-  isCell: (dir: Vector3) => boolean = () => true,
+  inCell: (dir: Vector3) => number = () => Number.NaN,
 ): Generator<void, CellSurvey, void> {
   const M = MODES[mode];
+  // (the cell itself, from its own geometry on the CPU: the same function for every cell)
+  const isCell = (dir: Vector3): boolean => !(inCell(dir) < 0);
   // the chart round the cell itself (its site can lie off to one side of it: the cells are a warped Voronoi of
   // points in space), wide enough to take all of it and the frame. Its points are found on a coarse grid by
   // the layout's key, each checked for the cell itself (isCell: another cell nearby can have the same key)
@@ -463,6 +465,12 @@ export function* surveyCellJob(
       const mine = Math.floor(layout.nearest(dir, 0) * 1024) === cell.key && ownNear(dir);
       const edge = layout.sample(dir, 3);
       side[k] = mine ? edge : -edge;
+      // (near its edge the bake's texels can tell two neighbours different stories, leaving a gap between their
+      // floors: there both read the cells' own geometry, one function for both)
+      if (edge < 2.5) {
+        const exact = inCell(dir);
+        if (!Number.isNaN(exact)) side[k] = exact;
+      }
       const wild = (0.5 - terrain.sample(dir, 2)) * SURVEY.softness;
       const fl = terrain.sample(dir, 3);
       const flat = (fl - 0.5) * SURVEY.softness;
