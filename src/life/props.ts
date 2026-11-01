@@ -305,11 +305,12 @@ export function wallAt(f: WallFace, u: number, y: number, out: Vector3): Vector3
 
 /**
  * The cutaway's cut (view/cutaway.ts, hut.ts), straight, as Kai asked: the
- * front and the right end (the walls toward the view) cut low, just over the
- * lintels of the front's door and window; the back and the left end stand
- * whole, with the corners they share; heights over the clearing (m).
+ * front and the right end (the walls toward the view) cut low, across the
+ * front's window and its door (their frames, panes and planks cut with them;
+ * the right end's window lies wholly over the cut); the back and the left
+ * end stand whole, with the corners they share; heights over the clearing (m).
  */
-export const CUT = { front: FLOOR + 2.3, back: COTTAGE.wall } as const;
+export const CUT = { front: FLOOR + 1.25, back: COTTAGE.wall } as const;
 
 /** The room's inner faces (local m: x = -CUT_X the left end's, z = -CUT_Z the back's): what lies in front of the back and right of the left end is cut low. */
 const CUT_X = COTTAGE.halfX - COTTAGE.thickness / 2;
@@ -672,15 +673,14 @@ export class Homestead {
   readonly faces: WallFace[];
   private readonly materials: ShaderMaterial[] = [];
   /**
-   * The cutaway into the hut (view/cutaway.ts): the walls and the roof drawn
-   * with their CUTAWAY builds while it is open, the roof and the chimney
-   * lifting off and dissolving as `uCutaway` runs 0 → 1; shut, the house is
-   * drawn with its own materials, exactly as ever.
+   * The cutaway into the hut (view/cutaway.ts): the walls, the roof, and the
+   * windows' and the door's wood and glass drawn with their CUTAWAY builds while
+   * it is open, the roof and the chimney lifting off and dissolving and the
+   * walls and what is in them cut as `uCutaway` runs 0 → 1; shut, the house is
+   * drawn with its own materials.
    */
   private readonly cut: Array<{ mesh: Mesh; own: ShaderMaterial; cutaway: ShaderMaterial }> = [];
   private readonly cutaway: IUniform<number> = { value: 0 };
-  /** Where the chimney goes in the cutaway (local m): onto the back wall's top, over the hearth inside (Kai's mock-up). */
-  private readonly chimney: IUniform<Vector3> = { value: new Vector3() };
   private roof: Mesh | null = null;
 
   constructor(shared: Record<string, IUniform>, seed: number) {
@@ -692,7 +692,6 @@ export class Homestead {
     const lean = new Matrix4().makeRotationZ(rand.range(-0.025, -0.01)).multiply(new Matrix4().makeRotationX(rand.range(-0.012, 0.012)));
     const foot = ROOF.top + CHIMNEY.z - CHIMNEY.half - 0.25; // inside the roof, under its back face's foot
     const head = ROOF.top + 0.75;
-    this.chimney.value.set(0, COTTAGE.wall - foot - 0.04, -COTTAGE.halfZ - CHIMNEY.z);
     wallB.box(new Vector3(CHIMNEY.x, (foot + head) / 2, CHIMNEY.z), new Vector3(CHIMNEY.half, (head - foot) / 2, CHIMNEY.half), lean, foot, 1, 'xXYzZ');
     wallB.box(new Vector3(CHIMNEY.x, head + 0.05, CHIMNEY.z), new Vector3(CHIMNEY.half + 0.06, 0.05, CHIMNEY.half + 0.06), lean, foot, 1);
     const roofB = new Builder();
@@ -714,7 +713,7 @@ export class Homestead {
       const mesh = new Mesh(builder.build(), this.material(shared, kind));
       mesh.frustumCulled = false;
       this.group.add(mesh);
-      if (kind === 'wall' || kind === 'roof') this.cut.push({ mesh, own: mesh.material, cutaway: this.material(shared, kind, true) });
+      if (kind === 'wall' || kind === 'roof' || kind === 'wood' || kind === 'glass') this.cut.push({ mesh, own: mesh.material, cutaway: this.material(shared, kind, true) });
       if (kind === 'roof') this.roof = mesh;
     }
     this.group.matrixAutoUpdate = false;
@@ -725,10 +724,12 @@ export class Homestead {
       name: cutaway ? `${kind} (cutaway)` : kind,
       vertexShader,
       fragmentShader,
-      uniforms: cutaway ? { ...shared, uKind: { value: KIND_ID[kind] }, uCutaway: this.cutaway, uChimney: this.chimney } : { ...shared, uKind: { value: KIND_ID[kind] } },
-      defines: cutaway
-        ? { CUTAWAY: '', CUT_FRONT: CUT.front.toFixed(4), CUT_BACK: CUT.back.toFixed(4), CUT_X: CUT_X.toFixed(4), CUT_Z: CUT_Z.toFixed(4), CHIMNEY_TOP: `vec3(${CHIMNEY.x.toFixed(3)}, ${CHIMNEY.z.toFixed(3)}, ${CHIMNEY.half.toFixed(3)})` }
-        : {},
+      uniforms: cutaway ? { ...shared, uKind: { value: KIND_ID[kind] }, uCutaway: this.cutaway } : { ...shared, uKind: { value: KIND_ID[kind] } },
+      // (the chimney's top, where its flue opens: its middle x, z and its half width, m)
+      defines: {
+        CHIMNEY_TOP: `vec3(${CHIMNEY.x.toFixed(3)}, ${CHIMNEY.z.toFixed(3)}, ${CHIMNEY.half.toFixed(3)})`,
+        ...(cutaway ? { CUTAWAY: '', CUT_FRONT: CUT.front.toFixed(4), CUT_BACK: CUT.back.toFixed(4), CUT_X: CUT_X.toFixed(4), CUT_Z: CUT_Z.toFixed(4) } : {}),
+      },
       side: kind === 'roof' ? DoubleSide : FrontSide,
     });
     this.materials.push(mat);

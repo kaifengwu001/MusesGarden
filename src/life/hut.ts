@@ -174,13 +174,25 @@ function shell(faces: readonly WallFace[]): { floor: BufferGeometry; walls: Buff
     const high = index >= 2;
     const y = high ? CUT.back : CUT.front;
     const ends = [index === BACK ? 0 : t, index === 1 ? f.length - t : f.length];
-    const cols = Math.max(2, Math.ceil((ends[1] - ends[0]) / 0.2));
-    tops.grid(cols, 1, (s, g) => {
-      const u = ends[0] + (ends[1] - ends[0]) * s;
-      const outer = wallAt(f, u, y, new Vector3());
-      const inner = f.start.clone().addScaledVector(f.along, u).addScaledVector(inward, t).setY(y);
-      return { p: outer.lerp(inner, g), n: up, u, v: g * t, paint: [0, 0, 0, 0] };
-    });
+    // (where the cut crosses an opening there is no wall to cut: the cut stops either side of it)
+    const spans: number[][] = [[ends[0], ends[1]]];
+    for (const o of f.openings) {
+      if (o.bottom >= y || o.top <= y) continue;
+      for (let k = spans.length - 1; k >= 0; k--) {
+        const [a, b] = spans[k];
+        if (o.to <= a || o.from >= b) continue;
+        spans.splice(k, 1, ...[[a, o.from], [o.to, b]].filter(([p, q]) => q - p > 1e-3));
+      }
+    }
+    for (const [a, b] of spans) {
+      const cols = Math.max(2, Math.ceil((b - a) / 0.2));
+      tops.grid(cols, 1, (s, g) => {
+        const u = a + (b - a) * s;
+        const outer = wallAt(f, u, y, new Vector3());
+        const inner = f.start.clone().addScaledVector(f.along, u).addScaledVector(inward, t).setY(y);
+        return { p: outer.lerp(inner, g), n: up, u, v: g * t, paint: [0, 0, 0, 0] };
+      });
+    }
   });
   // where a whole wall meets a low one, the whole one's end stands upright, cut through: the left end's over the
   // front, the back's over the right end (uv: up it, and in from the outer face)
@@ -207,6 +219,8 @@ function shell(faces: readonly WallFace[]): { floor: BufferGeometry; walls: Buff
   plate(new Vector3(ROOM.x + w + 0.01, CUT.front + h, 0), new Vector3(w, h, ROOM.z));
   const front = faces[0];
   for (const o of front.openings) {
+    // (a lintel shows in the cut only where the cut runs over its opening)
+    if (o.top + 0.15 > CUT.front + 0.01) continue;
     const x0 = front.start.x + o.from - LINTEL.bearing;
     const x1 = front.start.x + o.to + LINTEL.bearing;
     const top = CUT.front + 0.006;

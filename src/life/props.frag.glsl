@@ -125,8 +125,10 @@ vec3 plaster(vec2 p, out float bloom) {
 
 void main() {
 #ifdef CUTAWAY
-  // lifting off, the roof dissolves in brushed patches, and so do the walls over the cut: all gone once it is open
-  float overCut = uKind == 0 && vPaint.w < 0.5 && vLocal.y > cutHeight(vLocal.xz) ? uCutaway : 0.0;
+  // lifting off, the roof and the chimney dissolve in brushed patches, and so do the walls over the cut with the
+  // windows' and the door's wood and glass (not the bench or the chair): all gone once it is open
+  bool cuts = (uKind == 0 && vPaint.w < 0.5) || (uKind == 2 && vPaint.w < 1.5) || uKind == 4;
+  float overCut = cuts && vLocal.y > cutHeight(vLocal.xz) ? uCutaway : 0.0;
   float gone = max(vLift, overCut);
   if (gone > 0.0 && 0.5 + 0.5 * gnoise(vLocal * 1.9, 990u) + 0.12 * gnoise(vLocal * 7.0, 991u) < gone * 1.45 - 0.08) discard;
   // and what stands between the camera and Muse's shelf
@@ -177,17 +179,15 @@ void main() {
     // in shade the plaster goes an olive grey, the meadow's green bounced into it (as the painting's shaded end)
     vec3 shade = vec3(0.62, 0.68, 0.54) + pal(ROW_LIGHT, 2) * 0.08 * clamp(0.6 - dot(n, vUp), 0.0, 1.0);
     col = painted(base, sunlight(n, sun, shadow), shade);
-#ifdef CUTAWAY
-    if (plain && vLocalNormal.y > 0.7 && uCutaway > 0.0) {
+    if (plain && vLocalNormal.y > 0.7) {
       // the chimney seen from above: hollow, its flue a dark mouth with soot round it (not a solid block)
       vec2 q = abs(vLocal.xz - CHIMNEY_TOP.xy);
       float edge = max(q.x, q.y);
       float flue = 1.0 - smoothstep(CHIMNEY_TOP.z * 0.55, CHIMNEY_TOP.z * 0.6, edge);
       float soot = 1.0 - smoothstep(CHIMNEY_TOP.z * 0.6, CHIMNEY_TOP.z * 1.05, edge + 0.04 * brush);
-      col = mix(col, col * vec3(0.42, 0.4, 0.38), soot * 0.7 * uCutaway);
-      col = mix(col, vec3(0.012, 0.01, 0.009) + vec3(0.03, 0.016, 0.006) * smoothstep(0.25, 0.0, edge / CHIMNEY_TOP.z), flue * uCutaway);
+      col = mix(col, col * vec3(0.42, 0.4, 0.38), soot * 0.7);
+      col = mix(col, vec3(0.012, 0.01, 0.009) + vec3(0.03, 0.016, 0.006) * smoothstep(0.25, 0.0, edge / CHIMNEY_TOP.z), flue);
     }
-#endif
     // the eaves' band an olive grey, deepest right under the roof, brushed along its lower edge
     float band = eave * (0.62 + 0.25 * smoothstep(EAVE.x - 0.35, EAVE.x + 0.1, height)) * (0.9 + 0.1 * gnoise(vec3(uv.x * 3.0, uv.y * 9.0, 2.2), 958u));
     col = mix(col, pal(ROW_STONE, 10) * (0.86 + 0.22 * luma(base)), band);

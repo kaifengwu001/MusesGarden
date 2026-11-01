@@ -67,9 +67,11 @@ const MUSE_NEAR = 30;
 /**
  * Muse in its hut: where it stands greeting you (local m: on the rug, clear of the table), facing the way the
  * cutaway looks in from (its bearing from the front, rad); at the stove, how far it is turned from facing the back
- * wall toward the left (rad), clear of the table; and how often a visit finds it cooking, greeting you, asleep.
+ * wall toward the left (rad), clear of the table; asleep, how far toward the bed's foot from the mattress's middle
+ * (m: so its head lies on the pillow, not over the headboard); and how often a visit finds it cooking, greeting you,
+ * asleep.
  */
-const INSIDE = { x: 0.6, z: 0.75, facing: 0.68, stove: 0.96 } as const;
+const INSIDE = { x: 0.6, z: 0.75, facing: 0.68, stove: 0.96, toFoot: 0.25 } as const;
 const VISITS: ReadonlyArray<readonly [Indoors, number]> = [
   ['cook', 0.4],
   ['greet', 0.35],
@@ -349,10 +351,10 @@ export class GardenUi {
     this.pins.set(specs);
   }
 
-  /** Where Muse is, in a word: at home, in the meadow (on the planet, away from its hut), or out exploring (as the source says). */
+  /** Where Muse is, in a word: at home (about its hut, as the door has it: MUSE_NEAR), in the meadow (farther off), or out exploring (as the source says). */
   private refreshWhereabouts(): void {
     const w = this.world;
-    const word = !this.state.status.home ? 'out exploring' : w.muse.home ? 'at home' : 'in the meadow';
+    const word = !this.state.status.home ? 'out exploring' : this.museAbout() ? 'at home' : 'in the meadow';
     // (drawn or not decides where its pin stands, so a change of that alone stands the pins again)
     const now = w.muse.away ? `${word}, unseen` : word;
     if (now === this.whereabouts) return;
@@ -395,7 +397,7 @@ export class GardenUi {
       [x, z, aheadX, aheadZ] = [pot.x - (lx * POT[0] + fx * POT[2]) * MUSE_HEIGHT, pot.z - (lz * POT[0] + fz * POT[2]) * MUSE_HEIGHT, fx, fz];
     } else if (bed) {
       // facing the bed's foot, so that lying back its head goes to the pillow
-      [x, y, z, aheadX, aheadZ] = [bed.at.x, bed.at.y, bed.at.z, bed.foot.x, bed.foot.z];
+      [x, y, z, aheadX, aheadZ] = [bed.at.x + bed.foot.x * INSIDE.toFoot, bed.at.y, bed.at.z + bed.foot.z * INSIDE.toFoot, bed.foot.x, bed.foot.z];
     }
     const dir = c.local(x, 0, z, new Vector3());
     const ahead = c.local(x + aheadX, 0, z + aheadZ, new Vector3());
@@ -617,9 +619,10 @@ export class GardenUi {
     return true;
   }
 
-  /** The wheel or a pinch while in the hut comes closer to the room or stands back (true: the garden took it). */
+  /** The wheel or a pinch while in the hut comes closer to the room or stands back (true: the garden took it); scrolling out of the showpiece's view puts its card away. */
   zoom(delta: number): boolean {
     if (!this.cutaway.active) return false;
+    if (this.cutaway.atShelf && delta < 0) this.closeCard();
     this.cutaway.zoom(delta);
     return true;
   }

@@ -92,7 +92,7 @@ describe('Muse’s hut inside', () => {
     }
   });
 
-  it('cuts the walls straight: the front and the right end low, over the front’s lintels; the back and the left end whole', () => {
+  it('cuts the walls straight: the front and the right end low, across the front’s window and door; the back and the left end whole', () => {
     expect(cutAt(0, OUTER.z)).toBe(CUT.front);
     expect(cutAt(OUTER.x, 0)).toBe(CUT.front);
     expect(cutAt(0, -OUTER.z)).toBe(CUT.back);
@@ -101,8 +101,9 @@ describe('Muse’s hut inside', () => {
     expect(cutAt(-OUTER.x + 0.1, OUTER.z - 0.1)).toBe(CUT.back);
     expect(cutAt(OUTER.x - 0.1, -OUTER.z + 0.1)).toBe(CUT.back);
     expect(cutAt(OUTER.x - 0.1, OUTER.z - 0.1)).toBe(CUT.front);
-    // over the door and the window (2.15 m up), under the eaves
-    expect(CUT.front - FLOOR).toBeGreaterThan(2.15);
+    // across the front's window (its sill 0.85 m up, its head 2.15 m) and its door
+    expect(CUT.front - FLOOR).toBeGreaterThan(0.85);
+    expect(CUT.front - FLOOR).toBeLessThan(2.15);
     expect(CUT.back).toBeGreaterThan(CUT.front);
   });
 
