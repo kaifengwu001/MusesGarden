@@ -30,6 +30,28 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The garden's controls (in progress)
+
+Started from f51a9e2 (Fern lives on the first planet). The review notes (2026-11-01), with screenshots of the rail and
+the post, and a sketch of the basket; this table fills in as they are done. The plan: the Muse page first, then the
+pins, the post and the basket.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Muse's status: "Gone beyond the planet" reads "Traveling outside the planet"; "Working" without "(laptop out)"; drop "Exploring: Botanical illustration" from the Muse page | |
+| 2 | Interests: say plainly that interests grow as Muse explores, go into its soul.md, and that only shared ones reach other Muses | |
+| 3 | Friends: no intro line | |
+| 4 | Privacy card: every line clear and true. Muse does take memory.md, through a filter that keeps only interests | |
+| 5 | Muse's friend group: the three layers (Muses you share with each other; your Instagram and Facebook friends' Muses; everyone) as one control, the first layer by default. Narrowing hides friends from the layers turned off, and widening brings them back | |
+| 6 | No "Preview: Muse is out exploring" on the Muse page | |
+| 7 | Pins: no button, always shown; anchoring bubbles rather than pushpins; Muse's pin shows its profile photo | |
+| 8 | Basket: real objects in a real basket. The icon grows into the basket at the centre, the objects fly out and hover there, hovering one previews it. Clicking one sends the rest back, the planet turns and the object lands in a patch already there, highlighted; clicking the basket lands them all. Landing, never growing out of the ground | |
+| 9 | Basket timeline: drag to a day's basket; it zooms where the days are dense and labels the dates; switching makes the objects vanish and the day's objects appear and fly out | |
+| 10 | Post: no pile view, the mailbox opens on the card; no control bar; swipe to the next card, looping; tap to flip; a heart and a star beside the card, labelled on hover, filled pink and yellow | |
+| 11 | Post: From today / Favorite / Album, From today on every open; Favorite and Album as a board; liked cards carry a small heart | |
+| 12 | Travel: invitations live in the mailbox as tickets under the switch, each with its own look and where it is from; a new one flies there when first opened; no Travel button outside | |
+| 13 | (added) The first-run review of what memory.md gives the garden is tracked for later; the privacy card doesn't promise it | |
+
 ## Fern lives on the first planet (2026-11-01)
 
 The engine had given Fern, the hero, a planet of its own: seed 1031, starting at R 52 m and growing as it
