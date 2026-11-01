@@ -32,6 +32,20 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the fifth round
+
+Started from 6c6768e (Kai's eight notes on the fourth pass answered). Kai (2026-11-01). This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | There are still numerous geometry glitches when zoomed in | |
+| 2 | The lines on the paddies' edges and cuts are often broken | |
+| 3 | Some mountains are still floating | |
+| 4 | The mountains are slightly too tall: perhaps scale them down vertically | |
+| 5 | Groups of mountains look better than a single mountain | |
+| 6 | The fog can be deeper vertically, cover a higher range of heights, and be more volumetric; perhaps some of the meadow planet's clouds too | |
+| 7 | The paddies' steps are too coarse: the dams are too tall, the bands too wide, and the cuts too far apart | |
+
 ### Kai's notes on the fourth pass
 
 Started from eea900c (the fourth pass: Kai's models, the river, the gentler hills, the watercolour paddies). Kai (2026-11-01): "This has certainly been an improvement. items identified as still off are also correct." Next steps, with a screenshot of the paddies from above (kept out of git: reference/terraces/kai-notes-small-rings.webp). This table fills in as they are done.
