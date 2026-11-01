@@ -18,7 +18,8 @@ import type {
 } from '../../../src/muse/contract';
 import { openMemoryStore } from './memory';
 import { SeqConflictError } from './seq';
-import { openSqliteStore } from './sqlite';
+import { DatabaseSync } from 'node:sqlite';
+import { openSqliteStore, SCHEMA_VERSION } from './sqlite';
 
 const A = 'ada' as MuseId;
 const B = 'bo' as MuseId;
@@ -225,5 +226,21 @@ describe('sqlite file store', () => {
     expect(await reopened.llmCache.get('model:abc')).toBe('cached');
     expect(snapshot(reopened).a).toHaveLength(2);
     reopened.close();
+  });
+
+  it('refuses a garden file from an older build, and opens its own again', () => {
+    const old = join(dir, 'old.db');
+    const raw = new DatabaseSync(old);
+    raw.exec('CREATE TABLE events (muse_id TEXT, seq INTEGER, at INTEGER, kind TEXT, body_json TEXT)');
+    raw.close();
+    expect(() => openSqliteStore(old)).toThrow(/older build.*rm -rf \.muse/);
+
+    const path = join(dir, 'current.db');
+    openSqliteStore(path).close();
+    const again = openSqliteStore(path);
+    again.close();
+    const check = new DatabaseSync(path);
+    expect((check.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
+    check.close();
   });
 });

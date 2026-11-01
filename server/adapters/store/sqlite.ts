@@ -62,10 +62,23 @@ const toItem = (r: ScheduleRow): ScheduleItem => ({
   payload: JSON.parse(r.payload_json) as ScheduleItem['payload'],
 });
 
+/**
+ * The shape of the stored events this build reads. Raise it whenever a stored event's shape changes: an older garden
+ * file is then refused rather than replayed wrongly (the files are local and gitignored, so starting again is cheap).
+ */
+export const SCHEMA_VERSION = 2;
+
 export function openSqliteStore(path: string): Store {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode=WAL');
+  const existing = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'events'").get() !== undefined;
+  const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+  if (existing && version !== SCHEMA_VERSION) {
+    db.close();
+    throw new Error(`${path} is a garden from an older build (event shape ${version}, this build reads ${SCHEMA_VERSION}): delete it, or its folder (rm -rf .muse), and start again`);
+  }
   db.exec(SCHEMA);
+  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 
   const q = {
     lastSeq: db.prepare('SELECT COALESCE(MAX(seq), 0) AS last FROM events WHERE muse_id = ?'),
