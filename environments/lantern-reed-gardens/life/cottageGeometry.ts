@@ -73,10 +73,14 @@ export class CottageGeometry {
     for (let i = 0; i < rim.length; i++) {
       const j = (i + 1) % rim.length;
       this.triangle(center,rim[j],rim[i],2,[[center.x,center.z],[rim[j].x,rim[j].z],[rim[i].x,rim[i].z]]);
+      const bevel = 0.035 + 0.035 * (0.5 + 0.5 * Math.sin(i * 3.1 + seed * 17));
+      const shoulderA = rim[i].clone().add(point((xs[i]-center.x)*0.022,-bevel,(zs[i]-center.z)*0.022));
+      const shoulderB = rim[j].clone().add(point((xs[j]-center.x)*0.022,-bevel*0.8,(zs[j]-center.z)*0.022));
       const lowerA = point(xs[i]+(center.x-xs[i])*0.055,bottom,zs[i]+(center.z-zs[i])*0.055);
       const lowerB = point(xs[j]+(center.x-xs[j])*0.055,bottom,zs[j]+(center.z-zs[j])*0.055);
-      this.quad(rim[i],rim[j],lowerB,lowerA,2,rim[i].distanceTo(rim[j]),top-bottom);
-      this.tube([rim[i].clone().add(point(0,0.004,0)),rim[j].clone().add(point(0,0.004,0))],[0.008,0.008],11,4);
+      this.quad(rim[i],rim[j],shoulderB,shoulderA,2,rim[i].distanceTo(rim[j]),bevel);
+      this.quad(shoulderA,shoulderB,lowerB,lowerA,2,rim[i].distanceTo(rim[j]),top-bottom);
+      this.tube([rim[i].clone().add(point(0,0.004,0)),rim[j].clone().add(point(0,0.004,0))],[0.011,0.011],11,4);
     }
   }
 

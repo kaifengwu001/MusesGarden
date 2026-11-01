@@ -11,6 +11,29 @@ uniform vec3 uPoolMirrorCentre;
 uniform vec4 uLanternLights[16];
 uniform int uLanternLightCount;
 uniform float uLanternDusk;
+uniform vec4 uPoolglassWakes[3];
+
+// Thin broken rings around the animals anchor their bodies to the pool surface.
+float poolglassWake(vec3 dir, vec3 along) {
+  float wake = 0.0;
+  for (int i=0;i<3;i++) {
+    vec4 animal = uPoolglassWakes[i];
+    if (animal.w <= 0.0) continue;
+    vec3 delta = (dir-animal.xyz)*uRadius;
+    float d=length(delta), spread=animal.w*1.65;
+    float phase=fract(uWaterLook.w*.22+float(i)*.31);
+    float rings=0.0;
+    for(int j=0;j<3;j++) {
+      float radius=spread+.2+(float(j)+phase)*.42;
+      float line=d-radius;
+      float width=max(fwidth(d)*.7,.014);
+      rings+=exp(-line*line/(width*width))*(1.0-(float(j)+phase)/3.2);
+    }
+    float broken=.35+.65*smoothstep(-.5,.6,sin(dot(delta,along)*3.2+float(i)));
+    wake+=rings*broken*smoothstep(0.0,.15,phase)*(1.0-smoothstep(.86,1.0,phase));
+  }
+  return clamp(wake,0.0,1.0);
+}
 
 float rippleRing(vec3 dir) {
   float acc = 0.0;
@@ -149,6 +172,7 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   float sparkle = mix(glintOctave(dir, f0, along, uTerrainSeed + 130u + lv), glintOctave(dir, f1, along, uTerrainSeed + 131u + lv), t);
   col += pal(ROW_WATER, 3) * sparkle * 0.15 * uWaterLook.z * (1.0 - cloud);
   col = mix(col, pal(ROW_WATER, 3), clamp(rippleRing(dir), 0.0, 1.0) * 0.38);
+  col = mix(col, mix(pal(ROW_WATER,9),pal(ROW_WATER,3),.35), poolglassWake(dir,along)*.62);
   // A thin pale wet edge emphasizes the common waterline without foamy surf.
   float edge = smoothstep(-0.42, -0.06, shore) * (1.0 - smoothstep(0.025, 0.15, pixelMeters));
   col = mix(col, mix(pal(ROW_WATER, 9), pal(ROW_WATER, 3), 0.25), edge * 0.2);

@@ -171,6 +171,7 @@ export class World {
       uLanternDusk: { value: 0.8 },
       uLanternLights: { value: Array.from({ length: 16 }, () => new Vector4()) },
       uLanternLightCount: { value: 0 },
+      uPoolglassWakes: { value: Array.from({ length: 3 }, () => new Vector4()) },
       uGustRot: { value: new Vector4(1, 0, 1, 0) },
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
@@ -358,6 +359,13 @@ export class World {
 
     this.scenery.update(clock.time, this.terrain);
     this.wildlife.update(clock.time, this.terrain);
+    // Poolglass disturb the water where they actually swim, including after growth.
+    const wakes = this.shared.uPoolglassWakes.value as Vector4[];
+    let swimmer = 0;
+    for (const pose of this.wildlife.poses) {
+      if (pose.species !== 'poolglass') continue;
+      wakes[swimmer++].set(pose.dir.x, pose.dir.y, pose.dir.z, pose.visible ? pose.scale : 0);
+    }
     this.residents.update(clock.time, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     if (this.followingResident) this.frameResident(this.followingResident, false);
 

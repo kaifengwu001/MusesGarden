@@ -55,6 +55,11 @@ describe('Lantern wildlife', () => {
       const hero = w.poses.find(p => p.id === 'reed-wader-adult')!;
       expect(w.poses.every(p => p.visible)).toBe(true);
       w.poses.filter(p => p.species === 'poolglass').forEach(p => expect(banks.waterClearAt(p.x, p.z, p.scale * 2 + 0.1)).toBe(true));
+      const swimmer = w.poses.find(p => p.id === 'poolglass-adult')!;
+      // Keep the adult in the visible foreground channel, rather than resolving
+      // it behind the causeway simply to make room for a large swim orbit.
+      expect(swimmer.x).toBeLessThan(-31);
+      expect(swimmer.z).toBeGreaterThan(33);
       expect(hero.visible).toBe(true);
       expect(Math.abs(hero.x + 26)).toBeLessThan(0.3);
       expect(Math.abs(hero.z - 36)).toBeLessThan(0.3);
@@ -65,6 +70,22 @@ describe('Lantern wildlife', () => {
     }
     w.dispose(); banks.dispose();
   }, 15_000);
+
+  it('keeps authored wildlife clear of stone and reed islands across planet sizes and seeds', () => {
+    for (const radius of [40, 128, 400]) for (const seed of [5, 412, 9999]) {
+      const t = terrain(radius, seed), banks = new CanyonScenery({}, t), w = new LanternWildlife({}, t, banks);
+      for (const time of [0, 12, 48]) {
+        banks.update(time, t); w.update(time, t);
+        expect(w.poses.filter(p => p.visible), `${radius}/${seed}/${time}`).toHaveLength(6);
+        for (const p of w.poses.filter(p => p.species === 'poolglass')) {
+          expect(banks.waterClearAt(p.x, p.z, p.scale * 2 + 0.1), `${p.id}/${radius}/${seed}/${time}`).toBe(true);
+          expect(t.sample(p.dir, createGroundSample()).depth).toBeGreaterThan(0.28);
+          expect(p.height).toBeLessThan(0);
+        }
+      }
+      w.dispose(); banks.dispose();
+    }
+  }, 20_000);
 
   it('is deterministic after time seeking and a settled growth round trip', () => {
     const t = terrain(), w = new LanternWildlife({}, t);

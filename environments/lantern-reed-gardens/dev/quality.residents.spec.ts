@@ -9,7 +9,7 @@ test.use({ viewport: { width: 960, height: 640 }, deviceScaleFactor: 2 });
 /** Throttle real RAF delivery, without changing the app's clock, controller or stats. */
 async function installFramePressure(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const w = window as PressureWindow;
+    const w = window as unknown as PressureWindow;
     const state = w.__lanternFramePressure = { intervalMs: 0, frames: 0 };
     const raf = window.requestAnimationFrame.bind(window);
     const cancel = window.cancelAnimationFrame.bind(window);
@@ -45,11 +45,11 @@ async function installFramePressure(page: Page): Promise<void> {
 
 async function pressureFrames(page: Page, count: number): Promise<void> {
   const target = await page.evaluate(count => {
-    const state = (window as PressureWindow).__lanternFramePressure;
+    const state = (window as unknown as PressureWindow).__lanternFramePressure;
     state.intervalMs = 80;
     return state.frames + count;
   }, count);
-  await page.waitForFunction(target => (window as PressureWindow).__lanternFramePressure.frames >= target, target, { timeout: 15_000 });
+  await page.waitForFunction(target => (window as unknown as PressureWindow).__lanternFramePressure.frames >= target, target, { timeout: 15_000 });
 }
 
 async function resolution(page: Page) {

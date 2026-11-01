@@ -165,7 +165,7 @@ export class CanyonScenery {
         const angle=rand()*TAU,distance=Math.sqrt(rand())*(radius+0.9);
         const x=cx+Math.cos(angle)*distance,z=cz+Math.sin(angle)*distance;
         if(x>-12&&x<12&&z>4&&z<22)continue;
-        const fern=local(x,z,0.5+rand()*0.65);fern.height=0.13;herbs.push(fern);
+        const fern=local(x,z,0.72+rand()*0.8);fern.height=0.13;herbs.push(fern);
         const gravel=local(x,z,0.65+rand()*0.6);gravel.height=0.12;pebbles.push(gravel);
       }
     };
@@ -179,7 +179,7 @@ export class CanyonScenery {
       [-55,10,3.2,11,1],[-52,-3,3.5,13,0],[-31,-13,3.5,12,0],[22,30,3.5,12,0],
     ])colony(x,z,r,n,!!tall);
     // Low near-water reeds have their own small silhouette, not scaled giant trees.
-    for(const [x,z] of [[-39,33],[-30,35],[-24,31],[-20,18],[-31,16],[-8,32]]) {
+    for(const [x,z] of [[-39,33],[-40,31],[-24,31],[-20,18],[-31,16],[-8,32]]) {
       for(let k=0;k<5;k++) {
         const reed=local(x+(rand()-.5)*2.1,z+(rand()-.5)*1.7,0.66+rand()*0.5);
         reed.variant=3;reed.height=0.05;reeds[3].push(reed);
@@ -191,9 +191,23 @@ export class CanyonScenery {
       [-42,35,3.4,.25],[-44,30,2.5,-.4],[-42,14,3.1,.3],[-35,8,3.6,-.3],[-26,4,2.8,.1],
       [-17,9,2.7,.3],[-15,33,2.6,-.12],[-26,36,1.8,.1],[-21,43,3.0,-.2],[-30,48,2.4,.1],
       [12,25,3.4,.24],[17,15,2.6,-.2],[-11,-7,2.5,.2],[11,-8,2.6,.3],
-    ]) { const slab=local(x,z,scale,turn);slab.height=0.02;rocks.push(slab); }
+
+    ]) {
+      const slab=local(x,z,scale,turn);slab.height=0.02;rocks.push(slab);
+      // Low garnet fronds and loose gravel gather in the dry shelf seams. Keep
+      // the sheltered centre clear for feet and the adjacent swim channels open.
+      for (let i=0;i<4;i++) {
+        const lx=(-1.15+i*.76)*scale,lz=(i%2?.55:-.55)*scale;
+        const px=x+lx*Math.cos(turn)-lz*Math.sin(turn),pz=z+lx*Math.sin(turn)+lz*Math.cos(turn);
+        if(px>-12&&px<12&&pz>4&&pz<22)continue;
+        const gravel=local(px,pz,.45+rand()*.22);gravel.height=.02+.29*scale;pebbles.push(gravel);
+        if(i%2===0) {
+          const fern=local(px,pz,.72+rand()*.55);fern.height=.02+.29*scale;herbs.push(fern);
+        }
+      }
+    }
     // Long geological silhouettes rise above the little planet's curved horizon.
-    for(const [x,z,scale,turn] of [[-45,-28,1.2,.4],[-19,-40,1.35,1.8],[10,-37,.92,.7],[36,-26,1.3,2.4],[49,-5,.9,1.1],[-65,-8,.95,2.0],[-70,-40,1.1,0]]) {
+    for(const [x,z,scale,turn] of [[-49,-34,1.05,.4],[-21,-45,1.12,1.8],[10,-41,.78,.7],[38,-31,1.12,2.4],[51,-11,.86,1.1],[-67,-14,.88,2.0],[-72,-45,.92,0]]) {
       const mesa=local(x,z,scale,turn);mesa.height=-0.3;mesas.push(mesa);
     }
     // A few close pollinators have the readable 1.2–1.5 m wingspan of the artwork.

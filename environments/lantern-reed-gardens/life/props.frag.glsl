@@ -25,22 +25,24 @@ void main(){
  if(vKind<0.5|| (vKind>11.5&&vKind<12.5)){
    // Fibrous, split timber: the grain follows each beam or individual door plank.
    bool door=vKind>11.5;
-   base=linearColor(mix(vec3(0.43,0.28,0.22),vec3(0.66,0.46,0.32),variation*0.68+0.16));
-   if(door)base=linearColor(mix(vec3(0.46,0.32,0.24),vec3(0.68,0.49,0.34),variation));
+   base=linearColor(mix(vec3(0.37,0.23,0.18),vec3(0.65,0.43,0.29),variation*0.68+0.16));
+   if(door)base=linearColor(mix(vec3(0.43,0.29,0.22),vec3(0.65,0.45,0.31),variation));
    float grain=vUv.x*23.0+sin(vUv.y*2.5+variation*8.0)*0.15+sin(vUv.y*8.0)*0.025;
-   mark=inkLine(fract(grain)-0.5,0.025)*0.2;
+   mark=inkLine(fract(grain)-0.5,0.025)*0.25;
    mark+=inkLine(fract(vUv.x*8.0+0.08*sin(vUv.y*4.0))-0.5,0.018)*0.12;
    base*=0.95+0.07*sin(grain*6.283);
    light=max(light,0.24);
  }else if(vKind<1.5||vKind>13.5){
    // Thick, dull sage leaves retain their own edges, crease and irregular lateral veins.
    bool awning=vKind>13.5;
-   base=linearColor(mix(vec3(0.48,0.63,0.59),vec3(0.70,0.76,0.64),variation));
+   base=linearColor(mix(vec3(0.39,0.53,0.48),vec3(0.69,0.73,0.59),variation));
    if(awning)base=linearColor(mix(vec3(0.63,0.71,0.60),vec3(0.78,0.80,0.65),variation));
    float lateral=fract(vUv.y*7.0+abs(vUv.x-0.5)*2.1+0.08*sin(vUv.y*16.0))-0.5;
-   mark=inkLine(lateral,0.009)*0.34+inkLine(vUv.x-0.5,0.008)*0.3;
-   mark+=inkLine(abs(vUv.x-0.5)-0.484,0.006)*0.35;
-   base*=0.96+0.045*sin(vUv.y*21.0+vUv.x*7.0);
+   mark=inkLine(lateral,0.009)*0.23+inkLine(vUv.x-0.5,0.008)*0.34;
+   mark+=inkLine(abs(vUv.x-0.5)-0.484,0.006)*0.45;
+   base*=0.94+0.075*sin(vUv.y*21.0+vUv.x*7.0);
+   // Overlapping pieces keep a dark root and a light worn rim, even at distance.
+   base*=0.72+0.28*smoothstep(0.02,0.22,vUv.y);
    light=max(light,0.27);
  }else if(vKind<2.5){
    // Flat fractured limestone faces, with sparse chips and powdery flecks.
@@ -52,11 +54,11 @@ void main(){
    base*=0.965+speck*0.035;
    light=max(light,0.36);
  }else if(vKind<3.5){
-   base=linearColor(mix(vec3(0.31,0.43,0.41),vec3(0.45,0.55,0.46),variation));
+   base=linearColor(mix(vec3(0.22,0.31,0.30),vec3(0.36,0.43,0.36),variation));
    mark=inkLine(vUv.x-0.5,0.014)*0.2;
  }else if(vKind<4.5){
    // Sparse broken fern brushwork, varied by panel and branch. No repeating closed loop wallpaper.
-   base=linearColor(mix(vec3(0.30,0.47,0.53),vec3(0.48,0.65,0.66),variation));
+   base=linearColor(mix(vec3(0.24,0.35,0.39),vec3(0.39,0.52,0.53),variation));
    for(int i=0;i<3;i++){
      float seed=cellNoise(vec2(float(i)*2.7,variation*23.0));
      float stem=0.19+float(i)*0.58+0.13*sin(vUv.y*(1.6+seed)+seed*9.0);
@@ -75,7 +77,12 @@ void main(){
      mark+=(inkLine(vUv.x-stem,0.008)*0.22+leaf*0.3)*drawn*broken;
    }
    mark+=inkLine(fract(vUv.y*31.0+vUv.x*0.15)-0.5,0.015)*0.07;
+   mark+=inkLine(fract(vUv.x*24.0)-0.5,0.018)*0.05;
    base*=0.95+0.07*gnoise(vec3(vUv*5.0,variation),31u);
+   // The fabric sits behind the frame, with darker seams and shade below eaves.
+   float hem=exp(-min(abs(vUv.x),abs(vUv.y))*16.0);
+   float eave=smoothstep(2.55,3.42,vLocal.y);
+   base*=1.0-0.25*hem-0.22*eave;
  }else if(vKind<5.5){
    base=linearColor(vec3(0.18,0.20,0.22));
  }else if(vKind<6.5){
@@ -102,9 +109,18 @@ void main(){
    base=linearColor(vec3(0.74,0.70,0.63));
  }
  vec3 view=normalize(cameraPosition-vWorld);
- float contour=(1.0-smoothstep(0.03,0.14,abs(dot(n,view))))*0.22;
+ vec3 warpedNormal=warpNormal(vPlanet,n);
+ float contour=(1.0-smoothstep(0.03,0.14,abs(dot(warpedNormal,view))))*0.27;
  base*=1.0-min(mark+contour,0.63);
  vec3 col=tone3(base*1.03,base*0.96,base*vec3(0.60,0.68,0.84),light);
  col=mix(col,linearColor(vec3(1.0,0.76,0.43))*(0.9+variation*0.08),glow);
+ if(vKind>6.5&&vKind<7.5)col+=vec3(0.22,0.105,0.025)*uLanternDusk;
+ // A local warm wash ties the window to the timber reveal and stone sill.
+ // Kept narrow so the woven wall remains a cool counterpoint to the light.
+ if(vKind<6.5 || (vKind>11.5&&vKind<13.5)){
+   vec3 fromWindow=(vLocal-vec3(2.8,2.25,2.62))*vec3(0.8,0.8,1.3);
+   float spill=exp(-dot(fromWindow,fromWindow)*1.45)*uLanternDusk;
+   col+=vec3(0.16,0.055,0.012)*spill;
+ }
  gl_FragColor=vec4(applyAerial(col,distance(cameraPosition,vWorld),dir),1.0);
 }

@@ -20,7 +20,7 @@ interface Animal {
 }
 /** A foreground adult and two smaller neighbours of each species. */
 const ANIMALS: readonly Animal[] = [
-  { id: 'poolglass-adult', species: 'poolglass', x: -26, z: 8, scale: 0.55, phase: -1.55, turn: 0 },
+  { id: 'poolglass-adult', species: 'poolglass', x: -34, z: 13, scale: 0.55, phase: -1.55, turn: 0 },
   { id: 'poolglass-young', species: 'poolglass', x: -26, z: 5, scale: 0.28, phase: 0.8, turn: 0 },
   { id: 'poolglass-small', species: 'poolglass', x: -20, z: -3, scale: 0.23, phase: 3.4, turn: 0 },
   { id: 'reed-wader-adult', species: 'reed-wader', x: -26, z: 36, scale: 0.72, phase: 0, turn: -0.9 },
@@ -152,12 +152,14 @@ export class LanternWildlife {
       if (!this.safe(terrain, px, pz, animal.species, animal.scale)) continue;
       // Leave room for the entire gentle swim/walk, not just its centre.
       const onShelf = animal.species === 'reed-wader' && this.banks?.shelfHeightAt(px, pz) != null;
-      const radii = animal.species === 'poolglass' ? [1.4] : onShelf ? [0.24, 0.12, 0] : [0.75];
+      const radii = animal.species === 'poolglass'
+        ? this.banks?.waterClearAt ? [1.4, 0.8, 0.4, 0.18, 0] : [1.4]
+        : onShelf ? [0.24, 0.12, 0] : [0.75];
       for (const radius of radii) {
         let room = true;
         for (let j = 0; j < (radius ? 6 : 1) && room; j++) room = this.safe(terrain, px + Math.cos(j * Math.PI / 3) * radius, pz + Math.sin(j * Math.PI / 3) * radius, animal.species, animal.scale);
         // A small shelf can host a resting wader without forcing it to walk off.
-        if (room) return { x: px, z: pz, pondCentre: terrain.pondCentre, walk: onShelf ? radius * 0.9 : 0.6 };
+        if (room) return { x: px, z: pz, pondCentre: terrain.pondCentre, walk: animal.species === 'poolglass' || onShelf ? radius * 0.9 : 0.6 };
       }
     }
     return null;
@@ -200,7 +202,9 @@ export class LanternWildlife {
       if (animal.species === 'poolglass') {
         const angle = time * 0.055 + phase;
         z += terrain.pondCentre - home.pondCentre;
-        x -= Math.sin(angle) * 1.3; z += Math.cos(angle) * 0.8;
+        // Tight channels allow a slow stationary paddle, with the same complete
+        // footprint clearance as open-water swimming. No body crosses a shelf.
+        x -= Math.sin(angle) * home.walk; z += Math.cos(angle) * home.walk * 0.615;
         dx = -Math.cos(angle) * 1.3; dz = -Math.sin(angle) * 0.8;
       } else {
         const cycle = ((time + animal.phase) % 64 + 64) % 64;

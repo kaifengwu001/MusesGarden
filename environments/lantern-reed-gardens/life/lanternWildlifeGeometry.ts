@@ -31,10 +31,10 @@ class AnimalGeometry {
   }
 
   /** Thin convex leaf with a raised midrib; its edges taper to a separate tip. */
-  leaf(root: Vector3, tip: Vector3, across: Vector3, width: number, lift: number, kind: number, joint = root): void {
+  leaf(root: Vector3, tip: Vector3, across: Vector3, width: number, lift: number, kind: number, joint = root, outward = new Vector3(0, 1, 0)): void {
     const point = (u: number, t: number): Vector3 => root.clone().lerp(tip, t)
       .addScaledVector(across, u * width * Math.pow(Math.sin(Math.PI * t), 0.72))
-      .add(new Vector3(0, Math.sin(Math.PI * t) * (lift + (1 - Math.abs(u)) * 0.035), 0));
+      .addScaledVector(outward, Math.sin(Math.PI * t) * (lift + (1 - Math.abs(u)) * 0.035));
     for (let k = 0; k < 7; k++) for (const [a, b] of [[-1, 0], [0, 1]]) {
       const t0 = k / 7, t1 = (k + 1) / 7;
       const q = [point(a, t0), point(b, t0), point(b, t1), point(a, t1)];
@@ -96,27 +96,36 @@ export function poolglassGeometry(): BufferGeometry {
 
 export function reedWaderGeometry(): BufferGeometry {
   const b = new AnimalGeometry();
-  b.ellipsoid(v(0, 0.98, -0.1), v(0.88, 0.73, 1.1), 5);
+  // A low, long animal underneath the mantle, with its small face emerging from
+  // the narrow front. The visible silhouette comes from the leaf tips above it.
+  b.ellipsoid(v(0, 0.78, -0.12), v(0.76, 0.52, 1.3), 5);
   // Four feet: short firm ankles over broad three-toed webbing.
   for (const side of [-1, 1]) for (const front of [-1, 1]) {
-    const x = side * 0.59, z = front * 0.6;
-    b.ellipsoid(v(x, 0.25, z), v(0.15, 0.23, 0.14), 8, 10, 8);
-    for (let toe = -1; toe <= 1; toe++) b.leaf(v(x, 0.08, z), v(x + toe * 0.19, 0.0, z + 0.45), v(1, 0, 0), 0.16, 0.01, 8, v(x, 0.3, z));
+    const x = side * 0.51, z = front * 0.55;
+    b.ellipsoid(v(x, 0.21, z), v(0.11, 0.19, 0.12), 8, 10, 8);
+    for (let toe = -1; toe <= 1; toe++) b.leaf(v(x, 0.065, z), v(x + toe * 0.15, 0.0, z + 0.26), v(1, 0, 0), 0.12, 0.01, 8, v(x, 0.27, z));
   }
-  // Sage mantle: staggered, individually folded feather leaves overlap toward the tail.
-  for (let row = 0; row < 5; row++) for (let col = -3; col <= 3; col++) {
-    const angle = col * 0.37 + (row % 2) * 0.1;
-    const z = 0.7 - row * 0.34;
-    const section = Math.sqrt(Math.max(0.1, 1 - z * z / 1.45));
-    const root = v(Math.sin(angle) * 0.86 * section, 0.96 + Math.cos(angle) * 0.72 * section, z);
-    const tip = v(root.x * 1.08, root.y - 0.14 - Math.abs(col) * 0.025, z - 0.6);
-    b.leaf(root, tip, v(Math.cos(angle), -Math.sin(angle), 0), 0.24, 0.06, 6 + ((row + col + 6) % 3) * 0.1);
+  // Shingles follow the outside of the complete ellipsoid. Both ends remain
+  // outside the body, so the pale overlapping leaves cannot disappear into it.
+  for (let row = 0; row < 7; row++) for (let col = -4; col <= 4; col++) {
+    const angle = col * 0.37 + (row % 2) * 0.08;
+    const z = 1.02 - row * 0.32;
+    const endZ = z - 0.54 - 0.035 * Math.sin(row * 3.1 + col * 1.7);
+    const point = (along: number): Vector3 => {
+      const section = Math.sqrt(Math.max(0.04, 1 - (along + 0.12) ** 2 / (1.44 * 1.44)));
+      return v(Math.sin(angle) * 0.81 * section, 0.78 + Math.cos(angle) * 0.58 * section, along);
+    };
+    const root = point(z), tip = point(endZ);
+    const outward = v(Math.sin(angle), Math.cos(angle), 0);
+    tip.addScaledVector(outward, 0.055);
+    const width = 0.22 + 0.025 * Math.sin(row * 1.8 + col);
+    b.leaf(root, tip, v(Math.cos(angle), -Math.sin(angle), 0), width, 0.07, 6 + ((row + col + 9) % 5) * 0.08, root, outward);
   }
-  b.ellipsoid(v(0, 1.03, 0.91), v(0.51, 0.47, 0.43), 7, 24, 14);
+  b.ellipsoid(v(0, 0.81, 1.04), v(0.4, 0.32, 0.39), 7, 24, 14);
   // Soft drooping cheek leaves, deliberately separate from the body outline.
-  for (const side of [-1, 1]) b.leaf(v(side * 0.4, 1.13, 1.02), v(side * 0.52, 0.44, 1.13), v(1, 0, 0), 0.19, 0.02, 9);
-  b.leaf(v(-0.16, 1.43, 0.8), v(0.13, 1.83, 0.28), v(1, 0, 0), 0.2, 0.03, 6);
-  eyes(b, 0.3, 1.21, 1.25, 0.105);
-  b.ellipsoid(v(0, 0.94, 1.331), v(0.17, 0.016, 0.014), 10, 12, 6);
+  for (const side of [-1, 1]) b.leaf(v(side * 0.31, 0.9, 1.13), v(side * 0.44, 0.34, 1.18), v(1, 0, 0), 0.135, 0.015, 9);
+  b.leaf(v(-0.11, 1.16, 0.96), v(0.08, 1.43, 0.35), v(1, 0, 0), 0.15, 0.025, 6.16);
+  eyes(b, 0.25, 0.95, 1.322, 0.065);
+  b.ellipsoid(v(0, 0.745, 1.422), v(0.1, 0.007, 0.009), 10, 12, 6);
   return b.build();
 }

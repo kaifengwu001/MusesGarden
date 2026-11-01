@@ -50,14 +50,14 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
   // surface keeps the fishing/sitting anchors, without the former dark crate-like decking.
 
   const front=OUTER.z,back=-OUTER.z, ridge=-0.45;
-  const roofHeight=(t:number):number=>5.65-2.24*t+0.14*Math.sin(t*Math.PI)-0.4*Math.max(0,t-0.8)**2/0.04;
+  const roofHeight=(t:number):number=>5.65-2.24*t+0.14*Math.sin(t*Math.PI)-0.22*Math.pow(Math.max(0,t-0.8)/0.2,1.3);
   const roofX=(side:number,t:number):number=>ridge+side*(side<0?4.42:5.32)*t;
   // A-frame and ridge are real, exposed timbers, bowed and tied rather than extruded trim.
   for(const z of [back,front]) {
-    for(const x of [-OUTER.x,1.45,OUTER.x]) beam(point(x,FLOOR-0.04,z),point(x+(x<0?0.035:-0.045),3.5,z+0.018),0.14);
-    beam(point(-4.48,3.42,z),point(4.48,3.48,z),0.15);
-    beam(point(-4.65,3.35,z+0.1),point(ridge,5.55,z+0.1),0.15);
-    beam(point(ridge,5.55,z+0.1),point(4.85,3.35,z+0.1),0.15);
+    for(const x of [-OUTER.x,1.45,OUTER.x]) beam(point(x,FLOOR-0.04,z),point(x+(x<0?0.035:-0.045),3.5,z+0.018),0.175);
+    beam(point(-4.48,3.42,z),point(4.48,3.48,z),0.185);
+    beam(point(-4.65,3.35,z+0.1),point(ridge,5.55,z+0.1),0.18);
+    beam(point(ridge,5.55,z+0.1),point(4.85,3.35,z+0.1),0.18);
     beam(point(ridge,3.43,z+0.06),point(ridge,5.55,z+0.06),0.085);
     beam(point(-2.8,3.45,z+0.04),point(ridge,4.72,z+0.04),0.075);
     beam(point(ridge,4.72,z+0.04),point(2.7,3.47,z+0.04),0.075);
@@ -86,8 +86,8 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
   // Thin, irregular blue woven panels leave actual openings for the inset window and door.
   const panel=(x0:number,x1:number,y0:number,y1:number,z:number):void=>{
     b.variation=rand();
-    const inset=0.025*(rand()-0.5);
-    b.quad(point(x0,y0,z),point(x1,y0+0.015,z+inset),point(x1-0.018,y1,z),point(x0+0.025,y1-0.018,z-inset),4,x1-x0,y1-y0);
+    const inset=0.025*(rand()-0.5),depth=z>0?-0.085:0.085;
+    b.quad(point(x0,y0,z+depth),point(x1,y0+0.015,z+depth+inset),point(x1-0.018,y1,z+depth),point(x0+0.025,y1-0.018,z+depth-inset),4,x1-x0,y1-y0);
   };
   for(let i=0;i<6;i++) panel(-OUTER.x+i*1.43,-OUTER.x+(i+1)*1.43,FLOOR+0.08,3.4,back);
   for(const x of [-OUTER.x,OUTER.x]) for(let i=0;i<4;i++) {
@@ -100,24 +100,47 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
   panel(-OUTER.x,-2.75,FLOOR,3.39,front);panel(-2.75,-1.2,FLOOR,3.4,front);panel(-1.2,door0,FLOOR,3.38,front);
   panel(door0,door1,3.0,3.43,front);panel(door1,win0,FLOOR,3.4,front);
   panel(win0,win1,FLOOR,winBottom,front);panel(win0,win1,winTop,3.41,front);panel(win1,OUTER.x,FLOOR,3.4,front);
+  // Low weathered planks and exposed battens divide the woven insets into a
+  // timber structure. The supporting slab and every resident lane stay intact.
+  for(const [x0,x1] of [[-OUTER.x,door0-0.06],[door1+0.06,OUTER.x]]) {
+    const count=Math.ceil((x1-x0)/0.36),width=(x1-x0)/count;
+    for(let i=0;i<count;i++) {
+      b.variation=0.18+rand()*0.68;
+      b.box(x0+(i+0.5)*width,FLOOR+0.32,front+0.025,width-0.016,0.61+(rand()-0.5)*0.035,0.10,12);
+    }
+    beam(point(x0,FLOOR+0.66,front+0.07),point(x1,FLOOR+0.66,front+0.07),0.045);
+  }
+  for(const x of [-2.75,-1.2]) {
+    beam(point(x,FLOOR+0.05,front+0.075),point(x+0.02,3.41,front+0.075),0.075);
+    for(const y of [FLOOR+0.68,3.26]) b.box(x,y,front+0.157,0.07,0.07,0.025,6);
+  }
+  for(const x of [-OUTER.x,OUTER.x]) {
+    for(let row=0;row<3;row++) {
+      b.variation=0.25+rand()*0.55;
+      b.box(x,FLOOR+0.12+row*0.21,0,0.11,0.19,OUTER.z*2,0);
+    }
+    beam(point(x,FLOOR+0.66,back),point(x,FLOOR+0.66,front),0.045);
+  }
   // Dark reveal, recessed uneven door planks, two metal hinges and a warm wood threshold.
-  b.box((door0+door1)/2,1.88,front-0.035,1.29,2.33,0.12,5);
+  b.box((door0+door1)/2,1.88,front-0.14,1.29,2.33,0.14,5);
   for(let plank=0;plank<5;plank++) {
     b.variation=rand();
-    b.box(door0+0.045+(plank+0.5)*0.222,1.85,front+0.025,0.214,2.17,0.075,12);
+    b.box(door0+0.045+(plank+0.5)*0.222,1.85,front-0.065,0.214,2.17,0.075,12);
   }
-  for(const x of [door0-0.025,door1+0.025]) beam(point(x,FLOOR,front+0.12),point(x,3.05,front+0.12),0.075);
-  beam(point(door0-0.06,3.04,front+0.12),point(door1+0.1,3.04,front+0.12),0.09);
-  for(const y of [1.15,2.45]) b.box(door0+0.2,y,front+0.105,0.24,0.085,0.035,5);
-  beam(point(door1-0.22,1.75,front+0.16),point(door1-0.22,1.91,front+0.16),0.035,6);
+  for(const x of [door0-0.025,door1+0.025]) beam(point(x,FLOOR,front+0.12),point(x,3.05,front+0.12),0.105);
+  beam(point(door0-0.06,3.04,front+0.12),point(door1+0.1,3.04,front+0.12),0.12);
+  for(const y of [1.15,2.45]) b.box(door0+0.2,y,front+0.015,0.24,0.085,0.035,5);
+  beam(point(door1-0.22,1.75,front+0.07),point(door1-0.22,1.91,front+0.07),0.035,6);
+  beam(point(door0+0.13,1.12,front-0.004),point(door1-0.14,2.53,front-0.004),0.045);
   // Four warm divided panes sit behind broad timber jambs, never pasted onto the facade.
-  b.box((win0+win1)/2,(winBottom+winTop)/2,front-0.055,win1-win0+0.12,winTop-winBottom+0.12,0.1,5);
+  b.box((win0+win1)/2,(winBottom+winTop)/2,front-0.18,win1-win0+0.2,winTop-winBottom+0.2,0.1,5);
   for(let row=0;row<2;row++)for(let column=0;column<2;column++) {
     b.variation=0.2+rand()*0.6;
-    b.box(win0+(column+0.5)*(win1-win0)/2,winBottom+(row+0.5)*(winTop-winBottom)/2,front-0.01,(win1-win0)/2-0.065,(winTop-winBottom)/2-0.065,0.02,7);
+    b.box(win0+(column+0.5)*(win1-win0)/2,winBottom+(row+0.5)*(winTop-winBottom)/2,front-0.11,(win1-win0)/2-0.065,(winTop-winBottom)/2-0.065,0.02,7);
   }
-  for(const x of [win0-0.06,(win0+win1)/2,win1+0.06]) beam(point(x,winBottom-0.07,front+0.1),point(x,winTop+0.07,front+0.1),x===(win0+win1)/2?0.035:0.07);
-  for(const y of [winBottom-0.06,(winBottom+winTop)/2,winTop+0.06]) beam(point(win0-0.1,y,front+0.1),point(win1+0.1,y,front+0.1),y===(winBottom+winTop)/2?0.03:0.07);
+  for(const x of [win0-0.06,(win0+win1)/2,win1+0.06]) beam(point(x,winBottom-0.07,front+0.1),point(x,winTop+0.07,front+0.1),x===(win0+win1)/2?0.045:0.1);
+  for(const y of [winBottom-0.06,(winBottom+winTop)/2,winTop+0.06]) beam(point(win0-0.1,y,front+0.1),point(win1+0.1,y,front+0.1),y===(winBottom+winTop)/2?0.04:0.1);
+  for(const x of [win0-0.045,win1+0.045]) b.box(x,(winBottom+winTop)/2,front-0.035,0.11,winTop-winBottom+0.12,0.26,0);
   b.box((win0+win1)/2,winBottom-0.12,front+0.14,1.86,0.12,0.34,0);
 
   // A shaded under-roof backs the gaps. Broad overlapping leaves curve across each slope.
@@ -128,11 +151,14 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
     }
     for(const start of [0.59,0.29,-0.025]) for(let column=0;column<7;column++) {
       const z=-3.05+column*1.02+(rand()-0.5)*0.14;
-      const length=0.45+rand()*0.035,width=0.72+rand()*0.075, lift=0.05+rand()*0.035;
+      const length=0.43+rand()*0.08,width=0.68+rand()*0.16,lift=0.055+rand()*0.055;
+      const crease=rand()*6.283,notch=0.25+rand()*0.5,lean=(rand()-0.5)*0.16;
       b.leaf((u,t)=>{
         const along=start+length*t;
-        const spread=width*(0.37+0.63*Math.pow(Math.sin(Math.PI*t),0.7))*(1-0.91*Math.pow(t,14));
-        return point(roofX(side,along)+0.06*Math.sin(t*Math.PI+z),roofHeight(along)+lift+0.095*(1-u*u)*Math.sin(t*Math.PI)-0.045*Math.abs(u),z+u*spread+0.1*Math.sin(t*2.8+column));
+        const nick=1-0.10*Math.exp(-Math.pow((t-notch)/0.045,2))*Math.max(0,u);
+        const spread=width*(0.37+0.63*Math.pow(Math.sin(Math.PI*t),0.7))*(1-0.91*Math.pow(t,14))*nick;
+        const curl=(0.018*Math.sin(t*18+crease)+lean*t*t)*u*u;
+        return point(roofX(side,along)+0.06*Math.sin(t*Math.PI+z),roofHeight(along)+lift+0.095*(1-u*u)*Math.sin(t*Math.PI)-0.045*Math.abs(u)+curl,z+u*spread+0.1*Math.sin(t*2.8+column));
       },rand());
     }
   }
@@ -176,6 +202,18 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
     b.box(x,FLOOR+height*0.75,z,radius*1.1,0.025,radius*1.1,5);
   };
   pot(3.9,front+0.12,0.48,0.23);pot(-2.92,front+0.12,0.37,0.18);
+  // A few drying reeds and a little window herb are deliberate household
+  // details, placed against the wall rather than across the walking terrace.
+  for(let i=0;i<5;i++) {
+    const a=i*2.4,root=point(3.9,FLOOR+0.42,front+0.12);
+    const tip=root.clone().add(point(Math.cos(a)*0.12,0.49+(i%3)*0.13,Math.sin(a)*0.08));
+    beam(root,tip,0.012,6);
+    b.leaf((u,t)=>{
+      const width=0.065*Math.sin(Math.PI*t);
+      return tip.clone().add(point(Math.cos(a)*t*0.22+Math.sin(a)*u*width,t*0.08-t*t*0.18,Math.sin(a)*t*0.22-Math.cos(a)*u*width));
+    },0.2+i*0.12,1,0.012);
+  }
+  for(let i=0;i<5;i++) beam(point(-2.92+(i-2)*0.024,FLOOR+0.26,front+0.12),point(-2.98+i*0.025,FLOOR+0.84+(i%2)*0.1,front+0.03),0.012,6);
   // A small hanging lantern has a folded paper case, separate dark ribs and a cord.
   const centre=point(1.64,2.96,front+0.25),top=centre.clone().add(point(0,0.35,0)),bottom=centre.clone().add(point(0,-0.3,0));
   for(let i=0;i<5;i++) {
