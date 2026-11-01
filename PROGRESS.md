@@ -8,6 +8,7 @@ next. Each iteration has its own page, kept for comparison (Versions).
 
 | Iteration | Page | Commit |
 |---|---|---|
+| 17 | https://muses-garden-iteration-17.vercel.app | 0924020 |
 | 15 | https://muses-garden-iteration-15.vercel.app | 74926b7 |
 | 14 | https://muses-garden-iteration-14.vercel.app | 89b493a |
 | 13 | https://muses-garden-iteration-13.vercel.app | d5107a0 |
@@ -21,7 +22,8 @@ next. Each iteration has its own page, kept for comparison (Versions).
 | 5 | https://garden-of-muse-iteration-5.vercel.app | b1209d0 |
 | 4 | https://garden-of-muse-iteration-4.vercel.app | 67a2742 |
 
-The latest is also at https://the-meadow-omega.vercel.app (iteration 15).
+The latest is also at https://the-meadow-omega.vercel.app (iteration 17).
+Iteration 16 was built in the lab and has no page of its own: it is in 17.
 Each iteration is its own Vercel project, so its production address
 is public and stays put. `scripts/publish.sh N --latest` publishes the
 checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`

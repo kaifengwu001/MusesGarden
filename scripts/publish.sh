@@ -38,7 +38,9 @@ fi
 stage="$work/stage"
 mkdir -p "$stage"
 rsync -a --exclude '*.map' "$src/dist/" "$stage/"
-perl -pi -e 's{//# sourceMappingURL=\S+}{}' "$stage"/assets/*.js
+# (each file's own last line only: an inline worker's source, a string in the bundle, has one of its own, and
+# taking that out with what follows it on its line broke the bundle)
+perl -0777 -pi -e 's{\n//# sourceMappingURL=[^\s`]+\s*\z}{\n}' "$stage"/assets/*.js
 
 # deploy to production in a project (made if need be); print its public address (the shortest alias)
 deploy() {
