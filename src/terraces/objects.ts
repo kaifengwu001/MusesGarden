@@ -111,7 +111,12 @@ export class TerraceObjects {
 
   private *job(id: string, cell: CellSample, R: number, size: number, bakes: { terrain: CubeReadback; layout: CubeReadback }, terrain: TerraceTerrain, mode: SurveyMode, villages: readonly Village[]): Generator<void, void, void> {
     const yard = (dir: Vector3): number => houseDistance(villages, dir, R);
-    const survey = yield* surveyCellJob(cell, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront, mode, yard);
+    const at = createCellSample();
+    const isCell = (dir: Vector3): boolean => {
+      terrain.cells.at(dir, at);
+      return at.x === cell.x && at.y === cell.y && at.z === cell.z;
+    };
+    const survey = yield* surveyCellJob(cell, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront, mode, yard, isCell);
     const geometry = yield* buildCellMeshJob(survey);
     const mesh = new Mesh(geometry ?? undefined, this.material);
     mesh.frustumCulled = false;

@@ -14,6 +14,12 @@ export interface FloorPiece {
   readonly across: number[];
 }
 
+/** A square's corners as two triangles (corners 0 1 2 3 round it). */
+const HALVES = [
+  [0, 1, 2],
+  [0, 2, 3],
+] as const;
+
 /** Fields carried by a clipped vertex: x, y, hs, land, d (a cut's signed distance), side (into the cell), its side of the band's lens. */
 const F = 7;
 
@@ -117,59 +123,62 @@ export function* floorPiecesJob(s: CellSurvey, piece: (p: FloorPiece) => void, p
       ];
       for (let b = bandOf(hmin); b <= bandOf(hmax); b++) {
         const B = bands[b];
-        poly.length = 0;
-        ks.forEach((k, c) => poly.push(-half + ij[c][0] * g, -half + ij[c][1] * g, hs[k], land[k], 0, side[k], lensSide(B, hs[k], slope[k])));
-        let p = clip(poly, 3, 0);
-        if (p.length >= 3 * F) p = clip(p, 5, -0.03);
-        if (p.length >= 3 * F) p = clip(p, 2, B.lo);
-        if (p.length >= 3 * F) p = clip(p, 2, B.hi, true);
-        if (p.length < 3 * F) continue;
-        // split at the lens's wall (each corner's side of it, as the survey traced it: carried linearly, so exactly)
-        let parts: Array<{ p: number[]; side: number[]; lens: number }> = [];
-        let lensy = false;
-        for (let v = 0; v < p.length; v += F) if (p[v + 6] < 0) lensy = true;
-        if (!lensy) parts.push({ p, side: [], lens: 0 });
-        else {
-          const above = clip(p, 6, 0);
-          const inLens = clip(p, 6, 0, true);
-          if (above.length >= 3 * F) parts.push({ p: above, side: [], lens: 0 });
-          if (inLens.length >= 3 * F) parts.push({ p: inLens, side: [], lens: 1 });
-        }
-        // split along the band's cuts: each part takes the paddy of the band's points on its side
         const mine = lines.filter((l) => l[4] === b);
-        for (const [ax, ay, bx, by] of mine) {
-          const len = Math.hypot(bx - ax, by - ay);
-          if (len < 1e-6) continue;
-          const next: Array<{ p: number[]; side: number[]; lens: number }> = [];
+        // (as two triangles: a square whose corners straddle a level crosswise would clip to one polygon over both its sides)
+        for (const tri of HALVES) {
+          poly.length = 0;
+          for (const c of tri) poly.push(-half + ij[c][0] * g, -half + ij[c][1] * g, hs[ks[c]], land[ks[c]], 0, side[ks[c]], lensSide(B, hs[ks[c]], slope[ks[c]]));
+          let p = clip(poly, 3, 0);
+          if (p.length >= 3 * F) p = clip(p, 5, -0.03);
+          if (p.length >= 3 * F) p = clip(p, 2, B.lo);
+          if (p.length >= 3 * F) p = clip(p, 2, B.hi, true);
+          if (p.length < 3 * F) continue;
+          // split at the lens's wall (each corner's side of it, as the survey traced it: carried linearly, so exactly)
+          let parts: Array<{ p: number[]; side: number[]; lens: number }> = [];
+          let lensy = false;
+          for (let v = 0; v < p.length; v += F) if (p[v + 6] < 0) lensy = true;
+          if (!lensy) parts.push({ p, side: [], lens: 0 });
+          else {
+            const above = clip(p, 6, 0);
+            const inLens = clip(p, 6, 0, true);
+            if (above.length >= 3 * F) parts.push({ p: above, side: [], lens: 0 });
+            if (inLens.length >= 3 * F) parts.push({ p: inLens, side: [], lens: 1 });
+          }
+          // split along the band's cuts: each part takes the paddy of the band's points on its side
+          for (const [ax, ay, bx, by] of mine) {
+            const len = Math.hypot(bx - ax, by - ay);
+            if (len < 1e-6) continue;
+            const next: Array<{ p: number[]; side: number[]; lens: number }> = [];
+            for (const part of parts) {
+              const q = part.p;
+              for (let v = 0; v < q.length; v += F) q[v + 4] = ((bx - ax) * (q[v + 1] - ay) - (by - ay) * (q[v] - ax)) / len;
+              const left = clip(q, 4, 0);
+              const right = clip(q, 4, 0, true);
+              if (left.length >= 3 * F) next.push({ p: left, side: [...part.side, 1], lens: part.lens });
+              if (right.length >= 3 * F) next.push({ p: right, side: [...part.side, -1], lens: part.lens });
+            }
+            parts = next;
+          }
           for (const part of parts) {
-            const q = part.p;
-            for (let v = 0; v < q.length; v += F) q[v + 4] = ((bx - ax) * (q[v + 1] - ay) - (by - ay) * (q[v] - ax)) / len;
-            const left = clip(q, 4, 0);
-            const right = clip(q, 4, 0, true);
-            if (left.length >= 3 * F) next.push({ p: left, side: [...part.side, 1], lens: part.lens });
-            if (right.length >= 3 * F) next.push({ p: right, side: [...part.side, -1], lens: part.lens });
+            const sideOk = (x: number, y: number): boolean =>
+              mine.every(([ax, ay, bx, by], li) => {
+                const d = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+                return part.side[li] === undefined || Math.sign(d) === part.side[li] || Math.abs(d) < 1e-9;
+              });
+            // (a sliver no point of its own lies by, where two cuts close in: the nearest paddy of its band, never a hole)
+            const any = (): boolean => true;
+            let pd = paddyNear(i, j, b, part.lens, sideOk);
+            if (pd < 0) pd = paddyNear(i, j, b, part.lens, any);
+            if (pd < 0) pd = paddyNear(i, j, b, 1 - part.lens, any);
+            if (pd < 0) continue;
+            const xy: number[] = [];
+            const across: number[] = [];
+            for (let v = 0; v < part.p.length; v += F) {
+              xy.push(part.p[v], part.p[v + 1]);
+              across.push(acrossOf(B, part.p[v + 2]));
+            }
+            piece({ paddy: pd, xy, across });
           }
-          parts = next;
-        }
-        for (const part of parts) {
-          const sideOk = (x: number, y: number): boolean =>
-            mine.every(([ax, ay, bx, by], li) => {
-              const d = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
-              return part.side[li] === undefined || Math.sign(d) === part.side[li] || Math.abs(d) < 1e-9;
-            });
-          // (a sliver no point of its own lies by, where two cuts close in: the nearest paddy of its band, never a hole)
-          const any = (): boolean => true;
-          let pd = paddyNear(i, j, b, part.lens, sideOk);
-          if (pd < 0) pd = paddyNear(i, j, b, part.lens, any);
-          if (pd < 0) pd = paddyNear(i, j, b, 1 - part.lens, any);
-          if (pd < 0) continue;
-          const xy: number[] = [];
-          const across: number[] = [];
-          for (let v = 0; v < part.p.length; v += F) {
-            xy.push(part.p[v], part.p[v + 1]);
-            across.push(acrossOf(B, part.p[v + 2]));
-          }
-          piece({ paddy: pd, xy, across });
         }
       }
     }

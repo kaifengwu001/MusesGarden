@@ -545,7 +545,12 @@ export class TerraceWorld implements PlanetWorld {
         const id = `${c.x},${c.y},${c.z}`;
         if (seen.has(id)) continue;
         seen.add(id);
-        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront, mode, (d) => houseDistance(this.villages, d, R)));
+        const at = createCellSample();
+        const isCell = (d: Vector3): boolean => {
+          t.cells.at(d, at);
+          return at.x === c.x && at.y === c.y && at.z === c.z;
+        };
+        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront, mode, (d) => houseDistance(this.villages, d, R), isCell));
       }
     }
     return out;

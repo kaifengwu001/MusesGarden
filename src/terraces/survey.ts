@@ -159,6 +159,34 @@ export function chartDir(t: { centre: Vector3; e1: Vector3; e2: Vector3 }, R: nu
   return out.copy(t.centre).multiplyScalar(R).addScaledVector(t.e1, x).addScaledVector(t.e2, y).normalize();
 }
 
+/** A field blurred by a Gaussian of σ grid squares, a step every so many rows (its job yields between). */
+function* gaussian(src: Float32Array, n: number, sigma: number): Generator<void, Float32Array, void> {
+  const r = Math.ceil(3 * sigma);
+  const w = new Float32Array(2 * r + 1);
+  let sum = 0;
+  for (let k = -r; k <= r; k++) sum += w[k + r] = Math.exp(-(k * k) / (2 * sigma * sigma));
+  for (let k = 0; k < w.length; k++) w[k] /= sum;
+  const tmp = new Float32Array(n * n);
+  const out = new Float32Array(n * n);
+  for (let j = 0; j < n; j++) {
+    if (j % 64 === 63) yield;
+    for (let i = 0; i < n; i++) {
+      let a = 0;
+      for (let k = -r; k <= r; k++) a += w[k + r] * src[j * n + clamp(i + k, 0, n - 1)];
+      tmp[j * n + i] = a;
+    }
+  }
+  for (let j = 0; j < n; j++) {
+    if (j % 64 === 63) yield;
+    for (let i = 0; i < n; i++) {
+      let a = 0;
+      for (let k = -r; k <= r; k++) a += w[k + r] * tmp[clamp(j + k, 0, n - 1) * n + i];
+      out[j * n + i] = a;
+    }
+  }
+  return out;
+}
+
 /** A field blurred as a Gaussian of σ grid squares would blur it, near enough (three box passes each way, their widths odd): as fast for a wide σ as a narrow one. */
 function boxBlur(src: Float32Array, n: number, sigma: number): Float32Array {
   const r = Math.max(1, Math.round(0.5 * (Math.sqrt(4 * sigma * sigma + 1) - 1)));
@@ -360,8 +388,9 @@ export function surveyCell(
   front: number,
   mode: SurveyMode = 'terraces',
   yard: (dir: Vector3) => number = () => 1e9,
+  isCell: (dir: Vector3) => boolean = () => true,
 ): CellSurvey {
-  const job = surveyCellJob(cell, R, cellSize, terrain, layout, plots, front, mode, yard);
+  const job = surveyCellJob(cell, R, cellSize, terrain, layout, plots, front, mode, yard, isCell);
   for (;;) {
     const r = job.next();
     if (r.done) return r.value;
@@ -379,22 +408,39 @@ export function* surveyCellJob(
   front: number,
   mode: SurveyMode = 'terraces',
   yard: (dir: Vector3) => number = () => 1e9,
+  isCell: (dir: Vector3) => boolean = () => true,
 ): Generator<void, CellSurvey, void> {
   const M = MODES[mode];
   // the chart round the cell itself (its site can lie off to one side of it: the cells are a warped Voronoi of
-  // points in space), wide enough to take all of it and the frame
+  // points in space), wide enough to take all of it and the frame. Its points are found on a coarse grid by
+  // the layout's key, each checked for the cell itself (isCell: another cell nearby can have the same key)
   const site = { centre: cell.centre, e1: cell.along, e2: new Vector3().crossVectors(cell.centre, cell.along).normalize() };
   const box = [Infinity, Infinity, -Infinity, -Infinity];
-  const reach = SURVEY.reach * cellSize;
-  for (let y = -reach; y <= reach; y += SURVEY.scan) {
-    for (let x = -reach; x <= reach; x += SURVEY.scan) {
-      if (Math.floor(layout.nearest(chartDir(site, R, x, y, dir), 0) * 1024) !== cell.key) continue;
+  const S = SURVEY.scan;
+  const m = 2 * Math.ceil((SURVEY.reach * cellSize) / S) + 1;
+  const reach = 0.5 * (m - 1) * S;
+  const own = new Uint8Array(m * m);
+  for (let sj = 0; sj < m; sj++) {
+    for (let si = 0; si < m; si++) {
+      const x = -reach + si * S;
+      const y = -reach + sj * S;
+      chartDir(site, R, x, y, dir);
+      if (Math.floor(layout.nearest(dir, 0) * 1024) !== cell.key || !isCell(dir)) continue;
+      own[sj * m + si] = 1;
       box[0] = Math.min(box[0], x);
       box[1] = Math.min(box[1], y);
       box[2] = Math.max(box[2], x);
       box[3] = Math.max(box[3], y);
     }
   }
+  /** Whether a direction lies by the cell's own points on the coarse grid (within a step of one). */
+  const ownNear = (d: Vector3): boolean => {
+    const t = R / Math.max(d.dot(site.centre), 1e-6);
+    const si = Math.round((t * d.dot(site.e1) + reach) / S);
+    const sj = Math.round((t * d.dot(site.e2) + reach) / S);
+    for (let b = Math.max(sj - 1, 0); b <= Math.min(sj + 1, m - 1); b++) for (let a = Math.max(si - 1, 0); a <= Math.min(si + 1, m - 1); a++) if (own[b * m + a]) return true;
+    return false;
+  };
   if (!(box[2] >= box[0])) box.fill(0);
   const centre = chartDir(site, R, 0.5 * (box[0] + box[2]), 0.5 * (box[1] + box[3]), new Vector3());
   const e1 = cell.along.clone().addScaledVector(centre, -cell.along.dot(centre)).normalize();
@@ -414,7 +460,7 @@ export function* surveyCellJob(
       h[k] = terrain.sample(dir, 0);
       // the terraced land (not wild, not flat); and this cell (signed by its key: the edge distance is the
       // same either side). The terraces run on across cells: a cell only builds its own part of them
-      const mine = Math.floor(layout.nearest(dir, 0) * 1024) === cell.key;
+      const mine = Math.floor(layout.nearest(dir, 0) * 1024) === cell.key && ownNear(dir);
       const edge = layout.sample(dir, 3);
       side[k] = mine ? edge : -edge;
       const wild = (0.5 - terrain.sample(dir, 2)) * SURVEY.softness;
@@ -424,7 +470,8 @@ export function* surveyCellJob(
     }
     if (j % 16 === 15) yield;
   }
-  const hs = boxBlur(h, n, SURVEY.smooth / g);
+  // (a true Gaussian: the walls are its contours, and two cells must trace them alike, each on its own grid)
+  const hs = yield* gaussian(h, n, SURVEY.smooth / g);
   yield;
   const inLand = (k: number): boolean => land[k] >= 0;
   if (mode === 'flats') return yield* flatsLayout(cell, chart, R, n, g, half, h, hs, land, side, plots, front);

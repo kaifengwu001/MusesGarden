@@ -40,6 +40,9 @@ interface Frame {
   readonly season: number;
 }
 
+/** Added to a cell's lattice place before its key is hashed (cells.glsl the same). */
+const KEY_OFFSET = [1531, 2833, 4093] as const;
+
 const p = new Vector3();
 const f = new Vector3();
 const f1 = new Vector3();
@@ -126,7 +129,8 @@ export class TerraceCells {
     out.x = cx;
     out.y = cy;
     out.z = cz;
-    out.key = (latticeHash(cx, cy, cz, (s + 812) >>> 0) >>> 8) & 1023;
+    // (the lattice offset: the hash is the same for two cells mirrored through the origin's axes, a cell or two apart)
+    out.key = (latticeHash(cx + KEY_OFFSET[0], cy + KEY_OFFSET[1], cz + KEY_OFFSET[2], (s + 812) >>> 0) >>> 8) & 1023;
     out.centre.copy(f1).normalize();
     out.edge = (Math.max(edge, 0) / F) * R;
     const fr = this.frame(out);

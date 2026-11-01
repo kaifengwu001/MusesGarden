@@ -63,7 +63,8 @@ Cell cellAt(vec3 dir) {
   }
   Cell cell;
   cell.id = best;
-  cell.key = (meadowHash(best, uTSeed + 812u) >> 8) & 1023u;
+  // (offset as cells.ts offsets it: the hash is the same for two cells mirrored through the origin's axes)
+  cell.key = (meadowHash(best + ivec3(1531, 2833, 4093), uTSeed + 812u) >> 8) & 1023u;
   cell.centre = normalize(f1);
   cell.edge = max(edge, 0.0) / uCells.x * uRadius;
   return cell;

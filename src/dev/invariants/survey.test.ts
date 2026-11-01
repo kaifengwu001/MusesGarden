@@ -31,7 +31,14 @@ const bakes = {
   },
 } as unknown as { terrain: CubeReadback; layout: CubeReadback };
 
-const survey = (c: CellSample): CellSurvey => surveyCell(c, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront);
+const survey = (c: CellSample): CellSurvey => {
+  const own = createCellSample();
+  const isCell = (d: Vector3): boolean => {
+    terrain.cells.at(d, own);
+    return own.x === c.x && own.y === c.y && own.z === c.z;
+  };
+  return surveyCell(c, R, size, bakes.terrain, bakes.layout, terrain.plots, terrain.seasonFront, 'terraces', () => 1e9, isCell);
+};
 
 /** Terraced hillsides: a cell at each of a few spots of tame, sloping ground, and its neighbour across the slope. */
 function hillsides(count: number): Array<[CellSurvey, CellSurvey]> {
