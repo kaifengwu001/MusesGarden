@@ -86,7 +86,7 @@ export class GardenUi {
   constructor(
     parent: HTMLElement,
     private readonly world: World,
-    store: ParamStore,
+    private readonly store: ParamStore,
   ) {
     this.source = gardenSource();
     this.state = new GardenState(this.source);
@@ -161,6 +161,7 @@ export class GardenUi {
 
   private changed(change: string): void {
     const s = this.state;
+    if (change === 'snapshot') this.applyWorld();
     if (change === 'snapshot' || change === 'baskets') this.relayout(true);
     if (change === 'snapshot' || change === 'likes' || change === 'pins' || change === 'status') this.refreshPins();
     const unread = s.unread.length;
@@ -183,6 +184,14 @@ export class GardenUi {
     }
     if (change === 'baskets' || change === 'snapshot') this.basketsSheet.render();
     if (change === 'interests' || change === 'snapshot' || change === 'status') this.museSheet.render();
+  }
+
+  /** Muse's own planet, when the source names one: the finds were found on it. */
+  private applyWorld(): void {
+    const world = this.state.snapshot?.world;
+    if (!world) return;
+    this.store.set('world.seed', world.seed);
+    this.store.set('world.growth', world.g);
   }
 
   /** Lay the finds out on the planet again (a new basket, or a planet that grew). */
