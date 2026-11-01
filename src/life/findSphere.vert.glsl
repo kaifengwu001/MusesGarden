@@ -33,13 +33,13 @@ void main() {
   float px;
   float strength;
   if (spheres >= behind) {
-    at = f.dir * (uRadius + f.ground + 0.6);
+    at = f.dir * (uRadius + f.ground + findLift(f) + 0.6);
     px = view * (0.034 + 0.016 * max(lit.x, lit.y)) * (1.0 + 0.6 * lit.z);
     strength = spheres * (0.8 + 0.4 * max(lit.x, lit.y) + 0.5 * lit.z);
     vCore = 0.3;
   } else {
     // across about twice the specimen's height, set back so the plant hides its middle
-    vec3 mid = f.dir * (uRadius + f.ground + 0.4 * SPECIMEN_SCALE);
+    vec3 mid = f.dir * (uRadius + f.ground + findLift(f) + 0.4 * SPECIMEN_SCALE);
     vec3 away = normalize(mid - cameraPosition);
     at = mid + away * 0.8;
     px = 1.8 * SPECIMEN_SCALE / max(length(cameraPosition - warpPosition(at)) * uPixelAngle, 1e-6);

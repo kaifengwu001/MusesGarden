@@ -55,9 +55,7 @@ void main() {
   float age = findAge(f);
   // shrinking into its bed as the camera rises past the beds, far from the focus (as the
   // wildflowers do), and before it is too small to draw without sparkling
-  // (risen with its bed while the pointer is over it, as findBed.vert.glsl lifts the bed)
-  float lifted = f.index < float(MAX_BEDS) ? uBeds[int(f.index)].z : 0.0;
-  vec3 base = f.dir * (uRadius + f.ground - 0.02 + 0.22 * lifted);
+  vec3 base = f.dir * (uRadius + f.ground + findLift(f) - 0.02);
   float d = chordAngle(f.dir, uWarpUp) * uRadius;
   float pixels = 0.8 * SPECIMEN_SCALE / max(length(cameraPosition - warpPosition(base)) * uPixelAngle, 1e-6);
   float size = uFindLook.z * (1.0 - smoothstep(120.0, 200.0, d)) * smoothstep(1.5, 4.0, pixels);

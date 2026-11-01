@@ -47,7 +47,7 @@ const AT_HOME: MuseDirection = { kind: 'home', busy: false };
 const OUT_OF_SIGHT: MuseDirection = { kind: 'hidden' };
 
 /** A tap or the pointer this near a find's sphere (px) picks it; the sphere stands this high over its bed (m). */
-const SPHERE = { slop: 16, height: 1 } as const;
+const SPHERE = { slop: 16, height: 0.6 } as const;
 
 const sample = createGroundSample();
 const tmp = new Vector3();
