@@ -196,12 +196,41 @@ async function streamRelay() {
 }
 
 const shownCard = (page: Page) => page.evaluate(() => (window as unknown as Win).__garden.ui.card.shown);
-const hoverState = (page: Page) =>
-  page.evaluate(() => {
-    const marks = (window as unknown as Win).__garden.ui.marks;
-    const canvas = document.querySelector<HTMLCanvasElement>('#scene');
-    return { hovered: marks.hovered, lit: marks.lit.x, cursor: canvas?.style.cursor ?? '' };
-  });
+/** What the garden draws of its finds, as the test sees it. */
+interface MarksView {
+  hovered: string | null;
+  /** The find whose mark glows. */
+  lit: string | null;
+  cursor: string;
+  /** Of the finds asked about: each one planted in its bed and drawn. */
+  planted: Record<string, boolean>;
+  bedsShown: boolean;
+  spheresShown: number;
+}
+
+/** The test's only read of the garden's marks and beds; nothing else reaches into them. */
+const marks = (page: Page, ids: readonly string[] = []): Promise<MarksView> =>
+  page.evaluate((ids) => {
+    const ui = (window as unknown as Win).__garden.ui;
+    const m = ui.marks;
+    const planted = (id: string) => {
+      const slot = ui.beds.slot(id);
+      return slot !== undefined && ui.beds.beds[slot].x <= ui.beds.now && m.index.has(id);
+    };
+    return {
+      hovered: m.hovered,
+      lit: [...m.index].find(([, i]) => i === m.lit.x)?.[0] ?? null,
+      cursor: document.querySelector<HTMLCanvasElement>('#scene')?.style.cursor ?? '',
+      planted: Object.fromEntries(ids.map((id) => [id, planted(id)])),
+      bedsShown: m.specimens.visible,
+      spheresShown: m.spheresShown(),
+    };
+  }, ids);
+
+const hoverState = async (page: Page) => {
+  const { hovered, lit, cursor } = await marks(page);
+  return { hovered, lit, cursor };
+};
 
 async function openCard(page: Page, id: string): Promise<void> {
   await page.evaluate((id) => (window as unknown as Win).__garden.open(id), id);
@@ -281,31 +310,21 @@ test('the hero’s planet is drawn, and a basket arrives over the event stream a
     return ids.map((id) => {
       const bed = g.layout().beds.get(id);
       const place = g.state.find(id)?.place;
-      const slot = g.ui.beds.slot(id);
       let off = Infinity;
       if (bed && place) {
         const n = Math.hypot(...place);
         const cos = (bed.dir.x * place[0] + bed.dir.y * place[1] + bed.dir.z * place[2]) / n;
         off = Math.acos(Math.min(1, cos)) * R;
       }
-      return {
-        id,
-        waiting: g.ui.basketFlight.waiting(id),
-        planted: slot !== undefined && g.ui.beds.beds[slot].x <= g.ui.beds.now,
-        grown: g.ui.marks.index.has(id),
-        off,
-      };
+      return { id, waiting: g.ui.basketFlight.waiting(id), off };
     });
   }, finds);
+  const drawn = await marks(page, finds);
   for (const f of landed) {
-    expect(f, `find ${f.id} landed and planted`).toMatchObject({ waiting: false, planted: true, grown: true });
+    expect({ ...f, planted: drawn.planted[f.id] }, `find ${f.id} landed and planted`).toMatchObject({ waiting: false, planted: true });
     expect(f.off, `find ${f.id}: its bed (m) from where it was found`).toBeLessThanOrEqual(NUDGE_REACH);
   }
-  const drawn = await page.evaluate(() => {
-    const w = window as unknown as Win;
-    return { altitude: w.__world.rig.altitude, specimens: w.__garden.ui.marks.specimens.visible, spheres: w.__garden.ui.marks.spheresShown() };
-  });
-  expect(drawn.specimens || drawn.spheres > 0.5, `the landed finds are drawn, as specimens or from high up as spheres (${JSON.stringify(drawn)})`).toBe(true);
+  expect(drawn.bedsShown || drawn.spheresShown > 0.5, `the landed finds are drawn, in their beds or from high up as spheres (${JSON.stringify(drawn)})`).toBe(true);
   await page.screenshot({ path: `${SHOTS}/03-landed-specimens.png` });
   await context.close();
   await page.video()?.saveAs(`${SHOTS}/basket-flight.webm`);
@@ -319,15 +338,14 @@ test('hovering a landed find lights it, and a click opens its card with the real
 
   const near = await clearest(page, basket.finds, 0);
   await page.mouse.move(near.x, near.y);
-  const lit = await page.evaluate((id) => (window as unknown as Win).__garden.ui.marks.index.get(id), near.id);
-  await expect.poll(() => hoverState(page), { message: 'hover lights the find under the pointer' }).toEqual({ hovered: near.id, lit, cursor: 'pointer' });
+  await expect.poll(() => hoverState(page), { message: 'hover lights the find under the pointer' }).toEqual({ hovered: near.id, lit: near.id, cursor: 'pointer' });
   await page.screenshot({ path: `${SHOTS}/04-hover-glow.png` });
   await page.mouse.click(near.x, near.y);
   await expect.poll(() => shownCard(page), { timeout: 60_000 }).toBe(near.id);
   const card = page.locator('.g-card');
   await expect(card).toBeVisible();
   await expect
-    .poll(() => page.evaluate(() => (window as unknown as Win).__garden.ui.marks.specimens.visible), { message: 'the find’s specimen stands by its card' })
+    .poll(async () => (await marks(page)).bedsShown, { message: 'the find’s bed shows by its card' })
     .toBe(true);
   const href = (await card.locator('.g-open').getAttribute('href')) ?? '';
   expect(topicMapHosts.has(new URL(href).hostname), `${href} is a real item, not the topic map's page`).toBe(false);
@@ -350,10 +368,8 @@ test.fixme('from high up the spheres show; hovering one brightens it, and a tap 
     .poll(
       async () => {
         await page.mouse.wheel(0, 1200);
-        return page.evaluate(() => {
-          const w = window as unknown as Win;
-          return w.__world.rig.altitude > 120 && w.__garden.ui.marks.spheresShown() > 0.95;
-        });
+        const altitude = await page.evaluate(() => (window as unknown as Win).__world.rig.altitude);
+        return altitude > HIGH_UP && (await marks(page)).spheresShown > 0.95;
       },
       { timeout: 120_000, intervals: [500] },
     )
@@ -367,8 +383,7 @@ test.fixme('from high up the spheres show; hovering one brightens it, and a tap 
   });
   const sphere = await clearest(page, visited, 0.6);
   await page.mouse.move(sphere.x, sphere.y);
-  const sphereLit = await page.evaluate((id) => (window as unknown as Win).__garden.ui.marks.index.get(id), sphere.id);
-  await expect.poll(() => hoverState(page), { message: 'hover brightens the sphere under the pointer' }).toEqual({ hovered: sphere.id, lit: sphereLit, cursor: 'pointer' });
+  await expect.poll(() => hoverState(page), { message: 'hover brightens the sphere under the pointer' }).toEqual({ hovered: sphere.id, lit: sphere.id, cursor: 'pointer' });
   await page.screenshot({ path: `${SHOTS}/06-sphere-hover.png` });
   await page.mouse.click(sphere.x, sphere.y);
   await expect.poll(() => shownCard(page), { timeout: 90_000, message: 'the tap flew down to the find' }).toBe(sphere.id);
