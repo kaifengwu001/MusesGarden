@@ -1,5 +1,5 @@
-import { DoubleSide, InstancedBufferAttribute, Mesh, ShaderMaterial, Vector3, Vector4, type BufferGeometry, type InstancedBufferGeometry, type IUniform } from 'three';
-import { gpuMemory } from '../core/gpuMemory';
+import { DoubleSide, InstancedBufferAttribute, Mesh, ShaderMaterial, Vector3, Vector4, type InstancedBufferGeometry, type IUniform } from 'three';
+import { geometryBytes, gpuMemory } from '../core/gpuMemory';
 import { hash32, unit } from '../core/hash';
 import { BED_RADIUS, type Bed } from '../garden/placement';
 import { travel, tangentToward } from '../planet/geo';
@@ -42,12 +42,6 @@ export interface BedLook {
 function rand(seed: number): () => number {
   let s = hash32(seed >>> 0);
   return () => unit((s = hash32((s + 0x9e3779b9) >>> 0)));
-}
-
-/** Bytes a geometry holds on the GPU: every attribute and the index. */
-export function geometryBytes(g: BufferGeometry): number {
-  const index = g.getIndex()?.array.byteLength ?? 0;
-  return Object.values(g.attributes).reduce((sum, a) => sum + a.array.byteLength, index);
 }
 
 function idSeed(id: string): number {

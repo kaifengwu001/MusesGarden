@@ -1,9 +1,9 @@
 import { BufferAttribute, BufferGeometry, CustomBlending, DoubleSide, Mesh, OneFactor, OneMinusSrcColorFactor, Points, ShaderMaterial, Vector4, type IUniform, type Vector3 } from 'three';
-import { gpuMemory } from '../core/gpuMemory';
+import { geometryBytes, gpuMemory } from '../core/gpuMemory';
 import { smoothstep } from '../core/math';
 import { createGroundSample, type Terrain } from '../planet/terrain';
 import { buildMesh, formOf, type CollectibleMesh, type Family, type Form, type Ground } from './collectibleForms';
-import { geometryBytes, MAX_BEDS, type BedLook, type FindBeds } from './findBeds';
+import { MAX_BEDS, type BedLook, type FindBeds } from './findBeds';
 import vertexShader from './findForm.vert.glsl?raw';
 import sphereFragment from './findSphere.frag.glsl?raw';
 import sphereVertex from './findSphere.vert.glsl?raw';
