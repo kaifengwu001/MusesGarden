@@ -8,6 +8,7 @@ import type {
   PublicDiscovery,
   PublicProfile,
   SocialPolicy,
+  VisitOffer,
 } from '../../../src/muse/contract';
 import { localClock } from './clock';
 import { SOCIAL } from './constants';
@@ -38,14 +39,34 @@ function visitMs(draw: Draw): number {
   return SOCIAL.visitMedianMs * Math.exp(SOCIAL.visitSigma * z);
 }
 
-export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant, draw: Draw): Visit {
-  const left = socialLeftMs(s, now);
-  if (left <= 0 || photoSlotsLeft(s, now) <= 0) return null;
-  const friends = free
+/**
+ * Free friends with a photo slot on both sides, since every hangout brings a photo. Friends never met yet are first:
+ * they meet whatever social time is left. Everyone else needs social time on both sides.
+ */
+function visitable(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant): { readonly first: MuseState[]; readonly friends: MuseState[] } {
+  if (photoSlotsLeft(s, now) <= 0) return { first: [], friends: [] };
+  const ready = free
     .map((f) => f.state)
-    .filter((f) => areFriends(s, f) && socialLeftMs(f, now) > 0 && photoSlotsLeft(f, now) > 0)
+    .filter((f) => areFriends(s, f) && photoSlotsLeft(f, now) > 0)
     .sort((x, y) => compare(x.seed.id, y.seed.id));
+  return {
+    first: ready.filter((f) => relationshipWith(s, f.seed.id)?.lastMetAt === null),
+    friends: socialLeftMs(s, now) > 0 ? ready.filter((f) => socialLeftMs(f, now) > 0) : [],
+  };
+}
+
+export function visitOffer(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant): VisitOffer {
+  const { first, friends } = visitable(s, free, now);
+  return first.length > 0 ? 'first-meeting' : friends.length > 0 ? 'friend' : 'none';
+}
+
+export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant, draw: Draw): Visit {
+  const { first, friends } = visitable(s, free, now);
+  const role = (lastRole: 'host' | 'guest' | null | undefined) =>
+    draw('visit.direction') < (lastRole === 'guest' ? SOCIAL.goAfterBeingGuest : SOCIAL.goUsually) ? 'guest' : 'host';
+  if (first.length > 0) return { other: first[0].seed.id, role: role(null), until: (now + SOCIAL.firstMeetingMs) as Instant };
   if (friends.length === 0) return null;
+  const left = socialLeftMs(s, now);
 
   const rapport = friends.map((f) => relationshipWith(s, f.seed.id)?.rapport ?? 0);
   const closest = Math.max(...rapport);
@@ -57,10 +78,8 @@ export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseS
   const friend = pick(friends, weights, draw('visit.friend'));
   if (draw('visit.distant') < (relationshipWith(s, friend.seed.id)?.distance ?? 0)) return null;
 
-  const wasGuest = relationshipWith(s, friend.seed.id)?.lastRole === 'guest';
-  const role = draw('visit.direction') < (wasGuest ? SOCIAL.goAfterBeingGuest : SOCIAL.goUsually) ? 'guest' : 'host';
   const length = Math.min(visitMs(draw), left, socialLeftMs(friend, now));
-  return { other: friend.seed.id, role, until: (now + Math.floor(length)) as Instant };
+  return { other: friend.seed.id, role: role(relationshipWith(s, friend.seed.id)?.lastRole), until: (now + Math.floor(length)) as Instant };
 }
 
 export function chooseGift(giver: PublicProfile, receiver: MuseState, receiverProfile: PublicProfile): PublicDiscovery | null {

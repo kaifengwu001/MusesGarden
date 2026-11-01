@@ -92,7 +92,7 @@ describe('the evidence-gated reducer', () => {
     const now = instant(D2 + 2 * DAY_MS);
     for (let n = 0; n < 50; n++) {
       expect(startTrip(stripped, now, drawFor(MOSS.id, n))).toEqual(startTrip(seedOnly, now, drawFor(MOSS.id, n)));
-      expect(next(stripped, now, drawFor(MOSS.id, n), true)).toBe(next(seedOnly, now, drawFor(MOSS.id, n), true));
+      expect(next(stripped, now, drawFor(MOSS.id, n), 'friend')).toBe(next(seedOnly, now, drawFor(MOSS.id, n), 'friend'));
     }
   });
 

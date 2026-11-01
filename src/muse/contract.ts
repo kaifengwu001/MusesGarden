@@ -522,10 +522,16 @@ export type ReduceSocial = (s: SocialState, e: StoredEvent, self: MuseId) => Soc
 /** A uniform draw in [0, 1), already scoped by the engine to (museId, episode n). Same (kind, k) → same value. */
 export type Draw = (kind: string, k?: number) => number;
 
+/**
+ * Whom Muse could visit right now: nobody, a friend, or a friend it has never met. Owners who share Muse expect the
+ * two to meet soon, so a first meeting is offered even when today's social time has run out.
+ */
+export type VisitOffer = 'none' | 'friend' | 'first-meeting';
+
 /** Lane A1: server/domain/policy/. */
 export interface LifePolicy {
   /** When an episode ends and Muse isn't working: what next. 'visit' is an intent; SocialPolicy.chooseVisit picks who. */
-  next(s: MuseState, now: Instant, draw: Draw, friendFree: boolean): 'rest' | 'travel' | 'visit';
+  next(s: MuseState, now: Instant, draw: Draw, offer: VisitOffer): 'rest' | 'travel' | 'visit';
   restUntil(s: MuseState, now: Instant, draw: Draw): Instant;
   beyondUntil(s: MuseState, now: Instant, draw: Draw): Instant;
   /** Decides beyond first (null = go beyond the planet), then new area vs revisit. */
@@ -566,7 +572,9 @@ export interface PairOutcome {
 }
 
 export interface SocialPolicy {
-  /** Who to visit among free friends, and which way; null if nobody suits. */
+  /** What chooseVisit could pick among these free Muses now. */
+  visitOffer(s: MuseState, free: readonly { readonly state: MuseState }[], now: Instant): VisitOffer;
+  /** Who to visit among free friends, and which way; a friend never met comes first. Null if nobody suits. */
   chooseVisit(
     s: MuseState,
     free: readonly { readonly state: MuseState }[],

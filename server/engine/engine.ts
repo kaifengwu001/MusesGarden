@@ -452,15 +452,15 @@ export class Engine {
     const n = s.episodes + 1;
     const draw = this.deps.drawFor(m, n);
     const { life, social } = this.deps;
-    const free = this.freeFriends(tx, s);
-    let choice = life.next(s, tx.now, draw, free.length > 0);
+    const free = this.freeFriends(tx, s).map((state) => ({ state }));
+    let choice = life.next(s, tx.now, draw, social.visitOffer(s, free, tx.now));
     if (choice === 'visit') {
-      const v = social.chooseVisit(s, free.map((state) => ({ state })), tx.now, draw);
+      const v = social.chooseVisit(s, free, tx.now, draw);
       if (v) {
         this.startVisit(tx, m, v.other, v.role, v.until);
         return;
       }
-      choice = life.next(s, tx.now, this.deps.drawFor(m, n + 1_000_000), false);
+      choice = life.next(s, tx.now, this.deps.drawFor(m, n + 1_000_000), 'none');
     }
     if (choice === 'rest') {
       if (life.reflectionDue(s, tx.now)) await this.reflect(tx, m);

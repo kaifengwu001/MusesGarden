@@ -145,6 +145,7 @@ export const life: LifePolicy = {
 };
 
 export const social: SocialPolicy = {
+  visitOffer: (_s, free) => (free.length > 0 ? 'friend' : 'none'),
   chooseVisit: (_s, free, now) => (free[0] ? { other: free[0].state.seed.id, role: 'host', until: at(now + 50 * MIN) } : null),
   encounterRate: () => 0,
   encounter: () => ({ self: [], other: [] }),

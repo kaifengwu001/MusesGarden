@@ -32,6 +32,8 @@ export const SOCIAL = {
   goAfterBeingGuest: 0.3,
   visitMedianMs: 50 * MINUTE,
   visitSigma: 0.4,
+  /** Two friends' first visit, uncut by the day's social time. */
+  firstMeetingMs: 45 * MINUTE,
 
   inviteRapportBase: 1,
   inviteRapportSpan: 2,
