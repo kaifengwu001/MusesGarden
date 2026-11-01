@@ -25,6 +25,21 @@ type View = 'stack' | 'focus' | 'album';
 /** The card up close. */
 const HELD: Slot = { x: 0, y: -10, r: 0, s: 1, shown: true };
 
+/** A drag on the card up close; far or fast enough and it is thrown away. */
+interface Drag {
+  pointer: number;
+  node: HTMLElement;
+  x: number;
+  y: number;
+  moved: boolean;
+  trail: { x: number; y: number; t: number }[];
+}
+
+/** A throw: past this many px, or faster than this many px per ms. */
+const THROW_DISTANCE = 110;
+const THROW_SPEED = 0.5;
+const THROW_MS = 400;
+
 function place(node: HTMLElement, slot: Slot): void {
   node.style.setProperty('--x', `${slot.x}px`);
   node.style.setProperty('--y', `${slot.y}px`);
@@ -120,6 +135,8 @@ export class Mail {
   private focused = -1;
   private from: View = 'stack';
   private opening = false;
+  private drag: Drag | null = null;
+  private swallowClick = false;
 
   constructor(
     parent: HTMLElement,
@@ -141,6 +158,10 @@ export class Mail {
     head.append(this.title, this.sub, tools);
     this.stage = el('div', 'g-mail-stage');
     this.stage.addEventListener('click', (e) => this.stageClick(e));
+    this.stage.addEventListener('pointerdown', (e) => this.grab(e));
+    this.stage.addEventListener('pointermove', (e) => this.pull(e));
+    this.stage.addEventListener('pointerup', (e) => this.release(e, false));
+    this.stage.addEventListener('pointercancel', (e) => this.release(e, true));
     this.album = el('div', 'g-album');
     this.bar = el('div', 'g-mail-bar');
     this.likeButton = button('g-mail-act', 'Like', `${ICONS.heart}<span>Like</span>`, () => this.like());
@@ -252,6 +273,10 @@ export class Mail {
   }
 
   private stageClick(e: MouseEvent): void {
+    if (this.swallowClick) {
+      this.swallowClick = false;
+      return;
+    }
     const node = (e.target as HTMLElement).closest<HTMLElement>('.g-pc');
     if (!node) {
       if (this.view === 'focus') this.unfocus();
@@ -272,7 +297,7 @@ export class Mail {
     this.state.markRead(card.id);
     const nodes = [...this.stage.children] as HTMLElement[];
     nodes.forEach((node, i) => {
-      this.arrange(node, i);
+      if (!node.classList.contains('is-thrown')) this.arrange(node, i);
     });
     if (card.invitation) setTimeout(() => nodes[k].classList.add('is-open'), 380);
     this.likeButton.classList.toggle('is-liked', this.state.cardLiked(card.id));
@@ -290,6 +315,63 @@ export class Mail {
     if (!on) node.classList.remove('is-open');
     node.style.zIndex = on ? '200' : String(100 - i);
     place(node, on ? HELD : underSlot(i, this.focused));
+  }
+
+  private grab(e: PointerEvent): void {
+    this.swallowClick = false;
+    const target = e.target as HTMLElement;
+    const node = target.closest<HTMLElement>('.g-pc.is-focus');
+    if (this.view !== 'focus' || this.drag || !e.isPrimary || e.button !== 0 || !node || target.closest('button')) return;
+    node.setPointerCapture(e.pointerId);
+    this.drag = { pointer: e.pointerId, node, x: e.clientX, y: e.clientY, moved: false, trail: [{ x: e.clientX, y: e.clientY, t: e.timeStamp }] };
+  }
+
+  private pull(e: PointerEvent): void {
+    const d = this.drag;
+    if (!d || e.pointerId !== d.pointer) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) < 6) return;
+    d.moved = true;
+    d.node.classList.add('is-dragging');
+    d.trail.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
+    while (d.trail.length > 2 && e.timeStamp - d.trail[0].t > 90) d.trail.shift();
+    place(d.node, { ...HELD, x: dx, y: HELD.y + dy, r: dx * 0.04 });
+  }
+
+  /** Let go: thrown far or fast enough, the card flies off and the next comes up; else it springs back. */
+  private release(e: PointerEvent, cancelled: boolean): void {
+    const d = this.drag;
+    if (!d || e.pointerId !== d.pointer) return;
+    this.drag = null;
+    d.node.classList.remove('is-dragging');
+    if (!d.moved) return;
+    this.swallowClick = true;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    const from = d.trail[0];
+    const dt = Math.max(e.timeStamp - from.t, 1);
+    const vx = (e.clientX - from.x) / dt;
+    const vy = (e.clientY - from.y) / dt;
+    const flung = Math.hypot(vx, vy) > THROW_SPEED;
+    if (cancelled || (!flung && Math.hypot(dx, dy) < THROW_DISTANCE)) {
+      place(d.node, HELD);
+      return;
+    }
+    const [ux, uy] = flung ? [vx, vy] : [dx, dy];
+    const far = Math.hypot(window.innerWidth, window.innerHeight) / Math.hypot(ux, uy);
+    const node = d.node;
+    node.classList.add('is-thrown');
+    place(node, { ...HELD, x: dx + ux * far, y: HELD.y + dy + uy * far, r: dx * 0.04 + Math.sign(ux) * 24 });
+    this.step(1);
+    // back into the pile out of sight, then it shows there
+    setTimeout(() => {
+      node.style.transition = 'none';
+      this.arrange(node, Number(node.dataset.index));
+      void node.offsetWidth;
+      node.style.transition = '';
+      node.classList.remove('is-thrown');
+    }, THROW_MS);
   }
 
   private unfocus(): void {
