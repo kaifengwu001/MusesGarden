@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['.worktrees/**', 'dist/**', 'dist-single/**', 'shots/**', 'test-results/**', 'playwright-report/**', 'eslint.config.js', '.*.mjs'],
+    ignores: ['.worktrees/**', 'dist/**', 'dist-environments/**', 'dist-single/**', 'shots/**', 'test-results/**', 'playwright-report/**', 'eslint.config.js', '.*.mjs'],
   },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -25,12 +25,12 @@ export default defineConfig(
     },
   },
   {
-    files: ['src/**/*.ts'],
-    ignores: ['src/dev/**/*.spec.ts', 'src/muse/ui/**/*.e2e.ts'],
+    files: ['src/**/*.ts', 'environments/**/*.ts'],
+    ignores: ['src/dev/**/*.spec.ts', 'src/muse/ui/**/*.e2e.ts', 'environments/**/*.spec.ts', 'environments/*/vite.config.ts'],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['*.config.ts', 'src/dev/**/*.spec.ts', 'src/muse/ui/**/*.e2e.ts', 'server/**/*.ts'],
+    files: ['*.config.ts', 'src/dev/**/*.spec.ts', 'src/muse/ui/**/*.e2e.ts', 'server/**/*.ts', 'environments/**/*.spec.ts', 'environments/*/vite.config.ts', 'scripts/*.ts'],
     languageOptions: { globals: globals.node },
   },
 );

@@ -16,7 +16,10 @@
     "squint": "playwright test --project=squint",
     "verify": "npm run check && npm test && npm run test:gpu && npm run shots",
     "sim": "tsx --no-warnings server/cli/sim.ts",
-    "serve": "tsx --no-warnings server/http.ts"
+    "serve": "tsx --no-warnings server/http.ts",
+    "new-environment": "node --experimental-strip-types scripts/new-environment.ts",
+    "dev:lantern": "vite --port 5225 --strictPort",
+    "build:lantern": "tsc -p tsconfig.json && vite build --config environments/lantern-reed-gardens/vite.config.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",
