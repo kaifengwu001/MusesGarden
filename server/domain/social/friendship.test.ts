@@ -45,7 +45,7 @@ describe('meeting strangers beyond', () => {
   });
 
   it('judges similarity only from what each Muse shares publicly', () => {
-    const privateOnly = { interests: [interest('Lichen', { seededBy: 'owner-memory', stage: 'emerging' })] };
+    const privateOnly = { interests: [interest('Lichen')], hidden: ['topic:Lichen' as const] };
     expect(policy.encounterRate(muse('ada', privateOnly), muse('bo', privateOnly), 'beyond')).toBe(0);
   });
 });

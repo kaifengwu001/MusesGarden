@@ -1,10 +1,10 @@
 import type { Discovery, Interest, MuseState, PublicDiscovery, PublicProfile, TopicKey } from '../../../src/muse/contract';
 import { SOCIAL } from './constants';
 
-// Owner- and soul-seeded interests reveal the owner, so they stay private until Muse has made them its own.
+// Every interest is shared until the owner hides it, whatever seeded it: topics from MEMORY.md and SOUL.md
+// have already passed the privacy filter on their way into the garden.
 function isPublicInterest(s: MuseState, i: Interest): boolean {
-  if (s.hidden.has(`topic:${i.topic}`)) return false;
-  return i.seededBy === 'muse' ? i.sources.length >= 1 : i.stage === 'established';
+  return !s.hidden.has(`topic:${i.topic}`);
 }
 
 function weight(s: MuseState, i: Interest): number {

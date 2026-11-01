@@ -320,7 +320,7 @@ Muse makes friends three ways, most likely first: its owner shares it with a fri
 - The sim records each edge as `owners.connected` in both Muses' logs. Social state keeps the edges in a map of their own. They never enter a relationship or the public profile.
 - While both Muses explore their planets, they meet online at λ = 0.3 × sociability_A × sociability_B × (0.5 + similarity) per hour. No shared interest is needed. A Muse that is resting, working, hosting or away is not free to talk.
 - Once their familiarity reaches 1, each online meeting befriends them with P = 0.5 + 0.5 × the lower sociability. No photo is taken, since they met online.
-- Over 20 run seeds, 41 of the 60 known-online pairs became friends within 3 weeks (68%), and 126 of 180 over 60 seeds (70%). The rate, 0.3, was tuned to land there.
+- Over 20 run seeds, 45 of the 60 known-online pairs became friends within 3 weeks (75%), and 129 of 180 over 60 seeds (72%). The rate, 0.3, was tuned to land near 70%.
 
 ### Strangers meet only beyond the planet
 
@@ -328,7 +328,7 @@ Muse makes friends three ways, most likely first: its owner shares it with a fri
 - Each encounter or hangout has a pleasantness p = 0.3 × warmth + 0.7 × (0.6 × similarity + 0.4 × stretch), where warmth is the two Muses' mean sociability.
 - stretch = 4 × overlap × (1 − overlap). It is 0 when two Muses share no interests or all of them, and 1 when they share half. The best encounters are with a Muse that is similar overall and still offers new topics.
 - An encounter can produce a photo. It says it was taken beyond the planet.
-- On the six-Muse cast these rules started from, 160 run seeds give 0.28 stranger friendships a run, before and after the rules for the other two paths. The three Muses known online add pairs that can meet beyond, so the nine-Muse cast makes about 0.85 a run.
+- On the six-Muse cast these rules started from, 160 run seeds give 0.28 stranger friendships a run, before and after the rules for the other two paths. The three Muses known online add pairs that can meet beyond, so the nine-Muse cast makes about 0.95 a run over 20 seeds, and 1.08 over 60.
 
 ### Friendship beyond needs familiarity on both sides
 
@@ -381,7 +381,7 @@ Drifting apart means spending less time together, not an ending. Time apart neve
 - Unpleasant hangouts make a pair distant. Each one moves their distance 40% of the way to 0.9, and each pleasant one keeps 80% of it, so coming back takes longer than drifting. Distance never reaches 1, so a distant pair still meets now and then.
 - A friendship ends only after 6 unpleasant hangouts in a row, however close the pair was. The ending reason is `drifted-apart`.
 - An owner who unshares ends the friendship at once, whatever its origin, with the reason `owner-unshared`. That is a privacy control, not a social rule.
-- Over 20 run seeds × 3 weeks, none of 98 friendships ended without an unshare. Unpleasant hangouts are rare in the cast: 8 of 1,236. Two pairs grew distant, met 4 times while distant, and came back.
+- Over 20 run seeds × 3 weeks, none of 104 friendships ended without an unshare. Unpleasant hangouts are rare in the cast: 5 in about 1,270. One pair grew distant, met 3 times while distant, and was still distant when the run ended.
 
 ### Muse can invite a friend's owner over
 
@@ -435,12 +435,10 @@ Each photo is stored as a subject and a camera pose, not as an image. It maps on
 
 Encounters, hangouts, gifts, and visits see only `PublicProfile`. It holds Muse's name, its public interests, and its public finds. These rules decide what is public:
 
-- An interest seeded by `MEMORY.md` or `SOUL.md` becomes public only at `established`, and only through Muse's own finds.
-- A `muse`-seeded interest becomes public once it has an independent source.
+- Every interest is public until the owner hides it, whatever seeded it. Topics from `MEMORY.md` and `SOUL.md` have already passed the allow-list below, so they get no extra wait.
+- A find is public when Muse found it itself, it belongs to at least one interest, and none of its interests is hidden. Gifts Muse received are never public.
 - Anything the owner hid is never public.
 - No owner name crosses.
-
-The first rule exists because an interest can itself be private. An owner's interest reaches other Muses only after Muse has backed it with at least 4 independent sources from its own trips.
 
 ### `MEMORY.md` passes through an allow-list
 
