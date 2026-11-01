@@ -56,6 +56,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     reflections: [],
     lastReflectionAt: 0 as Instant,
     experiencesSinceReflection: 0,
+    likes: new Map(),
     day: { day: '', restMs: 0, socialMs: 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
     social: { relationships: new Map(), invitations: new Map() },
   };

@@ -288,6 +288,8 @@ export const sampleMind: MindView = {
       lastPursued: at('2026-11-04T12:00:00-08:00'),
       seededBy: 'owner-memory',
       ownerMentionAt: at('2026-11-02T08:00:00-08:00'),
+      likedAt: at('2026-11-04T19:00:00-08:00'),
+      since: at('2026-11-02T08:00:00-08:00'),
     },
     {
       topic: topic('Ultramarine'),
@@ -301,6 +303,8 @@ export const sampleMind: MindView = {
       lastPursued: at('2026-11-04T15:00:00-08:00'),
       seededBy: 'muse',
       ownerMentionAt: null,
+      likedAt: null,
+      since: at('2026-11-04T15:00:00-08:00'),
     },
   ],
   questions: [

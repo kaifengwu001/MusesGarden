@@ -1,12 +1,13 @@
 // Per-day numbers for tuning and for the arc: finds, areas, trips, photos, time spent, and how much of the
-// travelling the owner's interests still drive.
+// travelling the owner still drives, through MEMORY.md, SOUL.md and what they liked in the garden lately.
 import type { MetricsRow, MuseState, StoredEvent } from '../../src/muse/contract';
+import { PICK_LIKED_RECENT_MS } from './policy/constants';
 import { emptyState, reduceCore } from './state';
 import { HOUR_MS, localDay } from './time';
 
 type Row = { -readonly [K in keyof MetricsRow]: MetricsRow[K] } & { ownerTrips: number };
 
-/** Replays the log through the fold, so time counters and "who seeded this topic" are as they were that day. */
+/** Replays the log through the fold, so time counters, "who seeded this topic" and likes are as they were that day. */
 export function metrics(s: MuseState, log: readonly StoredEvent[]): MetricsRow[] {
   const tz = s.seed.timezone;
   const rows = new Map<string, Row>();
@@ -47,8 +48,10 @@ export function metrics(s: MuseState, log: readonly StoredEvent[]): MetricsRow[]
         r.trips++;
         if (e.plan.trip.kind === 'revisit') r.revisits++;
         if (e.plan.trip.kind !== 'serendipity') {
-          const seeded = st.interests.get(e.plan.trip.topic)?.seededBy;
-          if (seeded === 'owner-memory' || seeded === 'soul') r.ownerTrips++;
+          const i = st.interests.get(e.plan.trip.topic);
+          const seeded = i?.seededBy === 'owner-memory' || i?.seededBy === 'soul';
+          const liked = i?.likedAt != null && e.at - i.likedAt <= PICK_LIKED_RECENT_MS;
+          if (seeded || liked) r.ownerTrips++;
         }
         break;
       default:

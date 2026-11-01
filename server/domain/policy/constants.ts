@@ -15,9 +15,14 @@ export const BOOST_LOOKED = 0.05;
 export const BOOST_OWNER = 0.5;
 /** Salience added to each topic of a gift Muse received. */
 export const BOOST_GIFT = 0.2;
-/** w_owner = W_OWNER_BASE / (1 + W_OWNER_DECAY · garden soul version): the owner's pull fades as Muse reflects. */
+/** Salience for each topic of a find the owner liked in the garden (the first like only), times w_like. */
+export const BOOST_LIKED = 0.3;
+/** w_owner = W_OWNER_BASE / (1 + W_OWNER_DECAY · garden soul version): MEMORY.md's and SOUL.md's pull fades toward 0 as Muse reflects. */
 export const W_OWNER_BASE = 0.5;
 export const W_OWNER_DECAY = 0.1;
+/** w_like = W_LIKE_BASE · (W_LIKE_FLOOR + (1 − W_LIKE_FLOOR) / (1 + W_OWNER_DECAY · garden soul version)): a like's pull fades from 0.5 toward 0.25. */
+export const W_LIKE_BASE = 0.5;
+export const W_LIKE_FLOOR = 0.5;
 /** Affinity stays in [0, 1]. */
 export const AFFINITY_MIN = 0;
 export const AFFINITY_MAX = 1;
@@ -90,6 +95,9 @@ export const PICK_QUESTION = 0.15;
 /** Times w_owner, when MEMORY.md or SOUL.md mentioned the topic within PICK_OWNER_RECENT_MS. */
 export const PICK_OWNER = 0.2;
 export const PICK_OWNER_RECENT_MS = 7 * DAY_MS;
+/** Times w_like, when the owner liked a find about the topic within PICK_LIKED_RECENT_MS. */
+export const PICK_LIKED = 0.2;
+export const PICK_LIKED_RECENT_MS = 7 * DAY_MS;
 /** fatigue = exp(−time since last pursued / PICK_FATIGUE_TAU_MS). */
 export const PICK_FATIGUE = 0.25;
 export const PICK_FATIGUE_TAU_MS = 12 * HOUR_MS;

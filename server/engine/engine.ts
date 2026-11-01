@@ -11,6 +11,7 @@ import type {
   InvitationId,
   Judgment,
   LifePolicy,
+  LikeTarget,
   Mind,
   MindContext,
   MuseEventBody,
@@ -196,6 +197,24 @@ export class Engine {
       tx.emit(museId, body);
       if (body.basketTime !== undefined) this.scheduleBasketCheck(tx, museId);
       this.commit(tx);
+    });
+  }
+
+  /**
+   * A like or an unlike in the garden. False when Muse has no such find or photo. A photo that shows a friend
+   * names the friend in the event. Liking what is already liked, or unliking what isn't, records nothing.
+   */
+  like(museId: MuseId, target: LikeTarget, liked: boolean): Promise<boolean> {
+    return this.exclusive(() => {
+      const s = this.must(museId);
+      const photo = 'photo' in target ? s.photos.find((p) => p.id === target.photo) : undefined;
+      if ('find' in target ? !s.discoveries.has(target.find) : !photo) return false;
+      if ((s.likes.get('find' in target ? target.find : target.photo)?.liked ?? false) === liked) return true;
+      const friend = photo && (photo.subject === 'friend' || photo.subject === 'new-friend') ? photo.companions.at(0) : undefined;
+      const tx = this.tx(this.clockAt);
+      tx.emit(museId, { kind: 'owner.liked', target, liked, ...(friend ? { friend } : {}) });
+      this.commit(tx);
+      return true;
     });
   }
 

@@ -119,6 +119,8 @@ export interface Experience {
   readonly topics: readonly TopicKey[];
   readonly canonicalUrl?: CanonicalUrl;
   readonly note: string;
+  /** The owner liked this find, or a photo of it, in the garden. */
+  readonly liked?: boolean;
 }
 
 export interface InterestDelta {
@@ -268,7 +270,7 @@ export interface Interest {
   readonly topic: TopicKey;
   /** null until Muse first travels there; then the region the topic lives in. */
   readonly region: RegionKey | null;
-  /** Fast: boosted by events, decays exp(−Δt / 3 days). Read it with salienceAt(), never raw. */
+  /** Fast: boosted by finds, owner mentions and likes, decays exp(−Δt / 3 days). Read it with salienceAt(), never raw. */
   readonly salience: { readonly value: number; readonly at: Instant };
   /** Slow: changes only through reflection.committed. */
   readonly affinity: number;
@@ -279,6 +281,10 @@ export interface Interest {
   readonly seededBy: 'owner-memory' | 'soul' | 'muse';
   /** The owner's MEMORY.md or SOUL.md mentioned it recently (feeds the w_owner term of the topic pick). */
   readonly ownerMentionAt: Instant | null;
+  /** When the owner last liked a find about it that they hadn't liked before (feeds the w_like term of the topic pick). */
+  readonly likedAt: Instant | null;
+  /** When Muse took it up. */
+  readonly since: Instant;
 }
 
 // ─── The log ────────────────────────────────────────────────────────────────
@@ -519,6 +525,8 @@ export interface MuseState {
   /** The last reflection, committed or no-change: the 3-day clock restarts from it. */
   readonly lastReflectionAt: Instant;
   readonly experiencesSinceReflection: number;
+  /** What the owner liked in the garden, by find or photo. Only the first like of a thing nudged Muse. */
+  readonly likes: ReadonlyMap<DiscoveryId | PhotoId, { readonly liked: boolean; readonly firstAt: Instant }>;
   readonly day: DayCounters;
   readonly social: SocialState;
 }
@@ -803,7 +811,7 @@ export interface MetricsRow {
   readonly restHours: number;
   readonly socialHours: number;
   readonly workHours: number;
-  /** Share of planet trips whose topic was seeded by MEMORY.md or SOUL.md. */
+  /** Share of planet trips whose topic MEMORY.md or SOUL.md seeded, or the owner liked a find about in the week before. */
   readonly ownerDrivenShare: number;
 }
 

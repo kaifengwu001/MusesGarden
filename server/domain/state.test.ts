@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { PublicDiscovery, RegionKey } from '../../src/muse/contract';
+import type { Discovery, Interest, MuseState, PhotoSpec, PublicDiscovery, RegionKey } from '../../src/muse/contract';
 import { angularDistance, homePlace, hopPlace, isDry, placeNow, regionForNewTopic } from './atlas';
 import { discoveryId, instant, museId, photoId } from './ids';
+import { salienceAt, wLike } from './interests';
+import { BOOST_LIKED } from './policy/constants';
 import { drawFor } from './rng';
 import { Life, MOSS, t, topic, topicsOf, wiki } from './testing';
 import { HOUR_MS, MINUTE_MS } from './time';
@@ -185,5 +187,78 @@ describe('owner seeds and gifts', () => {
     expect(life.state.discoveries.size).toBe(0);
     expect(life.state.pendingBasket).toEqual([]);
     expect(life.state.experiencesSinceReflection).toBe(1);
+  });
+});
+
+describe('the owner likes things in the garden', () => {
+  const day = t('2026-11-03T09:00:00-08:00');
+  const later = day + 6 * HOUR_MS;
+
+  /** A trip that keeps Pigment (topics Pigment and Inorganic pigments) and photographs it. */
+  function lived(): { life: Life; pigment: Discovery; photo: PhotoSpec } {
+    const life = new Life();
+    life.push(day, { kind: 'memory.updated', textHash: 'h', topics: topicsOf('Jazz') });
+    const region = startTrip(life, day, 1, 'Pigment');
+    const [pigment] = life.hop(day + HOUR_MS, 1, 0, 'Pigment', region, [{ title: 'Pigment', score: 0.9, kept: true, topics: ['Pigment', 'Inorganic pigments'] }]);
+    const photo: PhotoSpec = { id: photoId(MOSS.id, 1, day + HOUR_MS, 0), at: instant(day + HOUR_MS), subject: 'find', planetOf: MOSS.id, dir: pigment.place.dir, forward: pigment.place.dir, zoom: 0.95, companions: [], discoveryId: pigment.id };
+    life.push(day + HOUR_MS, { kind: 'photo.taken', photo });
+    return { life, pigment, photo };
+  }
+  const salience = (s: MuseState, name: string) => salienceAt(s.interests.get(topic(name)) as Interest, later);
+
+  it("dates each interest from when Muse took it up", () => {
+    const { life } = lived();
+    expect(life.state.interests.get(topic('Jazz'))?.since).toBe(day);
+    expect(life.state.interests.get(topic('Pigment'))?.since).toBe(day);
+  });
+
+  it("lifts the liked find's interests by w_like and marks them liked, without making a topic of the rest", () => {
+    const { life, pigment } = lived();
+    const before = life.state;
+    life.push(later, { kind: 'owner.liked', target: { find: pigment.id }, liked: true });
+    expect(salience(life.state, 'Pigment') - salience(before, 'Pigment')).toBeCloseTo(BOOST_LIKED * wLike(before), 9);
+    expect(life.state.interests.get(topic('Pigment'))?.likedAt).toBe(later);
+    expect(life.state.interests.get(topic('Jazz'))).toEqual(before.interests.get(topic('Jazz')));
+    expect(life.state.interests.has(topic('Inorganic pigments'))).toBe(false);
+    expect(life.state.likes.get(pigment.id)).toEqual({ liked: true, firstAt: later });
+  });
+
+  it('nudges only on the first like: unliking and liking again just flip the flag', () => {
+    const { life, pigment } = lived();
+    life.push(later, { kind: 'owner.liked', target: { find: pigment.id }, liked: true });
+    const liked = life.state;
+    life.push(later + HOUR_MS, { kind: 'owner.liked', target: { find: pigment.id }, liked: false });
+    expect(life.state.likes.get(pigment.id)).toEqual({ liked: false, firstAt: later });
+    life.push(later + 2 * HOUR_MS, { kind: 'owner.liked', target: { find: pigment.id }, liked: true });
+    expect(life.state.interests).toEqual(liked.interests);
+    expect(life.state.likes.get(pigment.id)).toEqual({ liked: true, firstAt: later });
+  });
+
+  it("lets a liked photo of a find nudge the find's interests", () => {
+    const { life, photo } = lived();
+    const before = life.state;
+    life.push(later, { kind: 'owner.liked', target: { photo: photo.id }, liked: true });
+    expect(salience(life.state, 'Pigment')).toBeGreaterThan(salience(before, 'Pigment'));
+    expect(life.state.likes.get(photo.id)).toEqual({ liked: true, firstAt: later });
+  });
+
+  it('records a liked photo without a find, and changes no interest', () => {
+    const { life } = lived();
+    const selfie: PhotoSpec = { id: photoId(MOSS.id, 2, later, 0), at: instant(later), subject: 'selfie', planetOf: MOSS.id, dir: [0, 0, 1], forward: [1, 0, 0], zoom: 0.9, companions: [] };
+    life.push(later, { kind: 'photo.taken', photo: selfie });
+    const before = life.state;
+    life.push(later, { kind: 'owner.liked', target: { photo: selfie.id }, liked: true });
+    expect(life.state.interests).toEqual(before.interests);
+    expect(life.state.likes.get(selfie.id)).toEqual({ liked: true, firstAt: later });
+  });
+
+  it('does nothing with a like whose target is not in the fold, or an unlike of something never liked', () => {
+    const { life, pigment } = lived();
+    const before = life.state;
+    life.push(later, { kind: 'owner.liked', target: { find: discoveryId('d:nowhere') }, liked: true });
+    life.push(later, { kind: 'owner.liked', target: { photo: photoId(MOSS.id, 9, later, 0) }, liked: true });
+    life.push(later, { kind: 'owner.liked', target: { find: pigment.id }, liked: false });
+    expect(life.state.interests).toEqual(before.interests);
+    expect(life.state.likes.size).toBe(0);
   });
 });

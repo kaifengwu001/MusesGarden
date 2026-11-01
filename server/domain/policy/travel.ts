@@ -1,7 +1,7 @@
 // Trips: beyond or on the planet, a new area or a revisit, which topic, and how a trip runs hop by hop.
 import type { Candidate, Draw, Interest, Judgment, MuseState, QuestionId, RegionKey, TopicKey, TripStart } from '../../../src/muse/contract';
 import { farRegion, regionForNewTopic } from '../atlas';
-import { salienceAt, wOwner } from '../interests';
+import { salienceAt, wLike, wOwner } from '../interests';
 import { categorical, lognormal, softmax } from '../rng';
 import { DAY_MS } from '../time';
 import {
@@ -14,6 +14,8 @@ import {
   PICK_AFFINITY,
   PICK_FATIGUE,
   PICK_FATIGUE_TAU_MS,
+  PICK_LIKED,
+  PICK_LIKED_RECENT_MS,
   PICK_OWNER,
   PICK_OWNER_RECENT_MS,
   PICK_QUESTION,
@@ -72,15 +74,20 @@ function revisitable(s: MuseState): { readonly interest: Interest; readonly regi
   return out;
 }
 
-/** score = 0.35·affinity + 0.30·salience + 0.15·[open question] + 0.20·w_owner·[recent owner mention] − 0.25·fatigue. */
+/**
+ * score = 0.35·affinity + 0.30·salience + 0.15·[open question] + 0.20·w_owner·[recent owner mention]
+ *       + 0.20·w_like·[liked in the last week] − 0.25·fatigue.
+ */
 export function pickScore(s: MuseState, i: Interest, now: number): number {
   const mentioned = i.ownerMentionAt !== null && now - i.ownerMentionAt <= PICK_OWNER_RECENT_MS;
+  const liked = i.likedAt !== null && now - i.likedAt <= PICK_LIKED_RECENT_MS;
   const fatigue = i.lastPursued === null ? 0 : Math.exp(-Math.max(0, now - i.lastPursued) / PICK_FATIGUE_TAU_MS);
   return (
     PICK_AFFINITY * i.affinity +
     PICK_SALIENCE * salienceAt(i, now) +
     PICK_QUESTION * (questionOn(s, i.topic) ? 1 : 0) +
-    PICK_OWNER * wOwner(s) * (mentioned ? 1 : 0) -
+    PICK_OWNER * wOwner(s) * (mentioned ? 1 : 0) +
+    PICK_LIKED * wLike(s) * (liked ? 1 : 0) -
     PICK_FATIGUE * fatigue
   );
 }

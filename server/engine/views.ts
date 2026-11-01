@@ -14,6 +14,7 @@ import type {
   Interest,
   InvitationCard,
   InvitationId,
+  LikeTarget,
   MetricsRow,
   MindView,
   MuseId,
@@ -357,8 +358,9 @@ export class Commands implements GardenCommands {
     return ok;
   }
 
-  like(): Promise<CommandResult> {
-    return Promise.resolve(fail(409, 'likes are not in this build yet'));
+  async like(museId: MuseId, target: LikeTarget, liked: boolean): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    return (await this.engine.like(museId, target, liked)) ? ok : fail(404, 'Muse has no such find or photo');
   }
 
   useInvitation(): Promise<CommandResult> {

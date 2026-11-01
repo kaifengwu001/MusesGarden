@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Instant, LifePolicy, MuseId, MuseState, StoredEvent } from '../../src/muse/contract';
+import type { CastFile, Instant, LifePolicy, MuseId, MuseState, StoredEvent, TopicKey } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
@@ -12,6 +12,8 @@ export interface SimOptions {
   readonly start: Instant;
   readonly hours: number;
   readonly owners: 'auto-accept' | 'auto-decline';
+  /** A scripted owner who, from `from` until `until`, likes every delivered find about `topic`. */
+  readonly likes?: { readonly museId: MuseId; readonly topic: TopicKey; readonly from: Instant; readonly until: Instant };
 }
 
 /**
@@ -41,6 +43,15 @@ export async function run(engine: Engine, opts: SimOptions): Promise<void> {
   for (let h = 1; h <= opts.hours; h++) {
     await engine.advanceTo((opts.start + h * H) as Instant);
     await answerOwners(engine, opts.owners);
+    if (opts.likes) await likeFinds(engine, opts.likes);
+  }
+}
+
+async function likeFinds(engine: Engine, likes: NonNullable<SimOptions['likes']>): Promise<void> {
+  const s = engine.state(likes.museId);
+  if (!s || engine.now() < likes.from || engine.now() >= likes.until) return;
+  for (const find of s.baskets.flatMap((b) => b.items)) {
+    if (!s.likes.has(find) && s.discoveries.get(find)?.topics.includes(likes.topic)) await engine.like(likes.museId, { find }, true);
   }
 }
 

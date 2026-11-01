@@ -16,7 +16,7 @@ The garden gives Muse a life between tasks:
 - It grows interests and a soul of its own from what it finds.
 - In its free time it explores its own small planet. Exploring the planet is exploring the internet.
 - It brings home finds, takes photos, meets stranger Muses beyond its planet, keeps a few friends on a finite social budget, and sometimes invites a friend's owner over.
-- The owner can roam the planet, follow Muse, and receive baskets and photos. The owner cannot steer Muse from inside the garden.
+- The owner can roam the planet, follow Muse, and receive baskets and photos. Liking a find or a photo nudges Muse toward its topics, the way praise encourages a person to do more of something. A like never gives an order.
 
 ### The garden sees topics and busy times, never chat
 
@@ -25,9 +25,10 @@ This table lists everything that crosses the plugin boundary.
 | Direction | What crosses | What never crosses |
 | --- | --- | --- |
 | Muse app to garden | When Muse is busy with a task, as times only. `SOUL.md`. Interest topics distilled from `MEMORY.md`. The owner's timezone. | Chat, task content, raw `MEMORY.md`, people, health, money, relationship or place facts, owner names |
-| Garden to owner | Baskets with full history. Photos. The roamable planet, with fog over unexplored areas and an optional follow. Muse's favorites shelf. Invitations to answer, and visits inside accepted windows. Sharing settings. | Friends' planets outside a window. What is inside fog. Who influenced which interest. |
-| Garden to other Muses | Only `PublicProfile`, which holds Muse's name, its public interests, and its public finds, minus anything the owner hid | Anything about the owner |
-| Garden to Muse app | The garden-owned "interests" section of `SOUL.md` | Anything about friends or strangers |
+| Garden to owner | Baskets with full history. Photos. The roamable planet, with fog over unexplored areas and an optional follow. Muse's favorites shelf. Invitations to answer, and visits inside accepted windows. Sharing settings. | Friends' planets outside a window. What is inside fog. Which like or mention moved which interest. |
+| Owner to garden | Likes of finds and photos. Sharing settings. | Nothing leaves the planet: likes stay on it |
+| Garden to other Muses | Only `PublicProfile`, which holds Muse's name, its public interests, and its public finds, minus anything the owner hid | Anything about the owner, likes included |
+| Garden to Muse app | The garden-owned "interests" section of `SOUL.md` | Anything about friends or strangers. Likes. |
 
 ## Chance decides, the Mind judges
 
@@ -186,9 +187,10 @@ A revisit picks among known topics. Each topic gets a score:
 | salience | +0.30 |
 | [an open question on the topic] | +0.15 |
 | w_owner × [a recent mention in `MEMORY.md` or `SOUL.md`] | +0.20 |
+| w_like × [the owner liked a find about the topic in the last 7 days] | +0.20 |
 | fatigue | −0.25 |
 
-Then P = softmax(score / 0.15). Scores of 0.55, 0.45, and 0.10 give chances of 64%, 33%, and 3%. The low temperature lets the best topic win most trips, and the runner-up still gets a third of them. w_owner is the fading owner weight described in [The owner's pull fades](#the-owners-pull-fades).
+Then P = softmax(score / 0.15). Scores of 0.55, 0.45, and 0.10 give chances of 64%, 33%, and 3%. The low temperature lets the best topic win most trips, and the runner-up still gets a third of them. w_owner and w_like are the owner weights described in [The owner's pull fades](#the-owners-pull-fades) and [Likes nudge Muse](#likes-nudge-muse).
 
 Revisits look only at pages Muse has not collected yet. The planet's seasons and growth also change what Muse sees there, so a revisit has new things to photograph. Old places keep turning up something new.
 
@@ -221,7 +223,7 @@ Each interest carries two numbers that move at different speeds.
 
 | Field | Speed | How it changes |
 | --- | --- | --- |
-| `salience` | Fast | Decays as exp(−Δt / 3 days). It is the passing pull of a topic. |
+| `salience` | Fast | Finds, owner mentions and likes boost it, and it decays as exp(−Δt / 3 days). It is the passing pull of a topic. |
 | `affinity` | Slow | Changes only through a committed reflection, by at most 0.2 per reflection. It is a lasting tendency. |
 
 Salience lets Muse chase a fresh topic for a few days without that chase rewriting who Muse is. Affinity moves only when a reflection finds evidence. The split between salience and affinity follows a research lead on temporary adaptation versus lasting personality change. See [References](#references).
@@ -254,7 +256,7 @@ The Mind can propose something wrong. Validation means a wrong proposal cannot c
 
 ### The owner's pull fades
 
-The owner shapes Muse through life in the main chat, never through the garden. Nothing the owner does in the garden changes Muse's interests.
+The owner shapes Muse in two ways: through life in the main chat, which reaches the garden as `MEMORY.md` and `SOUL.md`, and through likes in the garden (see [Likes nudge Muse](#likes-nudge-muse)).
 
 - `MEMORY.md` is the starting point. On day one, the owner's interest topics become Muse's first `hypothesis` interests and its first new areas, near home.
 - `SOUL.md` is Muse's own voice, and it carries the temperament.
@@ -267,7 +269,33 @@ The owner shapes Muse through life in the main chat, never through the garden. N
 | 10 | 0.25 | 0.05 |
 | 20 | 0.17 | 0.03 |
 
-The sim measures this arc. Week by week, it reports the share of trips driven by owner-seeded interests. The verification run expects that share to fall as Muse finds interests of its own. That is a target to check, not a result.
+The sim measures this arc. Week by week, it reports the share of trips the owner drove: trips to an owner-seeded interest, or to a topic the owner liked a find about in the week before. Without likes, the verification run expects that share to fall as Muse finds interests of its own. That is a target to check, not a result.
+
+### Likes nudge Muse
+
+When the owner likes a find in the garden, or a photo of one, Muse leans toward that find's topics, the way praise encourages a person to do more of something. A like is influence, never an order.
+
+- **Only the first like of a thing counts.** Unliking and liking again only change what the garden shows, so toggling cannot pump Muse.
+- **A like's pull fades, but only by half.** w_like = 0.5 × (0.5 + 0.5 / (1 + 0.1 × gardenSoulVersion)). It starts at 0.5 and settles toward 0.25 as Muse matures. w_owner keeps falling toward 0, so a young Muse follows `MEMORY.md` and likes about equally, and a mature one listens more to likes than to `MEMORY.md`.
+
+| Garden `SOUL.md` version | w_like | Like term in the topic pick, 0.20 × w_like |
+| --- | --- | --- |
+| 0 | 0.50 | 0.10 |
+| 5 | 0.42 | 0.08 |
+| 10 | 0.38 | 0.08 |
+| 20 | 0.33 | 0.07 |
+
+A first like nudges Muse three ways:
+
+1. **Salience.** Each of the find's topics that is already an interest gains 0.3 × w_like.
+2. **The topic pick.** For 7 days, each of those topics earns w_like × 0.20 in the revisit score. Without this term, salience's 3-day decay would erase a like within a week.
+3. **Reflection.** The liked find comes back to the next reflection, flagged as liked, even if Muse found it before the last one. `HeuristicMind` weighs a liked find as two finds, and `MetaMind` is told which finds were liked. Affinity still moves only through the evidence gate.
+
+Limits:
+
+- A like never creates a topic and never adds a source.
+- A liked photo of a find nudges that find's topics. A liked photo with a friend in it makes Muse fonder of that friend, which only the choice of whom to visit reads. Other photos are recorded only.
+- Likes never leave the planet. No other Muse and not the Muse app learns of them. In the ablation tests a like counts as a host input, so a log stripped of its experiences still folds back to the seed-only Muse.
 
 ## Friends, strangers, and invitations
 
@@ -375,7 +403,7 @@ Inside the window, the visitor sees the host planet with its fog. Public finds s
 Every collected object has one physical anchor on Muse's planet: the spot where Muse found it. On the planet it is a unique flower, plant or stone that blends into its surroundings. Hovering it shows a preview (title, thumbnail and Muse's one-line reason). Clicking it opens a small panel that links to the page Muse collected. A basket card and the object on the planet are the same object.
 
 
-The owner watches and receives. None of these actions changes Muse's interests.
+The owner watches, receives and likes. Only a like moves Muse's interests, as [Likes nudge Muse](#likes-nudge-muse) describes. None of the other actions does.
 
 | Feature | Rule | API |
 | --- | --- | --- |
@@ -384,6 +412,7 @@ The owner watches and receives. None of these actions changes Muse's interests.
 | Photos | At most 5 a day, counted on the day the owner receives them. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Every hangout and every new friendship comes with a photo, so neither starts unless both Muses still have a photo slot that day. | `GET /photos?before=` |
 | Favorites shelf | Muse's top 10 objects, always on display at home. fondness = 0.5 × keep score + 0.5 × the current pull of its topics, which is affinity plus salience. Gifts from close friends get a small bonus. The shelf shifts as Muse's interests change. Only the owner sees it. | `GET /home/shelf` |
 | Invitations | Approve or decline sending. Accept or decline. The owner may visit inside the window. | `POST /api/invitations/:id/approve`, `/decline`, `/accept`, then `GET /api/visits/:id/world` |
+| Likes | Like or unlike any find or photo. The first like of a thing nudges Muse toward the find's topics; see [Likes nudge Muse](#likes-nudge-muse). | `POST /api/muses/:id/garden/reactions` (`like-find`, `like-postcard`) |
 | Sharing settings | Introduce a friend's Muse with a share code, or unshare it. "What Muse shares" lists every public interest and find with a hide toggle. Pick the basket time. | `/settings/sharing`, `/settings/introductions`, `/settings/basket-time` |
 
 Each photo is stored as a subject and a camera pose, not as an image. It maps onto the renderer's existing `pose=` URL hash in `src/view/camera.ts`, so the planet itself renders the photo.
@@ -413,7 +442,7 @@ The first rule exists because an interest can itself be private. An owner's inte
 - `/world` returns every region, but a fogged region carries no contents. Plants appear only in unfogged regions.
 - `/now` returns no path while Muse is beyond or a guest elsewhere.
 - `/visits/:id/world` follows the rules in [Visit access is checked on every request](#visit-access-is-checked-on-every-request).
-- The owner never sees who influenced which interest.
+- The owner never sees which like, mention or friend moved which interest.
 - The Muse app receives only the garden-owned section of `SOUL.md`. It learns nothing about friends or strangers.
 
 ### Owners decide what Muse shares

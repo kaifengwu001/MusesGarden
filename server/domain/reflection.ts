@@ -13,6 +13,7 @@ import type {
 import { eventRef } from './ids';
 import { gateAll } from './interests';
 import { REFLECTION_DUE_EXPERIENCES, REFLECTION_DUE_MS } from './policy/constants';
+import { likedFind, likeKey } from './state';
 
 const isReflection = (e: StoredEvent): boolean => e.event.kind === 'reflection.committed' || e.event.kind === 'reflection.no-change';
 
@@ -21,6 +22,8 @@ const RANK: Record<Experience['kind'], number> = { kept: 3, gift: 2, skipped: 1,
 /**
  * Everything Muse lived through since its last reflection, reflections excluded. Pages are grouped by
  * canonical URL, so a source seen on three hops and kept on the fourth is one experience: the kept one.
+ * A find the owner liked for the first time since then comes back to mind, flagged as liked, even if Muse
+ * found it before.
  */
 export function experiences(s: MuseState, log: readonly StoredEvent[]): Experience[] {
   const mine = log.filter((e) => e.museId === s.seed.id);
@@ -30,11 +33,23 @@ export function experiences(s: MuseState, log: readonly StoredEvent[]): Experien
   const offer = (x: Experience & { readonly canonicalUrl: CanonicalUrl }): void => {
     const prev = byUrl.get(x.canonicalUrl);
     const topics: TopicKey[] = [...new Set([...(prev?.topics ?? []), ...x.topics])];
-    byUrl.set(x.canonicalUrl, prev && RANK[prev.kind] >= RANK[x.kind] ? { ...prev, topics } : { ...x, topics });
+    const liked = prev?.liked === true || x.liked === true ? { liked: true } : {};
+    byUrl.set(x.canonicalUrl, prev && RANK[prev.kind] >= RANK[x.kind] ? { ...prev, topics, ...liked } : { ...x, topics, ...liked });
   };
+  const likedBefore = new Set<string>();
   for (const stored of mine) {
-    if (stored.seq <= since) continue;
     const e = stored.event;
+    if (e.kind === 'owner.liked' && e.liked) {
+      const id = likeKey(e.target);
+      const first = !likedBefore.has(id);
+      likedBefore.add(id);
+      const d = first && stored.seq > since ? likedFind(s, e.target) : undefined;
+      if (d) {
+        const kind = d.provenance === 'gift' ? 'gift' : 'kept';
+        offer({ ref: eventRef(stored.museId, stored.seq), at: e.at, kind, topics: d.topics, canonicalUrl: d.canonicalUrl, note: `My owner liked "${d.title}".`, liked: true });
+      }
+    }
+    if (stored.seq <= since) continue;
     const ref = eventRef(stored.museId, stored.seq);
     switch (e.kind) {
       case 'trip.hop':
