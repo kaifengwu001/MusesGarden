@@ -82,7 +82,7 @@ describe('member SOUL.md and MEMORY.md', () => {
     expect(shared).toContain(true);
   });
 
-  it('the placeholder hero leans lightly toward botanical illustration, where the hero chain starts', async () => {
+  it('the hero retains the demo botanical illustration seed, where the hero chain starts', async () => {
     const hero = cast.members.find((m) => m.role === 'hero');
     if (hero === undefined) throw new Error('no hero');
     expect(await interests(readMemberDocs(hero).memory)).toContain('Botanical illustration');
@@ -90,16 +90,22 @@ describe('member SOUL.md and MEMORY.md', () => {
 });
 
 describe('hero slot', () => {
-  it('tells Kai and Tracy where the real files go', () => {
-    expect(read('cast/hero/README.md').trim()).toBe('Put SOUL.md and MEMORY.md here; the loader prefers them over the placeholders.');
+  it('loads the authored hero soul and demo memory', () => {
+    expect(readMemberDocs({ dir: 'cast/hero' })).toEqual({
+      soul: read('cast/hero/SOUL.md'),
+      memory: read('cast/hero/MEMORY.md'),
+    });
   });
 
   it('prefers real SOUL.md and MEMORY.md over the placeholders', () => {
     const root = mkdtempSync(join(tmpdir(), 'muse-cast-'));
     try {
       cpSync(join(FIXTURES_DIR, 'cast/hero'), join(root, 'cast/hero'), { recursive: true });
+      rmSync(join(root, 'cast/hero/SOUL.md'));
+      rmSync(join(root, 'cast/hero/MEMORY.md'));
       const member = { dir: 'cast/hero' };
       expect(readMemberDocs(member, root).soul).toBe(read('cast/hero/SOUL.placeholder.md'));
+      expect(readMemberDocs(member, root).memory).toBe(read('cast/hero/MEMORY.placeholder.md'));
       writeFileSync(join(root, 'cast/hero/SOUL.md'), '---\nname: Kai’s Muse\n---\nReal soul.\n');
       writeFileSync(join(root, 'cast/hero/MEMORY.md'), '## Interests\n- Jazz\n');
       expect(readMemberDocs(member, root)).toEqual({ soul: '---\nname: Kai’s Muse\n---\nReal soul.\n', memory: '## Interests\n- Jazz\n' });
