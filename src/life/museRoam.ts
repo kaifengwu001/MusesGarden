@@ -47,6 +47,8 @@ const ROAM = { near: 5, far: 60, bias: 3 } as const;
 /** What it might do next, and how likely each is. */
 const LIKES = { wander: 3, water: 2.2, bench: 1.6, cook: 1.4, fish: 1.6, nap: 1.2, rest: 1 } as const;
 type Like = keyof typeof LIKES;
+/** In its hut, cooking at the hearth's stove: rounds of stirring and tasting a go, then a look about this long (s). */
+const INDOOR = { rounds: 4, pause: 6 } as const;
 /** How often it fishes from a shore rather than off the pier. */
 const SHORE = 0.3;
 /** The porch's lane along the front, clear of the bench and the stove (local m: z); the top of the steps and their foot on the meadow; where the terrace meets the pier. */
@@ -90,7 +92,8 @@ export interface RoamCues {
   /** (watering: also how far the can is tipped, and how much water pours from it) */
   water: { time: number; grip: number; tip: number; pour: number } | null;
   fish: { time: number; grip: number; edge: boolean } | null;
-  cook: { time: number; grip: number } | null;
+  /** (cooking in the hut, at the hearth's stove: where its pot is, planet space; at the porch's stove, none) */
+  cook: { time: number; grip: number; pot?: Vector3 } | null;
   sleep: { time: number; roused: number } | null;
   /** Humming on the bench (0 … 1), being petted (s into it, < 0 for none). */
   hum: number;
@@ -1093,6 +1096,57 @@ export class MuseRoam {
     const s = Math.min(this.day[lo].time, u - this.starts[lo]);
     a.gait = this.gaits[lo];
     this.day[lo].play(s, out, { camera, gait: this.gaits[lo] });
+    this.answer(now, out, camera);
+    const local = this.terrain.cottageLocal(out.dir, localTmp);
+    out.home = local.x > HOMESTEAD.x0 && local.x < HOMESTEAD.x1 && local.z > -3 && local.z < HOMESTEAD.z1 + 5;
+    return out;
+  }
+
+  /**
+   * Muse in its hut while you are there (the cutaway, view/cutaway.ts; muse.ts's `inside`): standing on its floor
+   * where it is put, facing as it is put; at the hearth's stove when there is a pot, cooking as at the porch's
+   * stove (the ladle out of its pocket, stirring and tasting, a few rounds, then a moment's look about, again);
+   * your doings and its answers over it as anywhere. `since`: when it came in (world s). camera: planet space.
+   */
+  inside(now: number, camera: Vector3, at: { dir: Vector3; height: number; heading: Vector3; pot: Vector3 | null; since: number }): Roaming {
+    const out = this.living;
+    const a = out.action;
+    a.time = now;
+    a.walk = 0;
+    a.stride = 1;
+    a.wave = -1;
+    a.look = 1;
+    a.gait = 0;
+    a.moves.length = 0;
+    out.lookAt = null;
+    const c = out.cues;
+    c.water = c.fish = c.cook = c.sleep = null;
+    c.hum = 0;
+    c.petted = -1;
+    out.dir.copy(at.dir);
+    out.height = at.height;
+    out.heading.copy(at.heading);
+    if (at.pot) {
+      const cooking = INDOOR.rounds * COOK.period + 2 * POCKET.time;
+      const cycle = cooking + INDOOR.pause;
+      const s = (((now - at.since) % cycle) + cycle) % cycle;
+      if (s < cooking) {
+        const tool = withTool(s, cooking);
+        a.moves.push({ kind: 'stir', time: tool.time, amount: 1, ease: tool.ease });
+        if (tool.pocket > 0) a.moves.push({ kind: 'pocket', time: s, amount: tool.pocket });
+        out.lookAt = tool.pocket > 0.5 ? null : lookTmp.copy(at.pot);
+        c.cook = { time: tool.time, grip: tool.grip, pot: at.pot };
+      }
+    }
+    this.answer(now, out, camera);
+    out.home = true;
+    return out;
+  }
+
+  /** Your doings and its answers over what it is doing: turned to you while it answers, if it is standing or walking; where it looks. */
+  private answer(now: number, out: Roaming, camera: Vector3): void {
+    const a = out.action;
+    const c = out.cues;
     // turned to you while it answers you, if it is standing or walking (stepping round as it turns)
     const w = this.you.attending(now);
     if (w <= 0) this.turnSide = 0;
@@ -1110,9 +1164,6 @@ export class MuseRoam {
     this.you.settle(now);
     if (this.you.apply(now, a, c)) out.lookAt = lookTmp.copy(camera);
     this.look(now, out);
-    const local = this.terrain.cottageLocal(out.dir, localTmp);
-    out.home = local.x > HOMESTEAD.x0 && local.x < HOMESTEAD.x1 && local.z > -3 && local.z < HOMESTEAD.z1 + 5;
-    return out;
   }
 
   /** Where it looks: its own way about, or at a point (its bearing from its heading, its height over its eyes). */

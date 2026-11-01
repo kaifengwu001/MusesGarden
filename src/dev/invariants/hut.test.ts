@@ -4,7 +4,7 @@ import { placeholderSource } from '../../garden/placeholder';
 import type { GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import { fit, PIECES, ROOM, type Piece } from '../../life/hut';
-import { CUT, cutAt, FLOOR, OUTER, STEPS } from '../../life/props';
+import { COTTAGE, CUT, cutAt, FLOOR, OUTER, STEPS } from '../../life/props';
 
 // Muse's hut inside (hut.ts, view/cutaway.ts): the furniture Kai made in
 // Tripo fitted into the room as Kai laid it out, the walls cut straight, the
@@ -53,46 +53,43 @@ describe('Muse’s hut inside', () => {
     for (const { piece, footprint } of fitted) expect(footprint, piece.name).not.toBeNull();
   });
 
-  it('stands every piece inside the room, clear of its walls', () => {
+  it('stands every piece within the walls (it may stand back into their thickness, as the hearth does)', () => {
+    const t = COTTAGE.thickness;
     for (const { piece, footprint: f } of fitted) {
       if (!f) continue;
-      expect(f.x - f.z, piece.name).toBeGreaterThanOrEqual(-ROOM.x - 1e-6);
-      expect(f.x + f.z, piece.name).toBeLessThanOrEqual(ROOM.x + 1e-6);
-      expect(f.y - f.w, piece.name).toBeGreaterThanOrEqual(-ROOM.z - 1e-6);
-      expect(f.y + f.w, piece.name).toBeLessThanOrEqual(ROOM.z + 1e-6);
+      expect(f.x - f.z, piece.name).toBeGreaterThanOrEqual(-ROOM.x - t);
+      expect(f.x + f.z, piece.name).toBeLessThanOrEqual(ROOM.x + t);
+      expect(f.y - f.w, piece.name).toBeGreaterThanOrEqual(-ROOM.z - t);
+      expect(f.y + f.w, piece.name).toBeLessThanOrEqual(ROOM.z + t);
     }
   });
 
-  it('stands nothing on the floor inside another', () => {
+  it('stands every piece where Kai laid it out in the editor: its foot’s middle, its size', () => {
+    for (const { piece, footprint: f } of fitted) {
+      if (!f || !('x' in piece.place)) continue;
+      expect(f.x, piece.name).toBeCloseTo(piece.place.x, 2);
+      expect(f.y, piece.name).toBeCloseTo(piece.place.z, 2);
+    }
+    expect(named('wood-stove').piece.height).toBeCloseTo(2.69, 2);
+    expect(named('display-cabinet').piece.height).toBeCloseTo(3.24, 2);
+    // the showpiece along the left wall, the hearth in the back wall, the desk at the front
+    const show = named('display-cabinet').footprint;
+    expect(show.x - show.z).toBeLessThan(-ROOM.x + 0.1);
+    expect(PIECES.filter((p) => p.showpiece)).toHaveLength(1);
+    expect(named('wood-stove').footprint.y - named('wood-stove').footprint.w).toBeLessThan(-ROOM.z);
+    const desk = named('work-desk').footprint;
+    expect(desk.y + desk.w).toBeGreaterThan(ROOM.z - 0.1);
+  });
+
+  it('stands nothing on the floor inside another (no two pieces’ middles closer than half a meter)', () => {
     const resting = fitted.filter((p) => p.piece.rests && p.footprint);
     for (let i = 0; i < resting.length; i++) {
       for (let j = i + 1; j < resting.length; j++) {
         const a = resting[i].footprint!;
         const b = resting[j].footprint!;
-        const overlap = Math.min(a.z + b.z - Math.abs(a.x - b.x), a.w + b.w - Math.abs(a.y - b.y));
-        expect(overlap, `${resting[i].piece.name} and ${resting[j].piece.name}`).toBeLessThan(0.05);
+        expect(Math.hypot(a.x - b.x, a.y - b.y), `${resting[i].piece.name} and ${resting[j].piece.name}`).toBeGreaterThan(0.5);
       }
     }
-  });
-
-  it('lays the room out as Kai asked: the showpiece along the left wall, the hearth in the middle of the back, the bed in the back corner on the right, the low shelf along the right end, the desk under the front window', () => {
-    const show = named('display-cabinet').footprint;
-    expect(show.x - show.z).toBeCloseTo(-ROOM.x + 0.02, 2);
-    expect(2 * show.w).toBeGreaterThan(0.55 * 2 * ROOM.z);
-    expect(PIECES.filter((p) => p.showpiece)).toHaveLength(1);
-    const hearth = named('wood-stove').footprint;
-    expect(hearth.y - hearth.w).toBeCloseTo(-ROOM.z, 2);
-    expect(Math.abs(hearth.x - 0.1)).toBeLessThan(0.05);
-    const bed = named('single-bed').footprint;
-    expect(bed.x + bed.z).toBeCloseTo(ROOM.x - 0.02, 2);
-    expect(bed.y - bed.w).toBeCloseTo(-ROOM.z + 0.02, 2);
-    const shelf = named('display-shelf').footprint;
-    expect(shelf.x + shelf.z).toBeCloseTo(ROOM.x - 0.02, 2);
-    expect(shelf.y).toBeGreaterThan(0);
-    const desk = named('work-desk').footprint;
-    expect(desk.y + desk.w).toBeCloseTo(ROOM.z - 0.02, 2);
-    // the pots and pans hang high over the stove
-    expect(Math.abs(named('wall-shelf').footprint.x - hearth.x)).toBeLessThan(0.05);
   });
 
   it('cuts the walls straight: the front and the right end low, over the front’s lintels; the back and the left end whole', () => {

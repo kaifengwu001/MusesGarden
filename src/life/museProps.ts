@@ -336,7 +336,8 @@ export class MuseProps {
       }
     }
 
-    // the ladle: from the mitten down to its bowl going round in the pot, or (tasting) up to its bowl before its mouth
+    // the ladle: from the mitten down to its bowl going round in the pot, or (tasting) up to its bowl before its mouth;
+    // the pot is the porch stove's, or in the hut the one on the hearth's stove (cues.cook.pot)
     const c = cues?.cook ?? null;
     const beat = c ? cookBeats(c.time) : { turn: 0, taste: 0, blow: 0 };
     const potMiddle = v7.setFromMatrixPosition(this.stove.matrix);
@@ -344,6 +345,12 @@ export class MuseProps {
     const potX = v9.set(this.stove.matrix.elements[0], this.stove.matrix.elements[1], this.stove.matrix.elements[2]);
     const potZ = v10.set(this.stove.matrix.elements[8], this.stove.matrix.elements[9], this.stove.matrix.elements[10]);
     const soup = v11.copy(potMiddle).addScaledVector(potUp, 0.63).addScaledVector(potX, -0.04);
+    if (c?.pot) {
+      soup.copy(c.pot);
+      potUp.copy(c.pot).normalize();
+      potX.addScaledVector(potUp, -potX.dot(potUp)).normalize();
+      potZ.crossVectors(potX, potUp);
+    }
     if (c && on) {
       const head = m4.multiplyMatrices(place, rig.frameOf(JOINT.head, m5));
       const mouth = v12.set(0, 0.01, 0.27).applyMatrix4(head);
@@ -360,10 +367,10 @@ export class MuseProps {
       m6.compose(v16.copy(hand).addScaledVector(along, -(working * reach + (1 - working) * 0.3 * H)), q, v17.set(H, H, H));
       hold(this.ladle, m6, c.grip);
     } else this.ladle.visible = false;
-    // the stove's fire, glowing while it cooks, embers otherwise; steam off the pot as it cooks
+    // the porch stove's fire, glowing while it cooks there, embers otherwise; steam off the pot as it cooks
     const cooking = c ? 1 : 0;
     const flicker = 0.85 + 0.25 * Math.sin(time * 11) * Math.sin(time * 7.3);
-    this.glow.set(1.4, 0.8, 0.35).multiplyScalar((0.25 + 0.75 * cooking) * flicker);
+    this.glow.set(1.4, 0.8, 0.35).multiplyScalar((0.25 + 0.75 * (c && !c.pot ? 1 : 0)) * flicker);
     if (cooking) {
       for (let k = 0; k < 7; k++) {
         const u = (((time / 2.8 + k / 7) % 1) + 1) % 1;

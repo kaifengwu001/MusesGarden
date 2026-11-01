@@ -21,7 +21,7 @@ import {
 } from 'three';
 import rugUrl from '../assets/interior/rug.webp';
 import { geometryBytes, gpuMemory } from '../core/gpuMemory';
-import { Builder, COTTAGE, CUT, FLOOR, FRONT, OUTER, wallAt, type Paint, type WallFace } from './props';
+import { Builder, COTTAGE, CUT, FLOOR, OUTER, wallAt, type Paint, type WallFace } from './props';
 import fragmentShader from './hut.frag.glsl?raw';
 import vertexShader from './hut.vert.glsl?raw';
 import dotFragment from './hutDot.frag.glsl?raw';
@@ -62,8 +62,9 @@ export interface Piece {
   url: string;
   /** Its whole height (m): the model is scaled to it. */
   height: number;
-  /** Its width across its front (m), when it is drawn out to fill a place (Muse's showpiece, along the left wall). */
+  /** Its width across its front and its depth (m), when it is drawn out to them (else they follow its height). */
   width?: number;
+  depth?: number;
   /** Mirrored across its front. */
   mirror?: boolean;
   /** A turn about up that sets it square first (rad): Tripo made a few askew. */
@@ -86,30 +87,36 @@ export interface Piece {
 
 const model = (name: string): string => new URL(`../assets/interior/${name}.glb`, import.meta.url).href;
 
+/** Degrees, as Kai's layout gives turns. */
+const deg = (d: number): number => (d * Math.PI) / 180;
+
 /**
- * The furniture (Kai's Tripo models), laid out after Kai's second mock-up
- * and notes: Muse's showpiece, one big display cabinet, along the blind left
- * wall (drawn out to most of its length); the hearth in the middle of the
- * back wall under the chimney, the pots and pans hung high over it, the dish
- * cabinet beside it on the left, the bed in the back corner on the right,
- * its head against the back wall; the low shelf along the right end toward
- * the front; the table on the rug in the middle of the room; the desk under
- * the front window; the armchair by the fire.
+ * The furniture (Kai's Tripo models), as Kai laid it out in the layout
+ * editor (2026-11-01; ui/garden/hutEditor.ts): each piece's foot's middle in
+ * the room (m), its turn as it faces and its size. The hearth, big, in the
+ * back wall left of the middle, the dish cabinet beyond it; the low shelf to
+ * its right with the pots and pans hung over it; Muse's showpiece, a tall
+ * display cabinet, along the left wall; the bed in the back corner on the
+ * right, its head against the back wall; the table, low and wide, on the rug
+ * in the middle of the room; the desk under the front window; the armchair
+ * by the fire.
  */
 export const PIECES: readonly Piece[] = [
-  { name: 'wood-stove', url: model('wood-stove'), height: 1.58, place: { wall: 'back', along: 0.1, gap: 0 }, rests: true, glow: { kind: 'fire', at: [0.56, 0.2, 0.75], strength: 2.1 } },
-  { name: 'wall-shelf', url: model('wall-shelf'), height: 0.91, place: { wall: 'back', along: 0.1, gap: 0 }, lift: 1.6 },
-  { name: 'dish-cabinet', url: model('dish-cabinet'), height: 1.95, place: { wall: 'back', along: -1.42, gap: 0.02 }, rests: true },
-  { name: 'display-shelf', url: model('display-shelf'), height: 1.35, place: { wall: 'right', along: 1.2, gap: 0.02 }, rests: true },
-  { name: 'display-cabinet', url: model('display-cabinet'), height: 2.4, width: 2.75, place: { wall: 'left', along: -0.15, gap: 0.02 }, rests: true, showpiece: true },
-  { name: 'dining-table', url: model('dining-table'), height: 1.38, square: -0.133, place: { x: -0.45, z: 0.35, turn: 0 }, rests: true, glow: { kind: 'lamp', at: [0.5, 0.72, 0.5], strength: 0.55 } },
-  { name: 'single-bed', url: model('single-bed'), height: 1.5, square: 0.538, place: { corner: ['right', 'back'], turn: 0, gap: 0.02 }, rests: true },
-  { name: 'work-desk', url: model('work-desk'), height: 1.25, place: { wall: 'front', along: -OUTER.x + (FRONT.window[0] + FRONT.window[1]) / 2, gap: 0.02 }, rests: true, glow: { kind: 'lamp', at: [0.86, 0.86, 0.3], strength: 0.35 } },
-  { name: 'woven-armchair', url: model('woven-armchair'), height: 1.0, place: { x: 1.35, z: -0.95, turn: -2.22 }, rests: true },
+  { name: 'wood-stove', url: model('wood-stove'), height: 2.69, place: { x: -0.55, z: -1.91, turn: 0 }, rests: true, glow: { kind: 'fire', at: [0.56, 0.2, 0.75], strength: 2.1 } },
+  { name: 'wall-shelf', url: model('wall-shelf'), height: 1.32, place: { x: 1.9, z: -2.15, turn: 0 }, lift: 1.28 },
+  { name: 'dish-cabinet', url: model('dish-cabinet'), height: 1.95, place: { x: -2.65, z: -1.95, turn: 0 }, rests: true },
+  { name: 'display-shelf', url: model('display-shelf'), height: 1.62, place: { x: 1.9, z: -2.05, turn: 0 }, rests: true },
+  { name: 'display-cabinet', url: model('display-cabinet'), height: 3.24, width: 2.75, place: { x: -3.64, z: -0.4, turn: deg(90) }, rests: true, showpiece: true },
+  { name: 'dining-table', url: model('dining-table'), height: 1.03, width: 1.67, depth: 1.64, square: -0.133, place: { x: -1.2, z: 0, turn: 0 }, rests: true, glow: { kind: 'lamp', at: [0.5, 0.72, 0.5], strength: 0.55 } },
+  { name: 'single-bed', url: model('single-bed'), height: 1.73, square: 0.538, place: { x: 3.05, z: -0.75, turn: 0 }, rests: true },
+  { name: 'work-desk', url: model('work-desk'), height: 1.44, place: { x: -2.4, z: 1.6, turn: deg(180) }, rests: true, glow: { kind: 'lamp', at: [0.86, 0.86, 0.3], strength: 0.35 } },
+  { name: 'woven-armchair', url: model('woven-armchair'), height: 1.0, place: { x: 1.65, z: -0.95, turn: deg(-127.2) }, lift: -0.02, rests: true },
 ];
 
-/** The rug from Kai's picture (its fringe included), under the table: its middle and its length along the room (m); its width follows the picture. */
-const RUG = { x: -0.45, z: 0.35, length: 2.7, aspect: 1.724 } as const;
+/** The rug from Kai's picture (its fringe included), under the table, as Kai laid it: its middle, its length and width (m), its turn. */
+const RUG = { x: -0.76, z: 0.01, length: 3.92, width: 2.11, turn: deg(7.3) } as const;
+/** The pot on the hearth's stove (a fraction of the stove's box as made: across its front, up, back to front): Muse cooks at it. */
+const POT_ON_STOVE = [0.47, 0.45, 0.6] as const;
 /** The favourites' places on the showpiece, as fractions of its front as made (x across, y up): three shelves of five. */
 const COLUMNS = [0.14, 0.32, 0.5, 0.68, 0.86] as const;
 const SLOTS: ReadonlyArray<readonly [number, number]> = [0.8, 0.59, 0.37].flatMap((y) => COLUMNS.map((x) => [x, y] as const));
@@ -255,11 +262,12 @@ export function fit(piece: Piece, geometry: BufferGeometry): { matrix: Matrix4; 
   const raw = geometry.boundingBox!.clone();
   const scale = piece.height / (raw.max.y - raw.min.y);
   const across = piece.width ? piece.width / (raw.max.x - raw.min.x) : scale;
+  const deep = piece.depth ? piece.depth / (raw.max.z - raw.min.z) : scale;
   const turn = 'wall' in piece.place ? FACING[piece.place.wall] : piece.place.turn;
   const centre = raw.getCenter(new Vector3());
   const matrix = new Matrix4()
     .makeRotationY(turn + (piece.square ?? 0))
-    .multiply(new Matrix4().makeScale(piece.mirror ? -across : across, scale, scale))
+    .multiply(new Matrix4().makeScale(piece.mirror ? -across : across, scale, deep))
     .multiply(new Matrix4().makeTranslation(-centre.x, -raw.min.y, -centre.z));
   // where it lands once turned: stand it in its place
   const box = turnedBox(geometry, matrix);
@@ -446,14 +454,17 @@ export class HutInterior {
     const rug = await new TextureLoader().loadAsync(rugUrl);
     rug.colorSpace = SRGBColorSpace;
     rug.anisotropy = 8;
-    const width = RUG.length / RUG.aspect;
     const g = new BufferGeometry();
-    const y = ROOM.floor + 0.012;
-    const [x0, x1, z0, z1] = [RUG.x - RUG.length / 2, RUG.x + RUG.length / 2, RUG.z - width / 2, RUG.z + width / 2];
-    g.setAttribute('position', new Float32BufferAttribute([x0, y, z1, x1, y, z1, x1, y, z0, x0, y, z1, x1, y, z0, x0, y, z0], 3));
+    const y = ROOM.floor + 0.02;
+    const [hx, hz] = [RUG.length / 2, RUG.width / 2];
+    const corner = (sx: number, sz: number): number[] => {
+      const p = new Vector3(sx * hx, y, sz * hz).applyAxisAngle(new Vector3(0, 1, 0), RUG.turn);
+      return [RUG.x + p.x, y, RUG.z + p.z];
+    };
+    g.setAttribute('position', new Float32BufferAttribute([...corner(-1, 1), ...corner(1, 1), ...corner(1, -1), ...corner(-1, 1), ...corner(1, -1), ...corner(-1, -1)], 3));
     g.setAttribute('normal', new Float32BufferAttribute(Array.from({ length: 6 }, () => [0, 1, 0]).flat(), 3));
     g.setAttribute('uv', new Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
-    this.stand('rug', null, g, this.material(4, rug, { RUG: '', PLACED: '' }), new Vector3(RUG.length, 0, width), 0, null, null);
+    this.stand('rug', null, g, this.material(4, rug, { RUG: '', PLACED: '' }), new Vector3(RUG.length, 0, RUG.width), RUG.turn, null, null);
     bytes += 1024 * 594 * 4 * 1.34;
     gpuMemory.set('hut', bytes);
     this.loaded = true;
@@ -511,6 +522,13 @@ export class HutInterior {
     this.uniforms.uRests.value = Math.min(rests.length, RESTS);
     this.placeFavourites();
     this.layDots();
+  }
+
+  /** Where the pot on the hearth's stove is (local m), as the stove stands now; null before it is in. */
+  potAt(out: Vector3): Vector3 | null {
+    const p = this.placed.find((e) => e.piece?.glow?.kind === 'fire');
+    if (!p?.raw || !p.matrix) return null;
+    return onModel(p.raw, new Matrix4().multiplyMatrices(p.place.value, p.matrix), POT_ON_STOVE, out);
   }
 
   /** The pieces and the rug as they stand, for the layout editor (ui/garden/hutEditor.ts). */

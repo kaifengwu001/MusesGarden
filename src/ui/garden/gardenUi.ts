@@ -8,6 +8,7 @@ import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
 import { MUSE_HEIGHT, type MuseDirection } from '../../life/muse';
+import { POT } from '../../life/museRig';
 import { Pins, type PinSpec } from '../../life/pins';
 import { FLOOR, FRONT, OUTER } from '../../life/props';
 import type { ParamStore } from '../../params';
@@ -62,8 +63,8 @@ const SHELF = { slop: 18, beacon: 26, cardFoot: 0.8 } as const;
 const NEAR_HUT = { distance: 70, altitude: 80 } as const;
 /** Muse this near the hut (m) is about it: its door opens to you, wherever Muse is pottering. */
 const MUSE_NEAR = 30;
-/** Where Muse stands in its hut (local m), facing the way the cutaway looks in from. */
-const INSIDE = { x: 0.95, z: 0.4 } as const;
+/** Where Muse stands in its hut (local m) until the room is in, facing the way the cutaway looks in from; at the stove, how far it is turned from facing the back wall toward the left (rad), clear of the table. */
+const INSIDE = { x: 0.95, z: 0.4, stove: 0.96 } as const;
 
 const sample = createGroundSample();
 const tmp = new Vector3();
@@ -362,15 +363,27 @@ export class GardenUi {
     if (muse) this.world.muse.direct(muse);
   }
 
-  /** Muse in its hut, standing on its floor and turned toward you. */
+  /**
+   * Muse in its hut: at the hearth's stove, cooking, once the room is in (the pot ahead of it and a little to its
+   * right, as its cooking pose has it: museRig.ts POT; standing at the hearth's right front, turned toward the pot);
+   * before, standing on the floor turned toward you.
+   */
   private inside(): MuseDirection {
     const c = this.cutaway;
-    const dir = c.local(INSIDE.x, 0, INSIDE.z, new Vector3());
-    const ahead = c.local(INSIDE.x + 0.63, 0, INSIDE.z + 0.78, new Vector3());
+    const pot = this.world.hut.potAt(tmpLocal);
+    let [x, z, aheadX, aheadZ]: number[] = [INSIDE.x, INSIDE.z, 0.63, 0.78];
+    if (pot) {
+      // facing f (turned INSIDE.stove from the back wall toward the left), its left l = up × f: the pot at l·POT[0] + f·POT[2]
+      const [fx, fz] = [-Math.sin(INSIDE.stove), -Math.cos(INSIDE.stove)];
+      const [lx, lz] = [fz, -fx];
+      [x, z, aheadX, aheadZ] = [pot.x - (lx * POT[0] + fx * POT[2]) * MUSE_HEIGHT, pot.z - (lz * POT[0] + fz * POT[2]) * MUSE_HEIGHT, fx, fz];
+    }
+    const dir = c.local(x, 0, z, new Vector3());
+    const ahead = c.local(x + aheadX, 0, z + aheadZ, new Vector3());
     const up = dir.clone().normalize();
     const heading = ahead.sub(dir);
     heading.addScaledVector(up, -heading.dot(up)).normalize();
-    return { kind: 'inside', dir: up, height: this.world.terrain.cottageGround + FLOOR, heading };
+    return { kind: 'inside', dir: up, height: this.world.terrain.cottageGround + FLOOR, heading, pot: pot ? c.local(pot.x, pot.y, pot.z, new Vector3()) : null };
   }
 
   /** After the world's update: the beds' clock, the pins, the card over its bed. */
