@@ -29,13 +29,13 @@ const DEV_KEY = 'b';
 const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 /**
- * The Muse overlay: DOM only, drawn over the planet with no GPU cost. Mounts when the URL has
- * `?muse` (`?muse=<id>` picks the owner's Muse, default "hero"), or whenever the page is not under
- * automation, so the frame-hash and screenshot tests never see it. `?dev` shows the dev tools; M toggles them.
+ * The Muse overlay: DOM only, drawn over the planet with no GPU cost. Mounts only when the URL has
+ * `?muse` (`?muse=<id>` picks the owner's Muse, default "hero"); without it the page shows the
+ * garden's interface (ui/garden). `?dev` shows the dev tools; M toggles them.
  */
 export function mountMuse(root: HTMLElement, world: World): void {
   const params = new URLSearchParams(location.search);
-  if (!params.has('muse') && navigator.webdriver) return;
+  if (!params.has('muse')) return;
   const api = new MuseApi((params.get('muse') || 'hero') as MuseId);
   const clock = new SimClock();
 

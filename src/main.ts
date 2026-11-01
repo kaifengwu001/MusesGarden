@@ -143,22 +143,23 @@ async function boot(): Promise<void> {
     },
   });
 
-  // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden): it sees taps first
-  const garden = new GardenUi(uiRoot, world, store);
+  // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden): it sees taps first.
+  // `?muse` shows the engine's own overlay instead (muse/ui), until the engine feeds this interface.
+  const garden = new URLSearchParams(location.search).has('muse') ? null : new GardenUi(uiRoot, world, store);
 
   attachInput(canvas, {
     drag: (dx, dy) => {
-      garden.interrupt();
+      garden?.interrupt();
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
       userPosed = true;
     },
     zoom: (delta) => {
-      garden.interrupt();
+      garden?.interrupt();
       world.rig.zoomBy(delta);
       userPosed = true;
     },
     tap: (x, y) => {
-      if (garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
+      if (garden?.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
         userPosed = true;
         return;
       }
@@ -170,7 +171,7 @@ async function boot(): Promise<void> {
     doubleTap: (x, y) => {
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) {
-        garden.interrupt();
+        garden?.interrupt();
         world.rig.glideTo(hit.dir);
         userPosed = true;
       }
@@ -235,11 +236,11 @@ async function boot(): Promise<void> {
   const update = (): void => {
     if (keys.update(world.rig, clock.realDt)) {
       userPosed = true;
-      garden.interrupt();
+      garden?.interrupt();
     }
-    garden.update(clock.realDt);
+    garden?.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
-    garden.frame(clock.realDt);
+    garden?.frame(clock.realDt);
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);
