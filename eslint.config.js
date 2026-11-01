@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   {
-    ignores: ['.worktrees/**', 'dist/**', 'dist-environments/**', 'dist-single/**', 'shots/**', 'test-results/**', 'playwright-report/**', 'eslint.config.js', '.*.mjs'],
+    ignores: ['.worktrees/**', '.vite-cache/**', 'dist/**', 'dist-environments/**', 'dist-single/**', 'shots/**', 'test-results/**', 'playwright-report/**', 'eslint.config.js', '.*.mjs'],
   },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,

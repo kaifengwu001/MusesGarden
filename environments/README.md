@@ -51,6 +51,8 @@ the meadow's byte for byte. From then on, it changes only inside its folder.
 The meadow keeps its own commands (`npm run dev` at `/`, `npm run build`) and its own build output (`dist/`). Each world's `README.md`
 records the meadow commit it was copied from.
 
-## Lantern checkout
+## Worlds in this checkout
 
 [Lantern Reed Gardens](lantern-reed-gardens/README.md) is available at http://localhost:5225/environments/lantern-reed-gardens/ using `npm run dev:lantern`. Its storage and build output are independent of other worlds. The original meadow remains at `/`.
+
+[Scarlet Sail Canyon](scarlet-sail-canyon/README.md) is served on port 5227. Its code, build output and resident storage are independent of the original meadow.

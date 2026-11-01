@@ -69,6 +69,8 @@ Visual revision checked on 1 November 2026:
 - The live-resolution regression runs at desktop DPR 2: High retains 1920×1280 under sustained slow frames, Auto reduces resolution, and returning to High restores 1920×1280. This test keeps animation live rather than freezing the render clock.
 - `npm run build:lantern` passes. The standalone output was served separately and checked for rendering, greetings and navigation, with no browser errors. The main JavaScript chunk is about 1.21 MB / 366 KB gzip, so Vite reports its existing 1024 KB chunk-size warning.
 - `git diff --check` passes; shared `src/` and `server/` have no changes.
+- Integration with main `7912632`: full repository CPU suite passes **817 tests**, with 3 skipped; TypeScript and ESLint pass. Eight targeted browser checks also pass after the shared find shaders were isolated locally. The meadow, server and Scarlet environment match that main commit exactly.
+- The environment scaffolder was checked against the current shared `FindTable` renderer in an isolated temporary world: generation, 25 CPU tests, both TypeScript configurations, lint and standalone build pass.
 
 The final correctness run used:
 

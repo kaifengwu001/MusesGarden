@@ -17,10 +17,13 @@
     "verify": "npm run check && npm test && npm run test:gpu && npm run shots",
     "sim": "tsx --no-warnings server/cli/sim.ts",
     "serve": "tsx --no-warnings server/http.ts",
+    "record:media": "tsx --no-warnings server/cli/record-media.ts",
     "new-environment": "node --experimental-strip-types scripts/new-environment.ts",
     "dev:lantern": "vite --port 5225 --strictPort",
     "build:lantern": "tsc -p tsconfig.json && vite build --config environments/lantern-reed-gardens/vite.config.ts",
-    "record:media": "tsx --no-warnings server/cli/record-media.ts"
+    "dev:scarlet": "vite --port 5227 --strictPort",
+    "build:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && vite build --config environments/scarlet-sail-canyon/vite.config.ts",
+    "check:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && eslint environments/scarlet-sail-canyon"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

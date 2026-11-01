@@ -25,3 +25,5 @@ reference/muse/
 .muse-live-e2e/
 
 dist-environments/
+
+.vite-cache/

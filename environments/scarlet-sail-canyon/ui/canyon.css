@@ -1,0 +1,93 @@
+:root { --ink:#344c50; --ink-soft:#536e72; --paper:#f8f3e6; --sky-pale:#bdd9d7; --coral:#b74b50; }
+.masthead { color:#344c50; max-width:70vw; text-shadow:0 1px 20px #f9f5e777; }
+.masthead h1 { font-size:clamp(36px,4.5vw,64px); max-width:660px; }
+.world-line { font-family:var(--font-ui); font-style:normal; font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+.canyon-community { position:fixed; left:var(--gutter); top:180px; width:262px; padding:19px 20px 10px; background:#f8f3e6e8; border:1px solid #45666a30; border-radius:4px 16px 16px 16px; box-shadow:0 12px 40px #2a53521a; pointer-events:auto; backdrop-filter:blur(12px); }
+.canyon-eyebrow { margin:0 0 7px; text-transform:uppercase; font-size:9px; letter-spacing:.18em; color:#8d5655; }
+.canyon-community h2 { font:400 22px/1.15 var(--font-serif); margin:0 0 15px; }
+.canyon-community button { cursor:pointer; border:1px solid #58757438; border-radius:5px; background:transparent; color:inherit; font:inherit; padding:7px 9px; }
+.canyon-community button:hover { background:#dfdacf; }
+.canyon-community button:focus-visible, .canyon-name:focus-visible { outline:2px solid #a63b4b; outline-offset:3px; }
+.canyon-places { display:flex; gap:5px; font-size:10px; padding-bottom:13px; border-bottom:1px solid #536e7230; }
+.canyon-residents { display:flex; gap:7px; margin:14px 0 5px; }
+.canyon-resident { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:11px!important; padding:8px 5px!important; }
+.canyon-resident::before { content:''; display:block; width:23px; height:27px; background:var(--coat); border:1px solid #5767654d; border-radius:45% 45% 38% 38%; margin:0 auto 6px; box-shadow:inset -4px -3px 0 #42636612; }
+.canyon-resident[aria-pressed=true] { background:#e7d9c9; border-color:#ac7272; }
+.canyon-resident-detail { border-top:1px solid #536e7230; padding-top:13px; margin-top:13px; }
+.canyon-resident-detail[hidden] { display:none; }
+.canyon-resident-detail h3 { font:400 23px var(--font-serif); margin:0 0 3px; }
+.canyon-activity { font-size:11px; line-height:1.5; margin:0 0 11px; }
+.canyon-name-label { display:flex; align-items:center; gap:9px; font-size:10px; color:#667775; }
+.canyon-name { min-width:0; width:100%; padding:6px 8px; border:1px solid #7587844a; background:#fff9ee; color:#344c50; border-radius:4px; font:12px var(--font-ui); }
+.canyon-resident-actions { display:flex; gap:5px; font-size:10px; margin-top:10px; }
+.canyon-close { margin-left:auto; }
+.canyon-notice { font-size:10px; line-height:1.5; margin:9px 0 0; }
+.canyon-notice:empty { display:none; }
+body.postcard .canyon-community, body.g-mail-open .canyon-community, body.g-away .canyon-community { display:none; }
+@media(max-width:700px) {
+  .masthead h1 { max-width:240px; font-size:38px; }
+  .world-line { max-width:230px; font-size:9px; line-height:1.6; }
+  .canyon-community { top:132px; left:16px; right:16px; width:auto; padding:10px 12px; }
+  .canyon-community h2, .canyon-eyebrow { display:none; }
+  .canyon-eyebrow { font-size:8px; }
+  .canyon-places { padding-bottom:8px; }
+  .canyon-places button { padding:6px; font-size:9px; }
+  .canyon-residents { margin-top:8px; }
+  .canyon-resident { display:flex; align-items:center; justify-content:center; gap:7px; padding:5px!important; }
+  .canyon-resident::before { width:15px; height:18px; margin:0; }
+  .canyon-resident-detail { padding-top:8px; margin-top:8px; }
+  .canyon-resident-detail h3 { font-size:19px; }
+  .canyon-activity { margin-bottom:6px; }
+  .canyon-name-label { gap:8px; }
+  .canyon-resident-actions { margin-top:6px; }
+  .hints { display:none; }
+}
+@media(max-height:650px) { .canyon-community { top:110px; } .canyon-eyebrow { display:none; } }
+
+/* A compact dock leaves the resident visible on a narrow screen. */
+@media(max-width:700px) {
+  .canyon-community { top:auto; bottom:108px; left:16px; right:16px; width:auto; padding:9px 12px; }
+  .canyon-community h2, .canyon-eyebrow { display:none; }
+  .canyon-places { justify-content:space-between; padding-bottom:6px; }
+  .canyon-places button { flex:1; }
+  .canyon-residents { margin:7px 0 0; gap:6px; }
+  .canyon-resident { padding:6px!important; }
+  .canyon-resident::before { display:inline-block; width:12px; height:15px; vertical-align:middle; margin:0 5px 0 0; }
+  .canyon-resident-detail { padding-top:7px; margin-top:7px; }
+  .canyon-resident-detail h3 { display:none; }
+  .canyon-activity { margin:0 0 6px; font-size:10px; }
+  .canyon-name-label { float:left; width:44%; }
+  .canyon-name-label > input { padding:6px; }
+  .canyon-resident-actions { margin:0 0 0 48%; gap:4px; }
+  .canyon-resident-actions button { padding:6px 4px; font-size:9px; }
+  .canyon-notice { clear:both; padding-top:4px; }
+  .masthead h1 { max-width:320px; font-size:34px; }
+}
+
+/* Keep a clear view of the inhabitants, especially on a narrow screen. */
+.masthead h1 { font-size:clamp(32px,4.1vw,62px); }
+.canyon-community { top:150px; }
+@media(max-width:700px) {
+  .masthead { top:18px; }
+  .masthead h1 { max-width:230px; font-size:32px; }
+  .canyon-community { top:auto; bottom:132px; left:12px; width:calc(100vw - 50px); padding:10px 12px; }
+  .canyon-community h2, .canyon-eyebrow { display:none; }
+  .canyon-places { float:right; border:0; padding:0; }
+  .canyon-residents { clear:both; margin:7px 0 0; }
+  .canyon-resident { display:flex; align-items:center; justify-content:center; gap:7px; padding:6px!important; }
+  .canyon-resident::before { width:14px; height:17px; margin:0; flex-shrink:0; }
+  .canyon-community.has-selection .canyon-places { display:none; }
+  .canyon-resident-detail { margin-top:8px; padding-top:8px; }
+  .canyon-resident-detail h3 { font-size:20px; }
+  .canyon-activity { margin-bottom:6px; }
+  .canyon-name-label { display:none; }
+  .canyon-resident-actions { margin-top:7px; }
+}
+
+.canyon-wildlife { display:flex; gap:5px; padding:12px 0 8px; border-bottom:1px solid #536e7230; }
+.canyon-wildlife button { flex:1; padding:7px 3px; font-size:10px; line-height:1.4; }
+.canyon-wildlife button::before { content:''; display:block; margin:0 auto 7px; width:24px; height:16px; border:1px solid #53606d88; }
+.canyon-wildlife .chalkstep::before { background:#bccbdc; border-radius:70% 45% 40% 40%; width:17px; height:22px; }
+.canyon-wildlife .fern-sifter::before { background:repeating-linear-gradient(100deg,#a9c0ad 0 7px,#687d7166 8px 9px); border-radius:70% 70% 25% 25%; }
+.canyon-wildlife .dewwing::before { background:#d95658; clip-path:polygon(0 5%,42% 18%,50% 90%,58% 18%,100% 5%,90% 70%,55% 100%,45% 100%,10% 70%); }
+@media(max-width:700px) { .canyon-wildlife { padding:7px 0; } .canyon-wildlife button { padding:4px; } .canyon-wildlife button::before { display:none; } .canyon-community.has-selection .canyon-wildlife { display:none; } }
