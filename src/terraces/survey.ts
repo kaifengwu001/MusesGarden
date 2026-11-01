@@ -2,7 +2,7 @@ import { Vector3 } from 'three';
 import { clamp, smoothstep } from '../core/math';
 import type { CubeReadback } from './bakeReader';
 import type { CellSample } from './cells';
-import { createCropSample, createPlotSample, TERRACE, type CropSample, type TerracePlots } from './plots';
+import { createCropSample, createPlotSample, SEASON, TERRACE, type CropSample, type TerracePlots } from './plots';
 
 // The terraces surveyed, cell by cell (ARCHITECTURE.md, "Terraces built on
 // the hills"). A cell is read on a grid in its own tangent chart (its middle
@@ -736,7 +736,7 @@ export function* surveyCellJob(
     plot.id = id;
     plot.season = season;
     const index = paddies.length;
-    paddies.push({ id, band: b, crop: plots.cropOf(plot, front, createCropSample()), floorH });
+    paddies.push({ id, band: b, crop: plots.cropOf(plot, front, createCropSample(), SEASON.band), floorH });
     byKey.set(key, index);
     return index;
   };

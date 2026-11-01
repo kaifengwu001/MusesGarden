@@ -32,7 +32,7 @@ export const TERRACE = { step: 0.62, cutMeters: 34, band: 4.2, riser: [0.12, 1.3
 /** The flats' rows (m wide) and their plots (× the row long). */
 export const PLOTS = { width: [9, 16], length: [1, 2.3] } as const;
 /** A paddy's delay: its cell's season's share (the rest its own chance), and how far the season spreads. A share left fallow. */
-export const SEASON = { cell: 0.5, spread: 0.42, fallow: 0.05 } as const;
+export const SEASON = { cell: 0.5, band: 0.82, spread: 0.42, fallow: 0.05 } as const;
 /** A band's cuts are placed from its outer wall at most this far downhill (m). */
 export const CUT_REACH = 5;
 /** Near its cell's edge, a cell is read this far in (m) past the life bake's texel. */
@@ -129,7 +129,8 @@ export class TerracePlots {
    * hillside flooded or green together), the same whichever cell builds it.
    */
   seasonOf(level: number, step: number): number {
-    return clamp(0.5 + 1.6 * gnoise(level * 0.31 + 0.5, step * 0.37 + 0.5, 0.5, (this.seed + 703) >>> 0), 0, 1);
+    // (each band its own, changing slowly along it: Kai's paddy painting has each band one colour over long stretches)
+    return clamp(0.5 + 1.6 * gnoise(level * 0.85 + 0.5, step * 0.09 + 0.5, 0.5, (this.seed + 703) >>> 0), 0, 1);
   }
 
   hash(cellKey: number, a: number, b: number, c: number, salt: number): number {
@@ -393,12 +394,12 @@ export class TerracePlots {
     return out;
   }
 
-  /** A paddy's crop this season (mirrors cropOf in paddy.glsl); front: the season's front. */
-  cropOf(p: PlotSample, front: number, out: CropSample): CropSample {
+  /** A paddy's crop this season (mirrors cropOf in paddy.glsl); front: the season's front; share: how much of its delay its season sets (the rest its own chance). */
+  cropOf(p: PlotSample, front: number, out: CropSample, share: number = SEASON.cell): CropSample {
     out.variant = unitHash(p.id);
     out.rows = unitHash(nextHash(p.id));
     const chance = unitHash((p.id ^ 0x9e3779b9) >>> 0);
-    const delay = clamp(SEASON.cell * p.season + (1 - SEASON.cell) * chance, 0, 1);
+    const delay = clamp(share * p.season + (1 - share) * chance, 0, 1);
     out.fallow = unitHash((p.id ^ 0x85ebca6b) >>> 0) < SEASON.fallow;
     out.delay = delay;
     out.hv = unitHash((p.id ^ 0x632be5ab) >>> 0);

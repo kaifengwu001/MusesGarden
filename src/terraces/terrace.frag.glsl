@@ -86,7 +86,9 @@ void main() {
     // faint stripes; at a distance the rows merge into a coarser grain, then into the paint's flat green
     float young = 1.0 - smoothstep(0.25, 0.6, c.maturity);
     float rowFade = 1.0 - smoothstep(0.05, 0.14, pixelMeters);
-    float row = 0.5 + 0.5 * cos(6.2832 * vFloor.w / 0.3);
+    // (each row in short strokes, the seedlings' clumps: the painting's hatching, not a ruled line)
+    float dash = smoothstep(-0.15, 0.35, gnoise(dir * uRadius * 5.5, uTerrainSeed + 937u));
+    float row = (0.5 + 0.5 * cos(6.2832 * vFloor.w / 0.3)) * mix(0.35, 1.0, dash);
     float grain = (0.5 + 0.5 * cos(6.2832 * vFloor.w / 1.1)) * (1.0 - smoothstep(0.25, 0.9, pixelMeters));
     cover = mix(cover, clamp(cover * mix(0.2, 1.8, row), 0.0, 1.0), rowFade * young);
     cover = clamp(cover * (1.0 + young * 0.5 * (grain - 0.5) * (1.0 - rowFade)), 0.0, 1.0);
