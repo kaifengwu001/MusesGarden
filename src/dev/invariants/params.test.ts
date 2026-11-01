@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseHash } from '../../core/hashSync';
-import { coerce, fieldAt, fields, formatValue, ParamStore, presets, stepDecimals, type GroupName, type ParamValue } from '../../params';
+import { coerce, DEFAULT_GROWTH, fieldAt, fields, formatValue, ParamStore, presets, RADIUS_DEFAULT, schema, stepDecimals, type GroupName, type ParamValue } from '../../params';
+import { FIRST_PLANET } from '../../planet/firstPlanet';
 
 /** Deterministic pseudo-random values for round-trip tests. */
 function lcg(seed: number): () => number {
@@ -19,6 +20,11 @@ describe('parameter schema', () => {
   it('has a unique URL key for every field', () => {
     const keys = fields.map((e) => e.field.url);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('keeps the first planet the meadow as tuned, seed 412 at R 128 m, where Fern lives (see CLAUDE.md)', () => {
+    expect([schema.world.seed.def, RADIUS_DEFAULT]).toEqual([412, 128]);
+    expect(FIRST_PLANET, 'the Muse server reads the meadow’s defaults from planet/firstPlanet.ts').toEqual({ seed: schema.world.seed.def, growth: DEFAULT_GROWTH });
   });
 
   it('leaves the hash keys used by other state free', () => {

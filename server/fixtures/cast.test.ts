@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CastMember, TopicKey } from '../../src/muse/contract';
+import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
 import { HeuristicMind } from '../adapters/minds/heuristic';
 import { parseSoul } from '../domain/soul';
@@ -31,6 +32,10 @@ describe('cast.json', () => {
     const friends = cast.members.filter((m) => m.role === 'friend').map((m) => m.id);
     const introducedToHero = cast.introductions.flatMap(([a, b]) => (a === hero?.id ? [b] : b === hero?.id ? [a] : []));
     expect(introducedToHero.sort()).toEqual(friends.sort());
+  });
+
+  it('puts the hero, and only the hero, on the first planet: the meadow as Kai tuned it (see CLAUDE.md)', () => {
+    expect(cast.members.filter((m) => m.worldSeed === FIRST_PLANET.seed).map((m) => m.role)).toEqual(['hero']);
   });
 
   it('knows the known Muses\' owners from the hero\'s: two on Instagram and one on Facebook, none introduced', () => {

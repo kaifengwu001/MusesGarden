@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { expect, test, type APIRequestContext, type BrowserContextOptions, type Page } from '@playwright/test';
 import type {} from '../../dev/harnessApi';
 import type { Find, GardenSnapshot, MediaKind } from '../../garden/types';
+import { FIRST_PLANET } from '../../planet/firstPlanet';
 
 // The garden's interface on the real engine: the hero's planet, a basket that arrives over the event stream and
 // flies its finds to where they were found, hover and the find card, the spheres from high up, likes that reach
@@ -18,7 +19,7 @@ const HERO = 'hero';
 const PAGE = `/?dev&garden=/api/muses/${HERO}#hud=0`;
 const SHOTS = 'shots/garden-live';
 const DB = '.muse-live-e2e/garden.db';
-const HERO_SEED = 1031;
+const HERO_SEED = FIRST_PLANET.seed;
 /** A bed is nudged at most this far from where its find was found (m, garden/placement.ts). */
 const NUDGE_REACH = 24;
 /** Above this the spheres have taken over from the patches (m, life/findBeds.ts). */

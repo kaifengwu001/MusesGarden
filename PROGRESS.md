@@ -30,6 +30,19 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Fern lives on the first planet (2026-11-01)
+
+The engine had given Fern, the hero, a planet of its own: seed 1031, starting at R 52 m and growing as it
+explored. Kai's call: Fern lives on the meadow, the first planet, because it is the one that is tuned. Fern's
+`worldSeed` is 412, and a Muse on the first planet starts at the meadow's tuned size (R 128 m, growth 0.1886),
+as if it had explored that much already; it grows from there as it explores more. The page with
+`?garden=/api/muses/hero` now draws the meadow exactly as it is without the engine.
+
+The first planet stays as it is: its seed, size and look are Kai's to change, and the rest of the team builds
+other worlds beside it. The rules are in [CLAUDE.md](CLAUDE.md), and `npm test` holds them
+(`params.test.ts`, `cast.test.ts`, `garden.test.ts`). A local garden seeded before this change (`.muse/`)
+has to be deleted and seeded again.
+
 ## Muse's life on the engine, in Kai's garden (muse-agent)
 
 The Muse agent's backend, designed in [docs/muse-agent.md](docs/muse-agent.md),

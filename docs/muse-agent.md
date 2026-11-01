@@ -162,6 +162,7 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 - Muse transports between regions, so the explored pockets need not connect.
 - Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
 - The planet's growth value `g` follows the explored area.
+- Fern, the hero, lives on the first planet: the meadow, seed 412. It starts at the meadow's tuned size (R 128 m), as if it had explored that much already, and grows from there. The first planet's seed and look stay as they are; see [CLAUDE.md](../CLAUDE.md).
 
 ### Each trip goes beyond, opens new ground, or revisits
 

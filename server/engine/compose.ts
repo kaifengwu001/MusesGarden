@@ -1,6 +1,7 @@
 // The composition root: the one place that picks concrete stores, sources and minds and wires the domain lanes
 // into the engine. Everything else depends only on the contract.
 import type { CastMember, Instant, Mind, MuseId, MuseState, Source, Store } from '../../src/muse/contract';
+import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { HeuristicMind } from '../adapters/minds/heuristic';
 import { MetaMind } from '../adapters/minds/meta';
 import { loadCorpus } from '../adapters/sources/corpus';
@@ -45,9 +46,13 @@ export interface Garden {
   readonly recording: MediaRecording;
 }
 
-/** Explored area drives the planet's growth slider: home alone is small, about forty regions is full size. */
+/**
+ * Explored area drives the planet's growth slider: home alone is small, about forty regions is full size. A Muse on
+ * the first planet (Fern, on the meadow) has explored the meadow's tuned size already, and grows from there.
+ */
 export function growth(s: MuseState): number {
-  return Math.min(1, 0.05 + (0.95 * Math.max(0, s.regions.size - 1)) / 40);
+  const start = s.seed.worldSeed === FIRST_PLANET.seed ? FIRST_PLANET.growth : 0.05;
+  return Math.min(1, start + (0.95 * Math.max(0, s.regions.size - 1)) / 40);
 }
 
 export const viewHelpers: ViewHelpers = {
