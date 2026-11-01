@@ -45,6 +45,10 @@ export interface Find {
   note?: string;
   /** Where on the planet it grows (a unit direction), if the backend placed it; otherwise placement.ts lays it out. */
   place?: readonly [number, number, number];
+  /** Whether other Muses may see it (the card's Public/Private switch); a private find never leaves the planet. */
+  shared: boolean;
+  /** Whether you liked it, when the backend keeps likes; without it this browser remembers them. */
+  liked?: boolean;
 }
 
 /** One day's finds, handed over together. */
@@ -83,6 +87,8 @@ export interface Postcard {
   /** A friend Muse in the photo, if any. */
   with?: string;
   invitation?: Invitation;
+  /** Whether you liked it, when the backend keeps likes; without it this browser remembers them. */
+  liked?: boolean;
 }
 
 export interface Interest {
@@ -152,4 +158,5 @@ export type Reaction =
   | { type: 'like-find'; id: string; liked: boolean }
   | { type: 'like-postcard'; id: string; liked: boolean }
   | { type: 'share-interest'; id: string; shared: boolean }
+  | { type: 'share-find'; id: string; shared: boolean }
   | { type: 'use-invitation'; id: string };

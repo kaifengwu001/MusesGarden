@@ -123,6 +123,36 @@ describe('the garden over HTTP on the engine', () => {
     expect(replayed.at(-1)?.event).toEqual({ type: 'status', status: snapshot.muse.status });
   });
 
+  it('keeps likes and private finds: each shows in the next snapshot and reaches an open garden', async () => {
+    const garden = await engineGarden();
+    await garden.commands.advance(24);
+    await serve(garden);
+    const before = garden.queries.garden(HERO, garden.now())!;
+    const [liked, hidden] = before.finds;
+    const card = before.postcards.find((p) => !p.invitation)!;
+    expect([liked.liked, liked.shared, hidden.liked, hidden.shared, card.liked]).toEqual([false, true, false, true, false]);
+    const live = await listen('/api/muses/hero/garden/events');
+    await live.until((f) => f.length > 0);
+
+    for (const reaction of [
+      { type: 'like-find', id: liked.id, liked: true },
+      { type: 'share-find', id: hidden.id, shared: false },
+      { type: 'like-postcard', id: card.id, liked: true },
+    ]) {
+      expect(await post('/api/muses/hero/garden/reactions', reaction)).toEqual({ status: 200, body: { ok: true } });
+    }
+
+    const snapshot = (await (await fetch(`${base}/api/muses/hero/garden`)).json()) as GardenSnapshot;
+    expect(snapshot.finds.find((f) => f.id === liked.id)).toMatchObject({ liked: true, shared: true });
+    expect(snapshot.finds.find((f) => f.id === hidden.id)).toMatchObject({ liked: false, shared: false });
+    expect(snapshot.postcards.find((p) => p.id === card.id)?.liked).toBe(true);
+    const frames = (await live.until((f) => f.some((x) => x.event.type === 'postcard'))).map((f) => f.event);
+    const baskets = frames.flatMap((e) => (e.type === 'basket' ? [e] : []));
+    expect(baskets.map((e) => e.basket.id)).toEqual([liked.basket, hidden.basket]);
+    expect(baskets.at(-1)?.finds).toEqual(snapshot.finds.filter((f) => f.basket === hidden.basket));
+    expect(frames.at(-1)).toEqual({ type: 'postcard', postcard: snapshot.postcards.find((p) => p.id === card.id) });
+  });
+
   it('refuses a Last-Event-ID that is not a log seq', async () => {
     await serve(await engineGarden());
     const res = await fetch(`${base}/api/muses/hero/garden/events`, { headers: { 'last-event-id': 'yesterday' } });
@@ -142,6 +172,8 @@ describe('reactions from the garden', () => {
     ['like-postcard', { type: 'like-postcard', id: 'p-hangout-1', liked: false }, { name: 'like', args: ['hero', { photo: 'p-hangout-1' }, false] }],
     ['share-interest', { type: 'share-interest', id: 'Pigment', shared: true }, { name: 'setHidden', args: ['hero', 'topic:Pigment', false] }],
     ['keep-interest', { type: 'share-interest', id: 'Sen no Rikyū', shared: false }, { name: 'setHidden', args: ['hero', 'topic:Sen no Rikyū', true] }],
+    ['share-find', { type: 'share-find', id: 'd-pigment', shared: true }, { name: 'setHidden', args: ['hero', 'discovery:d-pigment', false] }],
+    ['keep-find', { type: 'share-find', id: 'd-pigment', shared: false }, { name: 'setHidden', args: ['hero', 'discovery:d-pigment', true] }],
     ['use-invitation', { type: 'use-invitation', id: 'inv-wren-hero-1' }, { name: 'useInvitation', args: ['hero', 'inv-wren-hero-1'] }],
   ])('%s reaches its command', async (_, reaction, call) => {
     await serveFake();
@@ -156,9 +188,16 @@ describe('reactions from the garden', () => {
     expect(commands.calls).toEqual([]);
   });
 
+  it('a find Muse never found cannot be made public or private', async () => {
+    await serveFake();
+    expect((await post('/api/muses/hero/garden/reactions', { type: 'share-find', id: 'd-nowhere', shared: false })).status).toBe(404);
+    expect(commands.calls).toEqual([]);
+  });
+
   it.each<[string, unknown]>([
     ['an unknown type', { type: 'water', id: 'd-pigment' }],
     ['a like without liked', { type: 'like-find', id: 'd-pigment' }],
+    ['a share without shared', { type: 'share-find', id: 'd-pigment', liked: true }],
     ['an empty id', { type: 'use-invitation', id: '' }],
     ['not an object', [1, 2]],
   ])('refuses %s, and sends nothing on', async (_, reaction) => {

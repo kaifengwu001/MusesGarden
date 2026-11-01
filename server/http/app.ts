@@ -179,6 +179,9 @@ function routesFor({ queries, commands, now, subscribe }: Garden): readonly Rout
         }
         case 'share-interest':
           return result(await commands.setHidden(museId, `topic:${r.id}`, !r.shared));
+        case 'share-find':
+          if (!queries.plant(museId, r.id as DiscoveryId)) throw new HttpError(404, 'no such find');
+          return result(await commands.setHidden(museId, `discovery:${r.id}`, !r.shared));
         case 'use-invitation':
           return result(await commands.useInvitation(museId, r.id as InvitationId));
       }

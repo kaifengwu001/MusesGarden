@@ -143,7 +143,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
       if (title) media.title = title;
       if (kind === 'article') media.minutes = length;
       else if (length) media.duration = length;
-      const find: Find = { id: `${id}-${i}`, basket: id, topic, media };
+      const find: Find = { id: `${id}-${i}`, basket: id, topic, media, shared: topics.get(topic)?.shared ?? true };
       finds.push(find);
       return find.id;
     });

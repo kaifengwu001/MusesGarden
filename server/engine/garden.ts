@@ -215,8 +215,17 @@ function basketOf(input: GardenInput, b: DeliveredBasket): { readonly basket: Ba
   return { basket: { id: b.id, day: input.day(b.at), finds: finds.map((d) => d.id) }, finds };
 }
 
-function findOf(d: Discovery, basket: string, index: LogIndex): Find {
-  return { id: d.id, basket, topic: findTopic(d, index), media: mediaOf(d), note: d.reason, place: d.place.dir };
+function findOf(s: MuseState, d: Discovery, basket: string, index: LogIndex): Find {
+  return {
+    id: d.id,
+    basket,
+    topic: findTopic(d, index),
+    media: mediaOf(d),
+    note: d.reason,
+    place: d.place.dir,
+    shared: !s.hidden.has(`discovery:${d.id}`),
+    liked: s.likes.get(d.id)?.liked ?? false,
+  };
 }
 
 function nameOf(input: GardenInput, id: MuseId): string {
@@ -246,6 +255,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
     image: postcardImage(p.subject),
     place: placeOf(input, p, index.moments.get(p.id)),
     with: p.companions[0],
+    liked: input.s.likes.get(p.id)?.liked ?? false,
   };
 }
 
@@ -285,7 +295,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   const { s } = input;
   const index = indexLog(input.log());
   const delivered = s.baskets.map((b) => basketOf(input, b));
-  const finds = delivered.flatMap(({ basket, finds }) => finds.map((d) => findOf(d, basket.id, index)));
+  const finds = delivered.flatMap(({ basket, finds }) => finds.map((d) => findOf(s, d, basket.id, index)));
   const postcards = [
     ...s.photos.map((p) => photoCard(input, p, index)),
     ...[...s.social.invitations.values()].map((inv) => invitationCard(input, inv)).filter((p): p is Postcard => p !== null),
@@ -344,6 +354,7 @@ const MOVES: ReadonlySet<MuseEvent['kind']> = new Set(['episode.started', 'episo
 /**
  * The garden events that `events` (this Muse's, in log order) bring, each framed with the seq it came from, then
  * Muse's status: always, or only if one of them moved Muse. The status is framed with the last seq folded in.
+ * A like, or a find made public or private, sends its basket or its postcard again as it now stands.
  */
 export function gardenFrames(input: GardenInput, events: readonly StoredEvent[], withStatus: 'always' | 'if-moved'): GardenFrame[] {
   const { s } = input;
@@ -351,12 +362,24 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
   const indexed = () => (index ??= indexLog(input.log()));
   const frames: GardenFrame[] = [];
   const frame = (id: number, event: GardenEvent) => frames.push({ id, event });
+  const basketEvent = (b: DeliveredBasket): GardenEvent => {
+    const { basket, finds } = basketOf(input, b);
+    return { type: 'basket', basket, finds: finds.map((d) => findOf(s, d, basket.id, indexed())) };
+  };
+  const holding = (ids: readonly string[]) => s.baskets.filter((b) => b.items.some((id) => ids.includes(id)));
   for (const { seq, event: e } of events) {
     if (e.kind === 'basket.delivered') {
-      const { basket, finds } = basketOf(input, e.basket);
-      frame(seq, { type: 'basket', basket, finds: finds.map((d) => findOf(d, basket.id, indexed())) });
+      frame(seq, basketEvent(e.basket));
     } else if (e.kind === 'photo.taken') {
       frame(seq, { type: 'postcard', postcard: photoCard(input, e.photo, indexed()) });
+    } else if (e.kind === 'owner.liked') {
+      const { target } = e;
+      const photo = 'photo' in target ? s.photos.find((p) => p.id === target.photo) : undefined;
+      if (photo) frame(seq, { type: 'postcard', postcard: photoCard(input, photo, indexed()) });
+      if ('find' in target) for (const b of holding([target.find])) frame(seq, basketEvent(b));
+    } else if (e.kind === 'owner.settings') {
+      const finds = [...(e.hide ?? []), ...(e.unhide ?? [])].filter((r) => r.startsWith('discovery:')).map((r) => r.slice('discovery:'.length));
+      for (const b of holding(finds)) frame(seq, basketEvent(b));
     } else if (e.kind === 'invitation') {
       const inv = s.social.invitations.get(e.id);
       const postcard = inv ? invitationCard(input, inv) : null;
