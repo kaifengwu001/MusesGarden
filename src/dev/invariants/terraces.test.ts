@@ -10,7 +10,7 @@ import { createTerraceSample, generateTerraceLayout, TerraceTerrain, type Terrac
 // stand over the water, and the flats are plots, not bands.
 
 const terrain = new TerraceTerrain(generateTerraceLayout(7));
-terrain.update(128, { hills: 13, forest: 0.15 }, 1);
+terrain.update(128, { hills: 13, forest: 0.1 }, 1);
 const R = terrain.radius;
 
 /** Evenly spread directions (Fibonacci sphere). */

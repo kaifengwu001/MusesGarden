@@ -44,7 +44,7 @@ export const HILL_BASE_FREQ = 1.2;
 /** Spread (std) of gnoise; the normalised octave pairs keep it. */
 export const NOISE_STD = 0.27;
 /** Pattern sizes (m). */
-export const PATTERN = { forest: 110, forestDetail: 38, fogA: 55, fogB: 150, season: 80, region: 34, river: 150, riverWidth: 90 } as const;
+export const PATTERN = { forest: 48, forestDetail: 17, fogA: 55, fogB: 150, season: 80, region: 34, river: 150, riverWidth: 90 } as const;
 /** How much the forest's detail octave adds to its broad one. */
 export const FOREST_DETAIL = 0.45;
 /** Seeds (added to the world's noise seed). */
@@ -59,7 +59,7 @@ export function cellFrequency(radius: number): number {
 }
 
 /** Karst towers: per m² (before the ranges keep some), the share of the planet in ranges, their heights (m), their mounds' radius and height (× the tower's height), the models (towers.ts). */
-export const PEAKS = { density: 1 / 1800, ranges: 0.38, height: [18, 64], mound: [0.6, 0.12], models: 5, max: 96 } as const;
+export const PEAKS = { density: 1 / 1800, ranges: 0.38, height: [26, 78], mound: [0.6, 0.12], models: 5, max: 96 } as const;
 
 /**
  * The river: its width (m, from narrow to wide along it), its channel's depth under the valley floor (m)

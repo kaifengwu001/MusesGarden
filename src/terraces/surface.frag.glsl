@@ -215,6 +215,8 @@ void main() {
   if (river > 0.0) {
     vec3 wp = warpPosition(dir * (uRadius + vHeight));
     vec3 rw = paddyWater(dir, wp, nUp, normalize(cameraPosition - wp), bUp, waves.x, 0.25);
+    // (deeper than a paddy's: bluer and darker, the paintings' river against their silver fields)
+    rw = mix(rw, pal(TR_WATER, 2), 0.32);
     vec3 bank = tone3(pal(TR_EARTH, 2), mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), 0.5), pal(TR_EARTH, 3), bMesh);
     bank *= 0.92 + 0.12 * gnoise(dir * uRadius * 1.7, uTerrainSeed + 935u);
     float wet = smoothstep(0.72 - 0.02, 0.72 + 0.02, river);

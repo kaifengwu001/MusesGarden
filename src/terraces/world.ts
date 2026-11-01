@@ -116,7 +116,7 @@ export class TerraceWorld implements PlanetWorld {
     uRiceLook: { value: new Vector4(0.6, 0, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
   };
-  private fieldParams: TerraceFieldParams = { hills: 13, forest: 0.15 };
+  private fieldParams: TerraceFieldParams = { hills: 13, forest: 0.1 };
   private readonly cameraPlanet = new Vector3();
   /** Whether the valley fog is drawn (dev: `only=` without fog hides it). */
   private onlyFog = true;
