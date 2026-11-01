@@ -557,7 +557,7 @@ test('Muse’s page shows a friend tagged as a friend on Instagram or Facebook',
   await page.screenshot({ path: `${SHOTS}/12-muse-friend-known.png` });
 });
 
-test.fixme('an invitation reaches the hero: Travel now works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
+test('an invitation reaches the hero: Travel now works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
   // invite-flap: the open envelope's flap covers Travel now and Keep for later; the fix is in mail.ts.
   test.setTimeout(20 * 60_000);
   const card = await advanceUntil(api, 'an invitation for the hero', (s) => s.postcards.find((p) => p.invitation && !p.invitation.used));
