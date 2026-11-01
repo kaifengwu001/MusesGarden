@@ -1,0 +1,176 @@
+{
+  "date": "2026-11-01",
+  "branch": "planet/violet-dunes-refinement",
+  "base": "8e4b9f9",
+  "scope": "environments/violet-dunes/",
+  "cpu": {
+    "tests": 42,
+    "files": 6,
+    "passed": true
+  },
+  "typecheckAndLint": true,
+  "standaloneBuild": true,
+  "browserInvariants": {
+    "passed": 12,
+    "inheritedFixme": 1
+  },
+  "ecology": {
+    "passed": true,
+    "time": 12,
+    "renderScale": 1,
+    "errors": [],
+    "growthParity": {
+      "planet-R40": {
+        "heightError": 0.006922742372810653,
+        "waterError": 0,
+        "warpError": 4.629611727225751e-06,
+        "samples": 64
+      },
+      "planet-R128": {
+        "heightError": 0.004490510816698823,
+        "waterError": 0,
+        "warpError": 1.2513257331102077e-05,
+        "samples": 64
+      },
+      "planet-R400": {
+        "heightError": 0.012484934348540477,
+        "waterError": 0,
+        "warpError": 2.82507485450316e-05,
+        "samples": 64
+      },
+      "planet-R128-return": {
+        "heightError": 0.004490510816701487,
+        "waterError": 0,
+        "warpError": 1.2513257331086732e-05,
+        "samples": 64
+      }
+    },
+    "viewHashes": {
+      "shelter": [
+        "b4529c26:1600x1000",
+        "b4529c26:1600x1000",
+        "b4529c26:1600x1000"
+      ],
+      "survey": [
+        "d89d47fb:1600x1000",
+        "d89d47fb:1600x1000",
+        "d89d47fb:1600x1000"
+      ],
+      "muse": [
+        "de66a7c9:1600x1000",
+        "de66a7c9:1600x1000",
+        "de66a7c9:1600x1000"
+      ],
+      "dune-skipper": [
+        "65f72044:1600x1000",
+        "65f72044:1600x1000",
+        "65f72044:1600x1000"
+      ],
+      "seed-glider": [
+        "09bd9efb:1600x1000",
+        "09bd9efb:1600x1000",
+        "09bd9efb:1600x1000"
+      ],
+      "planet-R40": [
+        "608a2b76:1600x1000",
+        "608a2b76:1600x1000",
+        "608a2b76:1600x1000"
+      ],
+      "planet-R128": [
+        "aaa1d14d:1600x1000",
+        "aaa1d14d:1600x1000",
+        "aaa1d14d:1600x1000"
+      ],
+      "planet-R400": [
+        "b3f03dac:1600x1000",
+        "b3f03dac:1600x1000",
+        "b3f03dac:1600x1000"
+      ],
+      "planet-R128-return": [
+        "aaa1d14d:1600x1000",
+        "aaa1d14d:1600x1000",
+        "aaa1d14d:1600x1000"
+      ]
+    }
+  },
+  "frameCaptures": {
+    "views": 19,
+    "finalPortraitRun": {
+      "startTime": "2026-11-01T10:00:47.787Z",
+      "duration": 62520.566000000006,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "baselineComparison": false
+  },
+  "backend": "Chromium ANGLE Metal, desktop 1600x1000 DPR1",
+  "annotations": [
+    {
+      "type": "scrub",
+      "description": "frame p95 16.80 ms, JS p95 4.40 ms, max 7.30 ms, build slice max 8.30 ms"
+    },
+    {
+      "type": "frames",
+      "description": "347 frames, 2 resizes, 0 blank, 0 tile drops, up to 388 starflowers and 6052 seeded stones and clumps drawn"
+    },
+    {
+      "type": "colour",
+      "description": "MSAA 4\u00d7, scene colours 0.020 to 1.025"
+    }
+  ],
+  "isolation": {
+    "sharedSrcChanged": false,
+    "pathsOutsideEnvironment": []
+  },
+  "integration": {
+    "branch": "environment_violet_dune",
+    "base": "ad37acf",
+    "refinement": "b697519",
+    "typecheckAndLint": true,
+    "cpuTestsPassed": 42,
+    "productionBuild": true,
+    "browserSuite": {
+      "startTime": "2026-11-01T20:46:27.476Z",
+      "duration": 66724.811,
+      "expected": 13,
+      "skipped": 1,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "renderComparison": {
+      "refinementViews": [
+        "orchard",
+        "survey",
+        "muse"
+      ],
+      "pixelIdentical": true
+    },
+    "meadowComparison": {
+      "stableViews": 8,
+      "pixelIdentical": true,
+      "excludedSelfCheckVariation": {
+        "view": "bird's-eye 70 m",
+        "changedPixels": 300,
+        "maxChannelDelta": 126
+      }
+    },
+    "scope": "environments/violet-dunes/",
+    "focusedPerformanceRepeat": {
+      "startTime": "2026-11-01T20:49:04.252Z",
+      "duration": 6874.75,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "openPerformanceCheck": {
+      "frameP95Ms": 33.4,
+      "frameLimitMs": 20,
+      "jsP95Ms": 4.2,
+      "buildSliceMaxMs": 8.2,
+      "thresholdsChanged": false
+    }
+  }
+}

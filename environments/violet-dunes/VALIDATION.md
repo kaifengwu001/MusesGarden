@@ -1,0 +1,145 @@
+# Paper Orchard validation
+
+Review date: 1 November 2026. Checkout: `violet-dunes-refinement-01a195f7`,
+branch `planet/violet-dunes-refinement`, based on `8e4b9f9`. Preview port 5231.
+
+## Visual contract
+
+Use the [pink Physalis concept](reference/primary-concept.png) as the current
+target. The older [watercolour Violet Dunes](reference/original-violet-dunes.png)
+remains a material and palette reference. The accepted botanical direction
+supersedes the original diamond seed packets and the intermediate flat fans.
+
+| Relationship | Implementation to inspect |
+| --- | --- |
+| Violet granular sand, wind-worked crests and open interdune ground | Three asymmetric curved authored ridges over meter-scaled procedural dunes; separate slip-face pigment, broken ripple lines and pencil strokes |
+| Golden crowns with natural papery fruit | Thin tapering leaves, curved branching stems, rounded five-rib calyces and some openings showing a gold berry; no artificial lamp fittings or glow |
+| Dense planted slate islands framing a quieter route | Overlapping chipped slate, ivory feather fronds, periwinkle low foliage and small gold growth; distinct groups rather than continuous stone rails |
+| A small inhabited home among plants | Slate courses, visible timber, sagging canvas, work shelf and trays; protected floor and Muse apron |
+| Rose sky without a warm filter over every material | Local pink sky palette and distant lilac cirrus; neutral daylight on slate, cloth and sand |
+| Recognisable native life | Three four-footed dune skippers, four two-winged seed gliders, physical landing stems and matching animated shadows |
+
+No coiled, piped or piled terrain is used. Sand relief is continuous ground;
+slate has physical fractured edges; thin plants retain independent scale.
+
+## Review workflow and evidence
+
+1. Start the isolated checkout on port 5231. Finish source edits before tests.
+2. Open the primary image itself, then open the app without an old `pose`.
+3. Run the local ecology project. It freezes time at 12, renders at scale 1,
+   captures Orchard, Dunes, Muse and both animal views, and checks whole-planet
+   growth at R40, R128, R400 and R128 again.
+4. Compare dominant shapes, empty ground, plant scale, support contacts and
+   materials before judging small texture marks. Inspect the globe separately.
+5. Keep test success and visual acceptance separate. Record remaining gaps.
+
+The review page places the concept beside actual app checkpoints. The
+`checkpoint-first-pass.png` image is an intermediate integrated pass preserved
+before the later composition/material fixes; it is **not** a pristine capture
+of the original implementation. Raw captures and machine-readable evidence
+are generated under `shots/violet-dunes/refinement/` and are ignored by Git.
+
+## Correctness findings
+
+- Plant slope classification now uses its own quantized `Terrain` snapshot,
+  including the authored ridges. Asynchronous jobs never read a mutable live
+  terrain. Bounds include actual terrain height, scaled plants, wind and the
+  quadratic warp term.
+- Home framing solves against the displayed ground curvature. The inherited
+  physical-sphere calculation lowered the camera in a flattened vista.
+- Thin foliage uses centroid interpolation for bounded leaf coordinates.
+  Its central highlight has compact support. The previous odd-power formula
+  could extrapolate to negative colour under MSAA; the unchanged colour test
+  now measures a scene range of 0.000–1.020 at four samples.
+- Fauna contact checks sample actual foot vertices at R40, R128 and R400.
+  Shadow meshes copy the animated transforms. Perched gliders have support.
+- The first glider's perch sits beside the open route, so its observation
+  camera is not blocked by a nearby fruit crown. Portrait framing centres the
+  home instead of carrying the desktop composition's large horizontal offset.
+- Settled height bakes double resolution above R256, while continuous-growth
+  bakes and flora keep their original resolution. This fixes the large-world
+  interpolation error without increasing every growth frame's bake cost.
+  The extra 36 MiB is tracked and released on shrinking. Final near-field
+  heights explicitly round to nearest half before storage.
+- Shared `src/`, other worlds and the source `setting_gen` checkout are outside
+  this change. The source checkout remains untouched; delivery uses its own
+  branch based on current `main`.
+
+## Validated refinement checks
+
+| Check | Result |
+| --- | --- |
+| TypeScript and ESLint | `npm run check` passes |
+| Environment CPU contracts | 42 tests in six files pass, including actual fauna feet, asset bounds, authored slopes and bake allocation/disposal |
+| Browser invariants | All 12 pass, including three exact frozen-frame checks, CPU/GPU parity, picking, growth performance, walking/resize continuity, MSAA colours, startup/draw budgets and URL state |
+| Expanded ecology | Passes at R40 → R128 → R400 → R128; 64 ground/warp samples at each size, all nine view captures, no shader or runtime errors, exact returned globe hash |
+| Height agreement | Maximum error 6.92 mm at R40, 4.49 mm at R128 and 12.48 mm at R400, under the unchanged 20 mm limit |
+| Growth performance | Local 1600×1000 Metal run: frame p95 16.80 ms, JS p95 4.40 ms, max build slice 8.30 ms, all inside unchanged thresholds |
+| Frame continuity | 347 observed frames, two resizes, zero blank frames and zero tile drops |
+| MSAA material range | Four samples, scene RGB 0.020–1.025, inside the unchanged 0–3 range |
+| View matrix | 19 desktop, medium and mobile captures written; baseline recorded, no older-frame equality claim |
+| Production build | Standalone Vite build passes |
+| Isolation and formatting | `git diff --check` passes; no changed paths outside this environment |
+
+One inherited browser test remains marked `fixme`: automatic detection of LOD
+rings during a dolly. It is not counted as a pass. Performance numbers describe
+this local run; an extra concurrently rendering preview produced a slower run,
+so the final measurement used one active app render loop.
+
+The durable [check summary](reference/validation-evidence.json) preserves the
+growth errors, repeated-frame hashes and test annotations. The review exports
+use the renderer's own PNG pixels; the
+[app-context checkpoint](reference/checkpoint-app.png) also preserves the
+surrounding controls. Images have not been retouched.
+
+## Active visual limits
+
+The scene is an interactive stylised 3D interpretation. It still has broader,
+simpler shapes and less delicate drawn detail than the concept. The shelter
+retains the inherited navigation footprint, so its rectangular structure is
+more regular than the illustrated home. The local orchard is richer than the
+remote planet surface; remote planting is more widely spaced and gives way to
+paint at a distance. Native animals follow deterministic ambient loops rather
+than a complete ecosystem. Observation cameras frame once, so an animal may turn afterwards.
+
+High cirrus is a distant sky wash with negligible ground shadow. Optional low
+clouds use flattened puffs; their inherited ground-shadow projection remains
+spherical and is deliberately restrained. Do not describe those shadows as an
+exact ellipsoid projection.
+
+The user approved the Physalis and pink-sky direction. The current actual app
+has not yet received user visual sign-off.
+
+## Integration into main
+
+The delivery branch `environment_violet_dune` starts from `main` at `ad37acf`
+and adds only this environment. Refinement commit `b697519` remains preserved
+separately; unrelated unpublished history from `setting_gen` is not part of
+the delivery branch.
+
+The current shared Muse shaders changed their uniform and sculpt-attribute
+interfaces. Violet keeps its previously validated colour/shadow shaders, rig,
+sculpt mesher, worker and loader locally, while reusing the unchanged shared
+model assets. This preserves its scalar arm pose and shadow strength without
+changing the meadow's new interface. Shared camera helpers and the memory
+ledger remain compatible.
+
+The first planet has no source changes. At DPR1 on Metal, eight stable meadow
+reference views are pixel-identical between untouched `main` and this branch.
+The 70 m bird's-eye view is excluded from that comparison: its self-check on
+untouched `main` also changes 300 pixels (maximum channel difference 126).
+This inherited self-check variation is not counted as a successful equality
+check and was not changed here.
+
+Integration verification: root type checks and lint, the 42 environment CPU
+tests and standalone production build pass. The orchard, survey and Muse views
+are pixel-identical to refinement commit `b697519`. Both ecology tests pass;
+the browser run totals 13 passes, one failure and one inherited `fixme` skip.
+
+The remaining failure is the unchanged growth frame-time ceiling: the current
+integration run and one focused repeat both measure frame p95 33.40 ms against
+the 20 ms limit. The focused run's JS p95 is 4.20 ms and maximum build slice is
+8.20 ms, within their respective limits. The earlier refinement run measured
+16.80 ms with one active render loop. Current GPU/presentation performance is
+therefore recorded as an open check, not claimed to pass on this host. No
+threshold or scene detail was reduced for the integration.

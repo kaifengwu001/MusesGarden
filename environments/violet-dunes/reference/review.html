@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Orchard · visual review</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f5edef; color: #453d51; font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1800px; margin: auto; padding: 32px; }
+  h1 { margin: 0; font: 44px/1.2 Georgia, serif; }
+  p { max-width: 850px; }
+  a { color: #6a4776; text-underline-offset: 3px; }
+  .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  figure { margin: 0; }
+  img { display: block; width: 100%; border-radius: 10px; background: #e4d5e6; }
+  figcaption { padding: 10px 0; }
+  small { color: #746979; }
+  .views { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 12px; }
+  button { border: 1px solid #b9a6bd; border-radius: 20px; padding: 8px 14px; background: #fffaf2; color: inherit; cursor: pointer; font: inherit; }
+  button[aria-pressed="true"] { background: #72537d; color: white; }
+  button:focus-visible { outline: 3px solid #d6a931; outline-offset: 3px; }
+  .note { border-left: 3px solid #b197b7; padding-left: 16px; }
+  @media(max-width: 900px) { main { padding: 20px; } .pairs { grid-template-columns: 1fr; } h1 { font-size: 34px; } }
+</style>
+<main>
+  <h1>Paper Orchard</h1>
+  <p>Violet sand, golden Physalis, feathered ivory foliage and dusty pink daylight.
+    <a href="../#q=high&amp;hud=0">Open the living planet</a> ·
+    <a href="../VALIDATION.md">Validation and remaining gaps</a></p>
+  <div class="pairs">
+    <figure><img src="primary-concept.png" alt="Approved botanical and pink-sky concept: dense golden Physalis and slate around a canvas home in violet dunes."><figcaption><strong>Concept target</strong><br><small>Approved Physalis fruit and pink-sky direction. This is concept art.</small></figcaption></figure>
+    <figure><img src="checkpoint-orchard.png" alt="Current interactive orchard implementation."><figcaption><strong>Actual app · Orchard</strong><br><small>Seed 412 · high quality · time 12 · render scale 1. Interactive 3D interpretation; visual sign-off is pending.</small></figcaption></figure>
+  </div>
+  <div class="views" aria-label="Implementation review views">
+    <button aria-pressed="true" data-file="checkpoint-orchard.png" data-label="Orchard">Orchard</button>
+    <button aria-pressed="false" data-file="checkpoint-dunes.png" data-label="Dune survey">Dune survey</button>
+    <button aria-pressed="false" data-file="checkpoint-skipper.png" data-label="Dune skipper">Dune skipper</button>
+    <button aria-pressed="false" data-file="checkpoint-glider.png" data-label="Seed glider">Seed glider</button>
+    <button aria-pressed="false" data-file="checkpoint-planet.png" data-label="Whole planet · R128">Whole planet</button>
+    <button aria-pressed="false" data-file="checkpoint-first-pass.png" data-label="Earlier integrated pass">Earlier pass</button>
+  </div>
+  <figure><img id="detail" src="checkpoint-orchard.png" alt="Orchard implementation checkpoint."><figcaption id="caption">Orchard · actual app checkpoint</figcaption></figure>
+  <p class="note">Compare the large dune shapes, open route and grouped planting first, then inspect slate, thin calyces, canvas, ground contacts and animal anatomy. The earlier pass is a saved intermediate state, not an untouched baseline. Broader shapes and simpler drawing detail remain visible differences from the concept.</p>
+</main>
+<script>
+  for (const button of document.querySelectorAll('button[data-file]')) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('button[data-file]')) other.setAttribute('aria-pressed', String(other === button));
+      const image = document.querySelector('#detail');
+      image.src = button.dataset.file;
+      image.alt = button.dataset.label + ' implementation checkpoint.';
+      document.querySelector('#caption').textContent = button.dataset.label + ' · actual app checkpoint';
+    });
+  }
+</script>
+</html>
