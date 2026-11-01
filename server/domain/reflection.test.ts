@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { InterestDelta, MuseEventBody, ReflectionProposal, RegionKey, StoredEvent } from '../../src/muse/contract';
+import type { DiscoveryId, InterestDelta, MuseEventBody, ReflectionProposal, RegionKey, StoredEvent } from '../../src/muse/contract';
 import { regionForNewTopic } from './atlas';
 import { eventRef, instant, museId } from './ids';
 import { drawFor } from './rng';
@@ -34,7 +34,7 @@ function reflectNow(life: Life, at: number, p: ReflectionProposal): MuseEventBod
   return body;
 }
 
-/** Two days of life: owner seeds, the pigment trail, a revisit, and two reflections that cite it. */
+/** Two days of life: owner seeds, the pigment trail, a revisit, a like, and two reflections that cite it. */
 function lived(): Life {
   const life = new Life();
   life.push(D1, { kind: 'soul.updated', version: 1, topics: topicsOf('Origami'), temperament: TEMPERAMENTS.hero });
@@ -59,12 +59,13 @@ function lived(): Life {
     { title: 'Vermilion', score: 0.8, kept: true, topics: ['Vermilion', IP] },
   ]);
   life.push(D2 + 40 * MINUTE_MS, { kind: 'episode.ended', n: 2 });
+  life.push(D2 + 2 * HOUR_MS, { kind: 'owner.liked', target: { find: cobalt.id }, liked: true });
   reflectNow(life, D2 + 5 * HOUR_MS, proposal({ topic: topic(IP), dAffinity: 0.1, stage: 'established', evidence: cobalt.because }));
   life.push(D2 + DAY_MS, { kind: 'memory.updated', textHash: 'h2', topics: topicsOf('Jazz', 'Sourdough') });
   return life;
 }
 
-const HOST_INPUTS = new Set<StoredEvent['event']['kind']>(['soul.updated', 'memory.updated', 'host.work', 'owner.settings']);
+const HOST_INPUTS = new Set<StoredEvent['event']['kind']>(['soul.updated', 'memory.updated', 'host.work', 'owner.settings', 'owner.liked']);
 const REFLECTIONS = new Set<StoredEvent['event']['kind']>(['reflection.committed', 'reflection.no-change']);
 
 describe('the evidence-gated reducer', () => {
@@ -75,6 +76,7 @@ describe('the evidence-gated reducer', () => {
 
   it('grows interests from what Muse lived through', () => {
     expect(full.reflections).toHaveLength(2);
+    expect(full.likes.size).toBe(1);
     expect(full.interests.get(topic(IP))?.stage).toBe('established');
     expect(full.interests.get(topic(IP))?.sources).toHaveLength(4);
     expect(full.interests.get(topic(IP))?.affinity).toBeCloseTo(0.25, 9);
@@ -84,6 +86,7 @@ describe('the evidence-gated reducer', () => {
 
   it('folds back to the seed-only state once the experiences are removed, reflections and all', () => {
     expect(stripped.reflections).toEqual([]);
+    expect(stripped.likes).toEqual(seedOnly.likes);
     expect(stripped.interests).toEqual(seedOnly.interests);
     expect(full.interests).not.toEqual(seedOnly.interests);
   });
@@ -182,6 +185,44 @@ describe('experiences', () => {
       ['skipped', 'Lichen'],
     ]);
     expect(xs.every((x) => life.log[Number(x.ref.split('#')[1]) - 1].event.kind !== 'reflection.no-change')).toBe(true);
+  });
+});
+
+describe('experiences: what the owner liked', () => {
+  /** Muse keeps Herbarium, reflects, then keeps Lichen. */
+  function kept(): { life: Life; herbarium: DiscoveryId; lichen: DiscoveryId } {
+    const life = new Life();
+    const region = trip(life, D1, 1, BI, null);
+    const [herbarium] = life.hop(D1 + HOUR_MS, 1, 0, BI, region, [{ title: 'Herbarium', score: 0.8, kept: true }]);
+    life.push(D1 + 2 * HOUR_MS, { kind: 'reflection.no-change', reviewed: [] });
+    const [lichen] = life.hop(D1 + 3 * HOUR_MS, 1, 1, BI, region, [{ title: 'Lichen', score: 0.8, kept: true }]);
+    return { life, herbarium: herbarium.id, lichen: lichen.id };
+  }
+  const flagged = (l: Life) => experiences(l.state, l.log).map((x) => [x.note.includes('Herbarium') ? 'Herbarium' : 'Lichen', x.kind, x.liked === true]);
+  const like = (l: Life, at: number, find: DiscoveryId, liked = true) => l.push(at, { kind: 'owner.liked', target: { find }, liked });
+
+  it('flags a find liked since the last reflection on its one experience', () => {
+    const { life, lichen } = kept();
+    like(life, D1 + 4 * HOUR_MS, lichen);
+    expect(flagged(life)).toEqual([['Lichen', 'kept', true]]);
+  });
+
+  it('brings back a find Muse kept before the last reflection, the first time the owner likes it', () => {
+    const { life, herbarium } = kept();
+    like(life, D1 + 4 * HOUR_MS, herbarium);
+    expect(flagged(life)).toEqual([
+      ['Lichen', 'kept', false],
+      ['Herbarium', 'kept', true],
+    ]);
+  });
+
+  it('never brings a find back for a second like', () => {
+    const { life, herbarium } = kept();
+    like(life, D1 + 4 * HOUR_MS, herbarium);
+    like(life, D1 + 5 * HOUR_MS, herbarium, false);
+    life.push(D1 + 6 * HOUR_MS, { kind: 'reflection.no-change', reviewed: [] });
+    like(life, D1 + 7 * HOUR_MS, herbarium);
+    expect(flagged(life)).toEqual([]);
   });
 });
 

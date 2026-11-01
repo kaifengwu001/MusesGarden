@@ -193,6 +193,16 @@ describe('HeuristicMind.reflect', () => {
     expect(delta.stage).toBeUndefined();
   });
 
+  it('weighs a find the owner liked as two, so one liked find can move its topic', async () => {
+    const liked: Experience = { ...exp('kept', ['Tide', 'Moon'], 'Tide'), liked: true };
+    const plain = exp('kept', ['Moon'], 'Moon');
+    const { deltas } = await mind.reflect(botanist, [liked, plain]);
+    expect(deltas.map((d) => [d.topic, d.dAffinity, d.evidence])).toEqual([
+      ['Moon', 0.15, [liked.ref, plain.ref]],
+      ['Tide', 0.1, [liked.ref]],
+    ]);
+  });
+
   it('proposes nothing when no topic has two sources', async () => {
     const proposal = await mind.reflect(botanist, [exp('kept', ['Tide'], 'Tide'), exp('skipped', ['Tide'], 'Neap tide')]);
     expect(proposal).toEqual({ deltas: [], narrative: '', questions: [] });

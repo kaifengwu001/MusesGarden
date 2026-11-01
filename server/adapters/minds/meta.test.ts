@@ -267,6 +267,17 @@ describe('MetaMind.reflect', () => {
     expect(proposal).toEqual({ deltas: [], narrative: '', questions: [] });
   });
 
+  it('tells the model which finds the owner liked', async () => {
+    const { fetch, calls } = stubFetch(completion({ deltas: [], narrative: '', questions: [] }));
+    await mind(fetch).reflect(ctx, [{ ...experiences[0], liked: true }, experiences[1]]);
+    const user = (bodyOf(calls[0]).messages as { role: string; content: string }[]).find((m) => m.role === 'user')?.content ?? '';
+    const shown = JSON.parse(user.slice(user.indexOf('['))) as { ref: string; liked: boolean }[];
+    expect(shown.map((e) => [e.ref, e.liked])).toEqual([
+      ['pip#1', true],
+      ['pip#2', false],
+    ]);
+  });
+
   it('offers only the shown refs to the model as citable evidence', async () => {
     const { fetch, calls } = stubFetch(completion({ deltas: [], narrative: '', questions: [] }));
     await mind(fetch).reflect(ctx, experiences);
