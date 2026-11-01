@@ -32,6 +32,21 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the third pass
+
+Started from 8529225 (the terraces' third pass: the terraces built on the hills). Kai's notes (2026-11-01), with two new references to start from, kept out of git under reference/terraces/: a painting of the valley (valley-painting.webp: karst towers in mist, a river winding between terraced hills, flooded and green paddies in sweeping curves, white houses with dark roofs, a stone-walled path in front) and a painting of the whole planet from above (planet-painting.webp: karst towers round the rim and a few inside, a river looping across it under a bridge, curved terraces in lime, deep green and silver water, villages along winding paths, trees everywhere, the planet in a sea of cloud and far towers); and ten models to use, repeated with rotation: five karst mountains and five houses (reference/terraces/models/, as sent). This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | It is very far from the quality and beauty expected. Isolate the scene's parts and nail each one's design and algorithm before combining them | |
+| 2 | The rice paddies are still broken in many places, a childish simplification of the real thing, with none of its dynamism and complexity | |
+| 3 | The tall mountains have no texture or character: dumb, simple shapes, very ugly. Use the mountain models, repeated with rotation; they can also be scaled for more variety | |
+| 4 | The planet's composition stretches and squeezes the landscapes, so the view from above is unnatural | |
+| 5 | The colour is muted and uninspiring | |
+| 6 | Use the two new references as the starting points | |
+| 7 | The houses: use the house models, repeated with rotation | |
+| 8 | Only the paddies (on smoother hills and on flatter ground), the rivers and the roads need generating | |
+
 ### Kai's notes on the second pass
 
 Started from d9b8f92 (the terraces' second pass: villages, flocks, the squint test). Kai's notes (2026-11-01), with three more references kept out of git under reference/terraces/: an aerial photo of terraces following the contours, white flooded bands among greens (contours-aerial.webp); a painting of flat fields in a patchwork of square-ish plots and roads (flats-painting.webp); a photo of flat rice fields, rectangular plots in many greens, a road winding through (flats-photo.webp). This table fills in as they are done.
