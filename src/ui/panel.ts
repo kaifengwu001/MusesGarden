@@ -10,6 +10,7 @@ const GROUP_TITLES: Record<GroupName, string> = {
   water: 'Water',
   wind: 'Wind',
   clouds: 'Clouds',
+  terraces: 'Terraces',
   muse: 'Muse',
   light: 'Light',
   style: 'Style',

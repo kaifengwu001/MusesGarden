@@ -1,5 +1,5 @@
 import { Vector3, type PerspectiveCamera } from 'three';
-import { createGroundSample, type Terrain } from '../planet/terrain';
+import { createGroundSample, type GroundSample } from '../planet/terrain';
 import { unwarpPoint, type WarpFrame } from '../render/warp';
 
 // CPU picking that hits what you see. The GPU draws the warped surface, so
@@ -17,13 +17,19 @@ export interface Pick {
   water: number;
 }
 
+/** A ground picking can march over: the meadow's Terrain, the terraces' TerraceTerrain. */
+export interface PickGround {
+  readonly radius: number;
+  sample(dir: Vector3, out: GroundSample): GroundSample;
+}
+
 const origin = new Vector3();
 const ray = new Vector3();
 const q = new Vector3();
 const p = new Vector3();
 const ground = createGroundSample();
 
-function above(t: number, warp: WarpFrame, terrain: Terrain): number {
+function above(t: number, warp: WarpFrame, terrain: PickGround): number {
   q.copy(origin).addScaledVector(ray, t);
   unwarpPoint(warp, q, p);
   const len = p.length();
@@ -31,7 +37,7 @@ function above(t: number, warp: WarpFrame, terrain: Terrain): number {
 }
 
 /** Pick at normalised device coordinates; null when the ray misses the planet. */
-export function pickSurface(camera: PerspectiveCamera, ndcX: number, ndcY: number, warp: WarpFrame, terrain: Terrain): Pick | null {
+export function pickSurface(camera: PerspectiveCamera, ndcX: number, ndcY: number, warp: WarpFrame, terrain: PickGround): Pick | null {
   origin.copy(camera.position);
   ray.set(ndcX, ndcY, 0.5).unproject(camera).sub(origin).normalize();
   const R = terrain.radius;

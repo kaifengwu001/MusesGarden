@@ -78,6 +78,8 @@ export const DEFAULT_GROWTH = Math.round(growthForArea(areaOfRadius(RADIUS_DEFAU
 
 export const schema = {
   world: {
+    // which planet you are on: the meadow (Muse's home) or the terraces, a second planet to visit
+    planet: choice('pl', 'Planet', ['meadow', 'terraces'], 'meadow', 'world'),
     seed: int('seed', 'Seed', 412, 0, 9999, 'world'),
     growth: num('g', 'Growth', DEFAULT_GROWTH, 0, 1, 0.0001, 'live'),
     areaMin: num('amin', 'Area at g = 0', AREA_MIN, 5_000, 400_000, 1, 'live', { unit: 'm²' }),
@@ -129,6 +131,11 @@ export const schema = {
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.88, 0, 1, 0.01, 'live'),
   },
+  terraces: {
+    hills: num('th', 'Hills', 18, 4, 36, 0.5, 'terrain', { unit: 'm' }),
+    forest: num('tf', 'Woods', 0.15, 0, 0.9, 0.01, 'terrain'),
+    fog: num('tfg', 'Valley fog', 0.55, 0, 1, 0.01, 'live'),
+  },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
     model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'tripo', 'field'], 'tpose6', 'live'),
@@ -151,7 +158,8 @@ export const schema = {
   ui: {
     hud: bool('hud', 'Perf HUD', import.meta.env.DEV, 'ui'),
     postcard: bool('pc', 'Postcard', false, 'ui'),
-    debug: choice('dbg', 'Debug view', ['off', 'chunks', 'morph', 'normals'], 'off', 'ui'),
+    // land: the terraces' land use and each paddy's infill in flat colours (the terraces only)
+    debug: choice('dbg', 'Debug view', ['off', 'chunks', 'morph', 'normals', 'land'], 'off', 'ui'),
   },
 } as const;
 
@@ -244,7 +252,7 @@ export const presets = {
 export type PresetName = keyof typeof presets;
 
 /** Fields a preset or reset leaves alone. */
-const PRESERVED: readonly ParamPath[] = ['world.seed', 'quality.tier', 'ui.hud', 'ui.postcard'];
+const PRESERVED: readonly ParamPath[] = ['world.planet', 'world.seed', 'quality.tier', 'ui.hud', 'ui.postcard'];
 
 type Listener = (changed: ReadonlySet<ParamPath>) => void;
 

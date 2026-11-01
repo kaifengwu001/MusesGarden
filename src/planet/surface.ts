@@ -90,7 +90,8 @@ export class Surface {
   private grid = 0;
   readonly uniforms: { uGridSteps: IUniform<number>; uNearField: IUniform<Vector4>; uFlowersBuilt: IUniform<Texture | null>; uFlowerCells: IUniform<number> };
 
-  constructor(shared: Record<string, IUniform>, grid: number) {
+  /** The meadow's ground by default; another planet passes its own shaders (terraces/surface.*.glsl). */
+  constructor(shared: Record<string, IUniform>, grid: number, shaders: { name: string; vertexShader: string; fragmentShader: string } = { name: 'surface', vertexShader, fragmentShader }) {
     this.uniforms = {
       uGridSteps: { value: grid - 1 },
       uNearField: { value: new Vector4(0, 1, 0, 0.001) },
@@ -100,7 +101,7 @@ export class Surface {
     };
     const uniforms = { ...shared, ...this.uniforms };
     const material = (away: boolean): ShaderMaterial =>
-      new ShaderMaterial({ name: away ? 'surface (away from home)' : 'surface', vertexShader, fragmentShader, uniforms, defines: away ? { AWAY_FROM_HOME: 1 } : {} });
+      new ShaderMaterial({ name: away ? `${shaders.name} (away from home)` : shaders.name, vertexShader: shaders.vertexShader, fragmentShader: shaders.fragmentShader, uniforms, defines: away ? { AWAY_FROM_HOME: 1 } : {} });
     this.near = new SurfacePart(this.selection.capacity, material(false));
     this.away = new SurfacePart(this.selection.capacity, material(true));
     this.setGrid(grid);

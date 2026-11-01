@@ -27,6 +27,8 @@ export interface ControlBarActions {
   reroll(): void;
   /** Move to the vista (the reference framing). */
   vista(): void;
+  /** Visit the other planet. */
+  travel(): void;
 }
 
 export class ControlBar {
@@ -34,6 +36,7 @@ export class ControlBar {
   private readonly players: Player[] = [];
   private readonly sliders = new Map<ParamPath, HTMLInputElement>();
   private readonly cameraButton: HTMLButtonElement;
+  private readonly travelButton: HTMLButtonElement;
 
   constructor(
     parent: HTMLElement,
@@ -58,10 +61,12 @@ export class ControlBar {
     seed.addEventListener('click', () => actions.reroll());
     const reset = el('button', 'cb-button', 'Reset');
     reset.addEventListener('click', () => actions.reset());
+    this.travelButton = el('button', 'cb-button cb-travel', 'Travel');
+    this.travelButton.addEventListener('click', () => actions.travel());
     const postcard = el('button', 'cb-button', 'Postcard');
     postcard.title = 'Frame this view as a postcard (Esc to close)';
     postcard.addEventListener('click', () => store.set('ui.postcard', true));
-    this.el.append(this.group(this.cameraButton, vista, seed, reset, postcard));
+    this.el.append(this.group(this.cameraButton, vista, seed, reset, postcard), this.group(this.travelButton));
     parent.append(this.el);
 
     store.subscribe((changed) => {
@@ -69,6 +74,16 @@ export class ControlBar {
       if (changed.has('view.mode')) this.cameraButton.textContent = store.values.view.mode === 'wander' ? 'Overview' : 'Wander';
     });
     this.cameraButton.textContent = store.values.view.mode === 'wander' ? 'Overview' : 'Wander';
+  }
+
+  /** Label the bar for the planet you are on: the way to the other, and the season's name for Bloom on the terraces. */
+  setPlanet(kind: 'meadow' | 'terraces'): void {
+    this.travelButton.title = kind === 'meadow' ? 'Visit the terraces, a second planet' : 'Back to the meadow';
+    for (const p of this.players) {
+      if (p.path !== 'world.bloom') continue;
+      p.label = kind === 'terraces' ? 'Season' : 'Bloom';
+      if (!p.playing) p.button.textContent = p.label;
+    }
   }
 
   /** Advance Grow / Bloom playback; call once per frame with wall-clock dt. */

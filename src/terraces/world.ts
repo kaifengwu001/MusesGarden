@@ -1,0 +1,412 @@
+import { Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { BuildQueue } from '../core/buildQueue';
+import type { FrameClock } from '../core/clock';
+import type { Globals } from '../core/globals';
+import type { Tier } from '../core/quality';
+import type { ParamPath, ParamStore } from '../params';
+import type { CameraPreset, PlanetWorld } from '../planetWorld';
+import { TerrainBake } from '../planet/bake';
+import { LOD_DEFAULT, type LodConfig } from '../planet/chunks';
+import { tangentToward, travel } from '../planet/geo';
+import { growthState, type GrowthState } from '../planet/growth';
+import { GrowthBand } from '../planet/rest';
+import { Surface } from '../planet/surface';
+import { createLookUniforms } from '../render/look';
+import { Palette, ROW, sunAt } from '../render/palette';
+import { Sky } from '../render/sky';
+import { localSun } from '../render/sun';
+import { warpForZoom } from '../render/warp';
+import { CameraRig } from '../view/camera';
+import { pickSurface, type Pick } from '../view/picking';
+import fragmentShader from './bake.frag.glsl?raw';
+import { createTerraceFieldUniforms, gradientFrame, type TerraceFieldParams, type TerraceFieldUniforms } from './fields';
+import { TERRACE_ROWS } from './palette';
+import surfaceFragment from './surface.frag.glsl?raw';
+import surfaceVertex from './surface.vert.glsl?raw';
+import { Houses } from './houses';
+import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
+import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
+
+const NOON = new Palette(TERRACE_ROWS);
+const NOON_SUN = NOON.get(ROW.LIGHT, 0);
+const NOON_SKY = NOON.get(ROW.LIGHT, 1);
+const WORLD_UP = new Vector3(0, 1, 0);
+const WORLD_X = new Vector3(1, 0, 0);
+const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 4 } as const;
+/** Parameters the terraces' fields (and so the bake) depend on. */
+const FIELD_PATHS: ReadonlySet<string> = new Set(['terraces.hills', 'terraces.forest']);
+/**
+ * The valley fog: its density in a bank at the default setting (1/m), the
+ * banks' top and its softness (m), the clearing it leaves round the camera
+ * (m), and its two layers' drift (m/s).
+ */
+const FOG = { density: 0.16, top: 8, soft: 2.2, clearing: 28, drift: [0.55, 1.1] } as const;
+/** Heights of the named views (m): a bird's-eye view over the terraces, and standing on one. */
+const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
+/** The vista: the camera's height (m) and its tilt from straight down (rad). */
+const VISTA = { height: 34, tilt: (58 * Math.PI) / 180 } as const;
+
+/**
+ * The terraces: a second planet to visit, built on the meadow's foundations
+ * (rest space, growth, the bake, CDLOD, the warp, the painted light).
+ * Hills cut into terraced rice paddies, flooded, growing and ripe; forest on
+ * the hills and the karst peaks left wild; fog meandering in the valleys.
+ * Each frame: growth → fade band → fields (re-baked only when they change)
+ * → camera → light, wind, fog and look uniforms → warp → LOD → sky.
+ */
+export class TerraceWorld implements PlanetWorld {
+  readonly kind = 'terraces' as const;
+  readonly scene = new Scene();
+  readonly rig = new CameraRig();
+  readonly palette = new Palette(TERRACE_ROWS);
+  readonly look = createLookUniforms();
+  readonly terrainUniforms = createTerrainUniforms();
+  readonly band = new GrowthBand();
+  readonly queue = new BuildQueue();
+  readonly growth: GrowthState = { g: 0, area: 0, radius: 128 };
+  readonly sky: Sky;
+  readonly surface: Surface;
+  readonly bake: TerrainBake<TerraceFieldUniforms>;
+  terrain: TerraceTerrain;
+  readonly shared: Record<string, IUniform>;
+  readonly warp = { focus: new Vector3(), up: new Vector3(0, 1, 0), k: 0 };
+  readonly sunDir = new Vector3(0, 1, 0);
+  lod: LodConfig = LOD_DEFAULT;
+  nearFieldDrawn = false;
+  readonly nearInstances = { grass: 0, flowers: 0 };
+  readonly houses: Houses;
+  /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
+  villages: Village[] = [];
+  private readonly villageUniforms = createVillageUniforms();
+  private villagesFor = '';
+  /** The valley fog, the paddies' water and the crop's look (fog.glsl, water.glsl, surface.frag.glsl). */
+  private readonly atmosphere = {
+    uValleyFog: { value: new Vector4(FOG.density, FOG.top, FOG.soft, FOG.clearing) },
+    uFogDrift: { value: new Vector4(1, 0, 1, 0) },
+    uFogCover: { value: new Vector4(0.52, 0.16, 0.8, 0) },
+    uPaddyWater: { value: new Vector4(0.85, 80, 0, 0) },
+    uRiceLook: { value: new Vector4(0.6, 0, 0, 0) },
+  };
+  private fieldParams: TerraceFieldParams = { hills: 18, forest: 0.15 };
+  private fieldKey = '';
+  private fieldsR = Number.NaN;
+  private fieldsKey = '';
+  private fieldsFull = false;
+  private fieldsStill = 0;
+  private posed = false;
+  private nextGust = 0;
+  private readonly frustum = new Frustum();
+  private readonly projView = new Matrix4();
+  private readonly windAxis = new Vector3();
+  private readonly tmp = new Vector3();
+  private readonly heightBound = (): number => this.terrain.maxHeight;
+
+  constructor(
+    private readonly renderer: WebGLRenderer,
+    private readonly globals: Globals,
+    private readonly store: ParamStore,
+    tier: Tier,
+  ) {
+    this.bake = new TerrainBake(tier.maps.bake, { name: 'terraces bake', fragmentShader, uniforms: createTerraceFieldUniforms() });
+    this.terrain = new TerraceTerrain(generateTerraceLayout(store.values.world.seed));
+    this.refreshFieldParams();
+    this.look.uPalette.value = this.palette.texture;
+    this.terrainUniforms.uTerraceBake.value = this.bake.terrainTexture(false);
+    this.terrainUniforms.uTerraceLife.value = this.bake.floraTexture(false);
+    this.shared = {
+      ...globals,
+      ...this.look,
+      ...this.terrainUniforms,
+      ...this.atmosphere,
+      ...this.villageUniforms,
+      uGustRot: { value: new Vector4(1, 0, 1, 0) },
+      uGustFreq: { value: new Vector4(8, 24, 0, 0) },
+      uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
+    };
+    this.sky = new Sky();
+    this.surface = new Surface(this.shared, tier.terrainGrid, { name: 'terraces ground', vertexShader: surfaceVertex, fragmentShader: surfaceFragment });
+    this.houses = new Houses(this.shared);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.houses.mesh);
+    this.applyTier(tier);
+  }
+
+  applyTier(tier: Tier): void {
+    // a finer grid near the camera than the meadow's: the risers are half a meter wide
+    this.lod = { ...LOD_DEFAULT, grid: tier.terrainGrid, leafSize: 4 };
+  }
+
+  get needsDefaultPose(): boolean {
+    return !this.posed;
+  }
+
+  markPosed(): void {
+    this.posed = true;
+  }
+
+  /** Over the terraces, looking down across a valley: a stand on a terraced hillside, facing downhill. */
+  defaultPose(): void {
+    this.prepare();
+    const stand = this.findStand();
+    this.rig.lookAlong(stand.focus, stand.forward);
+    this.posed = true;
+  }
+
+  cameraPreset(name: CameraPreset, immediate = true): void {
+    this.prepare();
+    if (name === 'homestead' && this.villages.length > 0) {
+      // a village, from out over the terraces below it, looking up at it
+      const v = this.villages[0];
+      const h = v.houses[0];
+      const R = this.terrain.radius;
+      const focus = travel(v.dir, h.front, (v.radius + 22) / R, new Vector3());
+      this.rig.lookAlong(focus, tangentToward(focus, v.dir, new Vector3()), immediate);
+      const zoom = this.rig.zoomForAltitude(26);
+      this.rig.setZoom(zoom, immediate);
+      this.rig.lookUp((60 * Math.PI) / 180 - this.rig.framing(zoom).tilt);
+      this.posed = true;
+      return;
+    }
+    const stand = this.findStand();
+    this.rig.lookAlong(stand.focus, stand.forward, immediate);
+    if (name === 'vista') {
+      // the painting's view (reference/terraces/vista-green.webp): high over the terraces, looking down
+      // across them to the forest and the terraced hills beyond, no sky
+      const zoom = this.rig.zoomForAltitude(VISTA.height);
+      this.rig.setZoom(zoom, immediate);
+      this.rig.lookUp(VISTA.tilt - this.rig.framing(zoom).tilt);
+    } else if (name === 'muse' || name === 'meadow') this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.standing), immediate);
+    else this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.above), immediate);
+    this.posed = true;
+  }
+
+  /** Set up the ground for this world before the first frame does (a named view reads it, and the villages). */
+  private prepare(): void {
+    const world = this.store.values.world;
+    growthState(world.growth, world.areaMin, world.areaMax, this.growth);
+    if (this.growth.radius !== this.fieldsR || this.fieldKey !== this.fieldsKey || !this.fieldsFull) this.refreshFields(true);
+  }
+
+  /**
+   * The best stand from a spiral of candidates over the planet: on a terraced
+   * hillside, terraces below it, a valley in front and a peak or a hill
+   * across it; facing downhill.
+   */
+  private findStand(): { focus: Vector3; forward: Vector3 } {
+    const t = this.terrain;
+    const R = t.radius;
+    const s = createTerraceSample();
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    const d = new Vector3();
+    const a = new Vector3();
+    const b = new Vector3();
+    const q = new Vector3();
+    const fwd = new Vector3();
+    let best = -Infinity;
+    const focus = new Vector3(0, 1, 0);
+    const forward = new Vector3(1, 0, 0);
+    const n = 700;
+    for (let i = 0; i < n; i++) {
+      const z = 1 - (2 * (i + 0.5)) / n;
+      const r = Math.sqrt(1 - z * z);
+      d.set(r * Math.cos(golden * i), r * Math.sin(golden * i), z);
+      t.terraceAt(d, s);
+      if (s.wild > 0.05 || s.slope < 0.12 || s.slope > 0.55) continue;
+      const h0 = s.natural;
+      // downhill from the hills' own height
+      gradientFrame(d, a, b);
+      const e = 2 / R;
+      const ha = t.fields.natural(q.copy(d).addScaledVector(a, e).normalize());
+      const hb = t.fields.natural(q.copy(d).addScaledVector(b, e).normalize());
+      fwd.copy(a).multiplyScalar(-(ha - h0)).addScaledVector(b, -(hb - h0));
+      if (fwd.lengthSq() < 1e-12) continue;
+      fwd.normalize();
+      let terraced = 0;
+      let low = h0;
+      let across = 0;
+      for (let k = 1; k <= 24; k++) {
+        const dist = 8 * k;
+        travel(d, fwd, dist / R, q);
+        t.terraceAt(q, s);
+        if (dist < 70 && s.wild < 0.3) terraced++;
+        if (dist < 140) low = Math.min(low, s.natural);
+        if (dist >= 90) across = Math.max(across, s.natural - h0);
+      }
+      const score = terraced / 8 + 0.03 * Math.min(h0 - low, 18) + 0.025 * Math.min(Math.max(across, 0), 40);
+      if (score > best) {
+        best = score;
+        focus.copy(d);
+        forward.copy(fwd);
+      }
+    }
+    return { focus, forward };
+  }
+
+  onParams(changed: ReadonlySet<ParamPath>): void {
+    if (changed.has('world.seed')) this.terrain = new TerraceTerrain(generateTerraceLayout(this.store.values.world.seed));
+    for (const path of changed) {
+      if (FIELD_PATHS.has(path)) {
+        this.refreshFieldParams();
+        break;
+      }
+    }
+  }
+
+  private refreshFieldParams(): void {
+    const p = this.store.values.terraces;
+    this.fieldParams = { hills: p.hills, forest: p.forest };
+    this.fieldKey = `${this.terrain.layout.seed}/${JSON.stringify(this.fieldParams)}`;
+  }
+
+  private refreshFields(full: boolean): void {
+    const R = this.growth.radius;
+    this.fieldsR = R;
+    this.fieldsKey = this.fieldKey;
+    this.fieldsFull = full;
+    this.terrain.update(R, this.fieldParams, this.store.values.world.bloom);
+    this.terrain.writeUniforms(this.terrainUniforms);
+    this.bake.bake(this.renderer, this.terrain.fields, `${R}/${this.fieldKey}`, full);
+    this.terrainUniforms.uTerraceBake.value = this.bake.terrainTexture(full);
+    this.terrainUniforms.uTerraceLife.value = this.bake.floraTexture(full);
+    // the villages, once the ground holds still (they read the ground: a few ms)
+    const key = `${R}/${this.fieldKey}`;
+    if (full && key !== this.villagesFor) {
+      this.villagesFor = key;
+      this.villages = placeVillages(this.terrain);
+      writeVillageUniforms(this.villages, this.villageUniforms);
+      this.houses.set(this.villages);
+    }
+  }
+
+  update(clock: FrameClock, aspect: number, viewportHeight: number): void {
+    const p = this.store.values;
+    growthState(p.world.growth, p.world.areaMin, p.world.areaMax, this.growth);
+    const R = this.growth.radius;
+    this.band.update(R, clock.realDt);
+    if (this.terrain.layout.seed !== p.world.seed) this.terrain = new TerraceTerrain(generateTerraceLayout(p.world.seed));
+    if (`${this.terrain.layout.seed}/${JSON.stringify(this.fieldParams)}` !== this.fieldKey) this.refreshFieldParams();
+    if (R !== this.fieldsR || this.fieldKey !== this.fieldsKey) {
+      this.refreshFields(false);
+      this.fieldsStill = 0;
+    } else if (!this.fieldsFull && ++this.fieldsStill >= 6) this.refreshFields(true);
+    // the season is not baked: the bloom slider moves it live
+    this.terrain.seasonFront = seasonFront(p.world.bloom);
+    this.terrainUniforms.uPaddy.value.y = this.terrain.seasonFront;
+
+    this.rig.update(clock.realDt, R, aspect, (dir) => this.terrain.height(dir));
+    const rig = this.rig;
+    this.warp.focus.copy(rig.focus);
+    this.warp.up.copy(rig.up);
+    this.warp.k = warpForZoom(rig.zoom, R, p.view.visualRadius);
+    const g = this.globals;
+    g.uTime.value = clock.time;
+    g.uRadius.value = R;
+    g.uRadiusLag.value = Math.exp(this.band.lnRLag);
+    this.band.write(g.uGrowthBand.value);
+    g.uWarpFocus.value.copy(this.warp.focus);
+    g.uWarpUp.value.copy(this.warp.up);
+    g.uWarpK.value = this.warp.k;
+
+    this.updateLight(p.light.timeOfDay);
+    this.updateLook(clock);
+
+    const cam = rig.camera;
+    this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    this.surface.update(
+      {
+        camera: cam.position,
+        radius: R,
+        heightAbove: this.terrain.maxHeight,
+        heightBelow: 3,
+        frustum: this.frustum,
+        warp: this.warp,
+        horizonCull: Math.abs(this.warp.k) * R < 0.01,
+        warpHorizon:
+          Math.abs(this.warp.k) * R >= 0.01
+            ? {
+                focusDir: rig.up,
+                radiusEff: 1 / (1 / R + 2 * this.warp.k),
+                eyeHeight: rig.altitude + 0.5,
+                heightAt: this.heightBound,
+              }
+            : null,
+        home: null,
+      },
+      this.lod,
+    );
+    this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
+    this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
+  }
+
+  private updateLight(hours: number): void {
+    this.palette.update(hours);
+    const sun = sunAt(hours);
+    localSun(this.rig.up, sun.elevation, sun.azimuth, this.sunDir);
+    this.look.uSunDir.value.copy(this.sunDir);
+    this.look.uSunAngles.value.set(Math.sin(sun.elevation), Math.cos(sun.elevation), Math.cos(sun.azimuth), Math.sin(sun.azimuth));
+    const sunC = this.palette.get(ROW.LIGHT, 0, this.look.uSunTint.value);
+    sunC.r /= NOON_SUN.r;
+    sunC.g /= NOON_SUN.g;
+    sunC.b /= NOON_SUN.b;
+    const skyC = this.palette.get(ROW.LIGHT, 1, this.look.uShadeTint.value);
+    skyC.r /= NOON_SKY.r;
+    skyC.g /= NOON_SKY.g;
+    skyC.b /= NOON_SKY.b;
+  }
+
+  private updateLook(clock: FrameClock): void {
+    const p = this.store.values;
+    const L = this.look;
+    L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 0);
+    // a softer distance than the meadow's: the valley fog does the rest
+    L.uFog.value.set(p.style.fogDensity * 0.0018 * (1 + 6 * this.rig.tilt), 0.06 + 0.3 * p.style.fogDensity, this.rig.altitude * 0.95, 0.75);
+    L.uFogUp.value.copy(this.rig.up);
+    // the wind: a rotation field fixed to the planet, aimed by the direction param along the grain
+    const ref = this.terrain.layout.grain;
+    const north = tangentToward(ref, Math.abs(ref.y) > 0.98 ? WORLD_X : WORLD_UP, this.tmp);
+    const w = north.applyAxisAngle(ref, (-p.wind.direction * Math.PI) / 180);
+    const axis = this.windAxis.crossVectors(ref, w).normalize();
+    L.uWindVec.value.set(axis.x, axis.y, axis.z, p.wind.strength);
+    L.uGust.value.set(clock.time, 0, p.wind.gustiness, p.wind.strength);
+    const R = this.growth.radius;
+    const gusts = (-clock.time * (2.5 + 6 * p.wind.strength)) / R;
+    const ripples = (-clock.time * (3.5 + 9 * p.wind.strength)) / R;
+    (this.shared.uGustRot.value as Vector4).set(Math.cos(gusts), Math.sin(gusts), Math.cos(ripples), Math.sin(ripples));
+    (this.shared.uGustFreq.value as Vector4).set(R / 16, R / 5.5, 0, 0);
+    L.uDebug.value = DEBUG_VIEWS[p.ui.debug];
+    // the fog drifts in its two layers along the wind, slowly
+    const a = (-clock.time * FOG.drift[0] * (0.4 + p.wind.strength)) / R;
+    const b = (-clock.time * FOG.drift[1] * (0.4 + p.wind.strength)) / R;
+    const A = this.atmosphere;
+    A.uFogDrift.value.set(Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b));
+    A.uValleyFog.value.x = (FOG.density * p.terraces.fog) / 0.55;
+    A.uPaddyWater.value.set(p.water.reflection, this.terrain.maxHeight, 0, clock.time);
+    A.uRiceLook.value.set(p.wind.sheen * 1.2, 0, 0, 0);
+  }
+
+  effectiveTriangles(submitted: number): number {
+    return submitted;
+  }
+
+  pick(ndcX: number, ndcY: number): Pick | null {
+    return pickSurface(this.rig.camera, ndcX, ndcY, this.warp, this.terrain);
+  }
+
+  /** A gust ring bursting out from a point. */
+  gust(dir: Vector3, time: number): void {
+    const rings = this.shared.uGustRings.value as Vector4[];
+    rings[this.nextGust++ % rings.length].set(dir.x, dir.y, dir.z, time);
+  }
+
+  /** A ripple on a paddy's water (rings come later; for now the wind's ring stirs it). */
+  ripple(dir: Vector3, time: number): void {
+    this.gust(dir, time);
+  }
+
+  settle(): void {
+    this.band.settle();
+    this.queue.drain();
+    this.rig.settle();
+    growthState(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax, this.growth);
+    this.refreshFields(true);
+  }
+}

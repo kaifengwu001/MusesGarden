@@ -489,3 +489,19 @@ body.postcard .lil-gui.meadow-panel {
   letter-spacing: 0.04em;
   cursor: pointer;
 }
+
+/* ---- a visit: the mist the camera passes through to the other planet ---- */
+
+.veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 60%, #fbfaf4 0%, #eef2f1 55%, #dfe8ec 100%);
+  opacity: 0;
+  transition: opacity 0.9s ease-in-out;
+}
+
+.veil.closed {
+  opacity: 1;
+  pointer-events: auto;
+}

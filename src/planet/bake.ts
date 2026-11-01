@@ -6,13 +6,14 @@ import {
   Scene,
   ShaderMaterial,
   WebGLCubeRenderTarget,
+  type IUniform,
   type Texture,
   type WebGLRenderer,
 } from 'three';
 import { gpuMemory } from '../core/gpuMemory';
 import { fullscreenMesh } from '../render/fullscreen';
 import fragmentShader from './bake.frag.glsl?raw';
-import { createFieldUniforms, type Fields, type FieldUniforms } from './fields';
+import { createFieldUniforms, type FieldUniforms } from './fields';
 
 // The meadow fields baked into two direction-space cube maps, so the ground,
 // the paint and the vegetation read them back with one fetch instead of
@@ -47,8 +48,21 @@ function bakeSet(size: number): BakeSet {
   return { size, terrain: cube(size), flora: cube(size / 2), key: '' };
 }
 
-export class TerrainBake {
-  readonly uniforms: FieldUniforms;
+/** What a bake draws: its fragment shader (passes 0 and 1, as bake.frag.glsl) and the uniforms its fields write. */
+export interface BakeProgram<U> {
+  /** The material's name, and the GPU memory ledger's. */
+  readonly name: string;
+  readonly fragmentShader: string;
+  readonly uniforms: U;
+}
+
+/** Fields a bake can draw: they write its uniforms. */
+export interface BakedFields<U> {
+  writeUniforms(u: U): void;
+}
+
+export class TerrainBake<U extends object = FieldUniforms> {
+  readonly uniforms: U;
   /** Bakes so far (perf stat). */
   bakes = 0;
   private readonly full: BakeSet;
@@ -60,17 +74,19 @@ export class TerrainBake {
   private readonly scene: Scene;
   private readonly camera = new OrthographicCamera();
 
-  constructor(size: number) {
+  /** The meadow's fields by default; another planet passes its own (terraces/bake.frag.glsl). */
+  constructor(size: number, program?: BakeProgram<U>) {
+    const p = program ?? ({ name: 'terrain bake', fragmentShader, uniforms: createFieldUniforms() } as unknown as BakeProgram<U>);
     this.full = bakeSet(size);
     this.quick = bakeSet(size / 2);
     const bytes = (s: number): number => 6 * 8 * (s * s + (s / 2) ** 2);
-    gpuMemory.set('terrain bake', bytes(size) + bytes(size / 2));
-    this.uniforms = createFieldUniforms();
+    gpuMemory.set(p.name, bytes(size) + bytes(size / 2));
+    this.uniforms = p.uniforms;
     const material = new ShaderMaterial({
-      name: 'terrain bake',
+      name: p.name,
       vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader,
-      uniforms: { ...this.uniforms, uFace: this.face, uPass: this.pass, uSize: this.sizeU, uBakedTerrain: this.baked },
+      fragmentShader: p.fragmentShader,
+      uniforms: { ...(this.uniforms as Record<string, IUniform>), uFace: this.face, uPass: this.pass, uSize: this.sizeU, uBakedTerrain: this.baked },
       depthTest: false,
       depthWrite: false,
     });
@@ -91,7 +107,7 @@ export class TerrainBake {
   }
 
   /** Bake the full or the quick set when `key` (everything the fields depend on) has changed. */
-  bake(renderer: WebGLRenderer, fields: Fields, key: string, full: boolean): boolean {
+  bake(renderer: WebGLRenderer, fields: BakedFields<U>, key: string, full: boolean): boolean {
     const set = full ? this.full : this.quick;
     if (key === set.key) return false;
     set.key = key;

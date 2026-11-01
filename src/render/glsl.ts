@@ -11,6 +11,13 @@ import noise from '../planet/noise.glsl?raw';
 import rest from '../planet/rest.glsl?raw';
 import terrain from '../planet/terrain.glsl?raw';
 import water from '../planet/water.glsl?raw';
+import terracesCommon from '../terraces/common.glsl?raw';
+import terracesFields from '../terraces/fields.glsl?raw';
+import terracesFog from '../terraces/fog.glsl?raw';
+import terracesGround from '../terraces/ground.glsl?raw';
+import terracesPaddy from '../terraces/paddy.glsl?raw';
+import terracesVillage from '../terraces/village.glsl?raw';
+import terracesWater from '../terraces/water.glsl?raw';
 import common from './common.glsl?raw';
 import fog from './fog.glsl?raw';
 import sun from './sun.glsl?raw';
@@ -37,6 +44,14 @@ const chunks: Record<string, string> = {
   meadow_field: field,
   meadow_wind: wind,
   meadow_muse_press: musePress,
+  // the terraces (terraces/), a second planet on the same foundations
+  terraces_common: terracesCommon,
+  terraces_fields: terracesFields,
+  terraces_ground: terracesGround,
+  terraces_paddy: terracesPaddy,
+  terraces_village: terracesVillage,
+  terraces_fog: terracesFog,
+  terraces_water: terracesWater,
 };
 
 export function registerShaderChunks(): void {

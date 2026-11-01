@@ -659,6 +659,80 @@ so any view can be shared.
 | Picking | Playwright: CPU pick vs GPU position readback at 64 random pixels, error < 2 cm |
 | Looks like the reference when you squint | Playwright (`npm run squint`): the vista and the reference still, each shrunk to 48 × 27 and blurred, compared per cell in CIE Lab (mean ΔE76; the still stays out of git, so the test skips without it) |
 
+## The terraces: a second planet
+
+A second planet to visit (the Travel button, `pl=terraces` in the URL),
+built on the same foundations: rest space, growth, the bake, CDLOD, the
+warp, the painted light. Its own code is in `src/terraces/`. Hills of rice
+terraces, forest on the hilltops and in the gullies, small villages, karst
+peaks, fog in the valleys. The colours come from the blue ink painting of
+karst peaks in mist (reference/terraces/colour-blue.png); the vista is framed
+like, and squinted against, the green terraces painting
+(reference/terraces/vista-green.webp) recoloured into those colours
+(vista-target.png; references are kept out of git).
+
+### Land use: forest above, villages, terraces, the valley floor
+
+Every point of the planet is sorted the way the Hani terraces are laid out
+(forest at the top, the village below it, terraces down the slopes, the
+valley floor at the bottom), from fields baked in rest space
+(terraces/fields.*), in this order:
+
+1. **Peaks:** karst towers from a progressive point set (a constant number
+   per km² as the planet grows), kept where a macro range field allows them.
+   Forest on their flanks, ink-blue rock where they are too steep for it.
+2. **Too steep to terrace:** where a terrace would be narrower than about
+   1.8 m (slope over 0.6): forest.
+3. **Crowns:** where the hills' finer octaves (their local relief) stand
+   well above their surroundings, and the ground is well above the valley
+   floors: the hilltops, forest. Real terraces keep the forest above them
+   (it holds the water that feeds them).
+4. **Gullies:** where the local relief is well below its surroundings on a
+   slope: a line of trees down the gully.
+5. **Woods:** stretches of whole hillside left to forest, by a macro noise
+   (the Forest share).
+6. **Villages:** sites from a second point set, kept on gentle ground just
+   below a forest edge. Houses stand on terrace floors around the site (each
+   level is flat, so a house stands level on it), along the contour, facing
+   downhill; their ground is courtyard, not paddy.
+7. **Everything else is terraced.**
+
+### A hill turned into terraces
+
+The hills' height is cut into levels a riser apart (1.1 m): the level is
+L = ⌊h / riser + offset⌋, where a slow offset field lets the levels wander off
+the contours a little, so terraces narrow, widen and merge. Each level is a
+flat floor at L × riser; a band of it is riser / slope wide (steep: narrow,
+gentle: wide; on the flat valley floors one level spans the floor). Across a
+band, from its downhill edge:
+
+- **the bund**, the wall that holds the water: a ridge 0.22 m high and
+  0.45 m wide along the top of the riser below;
+- **the floor**, flat: the paddy;
+- **the riser** up to the next level, 0.55 m wide, steep.
+
+Along the band, **cross-bunds** divide it into paddies, across the band:
+the planet is tiled into cells about 48 m wide (a Voronoi tiling in
+direction space, chosen per octave of R), and within a cell each level is cut
+every 9–22 m (its own spacing and phase) along the contour's direction at
+the cell's middle, so the cuts run downhill, staggered from level to level.
+A cell's own edge is a cut too. So every paddy is enclosed: the bund along
+its outer edge, the riser along its inner edge, cross-bunds at its ends.
+
+**Infill:** each paddy (its cell, level and place along the band) decides
+what fills it: how far through the season it is, from a season field over
+the hillsides (so neighbours are alike) and a chance of its own: flooded
+(a mirror), seedlings in rows, growing, heading out, ripe; now and then
+fallow; in a village, courtyard. The Bloom slider is the season: all flooded
+at 0, at 1 (the default) about a quarter still flooded, the rest on their
+way or grown.
+
+The mesh is terraced near the camera (its grid is fine enough to draw a
+riser there, the near leaves 4 m wide) and has the hills' own shape further
+off; the fragment shader draws the bands, the walls and the infill per pixel,
+each filtered over the pixel's footprint, so they stay crisp up close and
+settle into their average colour far off instead of shimmering.
+
 ## Module map
 
     src/

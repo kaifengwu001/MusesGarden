@@ -10,18 +10,20 @@ import { GpuTimer } from './dev/gpuTimer';
 import { installHarness } from './dev/harness';
 import { measureParity } from './dev/parity';
 import type { ParamPath } from './params';
+import type { PlanetKind, PlanetWorld } from './planetWorld';
 import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
 import { registerShaderChunks } from './render/glsl';
 import { Post } from './render/post';
 import { ControlBar } from './ui/controlBar';
-import { worldLine } from './ui/format';
+import { terracesLine, worldLine } from './ui/format';
 import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from './view/input';
 import { AHEAD } from './life/scatter';
 import { Keys } from './view/keys';
+import { TerraceWorld } from './terraces/world';
 import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
@@ -87,10 +89,22 @@ async function boot(): Promise<void> {
   chooseTier(store.values.quality.tier);
 
   const globals = createGlobals();
-  const world = new World(renderer, globals, store, quality.tier);
+  // The planets: the meadow (Muse's home) always, the terraces from the first visit (or the URL) on.
+  // `world` is the one being updated and drawn; a visit swaps it (visit() below).
+  const meadow = new World(renderer, globals, store, quality.tier);
+  let terraces: TerraceWorld | null = null;
+  const planet = (kind: PlanetKind): PlanetWorld => {
+    if (kind === 'meadow') return meadow;
+    if (!terraces) {
+      terraces = new TerraceWorld(renderer, globals, store, quality.tier);
+      if (import.meta.env.DEV || import.meta.env.VITE_PROBE) (window as unknown as { __terraces: TerraceWorld }).__terraces = terraces;
+    }
+    return terraces;
+  };
+  let world: PlanetWorld = planet(store.values.world.planet);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
-  if (import.meta.env.DEV || import.meta.env.VITE_PROBE) (window as unknown as { __world: World }).__world = world;
-  const camera = world.rig.camera;
+  if (import.meta.env.DEV || import.meta.env.VITE_PROBE) (window as unknown as { __world: World; __planet: () => PlanetWorld }).__world = meadow;
+  if (import.meta.env.DEV || import.meta.env.VITE_PROBE) (window as unknown as { __planet: () => PlanetWorld }).__planet = () => world;
   const post = new Post(renderer);
   post.bloomEnabled = quality.tier.bloom;
   const gpuTimer = new GpuTimer(gl);
@@ -98,6 +112,10 @@ async function boot(): Promise<void> {
   const hud = new PerfHud(uiRoot);
   const ui = new Ui(uiRoot);
   const panel = createPanel(store);
+  // the mist a visit passes through (style.css .veil)
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  uiRoot.append(veil);
   ui.setHints([
     ['drag', 'orbit · glide'],
     ['scroll', 'down to the meadow'],
@@ -134,6 +152,7 @@ async function boot(): Promise<void> {
       world.rig.setZoom(0);
     },
     reroll: () => store.set('world.seed', Math.floor(Math.random() * 10000)),
+    travel: () => store.set('world.planet', world.kind === 'meadow' ? 'terraces' : 'meadow'),
     vista: () => {
       world.cameraPreset('vista', false);
       userPosed = true;
@@ -142,7 +161,7 @@ async function boot(): Promise<void> {
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
-  const onMuse = (x: number, y: number): { side: number } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+  const onMuse = (x: number, y: number): { side: number } | null => (world === meadow ? meadow.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2) : null);
   let pettingMuse = false;
   attachInput(canvas, {
     drag: (dx, dy) => {
@@ -155,7 +174,7 @@ async function boot(): Promise<void> {
     },
     tap: (x, y) => {
       if (onMuse(x, y)) {
-        world.muse.tap(clock.time);
+        meadow.muse.tap(clock.time);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -165,7 +184,7 @@ async function boot(): Promise<void> {
     },
     doubleTap: (x, y) => {
       if (onMuse(x, y)) {
-        world.muse.tap(clock.time);
+        meadow.muse.tap(clock.time);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -178,20 +197,21 @@ async function boot(): Promise<void> {
       const touch = onMuse(x, y);
       if (touch) {
         pettingMuse = true;
-        world.muse.hold(clock.time, touch.side);
+        meadow.muse.hold(clock.time, touch.side);
         return;
       }
-      const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
-      if (hit && hit.water >= 0) world.bloomStart(hit.dir);
+      if (world !== meadow) return;
+      const hit = meadow.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+      if (hit && hit.water >= 0) meadow.bloomStart(hit.dir);
     },
     holdMove: () => undefined,
     holdEnd: () => {
       if (pettingMuse) {
         pettingMuse = false;
-        world.muse.letGo(clock.time);
+        meadow.muse.letGo(clock.time);
         return;
       }
-      world.bloomEnd();
+      meadow.bloomEnd();
     },
   });
 
@@ -222,7 +242,8 @@ async function boot(): Promise<void> {
   const applyUi = (): void => {
     hud.visible = store.values.ui.hud;
     postcard.apply();
-    ui.setWorldLine(worldLine(store.values, world.growth));
+    ui.setWorldLine(world.kind === 'terraces' ? terracesLine(store.values, world.growth) : worldLine(store.values, world.growth));
+    controls.setPlanet(world.kind);
   };
 
   // The Overview/Wander param follows the zoom, and the toggle drives it.
@@ -234,12 +255,16 @@ async function boot(): Promise<void> {
   store.subscribe((changed) => {
     if (changed.has('quality.tier')) {
       chooseTier(store.values.quality.tier);
-      world.applyTier(quality.tier);
+      meadow.applyTier(quality.tier);
+      terraces?.applyTier(quality.tier);
       post.bloomEnabled = quality.tier.bloom;
       resizePending = true;
     }
     if (changed.has('view.mode') && !syncingMode) world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0);
-    world.onParams(changed);
+    // every planet hears every change (a seed changed on one is the seed of both)
+    meadow.onParams(changed);
+    terraces?.onParams(changed);
+    if (changed.has('world.planet')) void visit(store.values.world.planet);
     applyUi();
   });
 
@@ -259,7 +284,35 @@ async function boot(): Promise<void> {
 
   const render = (): void => {
     renderer.info.reset();
-    post.render(world.scene, camera, store.values.style.grain, store.values.style.contrast, store.values.style.brightness);
+    post.render(world.scene, world.rig.camera, store.values.style.grain, store.values.style.contrast, store.values.style.brightness);
+  };
+
+  // A visit: the camera climbs away from the planet as a white mist closes in, the other planet takes its
+  // place behind it (built and its shaders compiled on the first visit), and the mist clears as the camera
+  // comes down from high above to a bird's-eye view of it.
+  let visiting: PlanetKind | null = null;
+  const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+  const visit = async (kind: PlanetKind): Promise<void> => {
+    if (world.kind === kind || visiting === kind) return;
+    visiting = kind;
+    world.rig.setZoom(Math.min(world.rig.zoom, 0.1));
+    veil.classList.add('closed');
+    await wait(950);
+    const next = planet(kind);
+    next.applyTier(quality.tier);
+    if (next.needsDefaultPose) next.defaultPose();
+    next.rig.setZoom(0, true);
+    world = next;
+    userPosed = false;
+    update();
+    await post.warm(world.scene, world.rig.camera);
+    for (const program of renderer.info.programs ?? []) program.getUniforms();
+    world.rig.setZoom(world.rig.zoomForAltitude(70.2));
+    applyUi();
+    veil.classList.remove('closed');
+    visiting = null;
+    // a visit asked for while this one was under way (the button pressed twice) goes on from here
+    if (store.values.world.planet !== world.kind) void visit(store.values.world.planet);
   };
 
   const collectStats = (jsMs: number): void => {
@@ -286,8 +339,8 @@ async function boot(): Promise<void> {
     stats.growth = world.growth.g;
     stats.area = world.growth.area;
     stats.radius = world.growth.radius;
-    stats.grassInstances = world.grass.layer.visibleInstances;
-    stats.flowerInstances = world.flowers.layer.visibleInstances;
+    stats.grassInstances = world.nearInstances.grass;
+    stats.flowerInstances = world.nearInstances.flowers;
     stats.chunks = sel.count;
     stats.lodMin = sel.minLevel;
     stats.lodMax = sel.maxLevel;
@@ -359,7 +412,7 @@ async function boot(): Promise<void> {
   // Warm every shader before the first frame, against the real render target.
   resize();
   update();
-  await post.warm(world.scene, camera);
+  await post.warm(world.scene, world.rig.camera);
   // From orbit (the default start) the near field is not drawn, so its first use waited for the
   // way down: the field map's, the clouds' mirror's and the water mask's programs linked and the
   // grass and flower instances sent to the GPU then (a frame of 60–140 ms, which also starved the
@@ -393,17 +446,18 @@ async function boot(): Promise<void> {
       },
       settle: async () => {
         store.flush();
-        await world.muse.ready;
+        while (visiting) await wait(50);
+        if (world === meadow) await meadow.muse.ready;
         world.settle();
         update();
         world.settle();
-        await post.warm(world.scene, camera);
+        await post.warm(world.scene, world.rig.camera);
       },
       set: (path, value) => {
         store.set(path as ParamPath, value);
         store.flush();
       },
-      parity: () => measureParity(world, renderer),
+      parity: () => measureParity(meadow, renderer),
       pick: (x, y) => {
         const hit = world.pick(x, y);
         return hit ? { dir: [hit.dir.x, hit.dir.y, hit.dir.z], water: hit.water } : null;
@@ -427,7 +481,7 @@ async function boot(): Promise<void> {
     const key = event.key.toLowerCase();
     if (key === 'h' || key === '`') store.set('ui.hud', !store.values.ui.hud);
     else if (key === 'p') panel.toggle();
-    else if (key === 'm') {
+    else if (key === 'm' && world === meadow) {
       // to Muse, where it is now on its day
       world.cameraPreset('muse');
       userPosed = true;

@@ -15,6 +15,7 @@ import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
+import type { CameraPreset, PlanetWorld } from './planetWorld';
 import { TerrainBake } from './planet/bake';
 import { LOD_DEFAULT, type LodConfig } from './planet/chunks';
 import type { FieldParams } from './planet/fields';
@@ -31,7 +32,7 @@ import { warpForZoom, type WarpFrame } from './render/warp';
 import { CameraRig } from './view/camera';
 import { findVista, type Vista } from './view/vista';
 
-const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3 } as const;
+const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 0 } as const;
 const NOON_SUN = new Palette().get(ROW.LIGHT, 0);
 const NOON_SKY = new Palette().get(ROW.LIGHT, 1);
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -52,8 +53,6 @@ const FIELD_PATHS: ReadonlySet<string> = new Set([
   'flowers.blue',
 ]);
 
-export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse';
-
 /**
  * The homestead view, after the painting: the camera's height (m) and
  * distance (m) from the point it looks at (cottage-local x, y, z, m), its
@@ -69,7 +68,8 @@ const MUSE_VIEW = { height: 1.23 * MUSE_HEIGHT, distance: 4 * MUSE_HEIGHT, azimu
  * → warp → LOD → near field → sky → build queue. main.ts owns the renderer
  * and the loop; this owns the world.
  */
-export class World {
+export class World implements PlanetWorld {
+  readonly kind = 'meadow' as const;
   readonly scene = new Scene();
   readonly rig = new CameraRig();
   readonly palette = new Palette();
@@ -189,6 +189,11 @@ export class World {
   applyTier(tier: Tier): void {
     this.tier = tier;
     this.lod = { ...LOD_DEFAULT, grid: tier.terrainGrid };
+  }
+
+  /** Blades and flowers in view (perf stats). */
+  get nearInstances(): { grass: number; flowers: number } {
+    return { grass: this.grass.layer.visibleInstances, flowers: this.flowers.layer.visibleInstances };
   }
 
   /** True when the camera has not been placed from the URL yet. */

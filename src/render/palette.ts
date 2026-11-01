@@ -24,7 +24,8 @@ export const ROW = {
   BUD: 13,
 } as const;
 
-type Rows = Partial<Record<number, readonly string[]>>;
+/** Palette rows by index: each a list of sRGB hex colours, light → shadow, then variations. */
+export type Rows = Partial<Record<number, readonly string[]>>;
 
 // Noon. Column meanings per row are noted; shaders reference them by index.
 const NOON: Rows = {
@@ -103,12 +104,14 @@ export class Palette {
   private readonly data = new Uint8Array(SIZE * SIZE * 4);
   private readonly linear: Color[] = Array.from({ length: SIZE * SIZE }, () => new Color(1, 0, 1));
   private hours = Number.NaN;
-  private readonly noon = expand(NOON);
+  private readonly noon: Array<Color | null>;
   private readonly dawn = expand(DAWN);
   private readonly golden = expand(GOLDEN);
   private readonly tint = { dawn: toLinear(TINT.dawn), noon: toLinear(TINT.noon), golden: toLinear(TINT.golden) };
 
-  constructor() {
+  /** The meadow's colours by default; another planet passes its own noon rows (the sky, cloud and light rows keep their places). */
+  constructor(rows: Rows = NOON) {
+    this.noon = expand(rows);
     this.texture = new DataTexture(this.data, SIZE, SIZE, RGBAFormat, UnsignedByteType);
     this.texture.colorSpace = SRGBColorSpace;
     this.texture.magFilter = NearestFilter;
