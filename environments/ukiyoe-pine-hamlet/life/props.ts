@@ -152,8 +152,14 @@ function house(b: Builders): void {
     b.wood.box(x0,x1,FLOOR,1.28,FACE-0.14,FACE,0,'Z');
     b.wall.box(x0,x1,3.11,3.5,FACE-0.14,FACE,0,'Z');
     b.shoji.quad([x0,1.28,FACE-0.035],[x1,1.28,FACE-0.035],[x1,3.11,FACE-0.035],[x0,3.11,FACE-0.035]);
-    for (let i=0;i<=4;i++) { const x=x0+(x1-x0)*i/4; b.wood.box(x-0.028,x+0.028,1.28,3.11,FACE-0.02,FACE+0.025); }
-    for (let i=0;i<=5;i++) { const y=1.28+(3.11-1.28)*i/5; b.wood.box(x0,x1,y-0.023,y+0.023,FACE-0.02,FACE+0.025); }
+    // Continuous stiles own each crossing. Rails fill only the gaps between
+    // them, so their exposed front/back planes never overlap.
+    const stiles=Array.from({length:5},(_,i)=>x0+(x1-x0)*i/4);
+    for (const x of stiles) b.wood.box(x-0.028,x+0.028,1.257,3.133,FACE-0.02,FACE+0.025);
+    for (let i=0;i<=5;i++) for(let j=0;j<stiles.length-1;j++) {
+      const y=1.28+(3.11-1.28)*i/5;
+      b.wood.box(stiles[j]+0.028,stiles[j+1]-0.028,y-0.023,y+0.023,FACE-0.02,FACE+0.025,0,'yYzZ');
+    }
   }
   // A recessed dark open doorway and short interior floor preserve entrance depth.
   b.ink.quad([-0.82,FLOOR,1.75],[0.82,FLOOR,1.75],[0.82,3.11,1.75],[-0.82,3.11,1.75]);
@@ -162,14 +168,20 @@ function house(b: Builders): void {
   // Side elevations: a cream infill field, structural timber and one inset window.
   for (const side of [-1,1]) {
     const x=side*SIDE;
-    b.wall.quad([x,FLOOR,FACE],[x,FLOOR,-FACE],[x,3.5,-FACE],[x,3.5,FACE]);
+    // An actual opening, rather than shoji placed 12 mm over a plaster face.
+    for(const [y0,y1,z0,z1] of [[FLOOR,1.40,-FACE,FACE],[2.96,3.5,-FACE,FACE],[1.40,2.96,-FACE,-0.95],[1.40,2.96,0.95,FACE]])
+      b.wall.quad([x,y0,z1],[x,y0,z0],[x,y1,z0],[x,y1,z1]);
     b.wall.triangle([x,3.5,-FACE],[x,3.5,FACE],[x,5.12,0]);
-    const panelX=x+side*0.012;
+    const panelX=x-side*0.035;
     b.shoji.quad([panelX,1.40,0.95],[panelX,1.40,-0.95],[panelX,2.96,-0.95],[panelX,2.96,0.95]);
-    for (const z of [-0.95,-0.48,0,0.48,0.95]) b.wood.box(x-0.045,x+0.045,1.38,2.98,z-0.027,z+0.027);
-    for (const y of [1.40,1.79,2.18,2.57,2.96]) b.wood.box(x-0.045,x+0.045,y-0.025,y+0.025,-0.95,0.95);
-    for (const z of [-FACE,0,FACE]) b.wood.box(x-0.09,x+0.09,FLOOR,3.5,z-0.085,z+0.085);
-    b.wood.box(x-0.09,x+0.09,3.32,3.50,-FACE,FACE);
+    const stiles=[-0.95,-0.48,0,0.48,0.95];
+    for (const z of stiles) b.wood.box(x-0.045,x+0.045,1.375,2.985,z-0.027,z+0.027);
+    for (const y of [1.40,1.79,2.18,2.57,2.96]) for(let j=0;j<stiles.length-1;j++)
+      b.wood.box(x-0.045,x+0.045,y-0.025,y+0.025,stiles[j]+0.027,stiles[j+1]-0.027,0,'xXyY');
+    // Posts join the underside of the continuous plate; they do not share
+    // its exposed side plane over the top 18 cm of every post.
+    for (const z of [-FACE,0,FACE]) b.wood.box(x-0.09,x+0.09,FLOOR,3.32,z-0.085,z+0.085);
+    b.wood.box(x-0.09,x+0.09,3.32,3.50,-FACE-0.085,FACE+0.085);
     b.wood.box(x-0.07,x+0.07,1.16,1.30,-FACE,FACE);
     b.wood.beam([x,3.49,-FACE],[x,5.13,0],0.16);
     b.wood.beam([x,5.13,0],[x,3.49,FACE],0.16);
@@ -193,18 +205,25 @@ function house(b: Builders): void {
     // stay exposed across the roof under this irregular, restrained boundary.
     const retreat=(x:number):number=>Math.min(0.36,Math.max(0.18,0.28+0.065*Math.sin(x*0.74+side)+0.023*Math.sin(x*2.6+0.3)+0.018*Math.sin(x*4.7)));
     const roofY=(z:number):number=>ROOF.eave+ROOF.rise*(1-Math.abs(z)/ROOF.ez);
-    const snowBand=(bottom:(x:number)=>number,top:(x:number)=>number):void=>{
-      const nx=36,nz=5;
+    const snowBand=(bottom:(x:number)=>number):void=>{
+      const nx=36,nz=7;
       const p=(i:number,j:number):Point=>{
         const x=-ROOF.ex+2*ROOF.ex*i/nx;
-        const f=bottom(x)+(top(x)-bottom(x))*j/nz;
+        const lowerZ=ROOF.ez*(1-bottom(x));
+        // Explicit ridge shoulder vertices cover the raised tiles with the
+        // same connected snow surface, instead of a second floating strip.
+        const distance=j<=5?lowerZ+(0.42-lowerZ)*j/5:j===6?0.16:0;
+        const f=1-distance/ROOF.ez;
         const edge=Math.sin(x*3.1)*0.018+Math.cos(x*5.7)*0.012;
-        return [x,ROOF.eave+ROOF.rise*f+0.11+0.065*Math.sin(Math.PI*f)+edge,side*ROOF.ez*(1-f)];
+        const t=Math.min(1,Math.max(0,(distance-0.16)/0.26));
+        const crest=0.20*(1-t*t*(3-2*t));
+        return [x,ROOF.eave+ROOF.rise*f+0.11+0.065*Math.sin(Math.PI*f)+edge+crest,side*distance];
       };
       for(let j=0;j<nz;j++) for(let i=0;i<nx;i++) b.snow.quad(p(i,j),p(i+1,j),p(i+1,j+1),p(i,j+1));
-      for(let i=0;i<nx;i++)for(const j of [0,nz]){
-        const a=p(i,j),c=p(i+1,j);
+      for(let i=0;i<nx;i++){
+        const a=p(i,0),c=p(i+1,0);
         // The skirt meets the roof plane; a fixed thickness left daylight underneath.
+        // The two slopes share a ridge edge, with no coincident internal skirts.
         b.snow.quad([a[0],roofY(a[2]),a[2]],[c[0],roofY(c[2]),c[2]],c,a);
       }
       for(const i of [0,nx])for(let j=0;j<nz;j++){
@@ -212,18 +231,11 @@ function house(b: Builders): void {
         b.snow.quad([a[0],roofY(a[2]),a[2]],[c[0],roofY(c[2]),c[2]],c,a);
       }
     };
-    snowBand(retreat,()=>1);
+    snowBand(retreat);
 
   }
   b.roof.beam([-4.95,5.58,0],[4.95,5.58,0],0.23,0.23);
   for(let x=-4.8;x<4.9;x+=0.53) b.roof.box(x-0.055,x+0.055,5.58,5.72,-0.16,0.16);
-  // Slightly broken ridge accumulation follows the capped ridge without a box silhouette.
-  for(let i=0;i<36;i++) {
-    const x0=-4.98+9.96*i/36,x1=-4.98+9.96*(i+1)/36;
-    const y0=5.84+0.025*Math.sin(x0*2.3),y1=5.84+0.025*Math.sin(x1*2.3);
-    b.snow.quad([x0,y0-0.045,0.20],[x1,y1-0.045,0.20],[x1,y1,0],[x0,y0,0]);
-    b.snow.quad([x0,y0,0],[x1,y1,0],[x1,y1-0.045,-0.20],[x0,y0-0.045,-0.20]);
-  }
 }
 
 function furniture(b: Builders): void {
@@ -244,14 +256,30 @@ function bridge(b: Builders): void {
     b.wood.quad([x0,y0,BRIDGE.z1],[x1,y1,BRIDGE.z1],[x1,y1,BRIDGE.z0],[x0,y0,BRIDGE.z0],2);
     for(const z of [BRIDGE.z0,BRIDGE.z1]) {
       b.wood.quad([x0,y0-0.2,z],[x1,y1-0.2,z],[x1,y1,z],[x0,y0,z]);
-      for(const h of [0.40,BRIDGE.rail]) b.wood.beam([x0,y0+h,z],[x1,y1+h,z],0.09,0.12);
+      // One swept rail with shared vertical sections. Independent angled
+      // beam boxes overlap on their coplanar side faces at every arch joint.
+      for(const h of [0.40,BRIDGE.rail]) {
+        const section=(x:number,y:number,s:number,t:number):Point=>[x,y+h+t*0.06,z+s*0.045];
+        const a=(s:number,t:number):Point=>section(x0,y0,s,t);
+        const c=(s:number,t:number):Point=>section(x1,y1,s,t);
+        b.wood.quad(a(1,1),c(1,1),c(-1,1),a(-1,1),3);
+        b.wood.quad(a(-1,-1),c(-1,-1),c(1,-1),a(1,-1),3);
+        b.wood.quad(a(-1,1),c(-1,1),c(-1,-1),a(-1,-1),3);
+        b.wood.quad(a(1,-1),c(1,-1),c(1,1),a(1,1),3);
+        if(i===0)b.wood.quad(a(1,1),a(-1,1),a(-1,-1),a(1,-1));
+        if(i===n-1)b.wood.quad(c(-1,1),c(1,1),c(1,-1),c(-1,-1));
+      }
       b.snow.quad([x0,y0+BRIDGE.rail+0.07,z-0.055],[x1,y1+BRIDGE.rail+0.07,z-0.055],[x1,y1+BRIDGE.rail+0.10,z+0.055],[x0,y0+BRIDGE.rail+0.10,z+0.055]);
+      for(const side of [-1,1]) {
+        const edgeZ=z+side*0.055,top=side<0?0.07:0.10;
+        b.snow.quad([x0,y0+BRIDGE.rail+0.06,edgeZ],[x1,y1+BRIDGE.rail+0.06,edgeZ],[x1,y1+BRIDGE.rail+top,edgeZ],[x0,y0+BRIDGE.rail+top,edgeZ]);
+      }
     }
   }
   for(const x of [8,10,12,14,16]) for(const z of [BRIDGE.z0,BRIDGE.z1]) {
     const y=bridgeDeckHeight(x);
     b.wood.box(x-0.11,x+0.11,y-0.27,y+1.02,z-0.11,z+0.11);
-    b.snow.box(x-0.13,x+0.13,y+1.03,y+1.10,z-0.13,z+0.13,0,'YxXzZ');
+    b.snow.box(x-0.13,x+0.13,y+1.02,y+1.10,z-0.13,z+0.13,0,'YxXzZ');
   }
   for(const x of [8,16])for(const z of [9,11]){
     // Chamfered, slightly unequal mineral faces; broad bottom rests in the bank.

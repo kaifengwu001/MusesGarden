@@ -9,25 +9,27 @@ const TAU = Math.PI * 2;
 
 /** Solid branches, folded needle blades and selected drawn contours. No leaf billboards. */
 class MeshBuilder {
-  constructor(readonly coarse = false) {}
+  constructor(readonly coarse = false, readonly species = 0) {}
   private readonly p: number[] = [];
   private readonly n: number[] = [];
   private readonly uv: number[] = [];
   private readonly kind: number[] = [];
+  private readonly printStyle: number[] = [];
   private readonly ground: number[] = [];
   private readonly lp: number[] = [];
   private readonly ln: number[] = [];
   private readonly lk: number[] = [];
   private readonly lg: number[] = [];
 
-  tri(a: Vector3, b: Vector3, c: Vector3, kind: number, grounded: readonly number[] = [0, 0, 0], normals?: readonly Vector3[]): void {
+  tri(a: Vector3, b: Vector3, c: Vector3, kind: number, grounded: readonly number[] = [0, 0, 0], normals?: readonly Vector3[], chart?: readonly (readonly number[])[], style = this.species): void {
     const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
     if (normal.lengthSq() < 0.5) return;
     for (const [i, point] of [a, b, c].entries()) {
       this.p.push(point.x, point.y, point.z);
       const n = normals?.[i] ?? normal;
       this.n.push(n.x, n.y, n.z);
-      this.uv.push(i === 1 ? 1 : 0, i === 2 ? 1 : 0);
+      this.uv.push(chart?.[i][0] ?? point.x, chart?.[i][1] ?? point.y);
+      this.printStyle.push(style);
       this.kind.push(kind);
       this.ground.push(grounded[i]);
     }
@@ -58,15 +60,20 @@ class MeshBuilder {
       const z = tangent.clone().cross(x).normalize();
       return Array.from({ length: sides }, (_, k) => p.clone().addScaledVector(x, radii[i] * Math.cos(k * TAU / sides)).addScaledVector(z, radii[i] * Math.sin(k * TAU / sides)));
     });
+    const distances = [0];
+    for (let i = 1; i < points.length; i++) distances.push(distances[i - 1] + points[i].distanceTo(points[i - 1]));
+    // Branch-local arc length and circumference keep engraved grain aligned
+    // through bends. A repeated triangle UV would expose the triangulation.
+    const chart = (i: number, k: number): number[] => [k * TAU / sides * radii[0], distances[i]];
     for (let i = 0; i < rings.length - 1; i++) for (let k = 0; k < sides; k++) {
       const j = (k + 1) % sides, g = root && i === 0 ? 1 : 0;
-      this.tri(rings[i][k], rings[i + 1][j], rings[i][j], kind, [g, 0, g]);
-      this.tri(rings[i][k], rings[i + 1][k], rings[i + 1][j], kind, [g, 0, 0]);
+      this.tri(rings[i][k], rings[i + 1][j], rings[i][j], kind, [g, 0, g], undefined, [chart(i, k), chart(i + 1, k + 1), chart(i, k + 1)]);
+      this.tri(rings[i][k], rings[i + 1][k], rings[i + 1][j], kind, [g, 0, 0], undefined, [chart(i, k), chart(i + 1, k), chart(i + 1, k + 1)]);
     }
     const last = rings.length - 1;
     for (let k = 0; k < sides; k++) this.tri(points[last], rings[last][k], rings[last][(k + 1) % sides], kind);
-    // Two restrained bark seams per substantial branch; never the full wire mesh.
-    if (radii[0] > 0.09) for (const k of [1, Math.floor(sides * 0.65)]) this.line(rings.map(r => r[k]), kind, V(0, 0.3, 0.95));
+    // Bark is drawn in the single colour surface; overlaid lines clipped in
+    // and out of curved branches as the camera moved.
   }
 
   /** Dense overlapping needles need a dark internal volume at normal app scale.
@@ -82,7 +89,17 @@ class MeshBuilder {
         const q = p.clone().sub(center).applyAxisAngle(V(0, 1, 0), turn);
         return q.set(q.x / (rx * rx), q.y / (ry * ry), q.z / (rz * rz)).normalize().applyAxisAngle(V(0, 1, 0), -turn);
       });
-      this.tri(a, b, c, HAMLET_KIND.needle, [0, 0, 0], normals);
+      const radius = Math.sqrt(rx * rz);
+      const chart = [a, b, c].map(p => {
+        const q = p.clone().sub(center).applyAxisAngle(V(0, 1, 0), turn);
+        return [Math.atan2(q.z / rz, q.x / rx), Math.asin(Math.max(-1, Math.min(1, q.y / ry))) * ry];
+      });
+      // Unwrap each local crown seam before interpolation, including its poles.
+      if (Math.max(...chart.map(p => p[0])) - Math.min(...chart.map(p => p[0])) > Math.PI) {
+        for (const p of chart) if (p[0] < 0) p[0] += TAU;
+      }
+      for (const p of chart) p[0] *= radius;
+      this.tri(a, b, c, HAMLET_KIND.needle, [0, 0, 0], normals, chart);
     };
     const rings = [-0.7, -0.05, 0.68].map((h, level) => Array.from({ length: sides }, (_, i) => {
       const a = i * TAU / sides;
@@ -111,8 +128,11 @@ class MeshBuilder {
     const left = shoulder.clone().addScaledVector(side, width);
     const right = shoulder.clone().addScaledVector(side, -width);
     const ridge = shoulder.clone().addScaledVector(fold, width * 0.52);
-    this.tri(base, left, ridge, kind, [root ? 1 : 0, 0, 0]); this.tri(left, tip, ridge, kind);
-    this.tri(base, ridge, right, kind, [root ? 1 : 0, 0, 0]); this.tri(ridge, tip, right, kind);
+    const uBase = [0, 0], uLeft = [-1, 0.35], uRight = [1, 0.35], uRidge = [0, 0.35], uTip = [0, 1];
+    this.tri(base, left, ridge, kind, [root ? 1 : 0, 0, 0], undefined, [uBase, uLeft, uRidge], this.species + 10);
+    this.tri(left, tip, ridge, kind, [0, 0, 0], undefined, [uLeft, uTip, uRidge], this.species + 10);
+    this.tri(base, ridge, right, kind, [root ? 1 : 0, 0, 0], undefined, [uBase, uRidge, uRight], this.species + 10);
+    this.tri(ridge, tip, right, kind, [0, 0, 0], undefined, [uRidge, uTip, uRight], this.species + 10);
   }
 
   /** Slightly scalloped upper blanket, with a shallow edge and no stacked snow balls. */
@@ -134,14 +154,17 @@ class MeshBuilder {
       this.tri(rim[i], rim[j], lip[j], HAMLET_KIND.snow);
       this.tri(rim[i], lip[j], lip[i], HAMLET_KIND.snow);
     }
-    this.line([...lip, lip[0]], HAMLET_KIND.snow, V(0, 1, 0));
+    // The snow edge is a real vertical lip, without a coincident ink overlay.
   }
 
   bud(center: Vector3, radius: number): void {
     const top = center.clone().add(V(0, radius * 1.35, 0));
     const bottom = center.clone().add(V(0, -radius, 0));
     const ring = Array.from({ length: 5 }, (_, i) => center.clone().add(V(Math.cos(i * TAU / 5) * radius, 0, Math.sin(i * TAU / 5) * radius)));
-    for (let i = 0; i < 5; i++) { this.tri(top, ring[i], ring[(i + 1) % 5], HAMLET_KIND.bud); this.tri(bottom, ring[(i + 1) % 5], ring[i], HAMLET_KIND.bud); }
+    for (let i = 0; i < 5; i++) {
+      this.tri(top, ring[i], ring[(i + 1) % 5], HAMLET_KIND.bud, [0, 0, 0], undefined, [[0, 1], [-1, 0], [1, 0]]);
+      this.tri(bottom, ring[(i + 1) % 5], ring[i], HAMLET_KIND.bud, [0, 0, 0], undefined, [[0, -1], [1, 0], [-1, 0]]);
+    }
   }
 
   finish(footprint: number): HamletAsset {
@@ -150,12 +173,14 @@ class MeshBuilder {
     geometry.setAttribute('normal', new Float32BufferAttribute(this.n, 3));
     geometry.setAttribute('uv', new Float32BufferAttribute(this.uv, 2));
     geometry.setAttribute('aKind', new Float32BufferAttribute(this.kind, 1));
+    geometry.setAttribute('aPrintStyle', new Float32BufferAttribute(this.printStyle, 1));
     geometry.setAttribute('aGround', new Float32BufferAttribute(this.ground, 1));
     const ink = new BufferGeometry();
     ink.setAttribute('position', new Float32BufferAttribute(this.lp, 3));
     ink.setAttribute('normal', new Float32BufferAttribute(this.ln, 3));
     ink.setAttribute('uv', new Float32BufferAttribute(new Float32Array(this.lk.length * 2), 2));
     ink.setAttribute('aKind', new Float32BufferAttribute(this.lk, 1));
+    ink.setAttribute('aPrintStyle', new Float32BufferAttribute(new Float32Array(this.lk.length), 1));
     ink.setAttribute('aGround', new Float32BufferAttribute(this.lg, 1));
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
     ink.computeBoundingSphere();
@@ -164,15 +189,19 @@ class MeshBuilder {
 }
 
 function tuft(b: MeshBuilder, center: Vector3, scale: number, phase: number, count = 14): void {
-  b.needleVolume(center.clone().add(V(0, 0.12 * scale, 0)), 0.66 * scale, 0.48 * scale, 0.63 * scale, phase);
-  count = b.coarse ? 4 : Math.round(count * 1.45);
-  for (let i = 0; i < count; i++) {
-    const a = i * 2.39996323 + phase, outward = 0.70 + (i % 3) * 0.045;
-    const y = -0.07 + (i % 5) * 0.088;
-    const offset = V(Math.cos(a) * 0.53, y, Math.sin(a) * 0.53).multiplyScalar(scale);
-    const base = center.clone().add(offset);
-    const tip = center.clone().add(V(Math.cos(a) * outward, y + 0.10 * Math.sin(i * 1.8), Math.sin(a) * outward).multiplyScalar(scale));
-    b.blade(base, tip, 0.014 * scale, HAMLET_KIND.needle, a * 0.5);
+  b.needleVolume(center.clone().add(V(0, 0.10 * scale, 0)), 0.60 * scale, 0.39 * scale, 0.57 * scale, phase);
+  // Small radial whorls project from the connected foliage mass. The inner
+  // rosettes continue as surface drawing, keeping distant trees inexpensive.
+  const fans = b.coarse ? 2 : 4, spokes = b.coarse ? 2 : Math.round(count * 1.45 / fans);
+  for (let f = 0; f < fans; f++) {
+    const a = phase + f * TAU / fans;
+    const radial = V(Math.cos(a), 0, Math.sin(a)), tangent = V(-Math.sin(a), 0, Math.cos(a));
+    const origin = center.clone().addScaledVector(radial, 0.54 * scale).add(V(0, (0.05 + 0.08 * Math.sin(a)) * scale, 0));
+    for (let i = 0; i < spokes; i++) {
+      const angle = i * TAU / spokes + f * 0.37, length = (0.19 + (i % 3) * 0.025) * scale;
+      const tip = origin.clone().addScaledVector(tangent, Math.cos(angle) * length).add(V(0, Math.sin(angle) * length, 0)).addScaledVector(radial, 0.08 * scale);
+      b.blade(origin, tip, 0.013 * scale, HAMLET_KIND.needle, a * 0.5);
+    }
   }
 }
 
@@ -220,7 +249,7 @@ export function pineGeometry(coarse = false): HamletAsset {
 }
 
 export function cedarGeometry(coarse = false): HamletAsset {
-  const b = new MeshBuilder(coarse);
+  const b = new MeshBuilder(coarse, 1);
   const trunk = Array.from({ length: 8 }, (_, i) => V(Math.sin(i * 0.7) * 0.09, i * 1.5 - 0.12, Math.cos(i * 0.8) * 0.06));
   b.tube(trunk, trunk.map((_, i) => Math.max(0.025, 0.42 * (1 - i / 7))), HAMLET_KIND.bark, 7, true);
   for (let level = 0; level < 8; level++) {
@@ -232,13 +261,13 @@ export function cedarGeometry(coarse = false): HamletAsset {
       const mid = V(Math.cos(a) * length * 0.56, height - 0.28, Math.sin(a) * length * 0.56);
       const tip = V(Math.cos(a) * length, height - 0.48, Math.sin(a) * length);
       b.tube([V(0, height, 0), mid, tip], [0.085 - level * 0.008, 0.04, 0.012], HAMLET_KIND.bark, 4);
-      b.needleVolume(mid.clone().lerp(tip, 0.08).add(V(0, -0.16, 0)), length * 0.47, 0.52 - level * 0.023, 0.49 - level * 0.025, level * 0.8 + k, a);
+      b.needleVolume(mid.clone().lerp(tip, 0.08).add(V(0, -0.16, 0)), length * 0.47, 0.36 - level * 0.015, 0.41 - level * 0.019, level * 0.8 + k, a);
       for (let s = 0; s < (coarse ? 2 : 3); s++) {
         const centre = mid.clone().lerp(tip, s * 0.44).add(V(0, -s * 0.08, 0));
         for (let i = 0; i < (coarse ? 2 : 10); i++) {
           const aa = a + (i % 2 ? 1 : -1) * (0.35 + i * 0.14);
           const end = centre.clone().add(V(Math.cos(aa) * (0.36 + i * 0.025), -0.32 - (i % 3) * 0.09, Math.sin(aa) * (0.36 + i * 0.025)));
-          b.blade(centre, end, 0.023, HAMLET_KIND.needle, aa);
+          b.blade(centre, end, 0.018, HAMLET_KIND.needle, aa);
         }
       }
       if ((k + level) % 2 === 0) b.snowCap(mid.clone().lerp(tip, 0.15).add(V(0, 0.27, 0)), length * 0.4, 0.35 + length * 0.065, 0.24, a, level + k);
@@ -250,7 +279,7 @@ export function cedarGeometry(coarse = false): HamletAsset {
 }
 
 export function plumGeometry(): HamletAsset {
-  const b = new MeshBuilder();
+  const b = new MeshBuilder(false, 2);
   b.tube([V(0, -0.12, 0), V(-0.22, 0.8, 0.02), V(0.13, 1.7, 0.05), V(-0.14, 2.7, -0.12), V(0.3, 3.35, 0.08)], [0.23, 0.19, 0.12, 0.065, 0.012], HAMLET_KIND.bark, 6, true);
   for (let i = 0; i < 7; i++) {
     const a = i * 2.39996323, h = 0.95 + i * 0.29, spread = 1.5 - i * 0.08;
@@ -271,7 +300,7 @@ export function plumGeometry(): HamletAsset {
 }
 
 export function reedsGeometry(): HamletAsset {
-  const b = new MeshBuilder();
+  const b = new MeshBuilder(false, 3);
   for (let i = 0; i < 17; i++) {
     const a = i * 2.39996323, radius = 0.11 + (i % 5) * 0.062, h = 0.7 + (i % 7) * 0.105;
     const base = V(Math.cos(a) * radius, -0.08, Math.sin(a) * radius);
@@ -295,7 +324,7 @@ export function reedsGeometry(): HamletAsset {
 }
 
 export function rockGeometry(): HamletAsset {
-  const b = new MeshBuilder();
+  const b = new MeshBuilder(false, 4);
   for (const [cx, cz, sx, sz, height, phase] of [[0, 0, 1.13, 0.78, 1.15, 0.4], [-0.76, 0.33, 0.72, 0.54, 0.52, 1.7], [0.78, -0.22, 0.8, 0.62, 0.76, 2.7]]) {
     const sides = 6;
     const rings = [0, 0.48, 1].map((t, level) => Array.from({ length: sides }, (_, i) => {

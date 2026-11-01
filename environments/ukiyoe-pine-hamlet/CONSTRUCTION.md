@@ -83,6 +83,11 @@ bridge/analytic agreement, dimensions and roof-snow contact. Do not add floor
 overlays or move stair heights without updating both geometry and locomotion.
 Decorative rocks are not automatically walkable terrain.
 
+Shoji stiles own lattice crossings; horizontal rails terminate at each stile.
+Side shoji occupy real wall openings. Bridge rails are joined swept surfaces,
+not overlapping angled boxes. Roof snow has one ridge cover and no internal
+ridge skirts. Surface-ownership regressions reproduce the old overlap defects.
+
 Sumi and Mugi use separate courtyard lanes centred near `(-6, 9)` and `(4, 8)`.
 Routes are deterministic and checked for dry clearance and slope; unsafe loops
 shrink or fall back to a supported stationary point. Muse’s main route reserves
@@ -97,6 +102,18 @@ doorway, centre path, bridge approaches and neighbouring homes. Seeded Fibonacci
 sites extend mixed clusters around the globe. The local pine and cedar meshes
 carry more needle detail; separate cheaper remote templates provide distant
 forest mass. These are near/far placement classes, not camera-switched LOD.
+
+Pine needles use irregular fan marks, cedar uses paired leaf sprays, plum uses
+dark bark with lenticels, and reeds have light midribs. The botanical drawings
+live on the material surface; resting-position projection avoids stretched
+crown-top UVs. Branch charts follow the trunk and branch arcs. Redundant bark
+and snow outline layers were removed to avoid depth conflicts.
+
+`render/snow.glsl` gives ground, roofs and plant snow a shared warm-paper/blue
+relief palette with sparse close-up pigment grain. All detail is anchored to
+the resting surface and fades with its projected pixel footprint. Compute
+derivatives before material branches and seasonal discards; the helper itself
+contains no derivatives and is safe in vertex-stage includes.
 
 Placement samples both the anchor and its footprint. Roots and the lowest rock
 ring conform to the terrain in the shader. Colour, selected contours and shadow
@@ -116,6 +133,11 @@ to make a screenshot cleaner.
 
 Use the commands in [README.md](README.md). The ecology suite captures the actual
 app at frozen time, including Home, Bridge, Muse, Whole planet and Rain views.
+It also saves close pine, cedar and snow/plum material views. The flicker suite
+checks the user-reported camera, Home and Bridge in both seasons at DPR 1 and 2,
+with repeated frozen draws and a small camera sweep. Its pixel metrics complement
+the geometry audit; finite sampled views cannot prove absence of every possible
+depth conflict. Evidence and thresholds live in `reference/frame-stability.json`.
 Inspect the rendered images directly alongside the concept; the test cannot
 judge composition or material fidelity. Resident browser checks cover the UI,
 saved names, navigation, following, growth and season behaviour. Invariant tests
