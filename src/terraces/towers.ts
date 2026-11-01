@@ -13,8 +13,12 @@ import type { TerraceTerrain } from './terrain';
 // ones in full detail, far ones in their lighter copy.
 
 const URLS = [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/mountain${k}.glb`, import.meta.url).href);
-/** How far its base sinks into its mound (× its height), and out to where a tower is drawn in full detail (m, plus its height). */
-export const TOWER = { sink: 0.09, near: 140 } as const;
+/**
+ * Its base: under the lowest ground round its foot (sampled on two rings out to this far, × its height: the
+ * models' footprints reach about half their height across), sunk this much more (× its height); and out to
+ * where a tower is drawn in full detail (m, plus its height).
+ */
+export const TOWER = { foot: [0.22, 0.42], sink: 0.05, near: 140 } as const;
 
 export class Towers {
   private readonly set_: ModelSet;
@@ -33,7 +37,18 @@ export class Towers {
       const a = new Vector3().crossVectors(up, Math.abs(up.y) < 0.95 ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0)).normalize();
       const b = new Vector3().crossVectors(up, a);
       const e1 = a.multiplyScalar(Math.cos(peak.turn)).addScaledVector(b, Math.sin(peak.turn)).normalize();
-      return { model: peak.model, up, e1, base: terrain.fields.natural(up) - TOWER.sink * peak.height, height: peak.height, stretch: peak.stretch };
+      // (Kai: some floated, or showed a gap under them: the ground falls away round a foot on a slope)
+      let base = terrain.fields.natural(up);
+      const q = new Vector3();
+      const e2 = new Vector3().crossVectors(up, e1);
+      for (const ring of TOWER.foot) {
+        for (let k = 0; k < 10; k++) {
+          const t = e1.clone().multiplyScalar(Math.cos((k * Math.PI) / 5)).addScaledVector(e2, Math.sin((k * Math.PI) / 5));
+          q.copy(up).addScaledVector(t, (ring * peak.height * peak.stretch) / terrain.radius).normalize();
+          base = Math.min(base, terrain.fields.natural(q));
+        }
+      }
+      return { model: peak.model, up, e1, base: base - TOWER.sink * peak.height, height: peak.height, stretch: peak.stretch };
     });
     this.set_.set(placements, terrain.radius);
   }

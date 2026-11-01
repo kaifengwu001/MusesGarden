@@ -53,8 +53,9 @@ float valleyFog(vec3 c, vec3 p) {
   float t1 = min((-B + s) / (2.0 * A), 1.0);
   if (t1 <= t0) return 0.0;
   float tau = 0.0;
-  for (int i = 0; i < 8; i++) tau += fogDensityAt(c + d * mix(t0, t1, (float(i) + 0.5) / 8.0), c);
-  tau *= sqrt(A) * (t1 - t0) / 8.0;
+  // (twelve samples: the banks stand taller now, Kai asked for thicker, more volumetric fog)
+  for (int i = 0; i < 12; i++) tau += fogDensityAt(c + d * mix(t0, t1, (float(i) + 0.5) / 12.0), c);
+  tau *= sqrt(A) * (t1 - t0) / 12.0;
   return 1.0 - exp(-tau);
 }
 

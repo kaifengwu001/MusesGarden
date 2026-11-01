@@ -23,7 +23,7 @@ export const TERRACE_ROWS: Rows = {
   // the paddies' crop, from the paintings' fields (valley: grown #4B6C49 lit #698754, seedlings over water #8C9977;
   // planet: lime #ACB08A, greens #5F7060 #4F6357): seedling, fresh, deep, heading, ripe straw, pale tip, shade,
   // sheen, far, jade, sage, lime, blue-green (each paddy leans a little toward jade, lime or blue-green)
-  [TROW.RICE]: ['#A8BC8E', '#97B672', '#628656', '#A6B270', '#C2BC86', '#CCD6A8', '#3C5A44', '#DDE6CA', '#7C9686', '#6E9A76', '#8FA383', '#B2C680', '#5E8A7A'],
+  [TROW.RICE]: ['#97B178', '#7FA35B', '#4C7447', '#93A65C', '#B9B57A', '#C3CF9C', '#2E4C38', '#D6E2BF', '#6A8A72', '#5A8A63', '#7C9670', '#9DBA62', '#4A7A66'],
   // bund grass (the paintings' lime rims), bund shade, riser face (grass on earth), riser shade, wet mud, dark mud, courtyard and path, lit bund
   [TROW.EARTH]: ['#AFC48F', '#6F8660', '#71876A', '#4D6150', '#6C6F5C', '#484B3F', '#CFC6AE', '#CBD8B0'],
   // pale sky in the mirror, high sky in it, body looking down, shallow, glint, a bank in the mirror, ruffle, teal, white water:

@@ -29,7 +29,10 @@ void main() {
   float b = toonLight(dot(n, uSunDir));
   vec3 albedo = texture2D(uMap, vUv).rgb;
   vec3 col = albedo * mix(pal(ROW_LIGHT, 4) * 0.95, pal(ROW_LIGHT, 0) * 1.08, b);
-  col = applyAerial(col, dist, normalize(vPlanet));
+  // the haze lies thick low down and thin up high: a far tower's foot fades into it, its peak keeps its colour
+  // (Kai: distant mountains went all white in wander; a gradient up them instead)
+  float above = length(vPlanet) - uRadius;
+  col = mix(col, applyAerial(col, dist, normalize(vPlanet)), mix(1.0, 0.4, smoothstep(5.0, 55.0, above)));
   col = applyValleyFog(col, vPlanet);
   gl_FragColor = vec4(col, 1.0);
 }

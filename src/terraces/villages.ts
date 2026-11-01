@@ -14,7 +14,7 @@ import { createTerraceSample, type TerraceTerrain } from './terrain';
 // valley's gentle fall. Its ground is courtyard, not paddy (ground.glsl and
 // the ground's paint read the houses).
 
-export const VILLAGES = { density: 1 / 9000, max: 12, houses: [2, 7], spacing: 1.5, reach: 40, search: 64 } as const;
+export const VILLAGES = { density: 1 / 15000, max: 8, houses: [3, 6], spacing: 0, reach: 26, search: 64 } as const;
 /** Kai's house models (houses.ts): each one's footprint with its yard (× its height), and its height (m). */
 export const HOUSE_MODELS = [
   { x: 1.88, z: 1.82, height: 6.2 },
@@ -111,16 +111,20 @@ function housesAt(terrain: TerraceTerrain, site: Vector3, seed: number): House[]
   const t0 = new Vector3();
   const dirTo = new Vector3();
   const c = new Vector3();
+  const corner = new Vector3();
   const golden = Math.PI * (3 - Math.sqrt(5));
   gradientFrame(site, a, b);
   for (let k = 0; k < 40 && houses.length < want; k++) {
     const angle = golden * k + rand() * 0.6;
-    const r = k === 0 ? 0 : 5 + 6 * Math.sqrt(k) + rand() * 3;
+    // (Kai: the villages close together, the houses in a huddle, not dispersed)
+    const r = k === 0 ? 0 : 3 + 4.4 * Math.sqrt(k) + rand() * 1.5;
     if (r > VILLAGES.reach) break;
     t0.copy(a).multiplyScalar(Math.cos(angle)).addScaledVector(b, Math.sin(angle));
     travel(site, t0, r / R, c);
     terrain.terraceAt(c, s);
-    if (s.wild > 0.2 || s.flatness < 0.6) continue;
+    // (on the flats, never in the river: 1 … 2 there)
+    if (s.wild > 0.2 || s.flatness < 0.6 || s.flatness > 1) continue;
+    const floor = s.natural;
     const model = Math.floor(rand() * HOUSE_MODELS.length);
     const M = HOUSE_MODELS[model];
     const height = M.height * (0.9 + 0.2 * rand());
@@ -130,10 +134,21 @@ function housesAt(terrain: TerraceTerrain, site: Vector3, seed: number): House[]
     uphill(terrain, c, up);
     const front = up.clone().negate();
     const along = new Vector3().crossVectors(c, front).normalize();
-    const clear = houses.every((o) => angleBetween(o.dir, c) * R > 0.5 * (Math.max(o.length, o.depth) + Math.max(length, depth)) + VILLAGES.spacing);
+    // (neighbours' yards may meet and overlap a little: a huddle, the houses themselves apart)
+    const clear = houses.every((o) => angleBetween(o.dir, c) * R > 0.4 * (Math.max(o.length, o.depth) + Math.max(length, depth)) + VILLAGES.spacing);
     if (!clear) continue;
+    // and all of its yard on dry, tame ground: its corners too off the river and out of the woods
+    let dry = true;
+    for (const [u, v] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) {
+      t0.copy(along).multiplyScalar(u * length).addScaledVector(front, v * depth);
+      const len = t0.length();
+      if (len > 1e-6) travel(c, t0.divideScalar(len), len / R, corner);
+      terrain.terraceAt(corner, s);
+      if (s.flatness > 1 || s.wild > 0.45) dry = false;
+    }
+    if (!dry) continue;
     dirTo.copy(c);
-    houses.push({ dir: dirTo.clone(), along, front, floor: s.natural, length, depth, wall, seed: hash32(h ^ k), model, height });
+    houses.push({ dir: dirTo.clone(), along, front, floor, length, depth, wall, seed: hash32(h ^ k), model, height });
   }
   return houses;
 }

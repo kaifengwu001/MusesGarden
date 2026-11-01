@@ -1,7 +1,7 @@
 // The villages for the ground (villages.ts): where a point is in one, how
 // far it is from the nearest house's footprint, so the floor round the
 // houses is courtyard rather than paddy. Requires: terraces_common, uRadius.
-#define MAX_VILLAGES 12
+#define MAX_VILLAGES 8 // VILLAGES.max in villages.ts
 uniform vec4 uVillages[MAX_VILLAGES];      // middle (direction), reach (m); w < 0: none
 uniform vec4 uVillageHouses[MAX_VILLAGES]; // its first house, how many
 uniform sampler2D uHouses;                 // per house: direction, floor; along, length; front, depth

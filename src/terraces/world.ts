@@ -52,7 +52,7 @@ const FIELD_PATHS: ReadonlySet<string> = new Set(['terraces.hills', 'terraces.fo
  * banks' top and its softness (m), the clearing it leaves round the camera
  * (m), and its two layers' drift (m/s).
  */
-const FOG = { density: 0.17, top: 2.8, soft: 1.1, clearing: 24, drift: [0.55, 1.1] } as const;
+const FOG = { density: 0.24, top: 6.5, soft: 2.6, clearing: 24, drift: [0.55, 1.1] } as const;
 /** Heights of the named views (m): a bird's-eye view over the terraces, and standing on one. */
 const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
 /**
@@ -111,7 +111,7 @@ export class TerraceWorld implements PlanetWorld {
   private readonly atmosphere = {
     uValleyFog: { value: new Vector4(FOG.density, FOG.top, FOG.soft, FOG.clearing) },
     uFogDrift: { value: new Vector4(1, 0, 1, 0) },
-    uFogCover: { value: new Vector4(0.56, 0.16, 0.8, 0) },
+    uFogCover: { value: new Vector4(0.6, 0.13, 0.8, 0) },
     uPaddyWater: { value: new Vector4(0.85, 80, 0, 0) },
     uRiceLook: { value: new Vector4(0.6, 0, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
