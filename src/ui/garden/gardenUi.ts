@@ -354,9 +354,9 @@ export class GardenUi {
       this.pointerMoved = true;
       return;
     }
+    if (this.pointer) this.pointer.canvas.style.cursor = '';
     this.pointer = null;
     this.setHovered(null);
-    for (const c of document.getElementsByTagName('canvas')) c.style.cursor = '';
   }
 
   private hover(at: { x: number; y: number; canvas: HTMLCanvasElement }): void {
@@ -473,16 +473,8 @@ export class GardenUi {
     // (after the start: until each lands, its bed stays unplanted)
     if (fresh) this.state.visit(id);
     const R = this.world.growth.radius;
-    this.flight.to(
-      framingToFit(
-        arrivals.map((a) => a.bed),
-        this.flight,
-        R,
-        this.ground,
-      ),
-      R,
-      this.ground,
-    );
+    const view = framingToFit(arrivals.map((a) => a.bed), this.flight, R, this.ground);
+    this.flight.to(view, R, this.ground);
   }
 
   // ---- Muse ---------------------------------------------------------------------------------

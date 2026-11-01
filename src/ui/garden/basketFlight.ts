@@ -32,7 +32,7 @@ export interface BasketFlightHost {
   pulse(ids: readonly string[]): void;
 }
 
-/** Seconds: the basket's flight to the middle and its lid opening; a find rising out, and the gap to the next. */
+/** Seconds: the basket's flight to the middle, its lid opening, a find rising out and arcing down (and the gaps between finds), the basket's fade, a landing's ring. */
 const T = { fly: 0.62, open: 0.32, out: 0.5, outGap: 0.09, arc: 1.05, arcGap: 0.15, fade: 0.55, ring: 1.1 } as const;
 /** The finds leave the basket this long before the camera arrives (s). */
 const LEAD = 0.45;
@@ -67,6 +67,7 @@ interface Opening {
   /** Where the basket set off from (px) and its size there. */
   readonly from: { readonly x: number; readonly y: number; readonly scale: number };
   readonly flyers: Flyer[];
+  /** Seconds since it began. */
   t: number;
   /** When the last find landed (s; NaN until then). */
   allLanded: number;
@@ -74,6 +75,8 @@ interface Opening {
 
 const ease = (t: number): number => smoothstep(0, 1, t);
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
+/** A point `u` of the way along a quadratic Bézier from a through c to b (one coordinate). */
+const quad = (a: number, c: number, b: number, u: number): number => (1 - u) * (1 - u) * a + 2 * (1 - u) * u * c + u * u * b;
 /** 0 → 1 with a little overshoot. */
 const outBack = (t: number): number => {
   const u = t - 1;
@@ -113,7 +116,7 @@ export class BasketFlight {
   }
 
   /** Open a basket: `from` is where you picked it (the basket comes from there); `fresh` plants its finds as they land. */
-  start(arrivals: readonly Arrival[], from: DOMRect | null, fresh: boolean): void {
+  start(arrivals: readonly Arrival[], from: DOMRect, fresh: boolean): void {
     this.finish();
     if (arrivals.length === 0) return;
     if (reducedMotion()) {
@@ -152,13 +155,12 @@ export class BasketFlight {
     });
     layer.append(front);
     this.root.append(layer);
-    const origin = from ?? new DOMRect(window.innerWidth / 2, window.innerHeight, 0, 0);
     this.opening = {
       fresh,
       layer,
       back,
       front,
-      from: { x: origin.x + origin.width / 2, y: origin.y + origin.height / 2, scale: Math.min(0.7, Math.max(0.22, origin.height / BASKET.height)) },
+      from: { x: from.x + from.width / 2, y: from.y + from.height / 2, scale: Math.min(0.7, Math.max(0.22, from.height / BASKET.height)) },
       flyers,
       t: 0,
       allLanded: Number.NaN,
@@ -177,8 +179,8 @@ export class BasketFlight {
     // the basket: an arc from where it was picked to the middle, its lid opening there, and at last a fade
     const u = ease(clamp01(t / T.fly));
     const lift = Math.min(160, 0.35 * Math.hypot(middle.x - o.from.x, middle.y - o.from.y));
-    const bx = (1 - u) * (1 - u) * o.from.x + 2 * (1 - u) * u * ((o.from.x + middle.x) / 2) + u * u * middle.x;
-    const by = (1 - u) * (1 - u) * o.from.y + 2 * (1 - u) * u * ((o.from.y + middle.y) / 2 - lift) + u * u * middle.y;
+    const bx = quad(o.from.x, (o.from.x + middle.x) / 2, middle.x, u);
+    const by = quad(o.from.y, (o.from.y + middle.y) / 2 - lift, middle.y, u);
     const gone = Number.isNaN(o.allLanded) ? 0 : ease(clamp01((t - o.allLanded) / T.fade));
     const scale = (o.from.scale + (1 - o.from.scale) * outBack(clamp01(t / T.fly))) * (1 - 0.12 * gone);
     const basket = `translate3d(${bx - BASKET.width / 2}px, ${by - BASKET.height / 2 + 26 * gone}px, 0) scale(${scale})`;
@@ -191,13 +193,13 @@ export class BasketFlight {
     if (Number.isNaN(o.flyers[0].leave) && t >= lastOut && this.host.cameraRemaining() <= LEAD) {
       o.flyers.forEach((f, k) => (f.leave = t + k * T.arcGap));
     }
-    o.flyers.forEach((f, k) => this.place(o, f, k, bx, by, scale));
+    o.flyers.forEach((f, k) => this.move(o, f, k, bx, by, scale));
 
     if (Number.isNaN(o.allLanded) && o.flyers.every((f) => f.landed)) o.allLanded = t;
     if (t >= o.allLanded + Math.max(T.fade, T.ring)) this.finish();
   }
 
-  /** Land everything at once (another basket, a card, a reload of the garden) and put the basket away. */
+  /** Land everything at once (another basket, a card, a flight elsewhere) and put the basket away. */
   finish(): void {
     const o = this.opening;
     if (!o) return;
@@ -208,7 +210,7 @@ export class BasketFlight {
     o.layer.remove();
   }
 
-  private place(o: Opening, f: Flyer, k: number, bx: number, by: number, scale: number): void {
+  private move(o: Opening, f: Flyer, k: number, bx: number, by: number, scale: number): void {
     if (f.landed) return;
     const t = o.t;
     const style = f.el.style;
@@ -237,8 +239,8 @@ export class BasketFlight {
     const e = a < 0.5 ? 4 * a * a * a : 1 - Math.pow(-2 * a + 2, 3) / 2;
     const cx = (from.x + to.x) / 2;
     const cy = Math.min(from.y, to.y) - 60 - 0.25 * Math.hypot(to.x - from.x, to.y - from.y);
-    const x = (1 - e) * (1 - e) * from.x + 2 * (1 - e) * e * cx + e * e * to.x;
-    const y = (1 - e) * (1 - e) * from.y + 2 * (1 - e) * e * cy + e * e * to.y;
+    const x = quad(from.x, cx, to.x, e);
+    const y = quad(from.y, cy, to.y, e);
     f.el.classList.add('is-leaving');
     // the last part of the way it sinks into the ground where it lands
     style.opacity = String(1 - smoothstep(0.82, 1, a));
