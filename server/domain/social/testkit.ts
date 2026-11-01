@@ -103,6 +103,7 @@ export function muse(id: string, spec: MuseSpec = {}): MuseState {
     reflections: [],
     experiencesSinceReflection: 0,
     likes: new Map(),
+    favoritePhotos: new Set(),
     day: { day: '2026-11-02', restMs: 0, socialMs: spec.socialMsToday ?? 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
     social: emptySocial(),
   };

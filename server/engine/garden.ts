@@ -262,6 +262,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
     place: placeOf(input, p, index.moments.get(p.id)),
     with: p.companions[0],
     liked: input.s.likes.get(p.id)?.liked ?? false,
+    favorite: input.s.favoritePhotos.has(p.id),
   };
 }
 
@@ -281,6 +282,8 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
   const loves = (host?.interests ?? []).slice(0, 3).map((i) => topicLabel(i.topic));
   const invitation: Invitation = {
     from: inv.host,
+    fromName: name,
+    coat: coatOf(inv.host),
     world: inv.host,
     worldName: `${name}’s planet`,
     blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
@@ -305,6 +308,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
     ...[...s.social.invitations.values()].map((inv) => invitationCard(input, inv)).filter((p): p is Postcard => p !== null),
   ];
   return {
+    today: input.day(input.now.at),
     world: { seed: s.seed.worldSeed, g: input.g },
     muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now), reach: s.reach },
     interests: interests(input, finds, index),
@@ -360,7 +364,7 @@ const MOVES: ReadonlySet<MuseEvent['kind']> = new Set(['episode.started', 'episo
 /**
  * The garden events that `events` (this Muse's, in log order) bring, each framed with the seq it came from, then
  * Muse's status: always, or only if one of them moved Muse. The status is framed with the last seq folded in.
- * A like, or a find made public or private, sends its basket or its postcard again as it now stands.
+ * A like or a star, or a find made public or private, sends its basket or its postcard again as it now stands.
  */
 export function gardenFrames(input: GardenInput, events: readonly StoredEvent[], withStatus: 'always' | 'if-moved'): GardenFrame[] {
   const { s } = input;
@@ -383,6 +387,9 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
       const photo = 'photo' in target ? s.photos.find((p) => p.id === target.photo) : undefined;
       if (photo) frame(seq, { type: 'postcard', postcard: photoCard(input, photo, indexed()) });
       if ('find' in target) for (const b of holding([target.find])) frame(seq, basketEvent(b));
+    } else if (e.kind === 'owner.favorited') {
+      const photo = s.photos.find((p) => p.id === e.photo);
+      if (photo) frame(seq, { type: 'postcard', postcard: photoCard(input, photo, indexed()) });
     } else if (e.kind === 'owner.settings') {
       const finds = [...(e.hide ?? []), ...(e.unhide ?? [])].filter((r) => r.startsWith('discovery:')).map((r) => r.slice('discovery:'.length));
       for (const b of holding(finds)) frame(seq, basketEvent(b));

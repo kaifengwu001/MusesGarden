@@ -408,6 +408,11 @@ export class Commands implements GardenCommands {
     return (await this.engine.like(museId, target, liked)) ? ok : fail(404, 'Muse has no such find or photo');
   }
 
+  async favorite(museId: MuseId, photo: PhotoId, favorite: boolean): Promise<CommandResult> {
+    if (!this.known(museId)) return fail(404, 'no such Muse');
+    return (await this.engine.favorite(museId, photo, favorite)) ? ok : fail(404, 'Muse took no such photo');
+  }
+
   useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult> {
     return this.engine.invitationAction(id, museId, 'use');
   }

@@ -159,7 +159,7 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
     image: closeUrl,
     place: 'An invitation',
     with: 'pip',
-    invitation: { from: 'pip', world: 'mossy-hollow', worldName: 'Mossy Hollow', blurb: 'A redwood grove with a little shrine, where the fog comes in after lunch.' },
+    invitation: { from: 'pip', fromName: 'Pip', coat: '#f2c4a0', world: 'mossy-hollow', worldName: 'Mossy Hollow', blurb: 'A redwood grove with a little shrine, where the fog comes in after lunch.' },
   },
 ];
 
@@ -196,6 +196,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
     return { id, day: dayBefore(b.back, now), finds: ids, ...(b.title ? { title: b.title } : {}) };
   });
   return {
+    today: dayBefore(0, now),
     muse: {
       name: 'Muse',
       soul: 'Curious and a little shy. Likes things made slowly by hand, and anything that glows in the dark.',

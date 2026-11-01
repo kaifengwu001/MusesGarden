@@ -123,14 +123,14 @@ describe('the garden over HTTP on the engine', () => {
     expect(replayed.at(-1)?.event).toEqual({ type: 'status', status: snapshot.muse.status });
   });
 
-  it('keeps likes and private finds: each shows in the next snapshot and reaches an open garden', async () => {
+  it('keeps likes, stars and private finds: each shows in the next snapshot and reaches an open garden', async () => {
     const garden = await engineGarden();
     await garden.commands.advance(48);
     await serve(garden);
     const before = garden.queries.garden(HERO, garden.now())!;
     const [liked, hidden] = before.finds;
-    const card = before.postcards.find((p) => !p.invitation)!;
-    expect([liked.liked, liked.shared, hidden.liked, hidden.shared, card.liked]).toEqual([false, true, false, true, false]);
+    const [card, starred] = before.postcards.filter((p) => !p.invitation);
+    expect([liked.liked, liked.shared, hidden.liked, hidden.shared, card.liked, starred.favorite]).toEqual([false, true, false, true, false, false]);
     const live = await listen('/api/muses/hero/garden/events');
     await live.until((f) => f.length > 0);
 
@@ -138,6 +138,7 @@ describe('the garden over HTTP on the engine', () => {
       { type: 'like-find', id: liked.id, liked: true },
       { type: 'share-find', id: hidden.id, shared: false },
       { type: 'like-postcard', id: card.id, liked: true },
+      { type: 'favorite-postcard', id: starred.id, favorite: true },
     ]) {
       expect(await post('/api/muses/hero/garden/reactions', reaction)).toEqual({ status: 200, body: { ok: true } });
     }
@@ -145,12 +146,13 @@ describe('the garden over HTTP on the engine', () => {
     const snapshot = (await (await fetch(`${base}/api/muses/hero/garden`)).json()) as GardenSnapshot;
     expect(snapshot.finds.find((f) => f.id === liked.id)).toMatchObject({ liked: true, shared: true });
     expect(snapshot.finds.find((f) => f.id === hidden.id)).toMatchObject({ liked: false, shared: false });
-    expect(snapshot.postcards.find((p) => p.id === card.id)?.liked).toBe(true);
-    const frames = (await live.until((f) => f.some((x) => x.event.type === 'postcard'))).map((f) => f.event);
+    expect(snapshot.postcards.find((p) => p.id === card.id)).toMatchObject({ liked: true, favorite: false });
+    expect(snapshot.postcards.find((p) => p.id === starred.id)).toMatchObject({ liked: false, favorite: true });
+    const frames = (await live.until((f) => f.filter((x) => x.event.type === 'postcard').length >= 2)).map((f) => f.event);
     const baskets = frames.flatMap((e) => (e.type === 'basket' ? [e] : []));
     expect(baskets.map((e) => e.basket.id)).toEqual([liked.basket, hidden.basket]);
     expect(baskets.at(-1)?.finds).toEqual(snapshot.finds.filter((f) => f.basket === hidden.basket));
-    expect(frames.at(-1)).toEqual({ type: 'postcard', postcard: snapshot.postcards.find((p) => p.id === card.id) });
+    expect(frames.filter((e) => e.type === 'postcard')).toEqual([card, starred].map((c) => ({ type: 'postcard', postcard: snapshot.postcards.find((p) => p.id === c.id) })));
   });
 
   it('refuses a Last-Event-ID that is not a log seq', async () => {
@@ -170,6 +172,7 @@ describe('reactions from the garden', () => {
   it.each<[string, unknown, unknown]>([
     ['like-find', { type: 'like-find', id: 'd-pigment', liked: true }, { name: 'like', args: ['hero', { find: 'd-pigment' }, true] }],
     ['like-postcard', { type: 'like-postcard', id: 'p-hangout-1', liked: false }, { name: 'like', args: ['hero', { photo: 'p-hangout-1' }, false] }],
+    ['favorite-postcard', { type: 'favorite-postcard', id: 'p-hangout-1', favorite: true }, { name: 'favorite', args: ['hero', 'p-hangout-1', true] }],
     ['share-interest', { type: 'share-interest', id: 'Pigment', shared: true }, { name: 'setHidden', args: ['hero', 'topic:Pigment', false] }],
     ['keep-interest', { type: 'share-interest', id: 'Sen no Rikyū', shared: false }, { name: 'setHidden', args: ['hero', 'topic:Sen no Rikyū', true] }],
     ['share-find', { type: 'share-find', id: 'd-pigment', shared: true }, { name: 'setHidden', args: ['hero', 'discovery:d-pigment', false] }],
@@ -182,10 +185,12 @@ describe('reactions from the garden', () => {
     expect(commands.calls).toEqual([call]);
   });
 
-  it('a like on an invitation does nothing, and a like on a postcard Muse never sent is not found', async () => {
+  it('a like or a star on an invitation does nothing, and one on a postcard Muse never sent is not found', async () => {
     await serveFake();
     expect((await post('/api/muses/hero/garden/reactions', { type: 'like-postcard', id: 'inv-wren-hero-1', liked: true })).status).toBe(200);
+    expect((await post('/api/muses/hero/garden/reactions', { type: 'favorite-postcard', id: 'inv-wren-hero-1', favorite: true })).status).toBe(200);
     expect((await post('/api/muses/hero/garden/reactions', { type: 'like-postcard', id: 'p-nowhere', liked: true })).status).toBe(404);
+    expect((await post('/api/muses/hero/garden/reactions', { type: 'favorite-postcard', id: 'p-nowhere', favorite: true })).status).toBe(404);
     expect(commands.calls).toEqual([]);
   });
 
@@ -199,6 +204,7 @@ describe('reactions from the garden', () => {
     ['an unknown type', { type: 'water', id: 'd-pigment' }],
     ['a like without liked', { type: 'like-find', id: 'd-pigment' }],
     ['a share without shared', { type: 'share-find', id: 'd-pigment', liked: true }],
+    ['a star without favorite', { type: 'favorite-postcard', id: 'p-hangout-1', liked: true }],
     ['an empty id', { type: 'use-invitation', id: '' }],
     ['a friend group that is not one of the three', { type: 'set-reach', reach: 'friends' }],
     ['a friend group change without the group', { type: 'set-reach', id: 'everyone' }],

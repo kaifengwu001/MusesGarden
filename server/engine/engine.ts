@@ -21,6 +21,7 @@ import type {
   MuseId,
   MuseSeed,
   MuseState,
+  PhotoId,
   PhotoSpec,
   QuestionId,
   ReduceCore,
@@ -261,6 +262,19 @@ export class Engine {
       const friend = photo && (photo.subject === 'friend' || photo.subject === 'new-friend') ? photo.companions.at(0) : undefined;
       const tx = this.tx(this.clockAt);
       tx.emit(museId, { kind: 'owner.liked', target, liked, ...(friend ? { friend } : {}) });
+      this.commit(tx);
+      return true;
+    });
+  }
+
+  /** A postcard starred or unstarred in the garden. False when Muse took no such photo. Starring what is starred records nothing. */
+  favorite(museId: MuseId, photo: PhotoId, favorite: boolean): Promise<boolean> {
+    return this.exclusive(() => {
+      const s = this.must(museId);
+      if (!s.photos.some((p) => p.id === photo)) return false;
+      if (s.favoritePhotos.has(photo) === favorite) return true;
+      const tx = this.tx(this.clockAt);
+      tx.emit(museId, { kind: 'owner.favorited', photo, favorite });
       this.commit(tx);
       return true;
     });

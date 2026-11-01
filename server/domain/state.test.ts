@@ -254,6 +254,19 @@ describe('the owner likes things in the garden', () => {
     expect(life.state.likes.get(selfie.id)).toEqual({ liked: true, firstAt: later });
   });
 
+  it('keeps a starred photo until it is unstarred, and a star nudges nothing, where a like of the same photo does', () => {
+    const { life, photo } = lived();
+    const before = life.state;
+    life.push(later, { kind: 'owner.favorited', photo: photo.id, favorite: true });
+    expect([...life.state.favoritePhotos]).toEqual([photo.id]);
+    expect(life.state.interests).toEqual(before.interests);
+    expect(life.state.likes).toEqual(before.likes);
+    life.push(later + HOUR_MS, { kind: 'owner.favorited', photo: photo.id, favorite: false });
+    expect(life.state.favoritePhotos.size).toBe(0);
+    life.push(later + HOUR_MS, { kind: 'owner.liked', target: { photo: photo.id }, liked: true });
+    expect(salience(life.state, 'Pigment')).toBeGreaterThan(salience(before, 'Pigment'));
+  });
+
   it('does nothing with a like whose target is not in the fold, or an unlike of something never liked', () => {
     const { life, pigment } = lived();
     const before = life.state;

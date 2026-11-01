@@ -69,6 +69,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     reflections: [],
     experiencesSinceReflection: 0,
     likes: new Map(),
+    favoritePhotos: new Set(),
     day: freshDay(''),
     social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
     workSince: null,
@@ -156,6 +157,12 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       return gift(s, stored, e);
     case 'owner.liked':
       return like(s, e.target, e.liked, at);
+    case 'owner.favorited': {
+      const favoritePhotos = new Set(s.favoritePhotos);
+      if (e.favorite) favoritePhotos.add(e.photo);
+      else favoritePhotos.delete(e.photo);
+      return { ...s, favoritePhotos };
+    }
     case 'owner.introduced':
     case 'owner.unshared':
     case 'owners.connected':

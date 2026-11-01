@@ -80,10 +80,11 @@ function sampleGarden(): GardenSnapshot {
       image: postcardImage('invitation'),
       place: `From ${host.name}’s planet`,
       with: host.museId,
-      invitation: { from: host.museId, world: host.museId, worldName: `${host.name}’s planet`, blurb: `Where ${host.name} keeps Lichen.`, used: false },
+      invitation: { from: host.museId, fromName: host.name, coat: coatOf(host.museId), world: host.museId, worldName: `${host.name}’s planet`, blurb: `Where ${host.name} keeps Lichen.`, used: false },
     },
   ];
   return {
+    today: day(sampleNowExploring.at),
     world: { seed: sampleWorld.worldSeed, g: sampleWorld.g },
     muse: { name: sampleNowExploring.name, soul: soulLine(sampleSoulMd), status: museStatus(sampleNowExploring), reach: 'shared' },
     interests: topics.map((topic) => ({
@@ -159,6 +160,7 @@ export function fakeCommands(): FakeCommands {
     introduce: (...args) => accept({ name: 'introduce', args }),
     unshare: (...args) => accept({ name: 'unshare', args }),
     like: (...args) => accept({ name: 'like', args }),
+    favorite: (...args) => accept({ name: 'favorite', args }),
     useInvitation: (...args) => accept({ name: 'useInvitation', args }),
     withdrawInvitation: (...args) => accept({ name: 'withdrawInvitation', args }),
     hostWork: (...args) => accept({ name: 'hostWork', args }),

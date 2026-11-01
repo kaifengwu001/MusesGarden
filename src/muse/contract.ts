@@ -368,6 +368,8 @@ export type MuseEventBody =
   | { readonly kind: 'owners.connected'; readonly other: MuseId; readonly on: KnownOn }
   /** A like or an unlike in the garden; `friend` is the friend a liked photo shows, filled in by the engine. */
   | { readonly kind: 'owner.liked'; readonly target: LikeTarget; readonly liked: boolean; readonly friend?: MuseId }
+  /** A postcard starred or unstarred in the garden. It is the owner's own keeping and never nudges Muse. */
+  | { readonly kind: 'owner.favorited'; readonly photo: PhotoId; readonly favorite: boolean }
   // Life.
   | { readonly kind: 'episode.started'; readonly n: number; readonly plan: EpisodePlan }
   /** Work arrived: laptop out, in place. remainingMs is how much of a timed episode was left. */
@@ -552,6 +554,8 @@ export interface MuseState {
   readonly experiencesSinceReflection: number;
   /** What the owner liked in the garden, by find or photo. Only the first like of a thing nudged Muse. */
   readonly likes: ReadonlyMap<DiscoveryId | PhotoId, { readonly liked: boolean; readonly firstAt: Instant }>;
+  /** The photos the owner starred in the garden. Nothing of Muse's reads it. */
+  readonly favoritePhotos: ReadonlySet<PhotoId>;
   readonly day: DayCounters;
   readonly social: SocialState;
 }
@@ -914,6 +918,8 @@ export interface GardenCommands {
   unshare(museId: MuseId, other: MuseId): Promise<CommandResult>;
   /** A like or an unlike in the garden. */
   like(museId: MuseId, target: LikeTarget, liked: boolean): Promise<CommandResult>;
+  /** A postcard starred or unstarred in the garden. */
+  favorite(museId: MuseId, photo: PhotoId, favorite: boolean): Promise<CommandResult>;
   /** "Travel now" on an invitation the owner received: good for one visit, whenever they like. */
   useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   /** The host's owner takes back an invitation not yet used. Nothing else ever withdraws one. */

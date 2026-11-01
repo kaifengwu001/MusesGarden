@@ -63,8 +63,10 @@ export interface Basket {
 }
 
 export interface Invitation {
-  /** The Muse who invites you. */
+  /** The Muse who invites you: its id, its name, and its coat as a CSS colour (its ticket is printed in it). */
   from: string;
+  fromName: string;
+  coat: string;
   /** Its world: an id the travel step resolves, and the world's name. */
   world: string;
   worldName: string;
@@ -89,6 +91,8 @@ export interface Postcard {
   invitation?: Invitation;
   /** Whether you liked it, when the backend keeps likes; without it this browser remembers them. */
   liked?: boolean;
+  /** Whether you starred it, kept for you alone, when the backend keeps favorites; without it this browser remembers them. */
+  favorite?: boolean;
 }
 
 export interface Interest {
@@ -145,6 +149,8 @@ export interface MuseProfile {
 
 /** Everything the garden shows, as of now. */
 export interface GardenSnapshot {
+  /** The day it is where the owner lives (ISO date), by the backend's clock: the day the post's From today is. */
+  today: string;
   /** Muse's own planet, when the backend has one: its seed and growth (0..1), as the URL's `seed` and `g`. */
   world?: { seed: number; g: number };
   muse: MuseProfile;
@@ -165,6 +171,7 @@ export type GardenEvent =
 export type Reaction =
   | { type: 'like-find'; id: string; liked: boolean }
   | { type: 'like-postcard'; id: string; liked: boolean }
+  | { type: 'favorite-postcard'; id: string; favorite: boolean }
   | { type: 'share-interest'; id: string; shared: boolean }
   | { type: 'share-find'; id: string; shared: boolean }
   | { type: 'use-invitation'; id: string }
