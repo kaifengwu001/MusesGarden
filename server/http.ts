@@ -10,6 +10,7 @@ import type { Garden } from './http/app';
 import { createApp } from './http/app';
 import { startLiveClock } from './http/clock';
 import { fakeCommands, fakeQueries } from './http/fake';
+import { mediaCache } from './http/media';
 
 type Backend = Garden & { readonly name: string; readonly tick: (now: Instant) => Promise<void>; readonly close: () => void };
 
@@ -42,6 +43,7 @@ async function buildBackend(): Promise<Backend> {
     queries: garden.views,
     commands: garden.commands,
     now: () => garden.engine.now(),
+    media: mediaCache({ dir: `${dir}/media`, items: garden.recording.items }),
     tick: (now) => garden.commands.tick(now),
     close: () => garden.store.close(),
   };

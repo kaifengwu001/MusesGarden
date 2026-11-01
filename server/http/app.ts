@@ -11,6 +11,7 @@ import type {
   MuseId,
   PhotoId,
 } from '../../src/muse/contract';
+import type { MediaImages } from './media';
 import { requestingOwner } from './owner';
 import {
   HttpError,
@@ -36,12 +37,14 @@ export interface Garden {
   readonly commands: GardenCommands;
   /** The sim clock's instant, for /now, /invitations and /visits. */
   readonly now: () => Instant;
+  /** Pictures of finds whose own links expire; absent where nothing is cached. */
+  readonly media?: MediaImages;
 }
 
 interface Reply {
   readonly status: number;
   readonly type?: string;
-  readonly body: string;
+  readonly body: string | Uint8Array;
 }
 
 interface Call {
@@ -83,7 +86,7 @@ function result(r: CommandResult): Reply {
   return r.ok ? json({ ok: true }) : json({ error: r.error }, r.status);
 }
 
-function routesFor({ queries, commands, now }: Garden): readonly Route[] {
+function routesFor({ queries, commands, now, media }: Garden): readonly Route[] {
   const muse = (raw: string): MuseId => {
     const museId = id<MuseId>(raw, 'id');
     if (!queries.muses().some((m) => m.museId === museId)) throw new HttpError(404, 'no such Muse');
@@ -140,8 +143,10 @@ function routesFor({ queries, commands, now }: Garden): readonly Route[] {
     gardenReactions: () => {
       throw new HttpError(404, 'no such route');
     },
-    media: () => {
-      throw new HttpError(404, 'no such route');
+    media: async ({ params }) => {
+      const image = media === undefined ? null : await media(params.mid);
+      if (image === null) throw new HttpError(404, 'not found');
+      return { status: 200, type: image.type, body: image.body };
     },
     postcardImage: () => {
       throw new HttpError(404, 'no such route');
