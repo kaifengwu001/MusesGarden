@@ -28,6 +28,10 @@ export const SOCIAL = {
 
   budgetMsAtFullSociability: 3 * HOUR,
   closenessTemperature: 0.2,
+  /** Liked photos of a friend add up to this much closeness when choosing whom to visit... */
+  fondnessPull: 0.3,
+  /** ...half of it at this many likes. */
+  fondnessHalf: 2,
   goUsually: 0.5,
   goAfterBeingGuest: 0.3,
   visitMedianMs: 50 * MINUTE,

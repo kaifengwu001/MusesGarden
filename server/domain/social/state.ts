@@ -2,7 +2,7 @@ import type { Instant, MuseId, ReduceSocial, Relationship, RelationshipOrigin, S
 import { distanceAfter, isUnpleasant } from './relationships';
 
 export function emptySocial(): SocialState {
-  return { relationships: new Map(), invitations: new Map() };
+  return { relationships: new Map(), invitations: new Map(), likedPhotos: new Set() };
 }
 
 function fresh(other: MuseId, origin: RelationshipOrigin): Relationship {
@@ -10,6 +10,7 @@ function fresh(other: MuseId, origin: RelationshipOrigin): Relationship {
     other,
     status: 'acquainted',
     origin,
+    friendsSince: null,
     familiarity: 0,
     rapport: 0,
     rapportSinceInvite: 0,
@@ -20,6 +21,7 @@ function fresh(other: MuseId, origin: RelationshipOrigin): Relationship {
     lastRole: null,
     lastMetAt: null,
     lastInviteAt: null,
+    fondness: 0,
   };
 }
 
@@ -29,8 +31,14 @@ function withRelationship(s: SocialState, other: MuseId, origin: RelationshipOri
   return { ...s, relationships };
 }
 
-const befriend = (origin: RelationshipOrigin) => (r: Relationship): Relationship => ({ ...r, status: 'friends', origin, unpleasantStreak: 0 });
-const end = (r: Relationship): Relationship => (r.status === 'ended' ? r : { ...r, status: 'ended' });
+const befriend = (origin: RelationshipOrigin, at: Instant) => (r: Relationship): Relationship => ({
+  ...r,
+  status: 'friends',
+  origin,
+  friendsSince: r.status === 'friends' ? r.friendsSince : at,
+  unpleasantStreak: 0,
+});
+const end = (r: Relationship): Relationship => (r.status === 'ended' ? r : { ...r, status: 'ended', friendsSince: null });
 
 export const reduceSocial: ReduceSocial = (s, stored, self) => {
   const e = stored.event;
@@ -55,13 +63,18 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
         lastMetAt: at,
       }));
     case 'relationship.changed':
-      if (e.to === 'friends') return withRelationship(s, e.other, e.origin, befriend(e.origin));
+      if (e.to === 'friends') return withRelationship(s, e.other, e.origin, befriend(e.origin, at));
       if (e.to === 'ended') return s.relationships.has(e.other) ? withRelationship(s, e.other, e.origin, end) : s;
-      return withRelationship(s, e.other, e.origin, (r) => ({ ...r, status: 'acquainted' }));
+      return withRelationship(s, e.other, e.origin, (r) => ({ ...r, status: 'acquainted', friendsSince: null }));
     case 'owner.introduced':
-      return withRelationship(s, e.other, 'introduced', befriend('introduced'));
+      return withRelationship(s, e.other, 'introduced', befriend('introduced', at));
     case 'owner.unshared':
       return s.relationships.has(e.other) ? withRelationship(s, e.other, 'introduced', end) : s;
+    case 'owner.liked': {
+      if (!e.liked || !e.friend || !('photo' in e.target) || s.likedPhotos.has(e.target.photo) || !s.relationships.has(e.friend)) return s;
+      const likedPhotos = new Set(s.likedPhotos).add(e.target.photo);
+      return withRelationship({ ...s, likedPhotos }, e.friend, 'met-beyond', (r) => ({ ...r, fondness: r.fondness + 1 }));
+    }
     case 'invitation': {
       const previous = s.invitations.get(e.id);
       if (e.to !== 'sent' && !previous) return s;

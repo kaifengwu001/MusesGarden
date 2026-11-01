@@ -445,6 +445,8 @@ export interface Relationship {
   readonly other: MuseId;
   readonly status: RelationshipStatus;
   readonly origin: RelationshipOrigin;
+  /** When they became friends; null while they aren't. */
+  readonly friendsSince: Instant | null;
   /** Summed pleasantness of encounters beyond. */
   readonly familiarity: number;
   /** Summed pleasantness of hangouts. Never decays with time apart. */
@@ -458,6 +460,8 @@ export interface Relationship {
   readonly lastRole: 'host' | 'guest' | null;
   readonly lastMetAt: Instant | null;
   readonly lastInviteAt: Instant | null;
+  /** Photos of the two that the owner liked, each counted once. Only the choice of whom to visit reads it. */
+  readonly fondness: number;
 }
 
 export interface Invitation {
@@ -473,6 +477,8 @@ export interface Invitation {
 export interface SocialState {
   readonly relationships: ReadonlyMap<MuseId, Relationship>;
   readonly invitations: ReadonlyMap<InvitationId, Invitation>;
+  /** Photos whose first like already counted toward a friend's fondness, so toggling a like can't pump it. */
+  readonly likedPhotos: ReadonlySet<PhotoId>;
 }
 
 export interface MuseState {

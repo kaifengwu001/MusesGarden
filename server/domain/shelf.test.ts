@@ -64,6 +64,7 @@ describe('the favorites shelf', () => {
       other: museId(other),
       status: 'friends',
       origin: 'introduced',
+      friendsSince: null,
       familiarity: 0,
       rapport,
       rapportSinceInvite: 0,
@@ -74,8 +75,9 @@ describe('the favorites shelf', () => {
       lastRole: null,
       lastMetAt: null,
       lastInviteAt: null,
+      fondness: 0,
     });
-    const s = { ...life.state, social: { relationships: new Map([[museId('wren'), rel('wren', 4)], [museId('juniper'), rel('juniper', 1)]]), invitations: new Map() } };
+    const s = { ...life.state, social: { ...life.state.social, relationships: new Map([[museId('wren'), rel('wren', 4)], [museId('juniper'), rel('juniper', 1)]]) } };
     const [first, second] = shelf(s, D1);
     expect(first.discovery.title).toBe('Lichen');
     expect(first.fondness - second.fondness).toBeCloseTo(0.1 * (1 - 1 / 4), 9);

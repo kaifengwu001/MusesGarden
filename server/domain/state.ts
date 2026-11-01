@@ -64,7 +64,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     reflections: [],
     experiencesSinceReflection: 0,
     day: freshDay(''),
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set() },
     workSince: null,
     recentWork: [],
     lastReflectionAt: instant(0),

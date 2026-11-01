@@ -214,8 +214,17 @@ describe('owners introducing and unsharing', () => {
   it('makes introduced Muses friends at once, in both logs', () => {
     const [a, b] = pair(0.3, ['Lichen'], ['Jazz']);
     const [a2, b2] = apply(a, b, policy.ownerLink(a, b, 'introduce', T0), T0);
-    expect(a2.social.relationships.get(b.seed.id)).toMatchObject({ status: 'friends', origin: 'introduced' });
-    expect(b2.social.relationships.get(a.seed.id)).toMatchObject({ status: 'friends', origin: 'introduced' });
+    expect(a2.social.relationships.get(b.seed.id)).toMatchObject({ status: 'friends', origin: 'introduced', friendsSince: T0 });
+    expect(b2.social.relationships.get(a.seed.id)).toMatchObject({ status: 'friends', origin: 'introduced', friendsSince: T0 });
+  });
+
+  it('remembers when they became friends until the friendship ends', () => {
+    let [a, b] = pair(0.6);
+    [a, b] = apply(a, b, policy.ownerLink(a, b, 'introduce', T0), T0);
+    [a, b] = apply(a, b, policy.ownerLink(a, b, 'introduce', at(T0 + DAY)), at(T0 + DAY));
+    expect(a.social.relationships.get(b.seed.id)?.friendsSince).toBe(T0);
+    [a, b] = apply(a, b, policy.ownerLink(a, b, 'unshare', at(T0 + 2 * DAY)), at(T0 + 2 * DAY));
+    expect(a.social.relationships.get(b.seed.id)?.friendsSince).toBeNull();
   });
 
   it('ends an introduced friendship when an owner unshares, and nothing more crosses', () => {

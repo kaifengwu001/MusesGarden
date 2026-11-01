@@ -13,6 +13,7 @@ const friend: Relationship = {
   other: WREN,
   status: 'friends',
   origin: 'introduced',
+  friendsSince: null,
   familiarity: 0,
   rapport: 2,
   rapportSinceInvite: 0,
@@ -23,12 +24,13 @@ const friend: Relationship = {
   lastRole: null,
   lastMetAt: null,
   lastInviteAt: null,
+  fondness: 0,
 };
 
 /** Three days beyond the planet in 90-minute trips, photos folded as the engine would. Photos per owner-day. */
 function threeDaysBeyond(temperament: Temperament, withFriend: boolean): Map<string, number> {
   const life = new Life(MOSS, temperament);
-  const befriend = <S extends MuseState>(s: S): S => (withFriend ? { ...s, social: { relationships: new Map([[WREN, friend]]), invitations: new Map() } } : s);
+  const befriend = <S extends MuseState>(s: S): S => (withFriend ? { ...s, social: { ...s.social, relationships: new Map([[WREN, friend]]) } } : s);
   let n = 0;
   for (let now: number = START; now < START + 72 * HOUR_MS; now += 90 * MINUTE_MS) {
     n++;

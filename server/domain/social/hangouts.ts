@@ -73,7 +73,8 @@ export function chooseVisit(s: MuseState, free: readonly { readonly state: MuseS
   const mine = publicProfile(s);
   const weights = friends.map((f, i) => {
     const closeness = (closest > 0 ? rapport[i] / closest : 0) * similarity(mine, publicProfile(f));
-    return Math.exp(closeness / SOCIAL.closenessTemperature);
+    const fondness = relationshipWith(s, f.seed.id)?.fondness ?? 0;
+    return Math.exp((closeness + (SOCIAL.fondnessPull * fondness) / (fondness + SOCIAL.fondnessHalf)) / SOCIAL.closenessTemperature);
   });
   const friend = pick(friends, weights, draw('visit.friend'));
   if (draw('visit.distant') < (relationshipWith(s, friend.seed.id)?.distance ?? 0)) return null;

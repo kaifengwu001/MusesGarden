@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MuseState } from '../../../src/muse/contract';
+import type { DiscoveryId, MuseEventBody, MuseState, PhotoId } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
 import { DAY, HOUR, T0, apply, at, draws, find, fold, muse, ofKind, pastHangout, topics, type MuseSpec } from './testkit';
 
@@ -107,6 +107,24 @@ describe('choosing whom to visit', () => {
     expect(cy).toBeGreaterThan(di);
     expect(di).toBeGreaterThan(0);
     expect(bo + cy + di).toBe(1);
+  });
+
+  it('favours a friend whose photos the owner liked, counting each photo once', () => {
+    const { self, friends } = circle();
+    const [, cy] = friends;
+    const like = (photo: string, liked = true): MuseEventBody => ({ kind: 'owner.liked', target: { photo: photo as PhotoId }, liked, friend: cy.seed.id });
+    const notOfAFriend: MuseEventBody = { kind: 'owner.liked', target: { photo: 'p3' as PhotoId }, liked: true };
+    const aFind: MuseEventBody = { kind: 'owner.liked', target: { find: 'd' as DiscoveryId }, liked: true, friend: cy.seed.id };
+    const fond = fold(self, [like('p1'), like('p1', false), like('p1'), like('p2'), notOfAFriend, aFind], T0);
+    expect(fond.social.relationships.get(cy.seed.id)?.fondness).toBe(2);
+    expect(fond.social.relationships.get(friends[0].seed.id)?.fondness).toBe(0);
+
+    const share = (s: MuseState) => {
+      let n = 0;
+      for (let seed = 0; seed < 3000; seed++) if (policy.chooseVisit(s, friends.map((state) => ({ state })), at(T0 + 10 * HOUR), draws(seed))?.other === cy.seed.id) n++;
+      return n / 3000;
+    };
+    expect(share(fond)).toBeGreaterThan(1.5 * share(self));
   });
 
   it('only ever picks a friend', () => {

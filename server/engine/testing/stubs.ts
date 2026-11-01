@@ -57,7 +57,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     lastReflectionAt: 0 as Instant,
     experiencesSinceReflection: 0,
     day: { day: '', restMs: 0, socialMs: 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set() },
   };
 }
 
@@ -106,6 +106,7 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
     other: e.other,
     status: e.to,
     origin: e.origin,
+    friendsSince: e.to === 'friends' ? stored.event.at : null,
     familiarity: 0,
     rapport: 0,
     rapportSinceInvite: 0,
@@ -116,6 +117,7 @@ export const reduceSocial: ReduceSocial = (s, stored) => {
     lastRole: null,
     lastMetAt: null,
     lastInviteAt: null,
+    fondness: 0,
   });
   return { ...s, relationships };
 };
