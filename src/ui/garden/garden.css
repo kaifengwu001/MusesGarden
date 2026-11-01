@@ -2662,3 +2662,113 @@ body.g-away .masthead {
 body.postcard .garden {
   display: none;
 }
+
+/* ---- opening a basket (basketFlight.ts): the basket, its finds on their way, where they land ---- */
+
+.g-fly {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.g-fly-basket {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 156px;
+  height: 120px;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+
+.g-fly-basket svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.g-fly-basket.is-front {
+  filter: drop-shadow(0 16px 20px rgba(30, 42, 60, 0.24));
+}
+
+/* the lid's two flaps, hinged at the rim's ends, swing up and out as it opens */
+.g-fly-lid {
+  position: absolute;
+  top: 37px;
+  width: 70px;
+  height: 17px;
+  border-radius: 50%;
+  background: linear-gradient(#ebc68c, #c48d52);
+  box-shadow: inset 0 -2px 0 rgba(120, 80, 40, 0.35), 0 1px 0 rgba(92, 60, 30, 0.35);
+}
+
+.g-fly-lid.is-left {
+  left: 8px;
+  transform-origin: 3px 50%;
+  transform: rotate(calc(var(--open, 0) * -112deg));
+}
+
+.g-fly-lid.is-right {
+  right: 8px;
+  transform-origin: calc(100% - 3px) 50%;
+  transform: rotate(calc(var(--open, 0) * 112deg));
+}
+
+.g-fly-find {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 58px;
+  height: 58px;
+  border: 3px solid #fbf7ee;
+  border-radius: 12px;
+  background: var(--paper-deep) center / cover;
+  box-shadow: 0 8px 18px rgba(30, 44, 66, 0.26);
+  opacity: 0;
+  will-change: transform;
+}
+
+.g-fly-find i {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fbf7ee;
+}
+
+/* on its way down a find passes in front of the basket */
+.g-fly-find.is-leaving {
+  z-index: 1;
+}
+
+/* where a find lands: a ring on the ground in its interest's colour, spreading and fading */
+.g-fly-ring {
+  position: absolute;
+  width: 84px;
+  height: 36px;
+  margin: -18px 0 0 -42px;
+  border: 3px solid #fffaf0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--ring) 55%, transparent), transparent);
+  box-shadow: 0 0 16px 2px var(--ring), inset 0 0 12px var(--ring);
+  animation: g-fly-ring 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes g-fly-ring {
+  from {
+    transform: scale(0.15);
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}

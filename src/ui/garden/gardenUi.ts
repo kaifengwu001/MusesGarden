@@ -15,8 +15,9 @@ import { warpPoint } from '../../render/warp';
 import { Flight, type Framing } from '../../view/flight';
 import type { World } from '../../world';
 import { BasketsSheet } from './baskets';
+import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
 import { button, dayName, el } from './dom';
-import { FindCard } from './findCard';
+import { FindCard, topicColour } from './findCard';
 import './garden.css';
 import { ICONS } from './icons';
 import { Mail } from './mail';
@@ -34,8 +35,6 @@ import { TravelSheet, Visit } from './travel';
 
 /** How a find is framed: the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
-/** A basket's patch: its first find from a little farther back, under the clouds. */
-const PATCH_VIEW = { distance: 9.5, height: 3.6, aim: 1.0 } as const;
 /** The line from a bed up to its card (m); higher than this (m) a card is put away. */
 const STEM = 1.9;
 const CARD_UNDER = 30;
@@ -45,6 +44,15 @@ const MUSE_VIEW = { distance: 4.6, height: 1.35, bearing: 0.3, aim: 0.62 } as co
 
 const sample = createGroundSample();
 const tmp = new Vector3();
+
+/** The finds' marks on the planet (their specimens, and the glowing spheres seen from high up). */
+export interface FindMarks {
+  hover(id: string | null): void;
+  open(id: string | null): void;
+  pulse(ids: readonly string[]): void;
+  /** How plainly the spheres show at the camera's height, 0..1. */
+  spheresShown(): number;
+}
 
 /** 'Today’s basket', 'Tuesday’s basket', 'The basket of Tue 21 Oct'. */
 export function basketName(day: string): string {
@@ -57,7 +65,10 @@ export class GardenUi {
   private readonly root: HTMLElement;
   private readonly beds: FindBeds;
   private readonly pins = new Pins();
+  /** The finds' specimens and spheres, once they are drawn. */
+  marks: FindMarks | null = null;
   private readonly flight: Flight;
+  private readonly basketFlight: BasketFlight;
   private readonly card: FindCard;
   private readonly postbox: PostBox;
   private readonly mail: Mail;
@@ -96,6 +107,13 @@ export class GardenUi {
     this.beds = new FindBeds(world.shared);
     world.scene.add(...this.beds.meshes, this.pins.group);
     this.flight = new Flight(world.rig);
+    this.basketFlight = new BasketFlight(this.root, {
+      project: (dir, height) => this.project(dir, height, window.innerWidth, window.innerHeight),
+      cameraRemaining: () => this.flight.remaining,
+      // (a quarter second back on the planting clock: its first sprouts show as it lands)
+      plant: (ids) => this.beds.plant(ids, 0.12, -0.25),
+      pulse: (ids) => this.marks?.pulse(ids),
+    });
 
     this.card = new FindCard(this.root, {
       like: () => this.like(),
@@ -140,7 +158,7 @@ export class GardenUi {
     this.mail = new Mail(this.root, this.state, this.postbox, {
       travel: (id) => this.board(id),
     });
-    this.basketsSheet = new BasketsSheet(this.root, this.state, (id) => this.goToBasket(id));
+    this.basketsSheet = new BasketsSheet(this.root, this.state, (id, from) => this.goToBasket(id, from));
     this.museSheet = new MuseSheet(this.root, this.state, { muse: museFace, friend: friendFace }, (home) => this.setHome(home));
     this.travelSheet = new TravelSheet(this.root, this.state, (id) => this.board(id));
 
@@ -175,7 +193,7 @@ export class GardenUi {
     this.homeButton.title = home ? 'Muse’s cottage' : 'Muse’s cottage: Muse is out';
     if (change === 'snapshot' && s.freshBasket) {
       const fresh = s.freshBasket;
-      setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', () => this.goToBasket(fresh.id)), 1800);
+      setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', (from) => this.goToBasket(fresh.id, from)), 1800);
     }
     if (change === 'postcards' || change === 'snapshot') {
       this.mail.refresh();
@@ -203,7 +221,7 @@ export class GardenUi {
         if (!bed || !find) continue;
         const interest = this.state.interest(find.topic);
         looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5 });
-        if (!this.state.visitedBasket(basket.id)) hidden.add(id);
+        if (!this.state.visitedBasket(basket.id) || this.basketFlight.waiting(id)) hidden.add(id);
       }
     }
     this.beds.set(looks, radius, hidden);
@@ -238,6 +256,7 @@ export class GardenUi {
       this.relayout();
     }
     const away = this.visit.away;
+    this.basketFlight.update(dt);
     this.beds.update(away ? Infinity : w.rig.altitude);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     if (!this.state.status.home || away) {
@@ -321,6 +340,7 @@ export class GardenUi {
     const find = this.state.find(id);
     if (!bed || !find) return;
     if (this.card.shown) this.card.hide(direction);
+    this.basketFlight.finish();
     this.beds.highlight(null);
     this.current = id;
     // look from the side the camera comes from, unless it is right over the bed
@@ -339,6 +359,7 @@ export class GardenUi {
       liked: this.state.liked(id),
     });
     this.beds.highlight(id);
+    this.marks?.open(id);
   }
 
   private step(direction: 1 | -1): void {
@@ -358,34 +379,43 @@ export class GardenUi {
 
   private closeCard(): void {
     this.card.hide(0);
+    this.basketFlight.finish();
     this.beds.highlight(null);
+    this.marks?.open(null);
     this.current = null;
   }
 
   // ---- baskets ---------------------------------------------------------------------------
 
   /**
-   * Fly to a basket's patch, framed on its first find (the beds round it in view); a basket not yet
-   * visited is planted as you arrive, the middle bed first, and its card rises while the rest blossom.
+   * Open a basket: it flies in from `from` (where you picked it; the rail's basket by default) and its
+   * finds fly to where they were found while the camera follows, high enough to see them all. A basket
+   * not opened before plants its finds as they land; one opened before lights them up again.
    */
-  goToBasket(id: string): void {
+  goToBasket(id: string, from: DOMRect | null = null): void {
     const basket = this.state.basket(id);
-    const first = basket?.finds.find((f) => this.layout.beds.has(f));
-    const bed = first ? this.layout.beds.get(first) : undefined;
-    if (!basket || !first || !bed) return;
-    if (this.card.shown) this.card.hide(0);
-    this.beds.highlight(null);
-    this.current = first;
-    const fresh = !this.state.visitedBasket(id);
-    this.flight.to(this.framing(bed, PATCH_VIEW), this.world.growth.radius, this.ground, () => {
-      if (!fresh) {
-        this.raise(first);
-        return;
-      }
-      this.state.visit(id);
-      this.beds.plant(basket.finds, 0.24, 0.1);
-      setTimeout(() => this.raise(first), 1150);
+    const arrivals = (basket?.finds ?? []).flatMap((f): Arrival[] => {
+      const bed = this.layout.beds.get(f);
+      const find = this.state.find(f);
+      return bed && find ? [{ id: f, bed, image: find.media.image, colour: topicColour(this.state.interest(find.topic)) }] : [];
     });
+    if (arrivals.length === 0) return;
+    this.closeCard();
+    const fresh = !this.state.visitedBasket(id);
+    this.basketFlight.start(arrivals, from ?? this.basketsButton.getBoundingClientRect(), fresh);
+    // (after the start: until each lands, its bed stays unplanted)
+    if (fresh) this.state.visit(id);
+    const R = this.world.growth.radius;
+    this.flight.to(
+      framingToFit(
+        arrivals.map((a) => a.bed),
+        this.flight,
+        R,
+        this.ground,
+      ),
+      R,
+      this.ground,
+    );
   }
 
   // ---- Muse ---------------------------------------------------------------------------------
@@ -469,13 +499,15 @@ export class GardenUi {
 
   // ---- toasts ----------------------------------------------------------------------------------
 
-  toast(text: string, action?: string, onAction?: () => void): void {
+  /** A line at the top for a moment, with an action (it is handed the button's place on screen) if given. */
+  toast(text: string, action?: string, onAction?: (from: DOMRect) => void): void {
     this.toastEl.replaceChildren(el('span', '', text));
     if (action && onAction) {
       this.toastEl.append(
-        button('', action, '', () => {
+        button('', action, '', (e) => {
+          const from = (e.currentTarget as HTMLElement).getBoundingClientRect();
           this.toastEl.classList.remove('is-on');
-          onAction();
+          onAction(from);
         }),
       );
       (this.toastEl.lastChild as HTMLButtonElement).textContent = action;

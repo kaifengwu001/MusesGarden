@@ -6,15 +6,16 @@ import { Sheet } from './sheet';
 
 // The baskets Muse has handed you, newest first, down a timeline: each day
 // with its name (if Muse gave it one), its finds as small pictures, and how
-// many there were. One you missed is marked new. Tap a day and the camera
-// flies to its patch on the planet (planting it, if you had not been yet)
-// and its first card rises.
+// many there were. One you missed is marked new. Tap a day and its basket
+// flies out of the list and opens, and its finds fly to where Muse found
+// them (planting them, if you had not opened it yet).
 
 export class BasketsSheet extends Sheet {
   constructor(
     parent: HTMLElement,
     private readonly state: GardenState,
-    private readonly pick: (basket: string) => void,
+    /** A day was picked: its basket, and where its pictures were on screen. */
+    private readonly pick: (basket: string, from: DOMRect) => void,
   ) {
     super(parent, 'Baskets', 'What Muse brought home, day by day', 'g-baskets');
   }
@@ -52,13 +53,14 @@ export class BasketsSheet extends Sheet {
       go.innerHTML = ICONS.right;
       row.append(go);
       row.addEventListener('click', () => {
+        const from = thumbs.getBoundingClientRect();
         this.close();
-        this.pick(basket.id);
+        this.pick(basket.id, from);
       });
       item.append(row);
       list.append(item);
     }
-    const foot = el('p', 'g-sheet-note', 'Each day’s finds grow side by side as a patch of their own, a little farther out each day. Nothing scrolls on forever: this is all of it.');
+    const foot = el('p', 'g-sheet-note', 'Each find grows where Muse found it. Nothing scrolls on forever: this is all of it.');
     this.body.replaceChildren(list, foot);
   }
 }
