@@ -3,6 +3,7 @@ import type { GardenState } from '../../garden/state';
 import type { Postcard } from '../../garden/types';
 import { button, dayName, el, nextFrame, shortDate, wait } from './dom';
 import { ICONS } from './icons';
+import { PILE_SHOWN, stackSlot, underSlot, type Slot } from './pile';
 import type { PostBox } from './postbox';
 
 // The post: what comes out of the post box. Its door drops and the cards
@@ -20,6 +21,17 @@ export interface MailActions {
 }
 
 type View = 'stack' | 'focus' | 'album';
+
+/** The card up close. */
+const HELD: Slot = { x: 0, y: -10, r: 0, s: 1, shown: true };
+
+function place(node: HTMLElement, slot: Slot): void {
+  node.style.setProperty('--x', `${slot.x}px`);
+  node.style.setProperty('--y', `${slot.y}px`);
+  node.style.setProperty('--r', `${slot.r}deg`);
+  node.style.setProperty('--s', String(slot.s));
+  node.classList.toggle('is-buried', !slot.shown);
+}
 
 /** A stamp: a little painted planet with its cottage, on perforated card. */
 const STAMP = `<svg viewBox="0 0 60 72" aria-hidden="true"><rect width="60" height="72" fill="#f4ead2"/><rect x="5" y="5" width="50" height="62" fill="#9fcbe6"/><circle cx="30" cy="44" r="21" fill="#86b65a"/><path d="M9 44a21 21 0 0 1 42 0" fill="#9ccc62"/><circle cx="21" cy="35" r="4" fill="#5d93c9"/><g transform="translate(30 25)"><path d="M-7 0 0-6 7 0Z" fill="#7a6a58"/><rect x="-5.5" y="0" width="11" height="7" fill="#f3e6c4"/></g><path d="M8 18c6-4 12-4 16 0M36 14c5-3 10-3 14 0" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity=".9"/><text x="49" y="64" font-family="Fraunces, Georgia, serif" font-size="9" font-style="italic" text-anchor="end" fill="#3e3a36">M</text></svg>`;
@@ -218,8 +230,8 @@ export class Mail {
     const stage = this.stage.getBoundingClientRect();
     const nodes = this.cards.map((card) => this.build(card));
     this.stage.replaceChildren(...nodes);
+    const shown = Math.min(nodes.length, PILE_SHOWN);
     nodes.forEach((node, k) => {
-      const seed = Math.sin((k + 1) * 91.7) * 0.5;
       node.style.zIndex = String(100 - k);
       node.dataset.index = String(k);
       if (fly && mouth) {
@@ -231,12 +243,10 @@ export class Mail {
       }
       const land = (): void => {
         node.style.opacity = '';
-        node.style.setProperty('--x', `${seed * 26 + (k % 2 ? 6 : -6)}px`);
-        node.style.setProperty('--y', `${k * 5 - 8}px`);
-        node.style.setProperty('--s', String(1 - k * 0.012));
-        node.style.setProperty('--r', `${seed * 7 + (k === 0 ? -1.5 : 0)}deg`);
+        place(node, stackSlot(k));
       };
-      if (fly) void nextFrame().then(() => setTimeout(land, (nodes.length - 1 - k) * 70));
+      // the hidden cards land with the last one that shows
+      if (fly) void nextFrame().then(() => setTimeout(land, (shown - 1 - Math.min(k, shown - 1)) * 70));
       else land();
     });
   }
@@ -262,30 +272,24 @@ export class Mail {
     this.state.markRead(card.id);
     const nodes = [...this.stage.children] as HTMLElement[];
     nodes.forEach((node, i) => {
-      const on = i === k;
-      node.classList.toggle('is-focus', on);
-      node.classList.remove('is-flipped');
-      if (!on) node.classList.remove('is-open');
-      node.style.zIndex = on ? '200' : String(100 - i);
-      if (on) {
-        node.style.setProperty('--x', '0px');
-        node.style.setProperty('--y', '-10px');
-        node.style.setProperty('--r', '0deg');
-        node.style.setProperty('--s', '1');
-        if (card.invitation) setTimeout(() => node.classList.add('is-open'), 380);
-      } else {
-        const seed = Math.sin((i + 1) * 91.7) * 0.5;
-        node.style.setProperty('--x', `${seed * 40 + (i < k ? -1 : 1) * 30}px`);
-        node.style.setProperty('--y', `${150 + i * 4}px`);
-        node.style.setProperty('--s', '0.62');
-        node.style.setProperty('--r', `${seed * 10}deg`);
-      }
+      this.arrange(node, i);
     });
+    if (card.invitation) setTimeout(() => nodes[k].classList.add('is-open'), 380);
     this.likeButton.classList.toggle('is-liked', this.state.cardLiked(card.id));
     this.likeButton.innerHTML = `${this.state.cardLiked(card.id) ? ICONS.heartFilled : ICONS.heart}<span>${this.state.cardLiked(card.id) ? 'Liked' : 'Like'}</span>`;
     this.bar.classList.toggle('is-invitation', !!card.invitation);
     this.title.textContent = card.invitation ? 'An invitation' : card.place;
     this.sub.textContent = card.invitation ? `From ${this.friendName(card) ?? 'a friend'}` : `${dayName(card.day)}${this.friendName(card) ? ` · with ${this.friendName(card)}` : ''}`;
+  }
+
+  /** Card i up close, or in the pile under the one that is. */
+  private arrange(node: HTMLElement, i: number): void {
+    const on = i === this.focused;
+    node.classList.toggle('is-focus', on);
+    node.classList.remove('is-flipped');
+    if (!on) node.classList.remove('is-open');
+    node.style.zIndex = on ? '200' : String(100 - i);
+    place(node, on ? HELD : underSlot(i, this.focused));
   }
 
   private unfocus(): void {

@@ -1853,6 +1853,12 @@ body.garden-on .hud {
   --w: min(780px, 88vw, calc((100vh - 230px) * 1.5));
 }
 
+/* a card deep in a pile lies hidden under the last one that shows */
+.g-pc.is-buried {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .g-pc.is-away {
   opacity: 0;
   transition:
