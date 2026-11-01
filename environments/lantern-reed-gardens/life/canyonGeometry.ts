@@ -1,6 +1,6 @@
 import { BufferGeometry, Float32BufferAttribute, Vector3 } from 'three';
 
-/** Small non-indexed mesh builder. Hard faces remain hard; foliage is genuinely thin geometry. */
+/** Small mesh builder. Hard faces remain hard; foliage is genuinely thin geometry. */
 export class CanyonGeometry {
   private positions: number[] = [];
   private normals: number[] = [];
@@ -8,7 +8,11 @@ export class CanyonGeometry {
   private kinds: number[] = [];
 
   triangle(a: Vector3, b: Vector3, c: Vector3, kind: number, uv: readonly (readonly [number, number])[] = [[0, 0], [1, 0], [0, 1]]): void {
-    const n = new Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
+    const n = new Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a));
+    // Tapered blades meet at one point. Their collapsed end triangles cover no
+    // pixels, but used to carry zero normals and consume work in every colony.
+    if (n.lengthSq() < 1e-16) return;
+    n.normalize();
     for (const [i, p] of [a, b, c].entries()) {
       this.positions.push(p.x, p.y, p.z);
       this.normals.push(n.x, n.y, n.z);
@@ -55,11 +59,51 @@ export class CanyonGeometry {
   }
 
   build(): BufferGeometry {
+    // Weld only bit-identical GPU vertices: shared triangle corners can reuse a
+    // transform, while hard normals, UV seams and material boundaries stay split.
+    // Compare Float32 bits, including signed zero, rather than rounded keys.
+    const source = [new Float32Array(this.positions), new Float32Array(this.normals), new Float32Array(this.uvs), new Float32Array(this.kinds)];
+    const bits = source.map(values => new Uint32Array(values.buffer));
+    const sizes = [3, 3, 2, 1];
+    const welded: number[][] = [[], [], [], []], indices: number[] = [];
+    const first = new Map<number, number>(), originals: number[] = [], next: number[] = [];
+    const sameVertex = (original: number, current: number): boolean => {
+      for (let attribute = 0; attribute < source.length; attribute++) {
+        const originalOffset = original * sizes[attribute], currentOffset = current * sizes[attribute];
+        for (let component = 0; component < sizes[attribute]; component++) {
+          if (bits[attribute][originalOffset + component] !== bits[attribute][currentOffset + component]) return false;
+        }
+      }
+      return true;
+    };
+    for (let i = 0; i < this.kinds.length; i++) {
+      let hash = 2166136261;
+      for (let attribute = 0; attribute < source.length; attribute++) {
+        const offset = i * sizes[attribute];
+        for (let component = 0; component < sizes[attribute]; component++) hash = Math.imul(hash ^ bits[attribute][offset + component], 16777619);
+      }
+      let index = first.get(hash) ?? -1;
+      // Hashes only locate candidates. Compare every bit before sharing a
+      // vertex, so even a collision cannot change the rendered attributes.
+      while (index >= 0 && !sameVertex(originals[index], i)) index = next[index];
+      if (index < 0) {
+        index = originals.length;
+        originals.push(i);
+        next.push(first.get(hash) ?? -1);
+        first.set(hash, index);
+        for (let attribute = 0; attribute < source.length; attribute++) {
+          const offset = i * sizes[attribute];
+          for (let component = 0; component < sizes[attribute]; component++) welded[attribute].push(source[attribute][offset + component]);
+        }
+      }
+      indices.push(index);
+    }
     const geometry = new BufferGeometry();
-    geometry.setAttribute('position',new Float32BufferAttribute(this.positions,3));
-    geometry.setAttribute('normal',new Float32BufferAttribute(this.normals,3));
-    geometry.setAttribute('uv',new Float32BufferAttribute(this.uvs,2));
-    geometry.setAttribute('aKind',new Float32BufferAttribute(this.kinds,1));
+    geometry.setAttribute('position',new Float32BufferAttribute(welded[0],3));
+    geometry.setAttribute('normal',new Float32BufferAttribute(welded[1],3));
+    geometry.setAttribute('uv',new Float32BufferAttribute(welded[2],2));
+    geometry.setAttribute('aKind',new Float32BufferAttribute(welded[3],1));
+    geometry.setIndex(indices);
     geometry.computeBoundingSphere();
     return geometry;
   }
@@ -196,7 +240,9 @@ export function chalkGeometry(): BufferGeometry {
 export function fernGeometry(): BufferGeometry {
   const b = new CanyonGeometry();
   for (let f = 0; f < 7; f++) {
-    const turn = f * Math.PI * 2 / 5;
+    // Seven distinct directions keep the last two fronds from lying over the
+    // first two. A slight irregularity reads as growth rather than a rosette.
+    const turn = f * Math.PI * 2 / 7 + 0.08 * Math.sin(f * 2.4);
     const height = 0.55 + (f % 3) * 0.23;
     const side = new Vector3(Math.cos(turn), 0, Math.sin(turn));
     const tip = side.clone().multiplyScalar(0.44).setY(height);

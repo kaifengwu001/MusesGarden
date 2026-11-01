@@ -9,8 +9,8 @@ test('Lantern scenery renders its reeds, leaf roof and four-winged pollinators',
   await page.waitForFunction(() => window.__meadow?.isReady, undefined, { timeout: 60_000 });
   await page.evaluate(async () => { window.__meadow?.preset('homestead'); await window.__meadow?.settle(); });
   const batches = await page.evaluate(() => {
-    const w = (window as unknown as { __world: { scenery: { group: { children: { name: string; geometry: { instanceCount: number } }[] } } } }).__world;
-    return w.scenery.group.children.map(m => ({ name: m.name, count: m.geometry.instanceCount }));
+    const w = (window as unknown as { __world: { scenery: { populationCounts: { name: string; count: number; visible: number }[] } } }).__world;
+    return w.scenery.populationCounts;
   });
   expect(batches).toHaveLength(9);
   for (const batch of batches) expect(batch.count, batch.name).toBeGreaterThan(0);

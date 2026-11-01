@@ -3,7 +3,7 @@ import { ROW, type Palette } from '../render/palette';
 import { salt } from '../../../src/core/hash';
 import { smoothstep } from '../../../src/core/math';
 import fragmentShader from '../../../src/life/grass.frag.glsl?raw';
-import vertexShader from '../../../src/life/grass.vert.glsl?raw';
+import vertexShader from './grass.vert.glsl?raw';
 import { ScatterLayer, type ScatterLook, type ScatterView } from '../../../src/life/scatter';
 
 // Near-field grass: instanced blades (7 vertices) on the grass point set,

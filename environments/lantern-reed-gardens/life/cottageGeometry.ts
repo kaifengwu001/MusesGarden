@@ -13,7 +13,10 @@ export class CottageGeometry {
   private readonly variations: number[] = [];
 
   triangle(a: Vector3, b: Vector3, c: Vector3, kind: number, uv: readonly UV[] = [[0, 0], [1, 0], [0, 1]]): void {
-    const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+    const normal = b.clone().sub(a).cross(c.clone().sub(a));
+    // Pointed leaves converge at the tip; don't retain their zero-area faces.
+    if (normal.lengthSq() < 1e-16) return;
+    normal.normalize();
     for (const [i, p] of [a, b, c].entries()) {
       this.positions.push(p.x, p.y, p.z);
       this.normals.push(normal.x, normal.y, normal.z);
@@ -39,8 +42,11 @@ export class CottageGeometry {
   }
 
   tube(path: Vector3[], radii: number[], kind: number, sides = 6): void {
+    const closed = path[0].distanceToSquared(path[path.length - 1]) < 1e-16;
     const rings = path.map((p, i) => {
-      const direction = path[Math.min(i + 1, path.length - 1)].clone().sub(path[Math.max(0, i - 1)]).normalize();
+      const next = closed && i === path.length - 1 ? 1 : Math.min(i + 1, path.length - 1);
+      const previous = closed && i === 0 ? path.length - 2 : Math.max(0, i - 1);
+      const direction = path[next].clone().sub(path[previous]).normalize();
       const x = direction.clone().cross(Math.abs(direction.z) < 0.9 ? point(0,0,1) : point(1,0,0)).normalize();
       const y = direction.clone().cross(x).normalize();
       return Array.from({ length: sides }, (_, k) => p.clone().addScaledVector(x, Math.cos(k / sides * Math.PI * 2) * radii[i]).addScaledVector(y, Math.sin(k / sides * Math.PI * 2) * radii[i]));
@@ -55,7 +61,7 @@ export class CottageGeometry {
       }
       length = end;
     }
-    for (let k = 0; k < sides; k++) {
+    for (let k = 0; !closed && k < sides; k++) {
       const j = (k + 1) % sides;
       this.triangle(path[0],rings[0][j],rings[0][k],kind);
       this.triangle(path[path.length-1],rings[rings.length-1][k],rings[rings.length-1][j],kind);
@@ -94,14 +100,25 @@ export class CottageGeometry {
       for (const lower of [false,true]) {
         const a = sample(u0,t0,lower), c = sample(u1,t0,lower), d = sample(u1,t1,lower), e = sample(u0,t1,lower);
         const uv: UV[] = [[(u0+1)/2,t0],[(u1+1)/2,t0],[(u1+1)/2,t1],[(u0+1)/2,t1]];
-        this.triangle(a,c,d,lower ? 3 : kind,[uv[0],uv[1],uv[2]]);
-        this.triangle(a,d,e,lower ? 3 : kind,[uv[0],uv[2],uv[3]]);
+        if (lower) {
+          this.triangle(a,d,c,3,[uv[0],uv[2],uv[1]]);
+          this.triangle(a,e,d,3,[uv[0],uv[3],uv[2]]);
+        } else {
+          this.triangle(a,c,d,kind,[uv[0],uv[1],uv[2]]);
+          this.triangle(a,d,e,kind,[uv[0],uv[2],uv[3]]);
+        }
       }
     }
     for (const side of [-1,1]) {
       const edge = Array.from({length:rows+1},(_,i) => surface(side,i/rows));
       for (let i=0;i<rows;i++) this.quad(edge[i],edge[i+1],edge[i+1].clone().add(point(0,-thickness,0)),edge[i].clone().add(point(0,-thickness,0)),3);
       this.tube(edge,edge.map(() => 0.009),11,4);
+    }
+    // Roots and clipped tips have nonzero width on the roof shingles. Close
+    // those edges too, instead of leaving two visibly disconnected sheets.
+    for (const t of [0,1]) for (let column=0;column<columns;column++) {
+      const u0=-1+column/columns*2,u1=-1+(column+1)/columns*2;
+      this.quad(sample(u0,t,false),sample(u1,t,false),sample(u1,t,true),sample(u0,t,true),3);
     }
     const rib = Array.from({length:rows+1},(_,i) => surface(0,i/rows).add(point(0,0.012,0)));
     this.tube(rib,rib.map((_,i) => 0.015-i*0.0005),6,5);

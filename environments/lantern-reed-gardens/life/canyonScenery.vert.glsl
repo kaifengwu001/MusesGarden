@@ -14,7 +14,7 @@ varying vec3 vModelNormal;
 varying vec2 vUv;
 varying float vKind;
 varying float vVariation;
-vec3 rotateAround(vec3 n,vec3 axis,float a){return n*cos(a)+cross(axis,n)*sin(a)+axis*dot(axis,n)*(1.0-cos(a));}
+vec3 rotateAround(vec3 n,vec3 axis,float s,float c){return n*c+cross(axis,n)*s+axis*dot(axis,n)*(1.0-c);}
 void main(){
  vec3 U=normalize(aAnchor.xyz),X=normalize(aAcross),Z=normalize(cross(X,U));
  vec3 p=position*aPlacement.x;
@@ -23,11 +23,11 @@ void main(){
  }
  if(aKind>0.5&&aKind<1.5) p.z+=sin(uSceneryTime*0.7+aPlacement.y+position.x*0.4)*0.04*uv.y*uv.y*aPlacement.x;
  if(aKind>9.5&&aKind<10.5) p.y+=abs(p.x)*sin(uSceneryTime*14.0+aPlacement.y)*0.65;
- float d=length(p.xz),angle=asin(min(d/uRadius,0.9));
+ float d=length(p.xz),s=min(d/uRadius,0.9),c=sqrt(1.0-s*s);
  vec3 T=d>1e-5?(X*p.x+Z*p.z)/d:X;
- vec3 axis=normalize(cross(U,T)),up=U*cos(angle)+T*sin(angle);
+ vec3 axis=normalize(cross(U,T)),up=U*c+T*s;
  vec3 planet=up*(uRadius+aAnchor.w+p.y);
- vec3 n=rotateAround(normalize(X*normal.x+U*normal.y+Z*normal.z),axis,angle);
+ vec3 n=rotateAround(normalize(X*normal.x+U*normal.y+Z*normal.z),axis,s,c);
  vPlanet=planet;vPlanetNormal=n;vWorld=warpPosition(planet);
  vLocal=position;vModelNormal=normal;vUv=uv;vKind=aKind;vVariation=aPlacement.z;
  gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.0);

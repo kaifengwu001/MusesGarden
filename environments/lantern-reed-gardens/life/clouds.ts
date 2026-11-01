@@ -473,6 +473,8 @@ export class Clouds {
   private readonly bufferSize = new Vector2();
   private readonly clearColour = new Color();
   private lumpsBaked = false;
+  /** Empty mirrors remain valid until a cloudy frame writes into them. */
+  private emptyMirrors = false;
   private casters = 0;
   private lines: Line[] = [];
   private templates: Puff[][] = [];
@@ -716,6 +718,11 @@ export class Clouds {
    * never read this frame).
    */
   update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, focus: Vector3, seen: number): void {
+    if (p.coverage <= 0) {
+      this.updateClearSky(renderer, radius, p, camera, focus, seen);
+      return;
+    }
+    this.emptyMirrors = false;
     if (!this.lumpsBaked) this.bakeLumps(renderer);
     if (seed !== this.seed) this.build(seed);
     if (radius !== this.slotsR) this.layoutSlots(radius);
@@ -874,6 +881,46 @@ export class Clouds {
     if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearColor(this.clearColour, clearAlpha);
     renderer.setRenderTarget(previous);
+  }
+
+  /** No cloud geometry exists at zero coverage. Keep the residents' shadows,
+   * but do not build weather slots, shade lumps, or redraw empty reflections.
+   */
+  private updateClearSky(renderer: WebGLRenderer, radius: number, p: CloudParams, camera: PerspectiveCamera, focus: Vector3, seen: number): void {
+    this.count = 0;
+    this.order.length = 0;
+    this.all.length = 0;
+    this.mesh.visible = false;
+    this.mesh.geometry.instanceCount = 0;
+    this.shadowGeometry.instanceCount = 0;
+    this.projection.value.copy(camera.projectionMatrix);
+    this.uniforms.uCloudEye.value.copy(camera.position);
+    this.uniforms.uCloudLook.value.set(p.shadow, 0.22, 0, 0);
+    const orbit = smoothstep(ORBIT_REFLECTION[0] * radius, ORBIT_REFLECTION[1] * radius, camera.position.length() - radius);
+    this.uniforms.uCloudOrbit.value.set(orbit, 12, 0, 0);
+    const previous = renderer.getRenderTarget();
+    renderer.getClearColor(this.clearColour);
+    const alpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    try {
+      const faces = FACE_AXES.map(axis => Math.acos(clamp(axis.dot(focus), -1, 1)) < seen + FACE_REACH);
+      this.renderCube(renderer, this.shadowCube, this.shadowScene, faces);
+      if (this.casters > 0) this.renderWindow(renderer, focus, radius, camera.position.length() - radius);
+      else this.uniforms.uShadowWindow.value.w = 0;
+      if (!this.emptyMirrors) {
+        // Clear every layer face, including those a later orbit view can see.
+        for (let face = 0; face < 6; face++) {
+          renderer.setRenderTarget(this.layerCube, face);
+          renderer.clear(true, false, false);
+        }
+        renderer.setRenderTarget(this.mirrorTarget);
+        renderer.clear(true, false, false);
+        this.emptyMirrors = true;
+      }
+    } finally {
+      renderer.setClearColor(this.clearColour, alpha);
+      renderer.setRenderTarget(previous);
+    }
   }
 
   /** Choose a canonical shadow window for an explicitly settled scene.

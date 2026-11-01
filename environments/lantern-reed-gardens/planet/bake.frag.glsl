@@ -20,6 +20,10 @@ vec3 faceDirection(int face, vec2 st) {
 }
 
 void main() {
+  if (uPass == 1 && all(equal(uSpeciesDensity, vec4(0.0)))) {
+    gl_FragColor = vec4(0.0);
+    return;
+  }
   vec2 st = gl_FragCoord.xy / uSize * 2.0 - 1.0;
   vec3 dir = normalize(faceDirection(uFace, st));
   vec3 t = twirl(dir);

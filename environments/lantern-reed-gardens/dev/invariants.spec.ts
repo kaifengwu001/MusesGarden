@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { Scene } from 'three';
 import type {} from '../../../src/dev/harnessApi';
 
 // Browser-side invariants (`npm run test:gpu`). CPU-side invariants live in
@@ -143,7 +144,7 @@ test.describe('frames', () => {
       const g = window as unknown as {
         __frameT: number;
         __frames: { frames: number; drops: number; blank: number; resizes: number };
-        __world: { grass: { layer: Layer }; flowers: { layer: Layer }; scene: { onBeforeRender: () => void; onAfterRender: () => void }; renderer: { setSize: (...a: unknown[]) => unknown } };
+        __world: { grass: { layer: Layer }; flowers: { layer: Layer }; scene: Pick<Scene, 'onBeforeRender' | 'onAfterRender'>; renderer: { setSize: (...a: unknown[]) => unknown } };
       };
       const w = g.__world;
       const stats = { frames: 0, drops: 0, blank: 0, resizes: 0 };
@@ -160,7 +161,9 @@ test.describe('frames', () => {
       }
       // a tile already showing blades whose pages move between the update (which decides what is drawn) and the draw
       let drawnT = -2;
-      w.scene.onBeforeRender = () => {
+      const prepareScenery = w.scene.onBeforeRender.bind(w.scene);
+      w.scene.onBeforeRender = (...args) => {
+        prepareScenery(...args);
         if (g.__frameT === drawnT) return;
         drawnT = g.__frameT;
         stats.frames++;

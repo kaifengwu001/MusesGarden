@@ -1,8 +1,10 @@
-import { DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector3, Vector4, type BufferGeometry, type IUniform } from 'three';
+import { DoubleSide, Frustum, Group, InstancedBufferAttribute, InstancedBufferGeometry, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type BufferAttribute, type BufferGeometry, type Camera, type IUniform } from 'three';
 import { hash32, unit } from '../../../src/core/hash';
 import { smoothstep } from '../../../src/core/math';
 import { geometryBytes, gpuMemory } from '../../../src/core/gpuMemory';
 import { createGroundSample, type Terrain } from '../planet/terrain';
+import type { WarpFrame } from '../../../src/render/warp';
+import { placeScenerySphere, sceneryBounds, warpScenerySphere, type SceneryBounds } from './sceneryCulling';
 import { chalkGeometry, reedColonyGeometry, fernGeometry, lampPetalGeometry, mesaGeometry, pebblePatchGeometry } from './canyonGeometry';
 import vertexShader from './canyonScenery.vert.glsl?raw';
 import fragmentShader from './canyonScenery.frag.glsl?raw';
@@ -29,6 +31,12 @@ interface Batch {
   anchorData: InstancedBufferAttribute;
   acrossData: InstancedBufferAttribute;
   placementData: InstancedBufferAttribute;
+  sourceAnchor: BufferAttribute;
+  sourceAcross: BufferAttribute;
+  sourcePlacement: BufferAttribute;
+  spheres: Float64Array;
+  bounds: SceneryBounds;
+  count: number;
 }
 interface WaterFooting {
   x: number;
@@ -46,6 +54,7 @@ const UP = new Vector3(0, 1, 0), EAST = new Vector3(1, 0, 0);
 export class CanyonScenery {
   readonly group = new Group();
   readonly ready = true;
+  cullingEnabled = true;
   private readonly material: ShaderMaterial;
   private readonly batches: Batch[] = [];
   private readonly waterFootings: WaterFooting[] = [];
@@ -63,6 +72,10 @@ export class CanyonScenery {
   private readonly z = new Vector3();
   private readonly turned = new Vector3();
   private readonly ground = createGroundSample();
+  private readonly viewProjection = new Matrix4();
+  private readonly viewFrustum = new Frustum();
+  private readonly planetSphere = new Sphere();
+  private readonly warpedSphere = new Sphere();
 
   constructor(shared: Record<string, IUniform>, terrain: Terrain) {
     this.lights = (shared.uLanternLights as IUniform<Vector4[]> | undefined) ?? { value: Array.from({ length: 16 }, () => new Vector4()) };
@@ -77,6 +90,41 @@ export class CanyonScenery {
   }
 
   invalidate(): void { this.dirty = true; }
+
+  /** Available population stays independent of the camera's compact draw buffers. */
+  get populationCounts(): { name: string; count: number; visible: number }[] {
+    return this.batches.map(batch => ({ name: batch.mesh.name, count: batch.count, visible: batch.mesh.geometry.instanceCount }));
+  }
+
+  /** Called before each render list is built, including the pool's reflected camera. */
+  prepareView(camera: Camera, warp: WarpFrame): void {
+    this.viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.viewFrustum.setFromProjectionMatrix(this.viewProjection);
+    for (const batch of this.batches) {
+      let visible = 0;
+      const a = batch.anchorData.array, x = batch.acrossData.array, p = batch.placementData.array;
+      const sourceA = batch.sourceAnchor.array, sourceX = batch.sourceAcross.array, sourceP = batch.sourcePlacement.array;
+      for (let i = 0; i < batch.count; i++) {
+        if (this.cullingEnabled) {
+          const offset = i * 4;
+          this.planetSphere.center.fromArray(batch.spheres, offset);
+          this.planetSphere.radius = batch.spheres[offset + 3];
+          warpScenerySphere(this.planetSphere, warp, this.warpedSphere);
+          if (!this.viewFrustum.intersectsSphere(this.warpedSphere)) continue;
+        }
+        for (let j = 0; j < 4; j++) {
+          a[visible * 4 + j] = sourceA[i * 4 + j];
+          p[visible * 4 + j] = sourceP[i * 4 + j];
+        }
+        for (let j = 0; j < 3; j++) x[visible * 3 + j] = sourceX[i * 3 + j];
+        visible++;
+      }
+      batch.mesh.geometry.instanceCount = visible;
+      batch.anchorData.needsUpdate = true;
+      batch.acrossData.needsUpdate = true;
+      batch.placementData.needsUpdate = true;
+    }
+  }
 
   /** Safe interiors of the authored shelves, for wildlife resting above the pools. */
   shelfHeightAt(homeX: number, homeZ: number): number | null {
@@ -134,7 +182,9 @@ export class CanyonScenery {
     mesh.name = name;
     mesh.frustumCulled = false;
     this.group.add(mesh);
-    this.batches.push({ mesh, anchors, habitat, anchorData, acrossData, placementData });
+    this.batches.push({ mesh, anchors, habitat, anchorData, acrossData, placementData,
+      sourceAnchor: anchorData.clone(), sourceAcross: acrossData.clone(), sourcePlacement: placementData.clone(),
+      bounds: sceneryBounds(base), spheres: new Float64Array(anchors.length * 4), count: 0 });
   }
 
   private buildAnchors(terrain: Terrain): void {
@@ -306,9 +356,14 @@ export class CanyonScenery {
         let height = a.groundHeight - 0.06 * a.scale;
         if (a.height !== undefined) height = Math.max(height, a.height);
         if (flying) height += 2.4 + 0.55 * Math.sin(time * 0.32 + a.phase);
-        batch.anchorData.setXYZW(count, dir.x, dir.y, dir.z, height);
-        batch.acrossData.setXYZ(count, turned.x, turned.y, turned.z);
-        batch.placementData.setXYZW(count, a.scale * emergence, a.phase, a.tint, 0);
+        batch.sourceAnchor.setXYZW(count, dir.x, dir.y, dir.z, height);
+        batch.sourceAcross.setXYZ(count, turned.x, turned.y, turned.z);
+        batch.sourcePlacement.setXYZW(count, a.scale * emergence, a.phase, a.tint, 0);
+        // Read the rounded GPU inputs so the culling sphere encloses precisely
+        // the same curved placement that the vertex shader will receive.
+        placeScenerySphere(batch.bounds, R, batch.sourceAnchor.getX(count), batch.sourceAnchor.getY(count), batch.sourceAnchor.getZ(count), batch.sourceAnchor.getW(count), batch.sourcePlacement.getX(count), this.planetSphere);
+        this.planetSphere.center.toArray(batch.spheres, count * 4);
+        batch.spheres[count * 4 + 3] = this.planetSphere.radius;
         if(a.light!==undefined) {
           const variant=a.variant??0;
           const stemScale=variant===2?1.35:variant===3?.48:1;
@@ -324,7 +379,11 @@ export class CanyonScenery {
         }
         count++;
       }
+      batch.count = count;
       batch.mesh.geometry.instanceCount = count;
+      batch.anchorData.array.set(batch.sourceAnchor.array);
+      batch.acrossData.array.set(batch.sourceAcross.array);
+      batch.placementData.array.set(batch.sourcePlacement.array);
       batch.anchorData.needsUpdate = true;
       batch.acrossData.needsUpdate = true;
       batch.placementData.needsUpdate = true;

@@ -64,12 +64,12 @@ Large planets (radius above 256 m) use a 1024-pixel terrain bake at high quality
 Visual revision checked on 1 November 2026:
 
 - `npm run check`: all three TypeScript projects and ESLint pass.
-- Environment CPU suite: 73 tests pass, including dry resident routes, camera restoration, narrow-channel swimming and exact settled scenery after growth.
-- Final browser correctness suite: 20 tests pass across rendering, CPU/GPU parity at radii 40/128/400, deterministic growth, picking, finds, resident interaction, saved names, mobile layout, shared views, Reset and live resolution.
+- Environment CPU suite: 90 tests pass, including dry resident routes, camera restoration, narrow-channel swimming and exact settled scenery after growth.
+- Final browser correctness suite: 22 tests pass across rendering, CPU/GPU parity at radii 40/128/400, deterministic growth, picking, finds, resident interaction, saved names, mobile layout, shared views, Reset and live resolution.
 - The live-resolution regression runs at desktop DPR 2: High retains 1920×1280 under sustained slow frames, Auto reduces resolution, and returning to High restores 1920×1280. This test keeps animation live rather than freezing the render clock.
-- `npm run build:lantern` passes. The standalone output was served separately and checked for rendering, greetings and navigation, with no browser errors. The main JavaScript chunk is about 1.21 MB / 366 KB gzip, so Vite reports its existing 1024 KB chunk-size warning.
+- `npm run build:lantern` passes. The standalone output was served separately and checked for rendering, greetings and navigation, with no browser errors. The main JavaScript chunk is about 1.22 MB / 369 KB gzip, so Vite reports its existing 1024 KB chunk-size warning.
 - `git diff --check` passes; shared `src/` and `server/` have no changes.
-- Integration with main `7912632`: full repository CPU suite passes **817 tests**, with 3 skipped; TypeScript and ESLint pass. Eight targeted browser checks also pass after the shared find shaders were isolated locally. The meadow, server and Scarlet environment match that main commit exactly.
+- Integration with main `7912632`: full repository CPU suite passes **834 tests**, with 3 skipped; TypeScript and ESLint pass. Eight targeted browser checks also pass after the shared find shaders were isolated locally. The meadow, server and Scarlet environment match that main commit exactly.
 - The environment scaffolder was checked against the current shared `FindTable` renderer in an isolated temporary world: generation, 25 CPU tests, both TypeScript configurations, lint and standalone build pass.
 
 The final correctness run used:
@@ -81,18 +81,24 @@ MEADOW_PORT=5225 npx playwright test \
   --grep-invert 'scrubbing growth in real time|first frame within|draw calls stay|no LOD rings'
 ```
 
-Startup and draw-call budgets pass in the final isolated run. **The full-resolution High growth frame target remains open:** frame p95 is **50.1 ms** against the unchanged 20 ms target. JavaScript p95 is **9.8 ms**, below its 12.7 ms target, and build slices stay at 0 ms. A preceding run during other checks exceeded both startup and JavaScript budgets, so simultaneous work can worsen these timings. During growth, nonhero plants distribute grounding work over eight frames and the basin uses the cheaper sky/bank reflection. The first stationary frame restores exact placements, and the detailed terrain bake restores the geometry mirror. Auto remains available for responsiveness; High prioritizes resolution. The inherited dolly/LOD visual test is still marked unautomated.
+The performance targets now pass in **three consecutive runs**, with full-resolution High unchanged: frame p95 **16.8 ms** (target <20 ms), JavaScript p95 **7.0–7.3 ms** (target <12.7 ms), and maximum build slice **0.1 ms** (target <8.6 ms). Startup below 2 s and both draw-call budgets pass in all three runs. The earlier 50.1 ms growth result was before the refinements below; thresholds were not relaxed. Timing depends on the machine and other GPU work, so these results are measurements rather than a frame-rate guarantee for every device. The inherited dolly/LOD test remains unautomated.
+
+The refinement removes coplanar foundation/terrace/lookout surfaces and collapsed leaf-tip faces; roof leaves follow separated shingle courses. Regression tests check all nine scenery templates and cottage geometry at three seeds, including projected coplanar masonry intersections and unchanged resident support heights. Leaves use curved veins, a pale midrib, fibres and worn margins; rocks have filtered mineral grain, pinholes and angular seams. Fine detail fades below pixel size to avoid shimmer.
+
+Performance work preserves visible geometry and density. Each main/reflection camera conservatively rejects offscreen colonies using bounds that include leaf animation and the nonlinear planet warp. Full placement data stays separate from compact draw buffers. The nine-view comparison across radii 40/128/400 is pixel-identical with culling enabled or disabled. Exact vertex welding preserves normals, material boundaries and UV seams. Opaque scenery fills depth before the expensive ground/water shader; A/B captures differ by at most seven contact-edge pixels out of 1.6 million. Redundant per-vertex trigonometry and per-pixel light transforms are removed. Zero meadow flora and clear weather reuse empty maps while retaining resident shadows; connected gardens retain their find maps. The CPU/GPU parity probe builds its diagnostic field map on demand when that map is unused by the native habitat.
+
+Active growth still distributes nonhero grounding over eight frames and uses the sky/bank reflection; the settled scene restores exact placements and the full geometry reflection. Auto remains adaptive and High remains at full drawing-buffer resolution.
 
 The visual revision also verifies six habitat-supported animals, the live local reflection, selected lantern lights, and removal of native meadow birds/butterflies. Exact frame comparison after a growth round trip passes: explicit settling now resets the local shadow-grid hysteresis while live navigation keeps that hysteresis to prevent shimmer.
 
 The scenery test regenerates `shots/lantern-reed-gardens/reference-vista.png`, `scenery-home.png` and `scenery-day.png`. The final dusk postcard was inspected against the world reference: dense reeds, mineral shelves, the leaf-roof home, visible wildlife and reflected lantern light are present. Cliffs and canopies remain simplified procedural forms compared with the illustration. Use **Causeway → Dusk → Postcard** for the broad basin view; a close shelter view intentionally fades the planar reflection.
 
-The [reference pack](reference/README.md) keeps the world concept and the final rendered checkpoint beside the implementation. The local find shaders preserve the `fb21a13` renderer used by this world, independently of main's newer `FindTable` implementation.
+The [reference pack](reference/README.md) keeps the world concept and the final rendered checkpoint beside the implementation. The local find shaders preserve the `fb21a13` renderer used by this world, independently of main's newer `FindTable` implementation. Local grass and Muse-shadow shaders also preserve this world's multi-resident shadow maps when main changes its single-resident renderer.
 
 ## Task list handoff
 
 These updates have not been synced to the shared task list:
 
-- **Renderer backlog — Build Lantern Reed Gardens: done.** Standalone environment and build; three local residents; daylight/dusk, navigation, saved names and camera links; 73 CPU and 20 browser correctness tests pass.
+- **Renderer backlog — Build Lantern Reed Gardens: done.** Standalone environment and build; three local residents; daylight/dusk, navigation, saved names and camera links; 90 CPU and 22 browser correctness tests pass.
 - **Renderer backlog — Match Lantern Reed Gardens reference: implemented, awaiting visual review.** Dense varied reeds, grounded mineral shelves, mesas and canopies, rebuilt leaf-roof shelter, lantern emission and reflections, and three native wildlife types. All changes stay inside this environment.
-- **Renderer backlog — Stabilize high-quality growth and startup performance: todo.** Done when the existing growth check consistently meets frame p95 <20 ms, JavaScript p95 <12.7 ms and build slice <8.6 ms, and first frame stays below 2000 ms. Keep the current rendering budgets.
+- **Renderer backlog — Stabilize high-quality growth and startup performance: done.** Three repeated runs pass frame p95 <20 ms, JavaScript p95 <12.7 ms, build slice <8.6 ms and first frame <2000 ms, without changing the budgets or full-resolution High.

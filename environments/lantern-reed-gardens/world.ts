@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { BufferGeometry, Color, Frustum, InstancedBufferGeometry, Matrix4, Mesh, PerspectiveCamera, Ray, Scene, ShaderMaterial, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from '../../src/core/buildQueue';
 import type { FrameClock } from '../../src/core/clock';
 import type { Globals } from '../../src/core/globals';
@@ -31,7 +31,7 @@ import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
 import { PoolReflection } from './render/poolReflection';
 import { localSun } from '../../src/render/sun';
-import { warpForZoom, type WarpFrame } from '../../src/render/warp';
+import { warpForZoom, warpPoint, type WarpFrame } from '../../src/render/warp';
 import { CameraRig } from './view/camera';
 import { type Vista } from './view/vista';
 
@@ -143,9 +143,12 @@ export class World {
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
+  // Connected gardens may reveal their first eligible bed after this update
+  // as growth changes placement. Keep their maps ready ahead of that draw.
+  private readonly connectedGarden = new URLSearchParams(location.search).has('garden');
   /** The world's clock, as of the last update (a named view of Muse reads the time it is now, frozen or not). */
   private clock: FrameClock | null = null;
-  /** Whether the last update drew the near field (grass or flowers around the focus). */
+  /** Whether the current camera can see the near field; also used during warmup. */
   nearFieldDrawn = false;
   private readonly heightBound = (): number => this.terrain.maxHeight;
 
@@ -171,6 +174,7 @@ export class World {
       uLanternDusk: { value: 0.8 },
       uLanternLights: { value: Array.from({ length: 16 }, () => new Vector4()) },
       uLanternLightCount: { value: 0 },
+      uWarpedLanternLights: { value: Array.from({ length: 16 }, () => new Vector4()) },
       uPoolglassWakes: { value: Array.from({ length: 3 }, () => new Vector4()) },
       uGustRot: { value: new Vector4(1, 0, 1, 0) },
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
@@ -196,6 +200,9 @@ export class World {
     this.residents = new Residents(this.shared);
     this.scenery = new CanyonScenery(this.shared, this.terrain);
     this.scene.add(this.scenery.group);
+    // Each camera builds its own conservative instance list before Three uploads
+    // attributes. The reflected pass must never reuse the main camera's cull.
+    this.scene.onBeforeRender = (_renderer, _scene, camera) => this.scenery.prepareView(camera, this.warp);
     this.wildlife = new LanternWildlife(this.shared, this.terrain, this.scenery);
     this.scene.add(this.wildlife.group);
     for (const resident of this.residents.members) {
@@ -386,6 +393,15 @@ export class World {
     g.uWarpUp.value.copy(this.warp.up);
     g.uWarpK.value = this.warp.k;
 
+    // Every water pixel uses these positions. Warp each real light once per
+    // frame instead of repeating the same transform sixteen times per pixel.
+    const lights = this.shared.uLanternLights.value as Vector4[];
+    const warpedLights = this.shared.uWarpedLanternLights.value as Vector4[];
+    for (let i = 0; i < this.shared.uLanternLightCount.value; i++) {
+      const lamp = lights[i];
+      warpPoint(this.warp, this.tmp.set(lamp.x, lamp.y, lamp.z), this.tmp);
+      warpedLights[i].set(this.tmp.x, this.tmp.y, this.tmp.z, lamp.w);
+    }
     this.updateLight(p.light.timeOfDay);
     this.updateLook(clock);
     this.grass.setColours(this.palette);
@@ -407,7 +423,16 @@ export class World {
     const flowerNear = flowersAt(rig.altitude);
     this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
     this.nearFieldDrawn = grassNear > 0.5 || flowerNear > 0.5;
-    if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
+    // Native reeds and wildlife do not sample the meadow's three field maps.
+    // Find beds/specimens do: test their geometry, not last frame's visibility,
+    // so a newly planted or newly revealed find has valid maps on its first draw.
+    const hasFinds = this.scene.children.some(object => {
+      if (!(object instanceof Mesh) || !(object.material instanceof ShaderMaterial) || object.material.uniforms.uBeds === undefined || !(object.geometry instanceof BufferGeometry)) return false;
+      const geometry = object.geometry as BufferGeometry;
+      return (geometry.getAttribute('position')?.count ?? 0) > 0
+        && (!(geometry instanceof InstancedBufferGeometry) || geometry.instanceCount > 0);
+    });
+    if (this.nearFieldDrawn && (p.grass.density > 0 || p.flowers.density > 0 || this.connectedGarden || hasFinds)) this.field.render(this.renderer, rig.up, rig.forward, R);
     // This habitat has its own fauna; alpine birds and butterflies are not part of its ecology.
     this.birds.mesh.visible = false;
     this.birds.shadowMesh.visible = false;
@@ -501,7 +526,7 @@ export class World {
     this.surface.uniforms.uNearField.value.set(rig.up.x, rig.up.y, rig.up.z, Math.max(flowerNear, 0.001));
     this.surface.uniforms.uFlowersBuilt.value = this.flowers.layer.builtMap;
     this.surface.uniforms.uFlowerCells.value = this.flowers.layer.builtCells;
-    this.petals.update(grassNear);
+    this.petals.update(p.flowers.density > 0 ? grassNear : 0);
     if (this.growingBloom >= 0) {
       const disc = this.userBlooms[this.growingBloom];
       disc.w = Math.min(disc.w + (clock.realDt * 1.6) / R, 0.6);

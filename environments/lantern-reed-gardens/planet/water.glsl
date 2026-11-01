@@ -9,6 +9,7 @@ uniform mat4 uPoolMirrorMatrix;
 uniform float uPoolMirrorStrength;
 uniform vec3 uPoolMirrorCentre;
 uniform vec4 uLanternLights[16];
+uniform vec4 uWarpedLanternLights[16];
 uniform int uLanternLightCount;
 uniform float uLanternDusk;
 uniform vec4 uPoolglassWakes[3];
@@ -21,12 +22,15 @@ float poolglassWake(vec3 dir, vec3 along) {
     if (animal.w <= 0.0) continue;
     vec3 delta = (dir-animal.xyz)*uRadius;
     float d=length(delta), spread=animal.w*1.65;
+    float width=max(fwidth(d)*.7,.014);
+    // Beyond twelve widths every exponential is below single-precision range.
+    // Keep the derivative outside the rejection so quad derivatives stay valid.
+    if (d > spread+1.88+12.0*width) continue;
     float phase=fract(uWaterLook.w*.22+float(i)*.31);
     float rings=0.0;
     for(int j=0;j<3;j++) {
       float radius=spread+.2+(float(j)+phase)*.42;
       float line=d-radius;
-      float width=max(fwidth(d)*.7,.014);
       rings+=exp(-line*line/(width*width))*(1.0-(float(j)+phase)/3.2);
     }
     float broken=.35+.65*smoothstep(-.5,.6,sin(dot(delta,along)*3.2+float(i)));
@@ -132,32 +136,37 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   if (bank) col = mix(col, mirror, 0.35 * uWaterSky.x);
   col = mix(col, cl.rgb / max(cl.a, 1e-3), cl.a * 0.65 * uWaterSky.x);
   // Reflect the actual reeds, rocks, shelter and animals through the local basin plane.
+  float wavePhase=dot(dir,along)*uRadius;
+  if (uPoolMirrorStrength > 0.0) {
   vec4 reflected = uPoolMirrorMatrix * vec4(wp, 1.0);
   vec2 uv = reflected.xy / reflected.w;
   float inView = step(0.0,uv.x)*step(uv.x,1.0)*step(0.0,uv.y)*step(uv.y,1.0)*step(0.0,reflected.w);
-  float wavePhase=dot(dir,along)*uRadius;
   vec2 rippleOffset=vec2(sin(wavePhase*4.5+uWaterLook.w*.35)*.0028+sin(wavePhase*13.0-uWaterLook.w*.24)*.0012,sin(wavePhase*7.0-uWaterLook.w*.3)*.0007);
   vec4 objects=texture2D(uPoolMirror,clamp(uv+rippleOffset,0.001,0.999));
   vec3 reflectedObjects=objects.rgb/max(objects.a,0.001);
   float reflectionRipple=.85+.15*sin(wavePhase*10.0+uWaterLook.w*.35);
   float basinMirror=1.0-smoothstep(24.0,42.0,length(dir-uPoolMirrorCentre)*uRadius);
   col=mix(col,reflectedObjects,objects.a*inView*uPoolMirrorStrength*basinMirror*mix(0.42,0.73,pow(1.0-facing,0.8))*reflectionRipple);
+  }
 
   // Warm, fragmented vertical light paths are tied to real seed lantern positions.
-  vec3 reflectedRay=reflect(-v,n);
+  if (uLanternDusk > 0.0) {
+  vec3 reflectedRay=r0;
+  float rayHeight=dot(reflectedRay,n);
+  vec3 horizontalRay=normalize(reflectedRay-n*rayHeight);
+  float bands=0.25+0.75*smoothstep(-0.3,0.8,sin(wavePhase*13.0+uWaterLook.w*0.45)+0.25*sin(wavePhase*31.0));
   for(int i=0;i<16;i++) {
     if(i>=uLanternLightCount) break;
-    vec3 lamp=warpPosition(uLanternLights[i].xyz);
+    vec3 lamp=uWarpedLanternLights[i].xyz;
     vec3 delta=lamp-wp;
     vec3 toLamp=normalize(delta);
-    float vertical=dot(reflectedRay,n)-dot(toLamp,n);
-    vec3 horizontalRay=normalize(reflectedRay-n*dot(reflectedRay,n));
+    float vertical=rayHeight-dot(toLamp,n);
     vec3 horizontalLamp=normalize(toLamp-n*dot(toLamp,n));
     float across=length(horizontalRay-horizontalLamp);
     float spread=0.014+0.016/(1.0+length(delta)*0.04);
     float path=exp(-across*across/(spread*spread)-vertical*vertical/0.022);
-    float bands=0.25+0.75*smoothstep(-0.3,0.8,sin(dot(dir,along)*uRadius*13.0+uWaterLook.w*0.45)+0.25*sin(dot(dir,along)*uRadius*31.0));
     col+=vec3(1.0,0.57,0.19)*path*bands*uLanternLights[i].w*uLanternDusk*0.58;
+  }
   }
   col = mix(col, pal(ROW_WATER, 9), smoothstep(0.42, 0.85, stroke) * 0.07 * uWindVec.w);
   // Sparse elongated ripples carry a little sky colour across the quiet basin.

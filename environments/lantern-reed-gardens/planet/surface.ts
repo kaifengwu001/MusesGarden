@@ -91,6 +91,10 @@ export class Surface {
   readonly uniforms: { uGridSteps: IUniform<number>; uNearField: IUniform<Vector4>; uFlowersBuilt: IUniform<Texture | null>; uFlowerCells: IUniform<number> };
 
   constructor(shared: Record<string, IUniform>, grid: number) {
+    // Let opaque leaves, rocks and the home fill depth first. The expensive
+    // shore/water shader then runs only where the ground is actually visible.
+    // This changes submission order, not geometry, resolution or materials.
+    this.mesh.renderOrder = 1;
     this.uniforms = {
       uGridSteps: { value: grid - 1 },
       uNearField: { value: new Vector4(0, 1, 0, 0.001) },

@@ -33,25 +33,39 @@ void main(){
    base*=0.95+0.07*sin(grain*6.283);
    light=max(light,0.24);
  }else if(vKind<1.5||vKind>13.5){
-   // Thick, dull sage leaves retain their own edges, crease and irregular lateral veins.
+   // Dull sage cuticle, branching veins and lengthwise fibres: these are dried
+   // botanical shingles, with a thin worn margin rather than a clay surface.
    bool awning=vKind>13.5;
    base=linearColor(mix(vec3(0.39,0.53,0.48),vec3(0.69,0.73,0.59),variation));
    if(awning)base=linearColor(mix(vec3(0.63,0.71,0.60),vec3(0.78,0.80,0.65),variation));
    float lateral=fract(vUv.y*7.0+abs(vUv.x-0.5)*2.1+0.08*sin(vUv.y*16.0))-0.5;
    mark=inkLine(lateral,0.009)*0.23+inkLine(vUv.x-0.5,0.008)*0.34;
    mark+=inkLine(abs(vUv.x-0.5)-0.484,0.006)*0.45;
-   base*=0.94+0.075*sin(vUv.y*21.0+vUv.x*7.0);
+   float fibre=vUv.x*168.0+sin(vUv.y*9.0+variation*7.0)*0.9;
+   float fibreVisibility=1.0-smoothstep(0.35,1.0,fwidth(fibre));
+   float fineVein=inkLine(fract(vUv.y*21.0+abs(vUv.x-0.5)*6.1)-0.5,0.018);
+   float fineVisibility=1.0-smoothstep(0.2,0.7,fwidth(vUv.y*21.0+vUv.x*6.1));
+   mark+=fineVein*fineVisibility*0.045;
+   base*=0.96+0.028*sin(fibre*6.283)*fibreVisibility+0.035*sin(vUv.y*9.0+vUv.x*5.0+variation*11.0);
+   float wornRim=smoothstep(0.43,0.49,abs(vUv.x-0.5))*(0.5+0.5*sin(vUv.y*23.0+variation*19.0));
+   base=mix(base,linearColor(vec3(0.73,0.70,0.50)),wornRim*0.16);
    // Overlapping pieces keep a dark root and a light worn rim, even at distance.
    base*=0.72+0.28*smoothstep(0.02,0.22,vUv.y);
    light=max(light,0.27);
  }else if(vKind<2.5){
-   // Flat fractured limestone faces, with sparse chips and powdery flecks.
+   // Angular mineral seams and powdery limestone grains. Fine texture fades
+   // below a pixel so the stone stays calm during camera motion.
    base=linearColor(mix(vec3(0.79,0.72,0.63),vec3(0.96,0.90,0.76),variation));
-   float crack=fract(vUv.x*0.68+0.13*sin(vUv.y*3.1+variation*3.0)+0.045*sin(vUv.y*17.0))-0.5;
-   mark=inkLine(crack,0.006)*0.31;
-   mark+=inkLine(fract(vUv.y*0.75+0.12*sin(vUv.x*4.0))-0.5,0.004)*0.17;
+   float fracture=abs(fract(vUv.y*0.73+variation)-0.5)*0.21;
+   float crack=fract(vUv.x*0.68+fracture+variation*0.47)-0.5;
+   float seam=inkLine(crack,0.006);
+   mark=seam*0.27;
+   mark+=inkLine(fract(vUv.y*0.75+abs(fract(vUv.x*0.61)-0.5)*0.16+variation)-0.5,0.004)*0.13;
+   float mineral=inkLine(crack+0.017,0.008);
+   base=mix(base,linearColor(vec3(0.99,0.96,0.86)),mineral*0.12);
    float speck=gnoise(vLocal*38.0,113u);
-   base*=0.965+speck*0.035;
+   float grainVisibility=1.0-smoothstep(0.5,1.4,length(fwidth(vLocal*38.0)));
+   base*=0.985+speck*0.035*grainVisibility;
    light=max(light,0.36);
  }else if(vKind<3.5){
    base=linearColor(mix(vec3(0.22,0.31,0.30),vec3(0.36,0.43,0.36),variation));

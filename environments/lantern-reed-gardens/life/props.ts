@@ -21,6 +21,25 @@ export const CHAIR={x:-OUTER.x-0.55,z:OUTER.z+0.45,turn:0.5} as const;
 /** Retained for callers that describe the old footprint; no chimney is rendered. */
 export const CHIMNEY={x:0.1,z:-0.6,half:0.29} as const;
 
+type PavingRect = { x0: number; x1: number; z0: number; z1: number };
+
+/** Keep one exposed stone surface where the house, terrace and lookout meet. */
+function exposedPaving(rect: PavingRect, occupied: readonly PavingRect[]): PavingRect[] {
+  let parts = [rect];
+  for (const cover of occupied) parts = parts.flatMap((part) => {
+    const x0=Math.max(part.x0,cover.x0),x1=Math.min(part.x1,cover.x1);
+    const z0=Math.max(part.z0,cover.z0),z1=Math.min(part.z1,cover.z1);
+    if (x0>=x1 || z0>=z1) return [part];
+    return [
+      {x0:part.x0,x1:x0,z0:part.z0,z1:part.z1},
+      {x0:x1,x1:part.x1,z0:part.z0,z1:part.z1},
+      {x0,x1,z0:part.z0,z1:z0},
+      {x0,x1,z0:z1,z1:part.z1},
+    ].filter((piece)=>piece.x1-piece.x0>0.001 && piece.z1-piece.z0>0.001);
+  });
+  return parts;
+}
+
 function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
   const b = new CottageGeometry();
   let random = seed >>> 0;
@@ -30,17 +49,25 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
     const middle = a.clone().lerp(c, 0.48).add(point((rand()-0.5)*0.035,0,(rand()-0.5)*0.035));
     b.tube([a,middle,c],[width,width*0.91,width*0.83],kind,7);
   };
+  const occupiedPaving: PavingRect[] = [];
   const paving = (x0: number,x1: number,z0: number,z1: number,top: number,columns: number,rows: number): void => {
     // The mortar core is recessed. Full-depth chipped stones form every visible
     // edge, rather than a thin cap sitting on a broad featureless foundation box.
-    b.box((x0+x1)/2,(top-0.35)/2,(z0+z1)/2,x1-x0-0.28,top+0.15,z1-z0-0.2,13);
+    for (const part of exposedPaving({x0:x0+0.14,x1:x1-0.14,z0:z0+0.1,z1:z1-0.1},occupiedPaving)) {
+      b.box((part.x0+part.x1)/2,(top-0.35)/2,(part.z0+part.z1)/2,part.x1-part.x0,top+0.15,part.z1-part.z0,13);
+    }
     const width=(x1-x0)/columns,depth=(z1-z0)/rows;
     for(let row=0;row<rows;row++) {
       const joints=Array.from({length:columns+1},(_,column)=>x0+column*width+(column===0||column===columns?0:(rand()-0.5)*width*0.34));
       for(let column=0;column<columns;column++) {
-        b.stone(joints[column]+0.016,joints[column+1]-0.016,z0+row*depth+0.014,z0+(row+1)*depth-0.014,-0.25,top,rand());
+        const variation=rand();
+        for (const part of exposedPaving({x0:joints[column],x1:joints[column+1],z0:z0+row*depth,z1:z0+(row+1)*depth},occupiedPaving)) {
+          if (part.x1-part.x0<0.05 || part.z1-part.z0<0.05) continue;
+          b.stone(part.x0+0.016,part.x1-0.016,part.z0+0.014,part.z1-0.014,-0.25,top,variation);
+        }
       }
     }
+    occupiedPaving.push({x0,x1,z0,z1});
   };
   paving(-OUTER.x,OUTER.x,-OUTER.z,OUTER.z,FLOOR,8,4);
   paving(TERRACE.x0,TERRACE.x1,TERRACE.z0,TERRACE.z1,FLOOR,8,2);
@@ -149,16 +176,18 @@ function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
       const t0=i/14,t1=(i+1)/14;
       b.quad(point(roofX(side,t0),roofHeight(t0)-0.1,-3.16),point(roofX(side,t1),roofHeight(t1)-0.1,-3.16),point(roofX(side,t1),roofHeight(t1)-0.1,3.16),point(roofX(side,t0),roofHeight(t0)-0.1,3.16),3,1,1);
     }
-    for(const start of [0.59,0.29,-0.025]) for(let column=0;column<7;column++) {
+    for(const [course,start] of [0.59,0.29,0.018].entries()) for(let column=0;column<7;column++) {
       const z=-3.05+column*1.02+(rand()-0.5)*0.14;
-      const length=0.43+rand()*0.08,width=0.68+rand()*0.16,lift=0.055+rand()*0.055;
-      const crease=rand()*6.283,notch=0.25+rand()*0.5,lean=(rand()-0.5)*0.16;
+      const length=0.43+rand()*0.08,width=0.68+rand()*0.16,lift=0.06+rand()*0.018;
+      const crease=rand()*6.283,notch=0.25+rand()*0.5,lean=(rand()-0.5)*0.028;
       b.leaf((u,t)=>{
         const along=start+length*t;
         const nick=1-0.10*Math.exp(-Math.pow((t-notch)/0.045,2))*Math.max(0,u);
         const spread=width*(0.37+0.63*Math.pow(Math.sin(Math.PI*t),0.7))*(1-0.91*Math.pow(t,14))*nick;
         const curl=(0.018*Math.sin(t*18+crease)+lean*t*t)*u*u;
-        return point(roofX(side,along)+0.06*Math.sin(t*Math.PI+z),roofHeight(along)+lift+0.095*(1-u*u)*Math.sin(t*Math.PI)-0.045*Math.abs(u)+curl,z+u*spread+0.1*Math.sin(t*2.8+column));
+        // Each course covers the one below it; the slight cross-leaf tilt
+        // tucks one side under its neighbour instead of crossing through it.
+        return point(roofX(side,along)+0.045*Math.sin(t*Math.PI)*Math.sin(z),roofHeight(along)+lift+course*0.19*Math.min(1,t*4)+0.065*(1-u*u)*Math.sin(t*Math.PI)-0.025*Math.abs(u)-0.10*u+curl,z+u*spread+0.1*Math.sin(t*2.8+column));
       },rand());
     }
   }

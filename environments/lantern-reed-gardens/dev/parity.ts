@@ -38,6 +38,10 @@ void main() {
 export function measureParity(world: World, renderer: WebGLRenderer): Parity {
   // terrain: the field map's texels against the CPU mirror
   const field = world.field;
+  // Native Lantern plants do not need these maps during normal rendering.
+  // Evaluate the diagnostic target at the current camera before reading it,
+  // including when the last view or radius had no meadow-field consumers.
+  field.render(renderer, world.rig.up, world.rig.forward, world.growth.radius);
   const size = field.ground.width;
   const buf = new Uint16Array(4);
   const u = field.uniforms;

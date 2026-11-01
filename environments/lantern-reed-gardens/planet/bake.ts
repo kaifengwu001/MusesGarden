@@ -41,10 +41,11 @@ interface BakeSet {
   readonly terrain: WebGLCubeRenderTarget;
   readonly flora: WebGLCubeRenderTarget;
   key: string;
+  floraEmpty: boolean;
 }
 
 function bakeSet(size: number): BakeSet {
-  return { size, terrain: cube(size), flora: cube(size / 2), key: '' };
+  return { size, terrain: cube(size), flora: cube(size / 2), key: '', floraEmpty: false };
 }
 
 export class TerrainBake {
@@ -108,11 +109,15 @@ export class TerrainBake {
     if (key === set.key) return false;
     set.key = key;
     fields.writeUniforms(this.uniforms);
+    const emptyFlora = this.uniforms.uSpeciesDensity.value.lengthSq() === 0;
     const previous = renderer.getRenderTarget();
     for (const [target, pass] of [
       [set.terrain, 0],
       [set.flora, 1],
     ] as const) {
+      // A world without meadow flowers reads the same zero flora everywhere.
+      // Keep that cleared cube through growth rather than shading six faces.
+      if (pass === 1 && emptyFlora && set.floraEmpty) continue;
       this.pass.value = pass;
       // the flora pass reads the terrain it follows; the terrain pass must not
       // have its own target bound as a sampler (a feedback loop drops the draw)
@@ -124,6 +129,7 @@ export class TerrainBake {
         renderer.render(this.scene, this.camera);
       }
     }
+    set.floraEmpty = emptyFlora;
     renderer.setRenderTarget(previous);
     this.bakes++;
     return true;

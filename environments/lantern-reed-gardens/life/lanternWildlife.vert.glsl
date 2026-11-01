@@ -30,12 +30,12 @@ void main(){
  }
  p*=aAnimal.x;
  vec3 U=normalize(aAnchor.xyz),X=normalize(aAcross),Z=normalize(cross(X,U));
- float d=length(p.xz),angle=asin(min(d/uRadius,0.9));
+ float d=length(p.xz),s=min(d/uRadius,0.9),c=sqrt(1.0-s*s);
  vec3 T=d>1e-5?(X*p.x+Z*p.z)/d:X;
- vec3 axis=normalize(cross(U,T)),up=U*cos(angle)+T*sin(angle);
+ vec3 axis=normalize(cross(U,T)),up=U*c+T*s;
  vec3 planet=up*(uRadius+aAnchor.w+p.y);
  vec3 normalPlanet=normalize(X*n.x+U*n.y+Z*n.z);
- normalPlanet=normalPlanet*cos(angle)+cross(axis,normalPlanet)*sin(angle)+axis*dot(axis,normalPlanet)*(1.0-cos(angle));
+ normalPlanet=normalPlanet*c+cross(axis,normalPlanet)*s+axis*dot(axis,normalPlanet)*(1.0-c);
  vPlanet=planet;vNormal=normalPlanet;vWorld=warpPosition(planet);vUv=uv;vKind=aKind;vPhase=phase;
  gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.0);
 }
