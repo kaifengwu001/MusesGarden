@@ -45,13 +45,41 @@ trees (8). This table fills in as each is done.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | A second planet that we can visit, using the same procedural fundamental logic | |
-| 2 | Hilly terrain, with fog meandering between the mountains | |
-| 3 | Terraced rice paddies | |
-| 4 | Not all paddies are filled with water and reflective: some are fully grown, green waving rice, some in between, others fully reflective | |
-| 5 | Subtle colour differences from one paddy to another | |
-| 6 | Not all hills are covered by paddies: some hillsides are trees | |
-| 7 | White flocks of birds circle between the valleys | |
+| 1 | A second planet that we can visit, using the same procedural fundamental logic | The Travel button (and `pl=terraces` in the URL) visits it: the camera climbs away into a white mist, the other planet takes its place (built and its shaders compiled on the first visit) and the camera comes down to it. Built on the meadow's foundations: rest-space point sets, growth (R 40–400), the bake (planet/bake.ts now takes another planet's shader), CDLOD (planet/surface.ts takes its shaders), the tiny-planet warp, the palette and toon light, picking. Both worlds implement `PlanetWorld` (src/planetWorld.ts); the terraces' own code is in src/terraces/. The meadow renders pixel for pixel as before (0 pixels differ in the vista, cottage and orbit views; its GPU invariants pass). |
+| 2 | Hilly terrain, with fog meandering between the mountains | Rolling hills (octaves weighted by their size in meters, twirled) on flat valley floors, and karst towers from a progressive point set (steep, round-topped, on a wide skirt). Fog banks with a soft, level top lie in the valleys (their top 1.6–5.4 m by how thick the bank is), drifting in two layers along the wind; a clearing round the camera; integrated along the view in every material. |
+| 3 | Terraced rice paddies | ARCHITECTURE.md, "A hill turned into terraces": the hills cut into levels a riser (0.8 m) apart, each a flat floor with a bund along its outer edge and a riser up at its inner edge; cross-bunds cut each band across, every 9–22 m along the contour's way within cells about 48 m wide, staggered level to level; so every paddy is walled in. The mesh is terraced near the camera, its risers widening with distance so they never saw-tooth; the paint draws them crisp per pixel, filtered over the pixel. |
+| 4 | Not all paddies are filled with water and reflective: some are fully grown, green waving rice, some in between, others fully reflective | Each paddy decides its infill from its own chance and a gentle regional lean (so neighbouring bands differ, as in the painting): over the planet at the default season, 34 % flooded (a mirror of the sky, near white, the riser behind it a darker band), 16 % seedlings (dots on the water), 20 % growing (dashes standing toward you, water glinting between), 27 % fully grown (dense dashes), 4 % fallow. Wind waves run over the crop as pale crests and dark troughs. The Bloom slider is the season on this planet (labelled Season): all flooded at 0. |
+| 5 | Subtle colour differences from one paddy to another | Each paddy's own shade (lighter, darker, toward jade or yellow-green), and its own tint of water (teal or milky). |
+| 6 | Not all hills are covered by paddies: some hillsides are trees | ARCHITECTURE.md, "Land use": forest above, villages below it, terraces down the slopes, the valley floor at the bottom (the Hani order). Wild: the hills' crowns, the gullies, slopes too steep to terrace, the peaks' flanks, and woods (the Woods share). Trees on a rest-space point set wherever the land use is wild: one billboard each, a crown of five lumpy spheres traced per pixel with a painted edge, writing its depth. Villages (Kai's note after the first pass): sites from a point set, kept on gentle ground below a forest edge; 3–9 white houses with dark gable roofs stand on terrace floors, along the contour, courtyards round them. |
+| 7 | White flocks of birds circle between the valleys | Seven flocks wheel over valley floors (the meadow's birds' mesh and wingbeat), their loops leaning and drifting, 7–17 m over the floor. |
+
+Kai's notes on the first pass (2026-10-31): "FAR off". Use the green terraces painting (reference/terraces/vista-green.webp) as the vista to squint against, the blue one (colour-blue.png) for colour, and see how the meadow was improved, round after round. Then: first work out the algorithm that turns a hill (a heightfield) into rice paddies, each with a wall round it and a decision on its infill, and a noise algorithm for where the hillsides have paddies, trees and a small village.
+
+How the look was matched (look-dev, as the meadow's):
+
+- **The vista:** found by search (terraces/vista.ts): stands on terraced slopes, a coarse grid of view rays marched through the warp, each hit sorted into forest, open water or crop and compared row by row with the painting's layout, bands crossed per column counted (the painting crosses about one a row), villages and fogged valley floors counted as misses, the best few refined. It stands about 24 m up, low enough that the warp lays the ground out to a far horizon (higher up the small planet curves away and the sky shows, where the painting has none), with the view widened for the portrait frame (`CameraRig.widenFov`, which eases away as a named view's look-up does). About 0.6 s.
+- **The target:** the green painting recoloured into the blue painting's colours (its Lab mean and spread matched to the ink painting's), so one squint measures the composition and values of the one and the colours of the other.
+- **The palette:** measured from the blue painting (its fields' teal-green, its peaks' ink blue, its mist and paper whites) and set at the values of the target's materials.
+
+Squint (`npm run squint:terraces`; mean ΔE76 per cell over 27 × 48; the goal 10, the test fails above 18):
+
+| | Overall | Lightness only | Far | Middle | Near |
+|---|---|---|---|---|---|
+| First pass, as Kai saw it (fog everywhere) | 15.1 | 12.6 | 12.5 | 18.4 | 14.5 |
+| Now | 16.0 | 11.6 | 19.7 | 16.3 | 12.1 |
+
+(The first pass scored well only because both were pale: its view was a white wall of fog with a peak in it. Against the green painting itself, unrecoloured, the score went from 45.3 to 36.6.) What is still off: the far third, where the painting has paler terraced hills and the vista a dark forest and a fog bank; the near bands are wider than the painting's.
+
+Checkpoints: docs/checkpoints/terraces-1/ (every view, the land use and infill, the village, the birds, R 40 and 400 and the far side, the vista).
+
+Known, not done yet:
+
+- No rice plants up close yet: the near paddies are paint (dots, dashes, the wind's sheen), not plants.
+- No clouds, and so no shadows (the birds' included).
+- A tap on a paddy stirs the wind, not the water.
+- The paddies' cells are chosen per octave of R: growing past an octave re-tiles them; and as the hills rise with growth the terraces move with them.
+- Performance not measured yet (the look first). At R 400 the forest's point set is 452k instances (most dropped in the vertex shader); 16.6 ms a frame headless.
+- Not merged into main: branch `terraces`; no page published.
 
 ## Iteration 17: Muse lives on the planet (in progress)
 

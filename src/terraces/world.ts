@@ -23,6 +23,7 @@ import { createTerraceFieldUniforms, gradientFrame, type TerraceFieldParams, typ
 import { TERRACE_ROWS } from './palette';
 import surfaceFragment from './surface.frag.glsl?raw';
 import surfaceVertex from './surface.vert.glsl?raw';
+import { TerraceBirds } from './birds';
 import { Houses } from './houses';
 import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
@@ -84,6 +85,7 @@ export class TerraceWorld implements PlanetWorld {
   vistaMs = 0;
   readonly houses: Houses;
   readonly trees: Trees;
+  readonly birds: TerraceBirds;
   /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
   villages: Village[] = [];
   private readonly villageUniforms = createVillageUniforms();
@@ -103,6 +105,8 @@ export class TerraceWorld implements PlanetWorld {
   private fieldsFull = false;
   private fieldsStill = 0;
   private posed = false;
+  /** The world's clock, as of the last update (a named view of the birds reads the time it is now). */
+  private clock: FrameClock | null = null;
   private nextGust = 0;
   private readonly frustum = new Frustum();
   private readonly projView = new Matrix4();
@@ -136,7 +140,8 @@ export class TerraceWorld implements PlanetWorld {
     this.surface = new Surface(this.shared, tier.terrainGrid, { name: 'terraces ground', vertexShader: surfaceVertex, fragmentShader: surfaceFragment });
     this.houses = new Houses(this.shared);
     this.trees = new Trees(this.shared);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.houses.mesh, this.trees.mesh);
+    this.birds = new TerraceBirds(this.shared);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
     this.applyTier(tier);
   }
 
@@ -175,6 +180,40 @@ export class TerraceWorld implements PlanetWorld {
       this.rig.lookUp((60 * Math.PI) / 180 - this.rig.framing(zoom).tilt);
       this.posed = true;
       return;
+    }
+    if (name === 'lakes') {
+      // a valley where a flock circles, from a terrace across it, a little above the birds' loop
+      this.birds.update(this.clock?.time ?? 0, this.terrain);
+      const loop = this.birds.loop(0);
+      if (loop) {
+        const R = this.terrain.radius;
+        const a = new Vector3();
+        const b = new Vector3();
+        const t = new Vector3();
+        const q = new Vector3();
+        gradientFrame(loop.centre, a, b);
+        const s = createTerraceSample();
+        const focus = travel(loop.centre, a, (loop.radius + 46) / R, new Vector3());
+        // the first bearing round the loop where the stand is open terraced ground and nothing stands taller than the birds between
+        for (let k = 0; k < 12; k++) {
+          t.copy(a).multiplyScalar(Math.cos((k * Math.PI) / 6)).addScaledVector(b, Math.sin((k * Math.PI) / 6));
+          travel(loop.centre, t, (loop.radius + 46) / R, q);
+          this.terrain.terraceAt(q, s);
+          if (s.wild > 0.3) continue;
+          let clear = true;
+          for (let m = 0.15; m < 1 && clear; m += 0.1) clear = this.terrain.fields.natural(travel(loop.centre, t, (m * (loop.radius + 46)) / R, new Vector3())) < loop.floor + loop.height - 2;
+          if (!clear) continue;
+          focus.copy(q);
+          break;
+        }
+        this.rig.lookAlong(focus, tangentToward(focus, loop.centre, new Vector3()), immediate);
+        // from above the birds' loop, looking down across it: white birds against the fields and the forest
+        const zoom = this.rig.zoomForAltitude(Math.max(12, loop.floor + loop.height + 44 - this.terrain.height(focus)));
+        this.rig.setZoom(zoom, immediate);
+        this.rig.lookUp(Math.atan2(loop.radius + 46, loop.height + 44) - this.rig.framing(zoom).tilt);
+        this.posed = true;
+        return;
+      }
     }
     const stand = this.findStand();
     this.rig.lookAlong(stand.focus, stand.forward, immediate);
@@ -303,6 +342,7 @@ export class TerraceWorld implements PlanetWorld {
   }
 
   update(clock: FrameClock, aspect: number, viewportHeight: number): void {
+    this.clock = clock;
     const p = this.store.values;
     growthState(p.world.growth, p.world.areaMin, p.world.areaMax, this.growth);
     const R = this.growth.radius;
@@ -334,6 +374,7 @@ export class TerraceWorld implements PlanetWorld {
 
     this.updateLight(p.light.timeOfDay);
     this.updateLook(clock);
+    this.birds.update(clock.time, this.terrain);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -384,7 +425,8 @@ export class TerraceWorld implements PlanetWorld {
     const L = this.look;
     L.uToon.value.set(p.style.toonBands, p.style.bandSoftness, 0.7, 0);
     // a softer distance than the meadow's: the valley fog does the rest
-    L.uFog.value.set(p.style.fogDensity * 0.0018 * (1 + 6 * this.rig.tilt), 0.06 + 0.3 * p.style.fogDensity, this.rig.altitude * 0.95, 0.75);
+    // (a near peak keeps the ink's dark teal, as in the painting, with the white birds against it)
+    L.uFog.value.set(p.style.fogDensity * 0.0011 * (1 + 5 * this.rig.tilt), 0.06 + 0.3 * p.style.fogDensity, this.rig.altitude * 0.95, 0.7);
     L.uFogUp.value.copy(this.rig.up);
     // the wind: a rotation field fixed to the planet, aimed by the direction param along the grain
     const ref = this.terrain.layout.grain;

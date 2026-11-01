@@ -35,12 +35,12 @@ import shadowVertex from './birdShadow.vert.glsl?raw';
 // fanned tail) into the clouds' shadow map, so its shadow falls on the
 // meadow as theirs do.
 
-const MAX_BIRDS = 256;
+export const MAX_BIRDS = 256;
 /** Flocks on an R = 128 m planet; more as it grows (with R, so as many cross a place), up to MAX_FLOCKS. */
 const FLOCKS = 9;
 const MAX_FLOCKS = 32;
 /** Half wingspan (m) of the bird mesh below. */
-const HALF_SPAN = 0.48;
+export const HALF_SPAN = 0.48;
 /**
  * Level flight: the hilltops stand at about this share of the terrain's
  * height bound (the bound is four spreads up; the highest ground seen is
@@ -49,9 +49,9 @@ const HALF_SPAN = 0.48;
  */
 const FLIGHT = { hilltops: 0.5, height: [2.4, 3.8], cottage: 1.5, cottageRadius: 16 } as const;
 /** Wingbeat (Hz), its swing at the shoulder (rad), and the glides: their rhythm (s a cycle) and the sine level below which a bird glides. */
-const WINGBEAT = { hz: [1.7, 2.1], swing: 0.66, cycle: [8, 14], glide: [-0.5, -0.15] } as const;
+export const WINGBEAT = { hz: [1.7, 2.1], swing: 0.66, cycle: [8, 14], glide: [-0.5, -0.15] } as const;
 
-interface Bird {
+export interface Bird {
   /** Place in the flock (m): ahead, to the side, up. */
   ahead: number;
   side: number;
@@ -92,7 +92,7 @@ function rng(seed: number): () => number {
  * at the elbow); local x right, y up, z forward, half span 0.48 m.
  * aHinge: 0 body, ±1 inner wing, ±2 outer wing.
  */
-function birdGeometry(): InstancedBufferGeometry {
+export function birdGeometry(): InstancedBufferGeometry {
   const pos: number[] = [];
   const hinge: number[] = [];
   const tri = (h: number, ...v: number[]): void => {

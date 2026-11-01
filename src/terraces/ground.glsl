@@ -54,11 +54,26 @@ float terraceHeight(vec3 dir) {
   return terraceAt(dir).height;
 }
 
-// The ground for the mesh seen from `dist` m: terraced near the camera,
-// easing to the hills' own shape beyond where its grid could draw a riser
-// (the risers and bunds are painted per pixel there). A function of
-// distance, not of the node, so the mesh stays watertight.
+// The ground for the mesh seen from `dist` m: its risers never steeper than
+// its grid there can draw (CDLOD spacing grows with distance: about dist/40,
+// the finest leaves' 0.25 m up close), so they never saw-tooth along the
+// contours; the paint draws them crisp per pixel. Easing to the hills' own
+// shape where a band is only a few grid steps wide. A function of distance,
+// not of the node, so the mesh stays watertight (as the meadow's banks:
+// bankedAt in terrain.glsl).
 float terraceMeshHeight(vec3 dir, float dist) {
-  Terrace t = terraceAt(dir);
-  return mix(t.height, t.natural, smoothstep(uTerraceMesh.x, uTerraceMesh.y, dist));
+  vec4 b = textureLod(uTerraceBake, dir, 0.0);
+  float spacing = max(0.25, dist / 40.0);
+  float slope = max(b.g, 0.01);
+  float band = uTerrace.x / slope;
+  float x = b.r / uTerrace.x + b.a;
+  float level = floor(x);
+  float f = x - level;
+  float wr = clamp(max(min(uTerrace.y, 0.33 * band), 2.4 * spacing) / band, 0.03, 0.9);
+  float terraced = level * uTerrace.x + uTerrace.x * smoothstep(1.0 - wr, 1.0, f);
+  // (the bunds only where the grid can carry them)
+  float wb = clamp(uTerrace.z / band, 0.01, 0.3);
+  terraced += uTerrace.w * smoothstep(0.0, 0.35 * wb, f) * (1.0 - smoothstep(0.6 * wb, wb, f)) * (1.0 - smoothstep(0.12, 0.3, spacing));
+  float h = mix(terraced, b.r, b.b);
+  return mix(h, b.r, smoothstep(0.25, 0.45, spacing / band));
 }

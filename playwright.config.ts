@@ -28,7 +28,8 @@ export default defineConfig({
   projects: [
     { name: 'shots', testMatch: /shots\.spec\.ts/ },
     { name: 'invariants', testMatch: /invariants\.spec\.ts/ },
-    { name: 'squint', testMatch: /squint\.spec\.ts/ },
+    { name: 'squint', testMatch: /(?<!terraces)[Ss]quint\.spec\.ts/ },
+    { name: 'squint-terraces', testMatch: /terracesSquint\.spec\.ts/ },
   ],
   webServer: {
     command: `npx vite --port ${PORT} --strictPort`,

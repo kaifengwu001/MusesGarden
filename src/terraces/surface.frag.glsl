@@ -185,8 +185,8 @@ void main() {
     vec3 markCol = mix(tone3(pal(TR_RICE, 2), pal(TR_RICE, 6), pal(TR_RICE, 6) * 0.7, bUp), mix(cropCol, pal(TR_RICE, 5) * uSunTint, mix(0.35, 0.6, rnd)), 1.0 - young);
     vec3 floorCol = cropCol;
     if (pd.fallow > 0.5) {
-      // fallow this season: bare, damp earth with a little grass coming
-      floorCol = tone3(mix(pal(TR_EARTH, 4), pal(TR_EARTH, 0), 0.35), pal(TR_EARTH, 4), pal(TR_EARTH, 5), bUp);
+      // fallow this season: grass coming up through the damp earth, a pale sage
+      floorCol = tone3(mix(pal(TR_EARTH, 0), pal(TR_RICE, 10), 0.5), mix(pal(TR_EARTH, 0), pal(TR_EARTH, 4), 0.5), pal(TR_EARTH, 1), bUp);
       cover = 1.0;
     }
     if (cover < 0.999) {
@@ -227,10 +227,13 @@ void main() {
     float rock = smoothstep(1.3, 2.4, t.slope);
     vec3 floorForest = tone3(pal(TR_FOREST, 1), pal(TR_FOREST, 6), pal(TR_FOREST, 3), bMesh);
     vec3 cliff = tone3(pal(TR_PEAK, 0), mix(pal(TR_PEAK, 0), pal(TR_PEAK, 3), 0.5), pal(TR_PEAK, 3), bMesh);
-    // brushed down the slope, the ink's strokes
-    vec3 sp = dir * (uRadius / 2.5);
-    sp -= downhill * dot(sp, downhill) * 0.75;
-    cliff *= 0.9 + 0.2 * gnoise(sp, uTerrainSeed + 901u);
+    // brushed down the slope, the ink's strokes: long, in two sizes, the rock paler toward its top
+    vec3 sp = dir * (uRadius / 2.0);
+    sp -= downhill * dot(sp, downhill) * 0.82;
+    float ink = 0.65 * gnoise(sp, uTerrainSeed + 901u) + 0.35 * gnoise(sp * 3.1, uTerrainSeed + 902u);
+    cliff = mix(cliff, pal(TR_PEAK, 3) * 0.8, smoothstep(0.05, 0.45, ink) * 0.55);
+    cliff = mix(cliff, pal(TR_PEAK, 2), smoothstep(-0.1, -0.45, ink) * 0.35);
+    cliff = mix(cliff, mix(cliff, pal(TR_PEAK, 1), 0.45), smoothstep(10.0, 45.0, t.natural));
     tame = mix(tame, mix(floorForest, cliff, rock), wild);
   }
   col = tame;

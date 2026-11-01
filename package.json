@@ -14,6 +14,7 @@
     "test:gpu": "playwright test --project=invariants",
     "shots": "playwright test --project=shots",
     "squint": "playwright test --project=squint",
+    "squint:terraces": "playwright test --project=squint-terraces",
     "verify": "npm run check && npm test && npm run test:gpu && npm run shots"
   },
   "dependencies": {
