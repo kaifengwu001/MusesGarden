@@ -129,7 +129,7 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.muse.soul).not.toMatch(/^#|---|curiosity:/);
     expect(snap.muse.soul).toMatch(/[.!?…]$/);
     expect(snap.world).toEqual({ seed: 1031, g: expect.any(Number) as number });
-    expect(snap.friends.map((f) => f.id).sort()).toEqual(['juniper', 'wren']);
+    expect(snap.friends.map((f) => f.id).sort()).toEqual(['clover', 'juniper', 'wren']);
     for (const f of snap.friends) {
       expect(f.name).toBe(garden.engine.state(f.id as MuseId)!.seed.name);
       expect(f.coat).toMatch(/^#[0-9a-f]{6}$/);
