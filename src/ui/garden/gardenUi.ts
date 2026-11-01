@@ -6,8 +6,7 @@ import { placeholderSource, type PlaceholderSource } from '../../garden/placehol
 import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
-import { FindBeds } from '../../life/findBeds';
-import { FindForms, type FormLook } from '../../life/findForms';
+import { FindBeds, type BedLook } from '../../life/findBeds';
 import type { MuseDirection } from '../../life/muse';
 import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
@@ -27,8 +26,8 @@ import { MuseSheet } from './musePage';
 import { PostBox } from './postbox';
 import { TravelSheet, Visit } from './travel';
 
-// The garden's interface over the meadow: Muse's finds as flower beds with
-// their cards, the pins on the globe, the post box with Muse's postcards and
+// The garden's interface over the meadow: Muse's finds as patches of flowers
+// with their cards, the pins on the globe, the post box with Muse's postcards and
 // invitations, the ticket to other worlds, and a rail down the right: Muse
 // (its page), find Muse, its cottage, the baskets, the pins. Everything it
 // shows comes from a GardenSource (garden/source.ts) through GardenState.
@@ -52,13 +51,21 @@ const SPHERE = { slop: 16, height: 0.6 } as const;
 const sample = createGroundSample();
 const tmp = new Vector3();
 
-/** The finds' marks on the planet (their specimens, and the glowing spheres seen from high up). */
+/** The finds' marks on the planet (their patches of flowers, and the glowing spheres seen from high up). */
 export interface FindMarks {
   hover(id: string | null): void;
   open(id: string | null): void;
   pulse(ids: readonly string[]): void;
   /** How plainly the spheres show at the camera's height, 0..1. */
   spheresShown(): number;
+  /** Whether the patches are drawn at the camera's height. */
+  bedsShown(): boolean;
+  /** Whether a find's patch is planted (growing or grown) by now. */
+  planted(id: string): boolean;
+  /** The find under the pointer. */
+  readonly hovered: string | null;
+  /** The picked basket's finds, marked until another basket is picked. */
+  readonly selected: readonly string[];
 }
 
 /** 'Today’s basket', 'Tuesday’s basket', 'The basket of Tue 21 Oct'. */
@@ -71,9 +78,8 @@ export class GardenUi {
   readonly state: GardenState;
   private readonly root: HTMLElement;
   private readonly beds: FindBeds;
-  private readonly forms: FindForms;
   private readonly pins = new Pins();
-  /** The finds' specimens and spheres, once they are drawn. */
+  /** The finds' patches and spheres, once they are drawn. */
   marks: FindMarks | null = null;
   private readonly flight: Flight;
   private readonly basketFlight: BasketFlight;
@@ -122,9 +128,8 @@ export class GardenUi {
     parent.append(this.root);
     document.body.classList.add('garden-on');
     this.beds = new FindBeds(world.shared);
-    this.forms = new FindForms(world.shared, this.beds);
-    this.marks = this.forms;
-    world.scene.add(...this.beds.meshes, ...this.forms.objects, this.pins.group);
+    this.marks = this.beds;
+    world.scene.add(...this.beds.objects, this.pins.group);
     this.flight = new Flight(world.rig);
     this.basketFlight = new BasketFlight(this.root, {
       project: (dir, height) => this.project(dir, height, window.innerWidth, window.innerHeight),
@@ -247,7 +252,7 @@ export class GardenUi {
     if (!s) return;
     this.laidFor = { radius, layout: w.terrain.layout };
     this.layout = layOut(w.terrain, s.baskets, s.finds);
-    const looks: FormLook[] = [];
+    const looks: BedLook[] = [];
     const hidden = new Set<string>();
     for (const basket of this.state.baskets) {
       for (const id of basket.finds) {
@@ -255,12 +260,11 @@ export class GardenUi {
         const find = this.state.find(id);
         if (!bed || !find) continue;
         const interest = this.state.interest(find.topic);
-        looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5, topic: find.topic });
+        looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5 });
         if (!this.state.visitedBasket(basket.id) || this.basketFlight.waiting(id)) hidden.add(id);
       }
     }
     this.beds.set(looks, radius, hidden);
-    this.forms.set(looks, w.terrain, hidden);
     this.refreshPins();
   }
 
@@ -297,8 +301,7 @@ export class GardenUi {
     this.basketFlight.update(dt);
     // (picked when the pointer moved, or while a flight moves the view under it)
     if (this.pointer && (this.pointerMoved || this.flight.flying)) this.hover(this.pointer);
-    this.beds.update(away ? Infinity : w.rig.altitude);
-    this.forms.update(w.rig.altitude, !away);
+    this.beds.update(w.rig.altitude, !away);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -394,7 +397,6 @@ export class GardenUi {
   private setHovered(id: string | null): void {
     if (id === this.hovered) return;
     this.hovered = id;
-    this.beds.hover(id);
     this.marks?.hover(id);
   }
 
@@ -430,7 +432,7 @@ export class GardenUi {
     if (!bed || !find) return;
     if (this.card.shown) this.card.hide(direction);
     this.basketFlight.finish();
-    this.beds.highlight(null);
+    this.marks?.open(null);
     this.current = id;
     // look from the side the camera comes from, unless it is right over the bed
     this.flight.to(this.framing(bed, FIND_VIEW), this.world.growth.radius, this.ground, () => this.raise(id));
@@ -448,7 +450,6 @@ export class GardenUi {
       liked: this.state.liked(id),
       shared: this.state.findShared(id),
     });
-    this.beds.highlight(id);
     this.marks?.open(id);
   }
 
@@ -470,7 +471,6 @@ export class GardenUi {
   private closeCard(): void {
     this.card.hide(0);
     this.basketFlight.finish();
-    this.beds.highlight(null);
     this.marks?.open(null);
     this.current = null;
   }
@@ -491,6 +491,7 @@ export class GardenUi {
     });
     if (arrivals.length === 0) return;
     this.closeCard();
+    this.beds.select(arrivals.map((a) => a.id));
     const fresh = !this.state.visitedBasket(id);
     this.basketFlight.start(arrivals, from ?? this.basketsButton.getBoundingClientRect(), fresh);
     // (after the start: until each lands, its bed stays unplanted)
@@ -606,7 +607,7 @@ export class GardenUi {
       state: this.state,
       ui: this,
       layout: () => this.layout,
-      forms: this.forms,
+      beds: this.beds,
       open: (id: string) => this.openFind(id),
       basket: (id?: string) => this.goToBasket(id ?? this.state.baskets[0]?.id ?? ''),
       /** Replay a basket's planting: its beds hidden again and the basket marked new. */

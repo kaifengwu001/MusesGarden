@@ -425,7 +425,7 @@ The visitor sees the host planet with its fog. Public finds show their cards. Pr
 
 ## What the owner sees and does
 
-Every collected object has one physical anchor on Muse's planet: the spot where Muse found it. On the planet it is a unique flower, plant or stone that blends into its surroundings. Hovering it shows a preview (title, thumbnail and Muse's one-line reason). Clicking it opens a small panel that links to the page Muse collected. A basket card and the object on the planet are the same object.
+Every collected object has one physical anchor on Muse's planet: the spot where Muse found it. On the planet it is a small patch of flowers in its interest's species and colour, a clump of the meadow round it; from high up, a glowing sphere. The patches of the basket last opened stand larger, in a gentle tint, until another basket is opened. Hovering it shows a preview (title, thumbnail and Muse's one-line reason). Clicking it opens a small panel that links to the page Muse collected. A basket card and the object on the planet are the same object.
 
 
 The owner watches, receives and likes. Only a like moves Muse's interests, as [Likes nudge Muse](#likes-nudge-muse) describes. None of the other actions does.

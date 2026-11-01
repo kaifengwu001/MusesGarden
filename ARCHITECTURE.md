@@ -691,7 +691,9 @@ so any view can be shared.
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings
         props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench
-        findBeds.ts/.glsl  the finds' flower beds: the meadow's species bunched per find, planted from the middle out
+        findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, planted from the middle out)
+                           and their glowing spheres from high up; findTable.ts each find's state (planted, card,
+                           hover, pulse, picked basket) in a float texture, any number of finds
         pins.ts            pins in the globe from orbit: liked finds (hearts) and Muse (its face)
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
                            react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes, post
