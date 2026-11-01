@@ -37,7 +37,7 @@ import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from './muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from './museRig';
-import { MuseRoam, PACE, type Roaming } from './museRoam';
+import { MuseRoam, PACE, type Indoors, type Roaming } from './museRoam';
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from './museShadow.vert.glsl?raw';
 
@@ -78,14 +78,14 @@ const SHADOW = { size: 512, min: 0.9, step: 0.25, soft: 0.02 } as const;
  * `busy` (working at home), sat on the bench with its head bowed; `out` stands it at a spot out on the planet (a unit
  * direction), stepping toward `toward` while `walk` is above 0, still with its head bowed while `busy`; `inside` stands
  * it in its hut (the cutaway: view/cutaway.ts) on the floor there (its feet's height over R, m), facing along
- * `heading`, cooking at the hearth's stove when there is a `pot` (planet space), your taps and holds answered as
- * anywhere (museRoam.ts inside); `hidden` is beyond the planet or away at a friend's (away: not drawn, its life keeps
+ * `heading`, `doing` one of three things (cooking at the hearth's stove's `pot`, planet space; greeting you; asleep
+ * on its bed), your taps and holds answered as anywhere (museRoam.ts inside); `hidden` is beyond the planet or away at a friend's (away: not drawn, its life keeps
  * time). With no engine Muse lives its life.
  */
 export type MuseDirection =
   | { readonly kind: 'home'; readonly busy: boolean }
   | { readonly kind: 'out'; readonly dir: Vector3; readonly toward: Vector3 | null; readonly walk: number; readonly busy: boolean }
-  | { readonly kind: 'inside'; readonly dir: Vector3; readonly height: number; readonly heading: Vector3; readonly pot: Vector3 | null }
+  | { readonly kind: 'inside'; readonly doing: Indoors; readonly dir: Vector3; readonly height: number; readonly heading: Vector3; readonly pot: Vector3 | null }
   | { readonly kind: 'hidden' };
 
 /** The gait out on the planet (cycles of two steps a second), at its life's pace. */
@@ -444,7 +444,7 @@ export class Muse {
 
   /** The engine's say over Muse's life (null-free: with no engine it stays home, living its life). */
   direct(direction: MuseDirection): void {
-    if (direction.kind === 'inside' && this.direction.kind !== 'inside') this.insideSince = Number.NaN;
+    if (direction.kind === 'inside' && (this.direction.kind !== 'inside' || this.direction.doing !== direction.doing)) this.insideSince = Number.NaN;
     this.direction = direction;
     this.away = direction.kind === 'hidden';
   }
@@ -455,7 +455,7 @@ export class Muse {
     if (d.kind === 'inside') {
       // in its hut: its life puts it there, cooking if there is a pot, answering you as anywhere
       if (Number.isNaN(this.insideSince)) this.insideSince = time;
-      return roam.inside(time, camera, { dir: d.dir, height: d.height, heading: d.heading, pot: d.pot, since: this.insideSince });
+      return roam.inside(time, camera, { doing: d.doing, dir: d.dir, height: d.height, heading: d.heading, pot: d.pot, since: this.insideSince });
     }
     const life = roam.at(time, camera);
     if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;

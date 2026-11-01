@@ -3,7 +3,7 @@ import { smoothstep } from '../core/math';
 import { angleBetween, tangentToward, travel } from '../planet/geo';
 import { createGroundSample, type Terrain } from '../planet/terrain';
 import { Answers, rampIntegral, withTool } from './museLife';
-import { COOK, FISH, HOP, LIE_BACK, PLOP, POCKET, POT, RISE, STEP, WAKE, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
+import { COOK, FISH, HOP, LIE_BACK, PLOP, POCKET, POT, RISE, STEP, WAKE, WAVE_LENGTH, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
 import { BENCH, CHAIR, FACE, FLOOR, PIER, SIDE, STEPS, TERRACE } from './props';
 
 // Muse's life on the planet (muse.ts draws it): it roams the meadow at
@@ -47,8 +47,11 @@ const ROAM = { near: 5, far: 60, bias: 3 } as const;
 /** What it might do next, and how likely each is. */
 const LIKES = { wander: 3, water: 2.2, bench: 1.6, cook: 1.4, fish: 1.6, nap: 1.2, rest: 1 } as const;
 type Like = keyof typeof LIKES;
-/** In its hut, cooking at the hearth's stove: rounds of stirring and tasting a go, then a look about this long (s). */
-const INDOOR = { rounds: 4, pause: 6 } as const;
+/** In its hut, cooking at the hearth's stove: rounds of stirring and tasting a go, then a look about this long (s); greeting you: its wave this long after you come in (s), again now and then (s), its eyes on you until then. */
+const INDOOR = { rounds: 4, pause: 6, wave: 0.6, again: 24, watch: 6 } as const;
+
+/** What Muse is doing in its hut when you come in: cooking at the hearth's stove, standing in the room greeting you, asleep on its bed. */
+export type Indoors = 'cook' | 'greet' | 'sleep';
 /** How often it fishes from a shore rather than off the pier. */
 const SHORE = 0.3;
 /** The porch's lane along the front, clear of the bench and the stove (local m: z); the top of the steps and their foot on the meadow; where the terrace meets the pier. */
@@ -1103,12 +1106,14 @@ export class MuseRoam {
   }
 
   /**
-   * Muse in its hut while you are there (the cutaway, view/cutaway.ts; muse.ts's `inside`): standing on its floor
-   * where it is put, facing as it is put; at the hearth's stove when there is a pot, cooking as at the porch's
-   * stove (the ladle out of its pocket, stirring and tasting, a few rounds, then a moment's look about, again);
-   * your doings and its answers over it as anywhere. `since`: when it came in (world s). camera: planet space.
+   * Muse in its hut while you are there (the cutaway, view/cutaway.ts; muse.ts's `inside`), where it is put and
+   * facing as it is put, doing one of three things: at the hearth's stove, cooking as at the porch's (the ladle out
+   * of its pocket, stirring and tasting, a few rounds, a moment's look about, again); standing in the room greeting
+   * you (a wave as you come in, its eyes on you, a wave again now and then); or asleep on its bed (lying back,
+   * breathing slow, its snore bubble; a tap and it stirs). Your doings and its answers over it as anywhere.
+   * `since`: when you came in (world s). camera: planet space.
    */
-  inside(now: number, camera: Vector3, at: { dir: Vector3; height: number; heading: Vector3; pot: Vector3 | null; since: number }): Roaming {
+  inside(now: number, camera: Vector3, at: { doing: Indoors; dir: Vector3; height: number; heading: Vector3; pot: Vector3 | null; since: number }): Roaming {
     const out = this.living;
     const a = out.action;
     a.time = now;
@@ -1126,7 +1131,15 @@ export class MuseRoam {
     out.dir.copy(at.dir);
     out.height = at.height;
     out.heading.copy(at.heading);
-    if (at.pot) {
+    const since = now - at.since;
+    if (at.doing === 'sleep') {
+      a.moves.push({ kind: 'sleep', time: since, amount: 1, ease: 1, roused: -1 });
+      c.sleep = { time: since, roused: -1 };
+    } else if (at.doing === 'greet') {
+      const w = since < INDOOR.wave ? -1 : (since - INDOOR.wave) % INDOOR.again;
+      if (w >= 0 && w < WAVE_LENGTH) a.wave = w;
+      if (since < INDOOR.watch || (w >= 0 && w < WAVE_LENGTH)) out.lookAt = lookTmp.copy(camera);
+    } else if (at.pot) {
       const cooking = INDOOR.rounds * COOK.period + 2 * POCKET.time;
       const cycle = cooking + INDOOR.pause;
       const s = (((now - at.since) % cycle) + cycle) % cycle;

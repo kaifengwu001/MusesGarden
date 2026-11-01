@@ -117,6 +117,8 @@ export const PIECES: readonly Piece[] = [
 const RUG = { x: -0.76, z: 0.01, length: 3.92, width: 2.11, turn: deg(7.3) } as const;
 /** The pot on the hearth's stove (a fraction of the stove's box as made: across its front, up, back to front): Muse cooks at it. */
 const POT_ON_STOVE = [0.47, 0.45, 0.6] as const;
+/** The middle of the bed's mattress, on top (a fraction of the bed's box as made: Tripo made it askew, so not the box's middle): Muse sleeps there. */
+const ON_THE_BED = [0.38, 0.47, 0.624] as const;
 /** The favourites' places on the showpiece, as fractions of its front as made (x across, y up): three shelves of five. */
 const COLUMNS = [0.14, 0.32, 0.5, 0.68, 0.86] as const;
 const SLOTS: ReadonlyArray<readonly [number, number]> = [0.8, 0.59, 0.37].flatMap((y) => COLUMNS.map((x) => [x, y] as const));
@@ -529,6 +531,15 @@ export class HutInterior {
     const p = this.placed.find((e) => e.piece?.glow?.kind === 'fire');
     if (!p?.raw || !p.matrix) return null;
     return onModel(p.raw, new Matrix4().multiplyMatrices(p.place.value, p.matrix), POT_ON_STOVE, out);
+  }
+
+  /** Where Muse lies on its bed (local m: the mattress's middle, on top) and the way to the bed's foot (a unit direction, local), as the bed stands now; null before it is in. */
+  bedAt(out: Vector3): { at: Vector3; foot: Vector3 } | null {
+    const p = this.placed.find((e) => e.name === 'single-bed');
+    if (!p?.raw || !p.matrix) return null;
+    const at = onModel(p.raw, new Matrix4().multiplyMatrices(p.place.value, p.matrix), ON_THE_BED, out);
+    const yaw = p.handle.rotation.y;
+    return { at, foot: new Vector3(Math.sin(yaw), 0, Math.cos(yaw)) };
   }
 
   /** The pieces and the rug as they stand, for the layout editor (ui/garden/hutEditor.ts). */

@@ -221,9 +221,13 @@ export class Cutaway {
     this.aim.elevation = clamp(this.aim.elevation + (dy / height) * 1.4, LIMITS.elevation[0], LIMITS.elevation[1]);
   }
 
-  /** The wheel or a pinch (the rig's zoom steps: + comes closer). */
+  /** The wheel or a pinch (the rig's zoom steps: + comes closer); at the shelf, scrolling out goes back to the room. */
   zoom(delta: number): void {
     if (!this.entering) return;
+    if (this.shelfAsked && delta < 0) {
+      this.fromShelf();
+      return;
+    }
     const l = this.shelfAsked ? SHELF.limits.size : LIMITS.size;
     this.aim.size = clamp(this.aim.size * Math.exp(-delta * 2.2), l[0], l[1]);
   }
