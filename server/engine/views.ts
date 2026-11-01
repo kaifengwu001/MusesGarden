@@ -70,15 +70,17 @@ export function card(d: Discovery): PlantCard {
     title: d.title,
     url: d.url,
     summary: d.summary,
-    ...(d.thumb ? { thumb: d.thumb } : {}),
+    ...(d.media.image ? { thumb: d.media.image } : {}),
     reason: d.reason,
     foundAt: d.at,
     place: d.place,
+    media: d.media,
+    pursuing: d.pursuing,
   };
 }
 
 function preview(d: Discovery): PlantPreview {
-  return { title: d.title, ...(d.thumb ? { thumb: d.thumb } : {}), reason: d.reason };
+  return { title: d.title, ...(d.media.image ? { thumb: d.media.image } : {}), reason: d.reason };
 }
 
 function pin(d: Discovery, sent: ReadonlySet<DiscoveryId>): PlantPin {
@@ -281,16 +283,18 @@ export class Views implements GardenQueries {
     if (!inv || until === null || at >= until) return 'forbidden';
     const host = this.s(inv.host);
     if (!host) return 'forbidden';
-    const shared = new Set(this.social.publicProfile(host).discoveries.map((d) => d.id));
+    const shared = new Map(this.social.publicProfile(host).discoveries.map((d) => [d.id, d]));
     return {
       invitation,
       host: { museId: inv.host, name: host.seed.name },
       worldSeed: host.seed.worldSeed,
       g: this.helpers.growth(host),
       regions: this.regionViews(host),
-      plants: [...host.discoveries.values()].map((d) =>
-        shared.has(d.id) ? { id: d.id, dir: d.place.dir, preview: preview(d), card: card(d) } : { id: d.id, dir: d.place.dir, preview: null, card: null },
-      ),
+      plants: [...host.discoveries.values()].map((d) => {
+        const pub = shared.get(d.id);
+        // The public copy says which trip found it only when that trip's topic is public.
+        return pub ? { id: d.id, dir: d.place.dir, preview: preview(d), card: { ...card(d), pursuing: pub.pursuing } } : { id: d.id, dir: d.place.dir, preview: null, card: null };
+      }),
       until,
     };
   }

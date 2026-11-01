@@ -331,7 +331,6 @@ function gift(s: MuseState, stored: StoredEvent, e: Extract<MuseEventBody, { kin
     canonicalUrl: g.canonicalUrl,
     title: g.title,
     summary: g.summary,
-    ...(g.thumb ? { thumb: g.thumb } : {}),
     topics: g.topics,
     because: [eventRef(s.seed.id, stored.seq)],
     reason: 'A gift from a friend.',
@@ -339,6 +338,8 @@ function gift(s: MuseState, stored: StoredEvent, e: Extract<MuseEventBody, { kin
     provenance: 'gift',
     place: nearHome(s.seed.worldSeed, drawFor(s.seed.id, stored.seq)),
     at,
+    media: g.media,
+    pursuing: g.pursuing,
   };
   return collect(met, d, BOOST_GIFT);
 }

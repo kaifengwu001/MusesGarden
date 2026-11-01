@@ -10,7 +10,7 @@ import { renderSoulSection } from '../domain/soul';
 import { localDay } from '../domain/time';
 import { buildGarden } from '../engine/compose';
 import { loadCast } from '../fixtures/cast';
-import { checks, friendships, run, seedCast } from './run';
+import { checks, delivered, friendships, mediaMix, run, seedCast } from './run';
 
 const { values } = parseArgs({
   options: {
@@ -34,7 +34,6 @@ const cast = loadCast(values.cast);
 const hero = cast.members.find((m) => m.role === 'hero')?.id ?? null;
 const garden = buildGarden({
   db: values.db ?? null,
-  source: 'fixture',
   mind: values.mind === 'meta' ? 'meta' : 'heuristic',
   hero,
   start,
@@ -116,6 +115,15 @@ if (likes) {
   console.info(
     `Likes: ${liked} finds about ${likes.topic} liked. Its share of trips: next 3 days ${share(likes.from, likes.from + 3 * day)}  week 2 ${share(start + 7 * day, start + 14 * day)}`,
   );
+}
+
+const states = garden.engine.museIds().flatMap((id) => garden.engine.state(id) ?? []);
+const show = (mix: ReturnType<typeof mediaMix>) =>
+  `${Object.entries(mix.kinds).map(([k, v]) => `${k} ${v}%`).join(' ')} | ${Object.entries(mix.networks).map(([k, v]) => `${k} ${v}%`).join(' ')}`;
+console.info(`\nIn baskets (kinds | networks), all Muses: ${show(mediaMix(states.flatMap(delivered)))}`);
+for (const s of states) {
+  const t = s.temperament;
+  console.info(`  ${s.seed.name.padEnd(8)} focus ${t.focus} curiosity ${t.curiosity} whimsy ${t.whimsy} novelty ${t.novelty}: ${show(mediaMix(delivered(s)))}`);
 }
 
 if (hero) {

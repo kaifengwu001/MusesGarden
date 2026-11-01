@@ -15,8 +15,13 @@ export function clampSummary(text: string, max = SUMMARY_MAX): string {
   return `${head.slice(0, space > 0 ? space : max - 1).replace(/[\s,;:]+$/, '')}…`;
 }
 
+/** Matches `label` as whole words, ignoring case. */
+export function wordPattern(label: string): RegExp {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu');
+}
+
 /** `label` appears in `text` as whole words, ignoring case. */
 export function mentions(text: string, label: string): boolean {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text);
+  return wordPattern(label).test(text);
 }

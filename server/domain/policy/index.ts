@@ -6,6 +6,7 @@ import { experiences, reflectionDue, validateReflection } from '../reflection';
 import { parseSoul } from '../soul';
 import { basket, nextBasketCheck } from './basket';
 import { beyondUntil, next, restUntil } from './life';
+import { hopMedia } from './media';
 import { photosDuring } from './photo';
 import { continueTrip, hopMs, keep, serendipityRegion, startTrip } from './travel';
 
@@ -14,6 +15,7 @@ export const lifePolicy: LifePolicy = {
   restUntil,
   beyondUntil,
   startTrip,
+  mediaFor: hopMedia,
   serendipityRegion,
   hopMs,
   hopPlace: (s, region, k, draw) => hopPlace(s.seed.worldSeed, region, k, draw),

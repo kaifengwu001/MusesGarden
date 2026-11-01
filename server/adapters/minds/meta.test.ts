@@ -26,7 +26,7 @@ const ctx: MindContext = {
 
 function page(title: string): Candidate {
   const url = `https://en.wikipedia.org/wiki/${title}`;
-  return { origin: 'wikipedia', url, canonicalUrl: url as CanonicalUrl, title, summary: `About ${title}.`, topics: [topic(title)] };
+  return { url, canonicalUrl: url as CanonicalUrl, title, summary: `About ${title}.`, topics: [topic(title)], media: { kind: 'article', network: 'web' } };
 }
 
 const pages = [page('Ultramarine'), page('Lapis_lazuli'), page('Parking_meter')];

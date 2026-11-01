@@ -7,6 +7,7 @@ import * as samples from '../../src/muse/samples';
 import { createApp } from './app';
 import { fakeCommands, fakeQueries } from './fake';
 import type { FakeCommands } from './fake';
+import type { MediaImages } from './media';
 
 const HOUR = 3_600_000;
 const SAMPLE_NOW = samples.sampleNowExploring.at;
@@ -19,7 +20,7 @@ let base = '';
 let commands: FakeCommands;
 
 async function serve(
-  overrides: { queries?: Partial<GardenQueries>; commands?: Partial<GardenCommands>; now?: () => Instant } = {},
+  overrides: { queries?: Partial<GardenQueries>; commands?: Partial<GardenCommands>; now?: () => Instant; media?: MediaImages } = {},
 ) {
   await stop();
   commands = fakeCommands();
@@ -28,6 +29,7 @@ async function serve(
     queries: { ...fakeQueries(), ...overrides.queries },
     commands: { ...fake, ...overrides.commands },
     now: overrides.now ?? (() => fake.clock().now),
+    ...(overrides.media ? { media: overrides.media } : {}),
     subscribe: () => () => undefined,
   });
   const s = createServer(app);
@@ -311,6 +313,22 @@ describe('error bodies', () => {
     const parsed = JSON.parse(res.text) as unknown;
     expect(Object.keys(parsed as object)).toEqual(['error']);
     expect((parsed as { error: unknown }).error).toMatch(/^.{1,80}$/);
+  });
+});
+
+describe('media pictures', () => {
+  it('serves a cached picture with its type, and 404 for anything else', async () => {
+    const picture = new Uint8Array([0xff, 0xd8, 0xff, 7]);
+    await serve({ media: (mid) => Promise.resolve(mid === 'ig-DXyZ987' ? { type: 'image/jpeg', body: picture } : null) });
+    const res = await fetch(`${base}/api/media/ig-DXyZ987`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/jpeg');
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(picture);
+    expect((await call('GET', '/api/media/ig-other')).status).toBe(404);
+  });
+
+  it('answers 404 where the backend keeps no pictures', async () => {
+    expect(await call('GET', '/api/media/ig-DXyZ987')).toMatchObject({ status: 404 });
   });
 });
 

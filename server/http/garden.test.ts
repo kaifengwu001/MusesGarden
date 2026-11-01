@@ -37,7 +37,7 @@ afterEach(async () => {
 /** The real engine with the cast seeded, as `npm run serve` starts it. */
 async function engineGarden(): Promise<Garden> {
   const cast = loadCast();
-  const garden = buildGarden({ db: null, source: 'fixture', mind: 'heuristic', hero: HERO, start: START, clock: 'fast-forward', roles: new Map(cast.members.map((m) => [m.id, m.role])) });
+  const garden = buildGarden({ db: null, mind: 'heuristic', hero: HERO, start: START, clock: 'fast-forward', roles: new Map(cast.members.map((m) => [m.id, m.role])) });
   const work = `${FIXTURES_DIR}work-3weeks.json`;
   await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0 });
   return {

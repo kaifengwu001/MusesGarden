@@ -1,6 +1,7 @@
 // Test support: a fixed temperament table, a seed, and a log builder that folds as it goes.
 import type {
   CanonicalUrl,
+  MediaInfo,
   MuseState,
   Discovery,
   Instant,
@@ -16,6 +17,9 @@ import { hopPlace } from './atlas';
 import { canonicalUrl, discoveryId, eventRef, instant, museId, topicKey } from './ids';
 import { drawFor } from './rng';
 import { emptyState, reduceCore } from './state';
+
+/** What a stand-in find is online. */
+export const ARTICLE: MediaInfo = { kind: 'article', network: 'web' };
 
 export const TEMPERAMENTS = {
   hero: { curiosity: 0.6, focus: 0.7, sociability: 0.5, whimsy: 0.6, novelty: 0.5 },
@@ -84,6 +88,8 @@ export class Life {
         provenance: 'own',
         place,
         at: instant(at),
+        media: ARTICLE,
+        pursuing: topicKey(hopTopic),
       };
       this.push(at, { kind: 'discovery.collected', discovery });
       return discovery;

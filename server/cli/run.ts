@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Instant, InvitationState, LifePolicy, MuseId, MuseState, RelationshipOrigin, StoredEvent, TopicKey } from '../../src/muse/contract';
+import type { CastFile, Discovery, Instant, InvitationState, LifePolicy, MediaKind, MuseId, MuseState, Network, RelationshipOrigin, StoredEvent, TopicKey } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
@@ -125,6 +125,15 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
 
   const reflections = all.reduce((n, { s }) => n + s.reflections.length, 0);
   out.push({ name: 'reflections committed', pass: reflections > 0, detail: `${reflections}` });
+
+  const finds = all.flatMap(({ s }) => [...s.discoveries.values()]);
+  const kinds = new Set(all.flatMap(({ s }) => delivered(s)).map((d) => d.media.kind));
+  const unknown = finds.filter((d) => !KINDS.includes(d.media.kind)).length;
+  out.push({
+    name: 'every find is a reel, post, article or video, and baskets hold all four',
+    pass: finds.length > 0 && unknown === 0 && kinds.size === KINDS.length,
+    detail: `${finds.length} finds, ${unknown} without a kind; kinds in baskets: ${[...kinds].sort().join(', ')}`,
+  });
   return out;
 }
 
@@ -137,22 +146,46 @@ export function friendships(engine: Engine): Record<RelationshipOrigin, number> 
   return out;
 }
 
+const KINDS: readonly MediaKind[] = ['reel', 'post', 'article', 'video'];
+
+/** The finds a Muse has handed over in baskets. */
+export function delivered(s: MuseState): Discovery[] {
+  return s.baskets.flatMap((b) => b.items.flatMap((id) => s.discoveries.get(id) ?? []));
+}
+
+/** Shares of kinds and networks among `finds`, as percentages. */
+export function mediaMix(finds: readonly Discovery[]): { kinds: Record<MediaKind, number>; networks: Partial<Record<Network, number>> } {
+  const pct = (n: number) => Math.round((100 * n) / Math.max(1, finds.length));
+  const kinds = Object.fromEntries(KINDS.map((k) => [k, pct(finds.filter((d) => d.media.kind === k).length)])) as Record<MediaKind, number>;
+  const networks: Partial<Record<Network, number>> = {};
+  for (const d of finds) networks[d.media.network] = (networks[d.media.network] ?? 0) + 1;
+  for (const n of Object.keys(networks) as Network[]) networks[n] = pct(networks[n] ?? 0);
+  return { kinds, networks };
+}
+
+/** Rest counted the way the engine counts it: each stretch to the day it ended, a pause for work ending a stretch. */
 function restHoursPerDay(log: readonly StoredEvent[], tz: string, localDay: (at: Instant, tz: string) => string): number[] {
   const days = new Map<string, number>();
-  let restStart: number | null = null;
-  let pausedAt: number | null = null;
+  let resting = false;
+  let since: number | null = null;
+  const count = (at: Instant) => {
+    if (since === null) return;
+    const d = localDay(at, tz);
+    days.set(d, (days.get(d) ?? 0) + (at - since) / H);
+    since = null;
+  };
   for (const e of log) {
     const ev = e.event;
-    if (ev.kind === 'episode.started') restStart = ev.plan.activity === 'rest' ? ev.at : null;
-    if (ev.kind === 'episode.paused' && restStart !== null) pausedAt = ev.at;
-    if (ev.kind === 'episode.resumed' && restStart !== null && pausedAt !== null) {
-      restStart += ev.at - pausedAt;
-      pausedAt = null;
+    if (ev.kind === 'episode.started') {
+      resting = ev.plan.activity === 'rest';
+      since = resting ? ev.at : null;
     }
-    if (ev.kind === 'episode.ended' && restStart !== null) {
-      const d = localDay(ev.at, tz);
-      days.set(d, (days.get(d) ?? 0) + (ev.at - restStart) / H);
-      restStart = null;
+    if (!resting) continue;
+    if (ev.kind === 'episode.paused') count(ev.at);
+    if (ev.kind === 'episode.resumed') since = ev.at;
+    if (ev.kind === 'episode.ended') {
+      count(ev.at);
+      resting = false;
     }
   }
   return [...days.values()];

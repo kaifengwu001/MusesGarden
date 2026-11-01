@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MuseState } from '../../../src/muse/contract';
+import type { MuseState, TopicKey } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
 import { HOUR, T0, apply, at, draws, find, interest, muse, ofKind, topics, wiki } from './testkit';
 
@@ -16,8 +16,8 @@ const ada = muse('ada', {
   ],
   hidden: ['topic:Fern', 'discovery:Lichen secrets'],
   discoveries: [
-    find('Lichen dyes', ['Lichen']),
-    find('Sail knots', ['Knot']),
+    find('Lichen dyes', ['Lichen'], { pursuing: 'Fern' as TopicKey }),
+    find('Sail knots', ['Knot'], { pursuing: 'Sailing' as TopicKey }),
     find('Lichen secrets', ['Lichen']),
     find('Tide tables', ['Tide']),
     find('Harbour walk', ['Walk']),
@@ -37,10 +37,15 @@ describe('what a Muse shares', () => {
     expect(policy.publicProfile(ada).discoveries.map((d) => d.title).sort()).toEqual(['Harbour walk', 'Lichen dyes', 'Lichen tides', 'Sail knots', 'Tide tables']);
   });
 
+  it('tells which trip found a shared find only when that trip’s topic is not hidden', () => {
+    const shared = new Map(policy.publicProfile(ada).discoveries.map((d) => [d.title, d.pursuing]));
+    expect(shared).toEqual(new Map([['Harbour walk', null], ['Lichen dyes', null], ['Lichen tides', null], ['Sail knots', 'Sailing'], ['Tide tables', null]]));
+  });
+
   it('carries only the public fields, and nothing about the owner', () => {
     const profile = policy.publicProfile(ada);
     expect(Object.keys(profile).sort()).toEqual(['discoveries', 'interests', 'museId', 'name', 'worldSeed']);
-    for (const d of profile.discoveries) expect(Object.keys(d).sort()).toEqual(['canonicalUrl', 'id', 'summary', 'title', 'topics', 'url']);
+    for (const d of profile.discoveries) expect(Object.keys(d).sort()).toEqual(['canonicalUrl', 'id', 'media', 'pursuing', 'summary', 'title', 'topics', 'url']);
     for (const i of profile.interests) expect(Object.keys(i).sort()).toEqual(['topic', 'weight']);
     const json = JSON.stringify(profile);
     for (const secret of ['Lisbon', 'Fern', 'secrets', 'gift', 'Opera', 'reason', 'place']) expect(json).not.toContain(secret);

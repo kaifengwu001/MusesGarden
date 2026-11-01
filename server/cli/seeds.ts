@@ -47,7 +47,7 @@ interface Row {
 }
 
 async function one(seed: number): Promise<Row> {
-  const garden = buildGarden({ db: null, source: 'fixture', mind: 'heuristic', hero: null, start, clock: 'fast-forward', seed });
+  const garden = buildGarden({ db: null, mind: 'heuristic', hero: null, start, clock: 'fast-forward', seed });
   const opts = { cast: values.cast, work: values.work, start, hours } as const;
   await seedCast(garden.engine, lifePolicy, opts);
   await run(garden.engine, opts);

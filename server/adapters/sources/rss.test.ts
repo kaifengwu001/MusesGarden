@@ -1,20 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Candidate, CanonicalUrl, TopicKey } from '../../../src/muse/contract';
-import { canonicalLink, FEEDS, parseRss, RssSource } from './rss';
-import { urlOf } from './samples';
+import { canonicalLink, parseFeed } from './rss';
 
-const none = new Set<CanonicalUrl>();
-const recorded = new Map(FEEDS.map((f) => [f.url, readFileSync(new URL(`./samples/${new URL(f.url).hostname}.xml`, import.meta.url), 'utf8')]));
-
-function feedFetch(down?: string): typeof fetch {
-  return (input) => {
-    const url = urlOf(input);
-    if (url === down) return Promise.resolve(new Response('busy', { status: 503 }));
-    const xml = recorded.get(url);
-    return xml === undefined ? Promise.reject(new Error(`unexpected request ${url}`)) : Promise.resolve(new Response(xml));
-  };
-}
+const SAMPLES = new URL('./samples/', import.meta.url);
+const recorded = readdirSync(SAMPLES)
+  .filter((f) => f.endsWith('.xml'))
+  .map((f) => [f, readFileSync(new URL(f, SAMPLES), 'utf8')] as const);
 
 describe('canonicalLink', () => {
   it('forces https, lower-cases the host, and drops utm_* params and the fragment', () => {
@@ -24,34 +15,64 @@ describe('canonicalLink', () => {
   });
 });
 
-describe('parseRss', () => {
-  it('reads CDATA and entity-encoded items into plain text with canonical links', () => {
-    const xml = `<rss><channel><title>Feed</title>
+describe('parseFeed', () => {
+  it('reads CDATA and entity-encoded RSS items into plain text with canonical links', () => {
+    const xml = `<rss><channel><title>Daily &amp; Weekly</title>
       <item><title><![CDATA[Indigo &amp; Woad
       ]]></title><link>http://Example.org/indigo?utm_source=rss#top</link>
+      <pubDate>Tue, 27 Oct 2026 09:00:00 +0000</pubDate><dc:creator><![CDATA[Ada Blue]]></dc:creator>
       <description><![CDATA[<p><img src="https://img.example.org/woad.jpg" /> Blue from <b>leaves</b> &amp; vats.</p>
-      <p>The post <a href="x">Indigo</a> appeared first on <a href="y">Daily</a>.</p>]]></description></item>
+      <p>The post <a href="x">Indigo</a> appeared first on <a href="y">Daily</a>.</p>]]></description>
+      <content:encoded><![CDATA[<p>One two three four.</p>]]></content:encoded></item>
       <item><title>Frank &amp; Nancy&#8217;s Museum</title><link>https://example.org/museum</link>
+      <media:content url="https://img.example.org/museum.jpg" medium="image" width="1200" height="800"/>
       <description>&lt;p&gt;A small &lt;em&gt;museum&lt;/em&gt;.&lt;/p&gt;</description></item>
       <item><title>No link</title></item>
     </channel></rss>`;
-    expect(parseRss(xml)).toEqual([
-      {
-        url: 'http://Example.org/indigo?utm_source=rss#top',
-        link: 'https://example.org/indigo',
-        title: 'Indigo & Woad',
-        summary: 'Blue from leaves & vats.',
-        thumb: 'https://img.example.org/woad.jpg',
-      },
-      { url: 'https://example.org/museum', link: 'https://example.org/museum', title: 'Frank & Nancy’s Museum', summary: 'A small museum.' },
-    ]);
+    expect(parseFeed(xml)).toEqual({
+      title: 'Daily & Weekly',
+      items: [
+        {
+          url: 'http://Example.org/indigo?utm_source=rss#top',
+          link: 'https://example.org/indigo',
+          title: 'Indigo & Woad',
+          summary: 'Blue from leaves & vats.',
+          thumb: 'https://img.example.org/woad.jpg',
+          published: '2026-10-27',
+          author: 'Ada Blue',
+          words: 4,
+        },
+        {
+          url: 'https://example.org/museum',
+          link: 'https://example.org/museum',
+          title: 'Frank & Nancy’s Museum',
+          summary: 'A small museum.',
+          thumb: 'https://img.example.org/museum.jpg',
+        },
+      ],
+    });
+  });
+
+  it('reads Atom entries: the alternate link, the summary, the author and the date', () => {
+    const xml = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Type Notes</title>
+      <entry><title>Caslon at 300</title><link rel="replies" href="https://example.org/caslon#comments"/>
+      <link rel="alternate" type="text/html" href="https://example.org/caslon"/>
+      <published>2026-09-01T10:00:00Z</published><author><name>R. Punch</name></author>
+      <summary type="html">&lt;p&gt;A face that &lt;b&gt;lasted&lt;/b&gt;.&lt;/p&gt;</summary></entry>
+    </feed>`;
+    expect(parseFeed(xml)).toEqual({
+      title: 'Type Notes',
+      items: [{ url: 'https://example.org/caslon', link: 'https://example.org/caslon', title: 'Caslon at 300', summary: 'A face that lasted.', published: '2026-09-01', author: 'R. Punch' }],
+    });
   });
 
   it('parses every recorded feed into clean items', () => {
-    for (const [url, xml] of recorded) {
-      const items = parseRss(xml);
-      expect(items.length, url).toBeGreaterThan(0);
-      for (const item of items) {
+    expect(recorded.length).toBeGreaterThan(0);
+    for (const [name, xml] of recorded) {
+      const feed = parseFeed(xml);
+      expect(feed.title, name).not.toBe('');
+      expect(feed.items.length, name).toBeGreaterThan(0);
+      for (const item of feed.items) {
         expect(item.link.startsWith('https://')).toBe(true);
         expect(item.link).not.toMatch(/#|utm_/i);
         expect(item.title).not.toMatch(/<|&amp;|CDATA/);
@@ -59,53 +80,5 @@ describe('parseRss', () => {
         expect(item.summary).not.toMatch(/<|appeared first on/);
       }
     }
-  });
-});
-
-describe('RssSource on recorded feeds', () => {
-  const source = new RssSource({ fetch: feedFetch() });
-  const titles = (cs: readonly Candidate[]) => cs.map((c) => c.title);
-
-  it('search matches the topic label in an item’s title or summary', async () => {
-    const [first] = parseRss(recorded.get(FEEDS[1].url) ?? '');
-    const word = first.title.split(/[^\p{L}]+/u).sort((a, b) => b.length - a.length)[0];
-    const results = await source.search(word as TopicKey, 10, none);
-    expect(titles(results)).toContain(first.title);
-    for (const c of results) {
-      expect(`${c.title} ${c.summary}`.toLowerCase()).toContain(word.toLowerCase());
-      expect(c.origin).toBe('rss');
-      expect(c.topics[0]).toBe(word);
-    }
-    expect(await source.search(first.title as TopicKey, 10, new Set([canonicalLink(first.url)]))).toEqual([]);
-  });
-
-  it('next finds items that mention any of the page’s topics', async () => {
-    const [first] = parseRss(recorded.get(FEEDS[0].url) ?? '');
-    const word = first.title.split(/[^\p{L}]+/u).sort((a, b) => b.length - a.length)[0];
-    const from: Candidate = { ...(await source.serendipity(1, 0, none))[0], topics: ['Nothing matches this' as TopicKey, word as TopicKey] };
-    const next = await source.next(from, 10, none);
-    expect(next.length).toBeGreaterThan(0);
-    for (const c of next) expect(c.topics[0]).toBe(word);
-  });
-
-  it('serendipity is stable for a seed, differs across seeds, and honours exclude', async () => {
-    const a = await source.serendipity(6, 1, none);
-    expect(a).toHaveLength(6);
-    expect(await source.serendipity(6, 1, none)).toEqual(a);
-    expect(titles(await source.serendipity(6, 2, none))).not.toEqual(titles(a));
-    const rest = await source.serendipity(6, 1, new Set([a[0].canonicalUrl]));
-    expect(rest.map((c) => c.canonicalUrl)).not.toContain(a[0].canonicalUrl);
-    for (const c of a) expect(FEEDS.map((f) => f.topic)).toContain(c.topics[0]);
-  });
-
-  it('keeps serving the other feeds when one is down', async () => {
-    const partial = new RssSource({ fetch: feedFetch(FEEDS[0].url) });
-    const items = await partial.serendipity(50, 1, none);
-    expect(items.length).toBe(parseRss(recorded.get(FEEDS[1].url) ?? '').length + parseRss(recorded.get(FEEDS[2].url) ?? '').length);
-    expect(items.some((c) => c.topics.includes(FEEDS[0].topic as TopicKey))).toBe(false);
-  });
-
-  it('has no topic namespace of its own', async () => {
-    expect(await source.resolveTopic('Jazz')).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import type { Garden } from './http/app';
 import { createApp } from './http/app';
 import { startLiveClock } from './http/clock';
 import { fakeCommands, fakeQueries } from './http/fake';
+import { mediaCache } from './http/media';
 
 type Backend = Garden & { readonly name: string; readonly tick: (now: Instant) => Promise<void>; readonly close: () => void };
 
@@ -35,7 +36,6 @@ async function buildBackend(): Promise<Backend> {
   const start = (clock === 'live' ? Date.now() : Date.parse('2026-11-02T08:00:00-08:00')) as Instant;
   const garden = buildGarden({
     db: `${dir}/garden.db`,
-    source: process.env.MUSE_SOURCE === 'live' ? 'live' : 'fixture',
     mind: process.env.MODEL_API_KEY ? 'meta' : 'heuristic',
     hero,
     start,
@@ -51,6 +51,7 @@ async function buildBackend(): Promise<Backend> {
     queries: garden.views,
     commands: garden.commands,
     now: () => garden.engine.now(),
+    media: mediaCache({ dir: `${dir}/media`, items: garden.recording.items }),
     subscribe: (museId, after, send) => garden.views.subscribeGarden(museId, after, send),
     tick: (now) => garden.commands.tick(now),
     close: () => garden.store.close(),

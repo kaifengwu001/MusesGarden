@@ -16,7 +16,8 @@
     "squint": "playwright test --project=squint",
     "verify": "npm run check && npm test && npm run test:gpu && npm run shots",
     "sim": "tsx --no-warnings server/cli/sim.ts",
-    "serve": "tsx --no-warnings server/http.ts"
+    "serve": "tsx --no-warnings server/http.ts",
+    "record:media": "tsx --no-warnings server/cli/record-media.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

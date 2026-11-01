@@ -8,6 +8,7 @@ import type {
   EventRef,
   Instant,
   LifePolicy,
+  MediaKind,
   Mind,
   MuseId,
   MuseSeed,
@@ -24,6 +25,7 @@ import { openMemoryStore } from '../../adapters/store/memory';
 import type { EngineDeps } from '../engine';
 
 const MIN = 60_000;
+const KINDS: readonly MediaKind[] = ['article', 'reel', 'post', 'video'];
 
 export const drawFor = (museId: MuseId, n: number): Draw => (kind, k = 0) =>
   unit(mix(mix(mix(salt(museId), n), salt(kind)), k));
@@ -132,6 +134,7 @@ export const life: LifePolicy = {
   startTrip: (_s, _now, draw) =>
     draw('beyond') < 0.1 ? null : { kind: 'revisit', topic: 'Pigment' as TopicKey, region: '0:1:1' as RegionKey, question: null },
   serendipityRegion: () => '5:3:3' as RegionKey,
+  mediaFor: (_s, k) => [KINDS[k % KINDS.length]],
   hopMs: () => 20 * MIN,
   hopPlace: (_s, region) => ({ dir: [0, 1, 0], region }),
   findPlace: (_s, hop) => hop,
@@ -166,23 +169,23 @@ export const social: SocialPolicy = {
   },
 };
 
-const page = (title: string): Candidate => ({
-  origin: 'wikipedia',
-  url: `https://en.wikipedia.org/wiki/${title}`,
-  canonicalUrl: `https://en.wikipedia.org/wiki/${title}` as CanonicalUrl,
+const page = (title: string, kind: MediaKind): Candidate => ({
+  url: `https://example.org/finds/${title}`,
+  canonicalUrl: `https://example.org/finds/${title}` as CanonicalUrl,
   title,
   summary: `About ${title}.`,
   topics: [title as TopicKey],
+  media: { kind, network: 'web' },
 });
 
-const pages = (titles: readonly string[], exclude: ReadonlySet<CanonicalUrl>) =>
-  Promise.resolve(titles.map(page).filter((c) => !exclude.has(c.canonicalUrl)));
+const pages = (titles: readonly string[], [kind]: readonly MediaKind[], exclude: ReadonlySet<CanonicalUrl>) =>
+  Promise.resolve(titles.map((t) => page(t, kind)).filter((c) => !exclude.has(c.canonicalUrl)));
 const range = (n: number, name: (i: number) => string) => Array.from({ length: n }, (_, i) => name(i));
 
 export const source: Source = {
-  search: (topic, limit, exclude) => pages(range(limit, (i) => `${topic}_${i}`), exclude),
-  next: (from, limit, exclude) => pages(range(limit, (i) => `${from.title}_n${i}`), exclude),
-  serendipity: (limit, seed, exclude) => pages(range(limit, (i) => `Wander_${seed % 97}_${i}`), exclude),
+  search: (topic, kinds, limit, exclude) => pages(range(limit, (i) => `${topic}_${i}`), kinds, exclude),
+  next: (from, kinds, limit, exclude) => pages(range(limit, (i) => `${from.title}_n${i}`), kinds, exclude),
+  serendipity: (kinds, limit, seed, exclude) => pages(range(limit, (i) => `Wander_${seed % 97}_${i}`), kinds, exclude),
   resolveTopic: (label) => Promise.resolve(label as TopicKey),
 };
 
