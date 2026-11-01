@@ -209,7 +209,7 @@ A trip on the planet is a chain of hops. Each hop moves Muse to a new spot.
 
 Every find is a real reel, post, article or video someone put on the internet.
 
-- `npm run record:media` reads the sources in `server/fixtures/media-sources.json` and writes `server/fixtures/media.json`. The sim and the tests replay that recording offline.
+- `npm run record:media` reads the sources in `server/fixtures/media-sources.json` and writes `server/fixtures/media.json`, keeping two items of each kind per area (`--per-kind` changes that) and at least three for each pool topic. The sim and the tests replay that recording offline.
 - The sources are listed for each of the topic map's 14 areas: magazine and blog feeds, YouTube channels (videos, and Shorts as reels), Vimeo channels, Flickr tags and Bluesky accounts. A topic the sources leave with fewer than 3 items is filled from Bluesky posts that name it.
 - The recorder keeps an item only if its link answered. It files each item under the topics its title, caption and tags name, the item's own area first. An item that names none goes under its area's main topic.
 - Instagram joins once `META_IG_TOKEN` holds the owner's token. The recorder then reads the public business and creator accounts listed for each area through Business Discovery. Pictures from Instagram, Facebook and TikTok expire, so the server keeps them under `.muse/media/` and serves them from `/api/media/<id>`.

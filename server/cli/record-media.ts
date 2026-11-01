@@ -1,6 +1,7 @@
-// npm run record:media [-- --area fungi --dry]
+// npm run record:media [-- --area fungi --dry --per-kind 2]
 // Reads the newest items of every source in server/fixtures/media-sources.json, keeps those whose links answer, files
-// each under topics of the topic map, and writes server/fixtures/media.json. Instagram joins when META_IG_TOKEN is set.
+// each under topics of the topic map, keeps a few of each kind per area, and writes server/fixtures/media.json.
+// Instagram joins when META_IG_TOKEN is set.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { salt } from '../../src/core/hash';
@@ -24,6 +25,8 @@ const CONCURRENCY = 8;
  * its topic first, so each topic needs some of every kind for temperament to show in what Muse brings home.
  */
 const PER_KIND = 2;
+/** Items each pool topic (the hero chain's and the divergence test's) keeps at least. */
+const POOL_MIN = 3;
 /** Search results looked at per topic: many name the topic only in a picture's description, which is not kept. */
 const TOPIC_LOOK = 25;
 
@@ -116,6 +119,38 @@ function readerFor(instagram: InstagramReader | null): Record<SourceKind, ((ref:
   };
 }
 
+type Filed = MediaItemJson & { readonly fallback: boolean };
+
+/**
+ * At most `perKind` items of each kind per area, each pick going to the network picked least so far, then items of
+ * each pool topic until it has `poolMin`. Items filed by a match come before those filed under the area for want of one.
+ */
+function budget(filed: readonly Filed[], perKind: number, pools: readonly TopicKey[], poolMin: number): Filed[] {
+  const picked: Filed[] = [];
+  const perNetwork = new Map<string, number>();
+  const take = (x: Filed) => {
+    picked.push(x);
+    perNetwork.set(x.network, (perNetwork.get(x.network) ?? 0) + 1);
+  };
+  const groups = new Map<string, Filed[]>();
+  for (const x of filed) groups.set(`${x.area}|${x.kind}`, [...(groups.get(`${x.area}|${x.kind}`) ?? []), x]);
+  for (const group of groups.values()) {
+    const left = [...group].sort((a, b) => Number(a.fallback) - Number(b.fallback));
+    for (let n = 0; n < perKind && left.length > 0; n++) {
+      const used = new Set(picked.filter((p) => group.includes(p)).map((p) => p.network));
+      const rank = (x: Filed) => (used.has(x.network) ? 1000 : 0) + (perNetwork.get(x.network) ?? 0);
+      const i = left.reduce((best, x, j) => (rank(x) < rank(left[best]) ? j : best), 0);
+      take(left.splice(i, 1)[0]);
+    }
+  }
+  for (const t of pools) {
+    const extra = filed.filter((x) => x.topics.includes(t) && !picked.includes(x));
+    while (picked.filter((x) => x.topics.includes(t)).length < poolMin && extra.length > 0) take(extra.shift() as Filed);
+  }
+  const order = new Map(filed.map((x, i) => [x, i]));
+  return picked.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+}
+
 const count = <T>(xs: readonly T[], key: (x: T) => string) => {
   const m = new Map<string, number>();
   for (const x of xs) m.set(key(x), (m.get(key(x)) ?? 0) + 1);
@@ -130,7 +165,9 @@ function recordingJson(r: { recordedAt: string; items: readonly MediaItemJson[];
 }
 
 async function main(): Promise<void> {
-  const { values } = parseArgs({ options: { area: { type: 'string' }, dry: { type: 'boolean', default: false } } });
+  const { values } = parseArgs({ options: { area: { type: 'string' }, dry: { type: 'boolean', default: false }, 'per-kind': { type: 'string', default: '2' } } });
+  const perKind = Number(values['per-kind']);
+  if (!Number.isInteger(perKind) || perKind < 1) throw new Error('--per-kind takes a whole number of 1 or more');
   const map = loadCorpus();
   const index = topicIndex(map);
   const listed = parseSources(JSON.parse(readFileSync(SOURCES_PATH, 'utf8')), new Set(map.areas.map((a) => a.name)));
@@ -155,7 +192,7 @@ async function main(): Promise<void> {
   const namesMap = new RegExp([...mapSites].map((s) => s.split('.')[0]).join('|'), 'i');
   let offTopic = 0;
   let onMap = 0;
-  const filed: (MediaItemJson & { readonly fallback: boolean })[] = [];
+  const filed: Filed[] = [];
   const have = (t: TopicKey, kinds: readonly MediaKind[]) => filed.filter((x) => kinds.includes(x.kind) && x.topics.includes(t)).length;
   const file = (outcomes: readonly Outcome[]) => {
     for (const o of outcomes) {
@@ -181,7 +218,8 @@ async function main(): Promise<void> {
   file(curated);
 
   const words = new Map(listed.map((a) => [a.area, a.search]));
-  const pages = map.pages.filter((p) => values.area === undefined || p.area === values.area);
+  const pools = [...new Set([...loadHeroChain().map((c) => c.topics[0]), ...LEANS.flatMap((l) => UNSEEN[l].topics as readonly TopicKey[])])];
+  const pages = map.pages.filter((p) => (values.area === undefined || p.area === values.area) && pools.includes(p.candidate.topics[0]));
   const searches = pages.flatMap((p) => {
     const topic = p.candidate.topics[0];
     const ref = topicQuery(topic, words.get(p.area) ?? '');
@@ -192,14 +230,14 @@ async function main(): Promise<void> {
       ...(thin(['video', 'reel']) ? [() => attempt({ ...at, kind: 'youtube search' }, () => searchYoutube(ref, { videos: 3, shorts: 3 }))] : []),
     ];
   });
-  console.info(`Searching for topics with fewer than ${PER_KIND} items of a kind (${searches.length} searches)...`);
+  console.info(`Searching for pool topics with fewer than ${PER_KIND} items of a kind (${searches.length} searches)...`);
   const searched = await pool(searches, CONCURRENCY);
   file(searched);
   const outcomes = [...curated, ...searched];
 
   const order = new Map(map.areas.map((a, i) => [a.name, i]));
   filed.sort((a, b) => (order.get(a.area) ?? 0) - (order.get(b.area) ?? 0) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.id < b.id ? -1 : 1));
-  const strip = ({ fallback: _, ...item }: MediaItemJson & { readonly fallback: boolean }): MediaItemJson => item;
+  const strip = ({ fallback: _, ...item }: Filed): MediaItemJson => item;
   const held = new Set<string>();
   const unseen: Record<Lean, MediaItemJson[]> = { botany: [], jazz: [], neutral: [] };
   for (const lean of LEANS) {
@@ -211,7 +249,8 @@ async function main(): Promise<void> {
     for (const p of picked) held.add(p.id);
     unseen[lean] = picked.map(strip);
   }
-  const recording = { recordedAt: new Date().toISOString(), items: filed.filter((x) => !held.has(x.id)).map(strip), unseen };
+  const kept = budget(filed.filter((x) => !held.has(x.id)), perKind, pools, POOL_MIN);
+  const recording = { recordedAt: new Date().toISOString(), items: kept.map(strip), unseen };
   const parsed = parseMediaRecording(recording);
 
   const failed = outcomes.filter((o) => o.read === null);
@@ -230,9 +269,8 @@ async function main(): Promise<void> {
   const topics = map.pages.map((p) => p.candidate.topics[0]);
   const atLeast = (n: number) => topics.filter((t) => (perTopic.get(t) ?? 0) >= n).length;
   console.info(`Coverage: ${atLeast(1)} of ${topics.length} topics have an item, ${atLeast(3)} have 3 or more.`);
-  const pools = loadHeroChain().map((c) => c.topics[0]);
-  console.info(`  the hero's pools: ${pools.map((t) => `${t} ${perTopic.get(t) ?? 0}`).join(', ')}`);
-  console.info(`  filed under the area's main topic for want of a match: ${filed.filter((x) => x.fallback).length}`);
+  console.info(`  pool topics: ${pools.map((t) => `${t} ${perTopic.get(t) ?? 0}`).join(', ')}`);
+  console.info(`  filed under the area's main topic for want of a match: ${kept.filter((x) => x.fallback).length}`);
   console.info(`  topic search results left out for not naming their topic: ${offTopic}`);
   console.info(`  items from, linking to or naming the topic map's own site left out: ${onMap}`);
   console.info(`  without a caption: ${count(parsed.items.filter((i) => i.candidate.summary === ''), (i) => i.candidate.media.network) || 'none'}`);
