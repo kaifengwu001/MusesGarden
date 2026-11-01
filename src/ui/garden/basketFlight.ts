@@ -38,6 +38,8 @@ const T = { fly: 0.62, open: 0.32, out: 0.5, outGap: 0.09, arc: 1.05, arcGap: 0.
 const LEAD = 0.45;
 /** The basket's size (px), where the finds wait over it (px from its middle), and the height a find lands at (m). */
 const BASKET = { width: 156, height: 120, mouth: -12, fan: 128, over: -70 } as const;
+/** A screen narrower than this (px) shows the basket and its fan smaller, clear of the rail. */
+const ROOMY = 560;
 const LANDS_AT = 0.3;
 /** Finds close together are seen from a little farther back than a find is, looking at the ground between them (m: off, up, looked-at height). */
 const NEAR = { distance: 9.5, height: 3.6, aim: 0 } as const;
@@ -182,7 +184,8 @@ export class BasketFlight {
     const bx = quad(o.from.x, (o.from.x + middle.x) / 2, middle.x, u);
     const by = quad(o.from.y, (o.from.y + middle.y) / 2 - lift, middle.y, u);
     const gone = Number.isNaN(o.allLanded) ? 0 : ease(clamp01((t - o.allLanded) / T.fade));
-    const scale = (o.from.scale + (1 - o.from.scale) * outBack(clamp01(t / T.fly))) * (1 - 0.12 * gone);
+    const size = Math.min(1, window.innerWidth / ROOMY);
+    const scale = (o.from.scale + (size - o.from.scale) * outBack(clamp01(t / T.fly))) * (1 - 0.12 * gone);
     const basket = `translate3d(${bx - BASKET.width / 2}px, ${by - BASKET.height / 2 + 26 * gone}px, 0) scale(${scale})`;
     o.back.style.transform = o.front.style.transform = basket;
     o.back.style.opacity = o.front.style.opacity = String(Math.min(1, t / 0.12) * (1 - gone));
