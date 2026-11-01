@@ -34,7 +34,7 @@ const NOON: Rows = {
   [ROW.BRUSH]: ['#C4BACF', '#A99FB7', '#9290AA', '#DED3D7', '#B4B5CA', '#CDC3D2'],
   // the mirror's cobalt, the navy body, -, highlight, pale sky low in the mirror, deep cobalt high in it,
   // lily pad, lily pad shade, a bank in the mirror, ruffle
-  [ROW.WATER]: ['#879ABD', '#5D729D', '#DCE4ED', '#FFF1D8', '#AAB7D1', '#647EA5', '#B7C6BD', '#809DA0', '#77869F', '#C3CCE0'],
+  [ROW.WATER]: ['#A6B8E4', '#6885BC', '#DCE4ED', '#FFF1D8', '#CDD0E9', '#5373AB', '#B7C6BD', '#809DA0', '#77869F', '#D4D8EC'],
   // cup light, cup mid, inner, cup shade, stem, stem shade, blush, rose, coral, rose shade
   [ROW.PINK]: ['#B994BF', '#9A729F', '#DBB9CF', '#7B628C', '#9EBCAA', '#718D87', '#DDC1D3', '#B888AD', '#C69EA6', '#795B7A'],
   // petal, petal shade, centre, centre bright, cream, pale lilac
@@ -42,7 +42,7 @@ const NOON: Rows = {
   // yellow, yellow shade, blue, blue shade, red, red shade, orange, orange shade, violet, violet shade, lemon
   [ROW.SCATTER]: ['#E2C888', '#BFA76A', '#88A5AA', '#617F8B', '#C95556', '#973A4C', '#D99265', '#A66C4E', '#9CA3BA', '#737D99', '#F3E4B5'],
   // zenith, horizon, haze, sun glow, mid sky, haze over the far meadow
-  [ROW.SKY]: ['#7B9DBB', '#D5D5D3', '#E3DFDB', '#FFE5BB', '#9CB4CB', '#BBBECD'],
+  [ROW.SKY]: ['#426FA7', '#DDD6DC', '#8CA4C5', '#FFE5BB', '#7B9DC5', '#8AA2C5'],
   // lit, shadowed, mid, rim, base (the meadow's green through it)
   [ROW.CLOUD]: ['#F4E5D6', '#A9B4CC', '#DDD4D6', '#FFF0D5', '#B9C2CF'],
   // rock, shadow, light, lilac shade
@@ -69,13 +69,13 @@ const DAWN: Rows = {
 };
 
 const GOLDEN: Rows = {
-  [ROW.SKY]: ['#8299BE', '#E4BCA9', '#D2C7D1', '#FFE5BC', '#A2B1CF', '#B6B6CA'],
+  [ROW.SKY]: ['#5886BD', '#F1BEA6', '#8A9DBE', '#FFD2A1', '#7D94C1', '#839BC0'],
   [ROW.CLOUD]: ['#F2D7C5', '#A3AEC5', '#D8C5CE', '#FFE7CC', '#B4B9CB'],
   [ROW.LIGHT]: ['#FFE0B5', '#C7D4E8', '#B9C4BF', '#FFDFAD', '#919AB3'],
 };
 
 /** Warm or cool multiplier on every material row (not sky/light) per key. */
-const TINT = { dawn: '#F4E2DC', noon: '#FFFFFF', golden: '#FFEACB' };
+const TINT = { dawn: '#F4E2DC', noon: '#FFFFFF', golden: '#FFF5E8' };
 
 const SIZE = 16;
 const toLinear = (hex: string): Color => new Color(hex); // three converts sRGB hex → linear

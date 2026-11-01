@@ -1,9 +1,16 @@
-// Still shallow mineral pools. Sky, clouds and terrain reflect broadly;
-// new props and wildlife are deliberately absent from this inexpensive mirror.
+// Still shallow mineral pools, with a local geometry mirror near the garden
+// and the inexpensive sky/terrain reflection over the rest of the globe.
 #define MAX_RIPPLES 6
 uniform vec4 uWaterLook;
 uniform vec4 uWaterSky;
 uniform vec4 uRipples[MAX_RIPPLES];
+uniform sampler2D uPoolMirror;
+uniform mat4 uPoolMirrorMatrix;
+uniform float uPoolMirrorStrength;
+uniform vec3 uPoolMirrorCentre;
+uniform vec4 uLanternLights[16];
+uniform int uLanternLightCount;
+uniform float uLanternDusk;
 
 float rippleRing(vec3 dir) {
   float acc = 0.0;
@@ -101,13 +108,41 @@ vec3 waterColour(vec3 dir, vec3 wp, float shore, float depth, float b, float clo
   vec3 col = mix(body, mirror, reflection);
   if (bank) col = mix(col, mirror, 0.35 * uWaterSky.x);
   col = mix(col, cl.rgb / max(cl.a, 1e-3), cl.a * 0.65 * uWaterSky.x);
+  // Reflect the actual reeds, rocks, shelter and animals through the local basin plane.
+  vec4 reflected = uPoolMirrorMatrix * vec4(wp, 1.0);
+  vec2 uv = reflected.xy / reflected.w;
+  float inView = step(0.0,uv.x)*step(uv.x,1.0)*step(0.0,uv.y)*step(uv.y,1.0)*step(0.0,reflected.w);
+  float wavePhase=dot(dir,along)*uRadius;
+  vec2 rippleOffset=vec2(sin(wavePhase*4.5+uWaterLook.w*.35)*.0028+sin(wavePhase*13.0-uWaterLook.w*.24)*.0012,sin(wavePhase*7.0-uWaterLook.w*.3)*.0007);
+  vec4 objects=texture2D(uPoolMirror,clamp(uv+rippleOffset,0.001,0.999));
+  vec3 reflectedObjects=objects.rgb/max(objects.a,0.001);
+  float reflectionRipple=.85+.15*sin(wavePhase*10.0+uWaterLook.w*.35);
+  float basinMirror=1.0-smoothstep(24.0,42.0,length(dir-uPoolMirrorCentre)*uRadius);
+  col=mix(col,reflectedObjects,objects.a*inView*uPoolMirrorStrength*basinMirror*mix(0.42,0.73,pow(1.0-facing,0.8))*reflectionRipple);
+
+  // Warm, fragmented vertical light paths are tied to real seed lantern positions.
+  vec3 reflectedRay=reflect(-v,n);
+  for(int i=0;i<16;i++) {
+    if(i>=uLanternLightCount) break;
+    vec3 lamp=warpPosition(uLanternLights[i].xyz);
+    vec3 delta=lamp-wp;
+    vec3 toLamp=normalize(delta);
+    float vertical=dot(reflectedRay,n)-dot(toLamp,n);
+    vec3 horizontalRay=normalize(reflectedRay-n*dot(reflectedRay,n));
+    vec3 horizontalLamp=normalize(toLamp-n*dot(toLamp,n));
+    float across=length(horizontalRay-horizontalLamp);
+    float spread=0.014+0.016/(1.0+length(delta)*0.04);
+    float path=exp(-across*across/(spread*spread)-vertical*vertical/0.022);
+    float bands=0.25+0.75*smoothstep(-0.3,0.8,sin(dot(dir,along)*uRadius*13.0+uWaterLook.w*0.45)+0.25*sin(dot(dir,along)*uRadius*31.0));
+    col+=vec3(1.0,0.57,0.19)*path*bands*uLanternLights[i].w*uLanternDusk*0.58;
+  }
   col = mix(col, pal(ROW_WATER, 9), smoothstep(0.42, 0.85, stroke) * 0.07 * uWindVec.w);
   // Sparse elongated ripples carry a little sky colour across the quiet basin.
   vec3 waveDir = normalize(dir + along * (0.08 * sin(uWaterLook.w * 0.16) / uRadius));
   float wave = strokes(waveDir, uRadius / 4.0, along, uTerrainSeed + 148u);
   float ribbon = 1.0 - smoothstep(0.035, 0.085, abs(wave - 0.15));
   float broken = smoothstep(-0.05, 0.25, gnoise(dir * (uRadius / 11.0), uTerrainSeed + 149u));
-  col = mix(col, pal(ROW_WATER, 9), ribbon * broken * 0.18 * (1.0 - cloud) * (1.0 - smoothstep(0.15, 0.7, pixelMeters)));
+  col = mix(col, pal(ROW_WATER, 9), ribbon * broken * 0.3 * (1.0 - cloud) * (1.0 - smoothstep(0.15, 0.7, pixelMeters)));
   float f0, f1;
   uint lv;
   float t = patternOctaves(0.8, pixelMeters, 8.0, f0, f1, lv);

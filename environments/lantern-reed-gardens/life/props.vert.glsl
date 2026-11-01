@@ -2,6 +2,7 @@
 #include <meadow_warp>
 uniform float uRadius;
 attribute float aKind;
+attribute float aVariation;
 varying vec3 vWorld;
 varying vec3 vPlanet;
 varying vec3 vPlanetNormal;
@@ -20,6 +21,6 @@ void main(){
  vec3 planet=up*(ground+position.y);
  vPlanet=planet;vWorld=warpPosition(planet);
  vPlanetNormal=turn(normalize(X*normal.x+U*normal.y+Z*normal.z),axis,angle);
- vLocal=position;vUv=uv;vKind=aKind;vVariation=0.5;
+ vLocal=position;vUv=uv;vKind=aKind;vVariation=aVariation;
  gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.0);
 }

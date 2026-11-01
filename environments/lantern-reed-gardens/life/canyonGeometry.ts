@@ -67,11 +67,11 @@ export class CanyonGeometry {
 
 /** Long, thin botanical leaf with a central fold and a pointed, drooping tip. */
 export function addReedLeaf(b: CanyonGeometry, origin: Vector3, length: number, turn: number, width = 0.55, kind = 1): void {
-  const rows = 16;
+  const rows = kind === 3 ? 4 : 16;
   const point = (u: number, t: number): Vector3 => {
     const spread = width * Math.pow(Math.sin(Math.PI * t), 0.72);
     const x = length * (0.15 * t + 0.82 * t * t);
-    const y = length * (1.06 * t - 1.04 * t * t) + 0.08 * spread * (1 - Math.abs(u));
+    const y = length * (0.78 * t - 1.02 * t * t) + 0.16 * spread * (1 - Math.abs(u));
     const z = spread * u;
     return origin.clone().add(new Vector3(x * Math.cos(turn) + z * Math.sin(turn), y, z * Math.cos(turn) - x * Math.sin(turn)));
   };
@@ -83,75 +83,169 @@ export function addReedLeaf(b: CanyonGeometry, origin: Vector3, length: number, 
   }
 }
 
-/** Six crisp paper facets surrounding a warm seed core. */
+/** Six structural ribs hold a fluted papery husk, tapering to a ruby calyx. */
 export function addSeedLantern(b: CanyonGeometry, centre: Vector3, size: number): void {
-  const top = centre.clone().add(new Vector3(0, size * 0.78, 0));
-  const bottom = centre.clone().add(new Vector3(0, -size * 0.65, 0));
+  const levels = [[-0.73,0.025],[0.12,0.34],[0.57,0.14],[0.87,0.008]];
   for (let i = 0; i < 6; i++) {
     const a = i * Math.PI / 3, c = (i + 1) * Math.PI / 3;
-    const p = centre.clone().add(new Vector3(Math.cos(a) * size * 0.32, size * 0.1, Math.sin(a) * size * 0.32));
-    const q = centre.clone().add(new Vector3(Math.cos(c) * size * 0.32, size * 0.1, Math.sin(c) * size * 0.32));
-    b.triangle(bottom, q, p, 7, [[0.5, 0], [1, 0.55], [0, 0.55]]);
-    b.triangle(p, q, top, 7, [[0, 0.55], [1, 0.55], [0.5, 1]]);
-    b.tube([bottom, p, top], [size * 0.009, size * 0.008, size * 0.006], 8, 4);
+    const edge = (angle: number): Vector3[] => levels.map(([y,r]) => centre.clone().add(new Vector3(Math.cos(angle)*size*r,y*size,Math.sin(angle)*size*r)));
+    const left=edge(a),right=edge(c);
+    for(let k=0;k+1<levels.length;k++) {
+      const y0=(levels[k][0]+0.73)/1.6,y1=(levels[k+1][0]+0.73)/1.6;
+      b.triangle(left[k],right[k],right[k+1],7,[[0,y0],[1,y0],[1,y1]]);
+      b.triangle(left[k],right[k+1],left[k+1],7,[[0,y0],[1,y1],[0,y1]]);
+    }
+    b.tube(left,[0.011,0.008,0.007,0.006].map(r=>r*size),9,4);
+    const calyx=centre.clone().add(new Vector3(0,-size*0.8,0));
+    const outer=centre.clone().add(new Vector3(Math.cos(a)*size*0.27,-size*0.34,Math.sin(a)*size*0.27));
+    const middle=calyx.clone().lerp(outer,0.5).add(new Vector3(Math.cos(a)*size*0.035,0,Math.sin(a)*size*0.035));
+    b.tube([calyx,middle,outer],[0.036,0.036,0.005].map(r=>r*size),3,5);
   }
 }
 
-/** Three stems sharing one root, with separate seed cases and a few broad leaves. */
-export function fanTreeGeometry(): BufferGeometry {
+/** Branches are intentionally unequal: tall arching blades among a thicket of thin reed lamps. */
+export function reedColonyGeometry(variant = 0): BufferGeometry {
   const b = new CanyonGeometry();
-  for (let i = 0; i < 3; i++) {
-    const turn = i * 2.4;
-    const height = [5.4, 4.1, 3.3][i];
+  // A low broken mineral footing keeps the thicket rooted above shallow pools.
+  const footing=Array.from({length:11},(_,i)=>{
+    const a=i/11*Math.PI*2,r=(.98+.16*Math.sin(i*2.7+variant))*(variant===3?.77:1);
+    return new Vector3(Math.cos(a)*r,.11+.02*Math.sin(i*2.1),Math.sin(a)*r);
+  });
+  for(let i=0;i<footing.length;i++) {
+    const next=(i+1)%footing.length;
+    b.triangle(footing[i],footing[next],new Vector3(.07,.13,-.04),12);
+    b.quad(footing[i].clone().setY(-.15),footing[next].clone().setY(-.15),footing[next],footing[i],12);
+  }
+  for(let i=0;i<14;i++) {
+    const a=i*2.4+variant,r=.82+(i%3)*.18,x=Math.cos(a)*r,z=Math.sin(a)*r,s=.07+(i%4)*.025;
+    const top=new Vector3(x,.18,z);
+    const ring=Array.from({length:5},(_,k)=>new Vector3(x+Math.cos(k/5*Math.PI*2)*s,.06,z+Math.sin(k/5*Math.PI*2)*s));
+    for(let k=0;k<5;k++)b.triangle(ring[k],ring[(k+1)%5],top,12);
+  }
+  const count=[5,7,4,3][variant];
+  for (let i = 0; i < count; i++) {
+    const turn = i * 2.4 + variant * 0.63;
+    const height = [5.7,3.8,4.6,2.8,3.2,1.9,2.4][i]*(variant===2?1.35:variant===3?0.48:1);
     const side = new Vector3(Math.cos(turn), 0, Math.sin(turn));
-    const stem = Array.from({ length: 9 }, (_, k) => {
-      const t = k / 8;
-      return side.clone().multiplyScalar(0.2 + 0.65 * t * t).setY(height * t);
+    const stem = Array.from({ length: 7 }, (_, k) => {
+      const t = k / 6;
+      return side.clone().multiplyScalar(0.18+i*0.08 + (0.22+variant*0.14) * t * t).setY(height * t);
     });
-    b.tube(stem, stem.map((_, k) => 0.045 - k * 0.0035), 8, 6);
-    addSeedLantern(b, stem[8].clone().add(new Vector3(0, 0.42, 0)), 0.74 - i * 0.09);
-    addReedLeaf(b, stem[4], 2.9 - i * 0.35, turn + 0.3, 0.43);
-    if (i === 0) addReedLeaf(b, stem[6], 3.65, turn + 2.0, 0.63);
-    addReedLeaf(b, stem[3], 2.1 - i * 0.2, turn + 2.8, 0.31);
-    // Reddish sepals hold the case, slender and separate from its seed paper.
-    for (let k = 0; k < 4; k++) {
-      const angle = k * Math.PI / 2;
-      const at = stem[8].clone();
-      const tip = at.clone().add(new Vector3(Math.cos(angle) * 0.22, 0.38, Math.sin(angle) * 0.22));
-      b.tube([at, tip], [0.025, 0.008], 3, 4);
+    b.tube(stem, stem.map((_, k) => (0.039-k*0.003)*(variant===2?1.2:1)), 8, 5);
+    const size=(0.73-i*0.045)*(variant===2?1.17:variant===3?0.72:1);
+    addSeedLantern(b, stem[6].clone().add(new Vector3(0,size*0.7,0)),size);
+    if (variant!==3 && i<3) addReedLeaf(b,stem[3],2.6-i*0.35,turn+0.5,0.48-i*0.07);
+    if (i===0 && variant!==3) {
+      addReedLeaf(b,stem[5],variant===2?6.7:4.8,turn+2.1,variant===2?1.05:0.76);
+      addReedLeaf(b,stem[2],3.6,turn-0.7,0.66);
     }
   }
   return b.build();
 }
 
+export function fanTreeGeometry(): BufferGeometry { return reedColonyGeometry(); }
+
 /** A flat mineral paving fragment, with chipped planes and a sloping fracture edge. */
 export function chalkGeometry(): BufferGeometry {
   const b = new CanyonGeometry();
-  const lower = [[-1.1,-0.12,-0.7],[0.85,-0.1,-0.8],[1.16,-0.12,0.2],[0.55,-0.14,0.8],[-1.0,-0.12,0.6]].map(p => new Vector3(...p as [number,number,number]));
-  const upper = [[-0.98,0.25,-0.61],[0.77,0.23,-0.7],[1.02,0.22,0.2],[0.48,0.24,0.7],[-0.91,0.26,0.53]].map(p => new Vector3(...p as [number,number,number]));
-  const top = new Vector3(-0.05,0.26,-0.02);
-  for (let i = 0; i < 5; i++) {
-    const n = (i + 1) % 5;
-    b.quad(lower[i],lower[n],upper[n],upper[i],2,1.8,0.4);
-    b.triangle(upper[i],upper[n],top,2,[[0,0],[1.4,0],[0.7,0.8]]);
+  const outline=[[-1.8,-0.68],[-1.1,-1.02],[-0.3,-0.87],[0.2,-1.01],[1.28,-0.78],[1.72,-0.24],[1.48,0.17],[1.8,0.46],[0.68,0.82],[0.14,0.68],[-0.42,1.03],[-1.37,0.72],[-1.66,0.2]];
+  const lower=outline.map(([x,z],i)=>new Vector3(x*1.05,-0.3-Math.sin(i)*0.05,z*1.05));
+  const middle=outline.map(([x,z],i)=>new Vector3(x*1.025,0.04+Math.sin(i*1.9)*0.025,z*1.025));
+  const upper=outline.map(([x,z],i)=>new Vector3(x,0.29+Math.sin(i*2.3)*0.035,z));
+  const top = new Vector3(-0.05,0.31,-0.02);
+  for (let i = 0; i < outline.length; i++) {
+    const n = (i + 1) % outline.length;
+    b.quad(lower[i],lower[n],middle[n],middle[i],2,0.9,0.32);
+    b.quad(middle[i],middle[n],upper[n],upper[i],2,0.9,0.24);
+    b.triangle(upper[i],upper[n],top,2,[[upper[i].x,upper[i].z],[upper[n].x,upper[n].z],[top.x,top.z]]);
   }
   return b.build();
 }
 
-/** Violet shore plants have tiny dry leaves, with large gaps between each sprig. */
+/** Deep garnet fern fronds, with separated round lobes instead of soft blobs. */
 export function fernGeometry(): BufferGeometry {
   const b = new CanyonGeometry();
-  for (let f = 0; f < 5; f++) {
+  for (let f = 0; f < 7; f++) {
     const turn = f * Math.PI * 2 / 5;
-    const height = 0.32 + (f % 3) * 0.08;
+    const height = 0.55 + (f % 3) * 0.23;
     const side = new Vector3(Math.cos(turn), 0, Math.sin(turn));
-    const tip = side.clone().multiplyScalar(0.26).setY(height);
+    const tip = side.clone().multiplyScalar(0.44).setY(height);
     b.tube([new Vector3(),tip],[0.016,0.005],3,4);
-    for (let k = 1; k <= 4; k++) {
-      const t = k / 5;
+    for (let k = 1; k <= 6; k++) {
+      const t = k / 7;
       const mid = tip.clone().multiplyScalar(t);
-      addReedLeaf(b, mid, 0.19, turn + Math.PI / 2, 0.055, 3);
-      addReedLeaf(b, mid, 0.16, turn - Math.PI / 2, 0.05, 3);
+      addReedLeaf(b, mid, 0.34*(1-t*0.55), turn + Math.PI / 2, 0.10, 3);
+      addReedLeaf(b, mid, 0.31*(1-t*0.55), turn - Math.PI / 2, 0.09, 3);
+    }
+  }
+  return b.build();
+}
+
+/** A complete gravel patch costs one instance and contains individual angular lilac pebbles. */
+export function pebblePatchGeometry(): BufferGeometry {
+  const b=new CanyonGeometry();
+  for(let i=0;i<22;i++) {
+    const a=i*2.3999632297,r=0.18+Math.sqrt(i/22)*1.45;
+    const x=Math.cos(a)*r,z=Math.sin(a)*r;
+    const size=0.09+((i*7)%11)*0.017;
+    // Broken, blunt stone chips have shoulders and an off-centre top plane;
+    // a single tip over a regular ring read as a field of tiny pyramids.
+    const lower=Array.from({length:6},(_,j)=>{
+      const angle=j/6*Math.PI*2+i*.37,chip=1+.15*Math.sin(j*4.7+i);
+      return new Vector3(x+Math.cos(angle)*size*chip,0.015,z+Math.sin(angle)*size*.75*chip);
+    });
+    const upper=lower.map((p,j)=>new Vector3(x+(p.x-x)*.55+size*.12,size*(.4+.08*Math.sin(j*2.2+i)),z+(p.z-z)*.55-size*.08));
+    const top=new Vector3(x+size*.08,size*.44,z-size*.05);
+    for(let k=0;k<6;k++) {
+      const next=(k+1)%6;
+      b.quad(lower[k],lower[next],upper[next],upper[k],12);
+      b.triangle(upper[k],upper[next],top,12,[[0,0],[1,0],[.5,1]]);
+    }
+  }
+  return b.build();
+}
+
+/** Jointed mineral faces, broken shoulders and a broad irregular top. */
+export function mesaGeometry(): BufferGeometry {
+  const b=new CanyonGeometry();
+  const profile=[1.2,1.08,.94,.96,.80,.79];
+  for(let column=0;column<6;column++) {
+    const angle=column*2.4,off=column===0?0:5.5;
+    const height=[27,17,22,11,15,8][column]*.7,width=column===0?6.2:3.8;
+    const rings=Array.from({length:6},(_,j)=>Array.from({length:11},(_,k)=>{
+      const a=k/11*Math.PI*2;
+      const fracture=1+.18*Math.sin(k*2.7+column*1.9)+.055*Math.cos(j*2.7+k*1.4);
+      const r=width*fracture*profile[j];
+      const shiftX=Math.sin(j*1.8+column)*.8,shiftZ=Math.cos(j*1.6+column)*.65;
+      const ledge=(j===2||j===4)?Math.sin(k*1.7+column)*1.1:0;
+      return new Vector3(Math.cos(angle)*off+Math.cos(a)*r+shiftX,height*j/5+(j===5?Math.sin(k*1.8)*1.1:ledge),Math.sin(angle)*off+Math.sin(a)*r+shiftZ);
+    }));
+    for(let j=0;j<5;j++)for(let k=0;k<11;k++)b.quad(rings[j][k],rings[j][(k+1)%11],rings[j+1][(k+1)%11],rings[j+1][k],13,3.3,height/5);
+    const top=new Vector3(Math.cos(angle)*off,height-.15,Math.sin(angle)*off);
+    for(let k=0;k<11;k++)b.triangle(rings[5][k],rings[5][(k+1)%11],top,13,[[0,0],[1,0],[.5,1]]);
+    // Overlapping, asymmetric umbrella crowns read as a living canopy, not
+    // a flat cap. Thin trailing roots hang down the exposed ledges.
+    if(column<4)for(let tree=0;tree<3;tree++) {
+      const ta=tree*2.4+column,root=top.clone().add(new Vector3(Math.cos(ta)*2.1,0,Math.sin(ta)*2.1));
+      const crown=root.clone().add(new Vector3(.3,3.1+tree*.65,0));
+      b.tube([root,root.clone().lerp(crown,.65),crown],[.19,.12,.075],14,5);
+      for(let cluster=0;cluster<3;cluster++) {
+        const centre=crown.clone().add(new Vector3(Math.cos(cluster*2.6)*1.4,cluster*.28,Math.sin(cluster*2.6)*1.25));
+        const rim=Array.from({length:11},(_,k)=>{
+          const a=k/11*Math.PI*2,r=(2.2+cluster*.3)*(1+.14*Math.sin(k*2.3+tree));
+          return centre.clone().add(new Vector3(Math.cos(a)*r,.12*Math.sin(k*2.7),Math.sin(a)*r));
+        });
+        const crownRings=[[-.35,.65],[0,1],[.55,.87],[.92,.37]].map(([y,scale])=>rim.map(point=>centre.clone().addScaledVector(point.clone().sub(centre),scale).add(new Vector3(0,y,0))));
+        for(let k=0;k<11;k++) {
+          for(let level=0;level<3;level++) b.quad(crownRings[level][k],crownRings[level][(k+1)%11],crownRings[level+1][(k+1)%11],crownRings[level+1][k],14);
+          b.triangle(centre.clone().add(new Vector3(-.15,1.03,0)),crownRings[3][k],crownRings[3][(k+1)%11],14);
+          b.triangle(centre.clone().add(new Vector3(0,-.43,0)),crownRings[0][(k+1)%11],crownRings[0][k],14);
+        }
+        if(cluster===0)for(let vine=0;vine<3;vine++) {
+          const hang=rim[vine*3];
+          b.tube([hang,hang.clone().add(new Vector3(.12,-2.1-vine*.7,.15))],[.045,.018],14,4);
+        }
+      }
     }
   }
   return b.build();
@@ -161,15 +255,22 @@ export function fernGeometry(): BufferGeometry {
 export function lampPetalGeometry(): BufferGeometry {
   const b = new CanyonGeometry();
   b.tube([new Vector3(0,-0.015,-0.08),new Vector3(0,0.015,0.07),new Vector3(0,0,0.13)],[0.018,0.025,0.014],11,6);
+  b.tube([new Vector3(-0.026,0.016,0.086),new Vector3(-0.026,0.016,0.107)],[0.018,0.018],6,6);
+  b.tube([new Vector3(0.026,0.016,0.086),new Vector3(0.026,0.016,0.107)],[0.018,0.018],6,6);
   for (let wing = 0; wing < 4; wing++) {
     const side = wing < 2 ? -1 : 1;
     const forward = wing % 2 === 0 ? 1 : -1;
     const root = new Vector3(side * 0.018,0,forward * 0.024);
     const tip = new Vector3(side * 0.23,0.015,forward * 0.16);
-    const a = new Vector3(side * 0.13,0.025,forward * 0.005);
-    const c = new Vector3(side * 0.065,-0.003,forward * 0.15);
-    b.triangle(root,a,tip,10,[[0.5,0],[0,0.5],[0.5,1]]);
-    b.triangle(root,tip,c,10,[[0.5,0],[0.5,1],[1,0.5]]);
+    const axis=tip.clone().sub(root),across=new Vector3(-axis.z,0,axis.x).normalize();
+    const point=(u: number,t: number): Vector3 => root.clone().addScaledVector(axis,t)
+      .addScaledVector(across,u*.072*Math.pow(Math.sin(t*Math.PI),.72))
+      .add(new Vector3(0,(1-Math.abs(u))*.015*Math.sin(t*Math.PI),0));
+    for(let row=0;row<10;row++)for(const [a,c] of [[-1,0],[0,1]]) {
+      const t=row/10,next=(row+1)/10;
+      b.triangle(point(a,t),point(c,t),point(c,next),10,[[(a+1)/2,t],[(c+1)/2,t],[(c+1)/2,next]]);
+      b.triangle(point(a,t),point(c,next),point(a,next),10,[[(a+1)/2,t],[(c+1)/2,next],[(a+1)/2,next]]);
+    }
   }
   return b.build();
 }

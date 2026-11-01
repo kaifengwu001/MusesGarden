@@ -85,7 +85,7 @@ export const schema = {
     bloom: num('b', 'Bloom', 1, 0, 1, 0.001, 'live'),
   },
   view: {
-    mode: choice('cam', 'Camera', ['overview', 'wander'], 'overview', 'live'),
+    mode: choice('cam', 'Camera', ['overview', 'wander'], 'wander', 'live'),
     visualRadius: num('rv', 'Visual radius', 60, 20, 400, 1, 'live', { unit: 'm' }),
   },
   terrain: {
@@ -101,7 +101,7 @@ export const schema = {
     nearRadius: num('gr', 'Blade radius', 22, 6, 60, 0.5, 'life', { unit: 'm' }),
   },
   flowers: {
-    density: num('fd', 'Density', 0.35, 0, 40, 0.1, 'life', { unit: '/m²' }),
+    density: num('fd', 'Density', 0, 0, 40, 0.1, 'life', { unit: '/m²' }),
     patchiness: num('fpt', 'Patchiness', 0.95, 0, 1, 0.01, 'life'),
     patchSize: num('fps', 'Patch size', 13, 3, 40, 0.5, 'life', { unit: 'm' }),
     sizeVariation: num('fsv', 'Size variation', 0.6, 0, 1, 0.01, 'life'),
@@ -113,8 +113,8 @@ export const schema = {
   },
   water: {
     depthTint: num('dt', 'Depth tint', 0.65, 0, 1, 0.01, 'live'),
-    reflection: num('wr', 'Sky reflection', 0.65, 0, 1, 0.01, 'live'),
-    glints: num('wgl', 'Glints', 0.2, 0, 1, 0.01, 'live'),
+    reflection: num('wr', 'Sky reflection', 0.85, 0, 1, 0.01, 'live'),
+    glints: num('wgl', 'Glints', 0.35, 0, 1, 0.01, 'live'),
     lilyPads: num('wlp', 'Lily pads', 0, 0, 1, 0.01, 'live'),
   },
   wind: {
@@ -124,7 +124,7 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0.08, 0, 1, 0.01, 'life'),
+    coverage: num('cc', 'Coverage', 0, 0, 1, 0.01, 'life'),
     altitude: num('ca', 'Altitude', 16, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.24, 0, 1, 0.01, 'live'),
@@ -140,9 +140,9 @@ export const schema = {
   style: {
     toonBands: int('tb', 'Toon bands', 3, 2, 5, 'live'),
     bandSoftness: num('bs', 'Band softness', 0.08, 0, 0.3, 0.005, 'live'),
-    fogDensity: num('fog', 'Aerial haze', 0.22, 0, 1, 0.01, 'live'),
-    grain: num('gn', 'Paper grain', 0.012, 0, 0.1, 0.001, 'live'),
-    contrast: num('ct', 'Contrast', 1.02, 0.8, 1.4, 0.01, 'live'),
+    fogDensity: num('fog', 'Aerial haze', 0.13, 0, 1, 0.01, 'live'),
+    grain: num('gn', 'Paper grain', 0.004, 0, 0.1, 0.001, 'live'),
+    contrast: num('ct', 'Contrast', 1.1, 0.8, 1.4, 0.01, 'live'),
     brightness: num('br', 'Brightness', 1.0, 0.7, 1.2, 0.01, 'live'),
   },
   quality: {

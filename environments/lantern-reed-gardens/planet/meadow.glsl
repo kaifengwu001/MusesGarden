@@ -214,6 +214,25 @@ float mineralCuts(vec3 dir, float frequency, uint seed, float pixelMeters) {
   return (1.0 - smoothstep(max(0.0, width - aa), width + aa, min(first, second))) * min(1.0, width / aa);
 }
 
+// Uneven natural paving in the settlement. Joints carry lilac grit; the
+// material sits on the safe continuous walking surface, without fake steps.
+vec2 gardenPaving(vec2 position) {
+  vec2 p=position/3.9;
+  p+=vec2(gnoise(vec3(p*.8,2.0),765u),gnoise(vec3(p*.8,9.0),766u))*.14;
+  ivec2 cell=ivec2(floor(p));
+  float first=100.0,second=100.0,variant=0.0;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++) {
+    ivec2 c=cell+ivec2(x,y);
+    uint h=meadowHash(ivec3(c,3),uTerrainSeed+767u);
+    vec2 jitter=vec2(float(h&255u),float((h>>8)&255u))/255.0;
+    vec2 d=vec2(c)+.15+jitter*.7-p;
+    float distanceSquared=dot(d,d);
+    if(distanceSquared<first) {second=first;first=distanceSquared;variant=float((h>>16)&255u)/255.0;}
+    else second=min(second,distanceSquared);
+  }
+  return vec2((sqrt(second)-sqrt(first))*3.9,variant);
+}
+
 // Ivory mineral shelves collect lavender gravel where they meet a basin.
 // Texture is fixed to the ground; reeds carry the wind, stone stays still.
 vec3 meadowPaint(Meadow m) {
@@ -223,9 +242,9 @@ vec3 meadowPaint(Meadow m) {
   float grain = close * gnoise(p * 12.0, uTerrainSeed + 711u);
   float gravel = (1.0 - smoothstep(0.5, 5.0, m.shore)) * 0.85;
   gravel = clamp(gravel + (0.5 + 0.5 * mineral) * 0.12, 0.0, 1.0);
-  vec3 lit = mix(vec3(0.79, 0.79, 0.67), vec3(0.59, 0.46, 0.60), gravel);
-  vec3 mid = mix(vec3(0.51, 0.57, 0.59), vec3(0.35, 0.29, 0.42), gravel);
-  vec3 shade = mix(vec3(0.29, 0.37, 0.45), vec3(0.22, 0.23, 0.34), gravel);
+  vec3 lit = mix(vec3(0.71, 0.67, 0.53), vec3(0.49, 0.29, 0.50), gravel);
+  vec3 mid = mix(vec3(0.43, 0.46, 0.53), vec3(0.29, 0.18, 0.36), gravel);
+  vec3 shade = mix(vec3(0.19, 0.25, 0.37), vec3(0.14, 0.12, 0.26), gravel);
   vec3 col = tone3(lit, mid, shade, m.light);
   col *= 1.0 + mineral * 0.04 + grain * (0.025 + 0.13 * gravel);
   float f0, f1;
@@ -235,5 +254,16 @@ vec3 meadowPaint(Meadow m) {
   col = mix(col, vec3(0.25, 0.31, 0.36), cut * 0.45);
   float fleck = smoothstep(0.32, 0.56, grain) * gravel;
   col = mix(col, lit * uSunTint, fleck * 0.4);
+  vec2 local=cottageLocal(m.dir);
+  if(dot(m.dir,uCottage.xyz)>0.85 && dot(local,local)<1200.0 && m.pixelMeters<0.25) {
+    vec2 paving=gardenPaving(local);
+    float width=max(m.pixelMeters*0.8,0.004);
+    float joint=1.0-smoothstep(.018,.045+width,paving.x);
+    float bevel=smoothstep(.025,.055,paving.x)*(1.0-smoothstep(.055,.12+width,paving.x));
+    float fade=(1.0-smoothstep(.12,.25,m.pixelMeters))*(1.0-gravel*.75);
+    col*=1.0+(paving.y-.5)*.12*fade;
+    col=mix(col,tone3(vec3(.32,.23,.39),vec3(.19,.15,.26),vec3(.12,.12,.2),m.light),joint*fade*.65);
+    col+=vec3(.06,.055,.045)*bevel*fade;
+  }
   return col;
 }

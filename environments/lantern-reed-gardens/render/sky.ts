@@ -1,7 +1,7 @@
 import { Color, Matrix4, ShaderMaterial, Vector3, type IUniform, type Mesh, type PerspectiveCamera } from 'three';
 import { fullscreenMesh } from '../../../src/render/fullscreen';
 import { ROW, type Palette } from './palette';
-import fragmentShader from '../../../src/render/sky.frag.glsl?raw';
+import fragmentShader from './sky.frag.glsl?raw';
 import vertexShader from '../../../src/render/sky.vert.glsl?raw';
 
 /**

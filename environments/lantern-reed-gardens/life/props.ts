@@ -1,5 +1,5 @@
 import { DoubleSide, Mesh, Object3D, ShaderMaterial, Vector3, type IUniform } from 'three';
-import { CanyonGeometry, addSeedLantern } from './canyonGeometry';
+import { CottageGeometry, point } from './cottageGeometry';
 import fragmentShader from './props.frag.glsl?raw';
 import vertexShader from './props.vert.glsl?raw';
 
@@ -8,7 +8,7 @@ import vertexShader from './props.vert.glsl?raw';
 export const FLOOR=0.72;
 export const COTTAGE={halfX:4.12,halfZ:2.45,wall:3.45,thickness:0.36,overhang:0.45,pitch:0.16} as const;
 const OUTER={x:COTTAGE.halfX+COTTAGE.thickness/2,z:COTTAGE.halfZ+COTTAGE.thickness/2} as const;
-export const ROOF={ex:4.85,ez:3.6,eave:3.7,rise:1.2,ridge:0,slope:3.6,top:4.9} as const;
+export const ROOF={ex:5.05,ez:3.6,eave:3.3,rise:2.35,ridge:-0.45,slope:5.5,top:5.65} as const;
 export const TERRACE={x0:-OUTER.x-0.1,x1:OUTER.x-0.2,z0:OUTER.z-0.3,z1:OUTER.z+2.1} as const;
 /** The lookout stands above the basin margin; its deck still supports resident routines. */
 export const PIER={x0:-OUTER.x-3.9,x1:-OUTER.x+0.9,z0:OUTER.z-0.8,z1:OUTER.z+3.0} as const;
@@ -21,85 +21,170 @@ export const CHAIR={x:-OUTER.x-0.55,z:OUTER.z+0.45,turn:0.5} as const;
 /** Retained for callers that describe the old footprint; no chimney is rendered. */
 export const CHIMNEY={x:0.1,z:-0.6,half:0.29} as const;
 
-function shelterGeometry(seed:number):ReturnType<CanyonGeometry['build']>{
-  const b=new CanyonGeometry();
-  const beam=(a:Vector3,c:Vector3,width:number):void=>b.tube([a,c],[width,width*0.94],0,6);
-  const slab=(x0:number,x1:number,z0:number,z1:number,top:number):void=>b.box((x0+x1)/2,(top-0.3)/2,(z0+z1)/2,x1-x0,top+0.3,z1-z0,2);
-  slab(-OUTER.x,OUTER.x,-OUTER.z,OUTER.z,FLOOR);
-  slab(TERRACE.x0,TERRACE.x1,TERRACE.z0,TERRACE.z1,FLOOR);
-  slab(PIER.x0,PIER.x1,PIER.z0,PIER.z1,FLOOR);
-  for(let k=0;k<STEPS.count;k++)slab(STEPS.x0,STEPS.x1,TERRACE.z1+k*STEPS.tread,TERRACE.z1+(k+1)*STEPS.tread,FLOOR-k*STEPS.rise);
-  // Sparse timber boards on the dry lookout distinguish it from the chalk foundation.
-  for(let i=0;i<9;i++)b.box(PIER.x0+0.25+i*(PIER.x1-PIER.x0-0.5)/8,FLOOR-0.025,(PIER.z0+PIER.z1)/2,0.38,0.05,PIER.z1-PIER.z0-0.14,0);
-  const front=OUTER.z,back=-OUTER.z;
-  // Frame posts remain inside the non-walkable wall footprint, keeping terrace routes clear.
-  for(const x of [-OUTER.x,0,OUTER.x]){
-    beam(new Vector3(x,FLOOR-0.04,back),new Vector3(x,3.72,back),0.13);
-    beam(new Vector3(x,FLOOR-0.04,front),new Vector3(x,3.68,front),0.12);
-  }
-  for(const z of [back,front]){
-    const y=3.65;
-    beam(new Vector3(-OUTER.x-0.12,y,z),new Vector3(OUTER.x+0.12,y,z),0.13);
-    beam(new Vector3(-OUTER.x,FLOOR+0.05,z),new Vector3(OUTER.x,FLOOR+0.05,z),0.09);
-  }
-  for(const x of [-OUTER.x,0,OUTER.x]){
-    beam(new Vector3(x,3.7,-3.6),new Vector3(x,4.9,0),0.085);
-    beam(new Vector3(x,4.9,0),new Vector3(x,3.7,3.6),0.085);
-  }
-  beam(new Vector3(-4.85,4.9,0),new Vector3(4.85,4.9,0),0.09);
-  // Woven panels with a front door and a small warm window.
-  b.box(0,2.02,back,OUTER.x*2,2.6,0.07,5);
-  for(const x of [-OUTER.x,OUTER.x])b.box(x,2.02,0,0.07,2.6,OUTER.z*2,5);
-  const panel=(x0:number,x1:number,y0:number,y1:number):void=>b.box((x0+x1)/2,(y0+y1)/2,front,x1-x0,y1-y0,0.07,5);
-  panel(-OUTER.x,-3.0,FLOOR,3.31);
-  panel(-3.0,-1.78,FLOOR,1.6);panel(-3.0,-1.78,2.7,3.31);
-  panel(-1.78,0.3,FLOOR,3.31);panel(0.3,1.4,2.86,3.31);panel(1.4,OUTER.x,FLOOR,3.31);
-  b.box(0.85,FLOOR+1.05,front+0.02,1.08,2.1,0.07,0);
-  b.box(-2.39,2.15,front+0.025,1.12,1.0,0.025,7);
-  for(const x of [-3.02,-1.76,0.28,1.42])beam(new Vector3(x,FLOOR,front+0.08),new Vector3(x,3.32,front+0.08),0.045);
-  beam(new Vector3(-3.02,1.6,front+0.08),new Vector3(-1.76,1.6,front+0.08),0.045);
-  beam(new Vector3(-3.02,2.7,front+0.08),new Vector3(-1.76,2.7,front+0.08),0.045);
-  beam(new Vector3(-2.39,1.6,front+0.08),new Vector3(-2.39,2.7,front+0.08),0.035);
-  // Each roof leaf has its own silhouette, fold, veins and overlapping ridge attachment.
-  for (const side of [-1, 1]) for (let leaf = 0; leaf < 11; leaf++) {
-    const centre = -4.45 + leaf * 0.89;
-    const point = (u: number, t: number): Vector3 => {
-      const width = (0.42 + 0.25 * Math.sin(t * Math.PI)) * (1 - 0.72 * Math.pow(t, 12));
-      return new Vector3(centre + u * width, 4.95 - 1.22 * t + 0.06 * (1 - Math.abs(u)) * Math.sin(t * Math.PI), side * (t * 3.76 - 0.1));
-    };
-    for (let row = 0; row < 12; row++) for (const [a, c] of [[-1, 0], [0, 1]]) {
-      const t0 = row / 12, t1 = (row + 1) / 12;
-      const p0 = point(a,t0),p1 = point(c,t0),p2 = point(c,t1),p3 = point(a,t1);
-      b.triangle(p0,p1,p2,4,[[(a+1)/2,t0],[(c+1)/2,t0],[(c+1)/2,t1]]);
-      b.triangle(p0,p2,p3,4,[[(a+1)/2,t0],[(c+1)/2,t1],[(a+1)/2,t1]]);
+function shelterGeometry(seed: number): ReturnType<CottageGeometry['build']> {
+  const b = new CottageGeometry();
+  let random = seed >>> 0;
+  const rand = (): number => { random = Math.imul(random, 1664525) + 1013904223 >>> 0; return random / 0xffffffff; };
+  const beam = (a: Vector3, c: Vector3, width: number, kind = 0): void => {
+    b.variation = rand();
+    const middle = a.clone().lerp(c, 0.48).add(point((rand()-0.5)*0.035,0,(rand()-0.5)*0.035));
+    b.tube([a,middle,c],[width,width*0.91,width*0.83],kind,7);
+  };
+  const paving = (x0: number,x1: number,z0: number,z1: number,top: number,columns: number,rows: number): void => {
+    // The mortar core is recessed. Full-depth chipped stones form every visible
+    // edge, rather than a thin cap sitting on a broad featureless foundation box.
+    b.box((x0+x1)/2,(top-0.35)/2,(z0+z1)/2,x1-x0-0.28,top+0.15,z1-z0-0.2,13);
+    const width=(x1-x0)/columns,depth=(z1-z0)/rows;
+    for(let row=0;row<rows;row++) {
+      const joints=Array.from({length:columns+1},(_,column)=>x0+column*width+(column===0||column===columns?0:(rand()-0.5)*width*0.34));
+      for(let column=0;column<columns;column++) {
+        b.stone(joints[column]+0.016,joints[column+1]-0.016,z0+row*depth+0.014,z0+(row+1)*depth-0.014,-0.25,top,rand());
+      }
+    }
+  };
+  paving(-OUTER.x,OUTER.x,-OUTER.z,OUTER.z,FLOOR,8,4);
+  paving(TERRACE.x0,TERRACE.x1,TERRACE.z0,TERRACE.z1,FLOOR,8,2);
+  paving(PIER.x0,PIER.x1,PIER.z0,PIER.z1,FLOOR,4,3);
+  for(let k=0;k<STEPS.count;k++) paving(STEPS.x0,STEPS.x1,TERRACE.z1+k*STEPS.tread,TERRACE.z1+(k+1)*STEPS.tread,FLOOR-k*STEPS.rise,2,1);
+  // The lookout is a continuation of the limestone terrace. Its level stone
+  // surface keeps the fishing/sitting anchors, without the former dark crate-like decking.
+
+  const front=OUTER.z,back=-OUTER.z, ridge=-0.45;
+  const roofHeight=(t:number):number=>5.65-2.24*t+0.14*Math.sin(t*Math.PI)-0.4*Math.max(0,t-0.8)**2/0.04;
+  const roofX=(side:number,t:number):number=>ridge+side*(side<0?4.42:5.32)*t;
+  // A-frame and ridge are real, exposed timbers, bowed and tied rather than extruded trim.
+  for(const z of [back,front]) {
+    for(const x of [-OUTER.x,1.45,OUTER.x]) beam(point(x,FLOOR-0.04,z),point(x+(x<0?0.035:-0.045),3.5,z+0.018),0.14);
+    beam(point(-4.48,3.42,z),point(4.48,3.48,z),0.15);
+    beam(point(-4.65,3.35,z+0.1),point(ridge,5.55,z+0.1),0.15);
+    beam(point(ridge,5.55,z+0.1),point(4.85,3.35,z+0.1),0.15);
+    beam(point(ridge,3.43,z+0.06),point(ridge,5.55,z+0.06),0.085);
+    beam(point(-2.8,3.45,z+0.04),point(ridge,4.72,z+0.04),0.075);
+    beam(point(ridge,4.72,z+0.04),point(2.7,3.47,z+0.04),0.075);
+    for(const x of [-OUTER.x,OUTER.x]) {
+      const inward=x<0?0.75:-0.75;
+      beam(point(x,2.65,z+0.05),point(x+inward,3.42,z+0.05),0.075);
+      for(let wrap=0;wrap<4;wrap++) b.box(x,3.13+wrap*0.055,z+0.14,0.29,0.028,0.06,6);
     }
   }
-  // The gable ends show reed weave between the upper timber braces.
-  for (const x of [-OUTER.x, OUTER.x]) {
-    b.triangle(new Vector3(x,3.31,-OUTER.z),new Vector3(x,3.31,OUTER.z),new Vector3(x,4.82,0),5,[[0,0],[5.2,0],[2.6,1.5]]);
+  beam(point(ridge-0.06,5.64,-3.53),point(ridge+0.04,5.7,3.62),0.15);
+  for(const x of [-OUTER.x,OUTER.x]) beam(point(x,3.45,-3.05),point(x,3.45,3.22),0.12);
+  for(const z of [-2.25,-0.7,0.85,2.45]) for(const side of [-1,1]) {
+    const path=Array.from({length:8},(_,i)=>point(roofX(side,i/7),roofHeight(i/7)-0.13,z));
+    b.tube(path,path.map(()=>0.075),0,6);
   }
-  // The resident's bench and chair retain the exact sitting surfaces used by MuseRoam.
+  // Warm overlapping split-reed laths close most of the front loft. The exposed
+  // diagonal trusses stay in front, with a narrow ventilation gap under the ridge.
+  for(let row=0;row<7;row++) {
+    const y0=3.49+row*0.245,y1=y0+0.225;
+    const width0=3.73*(5.28-y0)/(5.28-3.49),width1=3.73*(5.28-y1)/(5.28-3.49);
+    b.variation=0.45+rand()*0.45;
+    b.quad(point(ridge-width0,y0,front-0.055),point(ridge+width0*1.12,y0+0.012,front-0.055),point(ridge+width1*1.12,y1,front-0.04),point(ridge-width1,y1,front-0.04),12,width0*2.12,0.225);
+    beam(point(ridge-width0,y0,front-0.025),point(ridge+width0*1.12,y0+0.012,front-0.025),0.018,6);
+  }
+
+  // Thin, irregular blue woven panels leave actual openings for the inset window and door.
+  const panel=(x0:number,x1:number,y0:number,y1:number,z:number):void=>{
+    b.variation=rand();
+    const inset=0.025*(rand()-0.5);
+    b.quad(point(x0,y0,z),point(x1,y0+0.015,z+inset),point(x1-0.018,y1,z),point(x0+0.025,y1-0.018,z-inset),4,x1-x0,y1-y0);
+  };
+  for(let i=0;i<6;i++) panel(-OUTER.x+i*1.43,-OUTER.x+(i+1)*1.43,FLOOR+0.08,3.4,back);
+  for(const x of [-OUTER.x,OUTER.x]) for(let i=0;i<4;i++) {
+    const z0=back+i*1.315,z1=z0+1.315;
+    b.variation=rand();
+    b.quad(point(x,FLOOR+0.04,z0),point(x,FLOOR+0.04,z1),point(x+(i%2?0.025:-0.02),3.4,z1),point(x,3.38,z0),4,1.315,2.65);
+    beam(point(x,FLOOR,z0),point(x,3.4,z0),0.04);
+  }
+  const door0=0.2,door1=1.42,win0=2.02,win1=3.58,winBottom=1.59,winTop=2.94;
+  panel(-OUTER.x,-2.75,FLOOR,3.39,front);panel(-2.75,-1.2,FLOOR,3.4,front);panel(-1.2,door0,FLOOR,3.38,front);
+  panel(door0,door1,3.0,3.43,front);panel(door1,win0,FLOOR,3.4,front);
+  panel(win0,win1,FLOOR,winBottom,front);panel(win0,win1,winTop,3.41,front);panel(win1,OUTER.x,FLOOR,3.4,front);
+  // Dark reveal, recessed uneven door planks, two metal hinges and a warm wood threshold.
+  b.box((door0+door1)/2,1.88,front-0.035,1.29,2.33,0.12,5);
+  for(let plank=0;plank<5;plank++) {
+    b.variation=rand();
+    b.box(door0+0.045+(plank+0.5)*0.222,1.85,front+0.025,0.214,2.17,0.075,12);
+  }
+  for(const x of [door0-0.025,door1+0.025]) beam(point(x,FLOOR,front+0.12),point(x,3.05,front+0.12),0.075);
+  beam(point(door0-0.06,3.04,front+0.12),point(door1+0.1,3.04,front+0.12),0.09);
+  for(const y of [1.15,2.45]) b.box(door0+0.2,y,front+0.105,0.24,0.085,0.035,5);
+  beam(point(door1-0.22,1.75,front+0.16),point(door1-0.22,1.91,front+0.16),0.035,6);
+  // Four warm divided panes sit behind broad timber jambs, never pasted onto the facade.
+  b.box((win0+win1)/2,(winBottom+winTop)/2,front-0.055,win1-win0+0.12,winTop-winBottom+0.12,0.1,5);
+  for(let row=0;row<2;row++)for(let column=0;column<2;column++) {
+    b.variation=0.2+rand()*0.6;
+    b.box(win0+(column+0.5)*(win1-win0)/2,winBottom+(row+0.5)*(winTop-winBottom)/2,front-0.01,(win1-win0)/2-0.065,(winTop-winBottom)/2-0.065,0.02,7);
+  }
+  for(const x of [win0-0.06,(win0+win1)/2,win1+0.06]) beam(point(x,winBottom-0.07,front+0.1),point(x,winTop+0.07,front+0.1),x===(win0+win1)/2?0.035:0.07);
+  for(const y of [winBottom-0.06,(winBottom+winTop)/2,winTop+0.06]) beam(point(win0-0.1,y,front+0.1),point(win1+0.1,y,front+0.1),y===(winBottom+winTop)/2?0.03:0.07);
+  b.box((win0+win1)/2,winBottom-0.12,front+0.14,1.86,0.12,0.34,0);
+
+  // A shaded under-roof backs the gaps. Broad overlapping leaves curve across each slope.
+  for(const side of [-1,1]) {
+    for(let i=0;i<14;i++) {
+      const t0=i/14,t1=(i+1)/14;
+      b.quad(point(roofX(side,t0),roofHeight(t0)-0.1,-3.16),point(roofX(side,t1),roofHeight(t1)-0.1,-3.16),point(roofX(side,t1),roofHeight(t1)-0.1,3.16),point(roofX(side,t0),roofHeight(t0)-0.1,3.16),3,1,1);
+    }
+    for(const start of [0.59,0.29,-0.025]) for(let column=0;column<7;column++) {
+      const z=-3.05+column*1.02+(rand()-0.5)*0.14;
+      const length=0.45+rand()*0.035,width=0.72+rand()*0.075, lift=0.05+rand()*0.035;
+      b.leaf((u,t)=>{
+        const along=start+length*t;
+        const spread=width*(0.37+0.63*Math.pow(Math.sin(Math.PI*t),0.7))*(1-0.91*Math.pow(t,14));
+        return point(roofX(side,along)+0.06*Math.sin(t*Math.PI+z),roofHeight(along)+lift+0.095*(1-u*u)*Math.sin(t*Math.PI)-0.045*Math.abs(u),z+u*spread+0.1*Math.sin(t*2.8+column));
+      },rand());
+    }
+  }
+  // A loose leaf awning drops over the left panel, held above the existing bench lane.
+  for(let i=0;i<4;i++) {
+    const x=-4.05+i*0.83;
+    b.leaf((u,t)=>{
+      const width=0.58*(0.75+0.25*Math.sin(t*Math.PI))*(1-0.75*Math.pow(t,12));
+      return point(x+u*width,3.62-0.72*t+0.13*Math.sin(t*Math.PI)+0.055*(1-u*u),front-0.15+t*1.26);
+    },0.35+i*0.1,14,0.04);
+  }
+  beam(point(-4.36,2.83,front+1.04),point(-4.34,3.68,front+0.08),0.04);
+  beam(point(-1.42,2.86,front+1.01),point(-1.44,3.67,front+0.06),0.04);
+
+  // Existing sitting surfaces and paths stay exactly where Muse's routines expect them.
   b.box(BENCH.x,FLOOR+BENCH.seat-0.035,BENCH.z,BENCH.half*2,0.07,BENCH.depth*2,0);
-  for(const dx of [-0.62,0.62])b.box(BENCH.x+dx,FLOOR+0.23,BENCH.z,0.1,0.42,0.32,0);
+  for(const dx of [-0.62,0.62]) b.box(BENCH.x+dx,FLOOR+0.23,BENCH.z,0.1,0.42,0.32,0);
   b.box(BENCH.x,FLOOR+0.14,BENCH.z,1.24,0.05,0.04,0);
   const chair=(x:number,y:number,z:number,w:number,h:number,d:number):void=>{
-    // The slight original chair turn is preserved in its location/footprint; broad seat is unambiguous.
-    const cx=CHAIR.x+x*Math.cos(CHAIR.turn)+z*Math.sin(CHAIR.turn);
-    const cz=CHAIR.z+z*Math.cos(CHAIR.turn)-x*Math.sin(CHAIR.turn);
+    const cx=CHAIR.x+x*Math.cos(CHAIR.turn)+z*Math.sin(CHAIR.turn),cz=CHAIR.z+z*Math.cos(CHAIR.turn)-x*Math.sin(CHAIR.turn);
     b.box(cx,y,cz,w,h,d,0);
   };
   chair(0,FLOOR+0.44,0,0.44,0.05,0.42);
   for(const x of [-0.18,0.18])for(const z of [-0.17,0.17])chair(x,FLOOR+0.21,z,0.05,0.42,0.05);
   for(const x of [-0.18,0.18])chair(x,FLOOR+0.72,-0.19,0.05,0.56,0.05);
   chair(0,FLOOR+0.86,-0.19,0.4,0.18,0.04);
-  // A low open timber guard at the back of the lookout, outside the accessible route.
-  const rz=PIER.z0+0.1;
-  for(let i=0;i<5;i++)b.box(PIER.x0+0.18+i*0.8,FLOOR+0.45,rz,0.055,0.9,0.055,0);
-  beam(new Vector3(PIER.x0+0.18,FLOOR+0.86,rz),new Vector3(PIER.x0+3.38,FLOOR+0.86,rz),0.035);
-  // One small lantern, with restrained warm color rather than bloom.
-  const lanternX=1.7+(seed%7)*0.012;
-  addSeedLantern(b,new Vector3(lanternX,2.78,front+0.22),0.28);
-  beam(new Vector3(lanternX,2.95,front+0.22),new Vector3(lanternX,3.3,front+0.22),0.018);
+  for(let i=0;i<5;i++) b.box(PIER.x0+0.18+i*0.8,FLOOR+0.45,PIER.z0+0.1,0.055,0.9,0.055,0);
+  beam(point(PIER.x0+0.18,FLOOR+0.86,PIER.z0+0.1),point(PIER.x0+3.38,FLOOR+0.86,PIER.z0+0.1),0.035);
+
+  // A repaired teal crate and open, thin-rimmed pots occupy the wall margin, off the routes.
+  b.box(-3.55,FLOOR+0.24,front+0.19,0.66,0.48,0.42,9);
+  for(const x of [-3.86,-3.25]) b.box(x,FLOOR+0.25,front+0.42,0.075,0.5,0.05,0);
+  for(const y of [FLOOR+0.08,FLOOR+0.41]) b.box(-3.55,y,front+0.43,0.72,0.065,0.05,0);
+  const pot=(x:number,z:number,height:number,radius:number):void=>{
+    const profile=[0.55,0.91,1,0.94,0.72,0.74];
+    for(let row=0;row<profile.length-1;row++)for(let k=0;k<12;k++) {
+      const a=k*Math.PI/6,c=(k+1)*Math.PI/6,y0=FLOOR+height*row/5,y1=FLOOR+height*(row+1)/5;
+      b.quad(point(x+Math.cos(a)*radius*profile[row],y0,z+Math.sin(a)*radius*profile[row]),point(x+Math.cos(c)*radius*profile[row],y0,z+Math.sin(c)*radius*profile[row]),point(x+Math.cos(c)*radius*profile[row+1],y1,z+Math.sin(c)*radius*profile[row+1]),point(x+Math.cos(a)*radius*profile[row+1],y1,z+Math.sin(a)*radius*profile[row+1]),8,1/12,height/5);
+    }
+    b.tube(Array.from({length:17},(_,i)=>point(x+Math.cos(i*Math.PI/8)*radius*0.74,FLOOR+height,z+Math.sin(i*Math.PI/8)*radius*0.74)),Array(17).fill(0.025) as number[],8,5);
+    b.box(x,FLOOR+height*0.75,z,radius*1.1,0.025,radius*1.1,5);
+  };
+  pot(3.9,front+0.12,0.48,0.23);pot(-2.92,front+0.12,0.37,0.18);
+  // A small hanging lantern has a folded paper case, separate dark ribs and a cord.
+  const centre=point(1.64,2.96,front+0.25),top=centre.clone().add(point(0,0.35,0)),bottom=centre.clone().add(point(0,-0.3,0));
+  for(let i=0;i<5;i++) {
+    const a=i*Math.PI*2/5,c=(i+1)*Math.PI*2/5;
+    const p=centre.clone().add(point(Math.cos(a)*0.14,0.04,Math.sin(a)*0.14)),q=centre.clone().add(point(Math.cos(c)*0.14,0.04,Math.sin(c)*0.14));
+    b.triangle(bottom,q,p,7);b.triangle(p,q,top,7);
+    b.tube([bottom,p,top],[0.008,0.009,0.007],0,4);
+  }
+  beam(top,point(1.64,3.5,front+0.25),0.015,6);
   return b.build();
 }
 

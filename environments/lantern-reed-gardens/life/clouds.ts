@@ -876,6 +876,14 @@ export class Clouds {
     renderer.setRenderTarget(previous);
   }
 
+  /** Choose a canonical shadow window for an explicitly settled scene.
+   * Live navigation keeps hysteresis so shadows do not shimmer between grids.
+   */
+  settle(): void {
+    this.localFace = -1;
+    this.localLevel = Number.NaN;
+  }
+
   /** Clear the faces of a cube map in sight and splat into them. */
   private renderCube(renderer: WebGLRenderer, target: WebGLCubeRenderTarget, scene: Scene, faces: readonly boolean[]): void {
     FACES.forEach((face, f) => {

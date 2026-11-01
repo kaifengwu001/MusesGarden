@@ -14,6 +14,7 @@ import { Petals } from '../../src/life/petals';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
 import { Residents } from './life/residents';
 import { CanyonScenery } from './life/canyonScenery';
+import { LanternWildlife } from './life/lanternWildlife';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
@@ -28,6 +29,7 @@ import { createGroundSample, createTerrainUniforms, generateLayout, Terrain, typ
 import { createLookUniforms } from '../../src/render/look';
 import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
+import { PoolReflection } from './render/poolReflection';
 import { localSun } from '../../src/render/sun';
 import { warpForZoom, type WarpFrame } from '../../src/render/warp';
 import { CameraRig } from './view/camera';
@@ -82,6 +84,7 @@ export class World {
   readonly queue = new BuildQueue();
   readonly growth: GrowthState = { g: 0, area: 0, radius: 128 };
   readonly sky: Sky;
+  readonly poolReflection = new PoolReflection();
   readonly surface: Surface;
   readonly bake: TerrainBake;
   readonly field: FieldMap;
@@ -94,6 +97,7 @@ export class World {
   readonly muse: Muse;
   readonly residents: Residents;
   readonly scenery: CanyonScenery;
+  readonly wildlife: LanternWildlife;
   followingResident: string | null = null;
   private heldResident: string | null = null;
   readonly petals: Petals;
@@ -163,7 +167,10 @@ export class World {
       ...this.look,
       ...this.terrainUniforms,
       ...this.cloudUniforms,
+      ...this.poolReflection.uniforms,
       uLanternDusk: { value: 0.8 },
+      uLanternLights: { value: Array.from({ length: 16 }, () => new Vector4()) },
+      uLanternLightCount: { value: 0 },
       uGustRot: { value: new Vector4(1, 0, 1, 0) },
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
@@ -188,11 +195,12 @@ export class World {
     this.residents = new Residents(this.shared);
     this.scenery = new CanyonScenery(this.shared, this.terrain);
     this.scene.add(this.scenery.group);
+    this.wildlife = new LanternWildlife(this.shared, this.terrain, this.scenery);
+    this.scene.add(this.wildlife.group);
     for (const resident of this.residents.members) {
       this.scene.add(resident.muse.mesh, resident.muse.props.group);
       this.clouds.addShadowCaster(resident.muse.shadowMesh);
     }
-    this.clouds.addShadowCaster(this.birds.shadowMesh);
     this.clouds.addShadowCaster(this.muse.shadowMesh);
     // (the float's rings on the water are the meadow's own ripples)
     this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
@@ -219,7 +227,7 @@ export class World {
     const world = this.store.values.world;
     growthState(world.growth, world.areaMin, world.areaMax, this.growth);
     this.refreshFields(false);
-    this.cameraPreset('homestead');
+    this.cameraPreset('vista');
   }
 
   /**
@@ -251,7 +259,7 @@ export class World {
       const vista = this.findVista();
       this.rig.lookAlong(vista.focus, vista.forward, immediate);
       this.rig.setZoom(vista.zoom, immediate);
-      this.rig.lookUp(Math.atan2(31, 5.2 + 31 * 31 / (2 * R)) - this.rig.framing(vista.zoom).tilt, immediate);
+      this.rig.lookUp(Math.atan2(31, 3.6 + 31 * 31 / (2 * R)) - this.rig.framing(vista.zoom).tilt, immediate);
     } else if (name === 'lakes') {
       // the nearest wetland margin (where land and water interlace), from a little above
       this.defaultPose();
@@ -270,9 +278,9 @@ export class World {
     const L = this.terrain.layout;
     const R = this.growth.radius;
     const across = new Vector3().crossVectors(L.cottage, L.homeBearing).normalize();
-    const target = travel(travel(L.cottage, across, -18 / R, new Vector3()), L.homeBearing, 17 / R, new Vector3());
+    const target = travel(travel(L.cottage, across, -23 / R, new Vector3()), L.homeBearing, 17 / R, new Vector3());
     const focus = travel(travel(L.cottage, across, -35 / R, new Vector3()), L.homeBearing, 43 / R, new Vector3());
-    return { focus, forward: tangentToward(focus, target, new Vector3()), zoom: this.rig.zoomForAltitude(6.2), score: 0 };
+    return { focus, forward: tangentToward(focus, target, new Vector3()), zoom: this.rig.zoomForAltitude(4.6), score: 0 };
   }
 
   onParams(changed: ReadonlySet<ParamPath>): void {
@@ -296,6 +304,7 @@ export class World {
   private refreshFields(full: boolean): void {
     const L = this.terrain.layout;
     const R = this.growth.radius;
+    const samplingChanged = full !== this.fieldsFull;
     this.fieldsR = R;
     this.fieldsKey = this.fieldKey;
     this.fieldsLayout = L;
@@ -305,6 +314,13 @@ export class World {
     this.bake.bake(this.renderer, this.terrain.fields, `${L.seed}/${R}/${this.fieldKey}`, full);
     this.terrainUniforms.uTerrainBake.value = this.bake.terrainTexture(full);
     this.terrainUniforms.uFloraBake.value = this.bake.floraTexture(full);
+    // Quick and full bakes use different finite-difference steps at the banks.
+    // Re-ground cached scenery and resolve animal homes when that step changes,
+    // even if the planet radius has already stopped moving.
+    if (samplingChanged) {
+      this.scenery?.invalidate();
+      this.wildlife?.invalidate();
+    }
   }
 
   private refreshFieldParams(): void {
@@ -322,6 +338,7 @@ export class World {
     };
     this.fieldKey = JSON.stringify(this.fieldParams);
     this.scenery?.invalidate();
+    this.wildlife?.invalidate();
   }
 
   update(clock: FrameClock, aspect: number, viewportHeight: number): void {
@@ -340,6 +357,7 @@ export class World {
     } else if (!this.fieldsFull && ++this.fieldsStill >= 6) this.refreshFields(true);
 
     this.scenery.update(clock.time, this.terrain);
+    this.wildlife.update(clock.time, this.terrain);
     this.residents.update(clock.time, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     if (this.followingResident) this.frameResident(this.followingResident, false);
 
@@ -382,8 +400,10 @@ export class World {
     this.field.radiusMeters = Math.max(grassNear, flowerNear, 8) + 6;
     this.nearFieldDrawn = grassNear > 0.5 || flowerNear > 0.5;
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
-    this.birds.update(clock.time, this.terrain);
-    this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
+    // This habitat has its own fauna; alpine birds and butterflies are not part of its ecology.
+    this.birds.mesh.visible = false;
+    this.birds.shadowMesh.visible = false;
+    this.butterflies.mesh.visible = false;
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
@@ -480,6 +500,17 @@ export class World {
     }
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
+  }
+
+  renderPoolReflection(): void {
+    // While the radius is changing, use the same inexpensive sky/bank mirror
+    // as the wider planet. The full scene mirror returns with the settled bake.
+    if (!this.fieldsFull) {
+      this.poolReflection.uniforms.uPoolMirrorStrength.value = 0;
+      return;
+    }
+    this.poolReflection.render(this.renderer, this.scene, this.rig.camera, this.terrain, this.warp, this.rig.zoom,
+      [this.scenery.group, this.homestead.group, this.wildlife.group, this.muse.mesh, ...this.residents.members.map(resident => resident.muse.mesh)]);
   }
 
   /**
@@ -680,6 +711,7 @@ export class World {
     this.band.settle();
     this.queue.drain();
     this.rig.settle();
+    this.clouds.settle();
     growthState(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax, this.growth);
     this.refreshFields(true);
   }

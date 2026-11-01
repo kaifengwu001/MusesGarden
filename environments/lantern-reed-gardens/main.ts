@@ -96,6 +96,7 @@ async function boot(): Promise<void> {
   if (import.meta.env.DEV || import.meta.env.VITE_PROBE) (window as unknown as { __world: World }).__world = world;
   const camera = world.rig.camera;
   const post = new Post(renderer);
+  post.bloomStrength = 0.32;
   post.bloomEnabled = quality.tier.bloom;
   const gpuTimer = new GpuTimer(gl);
   const stats = createFrameStats();
@@ -127,8 +128,7 @@ async function boot(): Promise<void> {
       } else {
         userPosed = false;
         world.defaultPose();
-        world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0, true);
-        world.rig.lookUp(0);
+        if (store.values.view.mode === 'overview') { world.rig.setZoom(0, true); world.rig.lookUp(0); }
       }
     },
   });
@@ -145,8 +145,6 @@ async function boot(): Promise<void> {
       store.reset();
       userPosed = false;
       world.defaultPose();
-      world.rig.setZoom(0);
-      world.rig.lookUp(0);
     },
     reroll: () => store.set('world.seed', Math.floor(Math.random() * 10000)),
     vista: () => {
@@ -308,6 +306,7 @@ async function boot(): Promise<void> {
 
   const render = (): void => {
     renderer.info.reset();
+    world.renderPoolReflection();
     post.render(world.scene, camera, store.values.style.grain, store.values.style.contrast, store.values.style.brightness);
   };
 
@@ -394,7 +393,9 @@ async function boot(): Promise<void> {
     entry.buildMs = world.queue.lastMs;
     logHead = (logHead + 1) % LOG;
     logCount = Math.min(logCount + 1, LOG);
-    quality.locked = clock.frozen; // never change resolution under a deterministic capture
+    // High is the full-resolution art preview; Auto may trade resolution for frame rate.
+    // Frozen captures keep their explicitly requested scale for deterministic tests.
+    quality.locked = clock.frozen || quality.choice === 'high';
     const change = quality.observe(clock.frameMs);
     if (change === 'tier') {
       world.applyTier(quality.tier);

@@ -95,6 +95,15 @@ void main() {
     m.pixelMeters = pixelMeters;
     m.nearFade = nearFade;
     land = meadowPaint(m);
+    if (uLanternDusk > 0.1 && pixelMeters < 0.2) {
+      float lampLight = 0.0;
+      for (int i=0;i<16;i++) {
+        if (i>=uLanternLightCount) break;
+        vec3 delta=dir*(uRadius+max(h,0.0))-uLanternLights[i].xyz;
+        lampLight+=exp(-dot(delta,delta)/13.0)*uLanternLights[i].w;
+      }
+      land+=vec3(0.2,0.095,0.018)*min(lampLight,1.8)*uLanternDusk;
+    }
     // the bank's face: where the turf drops to the water it is steep, and in its own shade. The
     // slope is taken per pixel (the height's screen derivatives over the position's, in the
     // ground's tangent plane), so a steep bank's face follows the shore, not the mesh's triangles
