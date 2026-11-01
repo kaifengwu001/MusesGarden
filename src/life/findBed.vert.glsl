@@ -37,13 +37,12 @@ uniform vec4 uBedLook; // stem top (m), nod, -, -
 centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
 
 // A flower landing: how long its sway runs (s), how fast it spreads (aDelay's units a second), how far it bows a
-// plant; how long the hero settles (s), and how a hero in focus stands (m up, times larger).
+// plant; how long the hero settles (s). How a hero in focus stands (FOCUS_LIFT m up, FOCUS_SIZE times larger,
+// nodding FOCUS_NOD rad) comes from findBeds.ts, which places the basket's flower where its hero stands.
 const float LAND_RING = 1.1;
 const float LAND_SPEED = 1.6;
 const float LAND_BOW = 0.45;
 const float LAND_SETTLE = 0.25;
-const float FOCUS_LIFT = 0.08;
-const float FOCUS_SIZE = 1.35;
 
 float rnd(float s, float k) {
   return fract(sin(s * 78.233 + k * 12.9898) * 43758.5453);
@@ -111,10 +110,11 @@ void main() {
   float strength = uWindVec.w;
   vec3 shared = inside > 0.5 ? wind.xyz : windDir(dir) * strength * (0.18 + 0.42 * strength);
   vec3 bend = windPlant(dir, shared, rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
-  if (landing > 0.0) {
-    // a ring running out from the middle, bowing each plant it passes downwind, fading as it goes
+  if (landing > 0.0 && !hero) {
+    // a ring running out from the middle, bowing each plant it passes downwind, fading as it goes; it builds
+    // from nothing as the flower touches down (the hero only settles: it stands where its flower came down)
     float off = delay - since * LAND_SPEED;
-    bend += windDir(dir) * (LAND_BOW * exp(-off * off / 0.018) * landing * (1.0 - 0.5 * clamp(delay / 0.85, 0.0, 1.0)));
+    bend += windDir(dir) * (LAND_BOW * exp(-off * off / 0.018) * landing * smoothstep(0.0, 0.12, since) * (1.0 - 0.5 * clamp(delay / 0.85, 0.0, 1.0)));
   }
   float stemTop = uBedLook.x;
   vec3 base = dir * (uRadius + aPlace.w - 0.02 + 0.22 * find.lift);
@@ -131,6 +131,8 @@ void main() {
     vec3 axis = wl > 1e-4 ? normalize(vec3(w.z, 0.0, -w.x)) : vec3(1.0, 0.0, 0.0);
     float flutter = sin(uGust.x * (7.0 + 3.0 * rnd(seed, 7.0)) + seed * 31.0) * 0.08 * (0.3 + uWindVec.w);
     float nod = uBedLook.y * mix(0.4, 1.0, open) + 0.6 * wl + flutter;
+    // a hero in focus nods slowly on its own, so the eye finds it among its patch
+    if (shown) nod += focus * FOCUS_NOD * sin(uPlantClock * 2.3);
     head = rotateAxis(head, axis, nod);
     vec3 top = base + up * (stemTop * stemScale * (1.0 - 0.25 * min(dot(bend, bend), 1.0))) + bend * (stemTop * stemScale);
     world = top + side * (head.x * scale) + up * (head.y * scale) + fwd * (head.z * scale);
@@ -165,9 +167,13 @@ void main() {
   float head = step(0.5, aPart);
   col = mix(col, col * 0.85 + findMarkTint() * 0.22, find.mark * mix(0.3, 0.5, head));
   col = mix(col, col * 1.12 + 0.025, find.open * head);
-  // under the pointer, coming home or in focus: glowing in the warm light, the heads most
+  // under the pointer, coming home or in focus: lit up, the heads most, their own colour made more vivid in a
+  // touch of warm light (a blend toward the light's pale colour washed them out to cream)
   float lit = max(max(find.lift, findPulse(find)), focus);
-  col = mix(col, mix(col * 1.35 + 0.08, findGlow(), 0.45), lit * mix(0.45, 1.0, head));
+  vec3 vivid = max(mix(vec3(luma(col)), col, 2.0) * 1.06, 0.0) + findGlow() * 0.03;
+  col = mix(col, vivid, lit * mix(0.45, 1.0, head));
+  // and a hero in focus has its petals' edges caught in the light, as if lit from behind
+  if (shown) col += findGlow() * (0.4 * focus * head * smoothstep(0.02, 0.07, length(local.xz)));
 
   vec3 wp = warpPosition(world);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);

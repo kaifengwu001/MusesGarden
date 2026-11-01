@@ -176,7 +176,9 @@ export function paintFlower(shape: Shape, hero: HeroLook, light: Light): Float32
     const head = part > 0.5 ? 1 : 0;
     col = mix(col, plus(scale(col, 0.85), scale(markTint, 0.22)), hero.mark * (0.3 + 0.2 * head));
     col = mix(col, add(scale(col, 1.12), 0.025), hero.open * head);
-    col = mix(col, mix(add(scale(col, 1.35), 0.08), glow, 0.45), hero.lit * (0.45 + 0.55 * head));
+    const l = 0.2126 * col[0] + 0.7152 * col[1] + 0.0722 * col[2];
+    const vivid = col.map((x, c) => Math.max((l + (x - l) * 2.0) * 1.06, 0) + glow[c] * 0.03) as unknown as Rgb;
+    col = mix(col, vivid, hero.lit * (0.45 + 0.55 * head));
     const c = graded(aerial(light, col, distance, hero.dir), light);
     out.set(c, i * 3);
   }

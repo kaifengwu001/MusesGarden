@@ -78,9 +78,16 @@ describe('a flower painted as its patch paints its hero', () => {
     expect(brightness(lit)).toBeGreaterThan(brightness(dark) + 0.3);
   });
 
-  it('glows brighter when lit, and takes the basket’s cool tint when marked', () => {
+  it('turns more vivid when lit (never paler), and takes the basket’s cool tint when marked', () => {
     const plain = paint(3).head;
-    expect(brightness(paint(3, { lit: 1 }).head)).toBeGreaterThan(brightness(plain) + 0.2);
+    const chroma = (c: Rgb): number => Math.max(...c) - Math.min(...c);
+    for (const s of [0, 2, 3] as const) {
+      const before = paint(s).head;
+      const lit = paint(s, { lit: 1 }).head;
+      expect(chroma(lit), `species ${s}`).toBeGreaterThan(chroma(before) + 0.05);
+      // not washed out: no more white in it than before
+      expect(Math.min(...lit), `species ${s}`).toBeLessThanOrEqual(Math.min(...before) + 0.02);
+    }
     // the mark pulls the blue toward its pale lilac: redder, and no bluer
     const marked = paint(3, { mark: 1 }).head;
     expect(marked[0]).toBeGreaterThan(plain[0]);

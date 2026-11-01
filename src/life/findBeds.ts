@@ -61,8 +61,11 @@ const SEEN_BELOW = 88;
 const SWAP = [72, 88] as const;
 /** A pulse lasts this long (s). */
 const PULSE = 1.4;
-/** The picked basket's patches and spheres stand this much larger. */
+/** The picked basket's patches and spheres stand this much larger; a hero in focus stands this much higher (m) and larger, and nods this far (rad). */
 const MARK_SIZE = 1.3;
+const FOCUS_LIFT = 0.12;
+const FOCUS_SIZE = 1.55;
+const FOCUS_NOD = 0.14;
 
 export interface BedLook {
   readonly bed: Bed;
@@ -133,7 +136,15 @@ export class FindBeds {
     this.state = { value: stateTexture(this.table) };
     gpuMemory.set('find state', this.table.data.byteLength);
     const uniforms = { ...shared, uFinds: this.state, uPlantClock: this.clock };
-    const defines = { FIND_PER_ROW: PER_ROW, FIND_PULSE: PULSE.toFixed(2), MARK_SIZE: MARK_SIZE.toFixed(2), BED_SPAN: (2 * BED_RADIUS).toFixed(2) };
+    const defines = {
+      FIND_PER_ROW: PER_ROW,
+      FIND_PULSE: PULSE.toFixed(2),
+      MARK_SIZE: MARK_SIZE.toFixed(2),
+      BED_SPAN: (2 * BED_RADIUS).toFixed(2),
+      FOCUS_LIFT: FOCUS_LIFT.toFixed(2),
+      FOCUS_SIZE: FOCUS_SIZE.toFixed(2),
+      FOCUS_NOD: FOCUS_NOD.toFixed(2),
+    };
     SPECIES_MESH.forEach((make, species) => {
       const geometry = make();
       geometry.instanceCount = 0;
