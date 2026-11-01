@@ -51,7 +51,8 @@ async function buildBackend(): Promise<Backend> {
 const backend = await buildBackend();
 const port = Number(process.env.MUSE_PORT ?? 8787);
 const server = createServer(createApp(backend));
-const clock = startLiveClock({ tick: backend.tick, now: backend.now });
+// Wall time, not the engine's: ticking to the engine's own now would never move it.
+const clock = startLiveClock({ tick: backend.tick });
 
 server.listen(port, () => console.info(`Muse garden API (${backend.name}) on http://localhost:${port}/api`));
 
