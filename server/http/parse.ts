@@ -116,7 +116,7 @@ export function lastEventId(raw: string | string[] | undefined): number | null {
   throw bad('Last-Event-ID must be a whole number');
 }
 
-const reactionType = oneOf('type', ['like-find', 'like-postcard', 'share-interest', 'use-invitation']);
+const reactionType = oneOf('type', ['like-find', 'like-postcard', 'share-interest', 'share-find', 'use-invitation']);
 
 /** A reaction from the garden. Its id names a find, a postcard or an interest: any printable text, looked up, never parsed. */
 export function reaction(body: unknown): Reaction {
@@ -128,6 +128,7 @@ export function reaction(body: unknown): Reaction {
     case 'like-postcard':
       return { type, id: raw, liked: flag(field(body, 'liked'), 'liked') };
     case 'share-interest':
+    case 'share-find':
       return { type, id: raw, shared: flag(field(body, 'shared'), 'shared') };
     case 'use-invitation':
       return { type, id: raw };

@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { BED_RADIUS, bedAt, layOut, type PlacementGround } from '../../garden/placement';
 import { dayBefore, placeholderSnapshot, placeholderSource } from '../../garden/placeholder';
 import { httpSource } from '../../garden/source';
-import type { Basket, Find } from '../../garden/types';
 import { GardenState } from '../../garden/state';
+import type { Basket, Find, GardenSnapshot } from '../../garden/types';
 import { angleBetween } from '../../planet/geo';
 import type { FieldParams } from '../../planet/fields';
 import { createGroundSample, generateLayout, Terrain, type GroundSample } from '../../planet/terrain';
@@ -37,7 +37,7 @@ function seaWorld(radius = 128): PlacementGround {
 /** A find found at a place (a direction, normalized by placement), in a basket of that day. */
 function found(id: string, day: string, place: readonly [number, number, number] | undefined): { basket: Basket; find: Find } {
   const basket: Basket = { id: `b-${id}`, day, finds: [id] };
-  const find: Find = { id, basket: basket.id, topic: 'ferns', media: { kind: 'post', url: 'https://example.com', source: 'Example' }, ...(place ? { place } : {}) };
+  const find: Find = { id, basket: basket.id, topic: 'ferns', media: { kind: 'post', url: 'https://example.com', source: 'Example' }, shared: true, ...(place ? { place } : {}) };
   return { basket, find };
 }
 
@@ -236,6 +236,104 @@ describe('the garden’s state', () => {
     source.push({ type: 'status', status: { home: false } });
     expect(state.status.home).toBe(false);
     expect(changes).toEqual(['postcards', 'baskets', 'status']);
+  });
+});
+
+describe('likes and sharing, kept by the backend', () => {
+  /** A backend that keeps likes: the placeholders with every like answered. */
+  function keeping(): { snapshot: GardenSnapshot; source: ReturnType<typeof placeholderSource> } {
+    const s = placeholderSnapshot(NOW);
+    const snapshot = { ...s, finds: s.finds.map((f) => ({ ...f, liked: false })), postcards: s.postcards.map((p) => ({ ...p, liked: false })) };
+    const source = placeholderSource();
+    source.load = () => Promise.resolve(snapshot);
+    return { snapshot, source };
+  }
+
+  /** localStorage for one test: the garden remembers in it, as in a browser. */
+  function browserStorage(): void {
+    const items = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (k: string) => items.get(k) ?? null, setItem: (k: string, v: string) => items.set(k, v) });
+  }
+
+  it('shows a flip at once, holds it until the backend sends it back, then follows the backend', async () => {
+    const { snapshot, source } = keeping();
+    const state = new GardenState(source);
+    await state.start();
+    const find = state.find(state.browseOrder[0])!;
+    const basket = state.basket(find.basket)!;
+    const resend = (change: Partial<Find>) =>
+      source.push({ type: 'basket', basket, finds: snapshot.finds.filter((f) => f.basket === basket.id).map((f) => (f.id === find.id ? { ...f, ...change } : f)) });
+    const seen = () => [state.liked(find.id), state.findShared(find.id), state.likedFindIds.includes(find.id)];
+
+    expect(seen()).toEqual([false, true, false]);
+    expect(state.toggleLike(find.id)).toBe(true);
+    state.shareFind(find.id, false);
+    expect(seen()).toEqual([true, false, true]);
+    resend({});
+    expect(seen(), 'the backend has not caught up yet').toEqual([true, false, true]);
+    resend({ liked: true, shared: false });
+    resend({ liked: false, shared: true });
+    expect(seen(), 'changed elsewhere, after it answered').toEqual([false, true, false]);
+  });
+
+  it('a basket sent again only updates its finds: the garden hears of likes, not of a basket arriving', async () => {
+    const { snapshot, source } = keeping();
+    const state = new GardenState(source);
+    await state.start();
+    const changes: string[] = [];
+    state.subscribe((c) => changes.push(c));
+    const basket = state.baskets[0];
+    const finds = snapshot.finds.filter((f) => f.basket === basket.id);
+    source.push({ type: 'basket', basket, finds: finds.map((f, i) => (i === 0 ? { ...f, liked: true } : f)) });
+    expect(state.liked(finds[0].id)).toBe(true);
+    source.push({ type: 'basket', basket: { ...basket, finds: [...basket.finds, 'f-more'] }, finds: [...finds, { ...finds[0], id: 'f-more' }] });
+    source.push({ type: 'basket', basket: { id: 'b-new', day: '2099-01-01', finds: ['f-new'] }, finds: [{ ...finds[0], id: 'f-new', basket: 'b-new' }] });
+    expect(changes).toEqual(['likes', 'baskets', 'baskets']);
+  });
+
+  it('a reload shows what the backend keeps, not what this browser saw', async () => {
+    browserStorage();
+    const { source } = keeping();
+    const first = new GardenState(source);
+    await first.start();
+    const find = first.browseOrder[0];
+    first.toggleLike(find);
+    first.toggleCardLike('pc-terrace');
+    first.setShared('noodles', true);
+    const again = new GardenState(source);
+    await again.start();
+    expect([again.liked(find), again.cardLiked('pc-terrace'), again.interest('noodles')?.shared]).toEqual([false, false, false]);
+    vi.unstubAllGlobals();
+  });
+
+  it('without a backend that keeps likes, this browser remembers them, as before', async () => {
+    browserStorage();
+    const first = new GardenState(placeholderSource());
+    await first.start();
+    const find = first.browseOrder[0];
+    first.toggleLike(find);
+    first.toggleCardLike('pc-terrace');
+    const again = new GardenState(placeholderSource());
+    await again.start();
+    expect([again.liked(find), again.likedFindIds, again.cardLiked('pc-terrace')]).toEqual([true, [find], true]);
+    vi.unstubAllGlobals();
+  });
+
+  it('goes back to what the backend holds when it turns a flip down', async () => {
+    const { source } = keeping();
+    source.react = () => Promise.reject(new Error('404'));
+    const state = new GardenState(source);
+    await state.start();
+    const changes: string[] = [];
+    state.subscribe((c) => changes.push(c));
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(state.toggleCardLike('pc-terrace')).toBe(true);
+    state.shareFind(state.browseOrder[0], false);
+    expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([true, false]);
+    await Promise.resolve();
+    expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([false, true]);
+    expect(changes).toEqual(['postcards', 'finds', 'postcards', 'finds']);
+    vi.restoreAllMocks();
   });
 });
 

@@ -17,7 +17,7 @@ export interface GardenSource {
   load(): Promise<GardenSnapshot>;
   /** Called with each thing that arrives while the garden is open; returns the way to stop listening. */
   subscribe(listener: (event: GardenEvent) => void): () => void;
-  /** Tell Muse what you did. Fire and forget: the garden has already shown it. */
+  /** Tell Muse what you did. The garden has already shown it; a rejection means the backend turned it down. */
   react(reaction: Reaction): Promise<void>;
 }
 
@@ -43,12 +43,13 @@ export function httpSource(base: string): GardenSource {
       return () => events.close();
     },
     async react(reaction) {
-      await fetch(`${root}/garden/reactions`, {
+      const response = await fetch(`${root}/garden/reactions`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(reaction),
       });
+      if (!response.ok) throw new Error(`garden: ${response.status} from ${root}/garden/reactions`);
     },
   };
 }

@@ -189,7 +189,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
       const area = b.at[i];
       const n = foundAt.get(area) ?? 0;
       foundAt.set(area, n + 1);
-      const find: Find = { id: `${id}-${i}`, basket: id, topic, media, place: foundNear(area, n) };
+      const find: Find = { id: `${id}-${i}`, basket: id, topic, media, place: foundNear(area, n), shared: topics.get(topic)?.shared ?? true };
       finds.push(find);
       return find.id;
     });

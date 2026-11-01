@@ -45,6 +45,7 @@ const day = (at: number) => localDay(at, 'America/Los_Angeles');
 function sampleGarden(): GardenSnapshot {
   const topicOf = new Map(sampleWorld.plants.map((p) => [p.id as string, p.topic]));
   const shared = new Set(sampleSharing.interests.filter((i) => !i.hidden).map((i) => i.topic as string));
+  const hiddenFinds = new Set(sampleSharing.finds.filter((f) => f.hidden).map((f) => f.id as string));
   const placed = new Set<string>();
   const baskets = [...sampleBaskets.items].reverse().map((b) => {
     const cards = b.items.filter((c) => !placed.has(c.id));
@@ -59,6 +60,7 @@ function sampleGarden(): GardenSnapshot {
       media: { kind: 'article', url: c.url, source: 'en.wikipedia.org', title: c.title, text: c.summary, image: c.thumb },
       note: c.reason,
       place: c.place.dir,
+      shared: !hiddenFinds.has(c.id),
     })),
   );
   const topics = [...new Set([...sampleMind.interests.map((i) => i.topic as string), ...finds.map((f) => f.topic)])];

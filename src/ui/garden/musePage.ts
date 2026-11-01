@@ -1,5 +1,5 @@
 import type { GardenState } from '../../garden/state';
-import { agoPhrase, el, shortDate } from './dom';
+import { agoPhrase, el, shortDate, toggle } from './dom';
 import { topicColour } from './findCard';
 import { ICONS } from './icons';
 import { Sheet } from './sheet';
@@ -27,29 +27,6 @@ function readPrefs(): Record<string, boolean> {
   } catch {
     return {};
   }
-}
-
-function toggle(label: string, on: boolean, onChange: (on: boolean) => void, words?: [string, string]): HTMLLabelElement {
-  const row = el('label', 'g-toggle');
-  const input = el('input');
-  input.type = 'checkbox';
-  input.checked = on;
-  input.setAttribute('role', 'switch');
-  const track = el('span', 'g-switch');
-  const text = el('span', words ? 'g-toggle-label g-sr' : 'g-toggle-label', label);
-  row.append(text);
-  if (words) {
-    const state = el('span', 'g-toggle-state');
-    const paint = (): void => {
-      state.innerHTML = `${input.checked ? ICONS.share : ICONS.lock}<span>${input.checked ? words[0] : words[1]}</span>`;
-    };
-    paint();
-    input.addEventListener('change', paint);
-    row.append(state);
-  }
-  row.append(input, track);
-  input.addEventListener('change', () => onChange(input.checked));
-  return row;
 }
 
 export class MuseSheet extends Sheet {

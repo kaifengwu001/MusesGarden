@@ -854,6 +854,17 @@
   height: 13px;
 }
 
+.g-card-share {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.g-card-share .g-toggle-state {
+  min-width: 0;
+  font-size: 12.5px;
+}
+
 .g-step {
   appearance: none;
   position: absolute;
