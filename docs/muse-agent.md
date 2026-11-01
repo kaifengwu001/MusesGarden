@@ -487,7 +487,7 @@ The code is split by domain, not by pipeline phase.
 
 ```
 src/muse/contract.ts        types only: events, state, plans, social states, Candidate, Discovery, PhotoSpec, PublicProfile, ports, API shapes
-src/muse/ui/                DOM overlay (frontend track)
+src/muse/ui/                dev tools (?dev) and the engine's hold on the 3D Muse; the garden's interface is src/ui/garden/
 server/domain/              pure: rng, state (reduce), interests, reflection, atlas (topics → regions, fog, unlocks), shelf, profile, renders
 server/domain/policy/       constants, life (next activity, rest budget, work pause), travel (trip start, topic pick, hops, keep), photo, basket
 server/domain/social/       relationships (statechart, familiarity, endings), encounters, hangouts (budget, closeness, gifts), invitations (statechart), access
