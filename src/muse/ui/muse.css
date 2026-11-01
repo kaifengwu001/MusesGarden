@@ -1,4 +1,4 @@
-/* The Muse overlay. Built on the tokens in src/ui/style.css: paper cards, serif italic labels, pill buttons. */
+/* The Muse dev tools (?dev). Built on the tokens in src/ui/style.css: paper cards, serif italic labels, pill buttons. */
 
 .mu {
   --mu-panel: rgba(251, 248, 238, 0.9);
@@ -8,7 +8,6 @@
   --mu-line: rgba(62, 58, 54, 0.1);
   /* Under the masthead: its title (font size × 0.9) and world line, then a little air. */
   --mu-top: calc(var(--gutter) * 0.85 + clamp(44px, 6.6vw, 104px) * 0.9 + clamp(13px, 1.05vw, 16px) * 2.3 + 18px);
-  --mu-bottom: calc(var(--gutter) * 0.6);
   font-family: var(--font-ui);
   color: var(--ink);
 }
@@ -27,9 +26,7 @@ body.postcard .mu {
   display: none;
 }
 
-.mu-btn,
-.mu-tab,
-.mu-switch {
+.mu-btn {
   appearance: none;
   border: 0;
   border-radius: 999px;
@@ -46,9 +43,7 @@ body.postcard .mu {
   transition: background 0.15s ease;
 }
 
-.mu-btn:hover,
-.mu-tab:hover,
-.mu-switch:hover {
+.mu-btn:hover {
   background: rgba(62, 58, 54, 0.12);
 }
 
@@ -128,699 +123,12 @@ body.postcard .mu {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- status pill --------------------------------------------------------- */
-
-.mu-status {
-  position: fixed;
-  left: var(--gutter);
-  top: var(--mu-top);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100vw - 2 * var(--gutter));
-  padding: 6px 7px 6px 14px;
-  border-radius: 999px;
-  background: var(--card);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  backdrop-filter: blur(14px) saturate(1.1);
-  box-shadow: var(--mu-shadow);
-  font-size: 13px;
-}
-
-.mu-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--mu-green);
-  box-shadow: 0 0 0 3px rgba(79, 143, 52, 0.18);
-}
-
-.mu-dot[data-activity='rest'],
-.mu-dot[data-activity='sleep'] {
-  background: var(--mu-blue);
-  box-shadow: 0 0 0 3px rgba(46, 110, 158, 0.16);
-}
-
-.mu-dot[data-activity='beyond'] {
-  background: #8a6fb0;
-  box-shadow: 0 0 0 3px rgba(138, 111, 176, 0.18);
-}
-
-.mu-dot[data-activity='visit'],
-.mu-visit .mu-dot {
-  background: #d08a3c;
-  box-shadow: 0 0 0 3px rgba(208, 138, 60, 0.18);
-}
-
-.mu-dot[data-activity='work'] {
-  background: var(--coral);
-  box-shadow: 0 0 0 3px rgba(224, 90, 79, 0.16);
-}
-
-.mu-name {
-  font-family: var(--font-serif);
-  font-size: 16px;
-  font-weight: 420;
-  letter-spacing: -0.005em;
-}
-
-.mu-label {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mu-reason {
-  padding-right: 8px;
-  font-size: 11.5px;
-  color: var(--ink-soft);
-}
-
-.mu-tag {
-  flex: none;
-  padding: 2px 8px;
-  white-space: nowrap;
-  border: 1px dashed rgba(62, 58, 54, 0.3);
-  border-radius: 999px;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.mu-toast {
-  position: fixed;
-  left: var(--gutter);
-  top: calc(var(--mu-top) + 50px);
-  margin: 0;
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: var(--card);
-  box-shadow: var(--mu-shadow);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-}
-
-/* ---- pins ---------------------------------------------------------------- */
-
-.mu-pins {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Over the pins layer (which follows them in tab order). */
-.mu-status,
-.mu-dock,
-.mu-toast {
-  z-index: 2;
-}
-
-.mu-pin {
-  position: absolute;
-  left: 0;
-  top: 0;
-  will-change: transform;
-  transition: opacity 0.4s ease;
-}
-
-.mu-pin.mu-off {
-  opacity: 0;
-  pointer-events: none !important;
-}
-
-.mu-muse-mark {
-  position: absolute;
-  left: -7px;
-  top: -7px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--ink);
-  box-sizing: border-box;
-  box-shadow: 0 2px 8px rgba(28, 40, 60, 0.3);
-}
-
-.mu-muse-mark::after {
-  content: '';
-  position: absolute;
-  inset: -7px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(251, 248, 238, 0.85);
-  animation: mu-ripple 2.8s ease-out infinite;
-}
-
-@keyframes mu-ripple {
-  from {
-    transform: scale(0.5);
-    opacity: 1;
-  }
-  to {
-    transform: scale(1.8);
-    opacity: 0;
-  }
-}
-
-.mu-muse-name {
-  position: absolute;
-  left: 0;
-  bottom: 14px;
-  transform: translateX(-50%);
-  padding: 2px 9px 3px;
-  border-radius: 999px;
-  background: var(--card);
-  box-shadow: 0 2px 10px rgba(28, 40, 60, 0.16);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.mu-muse.working .mu-muse-mark {
-  border-color: var(--coral);
-}
-
-.mu-muse.working .mu-muse-name::after {
-  content: ' · laptop out';
-  color: var(--ink-soft);
-}
-
-/* An object Muse collected: a quiet glint until the renderer draws the object itself. The button is
-   the hit area; the glint is what shows. */
-.mu-plant {
-  width: 26px;
-  height: 26px;
-  margin: -13px 0 0 -13px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.mu-glint {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 9px;
-  height: 9px;
-  margin: -4.5px 0 0 -4.5px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fffdf3 0 34%, rgba(255, 238, 186, 0.75) 58%, rgba(255, 238, 186, 0) 76%);
-  /* a hairline of ink keeps it visible on pale grass */
-  box-shadow:
-    0 0 0 1px rgba(62, 58, 54, 0.16),
-    0 0 8px 3px rgba(255, 246, 214, 0.55);
-  animation: mu-twinkle 4s ease-in-out infinite;
-  transition: scale 0.2s ease;
-}
-
-@keyframes mu-twinkle {
-  50% {
-    opacity: 0.6;
-  }
-}
-
-.mu-plant:hover .mu-glint,
-.mu-plant:focus-visible .mu-glint {
-  scale: 1.6;
-  animation-play-state: paused;
-}
-
-.mu-plant.mu-glow .mu-glint {
-  animation: mu-glow 1.1s ease-in-out 3;
-}
-
-@keyframes mu-glow {
-  50% {
-    scale: 2.6;
-    box-shadow: 0 0 14px 6px rgba(255, 246, 214, 0.8);
-  }
-}
-
-.mu-plant.mu-private {
-  cursor: default;
-  pointer-events: none;
-}
-
-.mu-private .mu-glint {
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
-  background: rgba(251, 248, 238, 0.7);
-  box-shadow: none;
-  animation: none;
-}
-
-.mu-preview {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 4px);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 220px;
-  padding: 10px 12px 11px;
-  border-radius: 12px;
-  background: var(--paper);
-  box-shadow: 0 8px 26px rgba(28, 40, 60, 0.22);
-  color: var(--ink);
-  text-align: left;
-  translate: -50% 0;
-  pointer-events: none;
-}
-
-.mu-preview-thumb {
-  width: 100%;
-  height: 92px;
-  margin-bottom: 4px;
-  border-radius: 7px;
-  object-fit: cover;
-}
-
-.mu-preview .mu-title {
-  font-size: 16px;
-}
-
-.mu-preview .mu-quote {
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-
-/* ---- dock and panels ----------------------------------------------------- */
-
-.mu-dock {
-  position: fixed;
-  right: calc(var(--gutter) * 0.6);
-  bottom: var(--mu-bottom);
-  display: flex;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 999px;
-  background: var(--card);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  backdrop-filter: blur(14px) saturate(1.1);
-  box-shadow: var(--mu-shadow);
-}
-
-.mu-dock-btn[aria-expanded='true'] {
-  background: rgba(62, 58, 54, 0.14);
-}
-
-.mu-badge {
-  display: inline-block;
-  min-width: 16px;
-  margin-left: 6px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--coral);
-  color: #fff;
-  font-family: var(--font-ui);
-  font-style: normal;
-  font-size: 10px;
-  line-height: 16px;
-  text-align: center;
-}
-
-.mu-panel {
-  position: fixed;
-  right: calc(var(--gutter) * 0.6);
-  bottom: calc(var(--mu-bottom) + 58px);
-  display: flex;
-  flex-direction: column;
-  width: min(420px, calc(100vw - 2 * var(--gutter)));
-  max-height: min(68vh, 660px);
-  border-radius: 16px;
-  background: var(--mu-panel);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
-  backdrop-filter: blur(16px) saturate(1.1);
-  box-shadow: 0 14px 44px rgba(28, 60, 96, 0.2);
-  outline: none;
-  /* over the lil-gui parameter panel (z-index 1001) while open */
-  z-index: 1002;
-}
-
-.mu-panel-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 12px;
-  padding: 16px 18px 12px;
-}
-
-.mu-panel-title {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-weight: 340;
-  font-size: 24px;
-  letter-spacing: -0.015em;
-}
-
-.mu-panel-sub {
-  margin: 0;
-  flex-basis: 100%;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-
-.mu-panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-bottom: 6px;
-}
-
-.mu-tabs {
-  display: flex;
-  gap: 2px;
-}
-
-.mu-tab {
-  background: none;
-  color: var(--ink-soft);
-}
-
-.mu-tab[aria-selected='true'] {
-  background: rgba(62, 58, 54, 0.08);
-  color: var(--ink);
-}
-
-/* ---- cards --------------------------------------------------------------- */
-
-.mu-basket-head {
-  margin: 4px 18px 8px;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-
-.mu-strip {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding: 0 18px;
-  padding: 4px 18px 16px;
-  scrollbar-width: thin;
-}
-
-.mu-card {
-  flex: 0 0 252px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  scroll-snap-align: start;
-  border-radius: 12px;
-  background: var(--paper);
-  box-shadow:
-    0 1px 0 rgba(62, 58, 54, 0.06),
-    0 6px 18px rgba(28, 60, 96, 0.1);
-  color: var(--ink);
-  text-decoration: none;
-  transition: translate 0.18s ease;
-}
-
-.mu-card-link {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  border-radius: 12px 12px 0 0;
-  color: inherit;
-  text-decoration: none;
-}
-
-.mu .mu-card-link:focus-visible {
-  outline-offset: -3px;
-}
-
-.mu-show {
-  align-self: flex-start;
-  margin: 0 14px 12px;
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
-.mu.visiting .mu-show {
-  display: none;
-}
-
-.mu-card:hover {
-  translate: 0 -2px;
-}
-
-.mu-thumb {
-  display: block;
-  width: 100%;
-  height: 118px;
-  object-fit: cover;
-  background: #e9e4d4;
-}
-
-.mu-card-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px 14px;
-}
-
-.mu-why {
-  margin: 0;
-}
-
-.mu-eyebrow {
-  display: block;
-  margin-bottom: 3px;
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.mu-quote {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  line-height: 1.38;
-}
-
-.mu-title {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: 18px;
-  letter-spacing: -0.01em;
-}
-
-.mu-summary {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--ink-soft);
-}
-
-.mu-open {
-  margin-top: auto;
-  padding-top: 2px;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: var(--mu-blue);
-}
-
-.mu-caption {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-
-.mu-more {
-  margin: 0 18px 14px;
-}
-
-/* A photo is a print: a painted horizon in CSS (no image, no canvas), its subject written on it. */
-.mu-photo {
-  flex-basis: 212px;
-  padding: 9px 9px 0;
-}
-
-.mu-photo:nth-child(even) {
-  rotate: 0.6deg;
-}
-
-.mu-photo:nth-child(odd) {
-  rotate: -0.5deg;
-}
-
-.mu-print {
-  display: flex;
-  align-items: flex-end;
-  height: 148px;
-  padding: 10px 12px;
-  border-radius: 3px;
-  background:
-    radial-gradient(circle at 74% 30%, rgba(255, 246, 214, 0.9) 0 7%, transparent 8%),
-    linear-gradient(180deg, #8fc2e6 0%, #cfe6f2 52%, #a8c97d 53%, #7fa95a 100%);
-  box-sizing: border-box;
-}
-
-.mu-photo[data-subject='friend'] .mu-print,
-.mu-photo[data-subject='new-friend'] .mu-print {
-  background:
-    radial-gradient(circle at 30% 34%, rgba(255, 234, 196, 0.95) 0 8%, transparent 9%),
-    linear-gradient(180deg, #e9b48f 0%, #f4d7b8 50%, #b6c98a 51%, #8aab63 100%);
-}
-
-.mu-print-title {
-  font-family: var(--font-serif);
-  font-size: 20px;
-  font-weight: 380;
-  color: var(--paper);
-  text-shadow: 0 1px 12px rgba(22, 40, 60, 0.45);
-}
-
-.mu-photo .mu-card-body {
-  padding: 10px 5px 12px;
-}
-
-/* ---- invitations --------------------------------------------------------- */
-
-.mu-letters {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 2px 18px 16px;
-}
-
-.mu-letter {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border-left: 3px solid var(--mu-blue);
-  border-radius: 4px 12px 12px 4px;
-  background: var(--paper);
-  box-shadow: 0 6px 18px rgba(28, 60, 96, 0.1);
-}
-
-.mu-letter[data-state='open'],
-.mu-letter[data-state='accepted'] {
-  border-left-color: var(--mu-green);
-}
-
-.mu-letter[data-state='declined'],
-.mu-letter[data-state='expired'],
-.mu-letter[data-state='closed'] {
-  border-left-color: rgba(62, 58, 54, 0.25);
-  opacity: 0.75;
-}
-
-.mu-state {
-  margin: 0;
-  font-size: 12px;
-}
-
 .mu-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-top: 6px;
-}
-
-/* ---- shelf --------------------------------------------------------------- */
-
-.mu-shelf-list {
-  margin: 0;
-  padding: 0 18px 12px;
-  list-style: none;
-  counter-reset: shelf;
-}
-
-.mu-shelf-item {
-  counter-increment: shelf;
-  border-top: 1px solid var(--mu-line);
-}
-
-.mu-shelf-item:first-child {
-  border-top: 0;
-}
-
-.mu-shelf-link {
-  display: grid;
-  grid-template-columns: 18px 52px 1fr;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 0;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.mu-shelf-link::before {
-  content: counter(shelf);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 15px;
-  color: var(--ink-soft);
-  text-align: right;
-}
-
-.mu-shelf-thumb {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-.mu-shelf-blank {
-  display: block;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 62%, rgba(79, 143, 52, 0.55) 0 22%, transparent 23%),
-    linear-gradient(180deg, #e8efe0, #d9e6cb);
-}
-
-.mu-shelf-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.mu-shelf-text .mu-title {
-  font-size: 16px;
-}
-
-.mu-shelf-text .mu-quote {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  font-size: 12.5px;
-  color: var(--ink-soft);
 }
 
 .mu-bar {
@@ -842,27 +150,12 @@ body.postcard .mu {
   transform-origin: left;
 }
 
-.mu-shelf-text .mu-bar {
-  width: 96px;
-  margin-top: 3px;
-}
-
-/* ---- settings ------------------------------------------------------------ */
-
-.mu-group {
-  padding: 4px 18px 14px;
-}
-
-.mu-group + .mu-group {
-  border-top: 1px solid var(--mu-line);
-  padding-top: 12px;
-}
-
-.mu-group-title {
-  margin: 0 0 2px;
+.mu-panel-title {
+  margin: 0;
   font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: 17px;
+  font-weight: 340;
+  font-size: 24px;
+  letter-spacing: -0.015em;
 }
 
 .mu-subhead {
@@ -874,38 +167,12 @@ body.postcard .mu {
   color: var(--ink-soft);
 }
 
-.mu-rows {
+.mu-title {
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.mu-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-}
-
-.mu-row-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-}
-
-.mu-switch {
-  min-width: 72px;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.mu-switch[aria-pressed='true'] {
-  background: rgba(79, 143, 52, 0.15);
-  color: #3f7529;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: -0.01em;
 }
 
 .mu-code {
@@ -915,15 +182,6 @@ body.postcard .mu {
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.06em;
-}
-
-.mu-introduce {
-  padding-top: 8px;
-}
-
-.mu-introduce .mu-input {
-  flex: 1;
-  min-width: 0;
 }
 
 .mu-radio {
@@ -951,32 +209,12 @@ body.postcard .mu {
   display: none;
 }
 
-/* ---- an object's card ----------------------------------------------------- */
-
-.mu-object {
-  width: min(300px, calc(100vw - 2 * var(--gutter)));
-  overflow: hidden;
-}
-
-.mu-object .mu-thumb {
-  height: 140px;
-}
-
-.mu-object .mu-summary {
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
-}
-
-.mu-object .mu-btn.mu-primary {
-  text-decoration: none;
-}
-
 /* ---- dev tools ----------------------------------------------------------- */
 
 .mu-dev {
   position: fixed;
   left: var(--gutter);
-  top: calc(var(--mu-top) + 56px);
+  top: var(--mu-top);
   bottom: calc(var(--gutter) * 0.6 + 120px);
   width: min(340px, calc(100vw - 2 * var(--gutter)));
   overflow-y: auto;
@@ -1040,6 +278,15 @@ body.postcard .mu {
 
 .mu-dev .mu-note {
   padding: 4px 16px 10px;
+}
+
+.mu-dev .mu-fail {
+  margin: 0 16px 10px;
+}
+
+.mu-introduce .mu-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .mu-hours {
@@ -1183,38 +430,12 @@ body.postcard .mu {
   line-height: 1.5;
 }
 
-/* ---- phones -------------------------------------------------------------- */
+/* ---- phones: clear of the garden's rail, ticket and post box on the right ---- */
 
 @media (max-width: 640px) {
-  .mu-dock {
-    top: calc(var(--mu-top) + 52px);
-    bottom: auto;
-    left: var(--gutter);
-    right: auto;
-  }
-  .mu-tag {
-    display: none;
-  }
-  .mu-panel {
-    left: var(--gutter);
-    right: var(--gutter);
-    bottom: calc(var(--gutter) * 0.5);
-    width: auto;
-    max-height: 72vh;
-  }
   .mu-dev {
-    top: calc(var(--mu-top) + 104px);
-    left: var(--gutter);
-    right: var(--gutter);
+    right: 80px;
+    bottom: 300px;
     width: auto;
-  }
-}
-
-@media (max-width: 1180px) and (min-width: 641px) {
-  .mu-dock {
-    bottom: calc(var(--mu-bottom) + 58px);
-  }
-  .mu-panel {
-    bottom: calc(var(--mu-bottom) + 116px);
   }
 }

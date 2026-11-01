@@ -1,4 +1,4 @@
-import type { CommandResult, MetricsRow, MindView } from '../contract';
+import type { CommandResult, MetricsRow, MindView, SharingView } from '../contract';
 import type { ClockMode, MuseApi } from './api';
 import { button, day, el, time } from './dom';
 
@@ -28,7 +28,10 @@ function section(title: string, open: boolean, ...children: HTMLElement[]): HTML
   return d;
 }
 
-/** Dev only: the sim clock, the host simulator (the Muse app's side) and the Mind inspector. */
+/**
+ * Dev only: the sim clock, the host simulator (the Muse app's side), the owner's share code, introductions and basket
+ * time, and the Mind inspector.
+ */
 export class DevTools {
   readonly el = el('aside', 'mu-dev');
   private readonly simTime = el('span', 'mu-mono');
@@ -37,6 +40,9 @@ export class DevTools {
   private readonly mind = el('div', 'mu-mind');
   private readonly metrics = el('div', 'mu-metrics');
   private readonly soul = el('pre', 'mu-soul');
+  private readonly fail = el('p', 'mu-fail');
+  private readonly shareCode = el('code', 'mu-code');
+  private readonly basket = { whenever: radio('Whenever it’s ready'), at: radio('At'), clock: el('input', 'mu-input mu-time') };
 
   constructor(
     private readonly api: MuseApi,
@@ -44,12 +50,14 @@ export class DevTools {
   ) {
     this.el.setAttribute('aria-label', 'Muse dev tools');
     const head = el('header', 'mu-dev-head');
-    head.append(el('h2', 'mu-panel-title', 'Muse, backstage'), el('span', 'mu-hint', 'B hides'));
+    head.append(el('h2', 'mu-panel-title', 'Muse, backstage'), el('span', 'mu-hint', `${api.museId} · B hides`));
     this.note.setAttribute('role', 'status');
     this.el.append(
       head,
+      this.fail,
       section('Clock', true, this.clockControls()),
       section('Host simulator', true, this.hostControls()),
+      section('Friends and baskets', true, this.ownerControls()),
       this.note,
       section('Mind', true, this.mind),
       section('Metrics', false, this.metrics),
@@ -67,12 +75,18 @@ export class DevTools {
   }
 
   async refresh(): Promise<void> {
-    const [clock, mind, metrics, soul] = await Promise.all([this.api.clock(), this.api.mind(), this.api.metrics(), this.api.soulMd()]);
-    this.simTime.textContent = `${day(clock.now)}, ${time(clock.now)}`;
-    for (const [mode, b] of this.modes) b.setAttribute('aria-pressed', String(mode === clock.mode));
-    this.renderMind(mind);
-    this.renderMetrics(metrics);
-    this.soul.textContent = soul;
+    try {
+      const [clock, mind, metrics, soul, sharing] = await Promise.all([this.api.clock(), this.api.mind(), this.api.metrics(), this.api.soulMd(), this.api.sharing()]);
+      this.fail.textContent = '';
+      this.simTime.textContent = `${day(clock.now)}, ${time(clock.now)}`;
+      for (const [mode, b] of this.modes) b.setAttribute('aria-pressed', String(mode === clock.mode));
+      this.renderMind(mind);
+      this.renderMetrics(metrics);
+      this.soul.textContent = soul;
+      this.renderSharing(sharing);
+    } catch (error) {
+      this.fail.textContent = `Couldn’t reach the engine (${error instanceof Error ? error.message : 'unknown error'}).`;
+    }
   }
 
   private async run(action: Promise<CommandResult>, done: string): Promise<void> {
@@ -149,6 +163,54 @@ export class DevTools {
     return form;
   }
 
+  /** The owner's settings the engine reads: their share code, an introduction by a friend's code, when baskets come. */
+  private ownerControls(): HTMLElement {
+    const box = el('div', 'mu-dev-box');
+    const code = el('div', 'mu-actions');
+    const copy = button('Copy', 'mu-btn', () => void navigator.clipboard?.writeText(this.shareCode.textContent ?? '').then(() => (this.note.textContent = 'Share code copied.')));
+    code.append(el('span', 'mu-dev-line', 'Share code'), this.shareCode, copy);
+
+    const introduce = el('form', 'mu-actions mu-introduce');
+    const friend = el('input', 'mu-input');
+    friend.placeholder = 'A friend’s share code';
+    friend.autocomplete = 'off';
+    friend.setAttribute('aria-label', 'Introduce with a code');
+    const submit = el('button', 'mu-btn mu-primary', 'Introduce');
+    submit.type = 'submit';
+    introduce.append(friend, submit);
+    introduce.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const shareCode = friend.value.trim();
+      if (!shareCode) return;
+      friend.value = '';
+      void this.run(this.api.introduce(shareCode), 'Introduced.');
+    });
+
+    const { whenever, at, clock } = this.basket;
+    clock.type = 'time';
+    clock.value = '09:00';
+    clock.setAttribute('aria-label', 'Basket time');
+    at.label.append(clock);
+    const save = (): void => void this.run(this.api.setBasketTime(at.input.checked ? clock.value || null : null), 'Basket time saved.');
+    whenever.input.addEventListener('change', save);
+    at.input.addEventListener('change', save);
+    clock.addEventListener('change', save);
+    const basket = el('div', 'mu-actions');
+    basket.append(el('span', 'mu-dev-line', 'Basket time'), whenever.label, at.label);
+
+    box.append(code, introduce, basket);
+    return box;
+  }
+
+  private renderSharing(s: SharingView): void {
+    this.shareCode.textContent = s.shareCode;
+    const { whenever, at, clock } = this.basket;
+    whenever.input.checked = s.basketTime === null;
+    at.input.checked = s.basketTime !== null;
+    clock.disabled = s.basketTime === null;
+    if (s.basketTime !== null && document.activeElement !== clock) clock.value = s.basketTime;
+  }
+
   private renderMind(m: MindView): void {
     const t = m.temperament;
     const traits = el('div', 'mu-traits');
@@ -213,4 +275,13 @@ export class DevTools {
     }
     this.metrics.replaceChildren(rows.length ? table : el('p', 'mu-empty', 'No days yet.'));
   }
+}
+
+function radio(text: string): { label: HTMLLabelElement; input: HTMLInputElement } {
+  const label = el('label', 'mu-radio');
+  const input = el('input');
+  input.type = 'radio';
+  input.name = 'mu-basket-time';
+  label.append(input, ` ${text} `);
+  return { label, input };
 }

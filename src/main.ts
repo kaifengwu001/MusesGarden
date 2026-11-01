@@ -9,7 +9,7 @@ import { QualityController, detectDevice, runBenchmark, type TierChoice } from '
 import { GpuTimer } from './dev/gpuTimer';
 import { installHarness } from './dev/harness';
 import { measureParity } from './dev/parity';
-import { mountMuse } from './muse/ui/overlay';
+import { connectEngine } from './muse/ui/overlay';
 import type { ParamPath } from './params';
 import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
@@ -144,9 +144,9 @@ async function boot(): Promise<void> {
   });
 
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
-  // Muse's; the garden sees every other tap before the meadow does.
-  // `?muse` shows the engine's own overlay instead (muse/ui), until the engine feeds this interface.
-  const garden = new URLSearchParams(location.search).has('muse') ? null : new GardenUi(uiRoot, world, store);
+  // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
+  // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
+  const garden = new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
@@ -154,12 +154,12 @@ async function boot(): Promise<void> {
   let pettingMuse = false;
   attachInput(canvas, {
     drag: (dx, dy) => {
-      garden?.interrupt();
+      garden.interrupt();
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
       userPosed = true;
     },
     zoom: (delta) => {
-      garden?.interrupt();
+      garden.interrupt();
       world.rig.zoomBy(delta);
       userPosed = true;
     },
@@ -168,7 +168,7 @@ async function boot(): Promise<void> {
         world.muse.tap(clock.time);
         return;
       }
-      if (garden?.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
+      if (garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
         userPosed = true;
         return;
       }
@@ -184,7 +184,7 @@ async function boot(): Promise<void> {
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) {
-        garden?.interrupt();
+        garden.interrupt();
         world.rig.glideTo(hit.dir);
         userPosed = true;
       }
@@ -262,11 +262,11 @@ async function boot(): Promise<void> {
   const update = (): void => {
     if (keys.update(world.rig, clock.realDt)) {
       userPosed = true;
-      garden?.interrupt();
+      garden.interrupt();
     }
-    garden?.update(clock.realDt);
+    garden.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
-    garden?.frame(clock.realDt);
+    garden.frame(clock.realDt);
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);
@@ -468,7 +468,6 @@ async function boot(): Promise<void> {
       markReady();
     }
   });
-  mountMuse(uiRoot, world);
 }
 
 boot().catch((error: unknown) => console.error(error));

@@ -7,6 +7,7 @@ import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
+import type { MuseDirection } from '../../life/muse';
 import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
 import { tangentToward, travel } from '../../planet/geo';
@@ -42,6 +43,8 @@ const CARD_UNDER = 30;
 /** The cottage's view and Muse's (as world.ts's named views): distance, height, bearing from the front (rad), looked-at point (cottage-local x, y, z, m). */
 const HOME_VIEW = { distance: 26, height: 11, bearing: 0.92, at: [-1.8, 2.6, 1.4] } as const;
 const MUSE_VIEW = { distance: 4.6, height: 1.35, bearing: 0.3, aim: 0.62 } as const;
+const AT_HOME: MuseDirection = { kind: 'home', busy: false };
+const OUT_OF_SIGHT: MuseDirection = { kind: 'hidden' };
 
 const sample = createGroundSample();
 const tmp = new Vector3();
@@ -83,10 +86,15 @@ export class GardenUi {
   private offscreen = 0;
   private readonly source: GardenSource;
 
+  /**
+   * `driveMuse`: the engine's say over the 3D Muse each frame (muse/ui/overlay.ts), when the page follows an engine;
+   * without one Muse is at home or out of sight as the source's status says.
+   */
   constructor(
     parent: HTMLElement,
     private readonly world: World,
     store: ParamStore,
+    private readonly driveMuse: ((dt: number) => MuseDirection | null) | null = null,
   ) {
     this.source = gardenSource();
     this.state = new GardenState(this.source);
@@ -223,9 +231,11 @@ export class GardenUi {
 
   // ---- each frame ------------------------------------------------------------------------
 
-  /** Before the world moves the camera: a flight drives it. */
+  /** Before the world moves: a flight drives the camera, and Muse is told where to be. */
   update(dt: number): void {
     this.flight.update(dt);
+    const muse = this.visit.away ? OUT_OF_SIGHT : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
+    if (muse) this.world.muse.direct(muse);
   }
 
   /** After the world's update: the beds' clock, the pins, the card over its bed. */
@@ -240,10 +250,6 @@ export class GardenUi {
     const away = this.visit.away;
     this.beds.update(away ? Infinity : w.rig.altitude);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
-    if (!this.state.status.home || away) {
-      w.muse.mesh.visible = false;
-      w.muse.shadowMesh.visible = false;
-    }
     const width = window.innerWidth;
     const height = window.innerHeight;
     const bed = this.current ? this.layout.beds.get(this.current) : undefined;
