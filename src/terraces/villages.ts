@@ -60,7 +60,8 @@ function uphill(terrain: TerraceTerrain, d: Vector3, out: Vector3): Vector3 {
 function suits(terrain: TerraceTerrain, d: Vector3): boolean {
   const R = terrain.radius;
   const b = terrain.fields.base(d, base);
-  if (b.wild > 0.15 || b.flat < 0.75) return false;
+  // (on the flats, not in the river: 1 … 2 there)
+  if (b.wild > 0.15 || b.flat < 0.75 || b.flat > 1) return false;
   for (const pk of terrain.fields.peaks) if (angleBetween(d, pk.dir) * R < pk.radius * 1.6 + 12) return false;
   uphill(terrain, d, up);
   for (let dist = 10; dist <= 60; dist += 10) {

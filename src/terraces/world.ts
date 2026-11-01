@@ -15,7 +15,7 @@ import { createLookUniforms } from '../render/look';
 import { Palette, ROW, sunAt } from '../render/palette';
 import { Sky } from '../render/sky';
 import { localSun } from '../render/sun';
-import { warpForZoom } from '../render/warp';
+import { unwarpPoint, warpForZoom } from '../render/warp';
 import { smoothstep } from '../core/math';
 import { CameraRig } from '../view/camera';
 import { pickSurface, type Pick } from '../view/picking';
@@ -27,6 +27,7 @@ import surfaceVertex from './surface.vert.glsl?raw';
 import { TerraceBirds } from './birds';
 import { Houses } from './houses';
 import { Rice, RICE } from './rice';
+import { Towers } from './towers';
 import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
 import { createVillageUniforms, houseDistance, placeVillages, writeVillageUniforms, type Village } from './villages';
@@ -96,6 +97,7 @@ export class TerraceWorld implements PlanetWorld {
   /** How long the last vista search took (ms; 0 when cached). */
   vistaMs = 0;
   readonly houses: Houses;
+  readonly towers: Towers;
   readonly trees: Trees;
   readonly rice: Rice;
   readonly objects: TerraceObjects;
@@ -115,6 +117,7 @@ export class TerraceWorld implements PlanetWorld {
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
   };
   private fieldParams: TerraceFieldParams = { hills: 18, forest: 0.15 };
+  private readonly cameraPlanet = new Vector3();
   private fieldKey = '';
   private fieldsR = Number.NaN;
   private fieldsKey = '';
@@ -156,13 +159,14 @@ export class TerraceWorld implements PlanetWorld {
     this.sky = new Sky();
     this.surface = new Surface(this.shared, tier.terrainGrid, { name: 'terraces ground', vertexShader: surfaceVertex, fragmentShader: surfaceFragment });
     this.houses = new Houses(this.shared);
+    this.towers = new Towers(this.shared);
     this.trees = new Trees(this.shared);
     this.birds = new TerraceBirds(this.shared);
     this.paddyMap = new PaddyMap(this.shared);
     Object.assign(this.shared, this.paddyMap.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceObjects(this.shared);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.trees.mesh, this.birds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.towers.group, this.trees.mesh, this.birds.mesh);
     this.applyTier(tier);
   }
 
@@ -349,6 +353,7 @@ export class TerraceWorld implements PlanetWorld {
     this.fieldsKey = this.fieldKey;
     this.fieldsFull = full;
     this.terrain.update(R, this.fieldParams, this.store.values.world.bloom);
+    this.towers.set(this.terrain);
     // (near a cell's edge its cell is read from more than a texel of the life bake in: it is at half resolution)
     this.terrain.writeUniforms(this.terrainUniforms, this.bake.texelMeters(R, full));
     this.bake.bake(this.renderer, this.terrain.fields, `${R}/${this.fieldKey}`, full);
@@ -395,6 +400,7 @@ export class TerraceWorld implements PlanetWorld {
     g.uWarpFocus.value.copy(this.warp.focus);
     g.uWarpUp.value.copy(this.warp.up);
     g.uWarpK.value = this.warp.k;
+    this.towers.update(unwarpPoint(this.warp, rig.camera.position, this.cameraPlanet));
 
     this.updateLight(p.light.timeOfDay);
     this.updateLook(clock);

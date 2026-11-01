@@ -78,7 +78,7 @@ export class TerraceTerrain {
   seasonFront = 0.72;
 
   constructor(public layout: TerraceLayout) {
-    this.fields = new TerraceFields(layout.noiseSeed, layout.grain);
+    this.fields = new TerraceFields(layout.noiseSeed);
     this.cells = new TerraceCells(this.fields, layout.noiseSeed);
     this.plots = new TerracePlots(this.fields, this.cells, layout.noiseSeed);
   }

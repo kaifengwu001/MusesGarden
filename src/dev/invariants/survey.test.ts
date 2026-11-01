@@ -56,6 +56,9 @@ function hillsides(count: number): Array<[CellSurvey, CellSurvey]> {
     const q = a.centre.clone().multiplyScalar(R).addScaledVector(a.along, size).normalize();
     const n = terrain.cells.at(q, createCellSample());
     if (n.key === a.key) continue;
+    // (both on terraced hillside: not down on a valley's floor or in the river)
+    const nb = terrain.fields.base(n.centre, base);
+    if (nb.wild > 0.25 || nb.flat > 0.25 || nb.slope < 0.12) continue;
     pairs.push([survey(a), survey(n)]);
   }
   return pairs;
