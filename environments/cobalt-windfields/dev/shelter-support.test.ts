@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { Ray, Vector3 } from 'three';
-import { FLOOR, shelterSupportGeometry } from '../life/props';
+import { coplanarOverlaps } from './coplanarOverlap';
+import { FLOOR, shelterGeometry, shelterSupportGeometry } from '../life/props';
 
 test('shelter, terrace, lookout and steps have one supported cap per point',()=>{
   const geometry=shelterSupportGeometry(),position=geometry.getAttribute('position'),normal=geometry.getAttribute('normal');
@@ -32,5 +33,12 @@ test('shelter, terrace, lookout and steps have one supported cap per point',()=>
     expect(heights).toHaveLength(1);
     expect(heights[0]).toBeCloseTo(height,6);
   }
+  geometry.dispose();
+});
+
+test('the complete shelter has no overlapping exposed planes above its buried bases',()=>{
+  const geometry=shelterGeometry(412);
+  const overlap=coplanarOverlaps(geometry).filter(pair=>pair.high>=FLOOR-1e-5);
+  expect(overlap).toEqual([]);
   geometry.dispose();
 });

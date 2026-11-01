@@ -56,7 +56,7 @@ function appendShelterSupport(b:WindGeometry):void{
   }
 }
 
-function shelterGeometry(seed:number):ReturnType<WindGeometry['build']>{
+export function shelterGeometry(seed:number):ReturnType<WindGeometry['build']>{
   const b=new WindGeometry();
   const beam=(a:Vector3,c:Vector3,width:number):void=>b.tube([a,c],[width,width*0.94],0,6);
   // Closed, chipped stone volumes. The uneven crest and exposed bedding edge
@@ -70,9 +70,12 @@ function shelterGeometry(seed:number):ReturnType<WindGeometry['build']>{
       [width/2-0.06,-depth/2+cut],[width/2-cut,-depth/2],
     ];
     const high=ring.map(([dx,dz],i)=>new Vector3(x+dx,top+slope*dz+Math.sin((id+1)*5.71+i*2.31+seed*0.013)*0.075,z+dz));
-    const bottom=ring.map(([dx,dz])=>new Vector3(x+dx*0.97,low,z+dz*0.97));
+    // Embedded bases avoid a second cap on the walkable floor; varied buried
+    // levels also prevent adjoining wall stones sharing an internal plane.
+    const base=low-.018-(id+1)*.002;
+    const bottom=ring.map(([dx,dz])=>new Vector3(x+dx*0.97,base,z+dz*0.97));
     const middle=new Vector3(x,top,z);
-    const underneath=new Vector3(x,low,z);
+    const underneath=new Vector3(x,base,z);
     for(let i=0;i<ring.length;i++){
       const j=(i+1)%ring.length;
       b.triangle(middle,high[i],high[j],2,[[x,z],[high[i].x,high[i].z],[high[j].x,high[j].z]]);
@@ -108,13 +111,13 @@ function shelterGeometry(seed:number):ReturnType<WindGeometry['build']>{
   stone(3.56,front-0.35,1.47,0.7,FLOOR,3.88,6);
   // A dark recessed entrance with a timber door and an open slatted screen.
   // Everything stays behind FACE, so the sitting and walking routes are unchanged.
-  b.box(-0.1,2.06,front-0.52,5.85,2.68,0.09,9);
-  b.box(0.85,FLOOR+1.05,front-0.41,1.08,2.1,0.1,0);
+  b.box(-0.1,2.055,front-0.52,5.85,2.69,0.09,9);
+  b.box(0.85,FLOOR+1.045,front-0.41,1.08,2.11,0.1,0);
   for(const x of [0.31,1.39])beam(new Vector3(x,FLOOR,front-0.31),new Vector3(x,2.93,front-0.31),0.055);
   beam(new Vector3(0.27,2.92,front-0.31),new Vector3(1.43,2.92,front-0.31),0.065);
   for(let i=0;i<11;i++)b.box(-2.82+i*0.175,1.87+(i%3)*0.025,front-0.3,0.10,2.22+(i%3)*0.05,0.08,0);
   for(const y of [1.3,2.25])beam(new Vector3(-2.92,y,front-0.23),new Vector3(-0.98,y,front-0.23),0.038);
-  b.box(1.18,1.76,front-0.33,0.055,0.12,0.06,6);
+  b.box(1.18,1.76,front-0.335,0.055,0.12,0.06,6);
   // Three massive bedding slabs bridge the cleft. Their different shoulders,
   // thicknesses and projecting ends replace the straight tiled roof silhouette.
   stone(-3.14,-0.16,3.42,6.12,3.55,4.34,7,-0.055);
@@ -150,12 +153,12 @@ function shelterGeometry(seed:number):ReturnType<WindGeometry['build']>{
     b.box(cx,y,cz,w,h,d,0);
   };
   chair(0,FLOOR+0.44,0,0.44,0.05,0.42);
-  for(const x of [-0.18,0.18])for(const z of [-0.17,0.17])chair(x,FLOOR+0.21,z,0.05,0.42,0.05);
+  for(const x of [-0.18,0.18])for(const z of [-0.17,0.17])chair(x,FLOOR+0.205,z,0.05,0.43,0.05);
   for(const x of [-0.18,0.18])chair(x,FLOOR+0.72,-0.19,0.05,0.56,0.05);
   chair(0,FLOOR+0.86,-0.19,0.4,0.18,0.04);
   // A low open timber guard at the back of the lookout, outside the accessible route.
   const rz=PIER.z0+0.1;
-  for(let i=0;i<5;i++)b.box(PIER.x0+0.18+i*0.8,FLOOR+0.45,rz,0.055,0.9,0.055,0);
+  for(let i=0;i<5;i++)b.box(PIER.x0+0.18+i*0.8,FLOOR+0.445,rz,0.055,0.91,0.055,0);
   beam(new Vector3(PIER.x0+0.18,FLOOR+0.86,rz),new Vector3(PIER.x0+3.38,FLOOR+0.86,rz),0.035);
   // One small lantern, with restrained warm color rather than bloom.
   const lanternX=1.7+(seed%7)*0.012;

@@ -59,6 +59,23 @@ function projectedCoverage(geometry: BufferGeometry): number {
   return pixels.size/(size*size);
 }
 
+/** Sum the visible sheet area from horizontal camera directions. This catches
+ * every leaf sharing one nearly edge-on plane without depending on a view. */
+function sheetAreaByAzimuth(geometry: BufferGeometry, kind: number): number[] {
+  const p=geometry.getAttribute('position'),k=geometry.getAttribute('aKind');
+  const areas=Array.from({length:12},()=>0),a=new Vector3(),b=new Vector3(),c=new Vector3();
+  for(let i=0;i<p.count;i+=3) {
+    if(k.getX(i)!==kind)continue;
+    a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);
+    const area=b.sub(a).cross(c.sub(a)).multiplyScalar(.5);
+    for(let angle=0;angle<areas.length;angle++) {
+      const t=angle*Math.PI*2/areas.length;
+      areas[angle]+=Math.abs(area.x*Math.cos(t)+area.z*Math.sin(t));
+    }
+  }
+  return areas;
+}
+
 describe('native windfield plants',()=>{
   test.each([0,1,2])('coral %i has one closed joined surface, blunt ends and restrained depth',variant=>{
     const geometry=coralGeometry(variant),p=geometry.getAttribute('position'),n=geometry.getAttribute('normal');
@@ -94,6 +111,8 @@ describe('native windfield plants',()=>{
     expect(geometry.getAttribute('position').count/3).toBeLessThan(1000);
     for(const attribute of Object.values(geometry.attributes))expect([...attribute.array].every(Number.isFinite)).toBe(true);
     expect(topology(geometry).degenerate).toBe(0);
+    const projected=sheetAreaByAzimuth(geometry,1);
+    expect(Math.min(...projected)/Math.max(...projected)).toBeGreaterThan(.28);
     const kinds=new Set(geometry.getAttribute('aKind').array);
     expect(kinds).toEqual(new Set([0,1]));
     geometry.dispose();

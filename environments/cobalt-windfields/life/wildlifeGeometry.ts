@@ -1,5 +1,5 @@
 import { BufferGeometry, Float32BufferAttribute, Vector3 } from 'three';
-import { WindGeometry } from './windGeometry';
+import { WindGeometry, sailLeaf } from './windGeometry';
 
 export type WildlifeSpecies = 'sailback' | 'kitelet' | 'sand-stitcher';
 export const WILDLIFE_SPECIES = ['sailback', 'kitelet', 'sand-stitcher'] as const;
@@ -187,29 +187,55 @@ export function wildlifeGeometry(species: WildlifeSpecies): BufferGeometry {
 }
 
 /** Physical landing and litter-catching surfaces, in displayed world metres. */
-export function wildlifeHabitatGeometry(species: 'kitelet' | 'sand-stitcher'): BufferGeometry {
+export function wildlifeHabitatGeometry(species: 'kitelet' | 'sand-stitcher', variant = 0): BufferGeometry {
   const a = new AnimalBuilder();
   a.part(0, P(0,0,0), b => {
     if (species === 'kitelet') {
-      const h = KITELET_PERCH_HEIGHT;
-      b.tube([P(-0.18,0,0.06),P(-0.17,h*0.4,0.03),P(-0.08,h*0.78,-0.06),P(0,h,0)],[0.024,0.017,0.011,0.006],STEM,7);
-      // A cupped leaf, not a circular platform. Its bowed midrib provides the
-      // exact landing point while each stand turns and scales independently.
-      const centre=P(0,h,0);
-      const rim=[P(-0.08,h-0.17,-0.16),P(0.12,h+0.025,-0.035),P(0.035,h+0.13,0.19),P(-0.13,h+0.018,0.025)];
-      for(let i=0;i<4;i++) b.triangle(centre,rim[i],rim[(i+1)%4],IVORY);
-      b.tube([rim[0],centre.clone().add(P(0,-0.003,0)),rim[2]],[0.004,0.0025,0.001],RIB,4);
-      membrane(b,[P(-0.16,h*0.4,0.03),P(-0.28,h*0.61,0.035),P(-0.34,h*0.88,-0.05),P(-0.14,h*0.57,-0.04)],IVORY,0.0025);
-    } else {
-      // Low coral roots hold three older stems. A fourth is placed during the
-      // carry cycle; all remain world-anchored instead of following the mouth.
-      for(const side of [-1,1]) for(let i=0;i<3;i++) {
-        const x=side*(0.19+i*0.045),z=0.23+i*0.09;
-        b.tube([P(x,0,z),P(x*0.96,0.13+i*0.035,z+0.035),P(x+side*0.045,0.22+i*0.025,z+0.02)],[0.021,0.013,0.004],7,6);
+      const v=Math.abs(variant)%3,h=KITELET_PERCH_HEIGHT;
+      const turn=[-.24,.72,-.88][v],width=[.24,.19,.31][v],length=[.46,.55,.42][v];
+      const at=(side:number,t:number):Vector3=>{
+        const arch=Math.max(0,1-t*t),x=side*width*Math.sqrt(arch)*(side<0?.86:1);
+        const z=t*length;
+        // The landing point is the midrib at (0,h,0). Cupped edges and a
+        // twisting tip create volume without duplicate coplanar membranes.
+        const y=h+t*(v===1?.32:.22)+side*side*.10*arch+side*t*.09;
+        return P(x*Math.cos(turn)+z*Math.sin(turn),y,z*Math.cos(turn)-x*Math.sin(turn));
+      };
+      const normal=(side:number,t:number):Vector3=>{
+        const e=.0001,tt=Math.max(-1+e,Math.min(1-e,t));
+        return at(Math.min(1,side+e),tt).sub(at(Math.max(-1,side-e),tt)).cross(at(side,Math.min(1,tt+e)).sub(at(side,Math.max(-1,tt-e)))).normalize();
+      };
+      for(let row=0;row<16;row++)for(let col=0;col<4;col++) {
+        const t0=-1+row/8,t1=-1+(row+1)/8,u0=-1+col/2,u1=-1+(col+1)/2;
+        if(row>0)b.triangle(at(u0,t0),at(u1,t0),at(u1,t1),IVORY,[[u0,t0],[u1,t0],[u1,t1]],[normal(u0,t0),normal(u1,t0),normal(u1,t1)]);
+        if(row<15)b.triangle(at(u0,t0),at(u1,t1),at(u0,t1),IVORY,[[u0,t0],[u1,t1],[u0,t1]],[normal(u0,t0),normal(u1,t1),normal(u0,t1)]);
       }
-      for(let i=0;i<3;i++) b.tube([P(-0.24+i*0.015,0.021+i*0.008,0.33+i*0.1),P(0.24-i*0.01,0.047+i*0.01,0.35+i*0.1)],[0.005,0.004],STEM,5);
+      const root=P(-.14-v*.025,0,.08-v*.04),fork=P(-.11,h*.43,.045);
+      b.tube([root,P(root.x-.045,h*.21,root.z+.03),fork,P(-.045,h*.76,-.025),P(0,h-.009,0)],[.012,.010,.008,.0055,.003],STEM,7);
+      const rib=Array.from({length:9},(_,i)=>at(0,-1+i/4).add(P(0,-.004,0)));
+      b.tube(rib,rib.map((_,i)=>.0035*(1-i/11)),RIB,5);
+      const branchEnd=[P(-.27,.49,.11),P(-.23,.55,.17),P(-.29,.36,-.16)][v];
+      b.tube([fork,fork.clone().lerp(branchEnd,.55).add(P(-.02,.02,.02)),branchEnd],[.006,.004,.002],STEM,6);
+      sailLeaf(b,branchEnd,[.54,.70,.45][v],[.20,.16,.25][v],[1.18,-.75,1.56][v],IVORY,v as 0|1|2,RIB);
+      if(v!==0) {
+        const tip=v===1?P(-.015,.31,-.19):P(.11,.51,.12);
+        b.tube([P(-.13,.23,.035),tip],[.0045,.002],STEM,6);
+        sailLeaf(b,tip,v===1?.32:.55,v===1?.13:.19,v===1?1.65:-.28,IVORY,v===1?2:1,RIB);
+      }
+    } else {
+      // Fallen tan twigs collect loosely at the lee edge. There are no red
+      // upright stakes masquerading as coral and no regular fence rows.
+      const twigs: readonly (readonly [number,number,number,number,number])[]=[
+        [-.24,.20,.17,.46,.022],[-.15,.47,.29,.31,.031],[-.28,.35,.06,.57,.014],[-.04,.18,.20,.52,.042],
+      ];
+      for(const [x0,z0,x1,z1,y] of twigs) {
+        const mid=P((x0+x1)*.5,y+.008,(z0+z1)*.5);
+        b.tube([P(x0,y,z0),mid,P(x1,y+.006,z1)],[.005,.004,.0028],STEM,6);
+      }
+      b.tube([P(-.26,.018,.35),P(-.15,.027,.39),P(-.04,.021,.55)],[.006,.004,.002],STEM,6);
+      b.tube([P(-.15,.027,.39),P(-.11,.034,.49),P(-.17,.028,.57)],[.003,.0022,.0012],STEM,5);
     }
   });
-  if(species==='sand-stitcher') a.part(9,P(0,0,0),b=>b.tube([P(-0.207,0.021,0.255),P(0.207,0.057,0.255)],[0.0051,0.0036],STEM,5));
-  const geometry=a.build(); geometry.name=`${species} physical habitat`; return geometry;
+  if(species==='sand-stitcher') a.part(9,P(0,0,0),b=>b.tube([P(-.207,.021,.255),P(.207,.057,.255)],[.0051,.0036],STEM,5));
+  const geometry=a.build(); geometry.name=`${species} physical habitat ${variant}`; return geometry;
 }

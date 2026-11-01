@@ -8,11 +8,12 @@ export class WindGeometry {
   private uvs: number[] = [];
   private kinds: number[] = [];
 
-  triangle(a: Vector3, b: Vector3, c: Vector3, kind: number, uv: readonly (readonly [number, number])[] = [[0, 0], [1, 0], [0, 1]]): void {
+  triangle(a: Vector3, b: Vector3, c: Vector3, kind: number, uv: readonly (readonly [number, number])[] = [[0, 0], [1, 0], [0, 1]], vertexNormals?: readonly Vector3[]): void {
     const n = new Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
     for (const [i, p] of [a, b, c].entries()) {
       this.positions.push(p.x, p.y, p.z);
-      this.normals.push(n.x, n.y, n.z);
+      const normal = vertexNormals?.[i] ?? n;
+      this.normals.push(normal.x, normal.y, normal.z);
       this.uvs.push(uv[i][0], uv[i][1]);
       this.kinds.push(kind);
     }
@@ -66,12 +67,11 @@ export class WindGeometry {
   }
 }
 
-/** An asymmetric papery kite leaf, with a continuous central rib and mapped veins. */
-export function sailLeaf(b: WindGeometry, origin: Vector3, height: number, width: number, turn = 0, kind = 1, profile: 0 | 1 | 2 = 0): void {
+/** A single papery membrane with transverse cupping and a gently twisted tip.
+ * One surface, not offset front/back cards; smooth normals preserve its curve. */
+export function sailLeaf(b: WindGeometry, origin: Vector3, height: number, width: number, turn = 0, kind = 1, profile: 0 | 1 | 2 = 0, ribKind = 0): void {
   const at = (side: number, v: number): Vector3 => {
     const arch = Math.max(0, Math.sin(Math.PI * v));
-    // The wind draws the tip sideways. Each edge has its own rounded shoulder;
-    // neither side is a straight triangle or a mirrored kite.
     const spread = profile === 1
       ? (side < 0 ? Math.pow(arch,.72)*(.62+.12*v) : Math.pow(arch,1.12)*(.88+.24*v))
       : profile === 2
@@ -79,21 +79,31 @@ export function sailLeaf(b: WindGeometry, origin: Vector3, height: number, width
         : (side < 0 ? Math.pow(arch,.88)*(.95-.38*v+.12*Math.sin(3*Math.PI*v)) : Math.pow(arch,1.55)*(.42+1.15*v));
     const lean = profile === 1 ? .24 : profile === 2 ? .56 : .42;
     const ribX = -height * lean * Math.pow(v,2.2) + width * .20 * arch;
-    const x = ribX + side * width * spread;
-    const z = Math.abs(side) * width * 0.19 * arch + height * 0.055 * Math.sin(v * Math.PI * 0.7);
-    return origin.clone().add(new Vector3(x * Math.cos(turn) + z * Math.sin(turn), height * v, z * Math.cos(turn) - x * Math.sin(turn)));
+    const across = side * width * spread;
+    // The shoulder curls out of the blade plane, while the last third rotates
+    // with the wind. Even an edge-on view sees a folded sheet, not a flat card.
+    const twist = (profile === 1 ? -.50 : profile === 2 ? .78 : .58) * (v-.22);
+    const cup = width * .34 * side * side * arch;
+    const x = ribX + across * Math.cos(twist);
+    const z = across * Math.sin(twist) + cup + height * .12 * Math.sin(v*Math.PI*.9);
+    return origin.clone().add(new Vector3(x*Math.cos(turn)+z*Math.sin(turn),height*v,z*Math.cos(turn)-x*Math.sin(turn)));
   };
-  const segments = 24;
-  for (let k = 0; k < segments; k++) {
-    const v0 = k / segments, v1 = (k + 1) / segments;
-    for (const side of [-1, 1]) {
-      const a = at(0, v0), c = at(side, v1), d = at(0, v1), edge = at(side, v0);
-      if (k > 0) b.triangle(a, edge, c, kind, [[0,v0],[side,v0],[side,v1]]);
-      if (k < segments-1) b.triangle(a, c, d, kind, [[0,v0],[side,v1],[0,v1]]);
-    }
+  const normalAt = (u: number, v: number): Vector3 => {
+    const e=.0002, vv=Math.max(e,Math.min(1-e,v));
+    const du=at(Math.min(1,u+e),vv).sub(at(Math.max(-1,u-e),vv));
+    const dv=at(u,Math.min(1,vv+e)).sub(at(u,Math.max(0,vv-e)));
+    return du.cross(dv).normalize();
+  };
+  const segments=14, bands=4;
+  for(let k=0;k<segments;k++) for(let band=0;band<bands;band++) {
+    const v0=k/segments,v1=(k+1)/segments,u0=-1+band*2/bands,u1=-1+(band+1)*2/bands;
+    const a=at(u0,v0),c=at(u1,v1),d=at(u0,v1),edge=at(u1,v0);
+    if(k>0)b.triangle(a,edge,c,kind,[[u0,v0],[u1,v0],[u1,v1]],[normalAt(u0,v0),normalAt(u1,v0),normalAt(u1,v1)]);
+    if(k<segments-1)b.triangle(a,c,d,kind,[[u0,v0],[u1,v1],[u0,v1]],[normalAt(u0,v0),normalAt(u1,v1),normalAt(u0,v1)]);
   }
-  const rib = Array.from({length:9}, (_, i) => at(0, i/8));
-  b.tube(rib, rib.map((_, i) => 0.012 * (1 - i/10)), 0, 5);
+  const rib=Array.from({length:9},(_,i)=>at(0,i/8));
+  const radius=Math.min(.011,height*.0055);
+  b.tube(rib,rib.map((_,i)=>radius*(1-i/10)),ribKind,5);
 }
 
 /** Three distinct sparse sail habits: paired kite, tall fork, and broad wind flag. */
@@ -110,19 +120,19 @@ export function seedSailGeometry(variant = 0): BufferGeometry {
     const main = stemPath([[0,0,0],[.06,.85,.01],[.22,1.65,.055],[.42,2.30,.10]],.038);
     sailLeaf(b,main[10],1.72,.69,-.20,1,0);
     const side = stemPath([[.09,1.05,.02],[-.16,1.34,.04],[-.48,1.65,.06]],.025);
-    sailLeaf(b,side[10],1.13,.48,.36,1,1);
+    sailLeaf(b,side[10],1.13,.48,1.12,1,1);
   } else if (v === 1) {
     const main = stemPath([[0,0,0],[-.04,1.05,-.02],[.16,1.96,.02],[.27,2.75,.06]],.035);
     sailLeaf(b,main[10],1.52,.46,.08,1,1);
     const fork = stemPath([[.02,1.32,-.01],[-.24,1.70,.01],[-.58,2.06,.08]],.026);
-    sailLeaf(b,fork[10],1.35,.55,-.43,1,0);
+    sailLeaf(b,fork[10],1.35,.55,-1.03,1,0);
     const low = stemPath([[-.03,.80,-.01],[.29,1.04,-.12],[.52,1.33,-.18]],.019);
-    sailLeaf(b,low[10],.67,.30,.52,1,2);
+    sailLeaf(b,low[10],.67,.30,1.29,1,2);
   } else {
     const main = stemPath([[0,0,0],[.20,.70,-.03],[.42,1.31,-.02],[.74,1.97,.03]],.041);
     sailLeaf(b,main[10],1.91,.91,-.42,1,2);
     const side = stemPath([[.21,.74,-.03],[-.09,1.03,.08],[-.30,1.26,.13]],.023);
-    sailLeaf(b,side[10],.89,.36,.45,1,1);
+    sailLeaf(b,side[10],.89,.36,1.16,1,1);
   }
   return b.build();
 }

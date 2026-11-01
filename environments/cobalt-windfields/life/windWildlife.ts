@@ -25,7 +25,7 @@ export function wildlifeHome(species: WildlifeSpecies, index: number): { x: numb
   if (species === 'kitelet' && index === 4) return { x: -2, z: 13 };
   if (species === 'sand-stitcher' && index === 2) return { x: -5, z: 7.6 };
   const home=WILDLIFE_HABITATS[species];
-  const offsets=species==='sailback'?[[-0.6,0.45],[0.5,-0.45],[-0.2,0.25]]:species==='kitelet'?[[-0.55,-0.35],[0.7,0.25],[-0.05,0.35],[0.4,-0.4],[-0.6,0.2]]:[[-0.45,-0.45],[0.4,0.35],[-0.05,0.1]];
+  const offsets=species==='sailback'?[[-0.6,0.45],[0.5,-0.45],[-0.2,0.25]]:species==='kitelet'?[[-1.1,-.72],[.94,.60],[-.12,1.0],[.88,-.94],[-.6,.2]]:[[-0.45,-0.45],[0.4,0.35],[-0.05,0.1]];
   const offset=offsets[index%offsets.length];
   return {x:home.x+offset[0],z:home.z+offset[1]};
 }
@@ -89,10 +89,10 @@ export function wildlifeMotion(species: WildlifeSpecies, index: number, time: nu
     const t = ((time + phase) % 20 + 20) % 20;
     let along: number;
     if (t < 7) { along = smoothstep(0, 7, t); pose.gait = Math.sin(t / 7 * Math.PI); pose.activity = 'Carrying one dry stem'; }
-    else if (t < 13) { along = 1; pose.activity = t < 10 ? 'Tucking a stem into the sand' : 'Inspecting its little wind fence'; }
+    else if (t < 13) { along = 1; pose.activity = t < 10 ? 'Tucking a stem into the sand' : 'Inspecting the gathered dry stems'; }
     else { along = 1 - smoothstep(13, 20, t); pose.gait = Math.sin((t - 13) / 7 * Math.PI); pose.activity = 'Scurrying through the lee garden'; }
-    // Leave the new stem in the root fence while walking back. The next stem
-    // is collected only at the other end of the loop, out of the fence.
+    // Leave the new stem with the fallen twigs while walking back. The next stem
+    // is collected only at the other end of the loop, away from the litter.
     pose.place = smoothstep(7, 9, t) * (1 - smoothstep(18, 20, t));
     const bearing=habitatBearing(species,index);
     pose.x += along * 0.7*Math.cos(bearing); pose.z += along*0.7*Math.sin(bearing)+Math.sin(along * Math.PI) * 0.12;
@@ -115,6 +115,7 @@ export function wildlifeDirection(terrain: Terrain, x: number, z: number, out = 
 interface Batch {
   species: WildlifeSpecies;
   habitat: boolean;
+  members: number[];
   geometry: InstancedBufferGeometry;
   body: Mesh<InstancedBufferGeometry, ShaderMaterial>;
   outline: Mesh<InstancedBufferGeometry, ShaderMaterial>;
@@ -162,12 +163,13 @@ export class WindWildlife {
     }));
     this.contacts.name = 'Wildlife ground contacts'; this.contacts.frustumCulled = false;
     this.group.add(this.contacts); patch.dispose();
-    const plans: Array<{species:WildlifeSpecies;habitat:boolean}>=[...WILDLIFE_SPECIES.map(species=>({species,habitat:false})),{species:'kitelet',habitat:true},{species:'sand-stitcher',habitat:true}];
-    for (const {species,habitat} of plans) {
+    const plans: Array<{species:WildlifeSpecies;habitat:boolean;variant?:number}>=[...WILDLIFE_SPECIES.map(species=>({species,habitat:false})),...[0,1,2].map(variant=>({species:'kitelet' as const,habitat:true,variant})),{species:'sand-stitcher',habitat:true}];
+    for (const {species,habitat,variant=0} of plans) {
       const speciesIndex=habitat?-1:WILDLIFE_SPECIES.indexOf(species);
-      const base = habitat?wildlifeHabitatGeometry(species as 'kitelet'|'sand-stitcher'):wildlifeGeometry(species), geometry = new InstancedBufferGeometry();
+      const base = habitat?wildlifeHabitatGeometry(species as 'kitelet'|'sand-stitcher',variant):wildlifeGeometry(species), geometry = new InstancedBufferGeometry();
       for (const name of Object.keys(base.attributes)) geometry.setAttribute(name, base.getAttribute(name));
-      const count = WILDLIFE_HABITATS[species].count;
+      const members=Array.from({length:WILDLIFE_HABITATS[species].count},(_,i)=>i).filter(i=>!habitat||species!=='kitelet'||i%3===variant);
+      const count = members.length;
       const attribute = (name: string, size: number): InstancedBufferAttribute => {
         const a = new InstancedBufferAttribute(new Float32Array(count * size), size); geometry.setAttribute(name, a); return a;
       };
@@ -179,9 +181,10 @@ export class WindWildlife {
       });
       const body = new Mesh(geometry, material(false)), outline = new Mesh(geometry, material(true));
       body.frustumCulled = outline.frustumCulled = false;
-      body.name = `${species} ${habitat?'habitats':'bodies'}`; outline.name = `${species} ${habitat?'habitat contours':'contours'}`;
+      const suffix=habitat&&variant>0?` ${variant}`:'';
+      body.name = `${species} ${habitat?'habitats':'bodies'}${suffix}`; outline.name = `${species} ${habitat?'habitat contours':'contours'}${suffix}`;
       this.group.add(outline, body);
-      this.batches.push({ species, habitat, geometry, body, outline, anchor, across, motion, feet, slope, presence });
+      this.batches.push({ species, habitat, members, geometry, body, outline, anchor, across, motion, feet, slope, presence });
       // Attributes are transferred to the instanced geometry, so the temporary
       // wrapper has never owned a GPU allocation or a separate attribute copy.
       base.dispose();
@@ -200,12 +203,13 @@ export class WindWildlife {
     for (const batch of this.batches) {
       let anyVisible = false;
       const habitat = WILDLIFE_HABITATS[batch.species];
-      for (let i = 0; i < habitat.count; i++) {
-        const pose = wildlifeMotion(batch.species, i, time, terrain.layout.seed);
-        const scale=batch.habitat?(batch.species==='kitelet'?wildlifePerchScale(i):1):WILDLIFE_DISPLAY_SCALE[batch.species];
+      for (let i = 0; i < batch.members.length; i++) {
+        const member=batch.members[i];
+        const pose = wildlifeMotion(batch.species, member, time, terrain.layout.seed);
+        const scale=batch.habitat?(batch.species==='kitelet'?wildlifePerchScale(member):1):WILDLIFE_DISPLAY_SCALE[batch.species];
         if(batch.habitat) {
-          const home=wildlifeHome(batch.species,i);
-          const bearing=habitatBearing(batch.species,i),reach=batch.species==='sand-stitcher'?0.7:0;
+          const home=wildlifeHome(batch.species,member);
+          const bearing=habitatBearing(batch.species,member),reach=batch.species==='sand-stitcher'?0.7:0;
           pose.x=home.x+reach*Math.cos(bearing);pose.z=home.z+reach*Math.sin(bearing);
           pose.lift=0;pose.headingX=Math.cos(bearing);pose.headingZ=Math.sin(bearing);pose.gait=0;pose.open=scale;
         }

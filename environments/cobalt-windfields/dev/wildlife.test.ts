@@ -201,7 +201,7 @@ describe('Cobalt reference wildlife', () => {
     wildlife.dispose();
   });
 
-  it('lands Kitelet feet on a physical seed cup and keeps placed stems at the roots', () => {
+  it('lands Kitelet feet on a physical seed cup and keeps placed stems with the litter', () => {
     const terrain=terrainAt(128,412), wildlife=new WindWildlife({},terrain);
     const perch=wildlifeHabitatGeometry('kitelet');
     const p=perch.getAttribute('position'),j=perch.getAttribute('aJoint');
@@ -226,4 +226,33 @@ describe('Cobalt reference wildlife', () => {
     expect(wildlifeMotion('sand-stitcher',0,16-phase,412).x).toBeLessThan(wildlifeMotion('sand-stitcher',0,9-phase,412).x);
     perch.dispose();wildlife.dispose();
   });
+
+  it('gives perches distinct cupped foliage and removes upright coral-like litter spikes',()=>{
+    const geometries=[0,1,2].map(i=>wildlifeHabitatGeometry('kitelet',i));
+    const signatures=geometries.map(g=>Array.from(g.getAttribute('position').array).join(','));
+    expect(new Set(signatures).size).toBe(3);
+    const a=new Vector3(),b=new Vector3(),c=new Vector3(),hit=new Vector3();
+    for(const g of geometries) {
+      const p=g.getAttribute('position'),k=g.getAttribute('aKind'),areas=Array.from({length:8},()=>0);
+      const ray=new Ray(new Vector3(0,3,0),new Vector3(0,-1,0));
+      let landing=-Infinity;
+      for(let i=0;i<p.count;i+=3) {
+        a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);
+        if(ray.intersectTriangle(a,b,c,false,hit))landing=Math.max(landing,hit.y);
+        if(k.getX(i)!==2)continue;
+        const area=b.sub(a).cross(c.sub(a)).multiplyScalar(.5);
+        for(let n=0;n<8;n++)areas[n]+=Math.abs(area.x*Math.cos(n*Math.PI/4)+area.z*Math.sin(n*Math.PI/4));
+      }
+      expect(landing).toBeCloseTo(KITELET_PERCH_HEIGHT,5);
+      expect(Math.min(...areas)/Math.max(...areas)).toBeGreaterThan(.3);
+      expect(g.boundingBox!.max.z-g.boundingBox!.min.z).toBeGreaterThan(.4);
+      g.dispose();
+    }
+    const litter=wildlifeHabitatGeometry('sand-stitcher');
+    expect(new Set(litter.getAttribute('aKind').array)).toEqual(new Set([6]));
+    expect(litter.boundingBox!.max.y).toBeLessThan(.075);
+    expect(litter.boundingBox!.max.x-litter.boundingBox!.min.x).toBeGreaterThan(.4);
+    litter.dispose();
+  });
+
 });

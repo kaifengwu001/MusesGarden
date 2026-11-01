@@ -1,6 +1,6 @@
 # Cobalt Windfields — active validation record
 
-Updated 1 November 2026. **Visual acceptance remains open.** The full environment CPU suite passed 59 tests, and 14 distinct targeted browser checks passed across the review runs. The final saved-find base normalization was followed by three focused CPU tests, scoped TypeScript/ESLint and a production build; those checks and the built-page smoke check passed. The result remains more angular and simplified than the references, with a more open foreground, a stage-like shelter and less layered distant land. These checks do not establish a faithful visual match.
+Updated 1 November 2026. **Visual acceptance remains open.** The latest correction addresses coincident surfaces, flat rock and sand materials, red habitat spikes, and repetitive edge-on foliage. All **66 CPU tests**, scoped and repository-wide TypeScript/ESLint checks, the production build and **14 targeted browser checks** pass for this revision. The built-page smoke check also passes. The scene remains more angular and simplified than the references, particularly the shelter and distant terrain.
 
 ## References and starting evidence
 
@@ -12,6 +12,51 @@ Updated 1 November 2026. **Visual acceptance remains open.** The full environmen
 Work is isolated to `environments/cobalt-windfields/`. The shared meadow `src/`, other environment folders and the separate Scarlet checkout are outside this rebuild. The development URL is `http://localhost:5217/environments/cobalt-windfields/`.
 
 Use the references themselves when continuing. The Scarlet [reference handoff](../../docs/planet-reference-handoff.md) supplies the comparison and evidence workflow; its species, palette and acceptance history do not apply to Cobalt.
+
+## Current material, foliage and surface correction
+
+This pass responds to the user's close-up screenshots and saved camera pose `-0.5712,0.5324,0.3232,0.5347,0.891`. All changes remain inside `environments/cobalt-windfields/`.
+
+| Reported problem | Correction and evidence boundary |
+| --- | --- |
+| Potential flickering where planes conflict | Sand deposits formerly emitted undersides exactly on rock caps; stacked beds likewise shared their supports' cap planes. Hidden bases now embed 3.5 cm into their supports while the visible sand rim still meets the rock. A positive-area coplanar-overlap test checks all nine geology prototypes, allowing only buried support faces. This tests actual triangle intersections rather than duplicate vertices or edge counts alone. |
+| Shelter contacts still contained coincident surfaces | The complete-shelter audit found 22 exposed coplanar triangle-pair overlaps: the door and recessed opening bases, lookout guard-post bases, and handle back. Bases now embed into their supports, and the handle enters the door slightly. The complete-shelter regression finds no positive-area overlap at or above the floor. The previous floor-union area and single-cap checks remain unchanged and pass. |
+| Ink edges could be pulled through an intersecting surface | Geological lines now offset 2.5 mm along the outward geometry normal instead of moving 5 mm toward the camera. Normal depth testing remains enabled and line depth writes remain disabled; no blanket polygon offset hides coincident faces. |
+| Rock faces looked uniformly blue and flat | `render/mineral.glsl` is shared locally by scenery and shelter materials. It adds continuous diffuse separation between face orientations, several scales of mineral color variation, restrained surface-normal relief, irregular fracture marks and fine grains. Coordinates follow physical scale; fine detail fades with pixel footprint. Cliff-front and rear profiles also have modest actual fracture-depth variation, without raised triangulation centers. These changes improve material cues but do not establish geological or reference fidelity. |
+| Peach ground did not read as sand | The ground now combines irregular wind ripples, broad warm washes and grain at different scales, with fine detail filtered by pixel footprint. Sand deposited on rock keeps its own material. The former flat-material result is retained for comparison; fresh material captures are linked below. |
+| Red upright spikes did not resemble coral | Those objects were Sand Stitcher habitat props, not coral. Their repeated red stakes have been replaced by low, irregular tan twig litter, retaining the carried-stem behavior. Actual coral remains in sheltered branching colonies. |
+| White leaves disappeared edge-on and repeated the same silhouette | Sail blades are now single cupped, twisted membranes with smooth normals and branches facing different directions. The small plants used by Kitelets have three different landing-cup and branching forms, with varied physical scale and matching landing heights. Ambient planting mixes adults and juveniles with independent size, heading and offset; coral size and orientation vary more widely. Spacing guards prevent duplicated root points and nearly coincident repeated rocks. No doubled leaf cards or unrelated meadow plants were introduced. |
+
+### Verification for this revision
+
+| Check | Latest result |
+| --- | --- |
+| Environment CPU suite | **66 tests passed.** Includes new geometry, surface-overlap, leaf visibility/variation and habitat checks. |
+| Scoped TypeScript / ESLint | **Passed.** |
+| Repository-wide check | **Passed.** |
+| Production build | **Passed**, retaining the existing large-chunk warning. |
+| Resident, native-find and review-angle browser checks | **All seven checks passed.** |
+| Terrain parity, picking and determinism browser checks | **All seven checks passed.** |
+| Final frozen-frame and triangle-order probe | **Three frozen views repeat exactly.** Reversed submission retains isolated pixel sensitivity; results below. |
+| Built-page smoke | **Passed:** all three wildlife views, greeting, overview and vista, with no collected JavaScript, WebGL or local HTTP errors. |
+
+The final probe used high quality, DPR 1, a fixed render scale of 1 and frozen time 12 s at 1,440 × 900. Three views (user pose, vista and homestead) repeated exactly. Reversing triangle submission in 17 scenery/homestead meshes changed **17 / 24 / 9 pixels** respectively out of 1,296,000; **5 / 2 / 2 pixels** changed by more than 12 channel levels. Every changed pixel was isolated: the largest eight-connected component was one pixel. No page or WebGL errors were recorded. The close shelter and rock captures show no broad overlap bands or competing cap patches. The residual sensitivity is consistent with edge/intersection depth precision, but this is **not** proof that every instance, camera, cross-mesh draw order or animation is flicker-free. See the exact [surface-order review](reference/surface-order-review.json).
+
+Fresh actual-application evidence:
+
+| View | Capture |
+| --- | --- |
+| Before this material correction | [Previous material appearance](reference/material-review-before.png) |
+| User's reported camera angle | [Revised user angle](reference/material-review-user-angle.png) |
+| Rock and sand close-up | [Rock](reference/material-review-rock.png), [sand](reference/material-review-sand.png) |
+| Reverse-side view | [Revised reverse view](reference/material-review-reverse.png) |
+| Shelter contact surfaces | [Shelter floor and steps](reference/shelter-floor.png) |
+
+One medium-quality production smoke frame reported 58 draw calls, 1,443,434 submitted triangles, 206,989,702 GPU bytes and 3.32 ms GPU time. This is a single observation, not a benchmark or a sustained frame-rate claim.
+
+The standard reference captures listed later in this record were also refreshed for the final correction. The earlier verification and production tables remain historical results; the table above governs this revision.
+
+Known limits remain open: angular geological silhouettes, the rectangular shelter, insufficient distant layering, the 400-find memory budget, local-only residents and unimplemented account-backed travel. No visual acceptance or performance-budget claim follows from the passing CPU checks.
 
 ## Visual contract
 
@@ -41,7 +86,7 @@ Use the references themselves when continuing. The Scarlet [reference handoff](.
 | Native wildlife was difficult to see in the opening | Small display scale, habitat placement and distance fading reduced visible presence. | Eleven authored animals occupy reserved local pockets: three Sailbacks, five Kitelets and three Sand Stitchers. Bodies currently use 3× display scale; visibility follows projected size, and inspection framing/contact placement follows that scale. The opening and all three encounter views now have passing browser checks and fresh captures. This validates the local display paths, not full-world wildlife population. |
 | Inherited saved plants could bypass the native visual language | Ambient plant replacement did not cover separate saved-find specimen and bed paths. | Saved specimens and decorative beds now use native coral/sail families while retaining find and topic IDs. The final saved coral fan is wider with rounded tips and a 0.02 m minimum tip radius, rather than thin reeds. Three focused shape tests pass; a browser pixel probe verifies more than 150 changed pixels for each of the specimen and bed layers, and ID-based selection remains working. |
 
-## Verification status
+## Earlier rebuild verification
 
 | Check | Status for this rebuild |
 | --- | --- |
@@ -109,7 +154,7 @@ Two connection-discovery attempts found no accessible external task tracker. **N
 | Saved-find memory budget — unresolved | Preserve the 400-find ≤1 MB test and record the known allocation overrun. Measure the final forms before considering the task complete. |
 | Cross-world backend travel — not implemented | Keep the local route preview separate from account-backed travel. |
 
-## Final capture evidence
+## Earlier rebuild capture evidence
 
 These are actual application captures from the review runs, distinct from the concept images. The main review captures are copied into `reference/` for durable comparison; the latest native-find recapture is noted in verification status:
 
@@ -125,7 +170,7 @@ These are actual application captures from the review runs, distinct from the co
 
 The captures show the revised construction and support further comparison. They do not close visual acceptance: foreground occupancy, natural geological complexity, the shelter silhouette and distant layering remain visibly different from the references.
 
-## Production measurements
+## Earlier production measurements
 
 The final built standalone page passed all three wildlife observation views, greeting, overview and vista navigation with no JavaScript or WebGL errors. The persistent development server listens on `127.0.0.1:5217`; the localhost application URL returned HTTP 200 over IPv4. Final `git diff --check` passed, and `git diff --name-only -- src` produced no paths. These checks do **not** verify the page currently visible in the user's app: direct inspection encountered a stale connection-refused error page, and the request to open the live page was queued.
 

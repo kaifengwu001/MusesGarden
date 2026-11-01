@@ -203,12 +203,20 @@ vec3 meadowPaint(Meadow m) {
   vec3 shade = mix(pal(ROW_BRUSH, 2), pal(ROW_BRUSH, 4), wash * 0.15);
   vec3 col = tone3(lit, mid, shade, m.light);
   col = mix(col, pal(ROW_BRUSH, 5), drift * (1.0-crest) * 0.10);
-  float close = 1.0 - smoothstep(0.025, 0.15, m.pixelMeters);
-  vec3 along = normalize(vec3(0.7, 0.24, -0.45));
-  float stretched = strokes(m.dir, uRadius / 0.32, along, uTerrainSeed + 713u);
-  float interrupted = smoothstep(-0.05, 0.45, gnoise(p / 2.5, uTerrainSeed + 714u));
-  col *= 1.0 - smoothstep(0.22, 0.55, stretched) * interrupted * close * 0.022;
-  float grainClose = 1.0 - smoothstep(0.012, 0.045, m.pixelMeters);
-  col *= 1.0 + gnoise(p * 26.0, uTerrainSeed + 711u) * grainClose * 0.045;
+  // Wind ripples have a continuous crest/trough profile and irregular long
+  // wavefronts. Broad changes in spacing avoid repeated contour-ring noise.
+  float warp=gnoise(p*.17,uTerrainSeed+713u)*4.0+gnoise(p*.65,uTerrainSeed+714u)*1.1;
+  float phase=(c.x*.42+c.y*.91)*17.0+warp;
+  float rippleFade=1.0-smoothstep(.045,.16,m.pixelMeters);
+  float patches=smoothstep(-.12,.36,gnoise(p/3.8,uTerrainSeed+716u));
+  float wave=sin(phase),slope=cos(phase);
+  float trough=pow(max(0.0,-wave),2.0);
+  col=mix(col,pal(ROW_BRUSH,5),trough*.16*rippleFade*(.08+.92*patches));
+  col*=1.0+(.045*slope+.015*wave)*rippleFade*(.08+.92*patches);
+  float grains=gnoise(p*65.0,uTerrainSeed+711u);
+  float grainFade=1.0-smoothstep(.003,.018,m.pixelMeters);
+  col*=1.0+grains*.14*grainFade;
+  float coarse=gnoise(p*7.5,uTerrainSeed+717u);
+  col*=1.0+coarse*.023*(1.0-smoothstep(.04,.13,m.pixelMeters));
   return col;
 }

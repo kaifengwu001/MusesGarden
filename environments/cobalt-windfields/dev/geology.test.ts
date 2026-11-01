@@ -1,5 +1,6 @@
 import { Vector3, Vector4, type InstancedBufferGeometry, type Mesh } from 'three';
 import { afterAll, describe, expect, it } from 'vitest';
+import { coplanarOverlaps } from './coplanarOverlap';
 import { makeGeologyPrototypes } from '../life/windGeology';
 import { clearsWindfieldRoutes, createWindfieldAnchors, WindfieldScenery } from '../life/windfieldScenery';
 import { createGroundSample, generateLayout, Terrain } from '../planet/terrain';
@@ -42,8 +43,18 @@ describe('Cobalt fractured geology', () => {
       expect(prototype.supportSites.length).toBeGreaterThan(0);
       expect(prototype.geometry.getAttribute('aGround').count).toBe(positions.count);
       expect(prototype.outline.getAttribute('aGround').count).toBe(prototype.outline.getAttribute('position').count);
+      const edgeNormal=prototype.outline.getAttribute('normal');
+      expect(edgeNormal.count).toBe(prototype.outline.getAttribute('position').count);
+      for(let i=0;i<edgeNormal.count;i++) expect(Math.hypot(edgeNormal.getX(i),edgeNormal.getY(i),edgeNormal.getZ(i))).toBeCloseTo(1,5);
     }
 
+  });
+
+  it('has no overlapping exposed cap or sand-underside planes', () => {
+    for(const prototype of prototypes) {
+      const overlaps=coplanarOverlaps(prototype.geometry).filter(overlap=>overlap.high>0);
+      expect(overlaps,prototype.name).toEqual([]);
+    }
   });
 
   it('builds deterministic clustered geology and roots every plant at an accepted rock', () => {

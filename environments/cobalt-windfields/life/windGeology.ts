@@ -43,7 +43,9 @@ class RockBuilder {
     // This affine shear retains planar faces without square vertical risers.
     const at=(x:number,y:number,z:number):Vector3=>P(x+y*0.22,y,z-y*0.16);
     const high=plan.map(([x,z])=>at(x,top(x,z),z));
-    const low=plan.map(([x,z])=>at(x,bottom(x,z),z));
+    // A stacked bed penetrates its support slightly. Its hidden underside
+    // must not duplicate the exposed cap of the bed directly below it.
+    const low=plan.map(([x,z])=>at(x,bottom(x,z)-(grounded?0:0.035),z));
     const cap=ShapeUtils.triangulateShape(plan.map(([x,z])=>new Vector2(x,z)),[]);
     const g=grounded?1:0;
     for(const [a,b,c] of cap) {
@@ -67,8 +69,13 @@ class RockBuilder {
     const points=[...profile];
     const area=points.reduce((sum,p,i)=>sum+p[0]*points[(i+1)%points.length][1]-p[1]*points[(i+1)%points.length][0],0);
     if(area<0) points.reverse();
-    const front=points.map(([px,y])=>P(px+x+y*lean,y,z+depth*0.5+px*0.055-y*0.11));
-    const back=points.map(([px,y])=>P(px+x+y*(lean-0.06),y,z-depth*0.5+y*0.09));
+    // Uneven fracture depths make the broad exposed face a set of subtly
+    // different mineral planes. The perimeter still defines the rock: no
+    // raised triangulation centre, tiled bevels or displaced floating veneer.
+    const relief=(px:number,y:number,phase:number):number=>Math.min(1,Math.max(0,y/1.5))*(
+      Math.sin(px*1.17+y*.73+phase)*.16+Math.sin(px*.57-y*1.41+phase*1.7)*.095);
+    const front=points.map(([px,y])=>P(px+x+y*lean,y,z+depth*0.5+px*0.055-y*0.11+relief(px,y,.7)));
+    const back=points.map(([px,y])=>P(px+x+y*(lean-0.06),y,z-depth*0.5+y*0.09+relief(px,y,2.3)*.75));
     const ground=points.map(([,y])=>y<0?1:0);
     const cap=ShapeUtils.triangulateShape(points.map(([px,y])=>new Vector2(px,y)),[]);
     for(const [a,b,c] of cap) {
@@ -136,7 +143,7 @@ class RockBuilder {
     }
     this.supportSites.push(...supports.values());
   }
-  /** Sand is a shallow curved deposit whose boundary returns exactly to its supporting bed. */
+  /** A closed sand deposit: visible rim meets the bed, hidden underside embeds into it. */
   sand(plan: Plan,support: Surface,thickness=0.11):void {
     const distance=(x:number,z:number):number=>{
       let closest=Infinity;
@@ -147,10 +154,11 @@ class RockBuilder {
       }
       return closest;
     };
-    const height=(x:number,z:number):number=>{
+    const cover=(x:number,z:number):number=>{
       const t=Math.min(1,distance(x,z)/0.38);
-      return support(x,z)+thickness*t*t*(3-2*t);
+      return t*t*(3-2*t);
     };
+    const height=(x:number,z:number):number=>support(x,z)+thickness*cover(x,z);
     const at=(x:number,y:number,z:number):Vector3=>P(x+y*0.22,y,z-y*0.16);
     const normal=(x:number,z:number):Vector3=>{
       const e=0.004,dx=(height(x+e,z)-height(x-e,z))/(e*2),dz=(height(x,z+e)-height(x,z-e))/(e*2);
@@ -162,7 +170,7 @@ class RockBuilder {
         draw(a,ab,ca,depth-1);draw(ab,b,bc,depth-1);draw(ca,bc,c,depth-1);draw(ab,bc,ca,depth-1);return;
       }
       const source=[a,c,b];
-      const upper=source.map(q=>at(q.x,height(q.x,q.y),q.y)),lower=source.map(q=>at(q.x,support(q.x,q.y),q.y));
+      const upper=source.map(q=>at(q.x,height(q.x,q.y),q.y)),lower=source.map(q=>at(q.x,support(q.x,q.y)-.035*cover(q.x,q.y),q.y));
       if(upper.every((q,i)=>q.distanceToSquared(lower[i])<1e-14))return;
       this.triangle(upper[0],upper[1],upper[2],13);
       const offset=this.smoothNormals.length-3;
@@ -179,8 +187,26 @@ class RockBuilder {
     geometry.setAttribute('aGround',new Float32BufferAttribute(this.ground,1));
     const normals=geometry.getAttribute('normal');
     this.smoothNormals.forEach((normal,index)=>{if(normal)normals.setXYZ(index,normal.x,normal.y,normal.z);});
+    // Edge vertices sit outside their adjacent mineral planes. A geometric
+    // offset preserves occlusion; camera-directed pulls can expose a rear
+    // edge through the front of another intersecting slab.
+    const positions=geometry.getAttribute('position');
+    const key=(x:number,y:number,z:number):string=>`${Math.fround(x)},${Math.fround(y)},${Math.fround(z)}`;
+    const vertexNormals=new Map<string,Vector3>();
+    for(let i=0;i<positions.count;i++) {
+      const k=key(positions.getX(i),positions.getY(i),positions.getZ(i));
+      const normal=vertexNormals.get(k)??new Vector3();
+      normal.add(new Vector3(normals.getX(i),normals.getY(i),normals.getZ(i)));
+      vertexNormals.set(k,normal);
+    }
+    const lineNormals:number[]=[];
+    for(let i=0;i<this.lines.length;i+=3) {
+      const normal=vertexNormals.get(key(this.lines[i],this.lines[i+1],this.lines[i+2]))?.clone().normalize()??P(0,1,0);
+      lineNormals.push(normal.x,normal.y,normal.z);
+    }
     const outline=new BufferGeometry();
     outline.setAttribute('position',new Float32BufferAttribute(this.lines,3));
+    outline.setAttribute('normal',new Float32BufferAttribute(lineNormals,3));
     outline.setAttribute('aGround',new Float32BufferAttribute(this.lineGround,1));
     return {geometry,outline};
   }

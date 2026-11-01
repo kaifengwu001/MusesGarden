@@ -31,7 +31,7 @@ const NOON: Rows = {
   // light, mid, shade, sunlit tips, pale (ahead of bloom), deep shade, far blue-green, pale light, wind sheen
   [ROW.GRASS]: ['#E99079', '#CC685E', '#9C4C50', '#F1B399', '#C38E80', '#703F4B', '#9C8F97', '#E9BAA2', '#F9E5BC'],
   // painted far meadow: brush light, brush mid, brush dark, dry highlight, cool strokes, warm strokes
-  [ROW.BRUSH]: ['#F5C5AC', '#E7AE97', '#CB9288', '#F9DAC0', '#B9A2A3', '#DA9C8C'],
+  [ROW.BRUSH]: ['#F1C4AA', '#DFA88F', '#B77F73', '#F8D8B9', '#B89D9A', '#D49980'],
   // the mirror's cobalt, the navy body, -, highlight, pale sky low in the mirror, deep cobalt high in it,
   // lily pad, lily pad shade, a bank in the mirror, ruffle
   [ROW.WATER]: ['#2E78C0', '#0D4A84', '#D7EEE8', '#F6FCFF', '#6FA6D8', '#1C5FAA', '#6FA548', '#4A7F35', '#16404A', '#8CBBE6'],

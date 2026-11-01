@@ -53,6 +53,6 @@ void main(){
  vec3 planet=up*(uRadius+aAnchor.w+p.y);
  vec3 n=rotateAround(normalize(X*normal.x+U*normal.y+Z*normal.z),axis,angle);
  vPlanet=planet;vPlanetNormal=n;vWorld=warpPosition(planet);
- vLocal=position;vLocalNormal=normal;vUv=uv;vKind=aKind;vVariation=aPlacement.z;
+ vLocal=position*aPlacement.x;vLocalNormal=normal;vUv=uv;vKind=aKind;vVariation=aPlacement.z;
  gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.0);
 }

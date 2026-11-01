@@ -81,9 +81,19 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
   const coral: WindfieldAnchor[][] = Array.from({ length: 3 }, () => []);
   const seeds: WindfieldAnchor[] = [];
   const local = (x: number, z: number, scale: number, turn = 0): WindfieldAnchor => ({ direction: new Vector3(), local:[x,z], scale, turn, phase:rand()*TAU, tint:rand(), threshold:0 });
+  const anchorDistance = (a: WindfieldAnchor,b: WindfieldAnchor): number => {
+    if(a.local&&b.local) return Math.hypot(a.local[0]-b.local[0],a.local[1]-b.local[1]);
+    if(!a.local&&!b.local&&a.direction.distanceToSquared(b.direction)<1e-12) {
+      return Math.hypot((a.offset?.[0]??0)-(b.offset?.[0]??0),(a.offset?.[1]??0)-(b.offset?.[1]??0));
+    }
+    return Infinity;
+  };
   let serial = 0;
   const rock = (type: number, anchor: WindfieldAnchor): WindfieldAnchor | undefined => {
     if (anchor.local && !clearsWindfieldRoutes(anchor.local[0], anchor.local[1], prototypes[type].footprint * anchor.scale)) return;
+    // Connected beds can intersect, but a second copy of the same transformed
+    // surface has no physical meaning and would compete for the same depth.
+    if(rocks[type].some(other=>anchorDistance(anchor,other)<0.06&&Math.abs(anchor.scale-other.scale)<0.015&&Math.abs(Math.sin((anchor.turn-other.turn)/2))<0.006)) return;
     anchor.id = `rock-${serial++}`;
     rocks[type].push(anchor);
     return anchor;
@@ -96,28 +106,51 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
     else anchor.offset = [(host.offset?.[0] ?? 0)+x,(host.offset?.[1] ?? 0)+z];
     return anchor;
   };
+  const plant = (groups: WindfieldAnchor[][],variant: number,anchor: WindfieldAnchor,clearance: number): boolean => {
+    if(anchor.local&&!clearsWindfieldRoutes(anchor.local[0],anchor.local[1],clearance)) return false;
+    // Keep roots distinct even where two accepted rocks share a lee edge.
+    // Leaves may overlap in projection; stems never start at the same point.
+    const spacing=groups===sails?0.34:0.16;
+    if(groups.some(group=>group.some(other=>anchorDistance(anchor,other)<spacing*(anchor.scale+other.scale)))) return false;
+    groups[variant].push(anchor);
+    return true;
+  };
   const ecology = (host: WindfieldAnchor, type: number, lushness: number, hero = false): void => {
     const proto = prototypes[type];
     const first=Math.floor(rand()*proto.leeSites.length);
     // Colonies follow two unequal stretches of a real front edge, leaving gaps.
     for(let seam=0;seam<(hero?2:1);seam++) {
       const site=proto.leeSites[(first+seam)%proto.leeSites.length];
-      const count=3+Math.floor(rand()*lushness);
+      const count=2+Math.floor(rand()*lushness);
       const span=hero?3.3:2.1;
       for(let i=0;i<count;i++) {
         const dx=site[0]+(i/(count-1)-0.5)*span+(rand()-0.5)*0.28;
         const dz=site[1]+0.38+rand()*0.7;
-        const anchor=offsetFrom(host,dx,dz,(0.73+rand()*0.48)*(hero?1.18:1));
-        anchor.turn=host.turn+(rand()-0.5)*0.7;
-        if(!anchor.local||clearsWindfieldRoutes(anchor.local[0],anchor.local[1],0.48)) coral[Math.floor(rand()*3)].push(anchor);
+        const age=rand();
+        const anchor=offsetFrom(host,dx,dz,(0.46+Math.pow(age,0.65)*0.91)*(hero?1.1:1));
+        anchor.turn=host.turn+(rand()-0.5)*1.35;
+        plant(coral,Math.floor(rand()*3),anchor,Math.max(0.32,0.43*anchor.scale));
       }
     }
-    if(hero||rand()<0.38) {
+    if(hero||rand()<0.42) {
       const site=proto.leeSites[(first+1)%proto.leeSites.length];
-      const amount=hero&&rand()<0.3?2:1;
+      // One wind-shaped adult and occasional young plants share a pocket.
+      // Age, heading and offset vary independently instead of stamping a row
+      // of equally tall, front-facing two-leaf trees along every rock.
+      const amount=hero?(rand()<0.6?3:2):(rand()<0.35?2:1);
+      const adultScale=hero?1.12+rand()*0.68:0.80+rand()*0.65;
+      const bearing=host.turn+(rand()-0.5)*2.6;
+      const adultVariant=Math.floor(rand()*3);
       for(let i=0;i<amount;i++) {
-        const anchor=offsetFrom(host,site[0]+i*1.9,site[1]+0.75+rand()*0.5,hero?1.0+rand()*0.48:0.8+rand()*0.3);
-        if(!anchor.local||clearsWindfieldRoutes(anchor.local[0],anchor.local[1],0.5)) sails[Math.floor(rand()*3)].push(anchor);
+        const young=i>0;
+        const scale=young?adultScale*(0.28+rand()*0.26):adultScale;
+        const side=i===2?-1:1;
+        const dx=site[0]+(young?side*(1.1+rand()*1.7):(rand()-0.5)*0.7);
+        const dz=site[1]+0.68+rand()*(young?1.25:0.55);
+        const anchor=offsetFrom(host,dx,dz,scale);
+        anchor.turn=bearing+(young?(side*0.9+(rand()-0.5)*1.1):0);
+        const variant=young?(adultVariant+i)%3:adultVariant;
+        plant(sails,variant,anchor,0.42+0.32*scale);
       }
     }
   };
@@ -194,7 +227,8 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
     for(let i=0;i<rows;i++) {
       const type=[0,1,2,0,4][Math.floor(rand()*5)];
       const x=(i-(rows-1)/2)*(5.2+rand()*2.5),z=(rand()-0.5)*4;
-      const host=rock(type,global(x,z,0.8+rand()*0.7))!;
+      const host=rock(type,global(x,z,0.8+rand()*0.7));
+      if(!host) continue;
       if(lush&&i%3===1) ecology(host,type,3);
       if(i%2===0) rock(3,global(x+(rand()-0.5)*4,z+5+rand()*3,0.55+rand()*0.55));
     }
@@ -266,6 +300,7 @@ export class WindfieldScenery {
     if(outlineBase) {
       const edgeGeometry=new InstancedBufferGeometry();
       edgeGeometry.setAttribute('position',outlineBase.getAttribute('position'));
+      edgeGeometry.setAttribute('normal',outlineBase.getAttribute('normal'));
       edgeGeometry.setAttribute('aGround',outlineBase.getAttribute('aGround'));
       edgeGeometry.setAttribute('aFootDepth',footData);
       edgeGeometry.setAttribute('aAnchor',anchorData);
