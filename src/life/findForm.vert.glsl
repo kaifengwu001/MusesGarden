@@ -76,7 +76,7 @@ void main() {
     // the farther along a frond, the further it is still rolled up toward the middle
     vec3 outward = vec3(local.x, 0.0, local.z);
     float l = length(outward);
-    if (l > 1e-4) local = rotateAxis(local, cross(outward / l, vec3(0.0, 1.0, 0.0)), 2.6 * (1.0 - open) * t * t);
+    if (l > 1e-4) local = rotateAxis(local, cross(outward / l, vec3(0.0, 1.0, 0.0)), 2.0 * (1.0 - open) * t * t);
   } else if (head) {
     local.xz *= mix(0.3, 1.0, open);
   }
