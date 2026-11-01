@@ -12,6 +12,8 @@ shots/
 reference/howls-lake.webp
 # Muse's design references (renders and photos of the character), kept out of git
 reference/muse/
+# the terraces planet's references (paintings and illustrations), kept out of git
+reference/terraces/
 
 # local probe scripts
 .*.mjs

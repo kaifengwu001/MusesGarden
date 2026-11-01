@@ -30,6 +30,29 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The terraces: a second planet (in progress)
+
+Started from a20b606 (iteration 17 after Kai's review). Kai's brief
+(2026-10-31): a second planet to visit, built on the same procedural
+fundamentals as the meadow. Eight reference images came with it, kept out of
+git under reference/terraces/: karst peaks in an ink-wash mist over flooded
+terraces (1); blue karst islands round a winding river (2); green terraces
+in bands of dots and dashes (3); a village among terraces in loose strokes
+(4); posterised terraces, flooded bands white and teal among greens (5); a
+woodcut of terraces, a plank path and huts (6); a forest canopy from above
+with white birds over it (7); layered green hills with white houses and bare
+trees (8). This table fills in as each is done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | A second planet that we can visit, using the same procedural fundamental logic | |
+| 2 | Hilly terrain, with fog meandering between the mountains | |
+| 3 | Terraced rice paddies | |
+| 4 | Not all paddies are filled with water and reflective: some are fully grown, green waving rice, some in between, others fully reflective | |
+| 5 | Subtle colour differences from one paddy to another | |
+| 6 | Not all hills are covered by paddies: some hillsides are trees | |
+| 7 | White flocks of birds circle between the valleys | |
+
 ## Iteration 17: Muse lives on the planet (in progress)
 
 Started from 86dadbd: iteration 16's interactions, built in the lab, go into
