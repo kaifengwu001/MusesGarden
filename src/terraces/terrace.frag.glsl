@@ -114,9 +114,9 @@ void main() {
     // a riser: grass over earth, lit as it leans, darker toward its foot, in tufts and streaks of grass
     float up = clamp((vHeight - vFloor.x + 1.0) / 1.4, 0.0, 1.0);
     col = tone3(pal(TR_EARTH, 2), mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), 0.5), pal(TR_EARTH, 3), b);
-    float streak = gnoise(dir * uRadius * 9.0 + vec3(0.0, vHeight * 0.8, 0.0), uTerrainSeed + 934u) * (1.0 - smoothstep(0.03, 0.12, pixelMeters));
-    col = mix(col, pal(TR_EARTH, 4), 0.25 * smoothstep(0.1, 0.6, -tuft));
-    col *= mix(0.72, 1.06, up) * (0.9 + 0.14 * tuft + 0.12 * streak);
+    // (no streaks: from a distance they read as pale ticks, a broken line along every wall)
+    col = mix(col, pal(TR_EARTH, 4), 0.2 * smoothstep(0.1, 0.6, -tuft));
+    col *= mix(0.72, 1.04, up) * (0.94 + 0.08 * tuft);
   } else if (part == 4) {
     // a skirt: earth where the terraced land ends
     col = tone3(pal(TR_EARTH, 3), mix(pal(TR_EARTH, 3), pal(TR_EARTH, 5), 0.5), pal(TR_EARTH, 5), b) * (0.92 + 0.1 * tuft);

@@ -94,6 +94,9 @@ const NONE = [0, 0, 0, 0] as const;
 /** The parts of a polyline (x, y pairs) inside the cell (its side field ≥ 0), cut exactly where it crosses out. */
 function inCell(s: CellSurvey, points: Float64Array, closed: boolean): Float64Array[] {
   const { n, g, half, side } = s;
+  // (each piece runs on a little past its cell's edge, under its neighbour's: two cells' last cross-sections at
+  // the edge itself came out turned a little against each other, and the bund broke there in a notch)
+  const OVER = 0.3;
   const at = (x: number, y: number): number => {
     const fx = Math.min(Math.max((x + half) / g, 0), n - 1.0001);
     const fy = Math.min(Math.max((y + half) / g, 0), n - 1.0001);
@@ -114,7 +117,7 @@ function inCell(s: CellSurvey, points: Float64Array, closed: boolean): Float64Ar
     const k = c % m;
     const x = points[2 * k];
     const y = points[2 * k + 1];
-    const v = at(x, y);
+    const v = at(x, y) + OVER;
     if (c > 0 && v >= 0 !== prev >= 0) {
       const kp = (c - 1) % m;
       const t = prev / (prev - v);
@@ -344,7 +347,10 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
     return i < 0 || j < 0 || i >= n || j >= n ? -1 : s.paddy[j * n + i];
   };
   for (const cut of s.cuts) {
-    for (const p of inCell(s, cut.points, false)) {
+    // (its ridge stops short of the walls it runs into: its end stood up against a riser as a pale tick)
+    const trimmed = trimEnds(cut.points, 0.25);
+    if (!trimmed) continue;
+    for (const p of inCell(s, trimmed, false)) {
       const m = p.length / 2;
       if (m < 2) continue;
       const ring: number[][] = [];
@@ -481,4 +487,30 @@ function rowMeters(s: CellSurvey, B: Band, x: number, y: number, across: number)
   const i = Math.min(Math.max(Math.round((x + s.half) / s.g), 0), s.n - 1);
   const j = Math.min(Math.max(Math.round((y + s.half) / s.g), 0), s.n - 1);
   return (across * (B.hi - B.lo)) / Math.max(s.slope[j * s.n + i], 0.08);
+}
+
+/** A polyline with d meters taken off each end (null if nothing is left). */
+function trimEnds(p: Float64Array, d: number): Float64Array | null {
+  const m = p.length / 2;
+  const len = (k: number): number => Math.hypot(p[2 * k + 2] - p[2 * k], p[2 * k + 3] - p[2 * k + 1]);
+  let total = 0;
+  for (let k = 0; k + 1 < m; k++) total += len(k);
+  if (total <= 2 * d + 0.1) return null;
+  const at = (s: number): [number, number] => {
+    let k = 0;
+    while (k + 1 < m - 1 && s > len(k)) {
+      s -= len(k);
+      k++;
+    }
+    const t = Math.min(s / (len(k) || 1), 1);
+    return [p[2 * k] + (p[2 * k + 2] - p[2 * k]) * t, p[2 * k + 1] + (p[2 * k + 3] - p[2 * k + 1]) * t];
+  };
+  const out: number[] = [...at(d)];
+  let s = 0;
+  for (let k = 0; k + 1 < m; k++) {
+    s += len(k);
+    if (s > d && s < total - d) out.push(p[2 * k + 2], p[2 * k + 3]);
+  }
+  out.push(...at(total - d));
+  return Float64Array.from(out);
 }
