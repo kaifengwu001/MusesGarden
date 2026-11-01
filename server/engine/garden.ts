@@ -249,7 +249,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
   };
 }
 
-// The seams lanes K and S fill: Interest.since, and S's invitation model and Relationship.friendsSince.
+// Dated from the log until the state carries Interest.since and Relationship.friendsSince.
 
 function interestSince(s: MuseState, topic: TopicKey, index: LogIndex): Instant {
   return index.firstSeen.get(topic) ?? s.at;

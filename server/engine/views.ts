@@ -136,8 +136,8 @@ export class Views implements GardenQueries {
     for (const frame of gardenFrames(input, missed, 'always')) send(frame);
     return this.engine.subscribe((events) => {
       const mine = events.filter((e) => e.museId === museId);
-      const now = mine.length > 0 ? this.gardenInput(museId, this.engine.now()) : null;
-      if (now) for (const frame of gardenFrames(now, mine, 'if-moved')) send(frame);
+      const latest = mine.length > 0 ? this.gardenInput(museId, this.engine.now()) : null;
+      if (latest) for (const frame of gardenFrames(latest, mine, 'if-moved')) send(frame);
     });
   }
 
