@@ -252,7 +252,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
 // Dated from the log until the state carries Interest.since and Relationship.friendsSince.
 
 function interestSince(s: MuseState, topic: TopicKey, index: LogIndex): Instant {
-  return index.firstSeen.get(topic) ?? s.at;
+  return s.interests.get(topic)?.since ?? index.firstSeen.get(topic) ?? s.at;
 }
 
 function friendsSince(s: MuseState, r: Relationship, index: LogIndex): Instant {
