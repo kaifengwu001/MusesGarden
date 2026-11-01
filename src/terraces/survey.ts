@@ -53,7 +53,7 @@ export type SurveyMode = keyof typeof MODES;
  * lower wall, up to `share` of the way across; where the band narrows again its wall meets the lower one at an
  * angle (`lead`). Its floor stands `floor` of the way up the band.
  */
-export const LENS = { smooth: 2, wide: [6.5, 10], share: 0.5, lead: 0.06, floor: 0.2 } as const;
+export const LENS = { smooth: 2, wide: [4.6, 7.2], share: 0.5, lead: 0.06, floor: 0.2 } as const;
 
 /** A lens's share across a band D meters tall where the hills' smoothed slope is `slope` (≤ 0: none there). */
 export function lensShare(D: number, slope: number): number {

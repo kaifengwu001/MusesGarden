@@ -18,14 +18,14 @@ const URLS = [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/mountain${k}
  * models' footprints reach about half their height across), sunk this much more (× its height); and out to
  * where a tower is drawn in full detail (m, plus its height).
  */
-export const TOWER = { foot: [0.22, 0.42], sink: 0.05, near: 140 } as const;
+export const TOWER = { foot: [0.25, 0.45, 0.62], sink: 0.08, near: 140, squash: 0.8 } as const;
 
 export class Towers {
   private readonly set_: ModelSet;
   readonly group;
 
   constructor(shared: Record<string, IUniform>) {
-    this.set_ = new ModelSet('towers', URLS, shared, PEAKS.max, TOWER.near);
+    this.set_ = new ModelSet('towers', URLS, shared, PEAKS.max, TOWER.near, TOWER.squash);
     this.group = this.set_.group;
   }
 
@@ -42,13 +42,13 @@ export class Towers {
       const q = new Vector3();
       const e2 = new Vector3().crossVectors(up, e1);
       for (const ring of TOWER.foot) {
-        for (let k = 0; k < 10; k++) {
-          const t = e1.clone().multiplyScalar(Math.cos((k * Math.PI) / 5)).addScaledVector(e2, Math.sin((k * Math.PI) / 5));
+        for (let k = 0; k < 12; k++) {
+          const t = e1.clone().multiplyScalar(Math.cos((k * Math.PI) / 6)).addScaledVector(e2, Math.sin((k * Math.PI) / 6));
           q.copy(up).addScaledVector(t, (ring * peak.height * peak.stretch) / terrain.radius).normalize();
           base = Math.min(base, terrain.fields.natural(q));
         }
       }
-      return { model: peak.model, up, e1, base: base - TOWER.sink * peak.height, height: peak.height, stretch: peak.stretch };
+      return { model: peak.model, up, e1, base: base - TOWER.sink * TOWER.squash * peak.height, height: peak.height, stretch: peak.stretch };
     });
     this.set_.set(placements, terrain.radius);
   }

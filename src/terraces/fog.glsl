@@ -53,17 +53,18 @@ float valleyFog(vec3 c, vec3 p) {
   float t1 = min((-B + s) / (2.0 * A), 1.0);
   if (t1 <= t0) return 0.0;
   float tau = 0.0;
-  // (twelve samples: the banks stand taller now, Kai asked for thicker, more volumetric fog)
-  for (int i = 0; i < 12; i++) tau += fogDensityAt(c + d * mix(t0, t1, (float(i) + 0.5) / 12.0), c);
-  tau *= sqrt(A) * (t1 - t0) / 12.0;
+  // (sixteen samples: the banks stand 14 m tall now, Kai asked for deeper, more volumetric fog)
+  for (int i = 0; i < 16; i++) tau += fogDensityAt(c + d * mix(t0, t1, (float(i) + 0.5) / 16.0), c);
+  tau *= sqrt(A) * (t1 - t0) / 16.0;
   return 1.0 - exp(-tau);
 }
 
 // The fog's colour seen at a height (m): white in the sun at its top, a soft blue-grey deeper in it.
 vec3 fogColour(float h) {
-  float up = smoothstep(0.0, uValleyFog.y, h);
+  // (lit white at its top, a deeper blue-grey low in it: the bank reads as a volume, not a veil)
+  float up = smoothstep(0.0, 1.2 * uValleyFog.y, h);
   vec3 lit = mix(pal(TR_FOG, 1), pal(TR_FOG, 0), uFogCover.z);
-  return mix(mix(pal(TR_FOG, 2), lit, 0.6), lit, up);
+  return mix(mix(pal(TR_FOG, 2), lit, 0.35), lit, up);
 }
 
 // The valley fog over a colour seen from the camera (view space) at a point (planet space).

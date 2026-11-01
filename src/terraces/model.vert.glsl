@@ -5,6 +5,7 @@
 #include <meadow_common>
 #include <meadow_warp>
 uniform float uRadius;
+uniform float uModelSquash; // its height × this (its footprint kept)
 
 attribute vec4 aBase;  // the site's up (direction), its base's height (m)
 attribute vec4 aFrame; // the model's x way (its length the width's stretch), the tower's height (m)
@@ -21,8 +22,8 @@ void main() {
   vec3 e1 = aFrame.xyz / s;
   vec3 e2 = cross(e1, up);
   float H = aFrame.w;
-  vec3 p = up * (uRadius + aBase.w) + (e1 * position.x * s + up * position.y + e2 * position.z * s) * H;
-  vec3 n = normalize(e1 * normal.x / s + up * normal.y + e2 * normal.z / s);
+  vec3 p = up * (uRadius + aBase.w) + (e1 * position.x * s + up * position.y * uModelSquash + e2 * position.z * s) * H;
+  vec3 n = normalize(e1 * normal.x / s + up * normal.y / uModelSquash + e2 * normal.z / s);
   vec3 w = warpPosition(p);
   vUv = uv;
   vNormal = warpNormal(p, n);

@@ -71,6 +71,8 @@ export class ModelSet {
     private readonly shared: Record<string, IUniform>,
     private readonly max: number,
     private readonly near: number,
+    /** Its models' heights × this (their footprints kept): Kai found the towers a little tall. */
+    squash = 1,
   ) {
     this.group.name = name;
     void loadModels(urls).then((models) => {
@@ -82,7 +84,7 @@ export class ModelSet {
             for (const a of ['position', 'normal', 'uv']) g.setAttribute(a, src.getAttribute(a));
             for (const a of ['aBase', 'aFrame']) g.setAttribute(a, new InstancedBufferAttribute(new Float32Array(this.max * 4), 4).setUsage(DynamicDrawUsage));
             g.instanceCount = 0;
-            const mesh = new Mesh(g, new ShaderMaterial({ name: `${name} lod${l}`, vertexShader, fragmentShader, uniforms: { ...this.shared, uMap: { value: m.map } } }));
+            const mesh = new Mesh(g, new ShaderMaterial({ name: `${name} lod${l}`, vertexShader, fragmentShader, uniforms: { ...this.shared, uMap: { value: m.map }, uModelSquash: { value: squash } } }));
             mesh.frustumCulled = false;
             this.group.add(mesh);
             return mesh;

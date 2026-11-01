@@ -59,7 +59,7 @@ export function cellFrequency(radius: number): number {
 }
 
 /** Karst towers: per m² (before the ranges keep some), the share of the planet in ranges, their heights (m), their mounds' radius and height (× the tower's height), the models (towers.ts). */
-export const PEAKS = { density: 1 / 1800, ranges: 0.38, height: [26, 78], mound: [0.6, 0.12], models: 5, max: 96 } as const;
+export const PEAKS = { density: 1 / 3400, ranges: 0.38, group: [1, 4], height: [26, 78], mound: [0.6, 0.12], models: 5, max: 96 } as const;
 
 /**
  * The river: its width (m, from narrow to wide along it), its channel's depth under the valley floor (m)
@@ -283,16 +283,30 @@ export class TerraceFields {
     }
     found.sort((a, b) => a.threshold - b.threshold);
     this.peaks = [];
+    // each site a group of towers (Kai: groups look better than a tower alone): the tallest at the site, the
+    // others round it, smaller, a little more than half its height out
+    const ta = new Vector3();
+    const tb = new Vector3();
     for (const f of found) {
-      if (this.peaks.length >= PEAKS.max) break;
       const h = hash32(f.seed);
-      // a few tall towers, many smaller ones
+      // a few tall groups, many smaller ones
       const tall = unit(h) ** 1.4;
-      const height = PEAKS.height[0] + (PEAKS.height[1] - PEAKS.height[0]) * tall;
-      const radiusM = PEAKS.mound[0] * height;
-      // off the river and its banks: towers stand on the valley floor and the hills, never in the water
-      if (this.riverAt(f.dir).distance < 0.5 * this.river.width + 0.55 * height + 6) continue;
-      this.peaks.push({ dir: f.dir, height, radius: radiusM, model: Math.floor(unit(mix(h, 2)) * PEAKS.models), turn: unit(mix(h, 3)) * Math.PI * 2, stretch: 0.85 + 0.35 * unit(mix(h, 4)) });
+      const main = PEAKS.height[0] + (PEAKS.height[1] - PEAKS.height[0]) * tall;
+      const count = PEAKS.group[0] + Math.floor(unit(mix(h, 5)) ** 0.7 * (PEAKS.group[1] - PEAKS.group[0] + 1));
+      gradientFrame(f.dir, ta, tb);
+      for (let k = 0; k < count && this.peaks.length < PEAKS.max; k++) {
+        const height = k === 0 ? main : main * (0.42 + 0.4 * unit(mix(h, 30 + k)));
+        let dir = f.dir;
+        if (k > 0) {
+          const bearing = Math.PI * 2 * unit(mix(h, 10 + k));
+          const out = (0.38 + 0.42 * unit(mix(h, 20 + k))) * main;
+          dir = d.copy(ta).multiplyScalar(Math.cos(bearing)).addScaledVector(tb, Math.sin(bearing)).multiplyScalar(out / radius).add(f.dir).normalize().clone();
+        }
+        // off the river and its banks: towers stand on the valley floor and the hills, never in the water
+        if (this.riverAt(dir).distance < 0.5 * this.river.width + 0.55 * height + 6) continue;
+        const hk = hash32((f.seed + 7919 * k) >>> 0);
+        this.peaks.push({ dir, height, radius: PEAKS.mound[0] * height, model: Math.floor(unit(mix(hk, 2)) * PEAKS.models), turn: unit(mix(hk, 3)) * Math.PI * 2, stretch: 0.85 + 0.35 * unit(mix(hk, 4)) });
+      }
     }
     const data = this.peakTexture.image.data as Float32Array;
     data.fill(0);

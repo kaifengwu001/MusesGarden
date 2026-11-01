@@ -52,7 +52,7 @@ const FIELD_PATHS: ReadonlySet<string> = new Set(['terraces.hills', 'terraces.fo
  * banks' top and its softness (m), the clearing it leaves round the camera
  * (m), and its two layers' drift (m/s).
  */
-const FOG = { density: 0.24, top: 6.5, soft: 2.6, clearing: 24, drift: [0.55, 1.1] } as const;
+const FOG = { density: 0.12, top: 14, soft: 5, clearing: 45, drift: [0.55, 1.1] } as const;
 /** Heights of the named views (m): a bird's-eye view over the terraces, and standing on one. */
 const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
 /**
