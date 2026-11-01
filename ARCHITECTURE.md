@@ -691,47 +691,84 @@ valley floor at the bottom), from fields baked in rest space
    slope: a line of trees down the gully.
 5. **Woods:** stretches of whole hillside left to forest, by a macro noise
    (the Forest share).
-6. **Villages:** sites from a second point set, kept on gentle ground just
-   below a forest edge. Houses stand on terrace floors around the site (each
-   level is flat, so a house stands level on it), along the contour, facing
-   downhill; their ground is courtyard, not paddy.
-7. **Everything else is terraced.**
+6. **Valley floors (flats):** the flat floors between the hills (a field of
+   its own, baked as `flat`), laid out as plots, not contour terraces.
+7. **Villages:** sites from a second point set on the flats near the foot of
+   the hills; houses on level ground, their ground courtyard, not paddy.
+8. **Everything else is terraced.**
 
-### A hill turned into terraces
+### Terraces built on the hills
 
-The hills' height is cut into levels a riser apart (1.1 m): the level is
-L = ⌊h / riser + offset⌋, where a slow offset field lets the levels wander off
-the contours a little, so terraces narrow, widen and merge. Each level is a
-flat floor at L × riser; a band of it is riser / slope wide (steep: narrow,
-gentle: wide; on the flat valley floors one level spans the floor). Across a
-band, from its downhill edge:
+The terraces are objects built on the hills, not the hills' mesh bent into
+steps (Kai, after the second pass). The hills' own mesh is sunk 2.6 m under
+built land (`objectsSink`, ground.glsl) and the terraces stand on it as
+meshes, built cell by cell round the camera (terraces/objects.ts, out to
+220 m), a few milliseconds a step on the build queue, nearest first.
 
-- **the bund**, the wall that holds the water: a ridge 0.22 m high and
-  0.45 m wide along the top of the riser below;
-- **the floor**, flat: the paddy;
-- **the riser** up to the next level, 0.55 m wide, steep.
+**Cells** are only units of work: a warped Voronoi of points in space (about
+56 m), keyed by a hash of their lattice place (cells.ts, cells.glsl; the
+lattice place offset before hashing: unoffset, two cells mirrored through
+the axes share a key). Everything a cell builds is planet-wide, so the
+terraces run on across cells without a seam; each cell builds only its own
+part, cut exactly at its edge.
 
-Along the band, **cross-bunds** divide it into paddies, across the band:
-the planet is tiled into cells about 48 m wide (a Voronoi tiling in
-direction space, chosen per octave of R), and within a cell each level is cut
-every 9–22 m (its own spacing and phase) along the contour's direction at
-the cell's middle, so the cuts run downhill, staggered from level to level.
-A cell's own edge is a cut too. So every paddy is enclosed: the bund along
-its outer edge, the riser along its inner edge, cross-bunds at its ends.
+**The survey** (terraces/survey.ts) reads the bakes back on the CPU
+(bakeReader.ts) on a 0.5 m grid in a chart round the cell's own extent (found
+on a 4 m grid by the layout's key, each point checked against the cell
+itself, with a 10 m frame for the smoothing). Per grid point: the hills'
+height smoothed (a Gaussian, σ 1.1 m), the land (not wild, not flat; or, in
+the flats' survey, flat and not courtyard), and the side of the cell's edge.
 
-**Infill:** each paddy (its cell, level and place along the band) decides
-what fills it: how far through the season it is, from a season field over
-the hillsides (so neighbours are alike) and a chance of its own: flooded
-(a mirror), seedlings in rows, growing, heading out, ripe; now and then
-fallow; in a village, courtyard. The Bloom slider is the season: all flooded
-at 0, at 1 (the default) about a quarter still flooded, the rest on their
-way or grown.
+- **Levels:** the planet's, the same everywhere: a step of 0.85 m with a
+  small jitter, now and then one left out (a band two levels wide between
+  walls half again as tall, Kai's wider paddies).
+- **Walls:** the smoothed hills' contours at the levels (marching squares),
+  uphill on their left.
+- **Lenses** (Kai: paddies all of a width, now and then a wider one): where
+  a band is wider than 6.5–10 m (its slope smoothed over 2 m), a lower
+  terrace grows inside it along its lower wall, up to half way across; its
+  wall is a contour of the share across the band less the lens's share, so
+  where the band narrows it curves into the lower wall. Its floor stands a
+  fifth of the way up the band.
+- **Cuts** (the breaks between paddies on a level): wherever a wall's
+  planet-wide cut field crosses a step, a gentle arc across the band the
+  shortest way, to the nearest point of its upper wall (an uphill trace
+  where there is none in reach); a cut that meets another of its band ends
+  on it.
+- **Paddies:** each band (and lens) flooded on the grid with the cuts as
+  fences, each part named by the wall stretch most of it borders (its
+  wall's level and its step along the cut field), so a paddy keeps its id
+  and crop whichever cell builds it.
+- **Flats:** a cell's block of rows 9–16 m wide along its way, cut into
+  plots 1–2.3 rows long, a little askew; each plot level with the ground
+  under its middle; the cell's edge a raised road.
 
-The mesh is terraced near the camera (its grid is fine enough to draw a
-riser there, the near leaves 4 m wide) and has the hills' own shape further
-off; the fragment shader draws the bands, the walls and the infill per pixel,
-each filtered over the pixel's footprint, so they stay crisp up close and
-settle into their average colour far off instead of shimmering.
+**The meshes** (floors.ts, terraceMesh.ts): every grid square of the land
+clipped exactly (as two triangles, Sutherland–Hodgman) at the land's edge,
+the cell's edge, the band's levels, the lens's wall and the band's cuts;
+whole squares of one paddy merged into rectangles. Walls: a riser from the
+floor below, battered back, down into the sunk ground, to a bund along the
+edge of the floor above (a bund keeps its band's height beside a lens, so a
+lens's wall meets it level). Ridges along the cuts wherever they part two
+paddies, over the higher floor. Skirts where the land ends. Per vertex the
+paddy's constants (colour, place in the season, its plants' and water's
+share): its crop at any season is worked out in the shaders (paddy.glsl
+cropFrom), so the season slider moves without a rebuild.
+
+**Drawing:** the terraces draw before the ground (early-z skips the sunk
+ground's shading); where the ground lies sunk all the way its paint reads
+its plot only as far as its band. Each floor: its water, mirroring the sky
+and the walls behind it (a short march against the planet's levels, read
+against the paddy's own floor: water.glsl), under its crop (cover by the
+plants' height: seedlings are dots on their water, a grown crop closes over
+it). Rice blades stand near the camera (rice.ts), reading the built paddies
+from a map drawn round the focus (paddyMap.ts): each blade as tall as its
+paddy's plants, fewer where they are young. Beyond the built reach the
+ground's paint (plots.glsl, the implicit layout of the first passes) draws
+the terraces far off.
+
+**The vista** is searched on the terraces as built (TerraceTerrain.builtAt:
+the band and the paddy's crop at a point, without a survey).
 
 ## Module map
 
@@ -774,6 +811,7 @@ settle into their average colour far off instead of shimmering.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
+      terraces/            the second planet: fields and bakes, cells, the survey (walls, lenses, cuts, paddies, flats), floors and meshes built round the camera, rice, villages, forest, birds, the vista search
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
