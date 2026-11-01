@@ -30,6 +30,41 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Muse's hut: the interior (in progress)
+
+Started from ad37acf, on the branch `hut-interior` in a worktree of its own
+(other sessions share the main checkout). Kai's brief (2026-11-01), with two
+references kept out of git: a mock-up of the hut with its roof off, seen from
+above at an angle with the room inside (reference/hut-interior/cutaway.jpg),
+and a red and cream rug (reference/hut-interior/rug.webp). With them, a
+library of Tripo models for the furniture, moved from the Desktop into the
+project.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | An interior for Muse's hut: cozy and lived in | |
+| 2 | A hearth or stove radiating warm light | |
+| 3 | Dark wooden floors and furniture | |
+| 4 | A large showpiece shelf holding Muse's favourites: favourite posts you can click and view, with the same glowing dot, line and card as the finds | |
+| 5 | You go in by clicking the door while Muse is inside or about the hut | |
+| 6 | The camera rises to reveal an almost orthographic cutaway of the room (as in the mock-up: the roof off, seen from above at an angle) | |
+| 7 | The interior's Tripo models move into the project | |
+
+The meadow outside stays as it is (CLAUDE.md): outside the cutaway it must
+draw pixel for pixel as before.
+
+**A test of the 3D pipeline (2026-11-01).** Kai made the display cabinet
+twice. The second ("(1)") is properly built: square posts, flat panels,
+modelled doors and handles, separate books, a glass case with a mortar in
+it, in 14.9k triangles, its 2048² texture much sharper (1.17 MB against
+318 KB). The first is melted clay: rounded, wavy posts, its doors painted
+onto a lumpy slab, in 53.9k triangles spent evenly, flat panels included.
+The other eight models are all of the first kind (the eight come to 566k
+triangles), so the advice was to make them again the second way, the
+straight-edged furniture first (table, bed, desk, dish cabinet, both
+shelves). Until then they stand in: each is fitted to its place by size as
+it loads, so a new file drops in under the same name.
+
 ## Fern lives on the first planet (2026-11-01)
 
 The engine had given Fern, the hero, a planet of its own: seed 1031, starting at R 52 m and growing as it
