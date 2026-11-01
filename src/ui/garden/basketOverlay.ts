@@ -85,7 +85,8 @@ export class BasketOverlay {
     this.label = el('p', 'g-days-label');
     this.label.setAttribute('aria-hidden', 'true');
     this.days.append(this.label, this.track);
-    this.layer.append(this.scrim, this.stage, this.hits, this.more, this.peek, this.days);
+    // (the days first: from the keyboard, Tab goes from them to the flowers, then the basket)
+    this.layer.append(this.scrim, this.stage, this.days, this.hits, this.more, this.peek);
     parent.append(this.layer);
 
     // the scrim takes every gesture meant for the planet; a click on it is a click outside the basket
@@ -103,8 +104,11 @@ export class BasketOverlay {
 
   /** Out (opening, open, swapping): the scrim holds the pointer and the buttons and timeline show. Otherwise all of it steps back. */
   sync(out: boolean): void {
+    const was = this.layer.classList.contains('is-out');
     this.layer.classList.toggle('is-out', out);
     document.body.classList.toggle('g-basket-open', out);
+    // the keyboard comes into the basket: the arrows already move through the days, Tab goes on to the flowers
+    if (out && !was) this.days.focus({ preventScroll: true });
     if (!out) {
       this.dragging = null;
       this.pointerX = null;
@@ -183,7 +187,10 @@ export class BasketOverlay {
     b.addEventListener('pointerleave', (e) => {
       if (e.pointerType !== 'touch') this.actions.hover(null);
     });
-    b.addEventListener('focus', () => this.actions.hover(target));
+    // focus from the keyboard previews; a tap focuses too, and that first tap is the preview already
+    b.addEventListener('focus', () => {
+      if (b.matches(':focus-visible')) this.actions.hover(target);
+    });
     b.addEventListener('blur', () => this.actions.hover(null));
     b.addEventListener('click', (e) => {
       // a click from the keyboard (detail 0) is never a finger's first tap

@@ -389,7 +389,7 @@ export class BasketStage {
   private ready(): WebGLRenderer | null {
     if (this.renderer || this.failed) return this.renderer;
     try {
-      const r = new WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: true, premultipliedAlpha: true, powerPreference: 'high-performance' });
+      const r = new WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: true, premultipliedAlpha: true });
       r.outputColorSpace = SRGBColorSpace;
       r.setClearColor(0x000000, 0);
       this.renderer = r;
