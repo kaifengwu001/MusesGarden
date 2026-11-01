@@ -38,7 +38,7 @@ describe('FindBeds', () => {
     // the new find stands grown at once rather than replaying the old one's planting; the old one, in its new bed, too
     expect(beds.slot('new')).toBe(0);
     expect(timeline[0].x).toBeLessThan(-1000);
-    expect(timeline[0].z).toBeLessThan(-1000);
+    expect(timeline[0].w).toBeLessThan(-1000);
     expect(timeline[beds.slot('old') ?? -1].x).toBeLessThan(-1000);
   });
 });

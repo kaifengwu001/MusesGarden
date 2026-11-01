@@ -11,10 +11,13 @@
 //            fully grown
 attribute vec4 aNormal;
 attribute vec4 aFind;
-uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, pulsed at (s), -
+uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, hover lift 0..1, pulsed at (s)
 uniform float uPlantClock;
 uniform vec4 uFindLook;       // hovered index, open index (-1: none), specimens shown 0..1, spheres shown 0..1
 uniform vec4 uSwatches[MAX_SWATCHES]; // palette row, lit, mid, shade
+
+// how high a hovered bed rises (m, as findBed.vert.glsl raises it): its specimen and its glow rise with it
+#define BED_LIFT 0.22
 
 #define FAMILY_BLOOM 0
 #define FAMILY_SPIRE 1
@@ -54,6 +57,11 @@ float findAge(Find f) {
   return f.index < float(MAX_BEDS) ? uPlantClock - uBeds[int(f.index)].x : 1e6;
 }
 
+// How far its bed is lifted (m): hovered, it rises a little.
+float findLift(Find f) {
+  return f.index < float(MAX_BEDS) ? BED_LIFT * uBeds[int(f.index)].z : 0.0;
+}
+
 // How lit it is, 0..1 each: hovered, open (or its bed lit under its card), pulsing (once, as it lands).
 vec3 findLit(Find f) {
   float hovered = 1.0 - step(0.5, abs(f.index - uFindLook.x));
@@ -62,7 +70,7 @@ vec3 findLit(Find f) {
   if (f.index < float(MAX_BEDS)) {
     vec4 bed = uBeds[int(f.index)];
     open = max(open, bed.y);
-    float since = uPlantClock - bed.z;
+    float since = uPlantClock - bed.w;
     pulse = since > 0.0 && since < PULSE ? sin(MEADOW_PI * since / PULSE) : 0.0;
   }
   return vec3(hovered, open, pulse);

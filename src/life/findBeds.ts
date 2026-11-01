@@ -52,8 +52,8 @@ function idSeed(id: string): number {
 
 export class FindBeds {
   readonly meshes: Array<Mesh<InstancedBufferGeometry, ShaderMaterial>> = [];
-  /** Per bed: planted at (s on the plant clock), highlight, pulsed at (s), -; shared by the four draws and the finds' specimens (findForms.ts). */
-  private readonly beds = Array.from({ length: MAX_BEDS }, () => new Vector4(LONG_AGO, 0, LONG_AGO, 0));
+  /** Per bed: planted at (s on the plant clock), highlight, hover lift, pulsed at (s); shared by the four draws and the finds' specimens (findForms.ts). */
+  private readonly beds = Array.from({ length: MAX_BEDS }, () => new Vector4(LONG_AGO, 0, 0, LONG_AGO));
   private readonly clock = { value: 0 };
   /** The beds' timeline, for other draws that plant and light up with them. */
   readonly uniforms: { readonly uBeds: IUniform<Vector4[]>; readonly uPlantClock: IUniform<number> } = { uBeds: { value: this.beds }, uPlantClock: this.clock };
@@ -104,7 +104,7 @@ export class FindBeds {
       if (this.holder[b] !== bed.find) {
         this.holder[b] = bed.find;
         this.beds[b].x = LONG_AGO;
-        this.beds[b].z = LONG_AGO;
+        this.beds[b].w = LONG_AGO;
       }
       if (hidden.has(bed.find)) this.beds[b].x = NOT_YET;
       else if (this.beds[b].x === NOT_YET) this.beds[b].x = LONG_AGO;
@@ -160,7 +160,7 @@ export class FindBeds {
     const now = this.now;
     for (const id of finds) {
       const b = this.index.get(id);
-      if (b !== undefined) this.beds[b].z = now;
+      if (b !== undefined) this.beds[b].w = now;
     }
   }
 
