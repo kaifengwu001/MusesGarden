@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BED_RADIUS, bedAt, layOut, type PlacementGround } from '../../garden/placement';
 import { dayBefore, placeholderSnapshot, placeholderSource } from '../../garden/placeholder';
 import { httpSource } from '../../garden/source';
+import type { Basket, Find } from '../../garden/types';
 import { GardenState } from '../../garden/state';
 import { angleBetween } from '../../planet/geo';
 import type { FieldParams } from '../../planet/fields';
@@ -20,7 +21,7 @@ const PARAMS: FieldParams = { roll: 1.25, hummocks: 0.8, wetlands: 0.45, waterLe
 function seaWorld(radius = 128): PlacementGround {
   return {
     radius,
-    layout: { cottage: new Vector3(0, 1, 0), homeBearing: new Vector3(0, 0, 1) },
+    layout: { cottage: new Vector3(0, 1, 0) },
     sample(dir: Vector3, out: GroundSample): GroundSample {
       const shore = (0.7 - dir.x) * radius;
       out.water = shore;
@@ -33,62 +34,104 @@ function seaWorld(radius = 128): PlacementGround {
   };
 }
 
+/** A find found at a place (a direction, normalized by placement), in a basket of that day. */
+function found(id: string, day: string, place: readonly [number, number, number] | undefined): { basket: Basket; find: Find } {
+  const basket: Basket = { id: `b-${id}`, day, finds: [id] };
+  const find: Find = { id, basket: basket.id, topic: 'ferns', media: { kind: 'post', url: 'https://example.com', source: 'Example' }, ...(place ? { place } : {}) };
+  return { basket, find };
+}
+
+function lay(ground: PlacementGround, items: ReadonlyArray<{ basket: Basket; find: Find }>): Map<string, Vector3> {
+  const layout = layOut(
+    ground,
+    items.map((i) => i.basket),
+    items.map((i) => i.find),
+  );
+  return new Map([...layout.beds].map(([id, bed]) => [id, bed.dir]));
+}
+
+/** A unit direction `meters` from +z toward −x on a planet of R 128 (−x is the dry side of seaWorld). */
+function at(meters: number, sideways = 0): readonly [number, number, number] {
+  const a = meters / 128;
+  const b = sideways / 128;
+  const v = new Vector3(-Math.sin(a) * Math.cos(b), Math.sin(b), Math.cos(a) * Math.cos(b)).normalize();
+  return [v.x, v.y, v.z];
+}
+
+const metersApart = (a: Vector3, b: Vector3, radius = 128): number => angleBetween(a, b) * radius;
+
 describe('where the finds grow', () => {
-  const snap = placeholderSnapshot(NOW);
   const ground = seaWorld();
-  const layout = layOut(ground, snap.baskets, snap.finds);
 
-  it('gives every find a bed and every basket a patch', () => {
-    expect(layout.beds.size).toBe(snap.finds.length);
-    expect(layout.patches.size).toBe(snap.baskets.length);
+  it('grows each find where Muse found it', () => {
+    const beds = lay(ground, [found('a', '2026-10-01', at(20)), found('b', '2026-10-02', at(40)), found('c', '2026-10-02', at(20, 30))]);
+    for (const [id, place] of [['a', at(20)], ['b', at(40)], ['c', at(20, 30)]] as const) expect(metersApart(beds.get(id)!, new Vector3(...place))).toBeLessThan(1e-6);
   });
 
-  it('grows every bed on dry ground, clear of the cottage and of the other beds', () => {
-    const beds = [...layout.beds.values()];
+  it('nudges finds found closer than a bed’s width apart, no farther than it must', () => {
+    const items = ['a', 'b', 'c', 'd'].map((id, i) => found(id, `2026-10-0${i + 1}`, at(30, i * 0.3)));
+    const beds = [...lay(ground, items).values()];
     for (const bed of beds) {
-      expect((0.7 - bed.dir.x) * ground.radius).toBeGreaterThan(1.5);
-      expect(angleBetween(bed.dir, ground.layout.cottage) * ground.radius).toBeGreaterThan(12);
-      for (const other of beds) if (other !== bed) expect(angleBetween(bed.dir, other.dir) * ground.radius).toBeGreaterThan(2 * BED_RADIUS);
+      expect(metersApart(bed, new Vector3(...at(30)))).toBeLessThan(4);
+      for (const other of beds) if (other !== bed) expect(metersApart(bed, other)).toBeGreaterThan(2 * BED_RADIUS);
     }
   });
 
-  it('keeps each basket’s beds within its patch, the first in the middle', () => {
-    for (const basket of snap.baskets) {
-      const patch = layout.patches.get(basket.id)!;
-      basket.finds.forEach((id, i) => {
-        const d = angleBetween(layout.beds.get(id)!.dir, patch.dir) * ground.radius;
-        expect(d).toBeLessThanOrEqual(patch.reach + 1e-6);
-        if (i === 0) expect(d).toBeLessThan(0.01);
-      });
-    }
+  it('never moves a bed onto the water when its find was found on dry ground', () => {
+    // seaWorld's shore is where x = 0.7: six finds from the same spot a meter up from it, so most must move
+    const shore = Math.asin(0.7) * 128;
+    const items = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => found(id, '2026-10-01', at(-(shore - 1.4))));
+    for (const item of items) expect(ground.sample(new Vector3(...item.find.place!), createGroundSample()).water).toBeGreaterThan(0);
+    const s = createGroundSample();
+    for (const dir of lay(ground, items).values()) expect(ground.sample(dir, s).water).toBeGreaterThan(BED_RADIUS);
   });
 
-  it('winds the patches outward from the cottage, the oldest day nearest home', () => {
-    const byDay = [...snap.baskets].sort((a, b) => (a.day < b.day ? -1 : 1));
-    const distances = byDay.map((b) => angleBetween(layout.patches.get(b.id)!.dir, ground.layout.cottage) * ground.radius);
-    expect(distances[0]).toBeLessThan(distances[distances.length - 1]);
+  it('brings a find whose place is on the water to the nearest dry ground', () => {
+    const shore = Math.asin(0.7) * 128;
+    const wet = at(-(shore + 3));
+    expect(ground.sample(new Vector3(...wet), createGroundSample()).water).toBeLessThan(0);
+    const dir = lay(ground, [found('a', '2026-10-01', wet)]).get('a')!;
+    expect(ground.sample(dir, createGroundSample()).water).toBeGreaterThan(BED_RADIUS);
+    expect(metersApart(dir, new Vector3(...wet))).toBeLessThan(6);
   });
 
-  it('is the same every time, and keeps a find the backend placed', () => {
-    const again = layOut(ground, snap.baskets, snap.finds);
-    for (const [id, bed] of layout.beds) expect(again.beds.get(id)!.dir.distanceTo(bed.dir)).toBe(0);
-    const placed = snap.finds.map((f, i) => (i === 0 ? { ...f, place: [0, 0.6, 0.8] as const } : f));
-    expect(layOut(ground, snap.baskets, placed).beds.get(snap.finds[0].id)!.dir.distanceTo(new Vector3(0, 0.6, 0.8))).toBeLessThan(1e-9);
+  it('keeps the beds already growing where they are when a newer basket comes', () => {
+    const old = [found('a', '2026-10-01', at(30)), found('b', '2026-10-02', at(50))];
+    const before = lay(ground, old);
+    const after = lay(ground, [found('new', '2026-10-09', at(30)), ...old]);
+    for (const id of ['a', 'b']) expect(after.get(id)!.distanceTo(before.get(id)!)).toBe(0);
+    expect(metersApart(after.get('new')!, after.get('a')!)).toBeGreaterThan(2 * BED_RADIUS);
+  });
+
+  it('grows a find with no place near the cottage, outside its clearing', () => {
+    const dir = lay(ground, [found('a', '2026-10-01', undefined)]).get('a')!;
+    const fromCottage = metersApart(dir, ground.layout.cottage);
+    expect(fromCottage).toBeGreaterThan(12);
+    expect(fromCottage).toBeLessThan(16);
   });
 
   it('finds the bed under a tap, and none between beds', () => {
+    const snap = placeholderSnapshot(NOW);
+    const layout = layOut(ground, snap.baskets, snap.finds);
     const bed = [...layout.beds.values()][3];
     expect(bedAt(layout, bed.dir, ground.radius)?.find).toBe(bed.find);
     expect(bedAt(layout, new Vector3(0, -1, 0), ground.radius)).toBeNull();
   });
 
-  it('lays out on the real terrain too: every bed above the water, at every size', () => {
+  it('lays out the example gallery on the real terrain at every size: every bed on dry ground, apart, near where it was found', () => {
+    const snap = placeholderSnapshot(NOW);
+    const places = new Map(snap.finds.map((f) => [f.id, new Vector3(...f.place!)]));
     for (const radius of [60, 128, 300]) {
       const terrain = new Terrain(generateLayout(412));
       terrain.update(radius, PARAMS, (2 * radius) / 512);
-      const real = layOut(terrain, snap.baskets, snap.finds);
+      const beds = [...layOut(terrain, snap.baskets, snap.finds).beds.values()];
       const s = createGroundSample();
-      for (const bed of real.beds.values()) expect(terrain.sample(bed.dir, s).water).toBeGreaterThan(0);
+      expect(beds).toHaveLength(snap.finds.length);
+      for (const bed of beds) {
+        expect(terrain.sample(bed.dir, s).water).toBeGreaterThan(BED_RADIUS);
+        expect(metersApart(bed.dir, places.get(bed.find)!, radius)).toBeLessThan(24);
+        for (const other of beds) if (other !== bed) expect(metersApart(bed.dir, other.dir, radius)).toBeGreaterThan(2 * BED_RADIUS);
+      }
     }
   });
 });
@@ -112,6 +155,27 @@ describe('the placeholder gallery', () => {
       expect(f.media.image?.startsWith('data:image/svg+xml')).toBe(true);
     }
     for (const b of snap.baskets) for (const id of b.finds) expect(ids.has(id)).toBe(true);
+  });
+
+  it('found every find somewhere on dry ground of the meadow’s own planet (seed 412, R 128)', () => {
+    const terrain = new Terrain(generateLayout(412));
+    terrain.update(128, PARAMS, 256 / 512);
+    const s = createGroundSample();
+    for (const f of snap.finds) {
+      expect(f.place).toBeDefined();
+      expect(terrain.sample(new Vector3(...f.place!), s).water).toBeGreaterThan(BED_RADIUS);
+      expect(s.clearing).toBeLessThan(0.05);
+    }
+  });
+
+  it('spreads the finds over several areas, and one basket over two far apart (so its flight has to climb)', () => {
+    const dirs = snap.finds.map((f) => new Vector3(...f.place!));
+    const areas: Vector3[] = [];
+    for (const d of dirs) if (areas.every((a) => metersApart(a, d) > 30)) areas.push(d);
+    expect(areas.length).toBeGreaterThanOrEqual(4);
+    const span = (b: Basket): number => Math.max(...b.finds.flatMap((x) => b.finds.map((y) => metersApart(new Vector3(...snap.finds.find((f) => f.id === x)!.place!), new Vector3(...snap.finds.find((f) => f.id === y)!.place!)))));
+    expect(span(snap.baskets[0])).toBeLessThan(25);
+    expect(Math.max(...snap.baskets.map(span))).toBeGreaterThan(100);
   });
 
   it('names Muses only, and tags friends known elsewhere by network alone', () => {

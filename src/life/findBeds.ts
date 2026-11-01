@@ -13,8 +13,8 @@ import fragmentShader from './grass.frag.glsl?raw';
 // species so it reads as a clump of the meadow rather than a planted
 // square. One instanced draw per species (findBed.vert.glsl), a few
 // thousand plants at most. A bed can be planted while you watch (it
-// blossoms from its middle out, then its card pops up: ui/garden), and the
-// bed you are looking at is lit a little brighter.
+// blossoms from its middle out: ui/garden), the bed you are looking at is
+// lit a little brighter, and the one under the pointer lifts a little.
 
 /** Plants per bed, the share of them that are companions, and their size against the meadow's flowers. */
 const PLANTS = 58;
@@ -29,6 +29,8 @@ const LONG_AGO = -1e6;
 const NOT_YET = 1e9;
 /** Higher than this (m) the beds are a pixel or two, and the near field's maps they read are not drawn (world.ts): they are not drawn either. */
 const SEEN_BELOW = 88;
+/** How fast the bed under the pointer lifts, and settles back (s). */
+const LIFT_TIME = 0.12;
 
 export interface BedLook {
   readonly bed: Bed;
@@ -49,11 +51,12 @@ function idSeed(id: string): number {
 
 export class FindBeds {
   readonly meshes: Array<Mesh<InstancedBufferGeometry, ShaderMaterial>> = [];
-  /** Per bed: planted at (s on the plant clock), highlight; shared by the four draws. */
+  /** Per bed: planted at (s on the plant clock), highlight, lift under the pointer (0..1); shared by the four draws. */
   private readonly beds = Array.from({ length: MAX_BEDS }, () => new Vector4(LONG_AGO, 0, 0, 0));
   private readonly clock = { value: 0 };
   private readonly index = new Map<string, number>();
   private highlighted = -1;
+  private hovered: string | null = null;
   private readonly start = performance.now();
 
   constructor(shared: Record<string, IUniform>) {
@@ -165,8 +168,17 @@ export class FindBeds {
     if (b >= 0) this.beds[b].y = 1;
   }
 
+  /** Lift the bed under the pointer (null: none). */
+  hover(find: string | null): void {
+    this.hovered = find;
+  }
+
   update(altitude: number): void {
-    this.clock.value = this.now;
+    const now = this.now;
+    const ease = Math.min(1, (now - this.clock.value) / LIFT_TIME);
+    const lifted = this.hovered === null ? -1 : (this.index.get(this.hovered) ?? -1);
+    this.beds.forEach((bed, b) => (bed.z += ((b === lifted ? 1 : 0) - bed.z) * ease));
+    this.clock.value = now;
     const seen = altitude < SEEN_BELOW;
     for (const mesh of this.meshes) mesh.visible = seen && mesh.geometry.instanceCount > 0;
   }

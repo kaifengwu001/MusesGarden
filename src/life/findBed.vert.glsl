@@ -26,7 +26,7 @@ attribute float aT;    // along the stem 0..1; 1 on the head
 attribute vec4 aPlace; // the plant's direction (unit), its ground's height over R (m)
 attribute vec4 aLook;  // seed in [0, 1), size factor, colour variant, bed index
 attribute float aDelay; // s after its bed is planted before this plant starts to rise (its distance from the bed's middle)
-uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, -, -
+uniform vec4 uBeds[MAX_BEDS]; // per bed: planted at (s on uPlantClock), highlight 0..1, lift under the pointer 0..1, -
 uniform float uPlantClock;
 uniform int uSpecies;
 uniform vec4 uBedLook; // stem top (m), nod, -, -
@@ -80,7 +80,7 @@ void main() {
   vec3 shared = inside > 0.5 ? wind.xyz : windDir(dir) * strength * (0.18 + 0.42 * strength);
   vec3 bend = windPlant(dir, shared, rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
   float stemTop = uBedLook.x;
-  vec3 base = dir * (uRadius + aPlace.w - 0.02);
+  vec3 base = dir * (uRadius + aPlace.w - 0.02 + 0.22 * bed.z);
   vec3 local = position;
   vec3 world;
   if (aPart < 0.5) {
@@ -124,8 +124,9 @@ void main() {
   col *= mix(vec3(1.0), vec3(0.68, 0.7, 0.8), clamp(shadow, 0.0, 1.0));
   vec3 toCam = cameraPosition - world;
   col += pal(ROW_LIGHT, 3) * aT * clamp(dot(-normalize(toCam), uSunDir) * 0.7 + 0.3, 0.0, 1.0) * 0.12 * uToon.z * (1.0 - shadow);
-  // the bed you are looking at: its heads a touch brighter
+  // the bed you are looking at: its heads a touch brighter; the one under the pointer, brighter still
   col = mix(col, col * 1.12 + 0.025, bed.y * step(0.5, aPart));
+  col = mix(col, col * 1.3 + 0.06, bed.z * step(0.5, aPart));
 
   vec3 wp = warpPosition(world);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);
