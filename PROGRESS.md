@@ -30,6 +30,72 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Muse's life on the engine, in Kai's garden (muse-agent)
+
+The Muse agent's backend, designed in [docs/muse-agent.md](docs/muse-agent.md),
+now feeds Kai's garden interface. Merged into main on 2026-11-01.
+
+### What it does
+
+- **The engine.** Each Muse has an append-only event log, folded into its state. A seeded policy picks each episode:
+  - explore the planet, rest, work, or meet a friend
+  - work pauses Muse where it is
+  - rest is at most 4 h a day
+  - at most one basket a day, of at most 7 finds
+  - at most five photos a day
+
+  `npm run sim -- --hours 504` runs the nine-Muse cast for three weeks and checks these.
+- **Finds are real.** Each one is a reel, post, article or video from the recording `server/fixtures/media.json`. `npm run record:media` makes it from `server/fixtures/media-sources.json`. Instagram comes through Business Discovery, with `META_IG_TOKEN` and `META_IG_USER_ID` in the environment, never in the repo. The topic map only names topics and links them; nothing Muse finds comes from it.
+- **Likes nudge Muse's interests.** The nudge weakens as Muse matures, but never below half.
+- **Friends come three ways:**
+  - Owners share their Muses; those two meet within 48 h.
+  - Owners are friends on Instagram or Facebook (a simulated graph in `cast.json`).
+  - Strangers meet beyond the planet, which is rare.
+
+  Friendships rarely end. Unpleasant hangouts make a pair distant instead.
+- **Invitations.** The guest's owner picks Travel now or Keep for later. An invitation is good for one visit, any time, and only the sender can withdraw it.
+- **Sharing.** Every interest is shared until the owner hides it. A find is public unless the owner makes it private.
+- **The garden API**, served by `npm run serve`:
+  - `GET /api/muses/:id/garden` is a snapshot.
+  - `GET /api/muses/:id/garden/events` is a live stream that resumes from `Last-Event-ID`.
+  - `POST /api/muses/:id/garden/reactions` takes likes, sharing and invitations.
+
+  Open the page at `/?garden=/api/muses/hero`. Add `&dev` for the dev tools: B hides them, and Advance runs the clock.
+- **On the planet.** Each find is a patch of its interest's flowers, where Muse found it. Opening a basket flies its finds there. That basket's patches stay tinted and 1.3× larger until another basket is opened. From high up, each find is a glowing sphere: hover lights it, and a tap flies down to it.
+- **The post.** A card swipes away in any direction to show the next. The pile shows at most six cards.
+
+### Checked (2026-11-01)
+
+- **`npm run check`.** Passes.
+- **`npm test`.** 656 pass. The divergence test timed out under load and passes alone (5 of 5).
+- **The 3-week sim.** All 9 checks pass.
+- **The live end-to-end suite.** `npx playwright test -c playwright.live.config.ts` passes 11 of 11 against the real engine: a basket arrives and flies, hover, spheres, likes and sharing read back after a reload, reconnect, a card of each kind, a friend known online, and Travel now once.
+- **GPU invariants.** 12 of 14 pass. The two timing budgets fail at load averages of 40 to 170 (33.4 ms against a 20 ms frame budget). The same branch without the patches change fails them identically, so the load is the cause, not the patches.
+
+### Open
+
+- **The recording is small** (118 items, 17 from Instagram):
+  - Over three weeks every Muse sees most of it, so the cast converges on the same interests.
+  - Strangers make about 10 friendships instead of about 1.
+  - Instagram is 13% of what Muse brings home, against a 65% target.
+  - Fix: record bigger. The recorder reads every source either way, so a bigger recording costs no extra time.
+- **The recording's contents:**
+  - Leave ads and sale promotions out.
+  - Keep disambiguation topics such as "Jazz (word)" out of filing.
+  - Replace the four Instagram accounts that answer "Invalid user id": mokuhangamagic, david_rumsey_maps, ilovetypography, langorigami.
+- **Meta's model is waiting on billing.** It answers HTTP 402 `billing_not_configured`. Until then the hero runs on the heuristic mind, and the precomputed 14-day run can't be made.
+- **The Instagram token expires about 2026-12-30.** It's a long-lived user token, renewed in the Graph API Explorer.
+- **The garden page:**
+  - Planet growth and new interests reach an open page only on a reload.
+  - The Muse pin and Find Muse should follow the 3D Muse the engine drives.
+  - Sharing controls belong in the interface: what Muse shares, friends, and unsharing one.
+  - The basket banner covers the top line of an open find card.
+- **Rendering:**
+  - Kai's poses for rest, laptop work, photos and hanging out.
+  - Fog over unexplored areas.
+  - Measure on a real phone; 400 finds' patches add about 630k triangles by the CPU count.
+- **Writing the hero's own SOUL.md and MEMORY.md.** The descriptions only reach Muse through Meta's model. The heuristic mind reads only the temperament numbers and the interest topics.
+
 ## Iteration 17: Muse lives on the planet (in progress)
 
 Started from 86dadbd: iteration 16's interactions, built in the lab, go into
