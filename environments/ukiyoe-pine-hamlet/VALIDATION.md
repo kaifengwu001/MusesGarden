@@ -54,6 +54,34 @@ the mobile test so comparison images use the same clean capture workflow.
 
 ## Remaining limits
 
+### PR integration on 1 November 2026
+
+The PR source branch is `environment_ukiyo`, integrated in
+`ukiyoe-pr-integration-01a19573` on main commit `ad37acf`, targeting `main`.
+The original standalone checkout remains separate and can keep serving port 5237;
+the integration browser checks used port 5239.
+
+Eight matching baseline shaders were copied locally to preserve the find/bed,
+grass and Muse-shadow rendering interfaces after main’s changes. The root Vite
+cache configuration is unchanged. Outside this environment, the PR only adds
+npm scripts and ignore rules; shared source and other worlds have no changes.
+
+On the integrated branch, scoped TypeScript/lint, all 64 CPU tests, all 14 targeted
+browser tests in one run, and the environment production build pass. Fresh
+captures are in the integration checkout’s `shots/ukiyoe-pine-hamlet/`.
+
+The original meadow was also built before and after integration. Every runtime
+file (HTML, JavaScript, CSS, images and models) is byte-identical. Only a
+non-runtime JavaScript source map differs. `check-frames` self-comparison of the
+unchanged baseline reports 8 of 9 views identical at both DPR 1 and DPR 2. The
+bird’s-eye 70 m view has a small existing variation (185 pixels at DPR 1, 638 at DPR 2),
+so an unconditional nine-view pixel-identity claim would be invalid. This is
+recorded rather than changing the protected first planet or relaxing a test.
+Raw comparison output and the runtime-file hash audit are preserved in
+`reference/pr-integration-checks.txt`.
+
+### Product and visual limits
+
 - The plant silhouettes, rock variation, paper texture and line work remain
   simpler than the drawn reference. Global forests use seeded groups rather than
   a fully authored island composition.

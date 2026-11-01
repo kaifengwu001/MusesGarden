@@ -34,6 +34,10 @@ for the current evidence and remaining issues.
 
 ## Isolation and provenance
 
+The integrated PR branch is `environment_ukiyo`, targeting `main`. Its checks
+were run in `ukiyoe-pr-integration-01a19573`; the original development checkout
+and source baseline are recorded below.
+
 - Standalone checkout: `ukiyoe-pine-hamlet-standalone-01a19573`.
 - Branch: `planet/ukiyoe-pine-hamlet`.
 - Scaffolded from the clean committed checkout at **5374842**; the shared meadow

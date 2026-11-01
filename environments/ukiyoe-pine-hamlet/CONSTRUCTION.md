@@ -29,6 +29,12 @@ stream/pond and rear ridges. Local shader chunks are registered under the engine
 existing `meadow_*` names. Camera warp, growth, detail selection and the Muse body
 continue to use the shared engine. World-specific imports resolve to this folder.
 
+The find-form, find-sphere, find-bed, grass and Muse-shadow shaders are preserved
+locally from the original compatible baseline. Newer main uses a different
+collectible interface and Muse shadow map; borrowing only its shader half would
+break the environment’s existing uniforms and vertex attributes. Shared `src/`
+remains unchanged.
+
 Land and water are separate draws sharing the same selected-node buffers and
 grid. Land keeps its signed underwater bed height; water stays on the base
 sphere. Their depth intersection defines the shoreline. This avoids painting
