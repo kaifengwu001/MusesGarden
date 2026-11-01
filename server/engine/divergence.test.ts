@@ -82,13 +82,17 @@ describe('divergence: history, not hidden parameters, drives what Muse keeps', (
     expect([...(await decide(two.engine, two.engine.state(id) as MuseState))]).toEqual([...(await decide(one.engine, one.engine.state(id) as MuseState))]);
   });
 
-  it('ablation: remove the experiences and the Muse chooses like its seed-only self again', async () => {
-    const { engine } = await twins(7);
+  it('ablation: remove the experiences and the Muse chooses like its seed-only self again, likes and all', async () => {
+    const { engine, commands } = await twins(7);
     for (const id of ['twin-a', 'twin-b']) {
+      const [find] = engine.state(id as MuseId)?.discoveries.keys() ?? [];
+      expect(await commands.like(id as MuseId, { find }, true)).toEqual({ ok: true });
       const log = engine.log(id as MuseId);
-      const seedOnly = replay(id, log.filter((e) => e.event.kind === 'soul.updated' || e.event.kind === 'memory.updated'));
+      const seedOnly = replay(id, log.filter((e) => e.event.kind === 'soul.updated' || e.event.kind === 'memory.updated' || e.event.kind === 'owner.liked'));
       const stripped = replay(id, withoutExperiences(log));
       expect(stripped.reflections).toEqual([]);
+      expect(engine.state(id as MuseId)?.likes.size).toBe(1);
+      expect(stripped.likes.size).toBe(0);
       expect([...(await preferences(engine, stripped))]).toEqual([...(await preferences(engine, seedOnly))]);
       const score = async (st: MuseState) => (await new HeuristicMind().judge(engine.mindContext(st, null), unseen)).map((j) => j.score);
       expect(await score(engine.state(id as MuseId) as MuseState)).not.toEqual(await score(seedOnly));

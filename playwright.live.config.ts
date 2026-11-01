@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import base from './playwright.config';
 
-// `npx playwright test -c playwright.live.config.ts`: the overlay against the real engine on a fresh garden.
+// `npx playwright test -c playwright.live.config.ts`: the dev tools and the 3D Muse against the real engine on a fresh garden.
 // The Muse server starts on :8787 (Vite proxies /api there) with a throwaway data folder and the fast-forward clock.
 const DATA = '.muse-live-e2e';
 const APP_PORT = 5298;

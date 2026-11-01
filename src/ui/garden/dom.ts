@@ -1,4 +1,5 @@
 // Small DOM helpers for the garden's interface, and the way it says days.
+import { ICONS } from './icons';
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -16,6 +17,30 @@ export function button(className: string, label: string, html = '', onClick?: (e
   if (html) b.innerHTML = html;
   if (onClick) b.addEventListener('click', onClick);
   return b;
+}
+
+/** A switch; with `words` ([on, off]) it shows the state in words beside it and keeps the label for screen readers. */
+export function toggle(label: string, on: boolean, onChange: (on: boolean) => void, words?: [string, string]): HTMLLabelElement {
+  const row = el('label', 'g-toggle');
+  const input = el('input');
+  input.type = 'checkbox';
+  input.checked = on;
+  input.setAttribute('role', 'switch');
+  const track = el('span', 'g-switch');
+  const text = el('span', words ? 'g-toggle-label g-sr' : 'g-toggle-label', label);
+  row.append(text);
+  if (words) {
+    const state = el('span', 'g-toggle-state');
+    const paint = (): void => {
+      state.innerHTML = `${input.checked ? ICONS.share : ICONS.lock}<span>${input.checked ? words[0] : words[1]}</span>`;
+    };
+    paint();
+    input.addEventListener('change', paint);
+    row.append(state);
+  }
+  row.append(input, track);
+  input.addEventListener('change', () => onChange(input.checked));
+  return row;
 }
 
 function parseDay(day: string): Date {

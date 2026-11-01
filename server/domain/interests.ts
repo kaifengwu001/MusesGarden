@@ -11,6 +11,8 @@ import {
   MAX_AFFINITY_DELTA,
   SALIENCE_MAX,
   SALIENCE_TAU_MS,
+  W_LIKE_BASE,
+  W_LIKE_FLOOR,
   W_OWNER_BASE,
   W_OWNER_DECAY,
 } from './policy/constants';
@@ -20,9 +22,14 @@ export function salienceAt(i: Interest, now: number): number {
   return i.salience.value * Math.exp(-Math.max(0, now - i.salience.at) / SALIENCE_TAU_MS);
 }
 
-/** The owner's pull on Muse, fading with every reflection Muse commits (the garden soul version). */
+/** MEMORY.md's and SOUL.md's pull on Muse, fading toward 0 with every reflection Muse commits (the garden soul version). */
 export function wOwner(s: MuseState): number {
   return W_OWNER_BASE / (1 + W_OWNER_DECAY * s.reflections.length);
+}
+
+/** A like's pull on Muse: praise from the garden fades as Muse matures, at the same rate, but never below W_LIKE_FLOOR of it. */
+export function wLike(s: MuseState): number {
+  return W_LIKE_BASE * (W_LIKE_FLOOR + (1 - W_LIKE_FLOOR) / (1 + W_OWNER_DECAY * s.reflections.length));
 }
 
 export function newInterest(topic: TopicKey, at: Instant, seededBy: Interest['seededBy']): Interest {
@@ -36,6 +43,8 @@ export function newInterest(topic: TopicKey, at: Instant, seededBy: Interest['se
     lastPursued: null,
     seededBy,
     ownerMentionAt: null,
+    likedAt: null,
+    since: at,
   };
 }
 

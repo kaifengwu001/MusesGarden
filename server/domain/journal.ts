@@ -40,7 +40,7 @@ function sentence(e: MuseEvent): string | null {
     case 'hangout':
       return e.received ? `Spent time with a friend and came away with *${e.received.title}*.` : 'Spent time with a friend.';
     case 'encounter':
-      return 'Met another Muse out beyond the planet.';
+      return e.where === 'online' ? 'Got talking online with the Muse of someone you know.' : 'Met another Muse out beyond the planet.';
     case 'relationship.changed':
       return e.to === 'friends' ? 'Made a new friend.' : e.to === 'ended' ? 'A friendship ended.' : null;
     case 'photo.taken':

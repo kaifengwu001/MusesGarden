@@ -35,6 +35,8 @@ export function interest(topic: string, over: Partial<Interest> = {}): Interest 
     lastPursued: T0,
     seededBy: 'muse',
     ownerMentionAt: null,
+    likedAt: null,
+    since: T0,
     ...over,
   };
 }
@@ -97,6 +99,7 @@ export function muse(id: string, spec: MuseSpec = {}): MuseState {
     photos: [],
     reflections: [],
     experiencesSinceReflection: 0,
+    likes: new Map(),
     day: { day: '2026-11-02', restMs: 0, socialMs: spec.socialMsToday ?? 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
     social: emptySocial(),
   };

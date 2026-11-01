@@ -17,5 +17,5 @@
     "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["src/dev/**/*.spec.ts", "src/muse/ui/**/*.spec.ts", "src/muse/ui/**/*.e2e.ts"]
+  "exclude": ["src/dev/**/*.spec.ts", "src/muse/ui/**/*.e2e.ts"]
 }

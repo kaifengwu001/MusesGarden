@@ -1,6 +1,6 @@
 // What Muse does next when an episode ends: a semi-Markov choice over travel, rest and visits, weighted by
 // its traits, its interests, its recent work and the budgets left today. No clock hour appears anywhere.
-import type { Draw, Instant, MuseState } from '../../../src/muse/contract';
+import type { Draw, Instant, MuseState, VisitOffer } from '../../../src/muse/contract';
 import { instant } from '../ids';
 import { salienceAt } from '../interests';
 import { categorical, lognormal } from '../rng';
@@ -48,15 +48,21 @@ export function restLeft(s: MuseState, now: number): number {
 
 const ACTIVITIES = ['travel', 'rest', 'visit'] as const;
 
-export function next(s: MuseState, now: Instant, draw: Draw, friendFree: boolean): 'rest' | 'travel' | 'visit' {
+/** A first meeting is weighed as if today's social time were untouched. */
+function visitShare(s: MuseState, now: Instant, offer: VisitOffer): number {
+  const budget = socialBudget(s);
+  if (offer === 'none' || budget <= 0) return 0;
+  return offer === 'first-meeting' ? 1 : socialLeft(s, now) / budget;
+}
+
+export function next(s: MuseState, now: Instant, draw: Draw, offer: VisitOffer): 'rest' | 'travel' | 'visit' {
   const { curiosity, sociability } = s.temperament;
   let top = 0;
   for (const i of s.interests.values()) top = Math.max(top, salienceAt(i, now));
-  const budget = socialBudget(s);
   const weights = [
     TRAVEL_BASE + curiosity + top,
     restLeft(s, now) > 0 ? REST_BASE + REST_PER_WORK * recentWork(s, now) : 0,
-    friendFree && budget > 0 ? VISIT_SCALE * sociability * (socialLeft(s, now) / budget) : 0,
+    VISIT_SCALE * sociability * visitShare(s, now, offer),
   ];
   return ACTIVITIES[Math.max(0, categorical(draw('life.next'), weights))];
 }

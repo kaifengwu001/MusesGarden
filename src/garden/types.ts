@@ -45,6 +45,10 @@ export interface Find {
   note?: string;
   /** Where on the planet it grows (a unit direction), if the backend placed it; otherwise placement.ts lays it out. */
   place?: readonly [number, number, number];
+  /** Whether other Muses may see it (the card's Public/Private switch); a private find never leaves the planet. */
+  shared: boolean;
+  /** Whether you liked it, when the backend keeps likes; without it this browser remembers them. */
+  liked?: boolean;
 }
 
 /** One day's finds, handed over together. */
@@ -83,6 +87,8 @@ export interface Postcard {
   /** A friend Muse in the photo, if any. */
   with?: string;
   invitation?: Invitation;
+  /** Whether you liked it, when the backend keeps likes; without it this browser remembers them. */
+  liked?: boolean;
 }
 
 export interface Interest {
@@ -131,6 +137,8 @@ export interface MuseProfile {
 
 /** Everything the garden shows, as of now. */
 export interface GardenSnapshot {
+  /** Muse's own planet, when the backend has one: its seed and growth (0..1), as the URL's `seed` and `g`. */
+  world?: { seed: number; g: number };
   muse: MuseProfile;
   interests: readonly Interest[];
   friends: readonly MuseFriend[];
@@ -150,4 +158,5 @@ export type Reaction =
   | { type: 'like-find'; id: string; liked: boolean }
   | { type: 'like-postcard'; id: string; liked: boolean }
   | { type: 'share-interest'; id: string; shared: boolean }
+  | { type: 'share-find'; id: string; shared: boolean }
   | { type: 'use-invitation'; id: string };

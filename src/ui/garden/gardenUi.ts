@@ -6,7 +6,9 @@ import { placeholderSource, type PlaceholderSource } from '../../garden/placehol
 import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../garden/types';
-import { FindBeds, type BedLook } from '../../life/findBeds';
+import { FindBeds } from '../../life/findBeds';
+import { FindForms, type FormLook } from '../../life/findForms';
+import type { MuseDirection } from '../../life/muse';
 import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
 import { tangentToward, travel } from '../../planet/geo';
@@ -15,8 +17,9 @@ import { warpPoint } from '../../render/warp';
 import { Flight, type Framing } from '../../view/flight';
 import type { World } from '../../world';
 import { BasketsSheet } from './baskets';
+import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
 import { button, dayName, el } from './dom';
-import { FindCard } from './findCard';
+import { FindCard, topicColour } from './findCard';
 import './garden.css';
 import { ICONS } from './icons';
 import { Mail } from './mail';
@@ -34,17 +37,29 @@ import { TravelSheet, Visit } from './travel';
 
 /** How a find is framed: the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
-/** A basket's patch: its first find from a little farther back, under the clouds. */
-const PATCH_VIEW = { distance: 9.5, height: 3.6, aim: 1.0 } as const;
 /** The line from a bed up to its card (m); higher than this (m) a card is put away. */
 const STEM = 1.9;
 const CARD_UNDER = 30;
 /** The cottage's view and Muse's (as world.ts's named views): distance, height, bearing from the front (rad), looked-at point (cottage-local x, y, z, m). */
 const HOME_VIEW = { distance: 26, height: 11, bearing: 0.92, at: [-1.8, 2.6, 1.4] } as const;
 const MUSE_VIEW = { distance: 4.6, height: 1.35, bearing: 0.3, aim: 0.62 } as const;
+const AT_HOME: MuseDirection = { kind: 'home', busy: false };
+const OUT_OF_SIGHT: MuseDirection = { kind: 'hidden' };
+
+/** A tap or the pointer this near a find's sphere (px) picks it; the sphere stands this high over its bed (m). */
+const SPHERE = { slop: 16, height: 0.6 } as const;
 
 const sample = createGroundSample();
 const tmp = new Vector3();
+
+/** The finds' marks on the planet (their specimens, and the glowing spheres seen from high up). */
+export interface FindMarks {
+  hover(id: string | null): void;
+  open(id: string | null): void;
+  pulse(ids: readonly string[]): void;
+  /** How plainly the spheres show at the camera's height, 0..1. */
+  spheresShown(): number;
+}
 
 /** 'Today’s basket', 'Tuesday’s basket', 'The basket of Tue 21 Oct'. */
 export function basketName(day: string): string {
@@ -56,8 +71,12 @@ export class GardenUi {
   readonly state: GardenState;
   private readonly root: HTMLElement;
   private readonly beds: FindBeds;
+  private readonly forms: FindForms;
   private readonly pins = new Pins();
+  /** The finds' specimens and spheres, once they are drawn. */
+  marks: FindMarks | null = null;
   private readonly flight: Flight;
+  private readonly basketFlight: BasketFlight;
   private readonly card: FindCard;
   private readonly postbox: PostBox;
   private readonly mail: Mail;
@@ -75,18 +94,27 @@ export class GardenUi {
   private readonly ticket: HTMLButtonElement;
   private readonly toastEl: HTMLElement;
   private toastTimer = 0;
-  private layout: GardenLayout = { beds: new Map(), patches: new Map() };
+  private layout: GardenLayout = { beds: new Map() };
   private laidFor: { radius: number; layout: Layout | null } = { radius: 0, layout: null };
   private relayoutAt = 0;
   /** The find whose card is up (or rising), and the one being flown to. */
   private current: string | null = null;
   private offscreen = 0;
+  /** Hover, with a pointer that can: where it is over the canvas (px; null when off it), whether it moved since the last pick, and the find under it. */
+  private pointer: { x: number; y: number; canvas: HTMLCanvasElement } | null = null;
+  private pointerMoved = false;
+  private hovered: string | null = null;
   private readonly source: GardenSource;
 
+  /**
+   * `driveMuse`: the engine's say over the 3D Muse each frame (muse/ui/overlay.ts), when the page follows an engine;
+   * without one Muse is at home or out of sight as the source's status says.
+   */
   constructor(
     parent: HTMLElement,
     private readonly world: World,
-    store: ParamStore,
+    private readonly store: ParamStore,
+    private readonly driveMuse: ((dt: number) => MuseDirection | null) | null = null,
   ) {
     this.source = gardenSource();
     this.state = new GardenState(this.source);
@@ -94,11 +122,21 @@ export class GardenUi {
     parent.append(this.root);
     document.body.classList.add('garden-on');
     this.beds = new FindBeds(world.shared);
-    world.scene.add(...this.beds.meshes, this.pins.group);
+    this.forms = new FindForms(world.shared, this.beds);
+    this.marks = this.forms;
+    world.scene.add(...this.beds.meshes, ...this.forms.objects, this.pins.group);
     this.flight = new Flight(world.rig);
+    this.basketFlight = new BasketFlight(this.root, {
+      project: (dir, height) => this.project(dir, height, window.innerWidth, window.innerHeight),
+      cameraRemaining: () => this.flight.remaining,
+      // (a quarter second back on the planting clock: its first sprouts show as it lands)
+      plant: (ids) => this.beds.plant(ids, 0.12, -0.25),
+      pulse: (ids) => this.marks?.pulse(ids),
+    });
 
     this.card = new FindCard(this.root, {
       like: () => this.like(),
+      share: (id, shared) => this.state.shareFind(id, shared),
       step: (d) => this.step(d),
       close: () => this.closeCard(),
     });
@@ -140,7 +178,7 @@ export class GardenUi {
     this.mail = new Mail(this.root, this.state, this.postbox, {
       travel: (id) => this.board(id),
     });
-    this.basketsSheet = new BasketsSheet(this.root, this.state, (id) => this.goToBasket(id));
+    this.basketsSheet = new BasketsSheet(this.root, this.state, (id, from) => this.goToBasket(id, from));
     this.museSheet = new MuseSheet(this.root, this.state, { muse: museFace, friend: friendFace }, (home) => this.setHome(home));
     this.travelSheet = new TravelSheet(this.root, this.state, (id) => this.board(id));
 
@@ -154,6 +192,12 @@ export class GardenUi {
       this.toast('The garden could not be reached just now.');
     });
     window.addEventListener('keydown', (e) => this.key(e));
+    if (matchMedia('(hover: hover)').matches) {
+      window.addEventListener('pointermove', (e) => this.pointerAt(e), { passive: true });
+      window.addEventListener('pointerout', (e) => {
+        if (!e.relatedTarget) this.pointerAt(null);
+      });
+    }
     if (import.meta.env.DEV || import.meta.env.VITE_PROBE) this.installProbe();
   }
 
@@ -161,6 +205,7 @@ export class GardenUi {
 
   private changed(change: string): void {
     const s = this.state;
+    if (change === 'snapshot') this.applyWorld();
     if (change === 'snapshot' || change === 'baskets') this.relayout(true);
     if (change === 'snapshot' || change === 'likes' || change === 'pins' || change === 'status') this.refreshPins();
     const unread = s.unread.length;
@@ -175,7 +220,7 @@ export class GardenUi {
     this.homeButton.title = home ? 'Muse’s cottage' : 'Muse’s cottage: Muse is out';
     if (change === 'snapshot' && s.freshBasket) {
       const fresh = s.freshBasket;
-      setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', () => this.goToBasket(fresh.id)), 1800);
+      setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', (from) => this.goToBasket(fresh.id, from)), 1800);
     }
     if (change === 'postcards' || change === 'snapshot') {
       this.mail.refresh();
@@ -183,6 +228,14 @@ export class GardenUi {
     }
     if (change === 'baskets' || change === 'snapshot') this.basketsSheet.render();
     if (change === 'interests' || change === 'snapshot' || change === 'status') this.museSheet.render();
+  }
+
+  /** Muse's own planet, when the source names one: the finds were found on it. */
+  private applyWorld(): void {
+    const world = this.state.snapshot?.world;
+    if (!world) return;
+    this.store.set('world.seed', world.seed);
+    this.store.set('world.growth', world.g);
   }
 
   /** Lay the finds out on the planet again (a new basket, or a planet that grew). */
@@ -194,7 +247,7 @@ export class GardenUi {
     if (!s) return;
     this.laidFor = { radius, layout: w.terrain.layout };
     this.layout = layOut(w.terrain, s.baskets, s.finds);
-    const looks: BedLook[] = [];
+    const looks: FormLook[] = [];
     const hidden = new Set<string>();
     for (const basket of this.state.baskets) {
       for (const id of basket.finds) {
@@ -202,11 +255,12 @@ export class GardenUi {
         const find = this.state.find(id);
         if (!bed || !find) continue;
         const interest = this.state.interest(find.topic);
-        looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5 });
-        if (!this.state.visitedBasket(basket.id)) hidden.add(id);
+        looks.push({ bed, species: interest?.species ?? 0, variant: interest?.variant ?? 0.5, topic: find.topic });
+        if (!this.state.visitedBasket(basket.id) || this.basketFlight.waiting(id)) hidden.add(id);
       }
     }
     this.beds.set(looks, radius, hidden);
+    this.forms.set(looks, w.terrain, hidden);
     this.refreshPins();
   }
 
@@ -223,9 +277,11 @@ export class GardenUi {
 
   // ---- each frame ------------------------------------------------------------------------
 
-  /** Before the world moves the camera: a flight drives it. */
+  /** Before the world moves: a flight drives the camera, and Muse is told where to be. */
   update(dt: number): void {
     this.flight.update(dt);
+    const muse = this.visit.away ? OUT_OF_SIGHT : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
+    if (muse) this.world.muse.direct(muse);
   }
 
   /** After the world's update: the beds' clock, the pins, the card over its bed. */
@@ -238,12 +294,12 @@ export class GardenUi {
       this.relayout();
     }
     const away = this.visit.away;
+    this.basketFlight.update(dt);
+    // (picked when the pointer moved, or while a flight moves the view under it)
+    if (this.pointer && (this.pointerMoved || this.flight.flying)) this.hover(this.pointer);
     this.beds.update(away ? Infinity : w.rig.altitude);
+    this.forms.update(w.rig.altitude, !away);
     this.pins.update(dt, this.state.pins && !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
-    if (!this.state.status.home || away) {
-      w.muse.mesh.visible = false;
-      w.muse.shadowMesh.visible = false;
-    }
     const width = window.innerWidth;
     const height = window.innerHeight;
     const bed = this.current ? this.layout.beds.get(this.current) : undefined;
@@ -271,23 +327,75 @@ export class GardenUi {
 
   // ---- input ----------------------------------------------------------------------------
 
-  /** A tap on the canvas: a pin, or a bed. True when the garden took it. */
+  /** A tap on the canvas: a pin, or a find (its sphere from high up, its bed below). True when the garden took it. */
   tap(x: number, y: number, width: number, height: number): boolean {
-    const w = this.world;
-    const pin = this.pins.pick(x, y, width, height, w.rig.camera);
+    const pin = this.pins.pick(x, y, width, height, this.world.rig.camera);
     if (pin) {
       if (pin.kind === 'muse') this.findMuse();
       else this.openFind(pin.id.slice('liked:'.length));
       return true;
     }
-    if (this.visit.away) return false;
-    const hit = w.pick((x / width) * 2 - 1, 1 - (y / height) * 2);
-    if (!hit) return false;
-    const bed = bedAt(this.layout, hit.dir, w.growth.radius);
+    const bed = this.findAt(x, y, width, height);
     if (!bed) return false;
     if (!this.state.visitedBasket(bed.basket)) this.goToBasket(bed.basket);
     else this.openFind(bed.find);
     return true;
+  }
+
+  /** The find under a point on the canvas (px): its sphere when the spheres show, else the bed the surface pick lands in. */
+  private findAt(x: number, y: number, width: number, height: number): Bed | null {
+    const w = this.world;
+    if (this.visit.away) return null;
+    if ((this.marks?.spheresShown() ?? 0) > 0.5) {
+      const R = w.growth.radius;
+      let best: Bed | null = null;
+      let bestD: number = SPHERE.slop;
+      for (const bed of this.layout.beds.values()) {
+        // only what is drawn: planted, and on this side of the horizon
+        if (!this.state.visitedBasket(bed.basket) || this.basketFlight.waiting(bed.find)) continue;
+        if (w.rig.camera.position.dot(bed.dir) <= R + bed.ground + SPHERE.height) continue;
+        const p = this.project(bed.dir, bed.ground + SPHERE.height, width, height);
+        const d = p ? Math.hypot(p.x - x, p.y - y) : Infinity;
+        if (d < bestD) {
+          bestD = d;
+          best = bed;
+        }
+      }
+      return best;
+    }
+    const hit = w.pick((x / width) * 2 - 1, 1 - (y / height) * 2);
+    return hit ? bedAt(this.layout, hit.dir, w.growth.radius) : null;
+  }
+
+  /** The pointer moved (null: it left the window). Picked at the next frame, so at most once a frame. */
+  private pointerAt(e: PointerEvent | null): void {
+    const canvas = e && e.pointerType !== 'touch' && e.buttons === 0 && e.target instanceof HTMLCanvasElement ? e.target : null;
+    if (e && canvas) {
+      const r = canvas.getBoundingClientRect();
+      this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top, canvas };
+      this.pointerMoved = true;
+      return;
+    }
+    if (this.pointer) this.pointer.canvas.style.cursor = '';
+    this.pointer = null;
+    this.setHovered(null);
+  }
+
+  private hover(at: { x: number; y: number; canvas: HTMLCanvasElement }): void {
+    this.pointerMoved = false;
+    const { clientWidth: width, clientHeight: height } = at.canvas;
+    const pin = this.pins.pick(at.x, at.y, width, height, this.world.rig.camera);
+    const bed = pin ? null : this.findAt(at.x, at.y, width, height);
+    const shown = bed && this.state.visitedBasket(bed.basket) && !this.basketFlight.waiting(bed.find) ? bed.find : null;
+    this.setHovered(shown);
+    at.canvas.style.cursor = pin || shown ? 'pointer' : '';
+  }
+
+  private setHovered(id: string | null): void {
+    if (id === this.hovered) return;
+    this.hovered = id;
+    this.beds.hover(id);
+    this.marks?.hover(id);
   }
 
   /** You took the camera (a drag, the wheel, a key): any flight ends there. */
@@ -321,6 +429,7 @@ export class GardenUi {
     const find = this.state.find(id);
     if (!bed || !find) return;
     if (this.card.shown) this.card.hide(direction);
+    this.basketFlight.finish();
     this.beds.highlight(null);
     this.current = id;
     // look from the side the camera comes from, unless it is right over the bed
@@ -337,8 +446,10 @@ export class GardenUi {
       index,
       total: basket.finds.length,
       liked: this.state.liked(id),
+      shared: this.state.findShared(id),
     });
     this.beds.highlight(id);
+    this.marks?.open(id);
   }
 
   private step(direction: 1 | -1): void {
@@ -358,39 +469,40 @@ export class GardenUi {
 
   private closeCard(): void {
     this.card.hide(0);
+    this.basketFlight.finish();
     this.beds.highlight(null);
+    this.marks?.open(null);
     this.current = null;
   }
 
   // ---- baskets ---------------------------------------------------------------------------
 
   /**
-   * Fly to a basket's patch, framed on its first find (the beds round it in view); a basket not yet
-   * visited is planted as you arrive, the middle bed first, and its card rises while the rest blossom.
+   * Open a basket: it flies in from `from` (where you picked it; the rail's basket by default) and its
+   * finds fly to where they were found while the camera follows, high enough to see them all. A basket
+   * not opened before plants its finds as they land; one opened before lights them up again.
    */
-  goToBasket(id: string): void {
+  goToBasket(id: string, from: DOMRect | null = null): void {
     const basket = this.state.basket(id);
-    const first = basket?.finds.find((f) => this.layout.beds.has(f));
-    const bed = first ? this.layout.beds.get(first) : undefined;
-    if (!basket || !first || !bed) return;
-    if (this.card.shown) this.card.hide(0);
-    this.beds.highlight(null);
-    this.current = first;
-    const fresh = !this.state.visitedBasket(id);
-    this.flight.to(this.framing(bed, PATCH_VIEW), this.world.growth.radius, this.ground, () => {
-      if (!fresh) {
-        this.raise(first);
-        return;
-      }
-      this.state.visit(id);
-      this.beds.plant(basket.finds, 0.24, 0.1);
-      setTimeout(() => this.raise(first), 1150);
+    const arrivals = (basket?.finds ?? []).flatMap((f): Arrival[] => {
+      const bed = this.layout.beds.get(f);
+      const find = this.state.find(f);
+      return bed && find ? [{ id: f, bed, image: find.media.image, colour: topicColour(this.state.interest(find.topic)) }] : [];
     });
+    if (arrivals.length === 0) return;
+    this.closeCard();
+    const fresh = !this.state.visitedBasket(id);
+    this.basketFlight.start(arrivals, from ?? this.basketsButton.getBoundingClientRect(), fresh);
+    // (after the start: until each lands, its bed stays unplanted)
+    if (fresh) this.state.visit(id);
+    const R = this.world.growth.radius;
+    const view = framingToFit(arrivals.map((a) => a.bed), this.flight, R, this.ground);
+    this.flight.to(view, R, this.ground);
   }
 
   // ---- Muse ---------------------------------------------------------------------------------
 
-  /** Where Muse is: on its terrace (where its day has it) when home; out, where the source says, or by the newest basket. */
+  /** Where Muse is: on its terrace (where its day has it) when home; out, where the source says, or by the newest find. */
   private musePlace(): { dir: Vector3; ground: number; home: boolean } {
     const w = this.world;
     const status = this.state.status;
@@ -399,9 +511,9 @@ export class GardenUi {
         const dir = new Vector3(...status.where).normalize();
         return { dir, ground: this.ground(dir), home: false };
       }
-      const newest = this.state.baskets[0];
-      const patch = newest && this.layout.patches.get(newest.id);
-      if (patch) return { dir: patch.dir.clone(), ground: this.ground(patch.dir), home: false };
+      const newest = this.state.baskets[0]?.finds[0];
+      const bed = newest ? this.layout.beds.get(newest) : undefined;
+      if (bed) return { dir: bed.dir.clone(), ground: bed.ground, home: false };
     }
     // at home: wherever its life has it about the hut (world.muse.where, kept current even while it isn't drawn)
     return { dir: w.muse.where.dir.clone(), ground: w.muse.where.height, home: true };
@@ -469,13 +581,15 @@ export class GardenUi {
 
   // ---- toasts ----------------------------------------------------------------------------------
 
-  toast(text: string, action?: string, onAction?: () => void): void {
+  /** A line at the top for a moment, with an action (it is handed the button's place on screen) if given. */
+  toast(text: string, action?: string, onAction?: (from: DOMRect) => void): void {
     this.toastEl.replaceChildren(el('span', '', text));
     if (action && onAction) {
       this.toastEl.append(
-        button('', action, '', () => {
+        button('', action, '', (e) => {
+          const from = (e.currentTarget as HTMLElement).getBoundingClientRect();
           this.toastEl.classList.remove('is-on');
-          onAction();
+          onAction(from);
         }),
       );
       (this.toastEl.lastChild as HTMLButtonElement).textContent = action;
@@ -492,6 +606,7 @@ export class GardenUi {
       state: this.state,
       ui: this,
       layout: () => this.layout,
+      forms: this.forms,
       open: (id: string) => this.openFind(id),
       basket: (id?: string) => this.goToBasket(id ?? this.state.baskets[0]?.id ?? ''),
       /** Replay a basket's planting: its beds hidden again and the basket marked new. */

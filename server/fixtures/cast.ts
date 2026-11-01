@@ -1,12 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CastFile, CastMember, MuseId } from '../../src/muse/contract';
+import type { CastFile, CastMember, KnownOn, MuseId } from '../../src/muse/contract';
 import { arr, num, obj, str } from '../adapters/sources/json';
 
 export const FIXTURES_DIR = fileURLToPath(new URL('./', import.meta.url));
 
-const ROLES: readonly CastMember['role'][] = ['hero', 'friend', 'stranger'];
+const ROLES: readonly CastMember['role'][] = ['hero', 'friend', 'known', 'stranger'];
+const NETWORKS: readonly KnownOn[] = ['instagram', 'facebook'];
 
 function timezone(v: unknown, what: string): string {
   const zone = str(v, what);
@@ -39,12 +40,24 @@ export function parseCastFile(raw: unknown): CastFile {
   });
   const ids = new Set(members.map((m) => m.id));
   if (ids.size !== members.length) throw new Error('cast: duplicate member id');
+  const pair = (a: MuseId, b: MuseId, at: string): void => {
+    if (!ids.has(a) || !ids.has(b) || a === b) throw new Error(`${at}: ${a} and ${b} must be two cast members`);
+  };
   const introductions = arr(o.introductions, 'introductions').map((p, i): readonly [MuseId, MuseId] => {
     const [a, b] = arr(p, `introductions[${i}]`).map((id) => str(id, `introductions[${i}]`) as MuseId);
-    if (!ids.has(a) || !ids.has(b) || a === b) throw new Error(`introductions[${i}]: ${a} and ${b} must be two cast members`);
+    pair(a, b, `introductions[${i}]`);
     return [a, b];
   });
-  return { members, introductions };
+  const knownOn = arr(o.knownOn ?? [], 'knownOn').map((k, i) => {
+    const at = `knownOn[${i}]`;
+    const edge = obj(k, at);
+    const [a, b] = [str(edge.a, `${at}.a`) as MuseId, str(edge.b, `${at}.b`) as MuseId];
+    pair(a, b, at);
+    const on = NETWORKS.find((n) => n === edge.on);
+    if (on === undefined) throw new Error(`${at}.on: ${String(edge.on)}`);
+    return { a, b, on };
+  });
+  return { members, introductions, knownOn };
 }
 
 export function loadCast(path = join(FIXTURES_DIR, 'cast.json')): CastFile {

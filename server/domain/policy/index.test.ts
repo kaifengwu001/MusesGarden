@@ -34,7 +34,7 @@ function aWeek(): Life {
   while (now < START + 7 * DAY_MS) {
     const draw = drawFor(MOSS.id, ++n);
     const at = instant(now);
-    if (life.next(muse.state, at, draw, false) === 'rest') {
+    if (life.next(muse.state, at, draw, 'none') === 'rest') {
       if (life.reflectionDue(muse.state, at)) {
         const kept = life.experiences(muse.state, muse.log).filter((x) => x.kind === 'kept');
         const proposal: ReflectionProposal = {

@@ -204,26 +204,28 @@ function reflectOn(ctx: MindContext, experiences: readonly Experience[]): Reflec
     for (const topic of new Set(e.topics)) byTopic.set(topic, [...(byTopic.get(topic) ?? []), e]);
   }
 
-  const deltas: (InterestDelta & { sources: number })[] = [];
+  const deltas: (InterestDelta & { weight: number })[] = [];
   for (const [topic, held] of byTopic) {
     const sources = new Set(held.map((e) => e.canonicalUrl)).size;
-    if (sources < 2) continue;
+    // A page the owner liked counts twice.
+    const weight = sources + new Set(held.filter((e) => e.liked).map((e) => e.canonicalUrl)).size;
+    if (weight < 2) continue;
     const days = new Set(held.map((e) => Math.floor(e.at / DAY_MS))).size;
     const stage = supportedStage(sources, days);
     const current = ctx.interests.find((i) => i.topic === topic)?.stage ?? 'fading';
     deltas.push({
       topic,
-      dAffinity: round(Math.min(0.2, 0.05 * sources), 2),
+      dAffinity: round(Math.min(0.2, 0.05 * weight), 2),
       ...(STAGE_RANK[stage] > STAGE_RANK[current] ? { stage } : {}),
       evidence: held.map((e): EventRef => e.ref),
-      reason: `${sources} separate finds keep pointing me to ${topic}.`,
-      sources,
+      reason: sources > 1 ? `${sources} separate finds keep pointing me to ${topic}.` : `My owner liked what I found about ${topic}.`,
+      weight,
     });
   }
-  deltas.sort((a, b) => b.sources - a.sources || (a.topic < b.topic ? -1 : a.topic > b.topic ? 1 : 0));
+  deltas.sort((a, b) => b.weight - a.weight || (a.topic < b.topic ? -1 : a.topic > b.topic ? 1 : 0));
 
   return {
-    deltas: deltas.map(({ sources: _, ...d }) => d),
+    deltas: deltas.map(({ weight: _, ...d }) => d),
     narrative: deltas.length > 0 ? `Lately I keep finding my way back to ${deltas[0].topic}.` : '',
     questions: [],
   };

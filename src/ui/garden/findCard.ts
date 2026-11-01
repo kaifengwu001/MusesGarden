@@ -1,5 +1,5 @@
 import type { Find, Interest } from '../../garden/types';
-import { button, duration, el } from './dom';
+import { button, duration, el, toggle } from './dom';
 import { ICONS } from './icons';
 
 // A find's card, standing over its bed on a thin line: tap a bed and the
@@ -8,8 +8,10 @@ import { ICONS } from './icons';
 // picture and length, a post with its picture and caption, an article with
 // its headline, the site and the time it takes to read. Under it a heart
 // (a like goes back to Muse and pins the find on your map), the link out,
-// and the find's topic. Swipe it, or press the arrows (← → on a keyboard),
-// for the next find; the camera flies there and the next card rises.
+// the find's topic, and a Public/Private switch (a private find never
+// leaves the planet: other Muses don't see it). Swipe it, or press the
+// arrows (← → on a keyboard), for the next find; the camera flies there and
+// the next card rises.
 
 export interface CardContext {
   /** 'Today’s basket', 'Tuesday’s basket'. */
@@ -17,10 +19,13 @@ export interface CardContext {
   index: number;
   total: number;
   liked: boolean;
+  /** Whether other Muses may see it. */
+  shared: boolean;
 }
 
 export interface CardActions {
   like(): void;
+  share(findId: string, shared: boolean): void;
   step(direction: 1 | -1): void;
   close(): void;
 }
@@ -110,6 +115,7 @@ export class FindCard {
   private readonly likeButton: HTMLButtonElement;
   private readonly openLink: HTMLAnchorElement;
   private readonly topic: HTMLElement;
+  private readonly share: HTMLElement;
   private readonly prev: HTMLButtonElement;
   private readonly next: HTMLButtonElement;
   /** The line's rise: 0 at the bed, 1 at the card; animated toward `riseTo`. */
@@ -139,8 +145,10 @@ export class FindCard {
     this.openLink.innerHTML = `<span>Open</span>${ICONS.open}`;
     this.topic = el('span', 'g-topic');
     foot.append(this.likeButton, this.topic, this.openLink);
+    this.share = el('div', 'g-card-share');
+    this.share.title = 'Public: other Muses can see it. Private: it never leaves your planet.';
     const close = button('g-card-close', 'Close', ICONS.close, () => actions.close());
-    this.card.append(this.kicker, close, this.content, foot);
+    this.card.append(this.kicker, close, this.content, foot, this.share);
     this.prev = button('g-step g-step-prev', 'Previous find', ICONS.left, () => actions.step(-1));
     this.next = button('g-step g-step-next', 'Next find', ICONS.right, () => actions.step(1));
     this.el.append(svg, this.card, this.prev, this.next);
@@ -169,6 +177,7 @@ export class FindCard {
     dot.style.background = topicColour(interest);
     this.topic.append(dot, interest?.name ?? find.topic);
     this.setLiked(context.liked, false);
+    this.share.replaceChildren(toggle('Let other Muses see this find', context.shared, (on) => this.actions.share(find.id, on), ['Public', 'Private']));
     this.open = true;
     this.rise = 0;
     this.riseTo = 1;
@@ -237,7 +246,7 @@ export class FindCard {
   }
 
   private swipeStart(e: PointerEvent): void {
-    if ((e.target as HTMLElement).closest('button, a') || !this.open) return;
+    if ((e.target as HTMLElement).closest('button, a, label') || !this.open) return;
     this.swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0 };
     this.card.setPointerCapture(e.pointerId);
     this.card.classList.add('is-dragging');

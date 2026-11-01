@@ -5,7 +5,7 @@ describe('the shared route table', () => {
   it('fills params with encoding and appends only the query values that are set', () => {
     expect(path('plant', { id: 'hero', pid: 'd:hero:1:0:0' })).toBe('/api/muses/hero/plants/d%3Ahero%3A1%3A0%3A0');
     expect(path('baskets', { id: 'hero' }, { before: null, limit: 20 })).toBe('/api/muses/hero/baskets?limit=20');
-    expect(path('answer', { id: 'inv 1', action: 'accept' }, { as: 'wren' })).toBe('/api/invitations/inv%201/accept?as=wren');
+    expect(path('withdraw', { id: 'inv 1' }, { as: 'wren' })).toBe('/api/invitations/inv%201/withdraw?as=wren');
     expect(path('clock', {})).toBe('/api/dev/clock');
   });
 

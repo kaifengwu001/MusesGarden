@@ -1,4 +1,4 @@
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Matrix4, Quaternion, Vector3, type PerspectiveCamera } from 'three';
 import { smoothstep } from '../core/math';
 import { angleBetween, tangentToward, travel } from '../planet/geo';
 import type { CameraRig } from './camera';
@@ -9,7 +9,8 @@ import type { CameraRig } from './camera';
 // bird crossing a valley) and comes down to frame the place: from a
 // distance and a height over the place's ground, looking at a point above it,
 // with the place a little below the middle of the view. Driven through the
-// rig's own controls each frame; any drag, zoom or key ends a flight.
+// rig's own controls each frame; any drag, zoom or key ends a flight. With
+// reduced motion asked for, a flight is a cut.
 
 export interface Framing {
   /** The place: a unit direction and its ground's height over R (m). */
@@ -56,6 +57,19 @@ export class Flight {
     return this.active;
   }
 
+  /** Seconds until the flight arrives (0 when not flying). */
+  get remaining(): number {
+    return this.active ? (1 - this.t) * this.duration : 0;
+  }
+
+  /** The camera a flight to this framing ends with, placed in `out` (to check what it will see). */
+  camera(f: Framing, radius: number, ground: Ground, out: PerspectiveCamera): PerspectiveCamera {
+    const pose = this.pose(f, radius, ground);
+    const up = pose.focus.clone().normalize();
+    this.rig.place(out, up, pose.forward, this.rig.zoomForAltitude(pose.altitude), pose.pitch, radius, ground(up), this.rig.camera.aspect);
+    return out;
+  }
+
   /** The pose that frames a place: the camera's focus direction and heading, its altitude over the focus's ground, and its look up. */
   pose(f: Framing, radius: number, ground: Ground): { focus: Vector3; forward: Vector3; altitude: number; pitch: number } {
     const R = radius;
@@ -91,7 +105,7 @@ export class Flight {
     this.peakAlt = hop > LONG_HOP && low < OVER_CLOUDS ? Math.max(OVER_CLOUDS, hop * 0.6) : low;
     this.startPitch = this.pitch;
     this.endPitch = pose.pitch;
-    this.duration = Math.min(3.4, 1.1 + 0.55 * Math.log1p(hop / 12) + (Math.abs(Math.log(this.endAlt / this.startAlt)) > 2 ? 0.5 : 0));
+    this.duration = reducedMotion() ? 1e-3 : Math.min(3.4, 1.1 + 0.55 * Math.log1p(hop / 12) + (Math.abs(Math.log(this.endAlt / this.startAlt)) > 2 ? 0.5 : 0));
     this.t = 0;
     this.active = true;
     this.done = then ?? null;
@@ -133,4 +147,8 @@ export class Flight {
       done?.();
     }
   }
+}
+
+function reducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

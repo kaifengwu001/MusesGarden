@@ -1,8 +1,10 @@
+import { Vector3 } from 'three';
 import closeUrl from '../assets/postcards/close.jpg';
 import cottageUrl from '../assets/postcards/cottage.jpg';
 import meadowUrl from '../assets/postcards/meadow.jpg';
 import pierUrl from '../assets/postcards/pier.jpg';
 import terraceUrl from '../assets/postcards/terrace.jpg';
+import { tangentToward, travel } from '../planet/geo';
 import { art, MOTIF_ASPECT, type Motif } from './art';
 import type { GardenSource } from './source';
 import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaKind, MuseFriend, Postcard } from './types';
@@ -10,7 +12,7 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaK
 // The example gallery the garden shows until a backend is plugged in
 // (source.ts): ten interests, six baskets of finds over the last ten days
 // (reels, posts, articles and a video, every picture a placeholder from
-// art.ts), Muse's postcards (photographed in the world: two Muses, Muse
+// art.ts, each found somewhere on the planet), Muse's postcards (photographed in the world: two Muses, Muse
 // waving), an invitation from a friend, and the friends themselves. Days are
 // counted back from today, so the newest basket is always today's.
 
@@ -38,13 +40,48 @@ const TOPICS: readonly Topic[] = [
   { id: 'ambient', name: 'Ambient music', species: 3, variant: 0.5, shared: false, motif: 'vinyl', sinceBack: 6 },
 ];
 
+/**
+ * Where Muse went looking, on the meadow's own planet (seed 412, R 128 m): unit directions,
+ * each on dry ground. A trip's finds lie a few meters apart round where it looked.
+ */
+const AREAS = {
+  /** The dry hill past the pond, some 80 m from home. */
+  hill: [-0.9817, -0.1822, 0.0547],
+  /** The pond's far bank, near home. */
+  pondBank: [-0.9542, -0.1115, -0.2775],
+  /** The wet meadow beyond the hill. */
+  wetMeadow: [-0.7688, -0.6267, 0.1272],
+  /** A lake shore round the side. */
+  lakeShore: [-0.3551, -0.3793, -0.8544],
+  /** The far fields, most of the way round. */
+  farFields: [0.1075, 0.6837, -0.7218],
+  /** The slope west of the cottage. */
+  west: [-0.8561, 0.51, 0.0831],
+} as const;
+type Area = keyof typeof AREAS;
+/** The radius the areas' spacing is in meters at (m). */
+const AREA_RADIUS = 128;
+
+/** The `n`th find made round an area: on a sunflower spiral out from where Muse looked, 3 m apart or so. */
+function foundNear(area: Area, n: number): [number, number, number] {
+  const centre = new Vector3(...AREAS[area]).normalize();
+  const north = tangentToward(centre, new Vector3(0, 1, 0), new Vector3());
+  const side = new Vector3().crossVectors(centre, north);
+  const a = n * 2.39996;
+  const t = north.multiplyScalar(Math.cos(a)).addScaledVector(side, Math.sin(a));
+  const [x, y, z] = travel(centre, t, (3.2 * Math.sqrt(n)) / AREA_RADIUS, new Vector3()).toArray();
+  return [x, y, z];
+}
+
 /** One example find: [topic, kind, source, author, title (articles and videos), text, minutes or seconds]. */
 type Row = [string, MediaKind, string, string, string | null, string, number?];
 
-const BASKETS: ReadonlyArray<{ back: number; title?: string; rows: Row[] }> = [
+/** Each basket's finds and where each was found (`at`, one area per row). */
+const BASKETS: ReadonlyArray<{ back: number; title?: string; at: readonly Area[]; rows: Row[] }> = [
   {
     back: 0,
     title: 'Clay and starlight',
+    at: ['hill', 'hill', 'hill', 'hill', 'hill'],
     rows: [
       ['ceramics', 'reel', 'Instagram', '@kiln.and.cloud', null, 'Throwing a moon jar in one go. The wobble at 0:14 is the best part.', 24],
       ['astronomy', 'article', 'Nightsky Weekly', 'Ines Okafor', 'Saturn’s rings are tilting edge-on, and they will all but vanish in March', 'Every fifteen years the rings line up with us. Here is when to look, and what you will see instead.', 6],
@@ -56,6 +93,7 @@ const BASKETS: ReadonlyArray<{ back: number; title?: string; rows: Row[] }> = [
   {
     back: 1,
     title: 'A long run down',
+    at: ['farFields', 'farFields', 'lakeShore', 'lakeShore'],
     rows: [
       ['light', 'reel', 'Instagram', '@halo.rooms', null, 'Walked into this ring of light and forgot what time it was.', 18],
       ['skiing', 'reel', 'Instagram', '@firstchair.club', null, 'First tracks on a bluebird morning.', 22],
@@ -65,6 +103,7 @@ const BASKETS: ReadonlyArray<{ back: number; title?: string; rows: Row[] }> = [
   },
   {
     back: 2,
+    at: ['wetMeadow', 'wetMeadow', 'wetMeadow'],
     rows: [
       ['ceramics', 'post', 'Instagram', '@glaze.lab', null, 'Three pots, one glaze, three kilns.'],
       ['ferns', 'article', 'The Understory', 'Priya Raman', 'Why ferns unfurl the way they do', 'A fiddlehead is a spiral of cells that grow faster on one side, and it starts before spring does.', 5],
@@ -73,6 +112,7 @@ const BASKETS: ReadonlyArray<{ back: number; title?: string; rows: Row[] }> = [
   },
   {
     back: 4,
+    at: ['pondBank', 'pondBank', 'west', 'west'],
     rows: [
       ['genart', 'reel', 'Instagram', '@plotter.weather', null, 'A pen plotter drawing tomorrow’s forecast.', 27],
       ['kits', 'post', 'Instagram', '@tiny.hangar', null, 'Panel lining done. Now for the decals.'],
@@ -82,6 +122,7 @@ const BASKETS: ReadonlyArray<{ back: number; title?: string; rows: Row[] }> = [
   },
   {
     back: 6,
+    at: ['farFields', 'farFields', 'farFields'],
     rows: [
       ['architecture', 'post', 'Instagram', '@arches.daily', null, 'Noon at the stairs: all shadow, no people.'],
       ['light', 'reel', 'Instagram', '@lumen.field', null, 'Two thousand bulbs in a field at dusk.', 16],
@@ -91,6 +132,7 @@ const BASKETS: ReadonlyArray<{ back: number; title?: string; rows: Row[] }> = [
   {
     back: 9,
     title: 'The first basket',
+    at: ['west', 'west'],
     rows: [
       ['ferns', 'post', 'Instagram', '@frondly.pressed', null, 'The first fern of the spring.'],
       ['ceramics', 'post', 'Instagram', '@kiln.and.cloud', null, 'Bisque firing day.'],
@@ -126,6 +168,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
   const topics = new Map(TOPICS.map((t) => [t.id, t]));
   const interests: Interest[] = TOPICS.map(({ motif: _motif, sinceBack, ...t }) => ({ ...t, since: dayBefore(sinceBack, now) }));
   const finds: Find[] = [];
+  const foundAt = new Map<Area, number>();
   const baskets: Basket[] = BASKETS.map((b, k) => {
     const id = `basket-${dayBefore(b.back, now)}`;
     const ids = b.rows.map(([topic, kind, source, author, title, text, length], i) => {
@@ -143,7 +186,10 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
       if (title) media.title = title;
       if (kind === 'article') media.minutes = length;
       else if (length) media.duration = length;
-      const find: Find = { id: `${id}-${i}`, basket: id, topic, media };
+      const area = b.at[i];
+      const n = foundAt.get(area) ?? 0;
+      foundAt.set(area, n + 1);
+      const find: Find = { id: `${id}-${i}`, basket: id, topic, media, place: foundNear(area, n), shared: topics.get(topic)?.shared ?? true };
       finds.push(find);
       return find.id;
     });

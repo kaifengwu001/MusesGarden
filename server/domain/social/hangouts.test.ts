@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import type { MuseState } from '../../../src/muse/contract';
+import type { DiscoveryId, MuseEventBody, MuseState, PhotoId } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
 import { DAY, HOUR, T0, apply, at, draws, find, fold, muse, ofKind, pastHangout, topics, type MuseSpec } from './testkit';
 
 function introduce(a: MuseState, b: MuseState): [MuseState, MuseState] {
   return apply(a, b, policy.ownerLink(a, b, 'introduce', T0), T0);
+}
+
+/** Introduced, and they have met once since. */
+function acquainted(a: MuseState, b: MuseState): [MuseState, MuseState] {
+  const [a1, b1] = introduce(a, b);
+  return [fold(a1, [pastHangout(b1, 'host', 0.6)], T0), fold(b1, [pastHangout(a1, 'guest', 0.6)], T0)];
 }
 
 describe('every hangout', () => {
@@ -29,7 +35,7 @@ describe('every hangout', () => {
 
     const [hostPhoto] = ofKind(out.host, 'photo.taken');
     const [guestPhoto] = ofKind(out.guest, 'photo.taken');
-    expect(hostPhoto.photo).toMatchObject({ subject: 'friend', planetOf: a.seed.id, companions: [b.seed.id], at: now });
+    expect(hostPhoto.photo).toMatchObject({ subject: 'friend', context: 'planet', planetOf: a.seed.id, companions: [b.seed.id], at: now });
     expect(guestPhoto.photo).toEqual({ ...hostPhoto.photo, companions: [a.seed.id] });
 
     const [hostSide] = ofKind(out.host, 'hangout');
@@ -103,6 +109,24 @@ describe('choosing whom to visit', () => {
     expect(bo + cy + di).toBe(1);
   });
 
+  it('favours a friend whose photos the owner liked, counting each photo once', () => {
+    const { self, friends } = circle();
+    const [, cy] = friends;
+    const like = (photo: string, liked = true): MuseEventBody => ({ kind: 'owner.liked', target: { photo: photo as PhotoId }, liked, friend: cy.seed.id });
+    const notOfAFriend: MuseEventBody = { kind: 'owner.liked', target: { photo: 'p3' as PhotoId }, liked: true };
+    const aFind: MuseEventBody = { kind: 'owner.liked', target: { find: 'd' as DiscoveryId }, liked: true, friend: cy.seed.id };
+    const fond = fold(self, [like('p1'), like('p1', false), like('p1'), like('p2'), notOfAFriend, aFind], T0);
+    expect(fond.social.relationships.get(cy.seed.id)?.fondness).toBe(2);
+    expect(fond.social.relationships.get(friends[0].seed.id)?.fondness).toBe(0);
+
+    const share = (s: MuseState) => {
+      let n = 0;
+      for (let seed = 0; seed < 3000; seed++) if (policy.chooseVisit(s, friends.map((state) => ({ state })), at(T0 + 10 * HOUR), draws(seed))?.other === cy.seed.id) n++;
+      return n / 3000;
+    };
+    expect(share(fond)).toBeGreaterThan(1.5 * share(self));
+  });
+
   it('only ever picks a friend', () => {
     const { self } = circle();
     for (let seed = 0; seed < 200; seed++) {
@@ -118,7 +142,7 @@ describe('choosing whom to visit', () => {
         const friends: MuseState[] = [];
         for (const id of ['bo', 'cy', 'di', 'ed', 'fy', 'gu']) {
           let friend = make(id, 1, '2026-11-03');
-          [self, friend] = introduce(self, friend);
+          [self, friend] = acquainted(self, friend);
           friends.push(friend);
         }
         let now = morning;
@@ -139,9 +163,36 @@ describe('choosing whom to visit', () => {
 
   it('starts a fresh budget on the owner’s next local day', () => {
     const spent = make('ada');
-    const [a, b] = introduce({ ...spent, day: { ...spent.day, socialMs: 3 * HOUR } }, make('bo'));
+    const [a, b] = acquainted({ ...spent, day: { ...spent.day, socialMs: 3 * HOUR } }, make('bo'));
     expect(policy.chooseVisit(a, [{ state: b }], at(T0 + 20 * HOUR), draws(1))).toBeNull();
     expect(policy.chooseVisit(a, [{ state: b }], at(T0 + DAY + 10 * HOUR), draws(1))).not.toBeNull();
+  });
+
+  it('meets a friend never met first, for 45 min, even with no social time left on either side', () => {
+    const tired = (id: string) => {
+      const s = make(id);
+      return { ...s, day: { ...s.day, socialMs: 3 * HOUR } };
+    };
+    const [ada, met] = acquainted(tired('ada'), tired('bo'));
+    const [self, fresh] = introduce(ada, tired('cy'));
+    const free = [{ state: met }, { state: fresh }];
+    const now = at(T0 + 10 * HOUR);
+    expect(policy.visitOffer(self, free, now)).toBe('first-meeting');
+    for (let seed = 0; seed < 50; seed++) expect(policy.chooseVisit(self, free, now, draws(seed))).toMatchObject({ other: fresh.seed.id, until: now + 45 * 60_000 });
+    expect(policy.visitOffer(self, [{ state: met }], now)).toBe('none');
+  });
+
+  it('holds a first meeting until both have a photo slot left today', () => {
+    const [a, b] = introduce(make('ada'), make('bo'));
+    const full = { ...b, day: { ...b.day, photos: 5 } };
+    expect(policy.visitOffer(a, [{ state: full }], at(T0 + 10 * HOUR))).toBe('none');
+    expect(policy.chooseVisit(a, [{ state: full }], at(T0 + 10 * HOUR), draws(1))).toBeNull();
+  });
+
+  it('offers an ordinary visit while both have social time left', () => {
+    const [a, b] = acquainted(make('ada'), make('bo'));
+    expect(policy.visitOffer(a, [{ state: b }], at(T0 + 10 * HOUR))).toBe('friend');
+    expect(policy.visitOffer(a, [], at(T0 + 10 * HOUR))).toBe('none');
   });
 
   it('goes over less often after being the guest last time', () => {

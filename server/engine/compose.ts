@@ -16,8 +16,9 @@ import { drawFor } from '../domain/rng';
 import { shelf } from '../domain/shelf';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
-import { renderSoulSection } from '../domain/soul';
+import { parseSoul, renderSoulSection } from '../domain/soul';
 import { emptyState, reduceCore } from '../domain/state';
+import { localDay } from '../domain/time';
 import { Engine, type EngineDeps } from './engine';
 import { Commands, Views, type ViewHelpers } from './views';
 
@@ -58,6 +59,8 @@ export const viewHelpers: ViewHelpers = {
   soulSection: renderSoulSection,
   journal: renderJournal,
   metrics,
+  localDay,
+  soulBody: (soulMd) => parseSoul(soulMd).body,
 };
 
 export function buildGarden(opts: GardenOptions): Garden {

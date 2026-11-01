@@ -1,9 +1,11 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Instant, MuseId, MuseSeed, StoredEvent } from '../../src/muse/contract';
 import { openSqliteStore } from '../adapters/store/sqlite';
+import { socialPolicy } from '../domain/social/policy';
+import { reduceSocial } from '../domain/social/state';
 import { Engine } from './engine';
 import { memoryStore, stubDeps } from './testing/stubs';
 
@@ -23,6 +25,20 @@ async function world(ids: readonly string[], opts: { introduce?: boolean; work?:
 }
 
 const kinds = (log: readonly StoredEvent[]) => log.map((e) => e.event.kind);
+
+/** What the log says the Muse was doing just before `t`: an activity, 'paused' for work, or null between episodes. */
+function activityBefore(log: readonly StoredEvent[], t: number): string | null {
+  let activity: string | null = null;
+  let running: string | null = null;
+  for (const { event: e } of log) {
+    if (e.at >= t) break;
+    if (e.kind === 'episode.started') activity = running = e.plan.activity;
+    if (e.kind === 'episode.ended') activity = running = null;
+    if (e.kind === 'episode.paused') activity = 'paused';
+    if (e.kind === 'episode.resumed') activity = running;
+  }
+  return activity;
+}
 const strip = (log: readonly StoredEvent[]) => log.map((e) => ({ seq: e.seq, ...e.event }));
 
 describe('engine clock', () => {
@@ -125,6 +141,38 @@ describe('engine clock', () => {
   });
 });
 
+describe('engine listeners', () => {
+  it('hear every stored event once the clock has reached it, and one that throws stops nothing', async () => {
+    const reference = await world(['moss', 'wren'], { introduce: true });
+    await reference.engine.advanceTo(at(12));
+
+    const { engine } = await world(['moss', 'wren'], { introduce: true });
+    const before = engine.log('moss' as MuseId).length;
+    const heard: StoredEvent[] = [];
+    const stopBroken = engine.subscribe(() => {
+      throw new Error('a broken listener');
+    });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const stop = engine.subscribe((events) => {
+      for (const e of events) expect(engine.now()).toBeGreaterThanOrEqual(e.event.at);
+      heard.push(...events);
+    });
+    await engine.advanceTo(at(12));
+    stop();
+    stopBroken();
+
+    expect(strip(engine.log('moss' as MuseId))).toEqual(strip(reference.engine.log('moss' as MuseId)));
+    const mossHeard = heard.filter((e) => e.museId === 'moss').map((e) => ({ seq: e.seq, ...e.event }));
+    expect(mossHeard).toEqual(strip(reference.engine.log('moss' as MuseId)).slice(before));
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
+
+    const count = heard.length;
+    await engine.advanceTo(at(24));
+    expect(heard.length, 'nothing after stop').toBe(count);
+  });
+});
+
 describe('engine on SQLite', () => {
   it('a restarted engine on the same database file picks up exactly where it left off', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'muse-engine-'));
@@ -147,5 +195,24 @@ describe('engine on SQLite', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('meeting online', () => {
+  it('happens only while both Muses explore, and only between those whose owners know each other', async () => {
+    const engine = new Engine({ ...stubDeps(memoryStore()), social: socialPolicy, reduceSocial }, T0);
+    for (const id of ['moss', 'wren', 'lark']) await engine.addMuse(seed(id), `I am ${id}.`, '', T0);
+    for (let i = 0; i < 2; i++) await engine.connectOwners('moss' as MuseId, 'wren' as MuseId, 'instagram', T0);
+    await engine.advanceTo(at(7 * 24));
+
+    const moss = engine.log('moss' as MuseId);
+    expect(moss.filter((e) => e.event.kind === 'owners.connected')).toHaveLength(1);
+    const met = moss.filter((e) => e.event.kind === 'encounter');
+    expect(met.length).toBeGreaterThan(2);
+    for (const e of met) {
+      expect(e.event).toMatchObject({ other: 'wren', where: 'online' });
+      for (const id of ['moss', 'wren']) expect(activityBefore(engine.log(id as MuseId), e.event.at)).toBe('travel');
+    }
+    expect(engine.log('lark' as MuseId).some((e) => e.event.kind === 'encounter')).toBe(false);
   });
 });

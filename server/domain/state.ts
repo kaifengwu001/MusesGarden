@@ -2,13 +2,16 @@
 import type {
   DayCounters,
   Discovery,
+  DiscoveryId,
   EpisodeState,
   Instant,
   Interest,
   InterestDelta,
+  LikeTarget,
   MuseEventBody,
   MuseSeed,
   MuseState,
+  PhotoId,
   ReduceCore,
   RegionKey,
   StoredEvent,
@@ -17,10 +20,11 @@ import type {
 } from '../../src/muse/contract';
 import { homeRegion, nearHome } from './atlas';
 import { eventRef, giftId, instant } from './ids';
-import { boost, gateAll, newInterest, wOwner, withSource } from './interests';
+import { boost, gateAll, newInterest, wLike, wOwner, withSource } from './interests';
 import {
   BOOST_GIFT,
   BOOST_KEPT,
+  BOOST_LIKED,
   BOOST_LOOKED,
   BOOST_OWNER,
   FRONTIER_MAX,
@@ -63,8 +67,9 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     photos: [],
     reflections: [],
     experiencesSinceReflection: 0,
+    likes: new Map(),
     day: freshDay(''),
-    social: { relationships: new Map(), invitations: new Map() },
+    social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
     workSince: null,
     recentWork: [],
     lastReflectionAt: instant(0),
@@ -148,9 +153,11 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       return { ...s, experiencesSinceReflection: s.experiencesSinceReflection + 1 };
     case 'hangout':
       return gift(s, stored, e);
+    case 'owner.liked':
+      return like(s, e.target, e.liked, at);
     case 'owner.introduced':
     case 'owner.unshared':
-    case 'owner.liked':
+    case 'owners.connected':
     case 'relationship.changed':
     case 'invitation':
       return s;
@@ -204,6 +211,34 @@ function ownerMention(s: MuseState, topics: readonly TopicKey[], seededBy: Inter
     interests.set(t, { ...boost(i, amount, at), ownerMentionAt: at });
   }
   return interests;
+}
+
+export const likeKey = (target: LikeTarget): DiscoveryId | PhotoId => ('find' in target ? target.find : target.photo);
+
+/** The find a like is about: the liked find, or the find a liked photo shows. */
+export function likedFind(s: MuseState, target: LikeTarget): Discovery | undefined {
+  const id = 'find' in target ? target.find : s.photos.find((p) => p.id === target.photo)?.discoveryId;
+  return id === undefined ? undefined : s.discoveries.get(id);
+}
+
+/**
+ * A like or an unlike from the garden. Only the first like of a thing nudges Muse, the way praise would: the
+ * topics of the find it is about that are already interests gain salience and count as liked for the topic pick.
+ * Unliking and liking again only flip the flag, and a like whose target isn't in the fold does nothing.
+ */
+function like(s: MuseState, target: LikeTarget, liked: boolean, at: Instant): MuseState {
+  const id = likeKey(target);
+  const known = s.likes.get(id);
+  if (known) return { ...s, likes: new Map(s.likes).set(id, { ...known, liked }) };
+  const exists = 'find' in target ? s.discoveries.has(target.find) : s.photos.some((p) => p.id === target.photo);
+  if (!liked || !exists) return s;
+  const interests = new Map(s.interests);
+  const amount = BOOST_LIKED * wLike(s);
+  for (const t of likedFind(s, target)?.topics ?? []) {
+    const i = interests.get(t);
+    if (i) interests.set(t, { ...boost(i, amount, at), likedAt: at });
+  }
+  return { ...s, interests, likes: new Map(s.likes).set(id, { liked: true, firstAt: at }) };
 }
 
 function hop(s: MuseState, e: Extract<MuseEventBody, { kind: 'trip.hop' }>, at: Instant): MuseState {

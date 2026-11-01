@@ -1,17 +1,20 @@
 import { readFileSync } from 'node:fs';
-import type { CastFile, Discovery, Instant, LifePolicy, MediaKind, MuseId, MuseState, Network, StoredEvent } from '../../src/muse/contract';
+import type { CastFile, Discovery, Instant, InvitationState, LifePolicy, MediaKind, MuseId, MuseState, Network, RelationshipOrigin, StoredEvent, TopicKey } from '../../src/muse/contract';
 import type { Engine } from '../engine/engine';
 import { loadCast, readMemberDocs } from '../fixtures/cast';
 import { parseWorkSchedule } from '../fixtures/work';
 
 const H = 3_600_000;
+/** The scripted guest's owner keeps an invitation for later, then travels this long after it arrived. */
+const TRAVEL_AFTER_MS = 48 * H;
 
 export interface SimOptions {
   readonly cast: string;
   readonly work: string | null;
   readonly start: Instant;
   readonly hours: number;
-  readonly owners: 'auto-accept' | 'auto-decline';
+  /** A scripted owner who, from `from` until `until`, likes every delivered find about `topic`. */
+  readonly likes?: { readonly museId: MuseId; readonly topic: TopicKey; readonly from: Instant; readonly until: Instant };
 }
 
 /**
@@ -26,6 +29,7 @@ export async function seedCast(engine: Engine, life: LifePolicy, opts: SimOption
     await engine.addMuse({ id: m.id, name, worldSeed: m.worldSeed, timezone: m.timezone }, docs.soul, docs.memory, opts.start);
   }
   for (const [a, b] of cast.introductions) await engine.introduce(a, b, opts.start);
+  for (const { a, b, on } of cast.knownOn) await engine.connectOwners(a, b, on, opts.start);
   if (opts.work) {
     const schedule = parseWorkSchedule(JSON.parse(readFileSync(opts.work, 'utf8')));
     for (const [id, blocks] of Object.entries(schedule)) {
@@ -36,21 +40,27 @@ export async function seedCast(engine: Engine, life: LifePolicy, opts: SimOption
   return cast;
 }
 
-/** Advances hour by hour, answering invitations the way the owners' policy says. */
+/** Advances hour by hour. Each guest's owner keeps an invitation for later and uses it a couple of days on. */
 export async function run(engine: Engine, opts: SimOptions): Promise<void> {
   for (let h = 1; h <= opts.hours; h++) {
     await engine.advanceTo((opts.start + h * H) as Instant);
-    await answerOwners(engine, opts.owners);
+    await travelOnKeptInvitations(engine);
+    if (opts.likes) await likeFinds(engine, opts.likes);
   }
 }
 
-async function answerOwners(engine: Engine, policy: SimOptions['owners']): Promise<void> {
+async function likeFinds(engine: Engine, likes: NonNullable<SimOptions['likes']>): Promise<void> {
+  const s = engine.state(likes.museId);
+  if (!s || engine.now() < likes.from || engine.now() >= likes.until) return;
+  for (const find of s.baskets.flatMap((b) => b.items)) {
+    if (!s.likes.has(find) && s.discoveries.get(find)?.topics.includes(likes.topic)) await engine.like(likes.museId, { find }, true);
+  }
+}
+
+async function travelOnKeptInvitations(engine: Engine): Promise<void> {
   for (const id of engine.museIds()) {
-    const s = engine.state(id);
-    if (!s) continue;
-    for (const inv of s.social.invitations.values()) {
-      if (inv.state === 'proposed' && inv.host === id) await engine.answerInvitation(inv.id, id, policy === 'auto-accept' ? 'approve' : 'decline');
-      if (inv.state === 'sent' && inv.guest === id) await engine.answerInvitation(inv.id, id, policy === 'auto-accept' ? 'accept' : 'decline');
+    for (const inv of engine.state(id)?.social.invitations.values() ?? []) {
+      if (inv.guest === id && inv.state === 'sent' && engine.now() - inv.sentAt >= TRAVEL_AFTER_MS) await engine.invitationAction(inv.id, id, 'use');
     }
   }
 }
@@ -101,11 +111,17 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
     detail: `${hangouts.length} hangouts, ${withGift.length} with a gift`,
   });
 
-  const metBeyond = all.some(({ log }) => log.some((e) => e.event.kind === 'relationship.changed' && e.event.to === 'friends' && e.event.origin === 'met-beyond'));
-  out.push({ name: 'a stranger became a friend', pass: metBeyond, detail: metBeyond ? 'yes' : 'none' });
+  const made = friendships(engine);
+  const metBeyond = all.reduce((n, { log }) => n + log.filter((e) => e.event.kind === 'encounter' && e.event.where === 'beyond').length, 0) / 2;
+  out.push({
+    name: 'each path made a friend (strangers, rarer, at least met beyond)',
+    pass: made.introduced > 0 && made['known-on'] > 0 && made['met-beyond'] + metBeyond > 0,
+    detail: `shared ${made.introduced}, known online ${made['known-on']}, strangers ${made['met-beyond']} (${metBeyond} meetings beyond)`,
+  });
 
-  const closed = all.some(({ log }) => log.some((e) => e.event.kind === 'invitation' && e.event.to === 'closed'));
-  out.push({ name: 'one invitation went from proposed to closed', pass: closed, detail: closed ? 'yes' : 'none' });
+  const invitations = (to: InvitationState) => new Set(all.flatMap(({ log }) => log.flatMap((e) => (e.event.kind === 'invitation' && e.event.to === to ? [e.event.id] : [])))).size;
+  const [sent, used] = [invitations('sent'), invitations('used')];
+  out.push({ name: 'an invitation was sent and used', pass: sent > 0 && used > 0, detail: `${sent} sent, ${used} used` });
 
   const reflections = all.reduce((n, { s }) => n + s.reflections.length, 0);
   out.push({ name: 'reflections committed', pass: reflections > 0, detail: `${reflections}` });
@@ -118,6 +134,15 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
     pass: finds.length > 0 && unknown === 0 && kinds.size === KINDS.length,
     detail: `${finds.length} finds, ${unknown} without a kind; kinds in baskets: ${[...kinds].sort().join(', ')}`,
   });
+  return out;
+}
+
+/** Friendships made over the run, by how they began, counted once per pair. */
+export function friendships(engine: Engine): Record<RelationshipOrigin, number> {
+  const out: Record<RelationshipOrigin, number> = { introduced: 0, 'known-on': 0, 'met-beyond': 0 };
+  for (const id of engine.museIds()) {
+    for (const { event: e } of engine.log(id)) if (e.kind === 'relationship.changed' && e.to === 'friends' && id < e.other) out[e.origin]++;
+  }
   return out;
 }
 

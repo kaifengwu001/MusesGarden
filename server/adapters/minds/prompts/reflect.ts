@@ -13,6 +13,7 @@ export function reflectPrompt(ctx: MindContext, experiences: readonly Experience
     topics: e.topics,
     canonicalUrl: e.canonicalUrl ?? null,
     note: e.note,
+    liked: e.liked === true,
   }));
   return {
     name: 'muse_reflection',
@@ -23,6 +24,7 @@ export function reflectPrompt(ctx: MindContext, experiences: readonly Experience
       '',
       'Rules:',
       '- Change an interest only when repeated, independent experiences support it: different pages, or different days. One page seen twice is one source.',
+      '- liked: true marks a find your owner liked. Weigh it as you would two finds: their praise encourages you toward it.',
       '- Every change cites the refs of the experiences behind it. Cite only refs listed below. Never cite a previous reflection or an earlier conclusion of yours.',
       '- dAffinity is from -0.2 to 0.2. Small steps are normal. Negative means the interest is losing you.',
       '- Move a stage only when the experiences clearly earn it. Otherwise set stage to null.',

@@ -2,6 +2,7 @@ import { ShaderChunk } from 'three';
 import cloudLumps from '../life/cloudLumps.glsl?raw';
 import clouds from '../life/clouds.glsl?raw';
 import field from '../life/field.glsl?raw';
+import find from '../life/findForm.glsl?raw';
 import musePress from '../life/musePress.glsl?raw';
 import wind from '../life/wind.glsl?raw';
 import cubesphere from '../planet/cubesphere.glsl?raw';
@@ -36,6 +37,7 @@ const chunks: Record<string, string> = {
   meadow_clouds: clouds,
   meadow_field: field,
   meadow_wind: wind,
+  meadow_find: find,
   meadow_muse_press: musePress,
 };
 
