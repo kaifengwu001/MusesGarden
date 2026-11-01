@@ -112,22 +112,29 @@ export function checks(engine: Engine, localDay: (at: Instant, tz: string) => st
   return out;
 }
 
+/** Rest counted the way the engine counts it: each stretch to the day it ended, a pause for work ending a stretch. */
 function restHoursPerDay(log: readonly StoredEvent[], tz: string, localDay: (at: Instant, tz: string) => string): number[] {
   const days = new Map<string, number>();
-  let restStart: number | null = null;
-  let pausedAt: number | null = null;
+  let resting = false;
+  let since: number | null = null;
+  const count = (at: Instant) => {
+    if (since === null) return;
+    const d = localDay(at, tz);
+    days.set(d, (days.get(d) ?? 0) + (at - since) / H);
+    since = null;
+  };
   for (const e of log) {
     const ev = e.event;
-    if (ev.kind === 'episode.started') restStart = ev.plan.activity === 'rest' ? ev.at : null;
-    if (ev.kind === 'episode.paused' && restStart !== null) pausedAt = ev.at;
-    if (ev.kind === 'episode.resumed' && restStart !== null && pausedAt !== null) {
-      restStart += ev.at - pausedAt;
-      pausedAt = null;
+    if (ev.kind === 'episode.started') {
+      resting = ev.plan.activity === 'rest';
+      since = resting ? ev.at : null;
     }
-    if (ev.kind === 'episode.ended' && restStart !== null) {
-      const d = localDay(ev.at, tz);
-      days.set(d, (days.get(d) ?? 0) + (ev.at - restStart) / H);
-      restStart = null;
+    if (!resting) continue;
+    if (ev.kind === 'episode.paused') count(ev.at);
+    if (ev.kind === 'episode.resumed') since = ev.at;
+    if (ev.kind === 'episode.ended') {
+      count(ev.at);
+      resting = false;
     }
   }
   return [...days.values()];
