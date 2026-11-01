@@ -3,8 +3,8 @@ import { smoothstep } from '../core/math';
 import { angleBetween, tangentToward, travel } from '../planet/geo';
 import { createGroundSample, type Terrain } from '../planet/terrain';
 import { Answers, rampIntegral, withTool } from './museLife';
-import { COOK, FISH, GARDEN, HOP, LIE_BACK, PLOP, POCKET, POT, RISE, STEP, WAKE, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
-import { BENCH, FLOOR, PIER, STEPS, TERRACE } from './props';
+import { COOK, FISH, HOP, LIE_BACK, PLOP, POCKET, POT, RISE, STEP, WAKE, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
+import { BENCH, CHAIR, FACE, FLOOR, PIER, SIDE, STEPS, TERRACE } from './props';
 
 // Muse's life on the planet (muse.ts draws it): it roams the meadow at
 // random and does what it likes where it is, more often close to its hut.
@@ -26,10 +26,22 @@ import { BENCH, FLOOR, PIER, STEPS, TERRACE } from './props';
 // between it and the meadow. Out on the meadow places are directions, and
 // Muse stands on the ground there.
 
-/** Its pace (Muse's heights a second), and the walk's share spent speeding up and slowing down at each end; a turn on the spot (s). */
+/** Its pace (Muse's heights a second), and the walk's share spent speeding up and slowing down at each end. */
 const PACE = 0.33;
 const RAMP = 0.12;
-const TURN = 1.0;
+/** A turn on the spot: its least time (s) and the time it adds for a half turn; turns smaller than `least` (rad) are taken in its stride. */
+const TURN = { time: 0.35, half: 0.8, least: 0.12 } as const;
+/**
+ * Its paths (m): how far before and after a corner it curves round it; how
+ * far into a walk it brings its heading round to the way (and how far before
+ * the end round to the way it means to face) rather than turning on the spot,
+ * for turns up to `swing` (rad); how far apart the path's points are; and how
+ * far a long walk over the meadow wanders off the straight line (its share of
+ * the way, at most `wander` m).
+ */
+const PATH = { corner: 0.9, sweep: 5, ease: 1.1, swing: 0.9, step: 0.2, meander: 0.12, wander: 2.5 } as const;
+/** How far out round the homestead's corners its ways over the meadow go (m), to get round the house to its back or its far side. */
+const ROUND = 1.6;
 /** How far out it goes (m from the hut): mostly close, now and then across the meadow. */
 const ROAM = { near: 5, far: 60, bias: 3 } as const;
 /** What it might do next, and how likely each is. */
@@ -38,10 +50,27 @@ type Like = keyof typeof LIKES;
 /** How often it fishes from a shore rather than off the pier. */
 const SHORE = 0.3;
 /** The porch's lane along the front, clear of the bench and the stove (local m: z); the top of the steps and their foot on the meadow; where the terrace meets the pier. */
-const LANE = 3.6;
 const TOP = { x: (STEPS.x0 + STEPS.x1) / 2, z: TERRACE.z1 - 0.5 } as const;
 const FOOT = { x: (STEPS.x0 + STEPS.x1) / 2, z: TERRACE.z1 + STEPS.count * STEPS.tread + 0.8 } as const;
-const JUNCTION = { x: TERRACE.x0 + 0.2, z: LANE } as const;
+/**
+ * Getting about on the deck (local m): Muse's girth (half its width, a
+ * little over), and a few places to go by when the straight way is blocked
+ * (by the bench, the stove, the chair, the house's corner): along the porch
+ * and out onto the pier. Its ways there are straight where they can be,
+ * round by these where not, the corners rounded off.
+ */
+const GIRTH = 0.45;
+const DECK_WAYS: readonly (readonly [number, number])[] = [
+  [3.2, 3.85],
+  [1.8, 3.85],
+  [0.4, 3.85],
+  [-1, 3.85],
+  [-2.4, 3.6],
+  // (behind the stove, between it and the house)
+  [-3.9, 3.5],
+  [-5.4, 4.5],
+  [-6.6, 4.9],
+];
 /** The little stove on the porch (local m: its middle; it stands on the floor), kept clear of the lane. */
 export const STOVE = { x: -3.45, z: 4.32, half: 0.24 } as const;
 /** Where it sits to fish off the pier: how far along the pier's front edge (local m: x). */
@@ -49,7 +78,7 @@ const PIER_SPOT = -6.6;
 /** The homestead's footprint with a margin (local m): paths over the meadow keep out of it. */
 const HOMESTEAD = { x0: PIER.x0 - 0.6, x1: TERRACE.x1 + 0.6, z0: -4, z1: TERRACE.z1 + STEPS.count * STEPS.tread + 0.3 } as const;
 
-type Facing = Vector3 | 'you';
+type Facing = Vector3;
 interface Spot {
   dir: Vector3;
   /** On the deck (the terrace, the steps or the pier), its local meters. */
@@ -58,7 +87,8 @@ interface Spot {
 
 /** What the props need to know of what Muse is doing (museProps.ts): each pastime's time into it, and how firmly its tool is held (0 … 1, as it comes out of the pocket and goes back). */
 export interface RoamCues {
-  water: { time: number; grip: number } | null;
+  /** (watering: also how far the can is tipped, and how much water pours from it) */
+  water: { time: number; grip: number; tip: number; pour: number } | null;
   fish: { time: number; grip: number; edge: boolean } | null;
   cook: { time: number; grip: number } | null;
   sleep: { time: number; roused: number } | null;
@@ -121,6 +151,68 @@ const scratch = new Vector3();
 const scratch2 = new Vector3();
 const ground = createGroundSample();
 
+/** A path over the planet: points along it (unit directions) and each one's distance from its start (m). */
+class Path {
+  readonly points: Vector3[] = [];
+  readonly at: number[] = [];
+
+  constructor(private readonly R: number) {}
+
+  get length(): number {
+    return this.at.length ? this.at[this.at.length - 1] : 0;
+  }
+
+  add(p: Vector3): void {
+    const n = this.points.length;
+    if (n && angleBetween(this.points[n - 1], p) * this.R < 1e-4) return;
+    this.at.push(n ? this.at[n - 1] + angleBetween(this.points[n - 1], p) * this.R : 0);
+    this.points.push(p.clone());
+  }
+
+  /** Straight on to a point (a great circle), every `step` m. */
+  line(to: Vector3, step: number): void {
+    const from = this.points[this.points.length - 1];
+    const steps = Math.max(1, Math.ceil((angleBetween(from, to) * this.R) / step));
+    const a = from.clone();
+    for (let k = 1; k <= steps; k++) this.add(a.clone().lerp(to, k / steps).normalize());
+  }
+
+  /** The point at a distance along it (m). */
+  point(d: number, out: Vector3): Vector3 {
+    const at = this.at;
+    const n = at.length;
+    if (d <= 0 || n < 2) return out.copy(this.points[0]);
+    if (d >= at[n - 1]) return out.copy(this.points[n - 1]);
+    let lo = 0;
+    let hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (at[mid] <= d) lo = mid;
+      else hi = mid;
+    }
+    const f = (d - at[lo]) / Math.max(at[hi] - at[lo], 1e-9);
+    return out.copy(this.points[lo]).lerp(this.points[hi], f).normalize();
+  }
+
+  /** Its heading at a distance along it: the way along it there (a unit tangent), smoothed over a stretch either side. */
+  heading(d: number, out: Vector3): Vector3 {
+    const L = this.length;
+    const span = Math.min(0.3, L / 2);
+    const a = this.point(Math.max(0, Math.min(L - 2 * span, d - span)), pathA);
+    const b = this.point(Math.min(L, Math.max(2 * span, d + span)), pathB);
+    const p = this.point(d, pathC);
+    out.subVectors(b, a);
+    out.addScaledVector(p, -out.dot(p));
+    return out.lengthSq() > 1e-18 ? out.normalize() : tangentToward(p, this.points[this.points.length - 1], out);
+  }
+}
+const pathA = new Vector3();
+const pathB = new Vector3();
+const pathC = new Vector3();
+
+/** Something it keeps doing as it walks or turns (holding its can): its moves and cues added, s into the segment. */
+type Carry = (s: number, out: Roaming) => void;
+
 export class MuseRoam {
   /** The itinerary written out so far: its segments, each one's start (s) and the gait there. */
   private readonly day: Segment[] = [];
@@ -136,6 +228,8 @@ export class MuseRoam {
   /** Where the day's clock is from the caller's (s): seeking moves it (dev). */
   private shift = 0;
   private readonly you = new Answers();
+  /** Which way round it turns to you (+1 to its left), chosen as it starts to: so a camera nearly behind it never has it turn one way and then the other. */
+  private turnSide = 0;
   private readonly living: Roaming;
   /** The homestead's frame: across its front, up, toward its pond (planet space). */
   private readonly X = new Vector3();
@@ -146,6 +240,8 @@ export class MuseRoam {
   private readonly seed: number;
   private readonly terrain: Terrain;
   readonly height: number;
+  /** The homestead's corners out on the meadow, to go round it by. */
+  private readonly corners: Vector3[] = [];
 
   /** terrain: the planet as it is now (its radius and layout fix the places); height: Muse's height (m). */
   constructor(terrain: Terrain, height: number) {
@@ -157,6 +253,17 @@ export class MuseRoam {
     this.U.copy(L.cottage);
     this.X.crossVectors(this.U, L.homeBearing).normalize();
     this.Z.crossVectors(this.X, this.U).normalize();
+    // the homestead's corners out on the meadow (those on dry ground), to go round it by
+    const H = HOMESTEAD;
+    for (const [x, z] of [
+      [H.x1 + ROUND, H.z1 + ROUND],
+      [H.x1 + ROUND, H.z0 - ROUND],
+      [H.x0 - ROUND, H.z0 - ROUND],
+      [H.x0 - ROUND, H.z1 + ROUND],
+    ]) {
+      const dir = this.local(x, z);
+      if (terrain.sample(dir, ground).water > 1) this.corners.push(dir);
+    }
     // it starts the day on the porch, looking out
     this.here = this.deckSpot(0.4, 4.2);
     this.facing = this.toward(this.here, this.deckSpot(0.4, 8).dir);
@@ -199,6 +306,61 @@ export class MuseRoam {
     return null;
   }
 
+  /** Can Muse stand here on the deck (local m), clear of its edges, the house, the bench, the stove and the chair? */
+  private deckFree(x: number, z: number): boolean {
+    const run = STEPS.count * STEPS.tread;
+    const terrace = x > TERRACE.x0 + 0.35 && x < TERRACE.x1 - 0.35 && z > FACE + GIRTH && z < TERRACE.z1 - 0.3;
+    const pier = x > PIER.x0 + 0.35 && x < PIER.x1 && z > PIER.z0 + 0.5 && z < PIER.z1 - 0.25;
+    const steps = x > STEPS.x0 + 0.3 && x < STEPS.x1 - 0.3 && z > TERRACE.z1 - 0.6 && z < TERRACE.z1 + run + 1;
+    if (!terrace && !pier && !steps) return false;
+    // (the house itself, beside the pier)
+    if (x > -SIDE - GIRTH && z < FACE + GIRTH) return false;
+    if (Math.abs(x - STOVE.x) < STOVE.half + GIRTH && Math.abs(z - STOVE.z) < STOVE.half + GIRTH) return false;
+    if (Math.abs(x - BENCH.x) < BENCH.half + GIRTH && z < BENCH.z + BENCH.depth + GIRTH) return false;
+    return Math.hypot(x - CHAIR.x, z - CHAIR.z) > 0.3 + GIRTH;
+  }
+
+  /** Is the straight way between two places on the deck clear (its ends, which may be close by things, let be)? */
+  private deckClear(a: { x: number; z: number }, b: { x: number; z: number }): boolean {
+    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    const steps = Math.max(1, Math.ceil(length / 0.08));
+    for (let i = 0; i <= steps; i++) {
+      const f = i / steps;
+      if (Math.min(f, 1 - f) * length < 0.3) continue;
+      if (!this.deckFree(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f)) return false;
+    }
+    return true;
+  }
+
+  /** The shortest way over the deck (the places after the first, the last the place itself): straight if it can, else by the deck's ways. */
+  private deckWay(a: { x: number; z: number }, b: { x: number; z: number }): { x: number; z: number }[] {
+    if (this.deckClear(a, b)) return [b];
+    const nodes = [a, ...DECK_WAYS.map(([x, z]) => ({ x, z })), b];
+    const n = nodes.length;
+    const best = new Array<number>(n).fill(Infinity);
+    const back = new Array<number>(n).fill(-1);
+    const done = new Array<boolean>(n).fill(false);
+    best[0] = 0;
+    for (;;) {
+      let k = -1;
+      for (let i = 0; i < n; i++) if (!done[i] && best[i] < Infinity && (k < 0 || best[i] < best[k])) k = i;
+      if (k < 0 || k === n - 1) break;
+      done[k] = true;
+      for (let i = 1; i < n; i++) {
+        if (done[i]) continue;
+        const d = best[k] + Math.hypot(nodes[i].x - nodes[k].x, nodes[i].z - nodes[k].z);
+        if (d < best[i] && this.deckClear(nodes[k], nodes[i])) {
+          best[i] = d;
+          back[i] = k;
+        }
+      }
+    }
+    if (best[n - 1] === Infinity) return [b];
+    const way: { x: number; z: number }[] = [];
+    for (let k = n - 1; k > 0; k = back[k]) way.unshift(nodes[k]);
+    return way;
+  }
+
   /** The height under a direction (m over R): the deck, or the ground. */
   groundAt(dir: Vector3): number {
     const c = this.terrain.cottageLocal(dir, localTmp);
@@ -237,6 +399,39 @@ export class MuseRoam {
     return true;
   }
 
+  /**
+   * The shortest way over the meadow from one place to another (the places
+   * after the first, the last the place itself): straight if it can, else
+   * round the homestead by its corners; null if there is none.
+   */
+  private meadowWay(from: Vector3, to: Vector3): Vector3[] | null {
+    if (this.clear(from, to)) return [to];
+    const nodes = [from, ...this.corners, to];
+    const n = nodes.length;
+    const best = new Array<number>(n).fill(Infinity);
+    const back = new Array<number>(n).fill(-1);
+    const done = new Array<boolean>(n).fill(false);
+    best[0] = 0;
+    for (;;) {
+      let k = -1;
+      for (let i = 0; i < n; i++) if (!done[i] && best[i] < Infinity && (k < 0 || best[i] < best[k])) k = i;
+      if (k < 0 || k === n - 1) break;
+      done[k] = true;
+      for (let i = 1; i < n; i++) {
+        if (done[i]) continue;
+        const d = best[k] + angleBetween(nodes[k], nodes[i]) * this.R;
+        if (d < best[i] && this.clear(nodes[k], nodes[i])) {
+          best[i] = d;
+          back[i] = k;
+        }
+      }
+    }
+    if (best[n - 1] === Infinity) return null;
+    const way: Vector3[] = [];
+    for (let k = n - 1; k > 0; k = back[k]) way.unshift(nodes[k]);
+    return way;
+  }
+
   /** A place out on the meadow to go to: random, more often close to the hut; dry, not steep, reachable from the steps' foot. */
   private meadowSpot(rand: () => number, dry = 1.2): Spot | null {
     const foot = this.local(FOOT.x, FOOT.z);
@@ -253,7 +448,7 @@ export class MuseRoam {
       const t = tangentToward(dir, this.U, new Vector3());
       const h1 = this.terrain.height(travel(dir, t, 0.8 / this.R, scratch));
       if (Math.abs(h1 - h0) > 0.3) continue;
-      if (!this.clear(foot, dir)) continue;
+      if (!this.meadowWay(foot, dir)) continue;
       return { dir, deck: null };
     }
     return null;
@@ -285,7 +480,7 @@ export class MuseRoam {
       if (this.terrain.sample(ahead, ground).water > -0.5) continue;
       const c = this.terrain.cottageLocal(dir, localTmp);
       if (c.x > HOMESTEAD.x0 - 1 && c.x < HOMESTEAD.x1 + 1 && c.z > HOMESTEAD.z0 && c.z < HOMESTEAD.z1 + 1) continue;
-      if (!this.clear(foot, dir, 1.6)) continue;
+      if (!this.meadowWay(foot, dir)) continue;
       return { spot: { dir, deck: null }, facing: tangentToward(dir, centre, new Vector3()) };
     }
     return null;
@@ -301,154 +496,254 @@ export class MuseRoam {
     this.gait += segment.gait;
   }
 
-  /** Stand where it is for a while, facing as asked, with something more (a look, a wave). */
+  /** Stand where it is for a while, facing as asked, with something more (a look, holding its can). */
   private stand(name: string, time: number, f: Facing, extra?: (s: number, out: Roaming) => void): void {
     const at = this.here;
+    const heading = f.clone();
     this.push({
       name,
       time,
       gait: 0,
-      play: (s, out, ctx) => {
+      play: (s, out) => {
         out.dir.copy(at.dir);
         out.height = this.groundAt(at.dir);
-        out.heading.copy(this.facingAt(f, at, ctx.camera));
+        out.heading.copy(heading);
         extra?.(s, out);
       },
     });
-    this.facing = f;
+    this.facing = heading;
   }
 
-  /** A facing's heading at a spot (toward the camera for 'you'). */
-  private facingAt(f: Facing, at: Spot, camera: Vector3): Vector3 {
-    return f === 'you' ? tangentToward(at.dir, camera, facingTmp) : facingTmp.copy(f);
-  }
-
-  /** Step round on the spot to face as asked. */
-  private turn(to: Facing, name = 'turn'): void {
+  /** Step round on the spot to face as asked: quicker for a small turn than a half turn, none at all for a slight one. */
+  private turn(to: Facing, name = 'turn', carry?: Carry): void {
     const at = this.here;
-    const from = this.facing;
+    const from = this.facing.clone();
+    const angle = between(from, to, at.dir);
+    this.facing = to.clone();
+    if (Math.abs(angle) < TURN.least) return;
+    const half = Math.abs(angle) / Math.PI;
+    const time = TURN.time + TURN.half * half;
+    const steps = 0.3 + 0.9 * half;
     this.push({
       name,
-      time: TURN,
-      gait: 1,
+      time,
+      gait: steps,
       play: (s, out, ctx) => {
-        const u = s / TURN;
+        const u = s / time;
         out.dir.copy(at.dir);
         out.height = this.groundAt(at.dir);
-        const a = this.facingAt(from, at, ctx.camera).clone();
-        const b = this.facingAt(to, at, ctx.camera);
-        turned(a, at.dir, between(a, b, at.dir) * smoothstep(0, 1, u), out.heading);
-        out.action.walk = 0.55 * Math.sin(Math.PI * u);
+        turned(from, at.dir, angle * smoothstep(0, 1, u), out.heading);
+        out.action.walk = 0.55 * Math.sin(Math.PI * u) * Math.min(1, Math.abs(angle) / 1.0);
         out.action.stride = 0;
-        out.action.gait = ctx.gait + u;
+        out.action.gait = ctx.gait + steps * u;
+        carry?.(s, out);
       },
     });
-    this.facing = to;
   }
 
-  /** Walk straight to a spot (a great circle over the meadow, a straight line over the deck), speeding up and slowing down at the ends. */
-  private walk(to: Spot): void {
-    const from = this.here;
-    const length = angleBetween(from.dir, to.dir) * this.R;
+  /**
+   * A path through waypoints (unit directions, where it is first): each
+   * corner rounded off (a curve from a little before it to a little after,
+   * inside it), and a long walk over the meadow wandering a little off the
+   * straight line, where the ground there allows.
+   */
+  private pathThrough(way: Vector3[], rand?: () => number): Path {
+    const points: Vector3[] = [way[0]];
+    for (let i = 1; i < way.length; i++) {
+      const a = points[points.length - 1];
+      const b = way[i];
+      const length = angleBetween(a, b) * this.R;
+      // (over the meadow, long: a bend or two off the straight line, each leg still walkable)
+      if (rand && length > 7 && !this.onDeck(a) && !this.onDeck(b)) {
+        const bends = length > 20 ? 2 : 1;
+        const side = new Vector3().crossVectors(tangentToward(a, b, new Vector3()), a).normalize();
+        const tries: Vector3[] = [];
+        let sign = rand() < 0.5 ? -1 : 1;
+        for (let k = 1; k <= bends; k++) {
+          const f = k / (bends + 1);
+          const off = sign * Math.min(PATH.meander * length, PATH.wander) * (0.5 + 0.5 * rand());
+          tries.push(travel(a.clone().lerp(b, f).normalize(), side, off / this.R, new Vector3()));
+          sign = -sign;
+        }
+        const legs = [a, ...tries, b];
+        if (legs.every((p, k) => k === 0 || (this.clear(legs[k - 1], p, 0.6) && this.terrain.sample(p, ground).water > 0.8))) points.push(...tries);
+      }
+      points.push(b);
+    }
+    // (wide, sweeping corners out on the meadow, if the curve keeps to dry ground out of the homestead; tight ones on the deck)
+    const wide = this.rounded(points, true);
+    return this.walkable(wide) ? wide : this.rounded(points, false);
+  }
+
+  /** Is a path over dry ground and off the homestead, and on the deck clear of what is on it? */
+  private walkable(path: Path): boolean {
+    const c = { x: 0, z: 0 };
+    const n = path.points.length;
+    for (let i = 0; i < n; i += 2) {
+      const p = path.points[i];
+      if (this.onDeck(p)) {
+        // (its ends, which may be close by things, let be)
+        if (Math.min(path.at[i], path.length - path.at[i]) < 0.3) continue;
+        this.terrain.cottageLocal(p, c);
+        if (!this.deckFree(c.x, c.z)) return false;
+        continue;
+      }
+      if (this.terrain.sample(p, ground).water < 0.3) return false;
+      this.terrain.cottageLocal(p, c);
+      if (c.x > HOMESTEAD.x0 + 0.4 && c.x < HOMESTEAD.x1 - 0.4 && c.z > HOMESTEAD.z0 + 0.4 && c.z < HOMESTEAD.z1 - 0.6) return false;
+    }
+    return true;
+  }
+
+  /** A path through points, each corner rounded off by a curve from a little before it to a little after (wide: as far as two fifths of either leg, out on the meadow). */
+  private rounded(points: Vector3[], wide: boolean): Path {
+    const path = new Path(this.R);
+    path.add(points[0]);
+    for (let i = 1; i < points.length - 1; i++) {
+      const c = points[i];
+      const before = angleBetween(points[i - 1], c) * this.R;
+      const after = angleBetween(c, points[i + 1]) * this.R;
+      const open = wide && !this.onDeck(c) && !this.onDeck(points[i - 1]) && !this.onDeck(points[i + 1]);
+      const d = open ? Math.min(PATH.sweep, 0.4 * before, 0.4 * after) : Math.min(wide ? 1.3 : PATH.corner, 0.45 * before, 0.45 * after);
+      const into = travel(c, tangentToward(c, points[i - 1], scratch), d / this.R, new Vector3());
+      const out = travel(c, tangentToward(c, points[i + 1], scratch), d / this.R, new Vector3());
+      path.line(into, PATH.step);
+      // (a quadratic curve with the corner for its pull: it stays inside the corner)
+      const curve = Math.max(10, Math.ceil((2 * d) / PATH.step));
+      for (let k = 1; k <= curve; k++) {
+        const u = k / curve;
+        path.add(new Vector3().addScaledVector(into, (1 - u) * (1 - u)).addScaledVector(c, 2 * u * (1 - u)).addScaledVector(out, u * u).normalize());
+      }
+    }
+    path.line(points[points.length - 1], PATH.step);
+    return path;
+  }
+
+  /** Is a direction on the homestead's deck (the terrace, the steps, the pier)? */
+  private onDeck(dir: Vector3): boolean {
+    const c = this.terrain.cottageLocal(dir, localTmp);
+    return Math.abs(c.x) < 14 && Math.abs(c.z) < 14 && this.deckAt(c.x, c.z) !== null;
+  }
+
+  /**
+   * Walk a path, speeding up and slowing down at its ends, its heading the
+   * path's way; setting off from the way it faced (`from`) it brings its
+   * heading round to the path over the first stretch, and arriving, round to
+   * the way it means to face (`end`).
+   */
+  private walkPath(path: Path, to: Spot, name: string, from?: Vector3, end?: Vector3, carry?: Carry): void {
+    const length = path.length;
     if (length < 0.05) return;
     const time = length / (PACE * this.height * (1 - RAMP));
     const steps = length / (2 * STEP.length * this.height);
-    const heading = this.toward(from, to.dir);
+    const startFacing = from?.clone();
+    const endFacing = end?.clone();
+    const ahead = new Vector3();
     this.push({
-      name: 'walk',
+      name,
       time,
       gait: steps,
       play: (s, out, ctx) => {
         const u = s / time;
         const covered = (rampIntegral(u, 0, RAMP) - rampIntegral(u, 1 - RAMP, 1)) / (1 - RAMP);
         const speed = smoothstep(0, RAMP, u) - smoothstep(1 - RAMP, 1, u);
-        travel(from.dir, heading, (covered * length) / this.R, out.dir);
+        const d = covered * length;
+        path.point(d, out.dir);
         out.height = this.groundAt(out.dir);
-        tangentToward(out.dir, to.dir, out.heading);
+        path.heading(d, out.heading);
+        // (the facing it set off with, carried along to here, coming round to the path's way; arriving, round to the facing it means to have)
+        if (startFacing) {
+          const was = tangentToward(out.dir, scratch.copy(out.dir).add(startFacing), facingTmp);
+          turned(was.clone(), out.dir, between(was, out.heading, out.dir) * smoothstep(0, PATH.ease, d), out.heading);
+        }
+        if (endFacing) {
+          const will = tangentToward(out.dir, scratch.copy(out.dir).add(endFacing), facingTmp);
+          turned(out.heading.clone(), out.dir, between(out.heading, will, out.dir) * smoothstep(length - PATH.ease, length, d), out.heading);
+        }
         out.action.walk = smoothstep(0, 0.35, speed);
         out.action.gait = ctx.gait + steps * covered;
-        out.lookAt = lookTmp.copy(to.dir).multiplyScalar(this.R + this.groundAt(to.dir) + 0.5 * this.height);
+        // looking a little ahead along the way
+        path.point(Math.min(length, d + 2.5), ahead);
+        out.lookAt = lookTmp.copy(ahead).multiplyScalar(this.R + this.groundAt(ahead) + 0.6 * this.height);
+        carry?.(s, out);
       },
     });
-    // (facing on along the way it came, as it arrives)
-    this.facing = tangentToward(to.dir, from.dir, new Vector3()).negate();
+    this.facing = endFacing ?? path.heading(length, new Vector3());
     this.here = to;
   }
 
-  /** The way from where it is to a spot: down off the deck by the steps, over the meadow straight, up onto the deck by the steps, along the porch's lane, out along the pier. */
+  /** The way from where it is to a spot: over the deck (straight, or round what is in the way), down or up its steps, over the meadow (straight, or round the homestead). */
   private route(to: Spot): Spot[] {
     const from = this.here;
     const way: Spot[] = [];
-    const lane = (s: Spot): Spot | null => {
-      const d = s.deck;
-      if (!d || d.x < TERRACE.x0 || Math.abs(d.z - LANE) < 0.05) return null;
-      return this.deckSpot(Math.min(Math.max(d.x, TERRACE.x0 + 0.3), TERRACE.x1 - 0.3), LANE);
+    const deck = (ps: { x: number; z: number }[]): void => {
+      for (const p of ps) way.push(this.deckSpot(p.x, p.z));
     };
-    const onPier = (s: Spot): boolean => s.deck !== null && s.deck.x < TERRACE.x0;
+    const meadow = (ps: Vector3[]): void => {
+      for (const p of ps) way.push({ dir: p, deck: null });
+    };
+    const foot = this.local(FOOT.x, FOOT.z);
     if (from.deck && to.deck) {
-      const a = lane(from);
-      if (a) way.push(a);
-      if (onPier(from) !== onPier(to)) way.push(this.deckSpot(JUNCTION.x, JUNCTION.z));
-      const b = lane(to);
-      if (b && !onPier(to)) way.push(b);
-      way.push(to);
+      deck(this.deckWay(from.deck, to.deck));
+      way[way.length - 1] = to;
       return way;
     }
     if (from.deck) {
-      // off the deck: along it to the top of the steps, down them
-      const a = lane(from);
-      if (a) way.push(a);
-      if (onPier(from)) way.push(this.deckSpot(JUNCTION.x, JUNCTION.z));
-      way.push(this.deckSpot(TOP.x, LANE), this.deckSpot(TOP.x, TOP.z), { dir: this.local(FOOT.x, FOOT.z), deck: null });
-      if (to.deck) return [...way, to];
-      way.push(to);
+      // off the deck: to the top of its steps, down them, on over the meadow
+      deck(this.deckWay(from.deck, TOP));
+      way.push({ dir: foot, deck: null });
+      meadow(this.meadowWay(foot, to.dir) ?? [to.dir]);
+      way[way.length - 1] = to;
       return way;
     }
     if (to.deck) {
-      // up the steps from the meadow (by way of their foot), along the lane
-      if (angleBetween(from.dir, this.local(FOOT.x, FOOT.z)) * this.R > 0.3) way.push({ dir: this.local(FOOT.x, FOOT.z), deck: null });
-      way.push(this.deckSpot(TOP.x, TOP.z), this.deckSpot(TOP.x, LANE));
-      if (onPier(to)) way.push(this.deckSpot(JUNCTION.x, JUNCTION.z));
-      else {
-        const b = lane(to);
-        if (b) way.push(b);
-      }
-      way.push(to);
+      // over the meadow to the foot of the steps, up them, on over the deck
+      if (angleBetween(from.dir, foot) * this.R > 0.3) meadow(this.meadowWay(from.dir, foot) ?? [foot]);
+      way.push(this.deckSpot(TOP.x, TOP.z));
+      deck(this.deckWay(TOP, to.deck));
+      way[way.length - 1] = to;
       return way;
     }
-    // over the meadow: straight if it can, else by way of the steps' foot
-    if (!this.clear(from.dir, to.dir)) way.push({ dir: this.local(FOOT.x, FOOT.z), deck: null });
-    way.push(to);
+    meadow(this.meadowWay(from.dir, to.dir) ?? [foot, to.dir]);
+    way[way.length - 1] = to;
     return way;
   }
 
-  /** Go to a spot along the way there, then turn to face as asked; the first turn named for where it is going. */
-  private go(to: Spot, f: Facing, name: string): void {
-    let first = true;
-    for (const step of this.route(to)) {
-      if (angleBetween(this.here.dir, step.dir) * this.R < 0.05) {
-        this.here = step;
-        continue;
-      }
-      this.turn(this.toward(this.here, step.dir), first ? name : 'turn');
-      first = false;
-      this.walk(step);
+  /**
+   * Go to a spot and face as asked: along one smooth path through the way
+   * there, turning into it as it sets off (on the spot first if it is facing
+   * well away from it) and coming round to its facing as it arrives (or on
+   * the spot after, for a big turn). The first segment named for where it is
+   * going.
+   */
+  private go(to: Spot, f: Facing, name: string, rand?: () => number, carry?: Carry): void {
+    const way = [this.here.dir, ...this.route(to).map((s) => s.dir)].filter((p, k, all) => k === 0 || angleBetween(all[k - 1], p) * this.R > 0.05);
+    if (way.length < 2) {
+      this.turn(f, name, carry);
+      return;
     }
-    this.turn(f);
+    const path = this.pathThrough(way, rand);
+    const set = path.heading(0, new Vector3());
+    const off = Math.abs(between(this.facing, set, this.here.dir));
+    if (off > PATH.swing) this.turn(set, name, carry);
+    const arrive = path.heading(path.length, new Vector3());
+    const end = Math.abs(between(arrive, f, to.dir)) <= PATH.swing;
+    this.walkPath(path, to, off > PATH.swing ? 'walk' : name, off > PATH.swing ? undefined : this.facing, end ? f : undefined, carry);
+    if (!end) this.turn(f, 'turn', carry);
   }
 
   /** A move played where it is (its posture's own placement given by `place`), with something more. */
   private play(name: string, kind: MoveKind, time: number, extra?: (s: number, out: Roaming, move: Move) => void, place?: (s: number, out: Roaming) => void): void {
     const at = this.here;
-    const f = this.facing;
+    const f = this.facing.clone();
     this.push({
       name,
       time,
       gait: 0,
-      play: (s, out, ctx) => {
+      play: (s, out) => {
         out.dir.copy(at.dir);
         out.height = this.groundAt(at.dir);
-        out.heading.copy(this.facingAt(f, at, ctx.camera));
+        out.heading.copy(f);
         place?.(s, out);
         const move: Move = { kind, time: s, amount: 1, ease: smoothstep(0, 0.7, s) * smoothstep(0, 0.7, time - s) };
         out.action.moves.push(move);
@@ -479,18 +774,18 @@ export class MuseRoam {
       case 'rest': {
         // out on the porch, looking over the meadow
         const spot = this.deckSpot(-0.6 + 2.4 * rand(), TERRACE.z1 - 0.45);
-        this.go(spot, this.out(spot), 'home');
-        this.stand('rest', 6 + 6 * rand(), this.facing, (_s, out) => (out.lookAt = null));
+        this.go(spot, this.out(spot), 'home', rand);
+        this.stand('rest', 10 + 12 * rand(), this.facing, (_s, out) => (out.lookAt = null));
         return;
       }
       case 'wander': {
         const spot = this.meadowSpot(rand);
         if (!spot) return this.outingHome(rand);
-        this.go(spot, this.toward(spot, travel(spot.dir, tangentToward(spot.dir, this.U, scratch), -1 / this.R, new Vector3())), 'wander');
-        this.stand('look about', 4 + 4 * rand(), this.facing, (_s, out) => (out.lookAt = null));
-        if (rand() < 0.4) {
+        this.go(spot, this.toward(spot, travel(spot.dir, tangentToward(spot.dir, this.U, scratch), -1 / this.R, new Vector3())), 'wander', rand);
+        this.stand('look about', 6 + 6 * rand(), this.facing, (_s, out) => (out.lookAt = null));
+        if (rand() < 0.5) {
           this.play('plop', 'plop', PLOP);
-          this.play('sit', 'sit', 8 + 8 * rand(), (_s, out) => (out.lookAt = null));
+          this.play('sit', 'sit', 15 + 25 * rand(), (_s, out) => (out.lookAt = null));
           this.play('rise', 'rise', RISE);
         }
         return;
@@ -499,46 +794,21 @@ export class MuseRoam {
         const spot = this.meadowSpot(rand);
         if (!spot) return this.outingHome(rand);
         const facing = this.toward(spot, travel(spot.dir, tangentToward(spot.dir, this.U, scratch), -1 / this.R, new Vector3()));
-        this.go(spot, facing, 'to water');
-        // poured here and there, a shuffle along to its right between
-        const pours = 3;
-        const time = pours * GARDEN.period;
-        const total = time + 2 * POCKET.time;
-        const start = spot.dir.clone();
-        const side = new Vector3().crossVectors(facing, start).normalize();
-        // (along to its right if the ground there is as good, else to its left, else on the spot)
-        const reach = (0.45 * H * (pours - 1)) / this.R;
-        const fine = (way: Vector3): boolean => {
-          const end = travel(start, way, reach, new Vector3());
-          return this.terrain.sample(end, ground).water > 1.2 && this.clear(start, end, 0);
-        };
-        if (!fine(side)) side.negate();
-        const step = fine(side) ? (0.45 * H) / this.R : 0;
-        this.push({
-          name: 'water',
-          time: total,
-          gait: 2 * (pours - 1),
-          play: (at, out, ctx) => {
-            const tool = withTool(at, total);
-            const s = Math.min(tool.time, time);
-            const n = Math.min(pours - 1, Math.floor(s / GARDEN.period));
-            const u = s - n * GARDEN.period;
-            const k = n > 0 ? smoothstep(0, 0.8, u) : 1;
-            travel(start, side, step * (n - 1 + k) * (n > 0 ? 1 : 0), out.dir);
-            out.height = this.groundAt(out.dir);
-            out.heading.copy(tangentToward(out.dir, scratch.copy(out.dir).addScaledVector(facing, 1), facingTmp));
-            if (n > 0 && u < 0.8) {
-              out.action.walk = 0.5 * Math.sin((Math.PI * u) / 0.8);
-              out.action.stride = 0.4;
-              out.action.gait = ctx.gait + 2 * (n - 1) + 2 * (u / 0.8);
-            } else out.action.gait = ctx.gait + 2 * n;
-            out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: tool.ease * (n > 0 ? smoothstep(0.5, 0.9, u) : 1) });
-            if (tool.pocket > 0) out.action.moves.push({ kind: 'pocket', time: at, amount: tool.pocket });
-            out.lookAt = tool.pocket > 0.5 ? null : lookTmp.copy(out.dir).multiplyScalar(this.R + out.height).addScaledVector(out.heading, 0.6 * H);
-            out.cues.water = { time: s, grip: tool.grip };
-          },
-        });
-        this.here = { dir: travel(start, side, step * (pours - 1), new Vector3()), deck: null };
+        this.go(spot, facing, 'to water', rand);
+        // the can out of its pocket; poured here and there, as it goes, now long, now short, now sweeping it over
+        // the plants, a content look now and then; between, a shuffle aside, a turn, a few steps, a look about
+        this.can(false);
+        const pours = 2 + Math.floor(rand() * 3);
+        for (let k = 0; k < pours; k++) {
+          this.pour(2.4 + 3 * rand(), 0.7 + 0.3 * rand(), rand() < 0.5, rand() < 0.4);
+          if (k === pours - 1) break;
+          const r = rand();
+          if (r < 0.35) this.shuffle(rand);
+          else if (r < 0.65) this.turn(turned(this.facing, this.here.dir, (rand() < 0.5 ? -1 : 1) * (0.35 + 0.75 * rand()), new Vector3()), 'turn', holdingCan);
+          else if (r < 0.9) this.stroll(rand);
+          else this.stand('look about', 1.5 + 1.5 * rand(), this.facing, holdingCan);
+        }
+        this.can(true);
         return;
       }
       case 'bench': {
@@ -547,9 +817,9 @@ export class MuseRoam {
         const front = this.deckSpot(x, BENCH.z + BENCH.depth + 0.47 * H);
         const seatZ = BENCH.z + BENCH.depth + 0.02 * H;
         const seat = this.deckSpot(x, seatZ);
-        this.go(front, this.out(front), 'to the bench');
+        this.go(front, this.out(front), 'to the bench', rand);
         this.hop('hopUp', front, seat, BENCH.seat);
-        this.play('bench', 'perch', 14 + 8 * rand(), (s, out) => {
+        this.play('bench', 'perch', 30 + 45 * rand(), (s, out) => {
           out.lookAt = null;
           out.cues.hum = perchBeats(s).hum;
         }, (_s, out) => (out.height += BENCH.seat));
@@ -559,8 +829,8 @@ export class MuseRoam {
       case 'cook': {
         // at the little stove on the porch: the ladle out of its pocket, stirring and tasting, put back
         const at = this.deckSpot(STOVE.x - POT[0] * H, STOVE.z - POT[2] * H);
-        this.go(at, this.out(at), 'to the stove');
-        const cooking = 2 * COOK.period + 2 * POCKET.time;
+        this.go(at, this.out(at), 'to the stove', rand);
+        const cooking = (3 + Math.floor(2 * rand())) * COOK.period + 2 * POCKET.time;
         const pot = this.local(STOVE.x, STOVE.z).multiplyScalar(this.R + this.terrain.cottageGround + FLOOR + POT[1] * H);
         this.play('cook', 'stir', cooking, (s, out, move) => {
           const tool = withTool(s, cooking);
@@ -574,10 +844,10 @@ export class MuseRoam {
       }
       case 'fish': {
         const shore = rand() < SHORE ? this.shoreSpot(rand) : null;
-        const fishing = 2 * FISH.period + 2 * POCKET.time;
+        const fishing = (3 + Math.floor(3 * rand())) * FISH.period + 2 * POCKET.time;
         if (shore) {
           // from a bank it has wandered to, sitting in the grass
-          this.go(shore.spot, shore.facing, 'to the shore');
+          this.go(shore.spot, shore.facing, 'to the shore', rand);
           this.play('plop', 'plop', PLOP);
           this.fishing(fishing, false);
           this.play('rise', 'rise', RISE);
@@ -587,7 +857,7 @@ export class MuseRoam {
         const edgeZ = PIER.z1;
         const stand = this.deckSpot(PIER_SPOT, edgeZ - 0.25 * H);
         const sit = this.deckSpot(PIER_SPOT, edgeZ + 0.02 * H);
-        this.go(stand, this.out(stand), 'to the pier');
+        this.go(stand, this.out(stand), 'to the pier', rand);
         const along = (s: number, a: number, b: number, from: Spot, to: Spot, out: Roaming): void => {
           out.dir.copy(from.dir).lerp(to.dir, smoothstep(a, b, s)).normalize();
           out.height = this.terrain.cottageGround + FLOOR;
@@ -603,11 +873,11 @@ export class MuseRoam {
         const spot = this.meadowSpot(rand, 2);
         if (!spot) return this.outingHome(rand);
         const facing = this.toward(spot, travel(spot.dir, tangentToward(spot.dir, this.U, scratch), (rand() - 0.5) * 4 / this.R, new Vector3()));
-        this.go(spot, facing, 'to a nap');
+        this.go(spot, facing, 'to a nap', rand);
         this.play('yawn', 'yawn', YAWN_LENGTH, (_s, out) => (out.lookAt = null));
         this.play('plop', 'plop', PLOP);
         this.play('lie back', 'lieBack', LIE_BACK);
-        const nap = 18 + 14 * rand();
+        const nap = 45 + 50 * rand();
         this.play('nap', 'sleep', nap, (s, out) => (out.cues.sleep = { time: s, roused: -1 }));
         this.play('wake', 'wake', WAKE, (s, out) => {
           // (the snore bubble pops as it wakes)
@@ -619,10 +889,97 @@ export class MuseRoam {
     }
   }
 
+  /** The can taken out of its pocket (or put back): the mitten's dip into the pocket, the can held from as it comes out. */
+  private can(away: boolean): void {
+    this.stand(away ? 'can away' : 'can out', POCKET.time, this.facing, (s, out) => {
+      const t = away ? POCKET.time - s : s;
+      const pocket = smoothstep(0, POCKET.in, t) * (1 - smoothstep(POCKET.out, POCKET.time, t));
+      out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: smoothstep(POCKET.out, POCKET.time, t), tip: 0, glad: 0 });
+      if (pocket > 0) out.action.moves.push({ kind: 'pocket', time: s, amount: pocket });
+      out.cues.water = { time: s, grip: smoothstep(POCKET.out - 0.05, POCKET.out + 0.1, t), tip: 0, pour: 0 };
+      out.lookAt = null;
+    });
+  }
+
+  /** A pour: the can tipped (as far as `tip`) and held a while, sweeping it a little over the plants or not, righted; then a content look, or not. */
+  private pour(time: number, tip: number, sweep: boolean, glad: boolean): void {
+    const at = this.here;
+    const f = this.facing.clone();
+    const H = this.height;
+    const look = glad ? 1.8 : 0;
+    this.push({
+      name: 'pour',
+      time: time + look,
+      gait: 0,
+      play: (s, out) => {
+        out.dir.copy(at.dir);
+        out.height = this.groundAt(at.dir);
+        const sway = sweep ? 0.22 * Math.sin((2 * Math.PI * s) / time) * smoothstep(0.3, 1, s) * smoothstep(0.3, 1, time - s) : 0;
+        turned(f, at.dir, s < time ? sway : 0, out.heading);
+        const tipped = tip * smoothstep(0, 0.6, s) * smoothstep(0, 0.5, time - s);
+        const content = glad ? smoothstep(time, time + 0.4, s) * smoothstep(0, 0.5, time + look - s) : 0;
+        out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: 1, tip: tipped, glad: content });
+        out.cues.water = { time: s, grip: 1, tip: tipped, pour: smoothstep(0.4, 0.7, tipped) };
+        out.lookAt = lookTmp.copy(out.dir).multiplyScalar(this.R + out.height).addScaledVector(out.heading, 0.6 * H);
+      },
+    });
+  }
+
+  /** A shuffle aside (to its left or right, where the ground is dry), the can held, facing as it was. */
+  private shuffle(rand: () => number): void {
+    const at = this.here;
+    const f = this.facing.clone();
+    const H = this.height;
+    const right = new Vector3().crossVectors(f, at.dir).normalize();
+    const d = (0.18 + 0.2 * rand()) * H;
+    let to: Vector3 | null = null;
+    for (const side of rand() < 0.5 ? [1, -1] : [-1, 1]) {
+      const p = travel(at.dir, right, (side * d) / this.R, new Vector3());
+      if (this.terrain.sample(p, ground).water > 1 && this.clear(at.dir, p, 0)) {
+        to = p;
+        break;
+      }
+    }
+    if (!to) return;
+    const end = to;
+    const time = 0.8 + d / H;
+    const steps = (2 * d) / (2 * STEP.length * H);
+    this.push({
+      name: 'shuffle',
+      time,
+      gait: steps,
+      play: (s, out, ctx) => {
+        const u = s / time;
+        out.dir.copy(at.dir).lerp(end, smoothstep(0, 1, u)).normalize();
+        out.height = this.groundAt(out.dir);
+        out.heading.copy(tangentToward(out.dir, scratch.copy(out.dir).add(f), facingTmp));
+        out.action.walk = 0.5 * Math.sin(Math.PI * u);
+        out.action.stride = 0.45;
+        out.action.gait = ctx.gait + steps * u;
+        holdingCan(s, out);
+      },
+    });
+    this.here = { dir: end, deck: null };
+  }
+
+  /** A few steps on to the next plants (a metre or two, roughly the way it faces, where the ground is dry), the can held. */
+  private stroll(rand: () => number): void {
+    const at = this.here;
+    for (let tries = 0; tries < 6; tries++) {
+      const way = turned(this.facing, at.dir, (rand() - 0.5) * 2.4, new Vector3());
+      const p = travel(at.dir, way, ((0.5 + 0.6 * rand()) * this.height) / this.R, new Vector3());
+      if (this.terrain.sample(p, ground).water < 1.2 || !this.clear(at.dir, p, 0)) continue;
+      // (it faces on the way it went, a little round)
+      const onward = turned(tangentToward(p, at.dir, new Vector3()).negate(), p, (rand() - 0.5) * 0.8, new Vector3());
+      this.go({ dir: p, deck: null }, onward, 'stroll', rand, holdingCan);
+      return;
+    }
+  }
+
   /** Nowhere out there would do: home to the porch to look out a while. */
   private outingHome(rand: () => number): void {
     const spot = this.deckSpot(-0.6 + 2.4 * rand(), TERRACE.z1 - 0.45);
-    this.go(spot, this.out(spot), 'home');
+    this.go(spot, this.out(spot), 'home', rand);
     this.stand('rest', 6 + 4 * rand(), this.facing, (_s, out) => (out.lookAt = null));
   }
 
@@ -644,17 +1001,17 @@ export class MuseRoam {
   /** A hop up onto a seat behind it (or down off it to its front): from one spot to the other in an arc, `seat` over the floor. */
   private hop(kind: 'hopUp' | 'hopDown', from: Spot, to: Spot, seat: number): void {
     const time = kind === 'hopUp' ? HOP.up : HOP.down;
-    const f = this.facing;
+    const f = this.facing.clone();
     const H = this.height;
     this.push({
       name: kind,
       time,
       gait: 0,
-      play: (s, out, ctx) => {
+      play: (s, out) => {
         const { along, rise, over } = hopArc(s, kind === 'hopUp');
         out.dir.copy(from.dir).lerp(to.dir, along).normalize();
         out.height = this.terrain.cottageGround + FLOOR + seat * rise + over * H;
-        out.heading.copy(this.facingAt(f, from, ctx.camera));
+        out.heading.copy(f);
         out.action.moves.push({ kind, time: s, amount: 1 });
       },
     });
@@ -731,9 +1088,13 @@ export class MuseRoam {
     this.day[lo].play(s, out, { camera, gait: this.gaits[lo] });
     // turned to you while it answers you, if it is standing or walking (stepping round as it turns)
     const w = this.you.attending(now);
+    if (w <= 0) this.turnSide = 0;
     if (w > 0 && a.moves.length === 0) {
       const toYou = tangentToward(out.dir, camera, facingTmp);
-      const turn = between(out.heading, toYou, out.dir);
+      let turn = between(out.heading, toYou, out.dir);
+      if (this.turnSide === 0) this.turnSide = turn >= 0 ? 1 : -1;
+      // (the long way round rather than flipping sides, once it has started round one way)
+      if (Math.sign(turn) !== this.turnSide && Math.abs(turn) > 0.75 * Math.PI) turn += 2 * Math.PI * this.turnSide;
       turned(out.heading.clone(), out.dir, turn * w, out.heading);
       a.walk = Math.max(a.walk * (1 - w), 0.5 * Math.sin(Math.PI * w) * Math.min(1, Math.abs(turn) / 0.8));
       a.stride *= 1 - w;
@@ -776,5 +1137,10 @@ export class MuseRoam {
 }
 
 const localTmp = { x: 0, z: 0 };
+/** Holding its can as it goes (walking, turning, standing between pours). */
+const holdingCan: Carry = (s, out) => {
+  out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: 1, tip: 0, glad: 0 });
+  out.cues.water = { time: s, grip: 1, tip: 0, pour: 0 };
+};
 const facingTmp = new Vector3();
 const lookTmp = new Vector3();

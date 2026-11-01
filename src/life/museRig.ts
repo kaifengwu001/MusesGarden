@@ -126,6 +126,9 @@ export interface Move {
   roused?: number;
   /** Sitting down, fishing and getting up on a ledge's edge (the pier's) with the legs hanging over it, not on the ground with them out in front. */
   edge?: boolean;
+  /** Watering: how far the can is tipped (0 … 1), and a content look (0 … 1), as its life has them (else they come in turn). */
+  tip?: number;
+  glad?: number;
 }
 
 export interface MuseAction {
@@ -237,16 +240,52 @@ export function hopArc(t: number, up: boolean): { along: number; rise: number; o
   return { along, rise: up ? along : 1 - along, over: HOP.arc * 4 * along * (1 - along) * (up ? 1 : 0.5) };
 }
 
-/** Where fishing is at (s into a catch): the line out (0 … 1 landed), the float's dip (0 … 1 under), the yank, the fish (0 in the water … 1 hung from the rod), let go (0 … 1 back in). */
-export function fishBeats(t: number): { cast: number; dip: number; yank: number; fish: number; free: number } {
-  const u = ((t % FISH.period) + FISH.period) % FISH.period;
+/** A number in [0, 1) for an integer (a catch's luck, its timing). */
+function luck(n: number, salt: number): number {
+  const h = Math.sin(n * 12.9898 + salt * 78.233) * 43758.5453;
+  return h - Math.floor(h);
+}
+
+/**
+ * Where fishing is at (s into it): each catch (FISH.period long) its own, its
+ * nibbles and bite a little sooner or later (shift, s), and not always lucky:
+ * the line out (0 … 1 landed), the float's dip (0 … 1 under), the yank, the
+ * fish (0 in the water … 1 hung from the rod), let go (0 … 1 back in); the
+ * cast's swing back and throw; nibbling, cheering, waving the fish off, or
+ * (unlucky) drooping at the bite that got away.
+ */
+export function fishBeats(t: number): {
+  cast: number;
+  back: number;
+  throwIt: number;
+  dip: number;
+  nibble: number;
+  yank: number;
+  fish: number;
+  free: number;
+  cheer: number;
+  bye: number;
+  missed: number;
+  lucky: boolean;
+  shift: number;
+} {
+  const n = Math.floor(t / FISH.period);
+  const u = t - n * FISH.period;
+  const lucky = luck(n, 1) < 0.6;
+  const j = (luck(n, 2) - 0.5) * 1.6;
+  const v = u - j;
   const cast = smoothstep(FISH.cast[0] + 0.55, FISH.cast[1], u);
-  const nibble = hump(FISH.nibble[0], FISH.nibble[0] + 0.25, u) * 0.4 + hump(FISH.nibble[1], FISH.nibble[1] + 0.25, u) * 0.5;
-  const dip = Math.max(nibble, during(FISH.bite - 0.1, FISH.bite, FISH.fly[0], FISH.fly[0] + 0.1, u));
-  const yank = during(FISH.bite, FISH.bite + 0.25, FISH.free - 0.6, FISH.free, u);
-  const fish = during(FISH.fly[0], FISH.fly[1], FISH.free, FISH.free + 0.01, u);
-  const free = u >= FISH.free ? smoothstep(FISH.free, FISH.free + 0.5, u) : 0;
-  return { cast, dip, yank, fish, free: u < FISH.cast[1] ? 0 : free };
+  const back = hump(FISH.cast[0], FISH.cast[0] + 0.7, u);
+  const throwIt = hump(FISH.cast[0] + 0.5, FISH.cast[1], u);
+  const nibbles = hump(FISH.nibble[0], FISH.nibble[0] + 0.25, v) * 0.4 + hump(FISH.nibble[1], FISH.nibble[1] + 0.25, v) * 0.5;
+  const dip = Math.max(nibbles, during(FISH.bite - 0.1, FISH.bite, FISH.fly[0], FISH.fly[0] + 0.1, v));
+  const yank = during(FISH.bite, FISH.bite + 0.25, lucky ? FISH.free - 0.6 : FISH.fly[1], lucky ? FISH.free : FISH.fly[1] + 0.6, v);
+  const fish = lucky ? during(FISH.fly[0], FISH.fly[1], FISH.free, FISH.free + 0.01, v) : 0;
+  const free = lucky && v >= FISH.free ? smoothstep(FISH.free, FISH.free + 0.5, v) : 0;
+  const cheer = lucky ? during(FISH.cheer[0], FISH.cheer[0] + 0.2, FISH.cheer[1] - 0.3, FISH.cheer[1], v) : 0;
+  const bye = lucky ? during(FISH.bye[0], FISH.bye[0] + 0.3, FISH.bye[1] - 0.3, FISH.bye[1], v) : 0;
+  const missed = lucky ? 0 : during(FISH.fly[0] + 0.3, FISH.fly[0] + 0.8, FISH.cheer[1] - 0.4, FISH.cheer[1] + 0.4, v);
+  return { cast, back, throwIt, dip, nibble: dip * (v < FISH.bite ? 1 : 0), yank, fish, free: u < FISH.cast[1] ? 0 : free, cheer, bye, missed, lucky, shift: j };
 }
 
 /** Where watering is at (s): the can tipped (0 … 1), water pouring, and which pour (the count of them). */
@@ -520,7 +559,7 @@ export class MuseRig {
       case 'fish':
         return this.fish(t, k, e, mv.edge === true);
       case 'water':
-        return this.water(t, e);
+        return this.water(t, e, mv.tip, mv.glad);
       case 'stir':
         return this.stir(t, e);
       case 'pocket':
@@ -676,11 +715,10 @@ export class MuseRig {
 
   /**
    * Being petted (t since your hold began; release since you let go, < 0
-   * while held): the head tilts into your hand (toward side) and squishes a
-   * little under it, the body leaning in after it, the hands brought in shyly
-   * before its belly, eyes shut in a happy squint, blushing. Held a while,
-   * its fur stands up in a wave from its feet to its head and it scrunches
-   * down with delight; let go, it shakes it out.
+   * while held): the head tilts into your hand (toward side), the body
+   * leaning in after it, the paws up shyly, eyes squeezed shut (> <),
+   * blushing; it keeps its height. Held a while, its fur stands up in a wave
+   * from its feet to its head; let go, it shakes it out.
    */
   private pet(t: number, release: number, side: number, k: number): void {
     const J = JOINT;
@@ -688,8 +726,6 @@ export class MuseRig {
     const on = k * smoothstep(0, 0.35, t) * (held ? 1 : 1 - smoothstep(0, PET.out, release));
     const sway = Math.sin(TAU * 0.42 * t);
     this.addTurn(J.head, 0.07 * on, 0.05 * side * on, (0.3 * side + 0.05 * sway) * on);
-    this.addSwell(J.head, 0.03 * on, -0.06 * on, 0.03 * on);
-    this.addShift(J.head, 0, -0.012 * on, 0);
     this.addTurn(J.chest, 0, 0, 0.06 * side * on);
     this.addTurn(J.pelvis, 0, 0, 0.03 * sway * on);
     // its mittens up to its cheeks
@@ -701,7 +737,8 @@ export class MuseRig {
     const into = held0 - PET.fluff;
     if (into <= 0) return;
     const peak = FLUFF.tuck + FLUFF.rise + FLUFF.hold * 0.5;
-    this.fluffUp(Math.min(into, peak), held ? -1 : release, k, false);
+    // (petted, it stands its full height: the fur stands up, the body is not squashed down)
+    this.fluffUp(Math.min(into, peak), held ? -1 : release, k, false, false);
   }
 
   /**
@@ -709,9 +746,10 @@ export class MuseRig {
    * shorter and rounder, the head sinking in, the shoulders up), eyes
    * squeezed shut, while the fur stands up in a wave from its feet to its
    * head; then (from shake ≥ 0) it shakes itself out, pops back up to its
-   * height and the fur lies back down. alone: the whole of it, its own face.
+   * height and the fur lies back down. alone: the whole of it, its own face;
+   * scrunch: squashed down as it goes (not as it is petted).
    */
-  private fluffUp(t: number, shake: number, k: number, alone: boolean): void {
+  private fluffUp(t: number, shake: number, k: number, alone: boolean, scrunch = true): void {
     const J = JOINT;
     const F = FLUFF;
     const tuck = smoothstep(0, F.tuck, t) * (shake >= 0 ? 1 - smoothstep(0.05, 0.3, shake) : 1);
@@ -721,10 +759,12 @@ export class MuseRig {
     const standing = rise * (1 - down);
     this.fluff.set(Math.max(this.fluff.x, -0.15 + 1.35 * rise), Math.max(this.fluff.y, standing * k), Math.max(this.fluff.z, 0.6 * hump(0, 1, rise) * k), 0.12);
     // scrunched down, the head in, the shoulders up; a tremble of delight
-    const pop = shake >= 0 ? 0.045 * hump(0.08, 0.42, shake) : 0;
-    this.stretch += (-0.1 * tuck + pop) * k;
-    this.addShift(J.head, 0, -0.02 * tuck * k, 0);
-    for (const side of [1, -1]) this.armBy(side, -0.15 * tuck * k, 0, 0.28 * tuck * k, 0.35 * tuck * k);
+    if (scrunch) {
+      const pop = shake >= 0 ? 0.045 * hump(0.08, 0.42, shake) : 0;
+      this.stretch += (-0.1 * tuck + pop) * k;
+      this.addShift(J.head, 0, -0.02 * tuck * k, 0);
+      for (const side of [1, -1]) this.armBy(side, -0.15 * tuck * k, 0, 0.28 * tuck * k, 0.35 * tuck * k);
+    }
     this.addTurn(J.chest, 0, 0.012 * Math.sin(TAU * 11 * t) * tuck * k, 0);
     // shaken out: the body twisting back and forth, the head after it
     if (shake >= 0 && shake < F.shake) {
@@ -938,41 +978,38 @@ export class MuseRig {
 
   // ---- its pastimes ----
 
-  /** Fishing from the ground (or a ledge's edge, the legs hanging over): the rod in its right mitten, cast, the float watched, a bite yanked, the fish cheered and let go and waved off. */
+  /** Fishing from the ground (or a ledge's edge, the legs hanging over): the rod in its right mitten, cast, the float watched, a bite yanked, the fish cheered and let go and waved off (or, the one that got away, a little droop). */
   private fish(t: number, k: number, e: number, edge: boolean): void {
     const J = JOINT;
     if (edge) this.perchBase(k);
     else this.sitBase(k);
     const u = ((t % FISH.period) + FISH.period) % FISH.period;
-    const { yank, fish, dip } = fishBeats(t);
-    // the cast: back over the shoulder, then forward
-    const back = hump(FISH.cast[0], FISH.cast[0] + 0.7, u);
-    const throwIt = hump(FISH.cast[0] + 0.5, FISH.cast[1], u);
-    const nib = dip * (u < FISH.bite ? 1 : 0);
-    const cheer = during(FISH.cheer[0], FISH.cheer[0] + 0.2, FISH.cheer[1] - 0.3, FISH.cheer[1], u);
-    const bye = during(FISH.bye[0], FISH.bye[0] + 0.3, FISH.bye[1] - 0.3, FISH.bye[1], u);
+    const { back, throwIt, nibble: nib, yank, fish, cheer, bye, missed, shift } = fishBeats(t);
     // the rod held out before it, up and back for the cast and the yank, dipping to the nibbles
     const lift = 0.14 * back - 0.03 * throwIt + 0.11 * yank - 0.03 * nib;
     const out = -0.12 * back + 0.06 * throwIt - 0.08 * yank + 0.03 * nib;
     this.reachFor(-1, ROD.x, ROD.y + lift, ROD.z + out, J.chest, e);
-    // leaning in to the nibbles, back with the yank, bouncing for the catch
-    this.addTurn(J.spine, (0.1 * nib - 0.08 * yank) * e, 0, 0);
-    this.addShift(J.root, 0, 0.03 * Math.abs(Math.sin(TAU * 2.2 * (u - FISH.cheer[0]))) * cheer * e, 0);
+    // leaning in to the nibbles, back with the yank, bouncing for the catch; drooping for the one that got away
+    this.addTurn(J.spine, (0.1 * nib - 0.08 * yank + 0.08 * missed) * e, 0, 0);
+    this.addTurn(J.head, 0.14 * missed * e, 0, 0.1 * Math.sin(TAU * 1.2 * u) * missed * e);
+    this.addShift(J.root, 0, 0.03 * Math.abs(Math.sin(TAU * 2.2 * (u - shift - FISH.cheer[0]))) * cheer * e, 0);
     // the free mitten flung up for the catch, then waving the fish off
     this.waveArm(1, (0.55 * cheer + 0.75 * bye) * e, Math.sin(TAU * 2.4 * u) * bye);
     this.express(Math.min(1, nib * 2) * e, { eyes: 1, smile: 0.2 });
     this.express(cheer * e, { squint: 1, smile: 1, blush: 0.5 });
     this.express(fish * (1 - cheer) * e, { smile: 0.8 });
     this.express(bye * e, { smile: 0.9, blush: 0.3 });
+    this.express(missed * e, { eyes: 0.55, smile: 0 });
   }
 
   /** Watering the meadow with a can in its right mitten: poured over the plants ahead of it, then a content look at them. */
-  private water(t: number, e: number): void {
+  private water(t: number, e: number, tipped?: number, content?: number): void {
     const J = JOINT;
     const n = Math.floor(t / GARDEN.period);
     const u = t - n * GARDEN.period;
-    const { tip } = gardenBeats(t);
-    const glad = during(GARDEN.glad[0], GARDEN.glad[0] + 0.4, GARDEN.glad[1] - 0.5, GARDEN.glad[1], u);
+    // (as its life tips the can and looks, or, given nothing, poured and looked at in turn)
+    const tip = tipped ?? gardenBeats(t).tip;
+    const glad = content ?? during(GARDEN.glad[0], GARDEN.glad[0] + 0.4, GARDEN.glad[1] - 0.5, GARDEN.glad[1], u);
     // the can held out over the plants, lifted a little as it pours
     this.reachFor(-1, CAN.x, CAN.y + 0.04 * tip, CAN.z + 0.03 * tip, -1, e);
     this.addTurn(J.spine, 0.06 * tip * e, 0, 0);

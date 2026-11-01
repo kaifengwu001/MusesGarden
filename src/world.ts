@@ -609,14 +609,15 @@ export class World {
    * it is now (at home, from out in front of the terrace, a little toward the
    * steps), looking at its middle; a view other than MUSE_VIEW's for checks.
    */
-  frameMuse(view: Partial<typeof MUSE_VIEW> = {}): void {
+  frameMuse(view: Partial<typeof MUSE_VIEW> & { fixed?: boolean } = {}): void {
     const L = this.terrain.layout;
     const R = this.terrain.radius;
     this.muse.update(this.clock?.time ?? 0, this.terrain, this.rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, true);
     const V = { ...MUSE_VIEW, ...view };
     const where = this.muse.where;
     const target = where.dir.clone();
-    const front = this.muse.home ? tangentToward(target, L.homeBearing.clone().add(target), new Vector3()) : where.heading.clone();
+    // (fixed: from the same side whichever way it faces, as for following it)
+    const front = this.muse.home || view.fixed ? tangentToward(target, L.homeBearing.clone().add(target), new Vector3()) : where.heading.clone();
     const toCamera = front.applyAxisAngle(target, V.azimuth);
     const focus = travel(target, toCamera, V.distance / R, new Vector3());
     this.rig.lookAlong(focus, tangentToward(focus, target, new Vector3()));

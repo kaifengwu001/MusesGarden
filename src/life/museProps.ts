@@ -37,7 +37,7 @@ import moteFragment from './museMotes.frag.glsl?raw';
 import moteVertex from './museMotes.vert.glsl?raw';
 import fragmentShader from './museProps.frag.glsl?raw';
 import vertexShader from './museProps.vert.glsl?raw';
-import { COOK, FISH, STIR, cookBeats, fishBeats, gardenBeats, sleepBeats, type MuseRig } from './museRig';
+import { COOK, FISH, STIR, cookBeats, fishBeats, sleepBeats, type MuseRig } from './museRig';
 import { STOVE, type Roaming } from './museRoam';
 import { FLOOR } from './props';
 
@@ -319,10 +319,10 @@ export class MuseProps {
 
     // the watering can, hung by its handle, tipped to pour; its water falling on the plants before it
     const w = cues?.water ?? null;
-    const tip = w ? gardenBeats(w.time).tip : 0;
+    const tip = w ? w.tip : 0;
     const canAt = holding(new Euler(0.1 + 0.8 * tip, 0, 0), new Vector3(0, -0.122, 0.012), m6);
     hold(this.can, canAt, w ? w.grip : 0);
-    const pour = w && on ? gardenBeats(w.time).pour : 0;
+    const pour = w && on ? w.pour : 0;
     if (pour > 0.05) {
       const rose = v7.set(0, 0.07, 0.19).applyMatrix4(canAt);
       const ground = v8.copy(rose).addScaledVector(forward, 0.12 * H);
@@ -379,7 +379,7 @@ export class MuseProps {
     // the rod, its line out to the float on the water, or the fish hung on it; rings where they touch the water
     const fsh = cues?.fish ?? null;
     const fu = fsh ? ((fsh.time % FISH.period) + FISH.period) % FISH.period : 0;
-    const beats = fsh ? fishBeats(fsh.time) : { cast: 0, dip: 0, yank: 0, fish: 0, free: 0 };
+    const beats = fishBeats(fsh ? fsh.time : 0);
     const swing = fsh ? 0.9 * Math.sin(Math.PI * Math.min(1, Math.max(0, fu - FISH.cast[0]) / 0.7)) * (fu < 0.7 ? 1 : 0) : 0;
     const rodAt = holding(new Euler(0.75 - 0.35 * beats.yank - swing, 0, 0.12), new Vector3(0, 0, 0), m6);
     hold(this.rod, rodAt, fsh ? fsh.grip : 0);
@@ -428,14 +428,15 @@ export class MuseProps {
         this.fish.matrixWorldNeedsUpdate = true;
         this.fish.visible = true;
       }
-      // rings on the water: the float landing, the nibbles, the bite, the fish dropped back
+      // rings on the water: the float landing, the nibbles, the bite, the fish dropped back (this catch's own times)
       const cycle = time - fu;
+      const j = beats.shift;
       for (const [t, strength] of [
         [FISH.cast[1] - 0.02, 1],
-        [FISH.nibble[0], 0.6],
-        [FISH.nibble[1], 0.7],
-        [FISH.bite, 1],
-        [FISH.free + 0.5, 1.2],
+        [FISH.nibble[0] + j, 0.6],
+        [FISH.nibble[1] + j, 0.7],
+        [FISH.bite + j, 1],
+        [FISH.free + 0.5 + j, beats.lucky ? 1.2 : 0],
       ] as const) {
         if (strength > 0) this.splash(landingDir, cycle + t, time);
       }

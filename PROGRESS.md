@@ -48,6 +48,18 @@ the meadow. Kai's notes (2026-10-31); this table fills in as they are done.
 
 For the garden's interfaces (that session asked): world.muse.where (direction, height, heading, kept current while not drawn), world.muse.home, world.muse.away (not drawn, no shadow, not tappable; its life keeps time).
 
+Kai's review of iteration 17's page (2026-10-31), done:
+
+- **Sudden turns, and turning round and back within a few frames.** Reproduced by scanning its heading frame by frame: every one was in the last frame or two of a walk, where it aimed at the point it was standing on (a direction from nearly nothing, noise), then snapped back as the next turn began. Walks now follow a path and take their heading from it (smoothed over 0.6 m), so this cannot happen. A test checks 20 minutes at 60 frames a second for any turn faster than a half turn on the spot. Turns on the spot now take time by how far they go (0.35 s plus 0.8 s for a half turn), slight ones are taken in its stride, and turning to you when you tap keeps to one side once started.
+- **Robotic, rectilinear paths.** It used to stop at every corner, turn on the spot and walk straight on. Now each walk is one smooth path:
+  - It turns into the path as it sets off (on the spot first only if it faced well away), and comes round to its facing as it arrives.
+  - Corners out on the meadow are wide sweeping curves (up to 5 m either side, checked against water and the homestead); long walks wander off the straight line once or twice.
+  - It goes round the house by its corners, so it now goes behind the house and past the pond, where before every outing fanned out to one quarter.
+  - On the porch (the most robotic part) the fixed lane is gone. It walks straight across wherever the way is clear of the bench, the stove, the chair and the wall, by a few places round them where not (behind the stove, between it and the house), with rounded corners.
+- **Watering, more organic.** Two to four pours, each its own length and tilt, now and then swept over the plants; a content look only sometimes; between pours, a shuffle aside, a turn, a few steps on, or a look about.
+- **Longer at each thing.** Asleep 45–95 s, on the bench 30–75 s, fishing 3–5 catches (45–75 s), cooking 3–4 tastes, sitting in the grass 15–40 s, resting on the porch 10–22 s. Each catch has its own timing and is not always lucky: some bites get away, with a little droop.
+- **Petting.** It keeps its full height (no squash, the head not squished): the head tilt, > < eyes, blush, hearts and its fur standing up.
+
 Known: the GPU invariant "scrubbing growth in real time stays within the frame budget" fails on this machine now, frame p95 33.4 ms, exactly 30 fps. It fails the same way at 86dadbd, which passed it earlier the same day, so it is the machine (another session's GPU load), not this work. To run again on a quiet machine.
 
 

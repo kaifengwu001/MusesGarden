@@ -47,6 +47,28 @@ describe('Muse roaming the planet', () => {
     });
   }
 
+  it('turns smoothly: no jump in its heading from one frame to the next, along its paths, at their ends, in its turns', () => {
+    const terrain = terrainAt(128);
+    const roam = new MuseRoam(terrain, H);
+    const camera = terrain.layout.cottage.clone().multiplyScalar(160);
+    let prev: Vector3 | null = null;
+    let worst = 0;
+    let when = 0;
+    for (let t = 0; t < 1200; t += 1 / 60) {
+      const heading = roam.at(t, camera).heading.clone();
+      if (prev) {
+        const a = Math.acos(Math.max(-1, Math.min(1, heading.dot(prev))));
+        if (a > worst) {
+          worst = a;
+          when = t;
+        }
+      }
+      prev = heading;
+    }
+    // (a half turn on the spot comes round at most about 4 rad a second: under 0.07 rad a frame)
+    expect(worst, `at ${when.toFixed(2)} s`).toBeLessThan(0.08);
+  });
+
   it('is the same Muse for the same planet and time', () => {
     const terrain = terrainAt(128);
     const a = new MuseRoam(terrain, H);

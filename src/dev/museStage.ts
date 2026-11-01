@@ -903,7 +903,7 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
     const swing = fsh ? 0.9 * Math.sin(Math.PI * Math.min(1, Math.max(0, fu - FISH.cast[0]) / 0.7)) * (fu < 0.7 ? 1 : 0) : 0;
     hold(rod, holding(-1, new Euler(0.75 - 0.35 * fishBeats(fsh ? fsh.time : 0).yank * (fsh ? 1 : 0) - swing, 0, 0.12), new Vector3(0, 0, 0), new Matrix4()), gf);
     const rodTip = new Vector3(0, ROD_LENGTH - 0.12, 0).applyMatrix4(rod.matrix);
-    const beats = fsh ? fishBeats(fsh.time) : { cast: 0, dip: 0, yank: 0, fish: 0, free: 0 };
+    const beats = fishBeats(fsh ? fsh.time : 0);
     const u0 = fsh ? ((fsh.time % FISH.period) + FISH.period) % FISH.period : 0;
     // where the float rests on the water, ahead of Muse
     const landing = tmp2.set(l.x, 0.012, l.z).addScaledVector(forward, CAST);
@@ -946,10 +946,10 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
       const cycle = fsh.time - u0;
       const base = t - fsh.time + cycle;
       splash(landing.x, landing.z, base + FISH.cast[1] - 0.02, 1);
-      splash(landing.x, landing.z, base + FISH.nibble[0], 0.6);
-      splash(landing.x, landing.z, base + FISH.nibble[1], 0.7);
-      splash(landing.x, landing.z, base + FISH.bite, 1);
-      if (u0 > FISH.free) splash(landing.x, landing.z, base + FISH.free + 0.5, 1.2);
+      splash(landing.x, landing.z, base + FISH.nibble[0] + beats.shift, 0.6);
+      splash(landing.x, landing.z, base + FISH.nibble[1] + beats.shift, 0.7);
+      splash(landing.x, landing.z, base + FISH.bite + beats.shift, 1);
+      if (beats.lucky && u0 > FISH.free + beats.shift) splash(landing.x, landing.z, base + FISH.free + 0.5 + beats.shift, 1.2);
     }
     (water.material).uniforms.uTime.value = t;
 
