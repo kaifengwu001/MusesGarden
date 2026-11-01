@@ -40,9 +40,10 @@ import dotVertex from './hutDot.vert.glsl?raw';
 // lamps lighting it (hut.frag.glsl). Along the left wall stands Muse's
 // showpiece, a big display cabinet holding its favourites: a glowing dot
 // (hutDot.vert.glsl) there opens the shelf's view, where a small white dot
-// on each favourite opens its card as a find's does. Nothing here is drawn,
-// or even loaded, before the cutaway first opens: the meadow outside draws
-// exactly as before.
+// on each favourite opens its card as a find's does. Nothing here is drawn
+// before the cutaway opens: the meadow outside draws exactly as before. The
+// furniture is fetched when the hut is near, reaches the GPU when first drawn
+// and leaves it when the cutaway shuts, so the meadow keeps to its budget.
 
 /** The room inside the walls (local m): half its width and depth (to the walls' inner faces), its floor and the walls' tops. */
 export const ROOM = { x: COTTAGE.halfX - COTTAGE.thickness / 2, z: COTTAGE.halfZ - COTTAGE.thickness / 2, floor: FLOOR, top: COTTAGE.wall } as const;
@@ -386,6 +387,9 @@ export class HutInterior {
   private opened = -1;
   /** How open the cutaway is, 0 (not drawn) … 1. */
   private amount = 0;
+  /** The furniture and the rug, and their bytes on the GPU while drawn. */
+  private readonly furniture: Array<Mesh<BufferGeometry, ShaderMaterial>> = [];
+  private bytes = 0;
 
   constructor(shared: Record<string, IUniform>, faces: readonly WallFace[]) {
     this.uniforms = {
@@ -494,9 +498,16 @@ export class HutInterior {
     g.setAttribute('uv', new Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
     this.stand('rug', null, g, this.material(4, rug, { RUG: '', PLACED: '' }), new Vector3(RUG.length, 0, RUG.width), RUG.turn, null, null);
     bytes += 1024 * 594 * 4 * 1.34;
-    gpuMemory.set('hut', bytes);
+    this.bytes = bytes;
     this.loaded = true;
     this.refresh();
+    this.book();
+  }
+
+  /** The ledger's 'hut': the furniture and the rug are on the GPU only while the cutaway is open (and loaded). */
+  private book(): void {
+    if (this.loaded && this.amount > 0) gpuMemory.set('hut', this.bytes);
+    else gpuMemory.delete('hut');
   }
 
   /** Stand a piece (or the rug) in the room: its mesh, and its handle at its foot's middle, turned as the piece faces. */
@@ -505,6 +516,7 @@ export class HutInterior {
     mesh.frustumCulled = false;
     mesh.name = name;
     this.group.add(mesh);
+    this.furniture.push(mesh);
     const box = new Box3().setFromBufferAttribute(geometry.attributes.position as Float32BufferAttribute);
     const handle = new Object3D();
     handle.name = name;
@@ -605,10 +617,20 @@ export class HutInterior {
 
   /** How open the cutaway is (0 … 1), and how far it has gone to the shelf (0 … 1): the room drawn from the first moment, the showpiece's dot once it is open, the favourites' dots at the shelf. */
   open(amount: number, shelf = 0): void {
+    const was = this.amount > 0;
     this.amount = amount;
     this.group.visible = amount > 0;
     (this.beacon.material.uniforms.uShown as IUniform<number>).value = amount * (1 - shelf);
     (this.dots.material.uniforms.uShown as IUniform<number>).value = amount * shelf;
+    if (was === amount > 0) return;
+    // shut: the furniture's buffers and pictures leave the GPU (kept here; three.js uploads them again when next drawn)
+    if (was) {
+      for (const mesh of this.furniture) {
+        mesh.geometry.dispose();
+        (mesh.material.uniforms.uMap.value as Texture | null)?.dispose();
+      }
+    }
+    this.book();
   }
 
   get shown(): boolean {

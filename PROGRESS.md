@@ -74,6 +74,8 @@ The meadow outside the cutaway draws pixel for pixel as before in every standard
 
 Known: the models are the stand-ins (see the pipeline test below), about 580k triangles and 28 MB together; the display cabinet is drawn out 1.4 times across to fill the wall, its things with it (a wide cabinet from Tripo would drop in). Muse is lit by the sun outside, not by the fire. The water's mirror still shows the roof. The cutaway's materials compile on the first knock (a hitch then).
 
+**GPU memory (after the merge with Tracy's main, 2026-11-01).** The furniture is fetched when you come near the hut, but it reaches the GPU only when the cutaway first draws it and leaves it when the cutaway shuts, and the ledger now books it so (it had booked the prefetch's 71.8 MB at once, putting the finds test's wander view at 301.5 MB against its 256). Outside, near the hut, it is 229.7 MB as before; inside, 301.5 MB at 1600×1000 (the stand-ins' nine pictures at 1024², 50.6 MB, their meshes about 18 MB, the rug 3.3 MB), over the budget while you are in. Lighter models from Tripo or smaller pictures would bring it in. A second visit uploads the furniture again as the camera starts to rise. `npm run check`, `npm test` (848) and `npm run test:gpu` (14) pass on main.
+
 **A test of the 3D pipeline (2026-11-01).** Kai made the display cabinet
 twice. The second ("(1)") is properly built: square posts, flat panels,
 modelled doors and handles, separate books, a glass case with a mortar in
