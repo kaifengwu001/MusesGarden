@@ -9,6 +9,9 @@
 // flower's stem rises with a little overshoot, then its head opens. The
 // picked basket's patches grow larger and take a cool tint; the one under the
 // pointer lifts and glows; the one whose card is up is a touch brighter.
+// Each patch's hero (findBeds.ts) is hidden while its twin flies in from the
+// basket; in focus it stands lifted, larger and lit; as its flower lands a
+// sway runs out through the patch and the hero settles with a small bounce.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -27,11 +30,20 @@ attribute float aPart; // 0 stem, 1 petal, 2 centre
 attribute float aT;    // along the stem 0..1; 1 on the head
 attribute vec4 aPlace; // the plant's direction (unit), its ground's height over R (m)
 attribute vec4 aLook;  // seed in [0, 1), size factor, colour variant, the find's index (findState)
-attribute float aDelay; // s after its patch is planted before this plant starts to rise (its distance from the patch's middle)
+attribute float aDelay; // s after its patch is planted before this plant starts to rise (its distance from the patch's middle); negative on the hero
 uniform float uPixelAngle;
 uniform int uSpecies;
 uniform vec4 uBedLook; // stem top (m), nod, -, -
 centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
+
+// A flower landing: how long its sway runs (s), how fast it spreads (aDelay's units a second), how far it bows a
+// plant; how long the hero settles (s), and how a hero in focus stands (m up, times larger).
+const float LAND_RING = 1.1;
+const float LAND_SPEED = 1.6;
+const float LAND_BOW = 0.45;
+const float LAND_SETTLE = 0.25;
+const float FOCUS_LIFT = 0.08;
+const float FOCUS_SIZE = 1.35;
 
 float rnd(float s, float k) {
   return fract(sin(s * 78.233 + k * 12.9898) * 43758.5453);
@@ -51,14 +63,22 @@ float rise(float age, float span) {
 
 void main() {
   FindState find = findState(aLook.w);
-  float age = uPlantClock - find.planted - aDelay;
+  bool hero = aDelay < 0.0;
+  float delay = abs(aDelay);
+  float age = uPlantClock - find.planted - delay;
+  float since = uPlantClock - find.landed;
+  float landing = since >= 0.0 && since < LAND_RING ? 1.0 - since / LAND_RING : 0.0;
+  float focus = hero ? find.focus : 0.0;
+  // the hero in focus or landing stands for the flower that came home: drawn whatever the thinning
+  bool shown = hero && (focus > 0.0 || landing > 0.0);
   // past the horizon, or a few pixels across: thinned (the picked basket's kept whole), then not drawn
   vec3 ground = aPlace.xyz * (uRadius + aPlace.w);
   vec3 seen = warpPosition(ground);
   float pixels = BED_SPAN / max(length(cameraPosition - seen) * uPixelAngle, 1e-6);
   float keep = max(mix(0.4, 1.0, smoothstep(6.0, 40.0, pixels)), find.mark) * step(1.5, pixels);
+  if (shown) keep = 1.0;
   float facing = dot(warpNormal(ground, aPlace.xyz), normalize(cameraPosition - seen));
-  if (age <= 0.0 || facing < -0.05 || rnd(aLook.x, 9.0) >= keep) {
+  if (age <= 0.0 || facing < -0.05 || rnd(aLook.x, 9.0) >= keep || (hero && find.away > 0.5)) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }
@@ -67,6 +87,11 @@ void main() {
   vec3 dir = aPlace.xyz;
   float seed = aLook.x;
   float scale = aLook.y * (0.85 + 0.3 * rnd(seed, 3.0)) * grow * mix(1.0, MARK_SIZE, find.mark);
+  if (shown) {
+    // larger in focus; just landed, a squash and a spring back
+    float settle = clamp(since / LAND_SETTLE, 0.0, 1.0);
+    scale *= mix(1.0, FOCUS_SIZE, focus) * (1.0 - 0.12 * sin(6.2831853 * settle) * (1.0 - settle));
+  }
   float stemScale = scale * mix(0.7, 1.0, open);
 
   // local frame: up = surface normal, random yaw
@@ -86,8 +111,14 @@ void main() {
   float strength = uWindVec.w;
   vec3 shared = inside > 0.5 ? wind.xyz : windDir(dir) * strength * (0.18 + 0.42 * strength);
   vec3 bend = windPlant(dir, shared, rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
+  if (landing > 0.0) {
+    // a ring running out from the middle, bowing each plant it passes downwind, fading as it goes
+    float off = delay - since * LAND_SPEED;
+    bend += windDir(dir) * (LAND_BOW * exp(-off * off / 0.018) * landing * (1.0 - 0.5 * clamp(delay / 0.85, 0.0, 1.0)));
+  }
   float stemTop = uBedLook.x;
   vec3 base = dir * (uRadius + aPlace.w - 0.02 + 0.22 * find.lift);
+  if (shown) base += dir * (FOCUS_LIFT * focus);
   vec3 local = position;
   vec3 world;
   if (aPart < 0.5) {
@@ -134,8 +165,8 @@ void main() {
   float head = step(0.5, aPart);
   col = mix(col, col * 0.85 + findMarkTint() * 0.22, find.mark * mix(0.3, 0.5, head));
   col = mix(col, col * 1.12 + 0.025, find.open * head);
-  // under the pointer or coming home: glowing in the warm light, the heads most
-  float lit = max(find.lift, findPulse(find));
+  // under the pointer, coming home or in focus: glowing in the warm light, the heads most
+  float lit = max(max(find.lift, findPulse(find)), focus);
   col = mix(col, mix(col * 1.35 + 0.08, findGlow(), 0.45), lit * mix(0.45, 1.0, head));
 
   vec3 wp = warpPosition(world);

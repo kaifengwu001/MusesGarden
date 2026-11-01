@@ -95,6 +95,69 @@ describe('FindTable', () => {
     expect(list.map((id) => table.get(id, 'lift'))).toEqual([1, 0, 0]);
   });
 
+  it('starts every find with its hero flower out of focus, landed long ago and at home (the shader draws it as before)', () => {
+    const table = new FindTable();
+    const list = ids(300);
+    table.assign(list, new Set(list.slice(0, 5)));
+    for (const id of list) {
+      expect(table.get(id, 'focus')).toBe(0);
+      expect(table.get(id, 'landed')).toBe(LONG_AGO);
+      expect(table.get(id, 'away')).toBe(0);
+    }
+  });
+
+  it('brings one find’s hero into focus at a time, easing in and out', () => {
+    const table = new FindTable();
+    const list = ids(3);
+    table.assign(list, new Set());
+    table.focus(list[0]);
+    table.ease(0.05);
+    const easing = table.get(list[0], 'focus') ?? 0;
+    expect(easing).toBeGreaterThan(0);
+    expect(easing).toBeLessThan(1);
+    settle(table);
+    expect(table.focused).toBe(list[0]);
+    expect(list.map((id) => table.get(id, 'focus'))).toEqual([1, 0, 0]);
+    table.focus(list[2]);
+    settle(table);
+    expect(list.map((id) => table.get(id, 'focus'))).toEqual([0, 0, 1]);
+    table.focus(null);
+    settle(table);
+    expect(list.map((id) => table.get(id, 'focus'))).toEqual([0, 0, 0]);
+  });
+
+  it('marks when a find’s flower landed, and hides or shows its hero, by find', () => {
+    const table = new FindTable();
+    const list = ids(3);
+    table.assign(list, new Set());
+    const v = table.version;
+    table.land(list[1], 12.5);
+    table.away(list[2], true);
+    expect(table.version).toBeGreaterThan(v);
+    expect(list.map((id) => table.get(id, 'landed'))).toEqual([LONG_AGO, 12.5, LONG_AGO]);
+    expect(list.map((id) => table.get(id, 'away'))).toEqual([0, 0, 1]);
+    table.away(list[2], false);
+    expect(table.get(list[2], 'away')).toBe(0);
+    // a find not in the garden is left alone
+    table.land('elsewhere', 3);
+    expect(table.get('elsewhere', 'landed')).toBeUndefined();
+  });
+
+  it('keeps a find’s focus, landing and absence when the garden is laid out again', () => {
+    const table = new FindTable();
+    const old = ids(4, 'old');
+    table.assign(old, new Set());
+    table.focus(old[1]);
+    settle(table);
+    table.land(old[1], 7);
+    table.away(old[3], true);
+    table.assign([...ids(2, 'new'), ...old], new Set());
+    expect(table.get(old[1], 'focus')).toBe(1);
+    expect(table.get(old[1], 'landed')).toBe(7);
+    expect(table.get(old[3], 'away')).toBe(1);
+    expect(table.get('new-0', 'landed')).toBe(LONG_AGO);
+  });
+
   it('counts a version on every change, so the texture uploads only then', () => {
     const table = new FindTable();
     table.assign(ids(2), new Set());
