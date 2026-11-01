@@ -36,7 +36,7 @@ varying float vMorph;
 varying float vHeight;
 flat varying vec2 vNodeInfo;
 
-const float COURTYARD = 2.4; // a house's courtyard reaches this far round it (m)
+const float COURTYARD = 1.0; // a house's courtyard reaches this far round its share of the model's footprint (m)
 
 // ∫₀ˣ of the indicator of [a, b], repeating every 1.
 float periodicCdf(float x, float a, float b) {
@@ -208,6 +208,18 @@ void main() {
       covCross *= 1.0 - inYard;
     }
     tame = floorCol * covFloor + bundCol * (covBund + covCross) + riserCol * covRiser;
+  }
+  // the river (the bake's flat past 1: 1 the top of its bank … 2 its middle): its water mirroring the sky
+  // and its banks, silver with the banks' darks along its edges; a bank of grass down to it from the fields
+  float river = clamp(p.flatness - 1.0, 0.0, 1.0);
+  if (river > 0.0) {
+    vec3 wp = warpPosition(dir * (uRadius + vHeight));
+    vec3 rw = paddyWater(dir, wp, nUp, normalize(cameraPosition - wp), bUp, waves.x, 0.25);
+    vec3 bank = tone3(pal(TR_EARTH, 2), mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), 0.5), pal(TR_EARTH, 3), bMesh);
+    bank *= 0.92 + 0.12 * gnoise(dir * uRadius * 1.7, uTerrainSeed + 935u);
+    float wet = smoothstep(0.72 - 0.02, 0.72 + 0.02, river);
+    tame = mix(tame, mix(bank, rw, wet), smoothstep(0.42, 0.5, river));
+    wild *= 1.0 - smoothstep(0.3, 0.5, river);
   }
   if (wild > 0.001) {
     // the forest floor under the trees, and the peaks' rock where it is too steep for them: the ink's

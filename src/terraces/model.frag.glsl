@@ -1,7 +1,8 @@
-// A karst tower as Kai's model paints it (its own texture: grey-blue rock in
-// long streaks, dark green tufts on its ledges and crown), lit softly by the
-// planet's sun (a cool blue shade, the light a little warm: the texture holds
-// its own shading), then the haze and the valley fog round its foot.
+// One of Kai's models as its own texture paints it (a tower's grey-blue rock
+// in long streaks and dark green tufts on its ledges, a house's white plaster
+// and dark tiles), lit softly by the planet's sun (a cool blue shade, the
+// light a little warm: the texture holds its own shading), then the haze and
+// the valley fog round its foot.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;

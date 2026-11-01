@@ -141,7 +141,9 @@ vec4 terraceBase(vec3 dir) {
   float h1 = naturalAt(normalize(dir + a * e));
   float h2 = naturalAt(normalize(dir + b * e));
   float slope = length(vec2(h1 - h, h2 - h)) / SLOPE_STEP;
-  return vec4(h, slope, wildAt(dir, h, parts.y * r.z, peak.y, slope), river > 0.0 ? 1.0 + river : flatAt(raw));
+  // (no trees in the river's water; along its banks, yes)
+  float wild = wildAt(dir, h, parts.y * r.z, peak.y, slope) * (1.0 - smoothstep(0.4, 0.7, river));
+  return vec4(h, slope, wild, river > 0.0 ? 1.0 + river : flatAt(raw));
 }
 
 // The season's spread over the hillsides, 0..1: where paddies are planted early or late.

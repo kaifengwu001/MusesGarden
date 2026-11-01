@@ -59,7 +59,7 @@ export function cellFrequency(radius: number): number {
 }
 
 /** Karst towers: per m² (before the ranges keep some), the share of the planet in ranges, their heights (m), their mounds' radius and height (× the tower's height), the models (towers.ts). */
-export const PEAKS = { density: 1 / 3200, ranges: 0.32, height: [18, 64], mound: [0.6, 0.12], models: 5, max: 96 } as const;
+export const PEAKS = { density: 1 / 1800, ranges: 0.38, height: [18, 64], mound: [0.6, 0.12], models: 5, max: 96 } as const;
 
 /**
  * The river: its width (m, from narrow to wide along it), its channel's depth under the valley floor (m)
@@ -414,7 +414,8 @@ export class TerraceFields {
     const slope = Math.hypot(h1 - h, h2 - h) / SLOPE_STEP;
     out.natural = h;
     out.slope = slope;
-    out.wild = this.wildAt(dir, h, local * valley, mound, slope);
+    // (no trees in the river's water; along its banks, yes)
+    out.wild = this.wildAt(dir, h, local * valley, mound, slope) * (1 - smoothstep(0.4, 0.7, river));
     out.flat = river > 0 ? 1 + river : this.flatAt(raw);
     return out;
   }

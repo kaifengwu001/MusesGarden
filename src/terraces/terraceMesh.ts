@@ -155,8 +155,10 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
       const h = surface(pd);
       const fl = [floorOf(pd), s.paddies[pd].crop.fallow ? 1 : 0, 0, 0];
       const first = b.pos.length / 3;
+      const B = s.bands[s.paddies[pd].band];
       for (let v = 0; v < pc.xy.length / 2; v++) {
         fl[2] = pc.across[v];
+        fl[3] = rowMeters(s, B, pc.xy[2 * v], pc.xy[2 * v + 1], pc.across[v]);
         b.vertex(pc.xy[2 * v], pc.xy[2 * v + 1], h, PART.floor, paddyData[pd], fl);
       }
       for (let v = 1; v + 1 < pc.xy.length / 2; v++) b.index.push(first, first + v, first + v + 1);
@@ -189,7 +191,10 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
       const y0 = -half + j * g - 0.03;
       const x1 = -half + (i1 + 1) * g + 0.03;
       const y1 = -half + (j1 + 1) * g + 0.03;
-      const fl = (x: number, y: number): number[] => [h, s.paddies[pd].crop.fallow ? 1 : 0, acrossOf(B, s.hs[Math.round((y + half) / g) * n + Math.round((x + half) / g)]), 0];
+      const fl = (x: number, y: number): number[] => {
+        const across = acrossOf(B, s.hs[Math.round((y + half) / g) * n + Math.round((x + half) / g)]);
+        return [h, s.paddies[pd].crop.fallow ? 1 : 0, across, rowMeters(s, B, x, y, across)];
+      };
       const a = b.vertex(x0, y0, h, PART.floor, paddyData[pd], fl(x0, y0));
       const c1 = b.vertex(x1, y0, h, PART.floor, paddyData[pd], fl(x1, y0));
       const c2 = b.vertex(x1, y1, h, PART.floor, paddyData[pd], fl(x1, y1));
@@ -442,4 +447,11 @@ export function* buildCellMeshJob(s: CellSurvey): Generator<void, BufferGeometry
     }
   }
   return b.geometry();
+}
+
+/** How far a floor's point lies from its band's lower wall (m): its share across the band over the hill's slope there (the crop's rows run along the band). */
+function rowMeters(s: CellSurvey, B: Band, x: number, y: number, across: number): number {
+  const i = Math.min(Math.max(Math.round((x + s.half) / s.g), 0), s.n - 1);
+  const j = Math.min(Math.max(Math.round((y + s.half) / s.g), 0), s.n - 1);
+  return (across * (B.hi - B.lo)) / Math.max(s.slope[j * s.n + i], 0.08);
 }

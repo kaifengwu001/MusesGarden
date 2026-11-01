@@ -1,6 +1,7 @@
-// A karst tower (towers.ts): its model (a unit tall, x and z across, y up)
-// stood rigid on its site, turned about the site's up, stretched across by
-// |e1|, its height in meters, its base sunk into its mound. Then warped.
+// One of Kai's models (models.ts: a karst tower, a house), a unit tall (x and
+// z across, y up), stood rigid on its site: turned about the site's up,
+// stretched across by |e1|, its height in meters, its base sunk a little into
+// the ground. Then warped.
 #include <meadow_common>
 #include <meadow_warp>
 uniform float uRadius;

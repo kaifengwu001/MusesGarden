@@ -14,8 +14,18 @@ import { createTerraceSample, type TerraceTerrain } from './terrain';
 // valley's gentle fall. Its ground is courtyard, not paddy (ground.glsl and
 // the ground's paint read the houses).
 
-export const VILLAGES = { density: 1 / 9000, max: 12, houses: [3, 9], spacing: 2.6, reach: 26, search: 64 } as const;
+export const VILLAGES = { density: 1 / 9000, max: 12, houses: [2, 7], spacing: 1.5, reach: 40, search: 64 } as const;
+/** Kai's house models (houses.ts): each one's footprint with its yard (× its height), and its height (m). */
+export const HOUSE_MODELS = [
+  { x: 1.88, z: 1.82, height: 6.2 },
+  { x: 1.36, z: 1.19, height: 8.4 },
+  { x: 1.18, z: 1.47, height: 8.0 },
+  { x: 1.65, z: 1.75, height: 6.6 },
+  { x: 1.03, z: 1.45, height: 7.4 },
+] as const;
 export const MAX_HOUSES = 96;
+/** A house's courtyard (cleared of plots, painted packed earth) covers this share of its model's footprint: the model's own yard covers the rest. */
+export const YARD = 0.7;
 export const villageClass = { salt: salt('villages'), jitter: 0.9 } as const;
 
 export interface House {
@@ -23,12 +33,15 @@ export interface House {
   readonly dir: Vector3;
   readonly along: Vector3;
   readonly front: Vector3;
-  /** The terrace floor it stands on (m), and its length, depth and walls' height (m). */
+  /** The terrace floor it stands on (m), and its length, depth (with its yard) and walls' height (m). */
   readonly floor: number;
   readonly length: number;
   readonly depth: number;
   readonly wall: number;
   readonly seed: number;
+  /** Which of Kai's house models stands there (HOUSE_MODELS), and its height (m). */
+  readonly model: number;
+  readonly height: number;
 }
 
 export interface Village {
@@ -102,22 +115,25 @@ function housesAt(terrain: TerraceTerrain, site: Vector3, seed: number): House[]
   gradientFrame(site, a, b);
   for (let k = 0; k < 40 && houses.length < want; k++) {
     const angle = golden * k + rand() * 0.6;
-    const r = k === 0 ? 0 : 3 + 3.4 * Math.sqrt(k) + rand() * 2;
+    const r = k === 0 ? 0 : 5 + 6 * Math.sqrt(k) + rand() * 3;
     if (r > VILLAGES.reach) break;
     t0.copy(a).multiplyScalar(Math.cos(angle)).addScaledVector(b, Math.sin(angle));
     travel(site, t0, r / R, c);
     terrain.terraceAt(c, s);
     if (s.wild > 0.2 || s.flatness < 0.6) continue;
-    const depth = 2.8 + 0.9 * rand();
-    const length = 4.4 + 3.2 * rand();
-    const wall = 2.5 + 0.6 * rand();
+    const model = Math.floor(rand() * HOUSE_MODELS.length);
+    const M = HOUSE_MODELS[model];
+    const height = M.height * (0.9 + 0.2 * rand());
+    const length = M.x * height;
+    const depth = M.z * height;
+    const wall = 0.45 * height;
     uphill(terrain, c, up);
     const front = up.clone().negate();
     const along = new Vector3().crossVectors(c, front).normalize();
     const clear = houses.every((o) => angleBetween(o.dir, c) * R > 0.5 * (Math.max(o.length, o.depth) + Math.max(length, depth)) + VILLAGES.spacing);
     if (!clear) continue;
     dirTo.copy(c);
-    houses.push({ dir: dirTo.clone(), along, front, floor: s.natural, length, depth, wall, seed: hash32(h ^ k) });
+    houses.push({ dir: dirTo.clone(), along, front, floor: s.natural, length, depth, wall, seed: hash32(h ^ k), model, height });
   }
   return houses;
 }
@@ -161,8 +177,8 @@ export function houseDistance(villages: readonly Village[], dir: Vector3, R: num
     if (angleBetween(dir, v.dir) * R > v.radius) continue;
     for (const h of v.houses) {
       off.subVectors(dir, h.dir).multiplyScalar(R);
-      const qx = Math.abs(off.dot(h.along)) - 0.5 * h.length;
-      const qy = Math.abs(off.dot(h.front)) - 0.5 * h.depth;
+      const qx = Math.abs(off.dot(h.along)) - 0.5 * YARD * h.length;
+      const qy = Math.abs(off.dot(h.front)) - 0.5 * YARD * h.depth;
       best = Math.min(best, Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0));
     }
   }
@@ -202,7 +218,7 @@ export function writeVillageUniforms(villages: readonly Village[], u: VillageUni
     u.uVillages.value[i].set(v.dir.x, v.dir.y, v.dir.z, v.radius);
     u.uVillageHouses.value[i].set(n, v.houses.length, 0, 0);
     for (const h of v.houses) {
-      data.set([h.dir.x, h.dir.y, h.dir.z, h.floor, h.along.x, h.along.y, h.along.z, h.length, h.front.x, h.front.y, h.front.z, h.depth], n * 12);
+      data.set([h.dir.x, h.dir.y, h.dir.z, h.floor, h.along.x, h.along.y, h.along.z, YARD * h.length, h.front.x, h.front.y, h.front.z, YARD * h.depth], n * 12);
       n++;
     }
   }

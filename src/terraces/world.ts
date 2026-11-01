@@ -118,6 +118,8 @@ export class TerraceWorld implements PlanetWorld {
   };
   private fieldParams: TerraceFieldParams = { hills: 18, forest: 0.15 };
   private readonly cameraPlanet = new Vector3();
+  /** Whether the valley fog is drawn (dev: `only=` without fog hides it). */
+  private onlyFog = true;
   private fieldKey = '';
   private fieldsR = Number.NaN;
   private fieldsKey = '';
@@ -167,6 +169,15 @@ export class TerraceWorld implements PlanetWorld {
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceObjects(this.shared);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.towers.group, this.trees.mesh, this.birds.mesh);
+    // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone:
+    // terraces, rice, houses, towers, trees, birds, fog; the ground always)
+    const only = new URLSearchParams(location.hash.slice(1)).get('only');
+    if (only !== null) {
+      const show = new Set(only.split(','));
+      const parts = { terraces: this.objects.group, rice: this.rice.mesh, houses: this.houses.mesh, towers: this.towers.group, trees: this.trees.mesh, birds: this.birds.mesh };
+      for (const [name, part] of Object.entries(parts)) part.visible = show.has(name);
+      this.onlyFog = show.has('fog');
+    }
     this.applyTier(tier);
   }
 
@@ -366,7 +377,7 @@ export class TerraceWorld implements PlanetWorld {
       this.villagesFor = key;
       this.villages = placeVillages(this.terrain);
       writeVillageUniforms(this.villages, this.villageUniforms);
-      this.houses.set(this.villages);
+      this.houses.set(this.villages, R);
     }
   }
 
@@ -401,6 +412,7 @@ export class TerraceWorld implements PlanetWorld {
     g.uWarpUp.value.copy(this.warp.up);
     g.uWarpK.value = this.warp.k;
     this.towers.update(unwarpPoint(this.warp, rig.camera.position, this.cameraPlanet));
+    this.houses.update(this.cameraPlanet);
 
     this.updateLight(p.light.timeOfDay);
     this.updateLook(clock);
@@ -494,7 +506,7 @@ export class TerraceWorld implements PlanetWorld {
     const b = (-clock.time * FOG.drift[1] * (0.4 + p.wind.strength)) / R;
     const A = this.atmosphere;
     A.uFogDrift.value.set(Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b));
-    A.uValleyFog.value.x = (FOG.density * p.terraces.fog) / 0.55;
+    A.uValleyFog.value.x = this.onlyFog ? (FOG.density * p.terraces.fog) / 0.55 : 0;
     A.uPaddyWater.value.set(p.water.reflection, this.terrain.maxHeight, 0, clock.time);
     A.uRiceLook.value.set(p.wind.sheen * 1.2, 0, 0, 0);
   }

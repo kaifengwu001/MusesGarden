@@ -469,7 +469,7 @@ export function* surveyCellJob(
       // (1 … 2 in the river: the plots end at the top of its bank)
       const plots = (Math.min(fl, 2 - fl) - 0.5) * SURVEY.softness;
       // the hills' terraces, or the valleys' plots (but a village's courtyards)
-      land[k] = mode === 'terraces' ? Math.min(wild, -flat) : Math.min(wild, plots, yard(dir) - 2.4);
+      land[k] = mode === 'terraces' ? Math.min(wild, -flat) : Math.min(wild, plots, yard(dir) - 1.0);
     }
     if (j % 16 === 15) yield;
   }
