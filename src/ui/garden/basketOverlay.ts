@@ -37,8 +37,60 @@ export interface OverlayActions {
   preview(target: Target): HTMLElement | null;
 }
 
+/** A box on the screen (px from the top left). */
+export interface Box {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+/** Where the preview goes: its top left (px) and its size against its own. */
+export interface PeekPlace {
+  readonly x: number;
+  readonly y: number;
+  readonly scale: number;
+}
+
 /** The timeline's widest (px), and how far under the basket it sits (px). */
 const TRACK = { width: 460, under: 26 } as const;
+/** The preview's margin inside the screen and its gap from what it is over (px), and the least it shrinks to to fit above its flower. */
+const PEEK = { margin: 12, gap: 10, least: 0.8 } as const;
+
+/**
+ * A flower's preview (w × h px): centred above the flower and inside the screen, raised clear of the other flowers
+ * and the basket where the screen leaves room (else as high as it goes), and a little smaller when the room above
+ * the flower is short.
+ */
+export function peekAbove(flower: Box, others: readonly Box[], w: number, h: number, screen: { readonly width: number; readonly height: number }): PeekPlace {
+  const { margin, gap, least } = PEEK;
+  const scale = Math.min(1, Math.max(least, (flower.top - gap - margin) / h));
+  const width = w * scale;
+  const height = h * scale;
+  const x = Math.min(screen.width - margin - width, Math.max(margin, (flower.left + flower.right) / 2 - width / 2));
+  let bottom = flower.top - gap;
+  for (;;) {
+    const hit = others.filter((o) => o.right > x - gap && o.left < x + width + gap && o.bottom > bottom - height - gap && o.top < bottom + gap);
+    if (hit.length === 0) break;
+    const raised = Math.min(...hit.map((o) => o.top)) - gap;
+    if (raised - height < margin) {
+      bottom = margin + height;
+      break;
+    }
+    bottom = raised;
+  }
+  return { x, y: Math.max(margin, bottom - height), scale };
+}
+
+/** The basket's preview (w × h px): beside it on a side with room, inside the screen (null: no room either side). */
+function peekBeside(basket: Box, w: number, h: number, screen: { readonly width: number; readonly height: number }): PeekPlace | null {
+  const gap = 14;
+  const right = basket.right + gap + w < screen.width - PEEK.margin;
+  if (!right && basket.left - gap - w < PEEK.margin) return null;
+  const x = right ? basket.right + gap : basket.left - gap - w;
+  const y = Math.min(screen.height - h - PEEK.margin, Math.max(PEEK.margin, (basket.top + basket.bottom) / 2 - h / 2));
+  return { x, y, scale: 1 };
+}
 
 const key = (t: Target): string => (t.kind === 'basket' ? 'basket' : `find:${t.id}`);
 
@@ -168,8 +220,23 @@ export class BasketOverlay {
       b.remove();
       this.buttons.delete(k);
     }
-    const anchor = preview ? this.buttons.get(key(preview)) : undefined;
-    this.showPeek(preview && anchor ? preview : null, anchor ?? null);
+    const button = preview ? this.buttons.get(key(preview)) : undefined;
+    if (preview && button) this.showPeek(preview, (w, h) => this.peekPlace(preview, button, layout, w, h));
+    else this.showPeek(null, null);
+  }
+
+  /** A flower's preview goes above it; the basket's beside it, or above its flowers when the screen is too narrow. */
+  private peekPlace(target: Target, button: HTMLElement, layout: ButtonLayout, w: number, h: number): PeekPlace {
+    const screen = { width: window.innerWidth, height: window.innerHeight };
+    const half = this.fanSize / 2;
+    const around = (f: { x: number; y: number }): Box => ({ left: f.x - half, top: f.y - half, right: f.x + half, bottom: f.y + half });
+    const b = layout.basket;
+    const basket: Box | null = b ? { left: b.x - b.width / 2, top: b.y - b.height / 2, right: b.x + b.width / 2, bottom: b.y + b.height / 2 } : null;
+    const flower = target.kind === 'find' ? layout.flowers.find((f) => f.id === target.id) : undefined;
+    const others = layout.flowers.filter((f) => f !== flower).map(around);
+    if (flower) return peekAbove(around(flower), basket ? [...others, basket] : others, w, h, screen);
+    const box = basket ?? button.getBoundingClientRect();
+    return peekBeside(box, w, h, screen) ?? peekAbove(box, others, w, h, screen);
   }
 
   private button(target: Target): HTMLButtonElement {
@@ -203,7 +270,7 @@ export class BasketOverlay {
     return b;
   }
 
-  private showPeek(target: Target | null, anchor: HTMLElement | null): void {
+  private showPeek(target: Target | null, place: ((w: number, h: number) => PeekPlace) | null): void {
     const k = target ? key(target) : null;
     if (k !== this.shownPeek) {
       this.shownPeek = k;
@@ -211,16 +278,9 @@ export class BasketOverlay {
       this.peek.replaceChildren(...(body ? [body] : []));
       this.peek.classList.toggle('is-on', body !== null);
     }
-    if (!anchor || !this.peek.classList.contains('is-on')) return;
-    // beside the flower, on the side with room, inside the screen
-    const r = anchor.getBoundingClientRect();
-    const w = this.peek.offsetWidth;
-    const h = this.peek.offsetHeight;
-    const gap = 14;
-    const right = r.right + gap + w < window.innerWidth - 12;
-    const x = right ? r.right + gap : r.left - gap - w;
-    const y = Math.min(window.innerHeight - h - 12, Math.max(12, r.top + r.height / 2 - h / 2));
-    this.peek.style.transform = `translate(${Math.max(12, x).toFixed(1)}px, ${y.toFixed(1)}px)`;
+    if (!place || !this.peek.classList.contains('is-on')) return;
+    const { x, y, scale } = place(this.peek.offsetWidth, this.peek.offsetHeight);
+    this.peek.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${scale.toFixed(3)})`;
   }
 
   // ---- the timeline ----------------------------------------------------------------------------------
