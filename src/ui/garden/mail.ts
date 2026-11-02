@@ -85,10 +85,9 @@ function postmark(day: string): string {
 }
 
 /** A postcard as a thing you hold: its photo on the front; on the back the place and day, a stamp, a postmark. */
-function postcard(card: Postcard, withName: string | null, liked: boolean): HTMLElement {
+function postcard(card: Postcard, withName: string | null): HTMLElement {
   const root = el('div', 'g-pc');
   root.dataset.id = card.id;
-  root.classList.toggle('is-liked', liked);
   const inner = el('div', 'g-pc-inner');
   const front = el('div', 'g-pc-front');
   const photo = el('img', 'g-pc-photo');
@@ -261,7 +260,7 @@ export class Mail {
   }
 
   private build(card: Postcard): HTMLElement {
-    return card.invitation ? envelope(card) : postcard(card, this.friendName(card), this.state.cardLiked(card.id));
+    return card.invitation ? envelope(card) : postcard(card, this.friendName(card));
   }
 
   /** Open the box: its door drops, and today's cards fly from its mouth into the deck. */
@@ -406,7 +405,6 @@ export class Mail {
     const starred = this.state.cardFavorite(photo.id);
     this.paintMark(this.likeButton, liked, liked ? ICONS.heartFilled : ICONS.heart, 'Like');
     this.paintMark(this.starButton, starred, starred ? ICONS.starFilled : ICONS.star, 'Favorite');
-    this.topNode()?.classList.toggle('is-liked', liked);
   }
 
   private paintMark(b: HTMLButtonElement, on: boolean, icon: string, word: string): void {

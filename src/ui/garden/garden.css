@@ -1842,17 +1842,6 @@ body.garden-on .hud {
   border-bottom: 1px solid rgba(62, 58, 54, 0.25);
 }
 
-.g-pc.is-liked .g-pc-front::before {
-  content: '♥';
-  position: absolute;
-  right: 5.5%;
-  top: 5%;
-  z-index: 2;
-  font-size: calc(var(--w) * 0.05);
-  color: #fff;
-  text-shadow: 0 2px 6px rgba(150, 40, 30, 0.45);
-}
-
 /* an invitation: an envelope with a wax seal; its ticket slides out when it opens */
 .g-env {
   perspective: 1400px;
@@ -2014,15 +2003,15 @@ body.garden-on .hud {
   opacity: 0;
 }
 
-/* the heart and the star beside the top card; each one's word shows to its right on hover */
+/* the heart and the star beside the top card, level with its photo's top edge (the top card: 10px up, its
+   photo inset 3.2% of its width); each one's word shows to its right on hover */
 .g-mail-side {
   position: absolute;
   left: calc(50% + var(--deck-w) / 2 + 26px);
-  top: calc(50% - 10px);
+  top: calc(50% - var(--deck-w) / 3 - 10px + var(--deck-w) * 0.032);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transform: translateY(-50%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
