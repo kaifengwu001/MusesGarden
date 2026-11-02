@@ -38,13 +38,34 @@ Started from fbb25fd (the mist as brushed strokes in three layers). Kai (2026-11
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | "Shapes still need more work" | |
-| 2 | "Overlapping actually doesn't look great: reduce to one layer, but have a bit more in the layer" | |
-| 3 | "No shadow from clouds" | |
-| 4 | "Add some translucency to them, and vary based on width" | |
-| 5 | "Add a general height-based fog" | |
-| 6 | "Start adding water and rice to paddies, based on base color: white is full water, dark green is very dense grass, and everything in between" | |
-| 7 | (Kai, on the work in progress) "Clouds reflect in paddies with water" | |
+| 1 | "Shapes still need more work" | The strokes are mostly long calm runs now: their sinuosity sits near 11° for most of their length, and only now and then, in a coiling stretch, rises to fold back on itself (up to 100°). They are longer (50–140 m) and rarely cross: a stroke overlapping another by more than a fifth is not kept. More to do: Kai's eye on what is still off. |
+| 2 | "Overlapping actually doesn't look great: reduce to one layer, but have a bit more in the layer" | One layer, 2 m over a form 60 % of the way from the land's broadest to the hills', so it lies in the valleys and up the hills' sides, the hilltops rising through it. It holds 137 strokes (52 of them branches or siblings) covering 16.5 % of the planet seen from above; the largest of the three layers before held 122 covering 14.5 %. Its strokes are placed by the mist's own ground raster (where the mist's paint shows it), made in 0.38 s. |
+| 3 | "No shadow from clouds" | The ground no longer reads the mist at all (`mistShadowAt` is gone). |
+| 4 | "Add some translucency to them, and vary based on width" | The cube map keeps each stroke's half-breadth beside the distance from its edge, and the mist's opacity follows it: 30 % where a stroke is half a meter wide or less (its necks and tails) up to 86 % where it is 3.8 m or broader (its bodies), a little denser seen aslant. |
+| 5 | "Add a general height-based fog" | A height fog of the terraces' own (fog.glsl): its density falls off by e every 6 m up from 16 m under the radius (0.0085 per m there), and its amount along each view ray is worked out exactly from the camera's height to the point's, so a valley seen from a hill is hazed by all the fog it holds and a hilltop seen from orbit hardly at all. Its colour is the sky's haze. It lies over the terraces, the trees, the towers, the houses, the rice and the mist; the sky is the meadow's shared shader and is left as it was. |
+| 6 | "Start adding water and rice to paddies, based on base color: white is full water, dark green is very dense grass, and everything in between" | The rice had not been growing at all: its paddy map drew the terraces with a placeholder camera, and three.js culled every chunk against that camera's view box, so the map stayed empty and every blade was dropped (since the terraces were rebuilt as culled chunks). Fixed, the blades grow within 24 m of the camera. Each floor shows as much water as its look says: all of it flooded, 45 % just planted, 20 % growing, 6 % grown, none grown deep. The blades are as dense as the rest is crop, so none stand in a flooded paddy, seedlings stand sparse in water, and grown deep is densest (160 blades a m² at full, from 120). The water mirrors the sky, a little paler than the sky's own, rippled a little, over its own shallow grey as the angle lets. |
+| 7 | (Kai, on the work in progress) "Clouds reflect in paddies with water" | The water mirrors the mist where its reflected ray meets the layer above it (none where the paddy lies over the layer), translucent by breadth as the mist itself is. The mirrored sky is kept blue enough for the mirrored mist to show white on it, as flooded terraces mirror their clouds. |
+
+Measured (12a267d, Chrome on this Mac):
+
+- The whole round against the last (fbb25fd), frozen frames at 2880×1800 on High, best / median of 4 rounds, ms a frame:
+
+  | View | fbb25fd | 12a267d |
+  |---|---|---|
+  | Orbit | 6.89 / 8.66 | 6.59 / 7.39 |
+  | 70 m | 12.75 / 13.76 | 12.93 / 14.17 |
+  | 30 m, toward the horizon | 13.37 / 14.98 | 13.45 / 14.38 |
+  | Vista | 11.43 / 11.98 | 11.83 / 14.03 |
+  | 4.3 m | 8.28 / 9.19 | 8.65 / 9.65 |
+  | 1.6 m | 6.26 / 7.11 | 6.73 / 6.86 |
+
+  Within half a millisecond everywhere: one mist layer instead of three pays for the fog, the water's mirror and the rice that now draws.
+- The meadow, against 7d21e88: identical in all nine views, High and Medium at 2×, High at 1× with MSAA (the only shared change: the fog chunk registered).
+- `npm run check`, `npm test` (122), `npm run test:gpu` (12, one skipped) and `npm run shots` (15) pass.
+
+Trades: the flooded paddies now mirror a sky bluer than the lab's flat white (the aerial's measured flooded colour), so the mist can show in them; a change of look by design, Kai's to judge.
+
+Still open: the strokes' shapes (Kai to say what is still off); the strokes are made on the main thread, a 0.38 s hitch at the first frame and at each step of the coverage or wind sliders; the water mirrors only the sky and the mist (not the hills, trees or towers); the fog does not tint the sky (the meadow's shared shader), so the farthest hills fade to a haze a little lighter than the sky behind them; the rice grows only within 24 m of the camera and below 60 m up. Checkpoints: docs/checkpoints/terraces-11/ (the paddies' water and rice at 12 m, 4.3 m and 1.6 m; the mist mirrored in the water, the mist shown and hidden; the mist and the fog from orbit to 30 m and straight down).
 
 ### Kai's notes on the mist layers
 

@@ -806,29 +806,38 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   terraces are, full detail near (140 m a tower, 60 m a house).
 - The mist (mist.ts, mistStrokes.ts, mist*.glsl; Kai, 2026-11-02: the
   paintings' meandering mist, low among the hills, branching and merging,
-  in layers, its meanders not mechanical, its widths growing and
-  shrinking as the blue-green landscape's): three shells round the planet,
-  each at its height over the land's form (the hills' octaves from 200 m,
-  then following those from 60 m a share of the way): in the valleys, up
-  the hills' sides, a few meters over the hills. Each layer's bands are
-  strokes (mistStrokes.ts), made once a seed on the CPU: each runs along
-  the wind and meanders as a river does (a sine-generated curve,
-  Kinoshita's, its sinuosity and wavelength wandering along it), steered
-  round the hills its layer meets (toward the side it clears the ground
-  more, 4 m ahead), its breadth swelling into long bodies and pinching to
-  necks, scalloped along one edge, pointed at its tail, now and then
-  curled at its end; some fork, some run with a stacked sibling; kept
-  where the layer clears the ground and they do not pile up. The panel's
-  coverage shows a share of them (the same first). Their segments are
-  splatted into the layer's cube map as the distance from their edges
-  (mistStroke.*.glsl: a quad round each, the fragment's distance to it,
-  max blending, so crossing strokes merge). Each layer drifts with the wind
-  (its lookup turned about the wind's axis); the hills above a layer rise
-  through it and it thins where the ground (a 96² raster a cube face)
-  comes up to it. Painted cream with greyer edges and a fine outline, light
-  from above, denser seen aslant, thinning round the camera. The ground's
-  shadow (`mistShadowAt`) reads each layer where the sun's ray from it
-  meets the layer. The meadow's clouds are not used.
+  its meanders not mechanical, its widths growing and shrinking as the
+  blue-green landscape's; one layer, translucent by its breadth, no
+  shadows): one shell round the planet, 2 m over a form 60 % of the way
+  from the land's broadest (the hills' octaves from 200 m) to the hills'
+  (from 60 m). Its bands are strokes (mistStrokes.ts), made once a seed on
+  the CPU: each runs along the wind and meanders as a river does (a
+  sine-generated curve, Kinoshita's, mostly calm, now and then coiling),
+  steered round the hills (toward the side it clears the ground more, 4 m
+  ahead), its breadth swelling into long bodies and pinching to necks,
+  scalloped along one edge, pointed at its tail, now and then curled at its
+  end; some fork, some run with a stacked sibling; kept where the layer
+  clears the ground (the mist's own 96² ground raster) and where it
+  overlaps others by under a fifth. The panel's coverage shows a share of
+  them (the same first). Their segments are splatted into an RG16F cube
+  map as the distance from their edges and their half-breadth there
+  (mistStroke.*.glsl: a quad round each, max blending). The layer drifts
+  with the wind (its lookup turned about the wind's axis); the hills rise
+  through it and it thins where the ground comes up to it. Painted cream
+  with greyer edges and a fine outline, its opacity by its breadth (30 %
+  at its necks to 86 % in its bodies), a little denser seen aslant,
+  thinning round the camera. It casts no shadow. The paddies' water
+  mirrors it (`mistReflected`: where the reflected ray meets the layer).
+- The height fog (fog.glsl, `uHeightFog`): a density falling off by e every
+  6 m up from 16 m under the radius, its amount along each view ray its
+  exact integral from the camera's height to the point's, the sky's haze in
+  colour; over the terraces, trees, towers, houses, rice and mist (not the
+  sky, which is shared).
+- The paddies' water (terrace.frag.glsl, rice.glsl `paddyWater`): each
+  floor shows as much water as its look says (all flooded, 45 % just
+  planted, 20 % growing, 6 % grown, none deep), mirroring the sky a little
+  paler than its own and the mist over it, a little rippled, over its own
+  shallow grey as the angle lets.
 - No grade but the paper grain: a planet may carry its own final grade
   (`PlanetWorld.grade`, render/post.ts), and the terraces' is the lab's,
   which draws straight to the canvas: no tone curve, bloom, contrast or
@@ -836,8 +845,10 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   measured. The meadow keeps the style's grade, its frames unchanged.
 - The trees (tree.*.glsl) are traced billboards where the build placed
   them; the rice blades near the camera read a map of the floors drawn
-  from above (paddyMap.ts): their floor and crop, each blade its paddy's
-  look under the same light, darker at its root.
+  from above (paddyMap.ts, its chunks drawn unculled: its camera is a
+  placeholder): their floor and crop, each blade its paddy's look under
+  the same light, darker at its root, as dense as the paddy is crop (none
+  flooded, densest grown deep, 160 a m² at full).
 
 ## Module map
 
