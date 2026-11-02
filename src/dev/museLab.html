@@ -16,6 +16,10 @@
   </head>
   <body>
     <canvas id="lab"></canvas>
-    <script type="module" src="./museLab.ts"></script>
+    <script type="module">
+      // lineup=1: the muses in clothes in a row (museLineup.ts); else one Muse (museLab.ts)
+      if (new URLSearchParams(location.hash.slice(1)).get('lineup') === '1') import('./museLineup.ts');
+      else import('./museLab.ts');
+    </script>
   </body>
 </html>

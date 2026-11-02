@@ -61,6 +61,11 @@ centroid varying vec3 vColour;
 attribute vec3 aWeightColour; // the lab's view of the skin weights
 varying vec3 vWeightColour;
 #endif
+#ifdef MUSE_PAINTED
+attribute float aCloth;       // a dressed muse's cloth (0 its fur … 1 cloth: museMesh.ts), painted from its texture
+centroid varying float vCloth;
+centroid varying vec2 vUv;    // (at the centroid too: under MSAA a seam's extrapolated coordinates read another island of the paint)
+#endif
 
 void main() {
   ivec4 j = ivec4(skinIndex);
@@ -157,6 +162,10 @@ void main() {
 #endif
 #ifdef MUSE_WEIGHTS
   vWeightColour = aWeightColour;
+#endif
+#ifdef MUSE_PAINTED
+  vCloth = aCloth;
+  vUv = uv;
 #endif
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }

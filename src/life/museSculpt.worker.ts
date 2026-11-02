@@ -1,4 +1,4 @@
-import { rigSculpt, SCULPTS, type ColourAt, type SculptKind } from './museMesh';
+import { DRESSED, rigSculpt, SCULPTS, type ColourAt, type DressedKind, type SculptKind } from './museMesh';
 
 // A sculpt rigged on Muse's skeleton (museMesh.ts) off the main thread:
 // refining, cutting and weighing it takes a moment, so no frame waits on it.
@@ -6,7 +6,7 @@ import { rigSculpt, SCULPTS, type ColourAt, type SculptKind } from './museMesh';
 // its paint's pixels (sRGB, RGBA); out: the rigged body's arrays.
 
 interface Job {
-  kind: SculptKind;
+  kind: SculptKind | DressedKind;
   position: Float32Array;
   normal: Float32Array;
   uv: Float32Array;
@@ -28,11 +28,11 @@ onmessage = (event: MessageEvent<Job>) => {
       out[2] = linear(paint.data[k + 2] / 255);
     };
   }
-  const body = rigSculpt(position, normal, uv, index, colourAt, SCULPTS[kind]);
+  const body = rigSculpt(position, normal, uv, index, colourAt, kind in SCULPTS ? SCULPTS[kind as SculptKind] : DRESSED[kind as DressedKind]);
   postMessage(body, {
     transfer: [
       ...[body.position, body.normal, body.index, body.skinIndex, body.skinWeight, body.fur, body.open, body.colour].map((a) => a.buffer),
-      ...[body.raise, body.raiseNormal, body.raiseOpen, body.hang, body.hangNormal, body.comb].flatMap((a) => (a ? [a.buffer] : [])),
+      ...[body.raise, body.raiseNormal, body.raiseOpen, body.hang, body.hangNormal, body.comb, body.cloth, body.uv].flatMap((a) => (a ? [a.buffer] : [])),
     ],
   });
 };

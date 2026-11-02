@@ -1,4 +1,5 @@
-import { JOINT, JOINTS, openness, packWeights, SKIN_INSET, smooth01, smoothWeights, type MuseBody, type MuseFit } from './museBody';
+import { Matrix4, Vector3 } from 'three';
+import { FACE, JOINT, JOINTS, openness, packWeights, SKIN_INSET, smooth01, smoothWeights, type MuseBody, type MuseFit } from './museBody';
 import { MeshField, type Box } from './meshField';
 import { MuseRig } from './museRig';
 
@@ -56,6 +57,11 @@ export interface MuseMesh extends MuseBody {
   hangNormal?: Float32Array;
   /** The fur's lie along the skin (rest space): the way its strands lean over, its length how far (muse.vert.glsl). */
   comb?: Float32Array;
+  /** A dressed muse's (Sculpt.dress): how much of each vertex is cloth (0 fur … 1 cloth, painted from the texture), its texture coordinates (the mesh split along the paint's seams), its face as measured, and its fit (its joints measured off it, its arms' turns solved). */
+  cloth?: Float32Array;
+  uv?: Float32Array;
+  features?: FaceLayout;
+  fit?: MuseFit;
 }
 
 /**
@@ -76,6 +82,36 @@ export interface Sculpt {
   corrective: boolean;
   /** Whether its right arm is re-laid along its left's mirror (mirrorArmPath): where the sculpt's arms are curved unalike. */
   mirrorArm?: boolean;
+  /** A muse in clothes (DRESSED): how its fur is told from them. */
+  dress?: Dress;
+}
+
+/**
+ * A muse in clothes, a hat, things in its pockets (DRESSED). Its fur is told
+ * from the rest by the paint: each vertex's colour (CIELAB, the mean over the
+ * skin about it, smoothed) against the fur's own at the arms' ends, fur below
+ * the first distance, cloth past the second. Cloth grows no fur and keeps its
+ * place (the coat's inset is the fur's); it is painted from the texture as
+ * made (muse.frag.glsl MUSE_PAINTED). Its joints are measured off it and its
+ * arms' turns solved to hang and wave as tpose6's (measureFit).
+ */
+export interface Dress {
+  fur: readonly [number, number];
+  /** Where a garment grown into the hood is its fur's own colour (muse 2's linen smock, muse 6's jacket): the hood's piece below this height is cloth (H), nearer the middle than its sleeves' ends (|x|, H) where its arms are of that piece too. */
+  hem?: number;
+  sleeve?: number;
+  /** How much further out its arms hang than tpose6's (rad, in the plane of its front: a wide garment's flare clears them). */
+  hangOut?: number;
+  /** Pieces kept whole as fur or cloth when this much of them (by area) is one or the other (a garment's speckles, a paw's shade). */
+  whole?: number;
+}
+
+/** The face of a dressed muse as measured off its sculpt (H): the painted eyes' centres (±x, y) and radius, the mouth's middle, half width and rise, the blushes' centres and radius, the plate's middle height and half sizes, and how far forward the plate starts (muse.frag.glsl MUSE_FEATURES). */
+export interface FaceLayout {
+  eye: [number, number, number];
+  mouth: [number, number, number, number];
+  blush: [number, number, number];
+  plate: [number, number, number, number];
 }
 
 /**
@@ -219,6 +255,41 @@ export const SCULPTS = {
 } as const satisfies Record<string, Sculpt>;
 export type SculptKind = keyof typeof SCULPTS;
 
+/**
+ * A dressed muse's arms' cut (H): out from x on its arm or sleeve (between
+ * two heights, where a sleeve or an armhole is all that is that far out),
+ * and the body well away from it, as tpose6's.
+ */
+const DRESSED_CUT = (x: number, y: readonly [number, number] = [0, 1]): Sculpt['cut'] => ({ arm: { x, y }, body: { x: 0.2, y: [0.3, 0.68], z: [-0.2, 0.2] } });
+
+/**
+ * Muses in clothes (src/assets/muse/muses/muse1–9.glb), sculpts again: each
+ * in tpose6's near T-pose, scaled so its eyes are at tpose6's height (a hat
+ * reaches above 1). Their fits are tpose6's until measured off them
+ * (measureFit), their cuts out from where the arm (or its sleeve) is clear.
+ */
+export const DRESSED = {
+  /** Brown; a green wrap tunic with short sleeves, a gold bow at its side, a flute in its pocket; a stick of a tail. Its paws are pieces of their own, out of the sleeves. */
+  muse1: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.37), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Cream; a red scalloped collar over a linen smock with pockets; its arms are pieces of their own, set into sleeves of the smock's that run into its body (they turn where they come out of them, and so fill them as they hang); a round tail. */
+  muse2: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], hem: 0.59 } },
+  /** Cream; green corduroy overalls, a sprout on the bib; a round tail. */
+  muse3: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Salmon; wrapped in leaves tied with cord, a leaf for a hat; a round tail. */
+  muse4: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Pink; a brown cap, a green dress with short puffed sleeves (cut with the arm), a cream apron with a loaf in its pocket; its arms are pieces of their own. */
+  muse5: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.33, [0.38, 0.62]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Grey-brown; a green bandana, a brown wrap jacket the colour of its fur (cloth below its collar, in from its cuffs), a linen apron with tools in its pockets (near its fur's colour too: a piece mostly cloth is all cloth). */
+  muse6: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.4), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], hem: 0.6, sleeve: 0.335, whole: 0.6 } },
+  /** Blue-grey; a red beret, a wide painter's smock with brushes and a palette (its arms hang a little out, clear of it); its paws are pieces of their own. */
+  muse7: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.37), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], hangOut: 0.22 } },
+  /** Salmon; a straw cap, a denim vest, a tool belt and an apron with a kite on it. */
+  muse8: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Green; a crown of flowers, a woven grass apron with a leaf on it. */
+  muse9: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+} as const satisfies Record<string, Sculpt>;
+export type DressedKind = keyof typeof DRESSED;
+
 /** How deep the coat is over a sculpt's skin (H): the sculpt is the coat's outside, as the references' silhouettes are, and the shells (muse.vert.glsl: FUR_LENGTH, lying over) carry it back out. */
 const COAT = 0.026;
 /** How many rounds the normals are smoothed for the coat's inset (smoothField): over a few times the coat's depth. */
@@ -285,6 +356,15 @@ const BOX: Box = { x: [-0.62, 0.62], y: [-0.03, 1.03], z: [-0.42, 0.42] };
 const FACE_EDGE = 0.04;
 const ON_FACE = 0.006;
 const FACE_BOX: Box = { x: [-0.3, 0.3], y: [0.55, 1.0], z: [-0.15, 0.32] };
+/**
+ * A dressed muse (DRESSED): the height its eyes are scaled to (H, tpose6's
+ * own, measured as below); the box its shape is measured in (a hat reaches
+ * up to 1.2, an apron forward); and how small a piece of cloth (H, its
+ * longest side) goes whole as a thing (a flute, a button, a flower).
+ */
+const EYES = 0.7666;
+const DRESSED_BOX: Box = { x: [-0.66, 0.66], y: [-0.03, 1.26], z: [-0.48, 0.48] };
+const RIGID = 0.16;
 
 export type ColourAt = (u: number, v: number, out: number[]) => void;
 
@@ -362,29 +442,54 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   const on = box.get(face);
   const vertices = new Map<number, number>();
   for (let i = 0; i < ids.size; i++) vertices.set(find(i), (vertices.get(find(i)) ?? 0) + 1);
-  const feature = (r: number): boolean => {
+  let feature = (r: number): boolean => {
     const b = box.get(r);
     if (r === body || r === face || !b) return false;
     // (and any stray scrap a few vertices big)
     if ((vertices.get(r) ?? 0) < STRAY) return true;
     return !!on && b[0] > on[0] - 0.02 && b[1] < on[1] + 0.02 && b[2] > on[2] - 0.02 && b[3] < on[3] + 0.02;
   };
+  // (a dressed muse: its face found by its eyes, not by its size, for a hat is wider; nothing of it a stray, for a
+  // flower in a crown is a few vertices; and the whole scaled so its eyes are at tpose6's height, a hat reaching above)
+  const dress = sculpt.dress;
+  const parts = dress ? faceParts(box) : null;
+  if (dress && !parts) throw new Error('a dressed muse whose eyes cannot be found');
+  if (parts) {
+    face = parts.plate;
+    feature = (r) => parts.features.has(r);
+    const k = EYES / parts.eye[1];
+    for (let i = 0; i < P.length; i++) P[i] *= k;
+    for (let i = 0; i < welded.length; i++) welded[i] *= k;
+    for (const b of box.values()) for (let a = 0; a < 6; a++) b[a] *= k;
+    parts.scale(k);
+  }
+  // (its paint per triangle, CIELAB: its fur told from its clothes, and a plate grown into its hood picked out)
+  const paint = dress && colourAt ? paintLab(P, index, weld, uv, colourAt, (t) => feature(find(weld[index[t * 3]]))) : null;
+  const fused = parts && parts.plate < 0 && paint ? fusedPlate(P, index, weld, paint, parts, (t) => feature(find(weld[index[t * 3]]))) : null;
   const bodyTriangles: number[] = [];
   const faceTriangles: number[] = [];
   const bodyCorners: number[] = [];
   const faceCorners: number[] = [];
+  /** Each body triangle's own number in the sculpt. */
+  const bodySource: number[] = [];
   for (let t = 0; t < index.length; t += 3) {
     const r = find(weld[index[t]]);
     if (feature(r)) continue;
-    const [triangles, corners] = r === face ? [faceTriangles, faceCorners] : [bodyTriangles, bodyCorners];
+    const onFace = r === face || fused?.has(t / 3) === true;
+    const [triangles, corners] = onFace ? [faceTriangles, faceCorners] : [bodyTriangles, bodyCorners];
     triangles.push(weld[index[t]], weld[index[t + 1]], weld[index[t + 2]]);
     corners.push(index[t], index[t + 1], index[t + 2]);
+    if (!onFace) bodySource.push(t / 3);
   }
+  if (parts) parts.platePoints(faceTriangles.map((v) => [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]]));
 
   // the face's plate ironed: a sculpt may have its own mouth carved into it, which would show under the paint
   ironPlate(P, N, faceTriangles);
-  // and the body's small folds filled (a mitten's thumb notch, crumpled: its crease would shade dark under the coat)
-  fillFolds(P, N, bodyTriangles);
+  // (a dressed muse's fur, per welded vertex: 1 fur … 0 cloth)
+  const furry = dress && paint ? furFromPaint(P, bodyTriangles, bodySource, paint, dress, find, parts?.hood ?? -1) : null;
+  // and the body's small folds filled (a mitten's thumb notch, crumpled: its crease would shade dark under the coat;
+  // not a garment's, whose hems and pleats are sharp as made)
+  fillFolds(P, N, furry ? bodyTriangles.filter((_, k, all) => furry[all[k - (k % 3)]] + furry[all[k - (k % 3) + 1]] + furry[all[k - (k % 3) + 2]] > 2.5) : bodyTriangles);
   // each arm cut out of the body by its crease; the right re-laid along the left's mirror where the sculpt asks
   const cuts = [cutArm(P, bodyTriangles, 1, sculpt.cut), cutArm(P, bodyTriangles, -1, sculpt.cut)];
   if (sculpt.mirrorArm) {
@@ -393,9 +498,18 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     // (its crease now where the left's is, mirrored)
     cuts[1] = cutArm(P, bodyTriangles, -1, sculpt.cut);
   }
+  // (a dressed muse's joints measured off it, its arms' turns solved; and the pieces no seed of the cut is on, a sleeve's
+  // cuff or a strap, which take their weights from the skin under them)
+  const measured = dress ? measureFit(P, bodyTriangles, cuts, sculpt.fit, dress.hangOut) : null;
+  const fit = measured?.fit ?? sculpt.fit;
+  // (and the pieces wholly an arm's: its own, or a paw out of a sleeve, whose weight rises from where it comes out)
+  const own = dress ? armPieces(bodyTriangles, cuts, find) : null;
+  const loose = dress ? loosePieces(P, bodyTriangles, sculpt.cut, find) : null;
 
   // refined, the body and the face apart (a vertex of the face's never shares a body's)
   const fine = new Fine();
+  // (a dressed muse's texture coordinates kept per corner, to split the mesh along the paint's seams)
+  fine.seams = !!dress;
   fine.add(P, N, bodyTriangles, bodyCorners, uv, sculpt.refine.body, false);
   const bodyFine = fine.index.length / 3;
   fine.add(P, N, faceTriangles, faceCorners, uv, sculpt.refine.face, true);
@@ -404,6 +518,9 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   const nrm = Float32Array.from(fine.normal);
   const fineIndex = total < 65536 ? Uint16Array.from(fine.index) : Uint32Array.from(fine.index);
   const neighbours = adjacency(total, fineIndex);
+  // (a dressed muse's cloth per refined vertex, and the piece each is of)
+  const pieceOf = (i: number): number => find(fine.from[i * 3]);
+  const cloth = furry ? Float32Array.from({ length: total }, (_, i) => (fine.face[i] ? 0 : 1 - [0, 1, 2].reduce((sum, k) => sum + fine.share[i * 3 + k] * furry[fine.from[i * 3 + k]], 0))) : null;
 
   // each arm cut out of the body by its crease, its weight rising from the cut into it
   const J = JOINT;
@@ -411,12 +528,13 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   const armShare = new Float32Array(total);
   const left = { cut: new Float32Array(0), inside: new Float32Array(0), along: new Float32Array(0) };
   const roots: { inside: Float32Array; along: Float32Array }[] = [];
-  const graded = sculpt.fit.shoulder !== undefined;
+  const graded = fit.shoulder !== undefined;
   for (const [side, upper, fore, shoulder] of [
     [1, J.upperArmL, J.foreArmL, J.shoulderL],
     [-1, J.upperArmR, J.foreArmR, J.shoulderR],
   ] as const) {
     const cut = cuts[side === 1 ? 0 : 1];
+    const mine = own?.[side === 1 ? 0 : 1];
     const inside = new Float32Array(total);
     for (let i = 0; i < total; i++) {
       for (let k = 0; k < 3; k++) inside[i] += fine.share[i * 3 + k] * cut[fine.from[i * 3 + k]];
@@ -424,8 +542,8 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     const along = inward(pos, neighbours, inside);
     if (side === 1) Object.assign(left, { cut, inside, along });
     roots.push({ inside, along });
-    const pivot = sculpt.fit.rest[upper];
-    const elbow = sculpt.fit.rest[fore];
+    const pivot = fit.rest[upper];
+    const elbow = fit.rest[fore];
     const u = [elbow[0] - pivot[0], elbow[1] - pivot[1], elbow[2] - pivot[2]];
     const lu = Math.hypot(u[0], u[1], u[2]);
     // how far into the root a vertex is (0 at the cut, 1 past the ramp), and how near the cut a vertex of
@@ -444,7 +562,9 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
         armShare[i] += share;
         continue;
       }
-      const r = into ? into[i] : along[i] / sculpt.ramp;
+      // (a piece wholly the arm's: its weight rises from where it comes out of what it is set in, the part of it
+      // buried there staying with the body, so a hanging arm still fills its sleeve or its socket)
+      const r = mine?.has(pieceOf(i)) ? (side * pos[i * 3] - (measured?.out[side === 1 ? 0 : 1] ?? 0)) / sculpt.ramp : into ? into[i] : along[i] / sculpt.ramp;
       // the arm turns as a whole from its root: its weight rises across the ramp from the cut, the shoulder keeping
       // what it leaves at the body's own share there (none under the arm), so the bend is at the shoulder's line and
       // spread over the body round it, never inside the arm (an arm that turned only partly along its first third
@@ -472,7 +592,7 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     // the legs: near their axes, up to the hip
     const legs = rest * (1 - smooth01((y - LEG.hip) / LEG.blend));
     for (const leg of [J.legL, J.legR]) {
-      const a = sculpt.fit.rest[leg];
+      const a = fit.rest[leg];
       const near = 1 - smooth01((Math.hypot((x - a[0]) / LEG.across, (z - a[2]) / LEG.along) - 1) / LEG.fade);
       const share = legs * near * (leg === J.legL ? smooth01((x + 0.03) / 0.06) : 1 - smooth01((x + 0.03) / 0.06));
       w[leg] += share;
@@ -491,9 +611,17 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   // (where the right side is made the left's mirror, it weighs and corrects as the left, mirrored)
   const mirror = sculpt.mirrorArm ? mirrorMap(pos, fineIndex, fine.face) : null;
   if (mirror) mirrorWeights(full, mirror);
+  // (a dressed muse: a loose piece weighs as the skin under it, so a sleeve's cuff goes with the arm in it; a small
+  // thing of cloth or wood, and a hat, go whole, as the mean of their weights)
+  const beneath = loose ? underSkin(pos, fineIndex, loose, pieceOf) : null;
+  if (beneath) carryWeights(full, beneath);
+  // (a loose piece mostly on an arm, a sleeve's cuff, goes whole with it: read from the skin under it, its edge on the
+  // body side would stay, and it would stretch round the arm as it hangs)
+  const rigid = cloth ? rigidPieces(box, cloth, pieceOf, loose ? onArms(full, loose, pieceOf) : new Set()) : null;
+  if (rigid) wholeWeights(full, rigid, pieceOf);
   const { skinIndex, skinWeight } = packWeights(full);
 
-  // the sculpt's colour, from its paint
+  // the sculpt's colour, from its paint (a dressed muse's cloth is painted from the texture, and keeps out of the coat's)
   const colour = new Float32Array(total * 3).fill(1);
   if (colourAt) {
     const rgb = [1, 1, 1];
@@ -501,12 +629,12 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
       colourAt(fine.uv[i * 2], fine.uv[i * 2 + 1], rgb);
       colour.set(rgb, i * 3);
     }
-    settleColours(colour, neighbours, fine.face);
+    settleColours(colour, neighbours, cloth ? fine.face.map((f, i) => f || cloth[i] > 0.5) : fine.face);
   }
 
   // the creases' shade from the sculpt's own shape; the coat: none on the face's plate, thin where it
-  // meets it and at the soles, full elsewhere; the body brought in under it
-  const shape = new MeshField(welded, [...bodyTriangles, ...faceTriangles], BOX, VOXEL, 1);
+  // meets it and at the soles, full elsewhere; the body brought in under it (a dressed muse's: only its fur's)
+  const shape = new MeshField(welded, [...bodyTriangles, ...faceTriangles], dress ? DRESSED_BOX : BOX, VOXEL, 1);
   const plate = new MeshField(welded, faceTriangles, FACE_BOX, 0.01);
   const fur = new Float32Array(total);
   const open = new Float32Array(total);
@@ -515,6 +643,8 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   // the way in under the coat: the normals smoothed over the skin, so a feature smaller than the coat is deep (a
   // thumb, a crease) moves in as a whole rather than turning inside out
   const under = smoothField(nrm, neighbours, COAT_SMOOTH);
+  // (a dressed muse's fur pressed flat under its clothes: a paw in a sleeve, a belly under a vest)
+  const pressed = cloth ? pressedFur(pos, nrm, fineIndex, cloth) : null;
   for (let i = 0; i < total; i++) {
     const x = pos[i * 3];
     const y = pos[i * 3 + 1];
@@ -523,8 +653,8 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     if (fine.face[i]) continue;
     const onPlate = z > 0 ? plate.nearest(x, y, z, near) : -1;
     const closest = onPlate >= 0 ? Math.hypot(near[0] - x, near[1] - y, near[2] - z) : Infinity;
-    const coat = smooth01((closest - ON_FACE) / FACE_EDGE);
-    fur[i] = coat * smooth01(y / 0.035);
+    const coat = smooth01((closest - ON_FACE) / FACE_EDGE) * (cloth ? 1 - cloth[i] : 1);
+    fur[i] = coat * smooth01(y / 0.035) * (pressed ? pressed[i] : 1);
     // in under the coat, the soles kept on the ground: near it, only sideways
     const ground = Math.min(1, Math.max(0, (y - 0.01) / 0.05));
     pos[i * 3] -= under[i * 3] * COAT * coat;
@@ -532,7 +662,7 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     pos[i * 3 + 2] -= under[i * 3 + 2] * COAT * coat;
   }
 
-  const comb = combField(pos, nrm, neighbours, skinIndex, skinWeight, sculpt.fit, fine.face);
+  const comb = combField(pos, nrm, neighbours, skinIndex, skinWeight, fit, fine.face);
   const rigged = { position: pos, normal: nrm, index: fineIndex, skinIndex, skinWeight, fur, open, colour, comb };
   if (graded) {
     // the arms' roots ironed as hung (taken into the rest mesh) and as raised (the wave's corrective)
@@ -551,7 +681,7 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     };
     const [pl, pr] = roots.map((root) => plate(root, FILL.margin));
     const plates = { both: Float32Array.from(pl, (v, i) => Math.max(v, pr[i])), left: plate(roots[0], FILL.raised) };
-    const { hang, hangNormal, raise, raiseNormal, stretch } = rootFixes(sculpt.fit, pos, nrm, fineIndex, neighbours, skinIndex, skinWeight, both, l, plates);
+    const { hang, hangNormal, raise, raiseNormal, stretch } = rootFixes(fit, pos, nrm, fineIndex, neighbours, skinIndex, skinWeight, both, l, plates);
     if (mirror) {
       mirrorVectors(hang, mirror, false);
       mirrorVectors(hangNormal, mirror, true);
@@ -561,7 +691,13 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
       mirrorScalars(stretch, mirror);
     }
     const raiseOpen = Float32Array.from(open, (o, i) => 1 - (1 - o) / Math.max(1, stretch[i]));
-    return { ...rigged, raise, raiseNormal, raiseOpen, hang, hangNormal };
+    const made = { ...rigged, raise, raiseNormal, raiseOpen, hang, hangNormal };
+    if (!dress || !cloth || !parts) return made;
+    // a dressed muse: its loose pieces corrected as the skin under them, its rigid ones not at all (they would bend);
+    // then split along the paint's seams, with its cloth, its face and its fit
+    if (beneath) carryCorrections(made, beneath);
+    if (rigid) for (let i = 0; i < total; i++) if (rigid.has(pieceOf(i))) uncorrect(made, i);
+    return { ...splitSeams(made, cloth, fine.cornerUv), features: parts.layout(), fit };
   }
   if (!sculpt.corrective) return rigged;
   // the wave's corrective, for the left arm (the one that waves)
@@ -570,7 +706,7 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   for (let t = 0; t < bodyTriangles.length; t += 3) {
     if (left.cut[bodyTriangles[t]] + left.cut[bodyTriangles[t + 1]] + left.cut[bodyTriangles[t + 2]] >= 2) leftArm.add(t / 3);
   }
-  const { raise, raiseNormal, stretch } = waveCorrective(sculpt.fit, leftArm, fine, bodyFine, surface, pos, neighbours, skinIndex, skinWeight, left.inside, left.along);
+  const { raise, raiseNormal, stretch } = waveCorrective(fit, leftArm, fine, bodyFine, surface, pos, neighbours, skinIndex, skinWeight, left.inside, left.along);
   const raiseOpen = Float32Array.from(open, (o, i) => 1 - (1 - o) / Math.max(1, stretch[i]));
   return { ...rigged, raise, raiseNormal, raiseOpen };
 }
@@ -1062,6 +1198,9 @@ class Fine {
   readonly index: number[] = [];
   /** Each refined triangle's own, as numbered in the list it was refined from. */
   readonly source: number[] = [];
+  /** Whether to keep each refined triangle's corners' texture coordinates as its own triangle has them (cornerUv: a vertex on the paint's seam has two). */
+  seams = false;
+  readonly cornerUv: number[] = [];
   /** The patch being refined: its corners' normals and its mid-edge ones. */
   private readonly corner = new Float64Array(9);
   private readonly mids = new Float64Array(9);
@@ -1069,14 +1208,21 @@ class Fine {
   add(P: Float64Array, N: Float64Array, triangles: number[], corners: number[] | null, uv: ArrayLike<number> | null, n: number, face: boolean): void {
     const shared = new Map<string, number>();
     const grid = new Int32Array(((n + 1) * (n + 2)) / 2);
+    const gridUv = new Float64Array(grid.length * 2);
     const at = (j: number, k: number): number => (k * (2 * n + 3 - k)) / 2 + j;
     const b = new Float64Array(30);
     for (let t = 0; t < triangles.length; t += 3) {
       const v = [triangles[t], triangles[t + 1], triangles[t + 2]];
+      const c = corners ? [corners[t], corners[t + 1], corners[t + 2]] : null;
       this.patch(P, N, v[0], v[1], v[2], b);
       for (let k = 0; k <= n; k++) {
         for (let j = 0; j <= n - k; j++) {
           const i = n - j - k;
+          const s = i / n;
+          const r = j / n;
+          const q = k / n;
+          const tu = c && uv ? s * uv[c[0] * 2] + r * uv[c[1] * 2] + q * uv[c[2] * 2] : 0;
+          const tv = c && uv ? s * uv[c[0] * 2 + 1] + r * uv[c[1] * 2 + 1] + q * uv[c[2] * 2 + 1] : 0;
           // a corner, a point of an edge (shared with the neighbour across it), or inside
           let key: string | null = null;
           if (i === n || j === n || k === n) key = `v${v[i === n ? 0 : j === n ? 1 : 2]}`;
@@ -1087,27 +1233,32 @@ class Fine {
           if (id === undefined) {
             id = this.position.length / 3;
             if (key) shared.set(key, id);
-            const s = i / n;
-            const r = j / n;
-            const q = k / n;
             this.point(b, s, r, q);
             this.from.push(v[0], v[1], v[2]);
             this.share.push(s, r, q);
-            if (corners && uv) {
-              const c = [corners[t], corners[t + 1], corners[t + 2]];
-              this.uv.push(s * uv[c[0] * 2] + r * uv[c[1] * 2] + q * uv[c[2] * 2], s * uv[c[0] * 2 + 1] + r * uv[c[1] * 2 + 1] + q * uv[c[2] * 2 + 1]);
-            } else this.uv.push(0, 0);
+            this.uv.push(tu, tv);
             this.face.push(face);
           }
           grid[at(j, k)] = id;
+          gridUv[at(j, k) * 2] = tu;
+          gridUv[at(j, k) * 2 + 1] = tv;
         }
       }
+      const corner = (a: number): void => {
+        if (this.seams) this.cornerUv.push(gridUv[a * 2], gridUv[a * 2 + 1]);
+      };
       for (let k = 0; k < n; k++) {
         for (let j = 0; j < n - k; j++) {
           this.index.push(grid[at(j, k)], grid[at(j + 1, k)], grid[at(j, k + 1)]);
+          corner(at(j, k));
+          corner(at(j + 1, k));
+          corner(at(j, k + 1));
           this.source.push(t / 3);
           if (j + k < n - 1) {
             this.index.push(grid[at(j + 1, k)], grid[at(j + 1, k + 1)], grid[at(j, k + 1)]);
+            corner(at(j + 1, k));
+            corner(at(j + 1, k + 1));
+            corner(at(j, k + 1));
             this.source.push(t / 3);
           }
         }
@@ -2009,4 +2160,740 @@ function settleColours(colour: Float32Array, neighbours: number[][], face: boole
     }
     colour.set(next);
   }
+}
+
+/**
+ * A dressed muse's face, found by its eyes (a hat or a collar is wider than
+ * its plate): the two small pieces in front, high up, most nearly each
+ * other's mirror; its mouth, a small piece in the middle under them; its
+ * plate, the smallest piece round them both, just behind (none where the
+ * plate is grown into the hood: fusedPlate finds it by its paint). The
+ * features are left out, Muse's own painted in their place, where the
+ * sculpt's own were (layout, after scale: the eyes a touch smaller than the
+ * sculpt's balls, as tpose6's painted eyes are its sculpt's).
+ */
+interface FaceParts {
+  plate: number;
+  /** The piece the hood is of: the biggest round the face, reaching below it. */
+  hood: number;
+  features: Set<number>;
+  /** The eyes' centres (±x, y), half width and front (z); the mouth's middle and half width; the plate's box (x0 x1 y0 y1, and its least depth z0). */
+  eye: number[];
+  mouth: number[] | null;
+  plateBox: number[] | null;
+  scale(k: number): void;
+  /** The plate's extent from its own points (x, y, z), where it is grown into the hood. */
+  platePoints(points: number[][]): void;
+  layout(): FaceLayout;
+}
+
+function faceParts(box: Map<number, number[]>): FaceParts | null {
+  const mid = (b: number[], a: number): number => (b[a * 2] + b[a * 2 + 1]) / 2;
+  const extent = (b: number[]): number => Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]);
+  const small = [...box].filter(([, b]) => extent(b) < 0.08 && mid(b, 1) > 0.5 && b[5] > 0.1 && Math.abs(mid(b, 0)) > 0.04);
+  let best: [number, number, number] | null = null;
+  for (let i = 0; i < small.length; i++) {
+    for (let j = i + 1; j < small.length; j++) {
+      const [ra, a] = small[i];
+      const [rb, b] = small[j];
+      if (mid(a, 0) * mid(b, 0) >= 0) continue;
+      const miss = Math.abs(mid(a, 0) + mid(b, 0)) + Math.abs(mid(a, 1) - mid(b, 1)) + Math.abs(mid(a, 2) - mid(b, 2)) + Math.abs(a[1] - a[0] - (b[1] - b[0]));
+      if (!best || miss < best[0]) best = [miss, ra, rb];
+    }
+  }
+  if (!best) return null;
+  const [ea, eb] = [box.get(best[1]) as number[], box.get(best[2]) as number[]];
+  const eye = [(Math.abs(mid(ea, 0)) + Math.abs(mid(eb, 0))) / 2, (mid(ea, 1) + mid(eb, 1)) / 2, (ea[1] - ea[0] + eb[1] - eb[0]) / 4, Math.max(ea[5], eb[5])];
+  const features = new Set([best[1], best[2]]);
+  let mouth: number[] | null = null;
+  for (const [r, b] of box) {
+    if (Math.abs(mid(b, 0)) > 0.03 || mid(b, 1) < eye[1] - 0.09 || mid(b, 1) > eye[1] - 0.01 || b[5] < eye[3] - 0.05 || extent(b) > 0.1) continue;
+    if (mouth && b[1] - b[0] <= mouth[2] * 2) continue;
+    mouth = [mid(b, 0), mid(b, 1), (b[1] - b[0]) / 2];
+    features.add(r);
+  }
+  let plate = -1;
+  for (const [r, b] of box) {
+    if (features.has(r) || b[0] > -eye[0] || b[1] < eye[0] || b[2] > eye[1] - 0.05 || b[3] < eye[1] + 0.04 || Math.abs(b[5] - eye[3]) > 0.08 || b[1] - b[0] > 0.5) continue;
+    const pb = box.get(plate);
+    if (!pb || (b[1] - b[0]) * (b[3] - b[2]) < (pb[1] - pb[0]) * (pb[3] - pb[2])) plate = r;
+  }
+  // (whatever else is set on the plate, or about the eyes and mouth where the plate is the hood's: a blush, a tooth)
+  const on = plate >= 0 ? (box.get(plate) as number[]) : [-eye[0] - 0.06, eye[0] + 0.06, eye[1] - 0.1, eye[1] + 0.05];
+  for (const [r, b] of box) {
+    if (r === plate || b[0] < on[0] - 0.02 || b[1] > on[1] + 0.02 || b[2] < on[2] - 0.02 || b[3] > on[3] + 0.02 || b[5] < eye[3] - 0.06 || extent(b) > 0.1) continue;
+    features.add(r);
+  }
+  let plateBox = plate >= 0 ? [on[0], on[1], on[2], on[3], on[4]] : null;
+  let hood = -1;
+  let hoodArea = 0;
+  for (const [r, b] of box) {
+    if (r === plate || features.has(r) || b[0] > -eye[0] || b[1] < eye[0] || b[2] > eye[1] - 0.1 || b[3] < eye[1]) continue;
+    const area = (b[1] - b[0]) * (b[3] - b[2]);
+    if (area > hoodArea) [hood, hoodArea] = [r, area];
+  }
+  return {
+    plate,
+    hood,
+    features,
+    eye,
+    mouth,
+    get plateBox() {
+      return plateBox;
+    },
+    scale(k) {
+      for (let a = 0; a < 4; a++) eye[a] *= k;
+      if (mouth) for (let a = 0; a < 3; a++) mouth[a] *= k;
+      if (plateBox) for (let a = 0; a < 5; a++) plateBox[a] *= k;
+    },
+    platePoints(points) {
+      if (plate >= 0 || points.length === 0) return;
+      plateBox = [Infinity, -Infinity, Infinity, -Infinity, Infinity];
+      for (const [x, y, z] of points) plateBox = [Math.min(plateBox[0], x), Math.max(plateBox[1], x), Math.min(plateBox[2], y), Math.max(plateBox[3], y), Math.min(plateBox[4], z)];
+    },
+    layout() {
+      // (as tpose6's painted face sits on its sculpt's: the eyes 0.88 of its balls, the face's shade round the rim
+      // 0.9 and 0.82 of its plate's box, the blush out and down from the eyes)
+      const rho = eye[0] / 0.0912;
+      const m = mouth ?? [0, eye[1] - 0.042 * rho, 0.0323 * rho];
+      const pb = plateBox ?? [-0.201 * rho, 0.201 * rho, eye[1] - 0.146 * rho, eye[1] + 0.163 * rho, 0.07];
+      return {
+        eye: [eye[0], eye[1], eye[2] * 0.88],
+        mouth: [m[0], m[1], m[2] * 0.88, 0.0106 * rho],
+        blush: [eye[0] * 1.09, eye[1] - 0.044 * rho, 0.036 * rho],
+        plate: [(pb[2] + pb[3]) / 2, ((pb[1] - pb[0]) / 2) * 0.905, ((pb[3] - pb[2]) / 2) * 0.822, Math.min(0.1, pb[4] - 0.01)],
+      };
+    },
+  };
+}
+
+/** CIELAB of a linear RGB colour (D65), into out. */
+function toLab(r: number, g: number, b: number, out: number[]): void {
+  const f = (t: number): number => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+  const y = f(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+  out[0] = 116 * y - 16;
+  out[1] = 500 * (x - y);
+  out[2] = 200 * (y - z);
+}
+
+/** A sculpt's paint per triangle: its colour in CIELAB, the mean of a few points across it (a single point reads one strand or stitch), and its area; and its fur's colour, the median at its arms' ends (beyond 0.88 of its width: its mittens are always its own fur). */
+interface Paint {
+  lab: Float32Array;
+  area: Float32Array;
+  fur: number[];
+}
+
+/** How far a colour is from the fur's (CIELAB, lightness counted at half: the paint's baked shade darkens the fur in its creases and under its hat, not its hue). */
+function furDistance(lab: ArrayLike<number>, k: number, fur: number[]): number {
+  return Math.hypot(0.5 * (lab[k] - fur[0]), lab[k + 1] - fur[1], lab[k + 2] - fur[2]);
+}
+
+function paintLab(P: Float64Array, index: ArrayLike<number>, weld: Int32Array, uv: ArrayLike<number>, colourAt: ColourAt, feature: (t: number) => boolean): Paint {
+  const count = index.length / 3;
+  const lab = new Float32Array(count * 3);
+  const area = new Float32Array(count);
+  const at = [
+    [1 / 3, 1 / 3],
+    [2 / 3, 1 / 6],
+    [1 / 6, 2 / 3],
+    [1 / 6, 1 / 6],
+    [0.45, 0.45],
+    [0.1, 0.45],
+    [0.45, 0.1],
+  ];
+  const rgb = [0, 0, 0];
+  const out = [0, 0, 0];
+  for (let t = 0; t < count; t++) {
+    const [a, b, c] = [index[t * 3], index[t * 3 + 1], index[t * 3 + 2]];
+    const sum = [0, 0, 0];
+    for (const [s, r] of at) {
+      const q = 1 - s - r;
+      colourAt(q * uv[a * 2] + s * uv[b * 2] + r * uv[c * 2], q * uv[a * 2 + 1] + s * uv[b * 2 + 1] + r * uv[c * 2 + 1], rgb);
+      for (let e = 0; e < 3; e++) sum[e] += rgb[e] / at.length;
+    }
+    toLab(sum[0], sum[1], sum[2], out);
+    lab.set(out, t * 3);
+    const [pa, pb, pc] = [weld[a] * 3, weld[b] * 3, weld[c] * 3];
+    const u = [P[pb] - P[pa], P[pb + 1] - P[pa + 1], P[pb + 2] - P[pa + 2]];
+    const v = [P[pc] - P[pa], P[pc + 1] - P[pa + 1], P[pc + 2] - P[pa + 2]];
+    area[t] = 0.5 * Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
+  }
+  let wide = 0;
+  const x = (t: number): number => Math.abs(P[weld[index[t * 3]] * 3] + P[weld[index[t * 3 + 1]] * 3] + P[weld[index[t * 3 + 2]] * 3]) / 3;
+  for (let t = 0; t < count; t++) if (!feature(t)) wide = Math.max(wide, x(t));
+  const tips: number[] = [];
+  for (let t = 0; t < count; t++) if (!feature(t) && x(t) > 0.88 * wide) tips.push(t);
+  const fur = [0, 1, 2].map((e) => tips.map((t) => lab[t * 3 + e]).sort((a, b) => a - b)[tips.length >> 1]);
+  return { lab, area, fur };
+}
+
+/**
+ * A plate grown into the hood (muse 4's, 8's): the triangles about the eyes,
+ * grown out across the skin while the paint is not the fur's (its shade and
+ * highlights vary more than the fur round it does), facing forward, within
+ * an oval about the eyes.
+ */
+function fusedPlate(P: Float64Array, index: ArrayLike<number>, weld: Int32Array, paint: Paint, parts: FaceParts, feature: (t: number) => boolean): Set<number> {
+  const count = index.length / 3;
+  const [ex, ey, , ez] = parts.eye;
+  const centre = (t: number, a: number): number => (P[weld[index[t * 3]] * 3 + a] + P[weld[index[t * 3 + 1]] * 3 + a] + P[weld[index[t * 3 + 2]] * 3 + a]) / 3;
+  const facing = (t: number): number => {
+    const [pa, pb, pc] = [weld[index[t * 3]] * 3, weld[index[t * 3 + 1]] * 3, weld[index[t * 3 + 2]] * 3];
+    const u = [P[pb] - P[pa], P[pb + 1] - P[pa + 1], P[pb + 2] - P[pa + 2]];
+    const v = [P[pc] - P[pa], P[pc + 1] - P[pa + 1], P[pc + 2] - P[pa + 2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    return n[2] / (Math.hypot(n[0], n[1], n[2]) || 1);
+  };
+  const seeds: number[] = [];
+  for (let t = 0; t < count; t++) {
+    if (feature(t) || centre(t, 2) < ez - 0.07 || facing(t) < 0.3 || furDistance(paint.lab, t * 3, paint.fur) < PLATE_PAINT) continue;
+    if (Math.min(Math.hypot(centre(t, 0) - ex, centre(t, 1) - ey), Math.hypot(centre(t, 0) + ex, centre(t, 1) - ey)) < 0.045) seeds.push(t);
+  }
+  const plate = new Set<number>();
+  if (seeds.length === 0) return plate;
+  // the triangles across each edge
+  const n = P.length / 3;
+  const across = new Map<number, number[]>();
+  for (let t = 0; t < count; t++) {
+    for (let e = 0; e < 3; e++) {
+      const a = weld[index[t * 3 + e]];
+      const b = weld[index[t * 3 + ((e + 1) % 3)]];
+      const key = Math.min(a, b) * n + Math.max(a, b);
+      const list = across.get(key) ?? [];
+      list.push(t);
+      across.set(key, list);
+    }
+  }
+  const stack = [...seeds];
+  for (const t of seeds) plate.add(t);
+  while (stack.length > 0) {
+    const t = stack.pop() as number;
+    for (let e = 0; e < 3; e++) {
+      const a = weld[index[t * 3 + e]];
+      const b = weld[index[t * 3 + ((e + 1) % 3)]];
+      for (const o of across.get(Math.min(a, b) * n + Math.max(a, b)) ?? []) {
+        if (plate.has(o) || feature(o) || facing(o) < 0 || Math.hypot(centre(o, 0) / 0.24, (centre(o, 1) - ey) / 0.17) > 1) continue;
+        if (furDistance(paint.lab, o * 3, paint.fur) < PLATE_PAINT) continue;
+        plate.add(o);
+        stack.push(o);
+      }
+    }
+  }
+  // and filled out to the rounded oblong it spans (museBody.ts FACE's exponent): where a hat's shadow is painted on
+  // it, the plate reads as the fur's colour
+  let [x0, x1, y0, y1] = [Infinity, -Infinity, Infinity, -Infinity];
+  for (const t of plate) [x0, x1, y0, y1] = [Math.min(x0, centre(t, 0)), Math.max(x1, centre(t, 0)), Math.min(y0, centre(t, 1)), Math.max(y1, centre(t, 1))];
+  const [cx, cy, hx, hy] = [(x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2];
+  for (let t = 0; t < count; t++) {
+    if (plate.has(t) || feature(t) || facing(t) < 0.2 || centre(t, 2) < ez - 0.12) continue;
+    if (Math.abs((centre(t, 0) - cx) / hx) ** FACE.n + Math.abs((centre(t, 1) - cy) / hy) ** FACE.n < 0.97) plate.add(t);
+  }
+  return plate;
+}
+
+/** How far from the fur's colour a plate grown into the hood is (ΔE, as furDistance). */
+const PLATE_PAINT = 12;
+
+/**
+ * A dressed muse's fur, per welded vertex (1 fur … 0 cloth): its paint (the
+ * mean of its triangles', by area) against the fur's at the arms' ends (its
+ * mittens are always its own fur), the distance smoothed over the skin a few
+ * times, then eased between the sculpt's two thresholds; a piece mostly one
+ * or the other is made wholly so.
+ */
+function furFromPaint(P: Float64Array, triangles: number[], source: number[], paint: Paint, dress: Dress, find: (a: number) => number, hood: number): Float32Array {
+  const n = P.length / 3;
+  const sum = new Float64Array(n * 3);
+  const weight = new Float64Array(n);
+  for (let k = 0; k < source.length; k++) {
+    const t = source[k];
+    const w = paint.area[t];
+    for (let e = 0; e < 3; e++) {
+      const v = triangles[k * 3 + e];
+      weight[v] += w;
+      for (let a = 0; a < 3; a++) sum[v * 3 + a] += w * paint.lab[t * 3 + a];
+    }
+  }
+  const used: number[] = [];
+  for (let v = 0; v < n; v++) {
+    if (weight[v] <= 0) continue;
+    used.push(v);
+    for (let a = 0; a < 3; a++) sum[v * 3 + a] /= weight[v];
+  }
+  let far = new Float32Array(n);
+  for (const v of used) far[v] = furDistance(sum, v * 3, paint.fur);
+  const neighbours = adjacency(n, triangles);
+  for (let round = 0; round < 3; round++) {
+    const next = far.slice();
+    for (const v of used) {
+      let s = far[v];
+      for (const u of neighbours[v]) s += far[u];
+      next[v] = s / (1 + neighbours[v].length);
+    }
+    far = next;
+  }
+  const furry = new Float32Array(n).fill(1);
+  const [near, off] = dress.fur;
+  for (const v of used) furry[v] = 1 - smooth01((far[v] - near) / (off - near));
+  // whole pieces (by area: a garment's dense weave would outvote the fur of the hood it is grown into)
+  const whole = dress.whole ?? 0.9;
+  const pieces = new Map<number, number[]>();
+  for (const v of used) {
+    const r = find(v);
+    const p = pieces.get(r) ?? [0, 0];
+    if (furry[v] > 0.5) p[0] += weight[v];
+    p[1] += weight[v];
+    pieces.set(r, p);
+  }
+  for (const v of used) {
+    const [s, c] = pieces.get(find(v)) as number[];
+    if (s / c > whole) furry[v] = 1;
+    else if (s / c < 1 - whole) furry[v] = 0;
+  }
+  // (a garment the fur's own colour: the hood's piece below its hem, eased over a centimetre or two)
+  if (dress.hem !== undefined) {
+    const hem = dress.hem;
+    const sleeve = dress.sleeve ?? Infinity;
+    for (const v of used) if (find(v) === hood) furry[v] *= 1 - (1 - smooth01((P[v * 3 + 1] - hem) / 0.02)) * (1 - smooth01((Math.abs(P[v * 3]) - sleeve) / 0.02));
+  }
+  return furry;
+}
+
+/**
+ * A dressed muse's fit, measured off it: each arm's centreline (its
+ * triangles' sections across |x| = c, from just past where the cut leaves it
+ * out to its mitten's end; an arm of its own piece, from where it comes out
+ * of the body or the garment it is set in, which is also returned, `out`, a
+ * side: such an arm's weight rises from there); the upper arm turning a little in from the cut,
+ * the shoulder at 0.15 out at its height, the elbow halfway to the tip, the
+ * mitten's middle 0.07 short of it; each leg over the middle of its sole.
+ * Then the arms' turns solved so that hung and at the top of a wave they
+ * point as tpose6's do (its fit is the one Kai approved).
+ */
+function measureFit(P: Float64Array, triangles: number[], cuts: Float32Array[], base: MuseFit, hangOut = 0): { fit: MuseFit; out: number[] } {
+  const J = JOINT;
+  const rest = base.rest.map((r) => [r[0], r[1], r[2]] as [number, number, number]);
+  let hand: [number, number, number] = base.hand ? [base.hand[0], base.hand[1], base.hand[2]] : [0.51, 0.41, 0];
+  const out = [0.3, 0.3];
+  const used = [...new Set(triangles)];
+  for (const [side, cut, upper, fore, shoulder] of [
+    [1, cuts[0], J.upperArmL, J.foreArmL, J.shoulderL],
+    [-1, cuts[1], J.upperArmR, J.foreArmR, J.shoulderR],
+  ] as const) {
+    // where the cut leaves the arm: the mean of its vertices next to the body's (an arm of its own piece: 0.3 out)
+    let sx = 0;
+    let edges = 0;
+    for (let t = 0; t < triangles.length; t += 3) {
+      for (let e = 0; e < 3; e++) {
+        const a = triangles[t + e];
+        const b = triangles[t + ((e + 1) % 3)];
+        if (cut[a] > 0.5 && cut[b] < 0.5) {
+          sx += side * P[a * 3];
+          edges++;
+        }
+      }
+    }
+    // the arm's sections out to where it ends; an arm of its own piece (buried in the body at its inner end) starts
+    // where it is full: its section as tall as three quarters of its middle's
+    const rows = armSections(P, triangles, cut, side);
+    const end = rows.findLastIndex((r) => r[3] >= ARM_PATH.end);
+    if (end < 4) continue;
+    // where it comes out of what it is set in: how far out the body (or a garment) reaches round the arm's middle,
+    // at its height and depth (an arm of its own piece, set into a sleeve or a socket, turns there)
+    const mid = rows[Math.floor(end * 0.6)];
+    const r = 0.8 * mid[3] / 2;
+    let reach = 0.2;
+    for (const v of used) if (cut[v] < 0.5 && Math.abs(P[v * 3 + 1] - mid[1]) < r && Math.abs(P[v * 3 + 2] - mid[2]) < r) reach = Math.max(reach, side * P[v * 3]);
+    out[side === 1 ? 0 : 1] = reach;
+    const root = edges > 0 ? sx / edges : reach;
+    const line = rows.slice(0, end + 1).filter((r) => r[0] >= root + 0.02 && r[3] > 0);
+    if (line.length < 4) continue;
+    const tip = rows[end][0] + ARM_PATH.step;
+    const at = (x: number): [number, number] => {
+      let k = 0;
+      while (k + 2 < line.length && line[k + 1][0] < x) k++;
+      const f = Math.min(1, Math.max(0, (x - line[k][0]) / (line[k + 1][0] - line[k][0] || 1)));
+      return [line[k][1] + f * (line[k + 1][1] - line[k][1]), line[k][2] + f * (line[k + 1][2] - line[k][2])];
+    };
+    const pivot = root - 0.02;
+    const [py, pz] = at(root + 0.02);
+    const elbow = pivot + 0.5 * (tip - pivot);
+    rest[upper] = [side * pivot, py, pz];
+    rest[fore] = [side * elbow, ...at(elbow)];
+    rest[shoulder] = [side * 0.15, py, pz];
+    if (side === 1) hand = [tip - 0.07, ...at(tip - 0.07)];
+  }
+  // the legs: over their soles
+  for (const [side, leg] of [
+    [1, J.legL],
+    [-1, J.legR],
+  ] as const) {
+    let x = 0;
+    let z = 0;
+    let soles = 0;
+    for (const v of new Set(triangles)) {
+      if (P[v * 3 + 1] > 0.04 || side * P[v * 3] < 0.02) continue;
+      x += P[v * 3];
+      z += P[v * 3 + 2];
+      soles++;
+    }
+    if (soles > 0) rest[leg] = [x / soles, rest[leg][1], z / soles];
+  }
+  return { fit: solveTurns({ ...base, rest, hand }, hangOut), out };
+}
+
+/** An arm's sections (its triangles' crossings of |x| = c, every ARM_PATH.step from 0.15 out to 0.75): c, their middle's height and depth (smoothed 1-2-1), and how tall each is (0 where none). */
+function armSections(P: Float64Array, triangles: number[], arm: Float32Array, side: number): number[][] {
+  const mine: number[] = [];
+  for (let t = 0; t < triangles.length; t += 3) {
+    if (arm[triangles[t]] + arm[triangles[t + 1]] + arm[triangles[t + 2]] >= 2) mine.push(triangles[t], triangles[t + 1], triangles[t + 2]);
+  }
+  const rows: number[][] = [];
+  for (let c = 0.15; c < 0.75; c += ARM_PATH.step) {
+    let [y0, y1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
+    for (let t = 0; t < mine.length; t += 3) {
+      for (let e = 0; e < 3; e++) {
+        const p = mine[t + e];
+        const q = mine[t + ((e + 1) % 3)];
+        const sp = side * P[p * 3] - c;
+        const sq = side * P[q * 3] - c;
+        if (sp < 0 === sq < 0) continue;
+        const f = sp / (sp - sq);
+        const y = P[p * 3 + 1] + f * (P[q * 3 + 1] - P[p * 3 + 1]);
+        const z = P[p * 3 + 2] + f * (P[q * 3 + 2] - P[p * 3 + 2]);
+        [y0, y1, z0, z1] = [Math.min(y0, y), Math.max(y1, y), Math.min(z0, z), Math.max(z1, z)];
+      }
+    }
+    rows.push(y1 > y0 ? [c, (y0 + y1) / 2, (z0 + z1) / 2, y1 - y0] : [c, 0, 0, 0]);
+  }
+  for (let round = 0; round < ARM_PATH.smooth; round++) {
+    const was = rows.map((r) => r.slice());
+    for (let k = 1; k + 1 < rows.length; k++) {
+      if (was[k][3] <= 0 || was[k - 1][3] <= 0 || was[k + 1][3] <= 0) continue;
+      for (let e = 1; e < 3; e++) rows[k][e] = (was[k - 1][e] + 2 * was[k][e] + was[k + 1][e]) / 4;
+    }
+  }
+  return rows;
+}
+
+/** The pieces wholly an arm's, a side (every vertex on the arm's side of its cut): an arm of its own piece, or a paw out of a sleeve. */
+function armPieces(triangles: number[], cuts: Float32Array[], find: (a: number) => number): Set<number>[] {
+  return cuts.map((cut) => {
+    const all = new Set<number>();
+    const not = new Set<number>();
+    for (const v of triangles) {
+      all.add(find(v));
+      if (cut[v] < 0.5) not.add(find(v));
+    }
+    return new Set([...all].filter((r) => !not.has(r)));
+  });
+}
+
+/** Where each arm points, hung and at the top of a wave: its upper arm (shoulder to elbow) and its forearm (elbow to the mitten's middle), as unit vectors. */
+function armAims(rig: MuseRig): { hang: Vector3[]; wave: Vector3[] } {
+  const J = JOINT;
+  const aims = (): Vector3[] => {
+    const joints = rig.joints();
+    const upper = new Vector3(joints[J.upperArmL * 3], joints[J.upperArmL * 3 + 1], joints[J.upperArmL * 3 + 2]);
+    const elbow = new Vector3(joints[J.foreArmL * 3], joints[J.foreArmL * 3 + 1], joints[J.foreArmL * 3 + 2]);
+    const e = rig.handFrame(1, new Matrix4()).elements;
+    const hand = new Vector3(e[12], e[13], e[14]);
+    return [elbow.clone().sub(upper).normalize(), hand.sub(elbow).normalize()];
+  };
+  rig.hang();
+  const hang = aims();
+  rig.raiseLeft();
+  return { hang, wave: aims() };
+}
+
+/** A fit's arms' turns solved (Nelder–Mead) so that hung and waving its arms point as tpose6's do (hung, turned out by `out`, rad). */
+function solveTurns(fit: MuseFit, out = 0): MuseFit {
+  const aim = armAims(new MuseRig(SCULPTS.tpose6.fit));
+  for (const d of aim.hang) d.applyAxisAngle(new Vector3(0, 0, 1), out);
+  const miss = (got: Vector3[], want: Vector3[]): number => got.reduce((s, d, k) => s + d.angleTo(want[k]) ** 2, 0);
+  const t6 = SCULPTS.tpose6.fit;
+  const hung = (v: number[]): MuseFit => ({ ...fit, hang: { x: v[0], z: v[1], fore: v[2] } });
+  const h = nelderMead((v) => miss(armAims(new MuseRig(hung(v))).hang, aim.hang), [t6.hang.x, t6.hang.z, t6.hang.fore]);
+  const waving = (v: number[]): MuseFit => ({ ...hung(h), wave: { x: v[0], y: v[1], z: v[2], fore: v[3], reach: t6.wave.reach } });
+  const w = nelderMead((v) => miss(armAims(new MuseRig(waving(v))).wave, aim.wave), [t6.wave.x, t6.wave.y, t6.wave.z, t6.wave.fore]);
+  return waving(w);
+}
+
+/** The minimum of a function near a start (Nelder–Mead's simplex, a few hundred steps). */
+function nelderMead(f: (v: number[]) => number, start: number[], step = 0.15, rounds = 300): number[] {
+  const n = start.length;
+  let points = [start, ...start.map((_, i) => start.map((v, j) => (i === j ? v + step : v)))];
+  let values = points.map(f);
+  for (let round = 0; round < rounds; round++) {
+    const order = values.map((_, i) => i).sort((a, b) => values[a] - values[b]);
+    points = order.map((i) => points[i]);
+    values = order.map((i) => values[i]);
+    const centre = start.map((_, j) => points.slice(0, n).reduce((s, p) => s + p[j], 0) / n);
+    const towards = (k: number): number[] => centre.map((c, j) => c + k * (points[n][j] - c));
+    const reflected = towards(-1);
+    const r = f(reflected);
+    if (r < values[0]) {
+      const expanded = towards(-2);
+      const e = f(expanded);
+      [points[n], values[n]] = e < r ? [expanded, e] : [reflected, r];
+    } else if (r < values[n - 1]) {
+      [points[n], values[n]] = [reflected, r];
+    } else {
+      const contracted = towards(0.5);
+      const c = f(contracted);
+      if (c < values[n]) [points[n], values[n]] = [contracted, c];
+      else {
+        for (let i = 1; i <= n; i++) {
+          points[i] = points[i].map((v, j) => points[0][j] + 0.5 * (v - points[0][j]));
+          values[i] = f(points[i]);
+        }
+      }
+    }
+  }
+  return points[values.indexOf(Math.min(...values))];
+}
+
+/**
+ * A dressed muse's loose pieces: those no seed of either arm's cut is on
+ * (cutArm: neither the arm out past its x, nor the body away from it), a
+ * sleeve's cuff or a strap over the shoulder, which the cut cannot place.
+ */
+function loosePieces(P: Float64Array, triangles: number[], cut: Sculpt['cut'], find: (a: number) => number): Set<number> {
+  const seeded = [new Set<number>(), new Set<number>()];
+  const all = new Set<number>();
+  for (const v of new Set(triangles)) {
+    const r = find(v);
+    all.add(r);
+    const y = P[v * 3 + 1];
+    const z = P[v * 3 + 2];
+    for (const [k, side] of [
+      [0, 1],
+      [1, -1],
+    ]) {
+      const x = side * P[v * 3];
+      const arm = x > cut.arm.x && y > cut.arm.y[0] && y < cut.arm.y[1];
+      const away = x < cut.body.x || y < cut.body.y[0] || y > cut.body.y[1] || z < cut.body.z[0] || z > cut.body.z[1];
+      if (arm || away) seeded[k].add(r);
+    }
+  }
+  return new Set([...all].filter((r) => !seeded[0].has(r) || !seeded[1].has(r)));
+}
+
+/** Where a loose piece's vertices lie on the skin under them (the rest's closest point, its triangle's corners and their shares), as a mirror map is read. */
+function underSkin(pos: Float32Array, index: ArrayLike<number>, loose: Set<number>, pieceOf: (i: number) => number): MirrorMap {
+  const count = pos.length / 3;
+  const kept: number[] = [];
+  for (let t = 0; t < index.length; t += 3) if (!loose.has(pieceOf(index[t]))) kept.push(index[t], index[t + 1], index[t + 2]);
+  const surface = new MeshField(pos, kept, DRESSED_BOX, 0.01);
+  const map: MirrorMap = { corners: new Int32Array(count * 3), shares: new Float32Array(count * 3), take: new Float32Array(count) };
+  const near = [0, 0, 0];
+  for (let i = 0; i < count; i++) {
+    if (!loose.has(pieceOf(i))) continue;
+    const t = surface.nearest(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], near);
+    if (t < 0) continue;
+    const [a, b, c] = [kept[t * 3], kept[t * 3 + 1], kept[t * 3 + 2]];
+    map.corners.set([a, b, c], i * 3);
+    map.shares.set(barycentric(pos, a, b, c, near), i * 3);
+    map.take[i] = 1;
+  }
+  return map;
+}
+
+/** The shares of a triangle's corners at a point on it (kept inside it). */
+function barycentric(p: ArrayLike<number>, a: number, b: number, c: number, at: number[]): [number, number, number] {
+  const u = [p[b * 3] - p[a * 3], p[b * 3 + 1] - p[a * 3 + 1], p[b * 3 + 2] - p[a * 3 + 2]];
+  const v = [p[c * 3] - p[a * 3], p[c * 3 + 1] - p[a * 3 + 1], p[c * 3 + 2] - p[a * 3 + 2]];
+  const d = [at[0] - p[a * 3], at[1] - p[a * 3 + 1], at[2] - p[a * 3 + 2]];
+  const uu = u[0] * u[0] + u[1] * u[1] + u[2] * u[2];
+  const uv = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const vv = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+  const du = d[0] * u[0] + d[1] * u[1] + d[2] * u[2];
+  const dv = d[0] * v[0] + d[1] * v[1] + d[2] * v[2];
+  const den = uu * vv - uv * uv || 1;
+  const sb = Math.max(0, (vv * du - uv * dv) / den);
+  const sc = Math.max(0, (uu * dv - uv * du) / den);
+  const sa = Math.max(0, 1 - sb - sc);
+  const sum = sa + sb + sc || 1;
+  return [sa / sum, sb / sum, sc / sum];
+}
+
+/** Skin weights carried onto the loose pieces from the skin under them. */
+function carryWeights(full: Float32Array, map: MirrorMap): void {
+  const own = full.slice();
+  for (let i = 0; i < map.take.length; i++) {
+    if (map.take[i] <= 0) continue;
+    for (let j = 0; j < JOINTS; j++) {
+      let w = 0;
+      for (let k = 0; k < 3; k++) w += map.shares[i * 3 + k] * own[map.corners[i * 3 + k] * JOINTS + j];
+      full[i * JOINTS + j] = w;
+    }
+  }
+}
+
+/**
+ * A dressed muse's fur under its clothes (per vertex, 1 free … 0 pressed
+ * flat): where cloth lies over the skin within the fur's length (its closest
+ * point out along the normal), the strands would stand through it.
+ */
+function pressedFur(pos: Float32Array, nrm: Float32Array, index: ArrayLike<number>, cloth: Float32Array): Float32Array {
+  const count = pos.length / 3;
+  const over: number[] = [];
+  for (let t = 0; t < index.length; t += 3) if (cloth[index[t]] > 0.5 && cloth[index[t + 1]] > 0.5 && cloth[index[t + 2]] > 0.5) over.push(index[t], index[t + 1], index[t + 2]);
+  const out = new Float32Array(count).fill(1);
+  if (over.length === 0) return out;
+  const field = new MeshField(pos, over, DRESSED_BOX, 0.01);
+  const near = [0, 0, 0];
+  for (let i = 0; i < count; i++) {
+    if (cloth[i] > 0.5) continue;
+    const [x, y, z] = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
+    if (field.nearest(x, y, z, near) < 0) continue;
+    const d = [near[0] - x, near[1] - y, near[2] - z];
+    const dist = Math.hypot(d[0], d[1], d[2]);
+    // (over it: out along its normal, not beside it where the fur meets a garment's edge)
+    if (dist < 1e-6 || (d[0] * nrm[i * 3] + d[1] * nrm[i * 3 + 1] + d[2] * nrm[i * 3 + 2]) / dist < 0.5) continue;
+    out[i] = smooth01((dist - PRESSED.flat) / (PRESSED.free - PRESSED.flat));
+  }
+  return out;
+}
+
+/** Fur under cloth (H): pressed flat where the cloth is this near, free where it is this far (the fur's length and a little). */
+const PRESSED = { flat: 0.012, free: 0.05 } as const;
+
+/** The loose pieces mostly on an arm (their weights, as carried, more an arm's than the body's). */
+function onArms(full: Float32Array, loose: Set<number>, pieceOf: (i: number) => number): Set<number> {
+  const J = JOINT;
+  const arm = [J.upperArmL, J.foreArmL, J.upperArmR, J.foreArmR, J.shoulderL, J.shoulderR];
+  const share = new Map<number, number[]>();
+  for (let i = 0; i < full.length / JOINTS; i++) {
+    const r = pieceOf(i);
+    if (!loose.has(r)) continue;
+    const s = share.get(r) ?? [0, 0];
+    for (const j of arm) s[0] += full[i * JOINTS + j];
+    s[1]++;
+    share.set(r, s);
+  }
+  return new Set([...share].filter(([, [a, n]]) => a / n > 0.5).map(([r]) => r));
+}
+
+/** A dressed muse's pieces that go whole: its small things of cloth or wood (shorter than RIGID), its hats (cloth wholly over its shoulders), and its loose pieces of cloth on its arms. */
+function rigidPieces(box: Map<number, number[]>, cloth: Float32Array, pieceOf: (i: number) => number, armed: Set<number>): Set<number> {
+  const mean = new Map<number, number[]>();
+  for (let i = 0; i < cloth.length; i++) {
+    const m = mean.get(pieceOf(i)) ?? [0, 0];
+    m[0] += cloth[i];
+    m[1]++;
+    mean.set(pieceOf(i), m);
+  }
+  const rigid = new Set<number>();
+  for (const [r, [s, c]] of mean) {
+    const b = box.get(r);
+    if (!b || s / c < 0.5) continue;
+    if (Math.max(b[1] - b[0], b[3] - b[2], b[5] - b[4]) < RIGID || b[2] > 0.62 || armed.has(r)) rigid.add(r);
+  }
+  return rigid;
+}
+
+/** Each rigid piece's weights its mean. */
+function wholeWeights(full: Float32Array, rigid: Set<number>, pieceOf: (i: number) => number): void {
+  const count = full.length / JOINTS;
+  const sums = new Map<number, Float64Array>();
+  for (let i = 0; i < count; i++) {
+    const r = pieceOf(i);
+    if (!rigid.has(r)) continue;
+    const s = sums.get(r) ?? new Float64Array(JOINTS + 1);
+    for (let j = 0; j < JOINTS; j++) s[j] += full[i * JOINTS + j];
+    s[JOINTS]++;
+    sums.set(r, s);
+  }
+  for (let i = 0; i < count; i++) {
+    const s = sums.get(pieceOf(i));
+    if (!s) continue;
+    for (let j = 0; j < JOINTS; j++) full[i * JOINTS + j] = s[j] / s[JOINTS];
+  }
+}
+
+type Corrected = MuseMesh & { raise: Float32Array; raiseNormal: Float32Array; raiseOpen: Float32Array; hang: Float32Array; hangNormal: Float32Array };
+
+/** The arms' roots' correctives carried onto the loose pieces from the skin under them (their offsets; their normals their own). */
+function carryCorrections(m: Corrected, map: MirrorMap): void {
+  const hang = m.hang.slice();
+  const raise = m.raise.slice();
+  for (let i = 0; i < map.take.length; i++) {
+    if (map.take[i] <= 0) continue;
+    for (let e = 0; e < 3; e++) {
+      let h = 0;
+      let r = 0;
+      for (let k = 0; k < 3; k++) {
+        h += map.shares[i * 3 + k] * hang[map.corners[i * 3 + k] * 3 + e];
+        r += map.shares[i * 3 + k] * raise[map.corners[i * 3 + k] * 3 + e];
+      }
+      m.hang[i * 3 + e] = h;
+      m.raise[i * 3 + e] = r;
+      m.hangNormal[i * 3 + e] = m.normal[i * 3 + e];
+      m.raiseNormal[i * 3 + e] = 0;
+    }
+    m.raiseOpen[i] = m.open[i];
+  }
+}
+
+/** A vertex without the arms' roots' correctives. */
+function uncorrect(m: Corrected, i: number): void {
+  for (let e = 0; e < 3; e++) {
+    m.hang[i * 3 + e] = 0;
+    m.raise[i * 3 + e] = 0;
+    m.hangNormal[i * 3 + e] = m.normal[i * 3 + e];
+    m.raiseNormal[i * 3 + e] = 0;
+  }
+  m.raiseOpen[i] = m.open[i];
+}
+
+/**
+ * A dressed muse's mesh split along its paint's seams: a vertex its triangles
+ * read the texture at in two places (two islands of the paint meet there) is
+ * made two, alike but for that, so each side reads its own. Everything else
+ * was measured on the whole skin before, so nothing parts at a seam.
+ */
+function splitSeams(m: Corrected, cloth: Float32Array, cornerUv: number[]): Corrected & { cloth: Float32Array; uv: Float32Array } {
+  const copies = new Map<string, number>();
+  const from: number[] = [];
+  const uv: number[] = [];
+  const index = new Uint32Array(m.index.length);
+  for (let c = 0; c < m.index.length; c++) {
+    const v = m.index[c];
+    const u = cornerUv[c * 2];
+    const w = cornerUv[c * 2 + 1];
+    const key = `${v},${Math.round(u * 8192)},${Math.round(w * 8192)}`;
+    let id = copies.get(key);
+    if (id === undefined) {
+      copies.set(key, (id = from.length));
+      from.push(v);
+      uv.push(u, w);
+    }
+    index[c] = id;
+  }
+  const expand = <T extends Float32Array | Uint16Array>(a: T, size: number): T => {
+    const out = new (a.constructor as new (n: number) => T)(from.length * size);
+    for (let i = 0; i < from.length; i++) for (let k = 0; k < size; k++) out[i * size + k] = a[from[i] * size + k];
+    return out;
+  };
+  return {
+    position: expand(m.position, 3),
+    normal: expand(m.normal, 3),
+    index: from.length < 65536 ? Uint16Array.from(index) : index,
+    skinIndex: expand(m.skinIndex, 4),
+    skinWeight: expand(m.skinWeight, 4),
+    fur: expand(m.fur, 1),
+    open: expand(m.open, 1),
+    colour: expand(m.colour, 3),
+    comb: m.comb ? expand(m.comb, 3) : undefined,
+    raise: expand(m.raise, 3),
+    raiseNormal: expand(m.raiseNormal, 3),
+    raiseOpen: expand(m.raiseOpen, 1),
+    hang: expand(m.hang, 3),
+    hangNormal: expand(m.hangNormal, 3),
+    cloth: expand(cloth, 1),
+    uv: Float32Array.from(uv),
+  };
 }

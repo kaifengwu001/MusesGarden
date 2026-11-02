@@ -4,6 +4,7 @@ import {
   BufferGeometry,
   Color,
   DirectionalLight,
+  DoubleSide,
   Float32BufferAttribute,
   HemisphereLight,
   InstancedBufferGeometry,
@@ -19,6 +20,7 @@ import {
   Scene,
   ShaderMaterial,
   SRGBColorSpace,
+  type Texture,
   Vector3,
   Vector4,
   WebGLRenderer,
@@ -27,7 +29,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { smoothstep } from '../core/math';
 import { FUR_LENGTH, MUSE_HEIGHT, SHELLS } from '../life/muse';
 import { buildMuseBody, FIELD_FIT, PARENT, type MuseBody, type MuseFit } from '../life/museBody';
-import { SCULPTS, type SculptKind } from '../life/museMesh';
+import { DRESSED, SCULPTS, type DressedKind, type FaceLayout, type SculptKind } from '../life/museMesh';
 import { loadTripo } from '../life/museTripo';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
@@ -41,10 +43,13 @@ import { registerShaderChunks } from '../render/glsl';
 // and their silhouettes compared. The hash picks the body, the look, the view
 // and the moment:
 //   model=procedural|tripo|tpose|tpose2|tpose5|tpose6 (src/assets/muse/tripo*.glb, rigged on the skeleton by museMesh.ts)
-//   look=muse|raw|weights|clay|facet|stretch|rough   (Muse's shaders; the file as exported; each vertex coloured by its joints;
+//         muse1 … muse9 (the muses in clothes, src/assets/muse/muses/: museMesh.ts DRESSED)
+//   lineup=1: the muses in clothes in a row, each idling, each answering a tap or a hold (museLineup.ts)
+//   look=muse|raw|weights|clay|facet|stretch|rough|kind   (Muse's shaders; the file as exported; each vertex coloured by its joints;
 //                           the bare skin in clay; the clay shaded by the triangles as drawn, not the skinned normals;
 //                           how much each part of the skin is stretched (red) or squashed (blue) in the pose;
-//                           how far each normal of the posed skin turns from its neighbours' (bumps, creases: red))
+//                           how far each normal of the posed skin turns from its neighbours' (bumps, creases: red);
+//                           a dressed muse's fur (cream), cloth (blue) and face (pink))
 //   wire=1 (the triangles over it)
 //   view=front|left|back|turn:<deg>|persp:<deg>   pose=idle|walk|wave|hang|<move>   t=<s>   gait=<cycles>   fur=0|1   bones=0|1
 //   (a move, on the spot: bounce|pet|fluff|yawn|hopup|perch|hopdown|plop|sit|rise|lie|sleep|wake|fish|water|stir; pet is held 3.5 s, then let go)
@@ -93,17 +98,10 @@ registerShaderChunks();
 const scene = new Scene();
 
 // (hang=z,x and wave=z,fore try other arm angles on the body's fit, rad)
-const sculpt = model in SCULPTS ? (model as SculptKind) : null;
-const baseFit: MuseFit = sculpt ? SCULPTS[sculpt].fit : FIELD_FIT;
+const sculpt = model in SCULPTS || model in DRESSED ? (model as SculptKind | DressedKind) : null;
 const angles = (key: string): number[] | null => params.get(key)?.split(',').map(Number) ?? null;
 const hang = angles('hang');
 const waveAt = angles('wave');
-const rig = new MuseRig({
-  ...baseFit,
-  hang: hang ? { ...baseFit.hang, z: hang[0], x: hang[1] ?? baseFit.hang.x } : baseFit.hang,
-  wave: waveAt ? { z: waveAt[0], fore: waveAt[1] ?? baseFit.wave.fore, x: waveAt[2] ?? baseFit.wave.x, y: waveAt[3] ?? baseFit.wave.y } : baseFit.wave,
-  reach: params.has('reach') ? Number(params.get('reach')) : baseFit.reach,
-});
 
 /** The moves on the spot (museRig.ts), each played over and over live (this long, s); pet is held PET_HOLD s, then let go. */
 const PET_HOLD = 3.5;
@@ -156,15 +154,22 @@ function act(t: number): void {
   // (the arms hung and nothing else moving, to compare the two arms)
   if (pose === 'hang') rig.hang();
 }
-act(time);
-
-async function body(): Promise<{ body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array }; grade: Vector3; raw: Mesh | null }> {
-  if (!sculpt) return { body: buildMuseBody(), grade: new Vector3(1, 1, 1), raw: null };
+async function body(): Promise<{ body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array; cloth?: Float32Array; uv?: Float32Array; features?: FaceLayout; fit?: MuseFit }; grade: Vector3; raw: Mesh | null; paint: Texture | null }> {
+  if (!sculpt) return { body: buildMuseBody(), grade: new Vector3(1, 1, 1), raw: null, paint: null };
   const loaded = await loadTripo(sculpt);
-  return { body: loaded.body, grade: params.get('grade') === '0' ? new Vector3(1, 1, 1) : loaded.grade, raw: loaded.raw };
+  return { body: loaded.body, grade: params.get('grade') === '0' ? new Vector3(1, 1, 1) : loaded.grade, raw: loaded.raw, paint: loaded.paint };
 }
 
-const { body: b, grade, raw } = await body();
+const { body: b, grade, raw, paint: texture } = await body();
+// its skeleton's fit: a dressed muse's measured off it (museMesh.ts measureFit)
+const baseFit: MuseFit = b.fit ?? (sculpt && sculpt in SCULPTS ? SCULPTS[sculpt as SculptKind].fit : FIELD_FIT);
+const rig = new MuseRig({
+  ...baseFit,
+  hang: hang ? { ...baseFit.hang, z: hang[0], x: hang[1] ?? baseFit.hang.x } : baseFit.hang,
+  wave: waveAt ? { z: waveAt[0], fore: waveAt[1] ?? baseFit.wave.fore, x: waveAt[2] ?? baseFit.wave.x, y: waveAt[3] ?? baseFit.wave.y } : baseFit.wave,
+  reach: params.has('reach') ? Number(params.get('reach')) : baseFit.reach,
+});
+act(time);
 
 /** The rigged body's geometry and materials (none where the file is shown as exported), and how it is redrawn for a look. */
 let rigged: { g: InstancedBufferGeometry; material: ShaderMaterial; wire: Mesh; setLook: (next: string) => void; paint: () => void } | null = null;
@@ -196,6 +201,10 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
     g.setAttribute('aHangNormal', new BufferAttribute(b.hangNormal, 3));
   }
   if (b.comb && params.get('comb') !== '0') g.setAttribute('aComb', new BufferAttribute(b.comb, 3));
+  if (b.cloth && b.uv && texture) {
+    g.setAttribute('aCloth', new BufferAttribute(b.cloth, 1));
+    g.setAttribute('uv', new BufferAttribute(b.uv, 2));
+  }
   const raised = g.getAttribute('aRaise') !== undefined;
   const hung = g.getAttribute('aHang') !== undefined;
   const combed = g.getAttribute('aComb') !== undefined;
@@ -207,7 +216,14 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
   const paint = (): void => {
     const c = colours.array as Float32Array;
     c.fill(0);
-    if (look === 'weights') {
+    if (look === 'kind') {
+      // a dressed muse's fur, cloth and face
+      for (let i = 0; i < n; i++) {
+        const k = b.cloth ? b.cloth[i] : 0;
+        const face = b.fur[i] < 0.03 && k < 0.5 && b.position[i * 3 + 2] > 0.05 && b.position[i * 3 + 1] > 0.55;
+        c.set(face ? [0.95, 0.55, 0.65] : [0.93 - 0.63 * k, 0.88 - 0.38 * k, 0.78 + 0.12 * k], i * 3);
+      }
+    } else if (look === 'weights') {
       // each vertex the blend of its joints' colours
       const col = new Color();
       for (let i = 0; i < n; i++) {
@@ -316,10 +332,12 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
   if (raised) shared.MUSE_RAISE = 1;
   if (hung) shared.MUSE_HANG = 1;
   if (combed) shared.MUSE_COMB = 1;
+  if (g.getAttribute('aCloth') !== undefined) shared.MUSE_PAINTED = 1;
+  if (b.features) shared.MUSE_FEATURES = 1;
   /** A look's defines: the shared ones, and its own. */
   const definesFor = (l: string): Record<string, number> => {
     const d = { ...shared };
-    if (l === 'weights' || l === 'stretch' || l === 'rough') d.MUSE_WEIGHTS = 1;
+    if (l === 'weights' || l === 'stretch' || l === 'rough' || l === 'kind') d.MUSE_WEIGHTS = 1;
     if (l === 'clay' || l === 'facet') d.MUSE_CLAY = 1;
     if (l === 'facet') d.MUSE_FACET = 1;
     return d;
@@ -350,8 +368,15 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
       uWarpK: { value: 0 },
       uTime: { value: time },
       uRadius: { value: 128 },
+      uMusePaint: { value: texture },
+      uMuseEyeAt: { value: new Vector3(...(b.features?.eye ?? [0, 0, 0])) },
+      uMuseMouthAt: { value: new Vector4(...(b.features?.mouth ?? [0, 0, 0, 0])) },
+      uMuseBlushAt: { value: new Vector3(...(b.features?.blush ?? [0, 0, 0])) },
+      uMuseFaceAt: { value: new Vector4(...(b.features?.plate ?? [0, 0, 0, 0])) },
     },
   });
+  // (a dressed muse's both sides: a garment is often a single sheet, an apron or a collar)
+  if (b.cloth) material.side = DoubleSide;
   const mesh = new Mesh(g, material);
   mesh.frustumCulled = false;
   // (hide=1: Muse not drawn, all else as it is: the stage's grass and shadows round it)
@@ -374,7 +399,7 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
     material.defines = definesFor(look);
     wireMaterial.defines = { ...definesFor(look), MUSE_WIRE: 1 };
     material.needsUpdate = wireMaterial.needsUpdate = true;
-    const coloured = look === 'weights' || look === 'stretch' || look === 'rough';
+    const coloured = look === 'weights' || look === 'stretch' || look === 'rough' || look === 'kind';
     g.instanceCount = fur && !coloured && look !== 'clay' && look !== 'facet' ? SHELLS + 1 : 1;
     paint();
   };
@@ -469,7 +494,7 @@ if (!live) {
     legend.textContent = `${keys}${stage && paused ? ' · paused' : ''}\nspace pause  ← → step   F fur  C clay  T triangles  R rough  S stretch  W weights   X wire  B bones   drag to turn, wheel to come close`;
   };
   const poses: Record<string, string> = { '1': 'idle', '2': 'walk', '3': 'wave', '4': 'day', '0': 'hang' };
-  const looks: Record<string, string> = { f: 'muse', c: 'clay', t: 'facet', r: 'rough', s: 'stretch', w: 'weights' };
+  const looks: Record<string, string> = { f: 'muse', c: 'clay', t: 'facet', r: 'rough', s: 'stretch', w: 'weights', k: 'kind' };
   addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
     if (stage?.key(event, t)) event.preventDefault();

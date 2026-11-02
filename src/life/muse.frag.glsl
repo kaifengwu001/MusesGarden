@@ -38,6 +38,12 @@ centroid varying vec3 vColour;
 #ifdef MUSE_WEIGHTS
 varying vec3 vWeightColour;
 #endif
+#ifdef MUSE_PAINTED
+// a dressed muse's clothes, its hat and its things: painted from its texture as made (read linear), no fur, no roots
+uniform sampler2D uMusePaint;
+centroid varying float vCloth;
+centroid varying vec2 vUv;
+#endif
 
 centroid varying vec3 vRest;
 centroid varying vec3 vNormal;
@@ -55,8 +61,20 @@ const vec3 SKIN = vec3(0.86, 0.69, 0.5);
 const vec3 BLUSH = vec3(0.86, 0.42, 0.34);
 const vec3 EYE = vec3(0.008, 0.006, 0.007);
 const vec3 MOUTH = vec3(0.03, 0.016, 0.013);
-// the face's features (H): museBody.ts FEATURES
+// the face's features (H): museBody.ts FEATURES; a dressed muse's measured off its sculpt (museMesh.ts FaceLayout)
+#ifdef MUSE_FEATURES
+uniform vec3 uMuseEyeAt;
+uniform vec4 uMuseMouthAt;
+uniform vec3 uMuseBlushAt;
+uniform vec4 uMuseFaceAt; // the plate's middle height, half sizes, and how far forward it starts
+#define EYE_AT uMuseEyeAt
+#define MOUTH_AT uMuseMouthAt
+#define BLUSH_AT uMuseBlushAt
+#define FACE_AT uMuseFaceAt.xyz
+#define FACE_FRONT uMuseFaceAt.w
+#else
 const vec3 EYE_AT = vec3(0.0973, 0.7709, 0.0198);
+#endif
 const float GLINT = 0.24; // the eyes' highlight's radius (× the eye's)
 const vec4 ARC = vec4(0.36, 0.78, 0.92, 0.21); // a shut eye's arc (× the eye's radius): its top, its fall to the ends (× x²), its half span, its line's half width
 const vec3 SQUEEZE = vec3(0.5, 0.48, 0.5);     // an eye squeezed shut, > < (× the eye's radius): its point toward the face's middle, its strokes' spread up and down, how far back they start
@@ -67,10 +85,13 @@ float segment(vec2 p, vec2 a, vec2 b) {
   vec2 ba = b - a;
   return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
 }
+#ifndef MUSE_FEATURES
 const vec4 MOUTH_AT = vec4(0.004, 0.7228, 0.0285, 0.0106);
-const float MOUTH_WIDTH = 0.0045;
 const vec3 BLUSH_AT = vec3(0.106, 0.727, 0.036);
 const vec3 FACE_AT = vec3(0.772, 0.182, 0.127);
+const float FACE_FRONT = 0.1;
+#endif
+const float MOUTH_WIDTH = 0.0045;
 
 float vnoise(vec3 p) {
   vec3 i = floor(p);
@@ -181,7 +202,10 @@ void main() {
   float shell = vShell;
   float H = uMuseSize.x;
   bool skin = shell <= 0.0;
-  bool onFace = vFur < 0.5 && vRest.z > 0.1;
+  bool onFace = vFur < 0.5 && vRest.z > FACE_FRONT;
+#ifdef MUSE_PAINTED
+  onFace = onFace && vCloth < 0.5;
+#endif
   if (!skin) {
     // a shell: only where a strand reaches this high (none on the face)
     if (vFur < 0.03) discard;
@@ -225,6 +249,10 @@ void main() {
     vec3 base = vColour * uMuseGrade * mix(0.74, 1.04, depth) * mix(0.7, 1.0, vOpen);
 #else
     vec3 base = mix(ROOTS, FUR * 1.05, depth) * mix(0.7, 1.0, vOpen);
+#endif
+#ifdef MUSE_PAINTED
+    // cloth as made, its creases shut in
+    base = mix(base, texture2D(uMusePaint, vUv).rgb * mix(0.7, 1.0, vOpen), smoothstep(0.3, 0.7, vCloth));
 #endif
     float light = smoothstep(-0.45, 0.75, ndl);
     light = mix(light, toonLight(ndl), 0.3) * (1.0 - cloud) * mix(0.88, 1.0, depth);

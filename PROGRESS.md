@@ -30,6 +30,40 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The muses in clothes (2026-11-02, in the lab)
+
+Kai's nine liked concepts, made into models (`src/assets/muse/muses/muse1–9.glb`), rigged as Muse is
+(museMesh.ts `DRESSED`): one at a time at `museLab.html#model=muse1` … `muse9` (all the lab's looks, and
+`look=kind`: fur cream, cloth blue, face pink), and all nine in a row at `museLab.html#lineup=1`
+(museLineup.ts).
+
+- **Prepared.** Each face is found by its eyes (a hat is wider than a plate), and the sculpt scaled so its
+  eyes are at tpose6's height (a hat reaches above 1). The sculpt's eyes and mouth are left out and Muse's
+  painted face put where they were (muse.frag.glsl `MUSE_FEATURES`); a plate grown into the hood (4, 8) is
+  picked out by its paint and filled to its oval.
+- **Fur and cloth.** Told apart by the paint: each vertex's colour against the fur's at the arms' ends
+  (CIELAB, lightness at half, for the paint's baked shade), a piece mostly one or the other made wholly so.
+  A garment the fur's own colour is cloth below a hem (2's linen smock; 6's jacket, in from its cuffs).
+  Cloth is painted from the texture as made (`MUSE_PAINTED`; the mesh split along the paint's seams), has
+  no fur and keeps its place; fur under it is pressed flat. Drawn on both sides (an apron is one sheet).
+- **Rigged.** Joints measured off each (the arm's sections; its root where the cut leaves it, or for an arm
+  of its own piece where it comes out of what it is set in), the arms' turns solved to hang and wave as
+  tpose6's. Sleeves are cut with the arm; a loose piece (a cuff, a strap) weighs as the skin under it, and
+  goes whole if it is on an arm; small things and hats go whole.
+- **The lineup.** Each idles on its own clock (breath, blinks, its weight shifting, glances) with a habit at
+  seeded times (a yawn, its fur shaken out, a hop, a long look round). A tap: a wave, or a bounce; a hold:
+  petted (> <, hearts, its fur up if held long); it turns to you. 60 fps at 1600 × 900, ready in about 4 s.
+- **Kai's notes, first look:** 5's sleeve didn't follow its arm (now cut with it); 2's arm left a hole in its
+  side (its arm sat in sleeves of the smock's that run into its body: it now turns where it comes out of
+  them, and fills them as it hangs).
+- **Checked:** tpose6 rigs byte for byte as before (a hash of every array), so the meadow's Muse is
+  unchanged; the Muse tests pass.
+- **Known issues:** 5's sleeve top shows the cream of the apron's strap (its texture has it painted there, under
+  the strap); 7's paw can show through its smock's sleeve as it hangs (its arms hang a little out, clear of the
+  smock's flare); the lab's one-muse frame cuts the tallest hats (use a `persp:` view, or the lineup).
+  `Answers.attending` is NaN while you hold Muse (the stage and the planet only test > 0, so Muse doesn't
+  turn to you while held there; the lineup reads it as 1).
+
 ## The unfolding (experiment, branch `unfold`)
 
 Kai's brief (2026-11-01), to test how the world unfolds for a new player: a

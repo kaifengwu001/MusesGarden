@@ -1,6 +1,6 @@
 import { Vector3, type BufferGeometry, type Mesh, type MeshStandardMaterial, type Texture } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import type { MuseMesh, SculptKind } from './museMesh';
+import type { DressedKind, MuseMesh, SculptKind } from './museMesh';
 import SculptWorker from './museSculpt.worker?worker&inline';
 
 // The Tripo3D sculpts of Muse (src/assets/muse/: each one GLB, unrigged, its
@@ -18,6 +18,19 @@ export const TRIPO_URLS: Record<SculptKind, string> = {
   tpose6: new URL('../assets/muse/tripo-tpose6.glb', import.meta.url).href,
 };
 
+/** The muses in clothes (museMesh.ts DRESSED). */
+export const DRESSED_URLS: Record<DressedKind, string> = {
+  muse1: new URL('../assets/muse/muses/muse1.glb', import.meta.url).href,
+  muse2: new URL('../assets/muse/muses/muse2.glb', import.meta.url).href,
+  muse3: new URL('../assets/muse/muses/muse3.glb', import.meta.url).href,
+  muse4: new URL('../assets/muse/muses/muse4.glb', import.meta.url).href,
+  muse5: new URL('../assets/muse/muses/muse5.glb', import.meta.url).href,
+  muse6: new URL('../assets/muse/muses/muse6.glb', import.meta.url).href,
+  muse7: new URL('../assets/muse/muses/muse7.glb', import.meta.url).href,
+  muse8: new URL('../assets/muse/muses/muse8.glb', import.meta.url).href,
+  muse9: new URL('../assets/muse/muses/muse9.glb', import.meta.url).href,
+};
+
 /**
  * The coat's albedo Muse is painted with (muse.frag.glsl FUR, linear): the
  * reference's cream, as the studio light of the lab returns its belly. The
@@ -27,14 +40,17 @@ const CREAM = [0.776, 0.658, 0.503] as const;
 
 export interface Loaded {
   body: MuseMesh;
-  /** A gain per channel (linear) that takes the paint's middle fur colour to the reference's cream. */
+  /** A gain per channel (linear) that takes the paint's middle fur colour to the reference's cream (a dressed muse keeps its own). */
   grade: Vector3;
   /** The mesh as exported (the lab shows it as it came). */
   raw: Mesh<BufferGeometry, MeshStandardMaterial>;
+  /** Its texture as made (a dressed muse's cloth is painted from it). */
+  paint: Texture | null;
 }
 
-export async function loadTripo(kind: SculptKind = 'tripo'): Promise<Loaded> {
-  const url = TRIPO_URLS[kind];
+export async function loadTripo(kind: SculptKind | DressedKind = 'tripo'): Promise<Loaded> {
+  const dressed = kind in DRESSED_URLS;
+  const url = dressed ? DRESSED_URLS[kind as DressedKind] : TRIPO_URLS[kind as SculptKind];
   const gltf = await new GLTFLoader().loadAsync(url);
   let found: Mesh<BufferGeometry, MeshStandardMaterial> | null = null;
   gltf.scene.traverse((o) => {
@@ -67,7 +83,7 @@ export async function loadTripo(kind: SculptKind = 'tripo'): Promise<Loaded> {
     };
     worker.postMessage(job, [job.position.buffer, job.normal.buffer, job.uv.buffer, ...(job.paint ? [job.paint.data.buffer] : [])]);
   });
-  return { body, grade: map ? gradeFor(map) : new Vector3(1, 1, 1), raw };
+  return { body, grade: map && !dressed ? gradeFor(map) : new Vector3(1, 1, 1), raw, paint: map };
 }
 
 /** A texture's image drawn at most `size` square, read back. */
