@@ -1,10 +1,13 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { SPECIES_MESH } from '../../life/flowerMeshes';
 import { basketFan, freeRect, type Fan } from './basketFan';
+import { DRAWING } from './basketDrawing';
+import type { ButtonLayout } from './basketOverlay';
 import type { BasketStage as Stage, StageFlower } from './basketStage';
 
 // The stage without a browser: it gets no canvas to draw on, but its flowers still move frame by frame, and the
-// overlay's buttons follow their heads (layout()), which is where a flower is drawn.
+// overlay's buttons follow their heads (layout()), which is where a flower is drawn. The basket's box there is the
+// drawing's opaque part, so a point on the screen can be read back as a point of the drawing.
 
 const SCREEN = { width: 1440, height: 900 };
 const RAIL = { left: 1372, top: 430, width: 44, height: 44 };
@@ -32,7 +35,19 @@ const newStage = (): Stage => new BasketStage({ append() {} } as unknown as HTML
 
 type Heads = Map<string, Array<{ x: number; y: number }>>;
 
-/** Frames until the act is done (and a few after): each flower's head per frame, and the basket's box on the frame each head first shows. */
+/** Whether a point on the screen is behind the drawn basket's front wall: on its opaque part, below its near rim's top edge. */
+function behindFrontWall(p: { x: number; y: number }, box: NonNullable<ButtonLayout['basket']>): boolean {
+  const { content, edge } = DRAWING;
+  const k = box.height / (content.bottom - content.top);
+  const x = content.left + (p.x - (box.x - box.width / 2)) / k;
+  const y = content.top + (p.y - (box.y - box.height / 2)) / k;
+  if (x < edge.from || x > edge.to || y > content.bottom) return false;
+  const f = ((x - edge.from) / (edge.to - edge.from)) * (edge.rows.length - 1);
+  const i = Math.min(Math.floor(f), edge.rows.length - 2);
+  return y > edge.rows[i] + (edge.rows[i + 1] - edge.rows[i]) * (f - i);
+}
+
+/** Frames until the act is done (and a few after): each flower's head per frame, and whether it first shows behind the basket's front wall. */
 function play(stage: Stage, act: (done: () => void) => void): { heads: Heads; first: Map<string, boolean> } {
   let done = false;
   act(() => (done = true));
@@ -45,7 +60,7 @@ function play(stage: Stage, act: (done: () => void) => void): { heads: Heads; fi
     for (const f of layout.flowers) {
       if (!heads.has(f.id)) {
         heads.set(f.id, []);
-        first.set(f.id, Math.abs(f.x - box.x) <= box.width / 2 && Math.abs(f.y - box.y) <= box.height / 2);
+        first.set(f.id, behindFrontWall(f, box));
       }
       heads.get(f.id)!.push({ x: f.x, y: f.y });
     }
@@ -64,7 +79,7 @@ function expectRise(fan: Fan, ids: readonly string[], { heads, first }: ReturnTy
   ids.forEach((id, k) => {
     const path = heads.get(id);
     expect(path, `${id} is shown`).toBeDefined();
-    expect(first.get(id), `${id} comes out of the basket`).toBe(true);
+    expect(first.get(id), `${id} comes out of the basket, from behind its front wall`).toBe(true);
     expect(jumps(path!), `${id} never jumps`).toEqual([]);
     const end = path!.at(-1)!;
     expect(Math.hypot(end.x - fan.slots[k].x, end.y - fan.slots[k].y), `${id} ends on its slot`).toBeLessThan(8);
