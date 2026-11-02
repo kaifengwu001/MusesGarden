@@ -39,6 +39,8 @@ export interface PlanetWorld {
   update(clock: FrameClock, aspect: number, viewportHeight: number): void;
   /** Close fade bands, finish queued work and snap the camera: the next frame is a pure function of state. */
   settle(): void;
+  /** A grade of its own (the frame's final grade, render/post.ts), in place of the style's contrast, brightness, tone curve and bloom. */
+  readonly grade?: { readonly curve: boolean; readonly bloom: boolean; readonly contrast: number; readonly brightness: number };
   /** Work done off the page's thread (the terraces' build in its worker): resolved once it is in place. */
   whenBuilt?(): Promise<void>;
   pick(ndcX: number, ndcY: number): Pick | null;

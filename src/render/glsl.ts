@@ -14,7 +14,6 @@ import water from '../planet/water.glsl?raw';
 import terracesCommon from '../terraces/common.glsl?raw';
 import terracesPaddy from '../terraces/paddy.glsl?raw';
 import terracesRice from '../terraces/rice.glsl?raw';
-import terracesWater from '../terraces/water.glsl?raw';
 import common from './common.glsl?raw';
 import fog from './fog.glsl?raw';
 import sun from './sun.glsl?raw';
@@ -45,7 +44,6 @@ const chunks: Record<string, string> = {
   terraces_common: terracesCommon,
   terraces_paddy: terracesPaddy,
   terraces_rice: terracesRice,
-  terraces_water: terracesWater,
 };
 
 export function registerShaderChunks(): void {

@@ -10,10 +10,11 @@ import { clip, faceDirection, Side, SphereGrid, tangentFrame, vertexCorner, type
 // mathematics (field.ts): every outline is found on the field itself, every
 // height, slope and normal worked out from it exactly, nothing read off a
 // mesh or a texture. The slope sorts the ground: the woods (their own ground,
-// the hills' height itself, with trees), the flats (plain fields in long
-// strips along the lie of the land, a band each, crossed every so far, thin
-// dark bunds between and a pale track winding through, as Kai's aerial of
-// flat rice fields has them), the terraces between.
+// the hills' height itself, with trees), the flats (plain fields, as Kai's
+// aerial of flat rice fields has them: each flat patch a lattice of its own,
+// long strips along the lie of its land crossed every so far, each field
+// level at the band its ground lies in on the whole and its own green, thin
+// dark bunds between and a pale track across), the terraces between.
 // Each band's paddies are filled level, each paddy its own (the cuts' lines
 // part them, bands.ts); along each bank a dam on the higher paddy's edge and
 // a riser down to the paddy below; across each cut a cross-bank; a bank of
@@ -22,8 +23,7 @@ import { clip, faceDirection, Side, SphereGrid, tangentFrame, vertexCorner, type
 // geometry comes out in chunks (a mesh each, culled on its own), per vertex
 // as the terraces' shaders read it (terrace.vert.glsl): position, normal,
 // aPart, aPaddy (its paddy's crop constants), aFloor (its floor or ground;
-// fallow, or the ground's slope; its share across its band; meters from its
-// bank).
+// fallow, or the ground's slope).
 
 export const PART = { floor: 0, riser: 1, bund: 2, bundSide: 3, earth: 4, ridge: 5, woods: 6, track: 7 } as const;
 
@@ -40,11 +40,14 @@ export interface DamParams {
 }
 
 export interface PlotParams {
-  /** A field's length (m: the strips, each a band, crossed this far apart) and how far the crossings wander (× it). */
+  /** A field's width across the strips and its length along them (m). */
+  readonly width: number;
   readonly length: number;
+  /** How far the strips' lines bend to and fro (× a field's width) and the crossings' (× its length), over 60 m or so. */
+  readonly bend: number;
   readonly warp: number;
-  /** The tracks winding through the flats: how far apart, about (m), and how wide (m). */
-  readonly trackScale: number;
+  /** Every how many crossings a track runs (pale, a cart's width: m) in place of a bund. */
+  readonly trackEvery: number;
   readonly trackWidth: number;
 }
 
@@ -73,7 +76,7 @@ export const BUILD: BuildParams = {
   minArea: 12,
   dam: { width: 0.3, widthVar: 0.08, widthScale: 7, height: 0.13, heightVar: 0.04, batter: 0.3 },
   cut: { spacing: [7, 20], cascade: 0.75, drift: 0.5, shift: 0.45, blend: 1.2 },
-  plot: { length: 32, warp: 0.3, trackScale: 120, trackWidth: 1.6 },
+  plot: { width: 9, length: 32, bend: 0.35, warp: 0.15, trackEvery: 4, trackWidth: 1.6 },
   treeSpacing: 2.2,
   leastWoods: 60,
   leastFlats: 400,
@@ -139,7 +142,7 @@ const OVERLAP = 0.1;
 const LOOK_SHARE = [0, 0.44, 0.54, 0.9, 1];
 const LOOK_DELAY = [1, 0.55, 0.424, 0.13, 0];
 
-const SLOT = { woods: 2, flat: 3, base: 100000, bands: 200000, u: 300000, v: 400000, w: 500000, cut: 600000 } as const;
+const SLOT = { woods: 2, flat: 3, base: 100000, bands: 200000, cut: 600000, fields: 1000000 } as const;
 
 /** A growable array of numbers, typed. */
 class Grow<T extends Float32Array | Float64Array | Int32Array | Uint8Array> {
@@ -394,40 +397,130 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   stats.cutLines = cutLines.length;
   stats.levelled = bands.dropped;
 
-  // the flats' fields: the strips are the bands themselves (along the lie of the land, a step apart); a turn of the
-  // planet's axes crosses them every field's length, wandering a little (the second coordinate); and the tracks,
-  // where a slow noise passes zero (its sign the third coordinate: −1 one side, 0 the other); the first coordinate
-  // is one cell everywhere
+  // the flats' fields: each flat patch (its vertices joined across the grid's triangles) a lattice of its own, on the
+  // plane at its middle: strips a field's width apart across the lie of its land (the way the hills' broader slope
+  // falls over it on the whole), crossed a field's length apart along it, both bending a little; a field is a cell
   const pl = P.plot;
-  const turn: number[] = [];
+  const patch = new Int32Array(V).fill(-1);
+  /** Per patch: its middle, the way its land falls (across the strips), the way the strips run (unit, xyz each). */
+  const patchFrame: number[] = [];
   {
-    let h = hash32((seed ^ 0x9107) >>> 0);
-    const r = (): number => unit((h = hash32((h + 0x9e3779b9) >>> 0)));
-    const a = r() * Math.PI * 2;
-    const b = Math.acos(2 * r() - 1);
-    const c = r() * Math.PI * 2;
-    const [ca, sa, cb, sb, cc, sc] = [Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b), Math.cos(c), Math.sin(c)];
-    turn.push(ca * cc - sa * cb * sc, -ca * sc - sa * cb * cc, sa * sb, sa * cc + ca * cb * sc, -sa * sc + ca * cb * cc, -ca * sb, sb * sc, sb * cc, cb);
-  }
-  const warpK = R / 60;
-  const trackK = R / pl.trackScale;
-  const latticeAt = (c: number, x: number, y: number, z: number): number => {
-    if (c === 0) return 0.5;
-    if (c === 2) return 0.5 * gnoise(x * trackK - 11.3, y * trackK + 27.1, z * trackK + 5.9, (seed + 0x7a75) >>> 0);
-    const q = (turn[3] * x + turn[4] * y + turn[5] * z) * R;
-    return q / pl.length + pl.warp * gnoise(x * warpK + 31.7, y * warpK - 12.9, z * warpK + 7.3, (seed + 0x9109) >>> 0);
-  };
-  const lattice = new Float32Array(3 * V).fill(Number.NaN);
-  const lat = (c: number, v: number): number => {
-    let q = lattice[3 * v + c];
-    if (Number.isNaN(q)) {
-      q = latticeAt(c, D[3 * v], D[3 * v + 1], D[3 * v + 2]);
-      lattice[3 * v + c] = q;
+    const up = new Int32Array(V);
+    for (let v = 0; v < V; v++) up[v] = v;
+    const root = (v: number): number => {
+      while (up[v] !== v) {
+        up[v] = up[up[v]];
+        v = up[v];
+      }
+      return v;
+    };
+    for (let f = 0; f < 6; f++) {
+      for (let cj = 0; cj < m; cj++) {
+        for (let ci = 0; ci < m; ci++) {
+          const t = grid.triangles(f, ci, cj);
+          for (let q = 0; q < 12; q += 3) {
+            for (let e = 0; e < 3; e++) {
+              const a = t[q + e];
+              const b = t[q + ((e + 1) % 3)];
+              if (!flatIdx[a] || !flatIdx[b]) continue;
+              const ra = root(a);
+              const rb = root(b);
+              if (ra !== rb) up[Math.max(ra, rb)] = Math.min(ra, rb);
+            }
+          }
+        }
+      }
     }
-    return q;
+    const ids = new Map<number, number>();
+    const sum: number[] = [];
+    for (let v = 0; v < V; v++) {
+      if (!flatIdx[v]) continue;
+      const r = root(v);
+      let id = ids.get(r);
+      if (id === undefined) {
+        id = ids.size;
+        ids.set(r, id);
+        sum.push(0, 0, 0);
+      }
+      patch[v] = id;
+      sum[3 * id] += D[3 * v];
+      sum[3 * id + 1] += D[3 * v + 1];
+      sum[3 * id + 2] += D[3 * v + 2];
+    }
+    // (the lie of each patch's land: the hills' broader gradient over it, its orientation's mean — the fall's way either
+    // way along it, so a valley's two sides agree)
+    const J = new Float64Array(3 * ids.size);
+    const frames: Float64Array[] = [];
+    for (let id = 0; id < ids.size; id++) {
+      const l = Math.hypot(sum[3 * id], sum[3 * id + 1], sum[3 * id + 2]) || 1;
+      frames.push(tangentFrame(sum[3 * id] / l, sum[3 * id + 1] / l, sum[3 * id + 2] / l, new Float64Array(6)));
+      sum[3 * id] /= l;
+      sum[3 * id + 1] /= l;
+      sum[3 * id + 2] /= l;
+    }
+    for (let v = 0; v < V; v += 3) {
+      const id = patch[v];
+      if (id < 0) continue;
+      field.height(D[3 * v], D[3 * v + 1], D[3 * v + 2], g3, true);
+      const F = frames[id];
+      const gx = g3[0] * F[0] + g3[1] * F[1] + g3[2] * F[2];
+      const gy = g3[0] * F[3] + g3[1] * F[4] + g3[2] * F[5];
+      J[3 * id] += gx * gx;
+      J[3 * id + 1] += gx * gy;
+      J[3 * id + 2] += gy * gy;
+    }
+    for (let id = 0; id < ids.size; id++) {
+      const F = frames[id];
+      const th = 0.5 * Math.atan2(2 * J[3 * id + 1], J[3 * id] - J[3 * id + 2]);
+      const [ca, sa] = [Math.cos(th), Math.sin(th)];
+      patchFrame.push(sum[3 * id], sum[3 * id + 1], sum[3 * id + 2]);
+      patchFrame.push(ca * F[0] + sa * F[3], ca * F[1] + sa * F[4], ca * F[2] + sa * F[5]);
+      patchFrame.push(-sa * F[0] + ca * F[3], -sa * F[1] + ca * F[4], -sa * F[2] + ca * F[5]);
+    }
+    stats.patches = ids.size;
+  }
+  const bendK = R / 60;
+  /** A patch's lattice at a direction: fam 0 across the strips (a field's width a unit), 1 along them (a field's length). */
+  const fieldAt = (fam: number, x: number, y: number, z: number, p: number): number => {
+    const o = 9 * p;
+    const F = patchFrame;
+    // (on the plane at the patch's middle: straight lines there are straight on the planet)
+    const s = Math.max(x * F[o] + y * F[o + 1] + z * F[o + 2], 0.2);
+    if (fam === 0) return (R * (x * F[o + 3] + y * F[o + 4] + z * F[o + 5])) / s / pl.width + pl.bend * gnoise(x * bendK + 31.7, y * bendK - 12.9, z * bendK + 7.3, (seed + 0x9109) >>> 0);
+    return (R * (x * F[o + 6] + y * F[o + 7] + z * F[o + 8])) / s / pl.length + pl.warp * gnoise(x * bendK - 5.3, y * bendK + 22.1, z * bendK - 17.9, (seed + 0x910a) >>> 0);
   };
-  const plotKey = (i: number, j: number, k: number): number => ((i + 512) * 1024 + (j + 512)) * 1024 + (k + 512);
-  const plotOf = (v: number): number => plotKey(Math.floor(lat(0, v)), Math.floor(lat(1, v)), Math.floor(lat(2, v)));
+  const latOwner = new Int32Array(V).fill(-1);
+  const latValue = new Float64Array(2 * V);
+  const lat = (fam: number, v: number, p: number): number => {
+    if (latOwner[v] !== p) {
+      // (a vertex between two patches: worked out again each time)
+      if (latOwner[v] >= 0) return fieldAt(fam, D[3 * v], D[3 * v + 1], D[3 * v + 2], p);
+      latOwner[v] = p;
+      latValue[2 * v] = fieldAt(0, D[3 * v], D[3 * v + 1], D[3 * v + 2], p);
+      latValue[2 * v + 1] = fieldAt(1, D[3 * v], D[3 * v + 1], D[3 * v + 2], p);
+    }
+    return latValue[2 * v + fam];
+  };
+  /** A field: its patch and its cell of the patch's lattice. */
+  const fieldKey = (p: number, i: number, j: number): number => (p * 4096 + (i + 2048)) * 4096 + (j + 2048);
+  const fieldOf = (v: number, p: number): number => fieldKey(p, Math.floor(lat(0, v, p)), Math.floor(lat(1, v, p)));
+  const psq = { face: 0, ci: 0, cj: 0 };
+  /** The patch a direction on the flats lies in (from the grid's vertices round it), or −1. */
+  const patchAt = (x: number, y: number, z: number): number => {
+    grid.square(x, y, z, psq);
+    for (let r = 0; r <= 2; r++) {
+      for (let dj = -r; dj <= r; dj++) {
+        for (let di = -r; di <= r; di++) {
+          const ci = psq.ci + di;
+          const cj = psq.cj + dj;
+          if (Math.max(Math.abs(di), Math.abs(dj)) !== r || ci < 0 || cj < 0 || ci >= m || cj >= m) continue;
+          const t = grid.triangles(psq.face, ci, cj);
+          for (const v of [t[2], t[0], t[3], t[6], t[9]]) if (patch[v] >= 0) return patch[v];
+        }
+      }
+    }
+    return -1;
+  };
 
   // the sides pieces are cut by (one per field and level, sharing their crossings with the outlines)
   const inWoods = new Side(grid, SLOT.woods, steepF, (v) => woodsIdx[v] === 1, true, steepV);
@@ -453,8 +546,18 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const [f, fv] = bands.H(k);
       return new Side(grid, SLOT.bands + k, f, (v) => bands.band[v] >= k, false, fv);
     });
-  const latticeSide = (c: number, i: number, above: boolean): Side =>
-    memoSide(1e7 * (c + 1) + 2 * (i + 50000) + (above ? 0 : 1), () => new Side(grid, [SLOT.u, SLOT.v, SLOT.w][c] + i + 50000, (x, y, z) => latticeAt(c, x, y, z) - i, (v) => Math.floor(lat(c, v)) >= i, above, (v) => lat(c, v) - i));
+  /** A patch's lattice line (fam 0: between strips, 1: a crossing) at i: its slot, and the side above it or below. */
+  const fieldLine = (p: number, fam: number, i: number): number => SLOT.fields + (p * 2 + fam) * 100000 + i + 50000;
+  const fieldSides = new Map<number, Side>();
+  const fieldSide = (p: number, fam: number, i: number, above: boolean): Side => {
+    const line = fieldLine(p, fam, i);
+    let sd = fieldSides.get(2 * line + (above ? 0 : 1));
+    if (!sd) {
+      sd = new Side(grid, line, (x, y, z) => fieldAt(fam, x, y, z, p) - i, (v) => Math.floor(lat(fam, v, p)) >= i, above, (v) => lat(fam, v, p) - i);
+      fieldSides.set(2 * line + (above ? 0 : 1), sd);
+    }
+    return sd;
+  };
 
   // the cuts' lines part the paddies: the triangles' edges each crosses, per band
   const barrier = new Map<number, Set<number>>();
@@ -583,14 +686,25 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   };
   // the woods' triangles: points, chunk
   const woodsTri = new Grow(new Int32Array(1 << 16));
-  // the fields' triangles: points, field, chunk; per corner its share across its band and meters from its step
+  // the fields' triangles: points, field, chunk; per field its area and its ground's terrace field over it (m³), and
+  // per patch the squares it lies in
   const plotTri = new Grow(new Int32Array(1 << 16));
-  const plotRow = new Grow(new Float32Array(1 << 16));
-  // (a field: its cell of the lattice and its band, key · L + band)
   const plotIds = new Map<number, number>();
+  const plotArea: number[] = [];
+  const plotSum: number[] = [];
+  // (checks: the terrace field's least and most under each field)
+  const plotLo: number[] = [];
+  const plotHi: number[] = [];
+  const weigh = (plot: number, a: Corner, b: Corner, c: Corner, t: number, lo: number, hi: number): void => {
+    const area = R * R * triArea([a.x, a.y, a.z], [b.x, b.y, b.z], [c.x, c.y, c.z]);
+    plotArea[plot] += area;
+    plotSum[plot] += area * t;
+    plotLo[plot] = Math.min(plotLo[plot], lo);
+    plotHi[plot] = Math.max(plotHi[plot], hi);
+  };
+  const patchSquares = new Map<number, number[]>();
   // the paddies' pieces: per triangle slot (4 a square) its first piece, first band and count; per piece whether it
-  // holds any of the floor, whether a cut parts it, its band; the pieces' triangles (points, piece, chunk) and per
-  // corner its share across its band and meters from its bank
+  // holds any of the floor, whether a cut parts it, its band; the pieces' triangles (points, piece, chunk)
   const slots = 4 * 6 * m * m;
   const slotFirst = new Int32Array(slots).fill(-1);
   const slotK0 = new Int32Array(slots);
@@ -599,10 +713,8 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   const pieceParted = new Grow(new Uint8Array(1 << 16));
   const pieceBand = new Grow(new Int32Array(1 << 16));
   const paddyTri = new Grow(new Int32Array(1 << 18));
-  const paddyRow = new Grow(new Float32Array(1 << 18));
-  // the halves of parted pieces: points, piece, cut, side, chunk; their rows
+  // the halves of parted pieces: points, piece, cut, side, chunk
   const halfTri = new Grow(new Int32Array(1 << 12));
-  const halfRow = new Grow(new Float32Array(1 << 12));
   const pieceOf = (slot: number, k: number): number => {
     const first = slotFirst[slot];
     if (first < 0) return -1;
@@ -615,24 +727,6 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     pieceParted.push(0);
     pieceBand.push(k);
     return pieceValid.n - 1;
-  };
-  /** A floor's corner's share across its band (0 its bank … 1 the next) and how far from its bank (m). */
-  const rowsOf = (c: Corner, k: number, out: Grow<Float32Array>): void => {
-    let gk: number;
-    let gk1: number;
-    let s: number;
-    if (c.v >= 0) {
-      gk = bands.gv(k, c.v);
-      gk1 = bands.gv(k + 1, c.v);
-      s = S[c.v];
-    } else {
-      const t = field.terrace(c.x, c.y, c.z);
-      gk = bands.g(k, c.x, c.y, c.z, t);
-      gk1 = bands.g(k + 1, c.x, c.y, c.z, t);
-      s = field.slope(c.x, c.y, c.z);
-    }
-    out.push(Math.min(Math.max(gk / Math.max(gk - gk1, 1e-6), 0), 1));
-    out.push(Math.max(gk, 0) / Math.max(s, 0.02));
   };
   const fan = (c: Corner[], emit: (a: Corner, b: Corner, d: Corner) => void): void => {
     for (let i = 1; i + 1 < c.length; i++) emit(c[0], c[i], c[i + 1]);
@@ -650,7 +744,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
         corners[2] = t[6];
         corners[3] = t[9];
         const five = [t[0], t[3], t[6], t[9], t[2]];
-        // (whole squares: the woods, a plot, a band with no cut through it)
+        // (whole squares: the woods, a field, a band with no cut through it)
         if (five.every((v) => woodsIdx[v])) {
           for (const [a, b, c] of [
             [0, 1, 2],
@@ -663,19 +757,23 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           }
           continue;
         }
-        if (five.every((v) => !woodsIdx[v] && flatIdx[v]) && five.every((v) => plotOf(v) === plotOf(five[0]) && bands.band[v] === bands.band[five[0]])) {
-          const plot = plotIndex(plotOf(five[0]) * L + bands.band[five[0]]);
+        const pp = patch[five.find((v) => patch[v] >= 0) ?? five[0]];
+        if (five.every((v) => flatIdx[v]) && five.every((v) => fieldOf(v, pp) === fieldOf(five[0], pp))) {
+          const plot = plotIndex(fieldOf(five[0], pp));
+          const t4 = [T[five[0]], T[five[1]], T[five[2]], T[five[3]]];
+          const t0 = (t4[0] + t4[1] + t4[2] + t4[3]) / 4;
           for (const [a, b, c] of [
             [0, 1, 2],
             [0, 2, 3],
           ]) {
-            for (const k of [a, b, c]) {
-              plotTri.push(corners[k]);
-              rowsOf(vertexCorner(grid, corners[k]), bands.band[five[0]], plotRow);
-            }
+            for (const k of [a, b, c]) plotTri.push(corners[k]);
             plotTri.push(plot);
             plotTri.push(chunk);
+            weigh(plot, vertexCorner(grid, corners[a]), vertexCorner(grid, corners[b]), vertexCorner(grid, corners[c]), t0, Math.min(...t4), Math.max(...t4));
           }
+          const list = patchSquares.get(pp);
+          if (list) list.push(si);
+          else patchSquares.set(pp, [si]);
           continue;
         }
         const k0 = bands.band[five[0]];
@@ -691,15 +789,13 @@ export function buildTerraces(input: BuildInput): BuildOutput {
             [0, 1, 2],
             [0, 2, 3],
           ]) {
-            for (const k of [a, b, c]) {
-              paddyTri.push(corners[k]);
-              rowsOf(vertexCorner(grid, corners[k]), k0, paddyRow);
-            }
+            for (const k of [a, b, c]) paddyTri.push(corners[k]);
             paddyTri.push(piece);
             paddyTri.push(chunk);
           }
           continue;
         }
+        let onFlats = false;
         for (let q = 0; q < 4; q++) {
           const tri: Corner[] = [vertexCorner(grid, t[3 * q]), vertexCorner(grid, t[3 * q + 1]), vertexCorner(grid, t[3 * q + 2])];
           const w = clip(tri, inWoods);
@@ -712,39 +808,29 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           const rest = clip(tri, outWoods);
           if (rest.length < 3) continue;
           const fl = clip(rest, inFlats);
-          if (fl.length >= 3) {
+          if (fl.length >= 3 && pp >= 0) {
+            // (the triangle cut into its patch's fields: between two lines of the strips and two of the crossings)
+            onFlats = true;
             const vs = [t[3 * q], t[3 * q + 1], t[3 * q + 2]];
-            const lo3 = [0, 1, 2].map((c) => Math.min(...vs.map((v) => Math.floor(lat(c, v)))));
-            const hi3 = [0, 1, 2].map((c) => Math.max(...vs.map((v) => Math.floor(lat(c, v)))));
-            for (let i = lo3[0]; i <= hi3[0]; i++) {
-              for (let j = lo3[1]; j <= hi3[1]; j++) {
-                for (let k = lo3[2]; k <= hi3[2]; k++) {
-                  let pc = fl;
-                  pc = clip(pc, latticeSide(0, i, true));
-                  pc = clip(pc, latticeSide(0, i + 1, false));
-                  pc = clip(pc, latticeSide(1, j, true));
-                  pc = clip(pc, latticeSide(1, j + 1, false));
-                  pc = clip(pc, latticeSide(2, k, true));
-                  pc = clip(pc, latticeSide(2, k + 1, false));
-                  if (pc.length < 3) continue;
-                  // (each field cut by the bands, each part of it at its own band's level: a field is never a step
-                  // off its ground)
-                  const fb0 = Math.min(...vs.map((v) => bands.band[v]));
-                  const fb1 = Math.max(...vs.map((v) => bands.band[v]));
-                  for (let kb = fb0; kb <= fb1; kb++) {
-                    const pb = fb0 === fb1 ? pc : clip(clip(pc, bandFrom(kb)), bandTo(kb + 1));
-                    if (pb.length < 3) continue;
-                    const plot = plotIndex(plotKey(i, j, k) * L + kb);
-                    fan(pb, (a, b, c) => {
-                      for (const p of [a, b, c]) {
-                        plotTri.push(p.id);
-                        rowsOf(p, kb, plotRow);
-                      }
-                      plotTri.push(plot);
-                      plotTri.push(chunk);
-                    });
-                  }
-                }
+            const tm = (T[vs[0]] + T[vs[1]] + T[vs[2]]) / 3;
+            const lo2 = [0, 1].map((c) => Math.min(...vs.map((v) => Math.floor(lat(c, v, pp)))));
+            const hi2 = [0, 1].map((c) => Math.max(...vs.map((v) => Math.floor(lat(c, v, pp)))));
+            for (let i = lo2[0]; i <= hi2[0]; i++) {
+              for (let j = lo2[1]; j <= hi2[1]; j++) {
+                let pc = clip(fl, fieldSide(pp, 0, i, true));
+                pc = clip(pc, fieldSide(pp, 0, i + 1, false));
+                pc = clip(pc, fieldSide(pp, 1, j, true));
+                pc = clip(pc, fieldSide(pp, 1, j + 1, false));
+                if (pc.length < 3) continue;
+                const plot = plotIndex(fieldKey(pp, i, j));
+                fan(pc, (a, b, c) => {
+                  plotTri.push(a.id);
+                  plotTri.push(b.id);
+                  plotTri.push(c.id);
+                  plotTri.push(plot);
+                  plotTri.push(chunk);
+                  weigh(plot, a, b, c, tm, Math.min(T[vs[0]], T[vs[1]], T[vs[2]]), Math.max(T[vs[0]], T[vs[1]], T[vs[2]]));
+                });
               }
             }
           }
@@ -764,10 +850,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
             const id = slotFirst[slot] + (k - b0);
             pieceValid.a[id] = 1;
             fan(pc, (a, b, c) => {
-              for (const p of [a, b, c]) {
-                paddyTri.push(p.id);
-                rowsOf(p, k, paddyRow);
-              }
+              paddyTri.push(a.id);
+              paddyTri.push(b.id);
+              paddyTri.push(c.id);
               paddyTri.push(id);
               paddyTri.push(chunk);
             });
@@ -783,10 +868,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
               if (half.length < 3) continue;
               pieceParted.a[id] = 1;
               fan(half, (a, b, c) => {
-                for (const p of [a, b, c]) {
-                  halfTri.push(p.id);
-                  rowsOf(p, k, halfRow);
-                }
+                halfTri.push(a.id);
+                halfTri.push(b.id);
+                halfTri.push(c.id);
                 halfTri.push(id);
                 halfTri.push(cut);
                 halfTri.push(sign);
@@ -794,6 +878,11 @@ export function buildTerraces(input: BuildInput): BuildOutput {
               });
             }
           }
+        }
+        if (onFlats) {
+          const list = patchSquares.get(pp);
+          if (list) list.push(si);
+          else patchSquares.set(pp, [si]);
         }
       }
     }
@@ -806,6 +895,10 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     if (i === undefined) {
       i = plotIds.size;
       plotIds.set(key, i);
+      plotArea.push(0);
+      plotSum.push(0);
+      plotLo.push(Infinity);
+      plotHi.push(-Infinity);
     }
     return i;
   }
@@ -884,8 +977,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   const crops = new Map<number, number[]>();
   let paddies = 0;
   const cropOf = (u: number, h: number): number[] =>
-    // (variant, place in the season, its plants' and its water's own share; fallow now and then)
-    [unit(hash32((h ^ 0x51) >>> 0)), delayOf(u), unit(hash32((h ^ 0x63) >>> 0)), unit(hash32((h ^ 0x25) >>> 0)), unit(hash32((h ^ 0x85) >>> 0)) < 0.05 ? 1 : 0];
+    // (variant, place in the season, its plants' and its water's own share; never fallow: the lab's paddies take the
+    // aerial's six looks only)
+    [unit(hash32((h ^ 0x51) >>> 0)), delayOf(u), unit(hash32((h ^ 0x63) >>> 0)), unit(hash32((h ^ 0x25) >>> 0)), 0];
   const paddyCrop = (piece: number): number[] => {
     const r = find(piece);
     let c = crops.get(r);
@@ -925,26 +1019,45 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   });
   time('Paddies');
 
-  // the fields' floors: level, each at its band's level
+  // the fields' floors: level, each at the band its ground lies in on the whole (the lab's: a field a step at most from
+  // the fields and paddies round it, its bunds and the flats' edge covering the step)
   const plotFloor = new Float64Array(plotIds.size);
-  for (const [key, i] of plotIds) plotFloor[i] = floorOf(((key % L) + L) % L);
-  const plotCrop: number[][] = [];
-  // (the fields grown, each its own green: yellow-green to deep, as in Kai's aerial; a field cut by a band's step keeps
-  // one green either side of it)
-  for (const [key, i] of plotIds) {
-    const cell = Math.floor(key / L);
-    plotCrop[i] = cropOf(0.56 + 0.44 * unit(hash32((cell ^ (seed + 78)) >>> 0)), hash32((cell + seed) >>> 0));
+  for (let i = 0; i < plotIds.size; i++) {
+    const t = plotSum[i] / Math.max(plotArea[i], 1e-9);
+    let a = 0;
+    let b = L;
+    while (a < b) {
+      const c = (a + b) >> 1;
+      if (levels[c] > t) b = c;
+      else a = c + 1;
+    }
+    plotFloor[i] = floorOf(a - 1);
   }
+  // (checks: how far the fields' floors stand off their ground, in steps: the worst, and how many stand over a step
+  // above some of it or under it)
+  stats.fieldsOver = 0;
+  stats.fieldsUnder = 0;
+  stats.fieldsWorst = 0;
+  for (let i = 0; i < plotIds.size; i++) {
+    const over = (plotFloor[i] - plotLo[i]) / step;
+    const under = (plotHi[i] - plotFloor[i]) / step;
+    if (over > 1.5) stats.fieldsOver++;
+    if (under > 1.5) stats.fieldsUnder++;
+    stats.fieldsWorst = Math.max(stats.fieldsWorst, Math.round(10 * Math.max(over, under)) / 10);
+  }
+  const plotCrop: number[][] = [];
+  // (the fields planted and grown, each its own green, lime to deep, as in Kai's aerial)
+  for (const [key, i] of plotIds) plotCrop[i] = cropOf(0.46 + 0.54 * unit(hash32((key ^ (seed + 78)) >>> 0)), hash32((key + seed) >>> 0));
 
   // the floors and the woods' ground, chunk by chunk
   const chunks = Array.from({ length: 6 * CHUNKS * CHUNKS }, () => new Chunk());
-  const floorVertex = (c: Chunk, id: number, owner: number, h: number, crop: number[], across: number, rows: number): number => {
+  const floorVertex = (c: Chunk, id: number, owner: number, h: number, crop: number[]): number => {
     const key = id * 4194304 + owner;
     const known = c.shared.get(key);
     if (known !== undefined) return known;
     grid.point(id, tmp);
     const s = R + h;
-    const v = c.vertex(tmp[0] * s, tmp[1] * s, tmp[2] * s, PART.floor, crop, h, crop[4], across, rows, tmp);
+    const v = c.vertex(tmp[0] * s, tmp[1] * s, tmp[2] * s, PART.floor, crop, h, crop[4], 0, 0, tmp);
     c.shared.set(key, v);
     return v;
   };
@@ -955,7 +1068,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     const crop = paddyCrop(piece);
     const h = floorOf(pieceBand.a[piece]);
     const owner = find(piece);
-    for (let k = 0; k < 3; k++) c.index.push(floorVertex(c, paddyTri.a[i + k], owner, h, crop, paddyRow.a[(i / 5) * 6 + 2 * k], paddyRow.a[(i / 5) * 6 + 2 * k + 1]));
+    for (let k = 0; k < 3; k++) c.index.push(floorVertex(c, paddyTri.a[i + k], owner, h, crop));
   }
   for (let i = 0; i < halfTri.n; i += 7) {
     const piece = halfTri.a[i + 3];
@@ -965,13 +1078,13 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     const owner = find(sideOf.get(cut * 2 + (sign > 0 ? 0 : 1)) ?? piece);
     const crop = paddyCrop(owner);
     const h = floorOf(pieceBand.a[piece]);
-    for (let k = 0; k < 3; k++) c.index.push(floorVertex(c, halfTri.a[i + k], owner, h, crop, halfRow.a[(i / 7) * 6 + 2 * k], halfRow.a[(i / 7) * 6 + 2 * k + 1]));
+    for (let k = 0; k < 3; k++) c.index.push(floorVertex(c, halfTri.a[i + k], owner, h, crop));
   }
   const PLOTS = 4194304 - 65536;
   for (let i = 0; i < plotTri.n; i += 5) {
     const plot = plotTri.a[i + 3];
     const c = chunks[plotTri.a[i + 4]];
-    for (let k = 0; k < 3; k++) c.index.push(floorVertex(c, plotTri.a[i + k], PLOTS + plot, plotFloor[plot], plotCrop[plot], plotRow.a[(i / 5) * 6 + 2 * k], plotRow.a[(i / 5) * 6 + 2 * k + 1]));
+    for (let k = 0; k < 3; k++) c.index.push(floorVertex(c, plotTri.a[i + k], PLOTS + plot, plotFloor[plot], plotCrop[plot]));
   }
   for (const c of chunks) c.shared.clear();
   // (the woods' ground: the hills' own height at each point, its normal from their gradient there)
@@ -999,10 +1112,15 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   stats.paddies = paddies;
   stats.plots = plotIds.size;
 
-  // the floor a direction stands on: the woods' ground, a plot's floor, a band's
+  // the floor a direction stands on: the woods' ground, a field's floor, a band's
   const surfaceAt = (x: number, y: number, z: number): number => {
     const cls = classAt(x, y, z);
     if (cls === 0) return field.height(x, y, z);
+    if (cls === 1) {
+      const p = patchAt(x, y, z);
+      const id = p < 0 ? undefined : plotIds.get(fieldKey(p, Math.floor(fieldAt(0, x, y, z, p)), Math.floor(fieldAt(1, x, y, z, p))));
+      if (id !== undefined) return plotFloor[id];
+    }
     return floorOf(bands.bandAt(x, y, z));
   };
   /** How steep the terrace field is at a direction (m per m: its own gradient, as the lab reads it). */
@@ -1029,8 +1147,8 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     if (count < 3) continue;
     const at = (i: number): number => (chain.closed ? (i + count) % count : Math.min(Math.max(i, 0), count - 1));
     const N = normals(pts, chain.closed);
-    // where it is a bank: its band still there (not pinched out), and terraced (a dam on its edge) or on the flats
-    // (a step between two fields, a thin dark bund on its edge)
+    // where it is a bank: its band still there (not pinched out), and terraced (on the flats each field is level on its
+    // own, the bands' outlines no step there)
     const present = new Uint8Array(count);
     const cls = new Int8Array(count);
     for (let i = 0; i < count; i++) {
@@ -1040,9 +1158,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       cls[i] = classAt(x, y, z);
     }
     const built = new Uint8Array(count);
-    for (const style of [2, 1]) {
+    {
       const ok = new Uint8Array(count);
-      for (let i = 0; i < count; i++) ok[i] = present[i] && cls[i] === style ? 1 : 0;
+      for (let i = 0; i < count; i++) ok[i] = present[i] && cls[i] === 2 ? 1 : 0;
       // (where it ends at the woods or the other farmed land, a little on into it, within its edge's half-width:
       // its end buried in it)
       {
@@ -1070,7 +1188,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       for (let i = 0; i < count; i++) if (ok[i] === 2) ok[i] = 1;
       for (const run of runs(ok, chain.closed)) {
         banks++;
-        bank(run.idx, run.closed, style === 1);
+        bank(run.idx, run.closed);
         for (const i of run.idx) {
           built[i] = 1;
           const key = cellOf(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]);
@@ -1086,14 +1204,14 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const [x, y, z] = [pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]];
       const [ix, iy, iz] = moveTo(x, y, z, N[3 * i], N[3 * i + 1], N[3 * i + 2], 0.04);
       const [ox, oy, oz] = moveTo(x, y, z, N[3 * i], N[3 * i + 1], N[3 * i + 2], -0.05);
-      if (classAt(ix, iy, iz) === 0 || classAt(ox, oy, oz) === 0) continue;
+      if (classAt(ix, iy, iz) !== 2 || classAt(ox, oy, oz) !== 2) continue;
       const inner = bands.bandAt(ix, iy, iz);
       const outer = bands.bandAt(ox, oy, oz);
       if (inner > outer) candidates.push(x, y, z, k + 0.001 * Math.min(inner - k + 1, 9) + 0.0001 * (present[i] ? 1 : 0));
     }
 
-    /** A bank along the points idx: a dam and a riser (the terraces), or a thin dark bund over a riser (a step on the flats). */
-    function bank(idx: number[], closed: boolean, flats: boolean): void {
+    /** A bank along the points idx: a dam and a riser under it. */
+    function bank(idx: number[], closed: boolean): void {
       // (an open run carried on a little past both its ends, along its own way: its ends overlap whatever they meet)
       const c = idx.length + (closed ? 0 : 2);
       const p = new Float64Array(3 * c);
@@ -1127,8 +1245,8 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const floor = floorOf(k);
       for (let i = 0; i < c; i++) {
         const [x, y, z] = [p[3 * i], p[3 * i + 1], p[3 * i + 2]];
-        w[i] = flats ? 0.6 * widthAt(x, y, z) : widthAt(x, y, z);
-        Hd[i] = flats ? 0.45 * heightAt(x, y, z) : heightAt(x, y, z);
+        w[i] = widthAt(x, y, z);
+        Hd[i] = heightAt(x, y, z);
         slope[i] = steepness(x, y, z);
         w[i] = Math.min(w[i], 0.45 * (up / slope[i]));
         const a = ring(i - 1);
@@ -1190,7 +1308,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           const z = p[3 * i + 2] + (q[3 * i + 2] - p[3 * i + 2]) * s;
           const l = Math.hypot(x, y, z);
           const h = s === 1 ? floor - UNDER : floor + f * Hd[i];
-          ch.vertex((x / l) * (R + h), (y / l) * (R + h), (z / l) * (R + h), flats ? PART.earth : s < 0.7 ? PART.bund : PART.bundSide, NONE, floor, 0, 0, 0);
+          ch.vertex((x / l) * (R + h), (y / l) * (R + h), (z / l) * (R + h), s < 0.7 ? PART.bund : PART.bundSide, NONE, floor, 0, 0, 0);
         }
       }
       const segs = closed ? c : c - 1;
@@ -1235,7 +1353,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           const v = ch.vertex(x * footR, y * footR, z * footR, PART.riser, NONE, floor, 0, 0, 0);
           if (i === 0) tri(ch, a, v, a + 1);
           else tri(ch, a, a + 1, v);
-          const f = ch.vertex(x * (R + floor - UNDER), y * (R + floor - UNDER), z * (R + floor - UNDER), flats ? PART.earth : PART.bundSide, NONE, floor, 0, 0, 0);
+          const f = ch.vertex(x * (R + floor - UNDER), y * (R + floor - UNDER), z * (R + floor - UNDER), PART.bundSide, NONE, floor, 0, 0, 0);
           for (let j = 0; j + 1 < M; j++) {
             if (i === 0) tri(ch, f, d0 + i * M + j + 1, d0 + i * M + j);
             else tri(ch, f, d0 + i * M + j, d0 + i * M + j + 1);
@@ -1342,7 +1460,8 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       PART.ridge,
     );
   }
-  // the fields' bunds (thin, dark) and the tracks (pale, a cart's width)
+  // the fields' bunds (thin, dark) along their patch's lattice, and every so many crossings a track (pale, a cart's
+  // width) in its place: each line traced over its patch's squares, kept where the flats are
   const flatRuns = (chains: Chain[], width: number, rise: number, wall: number, top: number): void => {
     for (const chain of chains) {
       const pts = resample(grid, chain, P.edgeSpacing);
@@ -1361,28 +1480,34 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       }
     }
   };
-  for (let cc = 1; cc < 3; cc++) {
-    // (the crossings and the tracks, traced over the planet; kept where the flats are)
-    const idx = new Int32Array(V);
-    for (let v = 0; v < V; v++) idx[v] = Math.floor(lat(cc, v));
-    const slot0 = [SLOT.u, SLOT.v, SLOT.w][cc] + 50000;
-    flatRuns(
-      grid.trace(idx, (u, w, k) =>
-        grid.crossing(
-          slot0 + k,
-          u,
-          w,
-          (x, y, z) => latticeAt(cc, x, y, z) - k,
-          (v) => lat(cc, v) - k,
-        ),
-      ),
-      cc === 2 ? pl.trackWidth : 0.6 * D_.width,
-      cc === 2 ? 0.04 : 0.06,
-      cc === 2 ? PART.track : PART.earth,
-      cc === 2 ? PART.track : PART.earth,
-    );
+  const lineIdx = new Int32Array(V);
+  for (const [p, squares] of patchSquares) {
+    for (let fam = 0; fam < 2; fam++) {
+      for (const si of squares) {
+        const f = Math.floor(si / (m * m));
+        const cj = Math.floor((si - f * m * m) / m);
+        const t = grid.triangles(f, si - f * m * m - cj * m, cj);
+        for (const v of [t[0], t[3], t[6], t[9], t[2]]) lineIdx[v] = Math.floor(lat(fam, v, p));
+      }
+      const chains = grid.trace(lineIdx, (u, w, k) => grid.crossing(fieldLine(p, fam, k), u, w, (x, y, z) => fieldAt(fam, x, y, z, p) - k, (v) => lat(fam, v, p) - k), squares);
+      const track = (k: number): boolean => fam === 1 && ((k % pl.trackEvery) + pl.trackEvery) % pl.trackEvery === 0;
+      flatRuns(
+        chains.filter((c) => !track(c.level)),
+        0.6 * D_.width,
+        0.06,
+        PART.earth,
+        PART.earth,
+      );
+      flatRuns(
+        chains.filter((c) => track(c.level)),
+        pl.trackWidth,
+        0.04,
+        PART.track,
+        PART.track,
+      );
+    }
   }
-  // where the flats meet the terraces: a bund between the plot and the paddy
+  // where the flats meet the terraces: a bund between the field and the paddy
   const edgeRidge = (chains: Chain[], width: number, rise: (hl: number, hr: number) => number, wall: number, top: number): void => {
     for (const chain of chains) {
       const pts = resample(grid, chain, P.edgeSpacing);

@@ -6,7 +6,6 @@
 // light rows are the meadow's (ROW_SKY, ROW_CLOUD, ROW_LIGHT in toon.glsl).
 #define TR_RICE 0
 #define TR_EARTH 1
-#define TR_WATER 2
 #define TR_FOREST 3
 #define TR_PEAK 4
 #define TR_FOG 5

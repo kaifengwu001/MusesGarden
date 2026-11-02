@@ -57,6 +57,8 @@ export function seasonFront(bloom: number): number {
  */
 export class TerraceWorld implements PlanetWorld {
   readonly kind = 'terraces' as const;
+  /** The paddy lab's grade: none (the lab draws straight to the canvas), so the colours measured from Kai's aerial reach the screen as measured: no tone curve, bloom, contrast or dimming; the paper grain stays. */
+  readonly grade = { curve: false, bloom: false, contrast: 1, brightness: 1 } as const;
   readonly scene = new Scene();
   readonly rig = new CameraRig();
   readonly palette = new Palette(TERRACE_ROWS);
@@ -79,12 +81,10 @@ export class TerraceWorld implements PlanetWorld {
   readonly rice: Rice;
   readonly objects: TerraceBuild;
   readonly paddyMap: PaddyMap;
-  /** The world's own: its noise's seed, the season's front, the paddies' water and the crop's look (paddy.glsl, water.glsl, terrace.frag.glsl). */
+  /** The world's own: its noise's seed, the season's front, the rice blades' near field (paddy.glsl, rice.vert.glsl, terrace.frag.glsl). */
   private readonly own = {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
-    uPaddyWater: { value: new Vector4(0.85, 0, 0, 0) },
-    uRiceLook: { value: new Vector4(0.6, 0, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
   };
   private posed = false;
@@ -344,8 +344,6 @@ export class TerraceWorld implements PlanetWorld {
     (this.shared.uGustRot.value as Vector4).set(Math.cos(gusts), Math.sin(gusts), Math.cos(ripples), Math.sin(ripples));
     (this.shared.uGustFreq.value as Vector4).set(R / 16, R / 5.5, 0, 0);
     L.uDebug.value = DEBUG_VIEWS[p.ui.debug];
-    this.own.uPaddyWater.value.set(p.water.reflection, 0, 0, clock.time);
-    this.own.uRiceLook.value.set(p.wind.sheen * 1.2, 0, 0, 0);
   }
 
   effectiveTriangles(submitted: number): number {

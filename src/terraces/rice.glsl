@@ -1,40 +1,29 @@
-// The crop's colour lit by b (the paint's and the blades'): by its stage
-// (seedlings a pale yellow-green, then fresh, then deep green, heading out
-// yellow-green at the tips, a few turning gold), each paddy its own shade of
-// green, slightly: lighter or darker, toward jade, lime or blue-green; the
-// taller and denser, the deeper its shade. And how much of a floor the crop
-// hides (the built paddies' paint and the far field's).
-// Requires: meadow_toon, terraces_common, terraces_paddy.
+// The paddies as the paddy lab paints them (src/dev/paddyLab/), the built
+// paddies' paint and the blades': each paddy one colour, its look by its stage
+// (the lab's LOOKS, measured from Kai's aerial), lit as the lab lights them.
+// Requires: meadow_toon, terraces_common.
 
-vec3 riceLit(float maturity, float variant) {
-  float m = maturity;
-  vec3 lit = mix(pal(TR_RICE, 0), pal(TR_RICE, 1), smoothstep(0.1, 0.45, m));
-  lit = mix(lit, pal(TR_RICE, 2), smoothstep(0.45, 0.85, m));
-  lit = mix(lit, pal(TR_RICE, 3), smoothstep(0.86, 1.0, m) * smoothstep(0.35, 0.9, variant) * 0.7);
-  lit = mix(lit, pal(TR_RICE, 4), smoothstep(0.93, 1.0, m) * smoothstep(0.85, 0.97, variant));
-  float v2 = fract(variant * 7.13);
-  float v3 = fract(variant * 3.71);
-  lit = mix(lit, pal(TR_RICE, 9), 0.28 * smoothstep(0.5, 0.95, v2));
-  lit = mix(lit, pal(TR_RICE, 11), 0.26 * smoothstep(0.45, 0.05, v2));
-  lit = mix(lit, pal(TR_RICE, 12), 0.24 * smoothstep(0.62, 0.95, v3));
-  return lit * (0.86 + 0.26 * fract(variant * 5.17));
+// A paddy's look by its place in the season (maturity, 0 flooded … 1 ripe; variant, 0..1 its own): flooded, the
+// sky's white with a touch of lilac (one in five shallow, a greyer white), then just planted (lime), growing,
+// grown, grown deep. At the season's default front the paddies share the looks as the lab's do (build/construct.ts
+// LOOK_SHARE).
+vec3 paddyLook(float maturity, float variant) {
+  vec3 c = mix(pal(TR_RICE, 0), pal(TR_RICE, 1), step(variant, 0.18));
+  c = mix(c, pal(TR_RICE, 2), smoothstep(0.0, 0.02, maturity));
+  c = mix(c, pal(TR_RICE, 3), smoothstep(0.29, 0.31, maturity));
+  c = mix(c, pal(TR_RICE, 4), smoothstep(0.64, 0.66, maturity));
+  return mix(c, pal(TR_RICE, 5), smoothstep(0.985, 0.995, maturity));
 }
 
-vec3 riceShade(vec3 lit) {
-  return mix(pal(TR_RICE, 6), lit * 0.45, 0.35);
-}
+// The lab's light (src/dev/paddyLab/lab.ts), as three.js lights a matt surface of colour albedo with normal n where
+// up is up: the sky's hemisphere (its sky above, its ground's bounce below; 1.6) and the sun (2.2), Lambert, over π.
+// Their colours the lab's, in linear light; the time of day tints them as it does the rest of the planet.
+const vec3 LAB_SKY = vec3(0.7484, 0.8276, 0.9551) * 1.6;
+const vec3 LAB_GROUND = vec3(0.1473, 0.1706, 0.0835) * 1.6;
+const vec3 LAB_SUN = vec3(1.0, 0.9114, 0.7874) * 2.2;
 
-vec3 riceColour(Crop c, float b) {
-  vec3 lit = riceLit(c.maturity, c.variant);
-  vec3 shade = riceShade(lit);
-  return tone3(lit, mix(lit, shade, 0.3 + 0.2 * smoothstep(0.3, 0.9, c.height)), shade, b);
-}
-
-// How much of a paddy's floor its crop hides from this view: plants h meters tall, looked at with
-// cosView between the view and straight down (more of the water between them shows from above). Seedlings
-// a hand high are dots on their water (the aerial photo's white bands), a grown crop closes over it.
-float cropCover(float h, float cosView) {
-  if (h <= 0.0) return 0.0;
-  float c0 = 0.97 * smoothstep(0.1, 0.9, h);
-  return 1.0 - pow(1.0 - c0, 1.0 / max(cosView, 0.18));
+vec3 labLight(vec3 albedo, vec3 n, vec3 up) {
+  vec3 sky = mix(LAB_GROUND, LAB_SKY, 0.5 + 0.5 * dot(n, up)) * uShadeTint;
+  vec3 sun = LAB_SUN * max(dot(n, uSunDir), 0.0) * uSunTint;
+  return albedo * (sky + sun) * 0.31830989;
 }

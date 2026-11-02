@@ -284,7 +284,8 @@ async function boot(): Promise<void> {
 
   const render = (): void => {
     renderer.info.reset();
-    post.render(world.scene, world.rig.camera, store.values.style.grain, store.values.style.contrast, store.values.style.brightness);
+    const g = world.grade;
+    post.render(world.scene, world.rig.camera, store.values.style.grain, g ? g.contrast : store.values.style.contrast, g ? g.brightness : store.values.style.brightness, g?.curve ?? true, g?.bloom ?? true);
   };
 
   // A visit: the camera climbs away from the planet as a white mist closes in, the other planet takes its

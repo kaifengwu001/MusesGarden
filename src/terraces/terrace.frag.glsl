@@ -1,25 +1,20 @@
-// The terraces as built, painted: each paddy's floor (its water mirroring the
-// sky, its crop over the water as tall as it has grown, or mud, or fallow
-// grass), the risers' faces lit as the walls they are, the dams' grassy tops
-// and the ridges along the cuts catching the light, the earth where the woods
-// meet the farmed land, the woods' own ground under the trees; the haze of
-// distance over it.
+// The terraces as built, painted as the paddy lab paints them (src/dev/
+// paddyLab/): each part its own colour, measured from Kai's aerial, lit as
+// the lab lights them (rice.glsl). Each paddy and each field on the flats one
+// colour, its look by its stage; the dams and the ridges along the cuts
+// cream, the risers olive; earth where the woods meet the farmed land and
+// along the flats' bunds; the woods' own ground under the trees, rock where
+// it is too steep for them; a track's packed earth. Then the haze of distance.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
-uniform float uPixelAngle;
 #include <meadow_toon>
 #include <meadow_fog>
 #include <meadow_warp>
 #include <terraces_common>
-#include <meadow_wind>
-#include <terraces_paddy>
 #include <terraces_rice>
-#include <terraces_water>
 
 uniform int uDebug;
-uniform vec4 uRiceLook; // wind sheen, -, -, -
-uniform vec4 uRiceNear; // the blades' focus (direction), their reach (m)
 
 varying vec3 vDir;
 varying vec3 vWarped;
@@ -34,106 +29,29 @@ void main() {
   vec3 n = normalize(vNormal);
   vec3 toCam = cameraPosition - vWarped;
   float viewDist = length(toCam);
-  vec3 v = toCam / viewDist;
-  if (dot(n, v) < 0.0) n = -n;
-  float pixelMeters = viewDist * uPixelAngle;
+  if (dot(n, toCam) < 0.0) n = -n;
   int part = int(vPart + 0.5);
-  vec3 P = dir * (uRadius + vHeight);
-  vec3 nUp = warpNormal(P, dir);
-  float bUp = toonLight(dot(nUp, uSunDir));
-  float b = toonLight(dot(n, uSunDir));
-  float tuft = gnoise(dir * uRadius * 3.1, uTerrainSeed + 933u);
-  vec3 col;
+  vec3 up = warpNormal(dir * (uRadius + vHeight), dir);
+  vec3 albedo;
   if (part == 0) {
-    Crop c;
-    c.variant = vPaddy.x;
-    c.maturity = vPaddy.y;
-    c.height = vPaddy.z;
-    c.water = vPaddy.w;
-    c.fallow = vFloor.y;
-    c.rows = 0.0;
-    vec2 waves = gustWaves(dir);
-    float ripple = pixelMeters < 0.6 ? rippleAt(dir) : 0.5;
-    float sheen = windSheen(waves, ripple) * uRiceLook.x;
-    // the view from above the floor: more of the water between the plants shows looking down
-    vec3 eye = unwarpPosition(cameraPosition) - P;
-    float cosView = clamp(dot(normalize(eye), dir), 0.0, 1.0);
-    // inside the blades' reach they stand there themselves (rice.ts), over the crop's own depth (the
-    // blades are fewer than a paddy's leaves: the paint keeps most of the crop under them)
-    float near = chordAngle(dir, uRiceNear.xyz) * uRadius;
-    float blades = uRiceNear.w > 0.5 ? mix(1.0, 0.24, smoothstep(0.45 * uRiceNear.w, uRiceNear.w, near)) * (1.0 - smoothstep(0.78 * uRiceNear.w, uRiceNear.w, near)) : 0.0;
-    float cover = cropCover(c.height, cosView) * (1.0 - 0.45 * blades);
-    // (the crop under the blades: their shade)
-    float shaded = blades * smoothstep(0.1, 0.4, c.height);
-    vec3 rice = riceColour(c, bUp * (1.0 - 0.45 * shaded));
-    vec3 sp = dir * uRadius;
-    float mottle = 0.6 * gnoise(sp * 0.7, uTerrainSeed + 931u) + 0.4 * gnoise(sp * 2.3, uTerrainSeed + 932u) * (1.0 - smoothstep(0.08, 0.3, pixelMeters));
-    rice *= 1.0 + 0.09 * mottle;
-    float tall = smoothstep(0.25, 0.9, c.height);
-    rice = mix(rice, pal(TR_RICE, 7) * uSunTint, max(sheen, 0.0) * (0.2 + 0.5 * tall));
-    rice *= mix(vec3(1.0), vec3(0.62, 0.72, 0.64), max(-sheen, 0.0) * (0.25 + 0.6 * tall));
-    vec3 mud = tone3(pal(TR_EARTH, 4), mix(pal(TR_EARTH, 4), pal(TR_EARTH, 5), 0.5), pal(TR_EARTH, 5), bUp);
-    vec3 under = mud;
-    if (c.water > 0.0) {
-      vec3 vw = normalize(cameraPosition - vWarped);
-      float tint = smoothstep(0.3, 0.9, fract(c.variant * 5.31));
-      under = paddyWater(dir, nUp, vw, bUp, waves.x, tint);
-      // (softened into a pale silver wash, as the paddy painting lays its flooded fields: the mirror's darks kept, quieter)
-      under = mix(under, mix(pal(TR_WATER, 0), pal(TR_WATER, 6), 0.5), 0.4);
-    }
-    // the crop's rows along the band (vFloor.w: meters from its lower wall), a row every 0.3 m: seedlings stand
-    // on them over their water (green lines on silver, the paintings' young fields), a grown crop shows them as
-    // faint stripes; at a distance the rows merge into a coarser grain, then into the paint's flat green
-    float young = 1.0 - smoothstep(0.25, 0.6, c.maturity);
-    float rowFade = 1.0 - smoothstep(0.05, 0.14, pixelMeters);
-    // (each row in short strokes, the seedlings' clumps: the painting's hatching, not a ruled line)
-    float dash = smoothstep(-0.15, 0.35, gnoise(dir * uRadius * 5.5, uTerrainSeed + 937u));
-    float row = (0.5 + 0.5 * cos(6.2832 * vFloor.w / 0.3)) * mix(0.35, 1.0, dash);
-    float grain = (0.5 + 0.5 * cos(6.2832 * vFloor.w / 1.1)) * (1.0 - smoothstep(0.25, 0.9, pixelMeters));
-    cover = mix(cover, clamp(cover * mix(0.2, 1.8, row), 0.0, 1.0), rowFade * young);
-    cover = clamp(cover * (1.0 + young * 0.5 * (grain - 0.5) * (1.0 - rowFade)), 0.0, 1.0);
-    rice *= 1.0 + (1.0 - young) * (rowFade * 0.1 * (row - 0.5) + 0.07 * (grain - 0.5));
-    col = mix(under, rice, cover);
-    if (c.fallow > 0.5) {
-      vec3 fallow = tone3(mix(pal(TR_EARTH, 0), pal(TR_RICE, 10), 0.5), mix(pal(TR_EARTH, 0), pal(TR_EARTH, 4), 0.5), pal(TR_EARTH, 1), bUp);
-      fallow *= 1.0 + 0.08 * mottle;
-      col = c.water > 0.0 ? mix(under, fallow, 0.55) : fallow;
-    }
-    // painted as the paddy painting washes them: each paddy a wash, paler and darker in soft blooms a few meters
-    // across, its pigment pooling a little darker and cooler along its edges where it meets its walls, a fine
-    // granulation up close
-    float width = vFloor.w / max(vFloor.z, 0.02);
-    float edge = min(vFloor.w, max(width - vFloor.w, 0.0));
-    float bloom = 0.55 * gnoise(sp * 0.16 + c.variant * 13.0, uTerrainSeed + 938u) + 0.45 * gnoise(sp * 0.47, uTerrainSeed + 939u);
-    float gran = gnoise(sp * 7.0, uTerrainSeed + 940u) * (1.0 - smoothstep(0.03, 0.1, pixelMeters));
-    col *= 1.0 + 0.075 * bloom + 0.035 * gran;
-    col = mix(col * vec3(0.84, 0.88, 0.87), col, smoothstep(0.0, 0.8, edge));
+    // a paddy, or a field on the flats: its look now (vPaddy: its own variant, its place in the season)
+    albedo = paddyLook(vPaddy.y, vPaddy.x);
   } else if (part == 1) {
-    // a riser: grass over earth, lit as it leans, darker toward its foot, in tufts and streaks of grass
-    float up = clamp((vHeight - vFloor.x + 1.0) / 1.4, 0.0, 1.0);
-    col = tone3(pal(TR_EARTH, 2), mix(pal(TR_EARTH, 2), pal(TR_EARTH, 3), 0.5), pal(TR_EARTH, 3), b);
-    // (no streaks: from a distance they read as pale ticks, a broken line along every wall)
-    col = mix(col, pal(TR_EARTH, 4), 0.2 * smoothstep(0.1, 0.6, -tuft));
-    col *= mix(0.72, 1.04, up) * (0.94 + 0.08 * tuft);
+    albedo = pal(TR_EARTH, 1);
   } else if (part == 4) {
-    // earth: a bank where the woods meet the farmed land
-    col = tone3(pal(TR_EARTH, 3), mix(pal(TR_EARTH, 3), pal(TR_EARTH, 5), 0.5), pal(TR_EARTH, 5), b) * (0.92 + 0.1 * tuft);
+    albedo = pal(TR_EARTH, 2);
   } else if (part == 6) {
-    // the woods' own ground under the trees (the hills' height itself, its normal from their gradient: the build
-    // worked both out): the forest floor, the rock where it is too steep for them (vFloor.y: its slope)
-    float rock = smoothstep(1.3, 2.4, vFloor.y);
-    vec3 floorForest = tone3(pal(TR_FOREST, 1), pal(TR_FOREST, 6), pal(TR_FOREST, 3), b);
-    vec3 cliff = tone3(pal(TR_PEAK, 0), mix(pal(TR_PEAK, 0), pal(TR_PEAK, 3), 0.5), pal(TR_PEAK, 3), b);
-    col = mix(floorForest, cliff, rock) * (0.94 + 0.08 * tuft);
+    // the woods' own ground (the hills' height itself, its normal from their gradient: the build worked both out),
+    // two greens mixed by a noise a few meters across; the rock where it is too steep for trees (vFloor.y: its slope)
+    vec3 ground = mix(pal(TR_FOREST, 9), pal(TR_FOREST, 10), 0.5 + 0.5 * gnoise(dir * uRadius / 3.0, uTerrainSeed + 931u));
+    albedo = mix(ground, mix(pal(TR_PEAK, 0), pal(TR_PEAK, 3), 0.4), smoothstep(1.3, 2.4, vFloor.y));
   } else if (part == 7) {
-    // a track through the flats: packed earth, pale, worn, a cart's two ruts in it
-    col = tone3(pal(TR_EARTH, 6), mix(pal(TR_EARTH, 6), pal(TR_EARTH, 4), 0.4), pal(TR_EARTH, 4), b);
-    col *= 0.92 + 0.1 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u);
+    albedo = pal(TR_EARTH, 3) * (0.94 + 0.08 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u));
   } else {
-    // a dam's top and sides, a ridge along a cut or between plots: grass over earth, catching the light as pale lines
-    col = tone3(pal(TR_EARTH, 7), mix(pal(TR_EARTH, 0), pal(TR_EARTH, 7), 0.4), pal(TR_EARTH, 1), b);
-    col *= 0.94 + 0.08 * tuft;
+    // a dam's top and sides, a ridge along a cut
+    albedo = pal(TR_EARTH, 0);
   }
+  vec3 col = labLight(albedo, n, up);
   col = applyAerial(col, viewDist, dir);
   if (uDebug == 4) {
     // (dbg=land: each part flat: floors by their paddy, risers dark blue, dams yellow, earth brown, ridges white,

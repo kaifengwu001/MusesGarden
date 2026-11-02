@@ -52,6 +52,7 @@ export class Post {
     uBloom: { value: number };
     uGrain: { value: number };
     uGrade: { value: Vector2 };
+    uCurve: { value: number };
     /** The part of the scene target and of the first bloom level drawn (uv), and the farthest a lookup may go in each (uv). */
     uSceneExtent: { value: Vector4 };
     uBloomExtent: { value: Vector4 };
@@ -81,6 +82,7 @@ export class Post {
       uBloom: { value: 0 },
       uGrain: { value: 0.02 },
       uGrade: { value: new Vector2(1, 1) },
+      uCurve: { value: 1 },
       uSceneExtent: { value: new Vector4(1, 1, 1, 1) },
       uBloomExtent: { value: new Vector4(1, 1, 1, 1) },
     };
@@ -130,16 +132,21 @@ export class Post {
     extent(this.uniforms.uBloomExtent.value, this.levelViews[0], this.levels[0]);
   }
 
-  /** Render the scene and grade it to the canvas: paper grain, and contrast and brightness in display space. */
-  render(scene: Object3D, camera: Camera, grain: number, contrast = 1, brightness = 1): void {
+  /**
+   * Render the scene and grade it to the canvas: its highlights' bloom and the painterly tone curve (unless a planet
+   * does without them), paper grain, and contrast and brightness in display space.
+   */
+  render(scene: Object3D, camera: Camera, grain: number, contrast = 1, brightness = 1, curve = true, bloom = true): void {
     const r = this.renderer;
+    const bloomOn = this.bloomEnabled && bloom;
     r.setRenderTarget(this.target);
     r.render(scene, camera);
-    if (this.bloomEnabled) this.renderBloom();
+    if (bloomOn) this.renderBloom();
     r.setRenderTarget(null);
     this.uniforms.uGrain.value = grain;
     this.uniforms.uGrade.value.set(contrast, brightness);
-    this.uniforms.uBloom.value = this.bloomEnabled ? this.bloomStrength : 0;
+    this.uniforms.uCurve.value = curve ? 1 : 0;
+    this.uniforms.uBloom.value = bloomOn ? this.bloomStrength : 0;
     r.render(this.scene, this.camera);
   }
 

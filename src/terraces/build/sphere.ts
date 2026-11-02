@@ -272,46 +272,52 @@ export class SphereGrid {
 
   /**
    * The outlines between the regions of an index over the vertices: for each level k, the line between the
-   * vertices where idx ≥ k and those where idx < k (the first on its left), its points from cross(u, v, k).
+   * vertices where idx ≥ k and those where idx < k (the first on its left), its points from cross(u, v, k). Over
+   * the whole planet, or over the squares given ((face · m + cj) · m + ci) only.
    */
-  trace(idx: Int32Array, cross: (u: number, v: number, k: number) => number): Chain[] {
+  trace(idx: Int32Array, cross: (u: number, v: number, k: number) => number, squares?: Iterable<number>): Chain[] {
     const next = new Map<number, Map<number, number>>();
     const { m } = this;
-    for (let f = 0; f < 6; f++) {
-      for (let cj = 0; cj < m; cj++) {
-        for (let ci = 0; ci < m; ci++) {
-          const t = this.triangles(f, ci, cj);
-          for (let q = 0; q < 12; q += 3) {
-            const A = t[q];
-            const B = t[q + 1];
-            const C = t[q + 2];
-            const ia = idx[A];
-            const ib = idx[B];
-            const ic = idx[C];
-            const top = Math.max(ia, ib, ic);
-            for (let k = Math.min(ia, ib, ic) + 1; k <= top; k++) {
-              const a = ia >= k;
-              const b = ib >= k;
-              const c = ic >= k;
-              let s: number;
-              let e: number;
-              if (+a + +b + +c === 1) {
-                if (a) [s, e] = [this.key(A, B), this.key(C, A)];
-                else if (b) [s, e] = [this.key(B, C), this.key(A, B)];
-                else [s, e] = [this.key(C, A), this.key(B, C)];
-              } else if (!a) [s, e] = [this.key(C, A), this.key(A, B)];
-              else if (!b) [s, e] = [this.key(A, B), this.key(B, C)];
-              else [s, e] = [this.key(B, C), this.key(C, A)];
-              let lv = next.get(k);
-              if (!lv) {
-                lv = new Map();
-                next.set(k, lv);
-              }
-              lv.set(s, e);
-            }
+    const square = (f: number, ci: number, cj: number): void => {
+      const t = this.triangles(f, ci, cj);
+      for (let q = 0; q < 12; q += 3) {
+        const A = t[q];
+        const B = t[q + 1];
+        const C = t[q + 2];
+        const ia = idx[A];
+        const ib = idx[B];
+        const ic = idx[C];
+        const top = Math.max(ia, ib, ic);
+        for (let k = Math.min(ia, ib, ic) + 1; k <= top; k++) {
+          const a = ia >= k;
+          const b = ib >= k;
+          const c = ic >= k;
+          let s: number;
+          let e: number;
+          if (+a + +b + +c === 1) {
+            if (a) [s, e] = [this.key(A, B), this.key(C, A)];
+            else if (b) [s, e] = [this.key(B, C), this.key(A, B)];
+            else [s, e] = [this.key(C, A), this.key(B, C)];
+          } else if (!a) [s, e] = [this.key(C, A), this.key(A, B)];
+          else if (!b) [s, e] = [this.key(A, B), this.key(B, C)];
+          else [s, e] = [this.key(B, C), this.key(C, A)];
+          let lv = next.get(k);
+          if (!lv) {
+            lv = new Map();
+            next.set(k, lv);
           }
+          lv.set(s, e);
         }
       }
+    };
+    if (squares) {
+      for (const si of squares) {
+        const f = Math.floor(si / (m * m));
+        const cj = Math.floor((si - f * m * m) / m);
+        square(f, si - f * m * m - cj * m, cj);
+      }
+    } else {
+      for (let f = 0; f < 6; f++) for (let cj = 0; cj < m; cj++) for (let ci = 0; ci < m; ci++) square(f, ci, cj);
     }
     const chains: Chain[] = [];
     for (const k of [...next.keys()].sort((a, b) => a - b)) {

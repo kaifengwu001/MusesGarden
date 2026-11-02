@@ -1,36 +1,33 @@
 import { ROW, type Rows } from '../render/palette';
 
-// The terraces' colours, measured from the two paintings Kai gave as the
-// starting points (reference/terraces/valley-painting.webp and
-// planet-painting.webp, look-dev regions.mjs): fields in yellow-greens from
-// lime to deep, water a pale silver, towers and trees dark blue-grey and
-// blue-green, mist and sky a cool grey-blue, white plaster and dark roofs.
-// The contrast is theirs: dark trees and towers against silver water and
-// lime fields. Same 16×16 texture as the meadow's: the sky, cloud and light
-// rows keep their places (the sky, the aerial haze and the sun read them);
-// the other rows are this planet's own (TR_* in terraces/common.glsl).
+// The terraces' colours. The paddies, their dams and risers, the earth and
+// the woods' ground are the paddy lab's (src/dev/paddyLab/build.ts), measured
+// from Kai's aerial of the terraces: the paddies by their stage (a little
+// lighter for the light), the dams cream, the risers olive. The trees, the
+// towers' stone, the mist and the sky are from the two paintings Kai gave as
+// the starting points (reference/terraces/valley-painting.webp and
+// planet-painting.webp, look-dev regions.mjs). Same 16×16 texture as the
+// meadow's: the sky, cloud and light rows keep their places (the sky, the
+// aerial haze and the sun read them); the other rows are this planet's own
+// (TR_* in terraces/common.glsl).
 
 export const TROW = {
   RICE: 0,
   EARTH: 1,
-  WATER: 2,
   FOREST: 3,
   PEAK: 4,
   FOG: 5,
 } as const;
 
 export const TERRACE_ROWS: Rows = {
-  // the paddies' crop, from the paintings' fields (valley: grown #4B6C49 lit #698754, seedlings over water #8C9977;
-  // planet: lime #ACB08A, greens #5F7060 #4F6357): seedling, fresh, deep, heading, ripe straw, pale tip, shade,
-  // sheen, far, jade, sage, lime, blue-green (each paddy leans a little toward jade, lime or blue-green)
-  [TROW.RICE]: ['#97B178', '#7FA35B', '#4C7447', '#93A65C', '#B9B57A', '#C3CF9C', '#2E4C38', '#D6E2BF', '#6A8A72', '#5A8A63', '#7C9670', '#9DBA62', '#4A7A66'],
-  // bund grass (the paintings' lime rims), bund shade, riser face (grass on earth), riser shade, wet mud, dark mud, courtyard and path, lit bund
-  [TROW.EARTH]: ['#AFC48F', '#6F8660', '#71876A', '#4D6150', '#6C6F5C', '#484B3F', '#CFC6AE', '#CBD8B0'],
-  // pale sky in the mirror, high sky in it, body looking down, shallow, glint, a bank in the mirror, ruffle, teal, white water:
-  // the flooded fields silver (#B1BCBE, light #B8C2C4), the river a little bluer (#9EB0BC), its darks the banks (#7D9497)
-  [TROW.WATER]: ['#CDD5D8', '#B3C1CA', '#7D9497', '#93A39B', '#EDF1F1', '#3C5446', '#B9C5C9', '#8EA4AA', '#D2D9DA'],
-  // the trees: canopy light, mid, shade, deep, rim, trunk, floor, far, olive light (valley: round #3A5538 lit #5C775F, cypress #223A42)
-  [TROW.FOREST]: ['#5C775F', '#3A5538', '#24402F', '#1A2E2C', '#7E9670', '#3E3A36', '#22392C', '#4C6570', '#74895A'],
+  // the paddies' looks (the lab's LOOKS): flooded (the sky's white, a touch of lilac), flooded and shallow, just
+  // planted (lime), growing, grown, grown deep
+  [TROW.RICE]: ['#F0EDF7', '#D9D6DB', '#8FA842', '#5C7830', '#3D5921', '#2B451A'],
+  // a dam (cream), a riser (olive), earth (the woods' edge, the flats' bunds), a track (packed earth, pale)
+  [TROW.EARTH]: ['#CCD1A3', '#788F57', '#5C5C3D', '#CFC6AE'],
+  // the trees: canopy light, mid, shade, deep, rim, trunk, floor, far, olive light (valley: round #3A5538 lit #5C775F,
+  // cypress #223A42); the woods' ground under them (the lab's, two greens a noise mixes)
+  [TROW.FOREST]: ['#5C775F', '#3A5538', '#24402F', '#1A2E2C', '#7E9670', '#3E3A36', '#22392C', '#4C6570', '#74895A', '#4D6138', '#6B6642'],
   // the towers' stone: lit, far, pale, deep, lit pale, moss (valley: lit #59718D, far #6881A1; planet: #485B6E, top #384E5E)
   [TROW.PEAK]: ['#59718D', '#6881A1', '#97A7C4', '#384E5E', '#A6B4C8', '#4D6650'],
   // the mist: lit, in shade, deep, warm paper (valley mist #B7BFCF; the cloud sea #94A1B7)

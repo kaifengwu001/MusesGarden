@@ -77,18 +77,12 @@ void main() {
   float bl = length(tip);
   vec3 p = base + up * (h * y * (1.0 - 0.3 * min(bl * bl, 1.2) * y)) + side * (w * position.x) + tip * (h * y * y);
 
-  // colour per vertex: its paddy's green, dark at the root, lit toward the tip; the wind's sheen
-  vec3 lit = riceLit(crop.a, crop.b);
-  vec3 shade = riceShade(lit);
-  float b = toonLight(dot(up, uSunDir));
-  float light = mix(0.3, 1.0, smoothstep(0.0, 0.85, y)) * b;
-  vec3 col = tone3(mix(lit, pal(TR_RICE, 5), 0.12 * y * y), mix(lit, shade, 0.4), shade, light);
+  // colour per vertex: its paddy's look, lit as its floor is, dark at the root and lighter toward the tip; the
+  // wind's sheen a little lighter and darker, stronger toward the tips
+  vec3 col = labLight(paddyLook(crop.a, crop.b), up, up) * mix(0.55, 1.08, smoothstep(0.0, 0.85, y));
   col *= 0.9 + 0.2 * rnd(seed, 8.0);
-  // (the wind's sheen as the paint lays it on the crop, a little stronger toward the tips)
   float sheen = wind.w * uRice.w;
-  float tall = smoothstep(0.25, 0.9, crop.r);
-  col = mix(col, pal(TR_RICE, 7) * uSunTint, max(sheen, 0.0) * (0.2 + 0.5 * tall) * (0.6 + 0.6 * y));
-  col *= mix(vec3(1.0), vec3(0.62, 0.72, 0.64), max(-sheen, 0.0) * (0.25 + 0.6 * tall) * (0.6 + 0.6 * y));
+  col *= 1.0 + 0.18 * sheen * (0.6 + 0.6 * y);
 
   vec3 wp = warpPosition(p);
   col = applyAerial(col, length(cameraPosition - wp), dir);
