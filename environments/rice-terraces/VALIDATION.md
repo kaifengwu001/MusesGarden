@@ -6,7 +6,7 @@ The user supplied two existing flat-render/reference images and confirmed that t
 
 ## Mainline integration — 2 November 2026
 
-Rice source commit `1f71849` is integrated with the newer mainline in an isolated checkout. All existing environment commands are preserved alongside the three Rice commands. The package lock and shared engine/server code are unchanged by Rice. Copied scaffold adapters are updated to the current sculpt loader and garden interfaces; the dedicated Ti Tian runtime and its geometry are unchanged.
+Rice source commit `1f71849` is integrated with the newer mainline in an isolated checkout, preserving the concurrent Cherry Blossom Waterways update at `e381efd`. All existing environment commands are preserved alongside the three Rice commands. The package lock and shared engine/server code are unchanged by Rice. Copied scaffold adapters are updated to the current sculpt loader and garden interfaces; the dedicated Ti Tian runtime and its geometry are unchanged.
 
 - Scoped TypeScript/ESLint and the standalone production build pass.
 - **43 CPU checks in nine files and four focused browser checks pass** against the integrated tree. Browser coverage includes exact frame/seed/radius return, cottage placement, reload and phone controls.

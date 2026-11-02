@@ -1,0 +1,4 @@
+body .masthead h1 { font-size: clamp(28px, 3.6vw, 52px); line-height: 1.05; letter-spacing: -0.045em; }
+body .masthead { max-width: 46vw; }
+.world-line { font-size: 13px; }
+@media (max-width: 700px) { body .masthead { max-width: 76vw; } }
