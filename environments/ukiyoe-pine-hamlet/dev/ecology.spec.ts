@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import type {} from '../../../src/dev/harnessApi';
 import type { World } from '../world';
+import { DETAIL_VIEWS } from './detailViews';
 
 test('reference views compile, expose Muse and preserve the seasonal layout', async ({ page }) => {
   const errors: string[] = [];
@@ -54,5 +55,24 @@ test('reference views compile, expose Muse and preserve the seasonal layout', as
     await page.evaluate(async()=>window.__meadow?.settle());
     await page.screenshot({path:`shots/ukiyoe-pine-hamlet/${material.file}.png`});
   }
+  for (const season of ['snow', 'rain'] as const) for (const [name, view] of Object.entries(DETAIL_VIEWS)) {
+    await page.evaluate(({ season, view }) => {
+      const w = (window as unknown as { __world: World }).__world;
+      w.setSeason(season);
+      (w as unknown as { frameLocal(view: { at: readonly number[]; height: number; distance: number; azimuth: number }, immediate: boolean): void }).frameLocal(view, true);
+      w.markPosed();
+    }, { season, view });
+    await page.evaluate(async () => window.__meadow?.settle());
+    await page.screenshot({ path: `shots/ukiyoe-pine-hamlet/detail-${name}-${season}.png` });
+  }
+  await page.evaluate(() => {
+    const w = (window as unknown as { __world: World }).__world;
+    w.setSeason('rain');
+    (w as unknown as { frameLocal(view: { at: readonly number[]; height: number; distance: number; azimuth: number }, immediate: boolean): void })
+      .frameLocal({ at: [-4.55, 0.7, 12], height: 3.3, distance: 11, azimuth: -0.4 }, true);
+    w.markPosed();
+  });
+  await page.evaluate(async () => window.__meadow?.settle());
+  await page.screenshot({ path: 'shots/ukiyoe-pine-hamlet/detail-garden-rain.png' });
   expect(errors).toEqual([]);
 });

@@ -16,6 +16,8 @@ self-contained art reference.
 | [08 · Pine cloud silhouette](08-pine-cloud-silhouette.png) | Primary pine shape: rounded clustered lobes, open branch tiers, restrained flat pigment. |
 | [09 · Pine woodblock detail](09-pine-woodblock-detail.png) | Primary close pine drawing: fine dark radial needles, muted green, scalloped foliage. |
 
+The subsequent 1 November correction adds [snow roof/bank](10-snow-roof-and-bank.png), [snow on bamboo](11-snow-bamboo.png), [snowy river](12-snow-river.png), and water references for [daylight](13-water-daylight.png), [moonlight](14-water-moonlight.png), and [reflections](15-water-reflections.png). These take precedence over earlier generated snow textures: white tops, rounded draping edges, restrained blue-gray lower boundaries; broad calm water with irregular horizontal reflected shapes. The user’s actual defect screenshots remain in `reported-surface-defects/`.
+
 The requested style is quiet and natural. The earlier alien-world explorations
 are not this planet’s visual brief. Muse must stay recognisable in the app; this
 pack is construction guidance rather than a set of flat backgrounds to display
@@ -35,6 +37,8 @@ Start with the [side-by-side comparison](comparison.html). Current checkpoints:
 [mobile neighbour](checkpoint-mobile-resident.png). These are actual app
 captures from the final verification pass on 1 November 2026.
 
+Latest correction details: [stone steps](checkpoint-detail-steps-snow.png), [snow roof](checkpoint-detail-roof-snow.png), [rain tiles](checkpoint-detail-roof-rain.png), [connected plum](checkpoint-detail-plum-snow.png), [snow cedar](checkpoint-detail-cedar-snow.png), [water](checkpoint-detail-water-rain.png) and [barley garden](checkpoint-detail-garden-rain.png).
+
 Material close-ups: [snow pine](checkpoint-pine-snow.png),
 [rain pine](checkpoint-pine-rain.png), [cedar](checkpoint-cedar-rain.png),
 [snow, plum and reeds](checkpoint-snow-detail.png). The
@@ -46,9 +50,7 @@ Rain captures remain in `pre-material-refinement/` for before/after comparison.
 The later pine correction also captures [canopy detail](checkpoint-pine-canopy-rain.png),
 [side](checkpoint-pine-side-rain.png), [above in rain](checkpoint-pine-above-rain.png),
 and [above in snow](checkpoint-pine-above-snow.png). These show crown volume and
-snow contact independently of the opening Home composition. Its current motion
-evidence is [pine frame stability](pine-frame-stability.json), including the
-close pine camera; `frame-stability.json` is the earlier material-pass record.
+snow contact independently of the opening Home composition. Its historical motion evidence is [pine frame stability](pine-frame-stability.json). These earlier checks missed the exactly coplanar lowest stair tread and did not constitute visual acceptance. Current expanded evidence is [surface correction stability](surface-correction-stability.json), including the close house, stairs, plum, cedar and water cameras.
 
 [First-pass Home](first-pass/home.png), [Home with UI](first-pass/home-ui.png),
 [Bridge](first-pass/bridge.png), [Muse](first-pass/muse.png),

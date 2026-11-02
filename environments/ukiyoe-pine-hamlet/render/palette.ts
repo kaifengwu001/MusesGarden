@@ -34,7 +34,7 @@ const NOON: Rows = {
   [ROW.BRUSH]: ['#98A38C', '#778A79', '#536C63', '#B9AE85', '#657F80', '#9DAD94'],
   // the mirror's cobalt, the navy body, -, highlight, pale sky low in the mirror, deep cobalt high in it,
   // lily pad, lily pad shade, a bank in the mirror, ruffle
-  [ROW.WATER]: ['#48728B', '#203D58', '#C5D3CC', '#E9E6D8', '#839AA3', '#34536F', '#6B7D62', '#405A4A', '#263747', '#93ABA9'],
+  [ROW.WATER]: ['#477E99', '#274F70', '#C5D3CC', '#E9E6D8', '#9AB5BA', '#345D7E', '#6B7D62', '#405A4A', '#263F50', '#A3C7C8'],
   // cup light, cup mid, inner, cup shade, stem, stem shade, blush, rose, coral, rose shade
   [ROW.PINK]: ['#F09AA2', '#DE6F80', '#F7C2B8', '#C2566E', '#6E9E4A', '#4D7A36', '#F5BCC2', '#DA4C74', '#EE7A66', '#A63A63'],
   // petal, petal shade, centre, centre bright, cream, pale lilac

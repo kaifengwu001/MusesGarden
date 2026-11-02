@@ -1,7 +1,7 @@
 import { AdditiveBlending, DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeometry, LineSegments, Mesh, ShaderMaterial, Vector3, type BufferGeometry, type IUniform, type Object3D } from 'three';
 import { hash32, unit } from '../../../src/core/hash';
 import { createGroundSample, type Terrain } from '../planet/terrain';
-import { createHamletAssets, type HamletAsset, type HamletSpecies } from './hamletGeometry';
+import { barleyGeometry, createHamletAssets, grassGeometry, type HamletAsset, type HamletSpecies } from './hamletGeometry';
 import vertexShader from './hamletScenery.vert.glsl?raw';
 import fragmentShader from './hamletScenery.frag.glsl?raw';
 
@@ -18,6 +18,12 @@ interface Batch {
   placementData: InstancedBufferAttribute;
 }
 export interface HamletClearing { direction: Vector3; radius: number; }
+/** Cottage-local cultivated patches. The gaps between beds remain usable paths. */
+export const CULTIVATED_BEDS = [
+  { x: -4.35, z: 5.95, width: 3.2, length: 1.65, rows: 5, plants: 4 },
+  { x: -4.55, z: 14.5, width: 3.5, length: 4.4, rows: 6, plants: 10 },
+  { x: 6.65, z: 1.6, width: 1.65, length: 4.6, rows: 3, plants: 10 },
+] as const;
 const TAU = Math.PI * 2;
 const UP = new Vector3(0, 1, 0), EAST = new Vector3(1, 0, 0);
 
@@ -104,21 +110,52 @@ export class HamletScenery {
     const rand = (): number => unit(state = hash32((state + 0x9e3779b9) >>> 0));
     const anchors: Record<HamletSpecies, Anchor[]> = { pine: [], cedar: [], plum: [], reeds: [], rock: [] };
     const distant: Record<'pine' | 'cedar', Anchor[]> = { pine: [], cedar: [] };
-    const local = (kind: HamletSpecies, x: number, z: number, scale: number, turn = rand() * TAU): void => {
-      anchors[kind].push({ direction: new Vector3(), local: [x, z], scale, turn, phase: rand() * TAU, tint: rand() });
+    const grass: Anchor[] = [];
+    const local = (kind: HamletSpecies, x: number, z: number, scale: number, turn = rand() * TAU, tint = rand()): void => {
+      anchors[kind].push({ direction: new Vector3(), local: [x, z], scale, turn, phase: rand() * TAU, tint });
     };
     // Left framing pine, open doorway and central approach. Pines stay broad;
     // the slender cedars establish a separate distant layer behind the roof.
-    for (const [x, z, scale, turn] of [[-9, -3, 1.13, -0.35], [-13, -7, 0.92, 0.65], [-15, 4, 0.8, -0.5], [8, -9, 0.85, 1.1], [-20, -13, 0.83, 0.2], [22, 1, 0.75, 2.3], [24, 25, 0.7, -0.4], [-15, 23, 0.62, 0.4]]) local('pine', x, z, scale, turn);
-    for (const [x, z, scale] of [[-17, -14, 0.83], [-10, -15, 0.91], [-5, -18, 0.86], [1, -21, 0.94], [7, -18, 0.79], [13, -15, 0.86], [19, -10, 0.76], [25, 0, 0.72], [26, 28, 0.7]]) local('cedar', x, z, scale);
+    for (const [x, z, scale, turn] of [[-9, -3, 1.27, -0.35], [-13, -7, 0.58, 0.65], [-15, 4, 0.82, -0.5], [8, -9, 1.04, 1.1], [-20, -13, 0.49, 0.2], [22, 1, 0.95, 2.3], [24, 25, 0.62, -0.4], [-15, 23, 0.38, 0.4]]) local('pine', x, z, scale, turn);
+    for (const [x, z, scale] of [[-17, -14, 0.65], [-10, -15, 1.16], [-7, -13, 0.47], [1, -21, 0.92], [7, -18, 0.60], [13, -15, 1.23], [16, -12, 0.55], [25, 0, 0.72], [26, 28, 0.41]]) local('cedar', x, z, scale);
     for (const [x, z, scale] of [[-6.6, 2.5, 0.76], [-10, 6, 0.84], [-12, 15, 0.81], [6.7, -4, 0.72], [19, 3, 0.78], [22, 19, 0.77], [1, -11, 0.72], [-19, 27, 0.72]]) local('plum', x, z, scale);
-    // An overlapping far shore gives the houses a landscape layer behind
-    // them; the open path and right-hand water remain the foreground void.
-    for (let row = 0; row < 2; row++) for (let i = 0; i < 12; i++) {
-      const kind = (i + row) % 3 === 0 ? 'pine' : 'cedar';
-      const x = -29 + i * 5.8 + (row ? 2.4 : 0) + rand();
-      const z = -25 - row * 7 - rand() * 3;
-      distant[kind].push({ direction: new Vector3(), local: [x, z], scale: 0.74 + rand() * 0.28, turn: rand() * TAU, phase: rand() * TAU, tint: rand() });
+    // Unequal groves leave visible openings between them. A few young trees
+    // grow beside the framing pine; the background is no longer two even rows.
+    for (const [x, z, scale] of [[-13.6, -2, 0.42], [-12.4, 1.4, 0.54], [20, -1.8, 0.38], [27, 22.5, 0.46]]) {
+      distant.pine.push({ direction: new Vector3(), local: [x, z], scale, turn: rand() * TAU, phase: rand() * TAU, tint: rand() });
+    }
+    for (const [cx, cz, count, spread] of [[-26, -26, 5, 6], [-12, -32, 7, 8], [11, -34, 4, 5], [29, -28, 6, 7]]) {
+      for (let i = 0; i < count; i++) {
+        const angle = i * 2.3999632297 + rand() * 0.45;
+        const radius = i ? Math.sqrt(i / count) * spread : 0;
+        const kind = i % 3 === 0 ? 'pine' : 'cedar';
+        distant[kind].push({ direction: new Vector3(), local: [cx + Math.cos(angle) * radius, cz + Math.sin(angle) * radius * 0.7],
+          scale: i ? 0.38 + rand() * 0.63 : 1.08 + rand() * 0.25, turn: rand() * TAU, phase: rand() * TAU, tint: rand() });
+      }
+    }
+    // Barley-like seed grass in tidy, densely planted rows beside the home.
+    // Small within-row offsets keep the plants alive without hiding cultivation.
+    for (const bed of CULTIVATED_BEDS) {
+      for (let row = 0; row < bed.rows; row++) for (let plant = 0; plant < bed.plants; plant++) {
+        const x = bed.x + (row / (bed.rows - 1) - 0.5) * bed.width + (rand() - 0.5) * 0.07;
+        const z = bed.z + (plant / (bed.plants - 1) - 0.5) * bed.length + (rand() - 0.5) * 0.09;
+        local('reeds', x, z, 0.56 + rand() * 0.32, 0.14 + (rand() - 0.5) * 0.5, -2);
+      }
+      for (let i = 0; i < 28; i++) {
+        const side = i % 4, t = rand() - 0.5;
+        const x = bed.x + (side < 2 ? (side ? 1 : -1) * (bed.width * 0.5 + 0.38) : t * (bed.width + 0.8));
+        const z = bed.z + (side < 2 ? t * (bed.length + 0.8) : (side === 2 ? -1 : 1) * (bed.length * 0.5 + 0.35));
+        grass.push({ direction: new Vector3(), local: [x, z], scale: 0.62 + rand() * 0.52, turn: rand() * TAU, phase: rand() * TAU, tint: -1 });
+      }
+    }
+    // Loose grass patches connect the tended beds to the path and bank. Clumps
+    // vary in scale and density, with bare gaps around stones and walking lanes.
+    for (const [cx, cz, count, spread] of [[-3, 20, 22, 2.4], [-8, 3.7, 18, 1.8], [-10.5, 12.5, 25, 2.5], [7.7, 5.5, 18, 1.2], [-2.9, 27, 20, 2.0], [7.5, -5.5, 18, 1.8]]) {
+      for (let i = 0; i < count; i++) {
+        const angle = rand() * TAU, radius = Math.sqrt(rand()) * spread;
+        grass.push({ direction: new Vector3(), local: [cx + Math.cos(angle) * radius, cz + Math.sin(angle) * radius],
+          scale: 0.55 + rand() * 0.8, turn: rand() * TAU, phase: rand() * TAU, tint: -1 });
+      }
     }
     // Rock/reed seams follow the river banks, interrupted at the bridge approaches.
     for (let side = -1; side <= 1; side += 2) for (const z of [-1, 3, 6, 14, 18, 23, 28]) {
@@ -144,7 +181,7 @@ export class HamletScenery {
     // water and reserves the home; the random stream never changes each frame.
     const home = terrain.layout.cottage, forward = terrain.layout.homeBearing;
     const right = new Vector3().crossVectors(home, forward).normalize();
-    const sites = 128;
+    const sites = 96;
     for (let i = 0; i < sites; i++) {
       const y = 1 - 2 * (i + 0.5) / sites, a = i * 2.3999632297 + this.seed * 0.001;
       const r = Math.sqrt(1 - y * y);
@@ -155,12 +192,18 @@ export class HamletScenery {
         const target = kind === 'pine' || kind === 'cedar' ? distant[kind] : anchors[kind];
         target.push({ direction: direction.clone().addScaledVector(x, offsetX / 128).addScaledVector(z, offsetZ / 128).normalize(), scale, turn: rand() * TAU, phase: rand() * TAU, tint: rand() });
       };
-      global(i % 4 === 0 ? 'cedar' : 'pine', 0, 0, 1.25 + rand() * 0.47);
-      const trees = 3 + Math.floor(rand() * 3), turn = rand() * TAU;
+      // Some sites are open glades, some single mature trees, others dense
+      // mixed-age groves. Their centres are jittered off the Fibonacci lattice.
+      const stand = rand();
+      const centreX = (rand() - 0.5) * 12, centreZ = (rand() - 0.5) * 12;
+      const trees = stand < 0.18 ? 0 : stand < 0.4 ? 1 : stand < 0.7 ? 3 : 6;
+      if (trees) global(i % 4 === 0 ? 'cedar' : 'pine', centreX, centreZ, 1.05 + rand() * 0.76);
+      const turn = rand() * TAU, groveWidth = 3 + rand() * 5;
       for (let k = 1; k < trees; k++) {
         const angle = turn + k * 2.3999632297;
-        const spread = 3.8 + Math.sqrt(k) * 2.7 + rand() * 1.4;
-        global((i + k) % 3 === 0 ? 'pine' : 'cedar', Math.cos(angle) * spread, Math.sin(angle) * spread, 0.91 + rand() * 0.47);
+        const spread = 1.4 + Math.sqrt(k / trees) * groveWidth;
+        const scale = k % 3 === 0 ? 0.38 + rand() * 0.28 : 0.65 + rand() * 0.57;
+        global((i + k) % 3 === 0 ? 'pine' : 'cedar', centreX + Math.cos(angle) * spread, centreZ + Math.sin(angle) * spread * 0.75, scale);
       }
       if (i % 5 === 0) global('plum', 2.4, 1.8, 0.72 + rand() * 0.25);
       global('rock', -2.1, 1.1, 0.62 + rand() * 0.38);
@@ -169,7 +212,11 @@ export class HamletScenery {
       if (i % 3 === 0) global('reeds', 2.9, 1.7, 0.6 + rand() * 0.35);
     }
     const assets = createHamletAssets();
-    for (const kind of Object.keys(anchors) as HamletSpecies[]) this.addBatch(kind, assets[kind], anchors[kind]);
+    for (const kind of Object.keys(anchors) as HamletSpecies[]) {
+      this.addBatch(kind, assets[kind], kind === 'reeds' ? anchors.reeds.filter(anchor => anchor.tint !== -2) : anchors[kind]);
+    }
+    this.addBatch('reeds', barleyGeometry(), anchors.reeds.filter(anchor => anchor.tint === -2));
+    this.addBatch('reeds', grassGeometry(), grass);
     const remote = createHamletAssets(true);
     this.addBatch('pine', remote.pine, distant.pine, true);
     this.addBatch('cedar', remote.cedar, distant.cedar, true);
@@ -196,6 +243,9 @@ export class HamletScenery {
           // The central resident path and both ends of the bridge stay empty.
           if (x > -1 - footprint && x < 6 + footprint && z > 3 - footprint && z < 31) continue;
           if (x > 6 - footprint && x < 18 + footprint && z > 8 - footprint && z < 12 + footprint) continue;
+          // Sumi's full courtyard loop has room for the body and crop foliage,
+          // not just an empty centre point. Mugi's loop lies in the main reserve.
+          if (x > -8.7 - footprint && x < -3.3 + footprint && z > 7.1 - footprint && z < 10.9 + footprint) continue;
         } else {
           direction.copy(anchor.direction);
           if (Math.acos(Math.max(-1, Math.min(1, direction.dot(home)))) * R < 37 + footprint) continue;

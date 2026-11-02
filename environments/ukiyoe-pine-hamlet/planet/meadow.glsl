@@ -199,6 +199,16 @@ vec3 meadowPaint(Meadow m) {
   float dc = chordAngle(m.dir, uCottage.xyz) * uRadius;
   if (dc < 34.0) {
     vec2 c = cottageLocal(m.dir);
+    // Cultivated beds share the ground surface. Their matte soil sits beneath
+    // the actual barley rows; no extra nearly-coplanar garden planes.
+    vec2 beds[3];
+    beds[0] = abs(c - vec2(-4.35, 5.95)) - vec2(1.60, 0.825);
+    beds[1] = abs(c - vec2(-4.55, 14.5)) - vec2(1.75, 2.20);
+    beds[2] = abs(c - vec2(6.65, 1.60)) - vec2(0.825, 2.30);
+    float cultivated = 0.0;
+    for (int i = 0; i < 3; i++) cultivated = max(cultivated, 1.0 - smoothstep(-0.07, 0.15, max(beds[i].x, beds[i].y)));
+    vec3 soil = tone3(pow(vec3(0.52, 0.44, 0.32), vec3(2.2)), pow(vec3(0.44, 0.40, 0.31), vec3(2.2)), pow(vec3(0.33, 0.34, 0.28), vec3(2.2)), m.light);
+    col = mix(col, soil, cultivated * (1.0 - uSnowAmount) * 0.76);
     float width = 1.0 + 0.07 * sin(c.y * 2.7);
     float lane = abs(c.x - 1.8 * sin(max(c.y - 5.0, 0.0) * 0.055));
     float spine = smoothstep(width + 0.35, width, lane) * smoothstep(3.9, 5.7, c.y) * smoothstep(34.0, 28.0, c.y);
@@ -216,6 +226,6 @@ vec3 meadowPaint(Meadow m) {
     col = mix(col, mix(pal(ROW_ROCK, 0), pal(ROW_SNOW, 1), uSnowAmount * 0.4), stone * mix(0.85, 0.65, uSnowAmount));
   }
   // Sparse directional pigment variation, never a heavy grain coating.
-  col *= 1.0 + 0.014 * m.stroke;
+  col *= 1.0 + 0.014 * m.stroke * (1.0 - uSnowAmount);
   return col;
 }

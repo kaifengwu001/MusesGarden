@@ -24,20 +24,6 @@ float line(float p,float width) {
   float d=abs(fract(p+0.5)-0.5);
   return 1.0-smoothstep(width,width+max(fwidth(p),0.003),d);
 }
-// Unequal stone faces, with a fine mortar separation rather than a brick grid.
-vec2 mineral(vec2 p) {
-  vec2 cell=floor(p), f=fract(p);
-  float first=10.0,second=10.0,id=0.0;
-  for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
-    vec2 c=vec2(float(x),float(y));
-    vec2 jitter=vec2(hash12(cell+c+1.3),hash12(cell+c+8.7));
-    vec2 q=c+0.20+0.60*jitter-f;
-    float d=dot(q,q);
-    if(d<first){second=first;first=d;id=jitter.x;}else second=min(second,d);
-  }
-  float edge=sqrt(second)-sqrt(first);
-  return vec2(1.0-smoothstep(0.018,0.042+fwidth(edge),edge),id);
-}
 void main() {
   float pixelMeters=max(length(dFdx(vLocal)),length(dFdy(vLocal)));
   if(uKind==6 && uSnowAmount<0.5) discard;
@@ -52,11 +38,12 @@ void main() {
   if(uKind==0){
     col=mix(vec3(0.40,0.35,0.26),vec3(0.69,0.62,0.47),shade);
   }else if(uKind==1){
-    float course=line(vUv.y/0.32,0.026);
-    float joint=line(vUv.x/0.42+floor(vUv.y/0.32)*0.5,0.019);
-    col=mix(vec3(0.025,0.049,0.077),vec3(0.085,0.145,0.20),shade);
-    col=mix(col,ink,max(course,joint*0.65)*0.78);
-    col+=vec3(0.012,0.020,0.025)*line(vUv.y/0.32-0.13,0.018);
+    float course=line(abs(vLocal.z)/3.14*10.0,0.018);
+    float joint=line((vLocal.x+4.84)/(9.68/24.0),0.012);
+    col=mix(vec3(0.025,0.042,0.060),vec3(0.082,0.125,0.165),shade);
+    col=mix(col,ink,max(course*0.58,joint*0.35));
+    // The curved tile shape supplies the broad light; only fine seams are inked.
+    edge=0.0;
   }else if(uKind==2){
     bool floorBoard=vPaint.w>0.5&&vPaint.w<1.5;
     bool bridgeBoard=vPaint.w>1.5&&vPaint.w<2.5;
@@ -82,16 +69,15 @@ void main() {
     edge*=0.30;
   }else if(uKind==5){
     vec2 p=abs(vLocalNormal.y)>0.6?vLocal.xz:vec2(abs(vLocalNormal.x)>0.6?vLocal.z:vLocal.x,vLocal.y);
-    vec2 stone=mineral(p*vec2(1.7,2.8));
-    col=mix(vec3(0.075,0.115,0.16),vec3(0.25,0.31,0.34),shade);
-    col*=0.86+0.22*stone.y;
-    col=mix(col,ink,stone.x*0.62);
-    // Tiny selected mineral flecks, filtered away as soon as they become subpixel.
-    float grain=gnoise(vec3(p*19.0,1.7),804u);
-    float detail=1.0-smoothstep(0.03,0.10,max(fwidth(p.x),fwidth(p.y)));
-    col*=1.0+detail*(0.10*smoothstep(0.36,0.58,grain)-0.12*(1.0-smoothstep(-0.55,-0.35,grain)));
+    float variation=0.94+0.08*fract(vPaint.w*1.37);
+    col=mix(vec3(0.085,0.115,0.135),vec3(0.30,0.34,0.35),shade)*variation;
+    // Sparse fine mineral grains; masonry joints are actual geometric edges.
+    float grain=gnoise(vec3(p*24.0,1.7),804u);
+    float detail=1.0-smoothstep(0.025,0.075,pixelMeters);
+    col*=1.0+detail*(0.10*smoothstep(0.40,0.60,grain)-0.13*(1.0-smoothstep(-0.60,-0.40,grain)));
+    edge=0.0;
   }else{
-    col=snowPrint(vLocal,pixelMeters,shade);
+    col=snowBoundary(shade,normalize(vLocalNormal).y);
     edge=0.0;
   }
   col=mix(col,ink,edge*(uKind==0?0.32:0.60));

@@ -68,7 +68,7 @@ The main house is 8.2 m wide. All values below are cottage-local metres, with
 `terrain.cottageGround`, not above the global water table.
 
 - Veranda: x `[-4.4, 4.4]`, z `[2.49, 4.15]`, one walking cap at `FLOOR`.
-- Steps: x `[-1, 1]`, three 0.4 m treads, each descending 0.24 m.
+- Steps: x `[-1, 1]`, three 0.4 m treads and four equal 0.18 m rises (including ground to first tread). The lowest cap is 0.18 m above the plateau; it must never share the terrain plane.
 - Bridge: x `[8, 16]`, z `[9, 11]`; supported height is
   `0.10 + 0.55 * sin(pi * u)`, with `u` running from one bank to the other.
 - `walkableHeightAt()` is the authoritative constructed-surface contract used by
@@ -118,15 +118,15 @@ twig starts at its parent endpoint rather than duplicating the common approach.
 The material uses one coherent fan chart per lobe; mixing perpendicular ray
 drawings created an unwanted woven pattern in an intermediate capture.
 
-Cedar uses paired leaf sprays, plum has dark bark with lenticels, and reeds have
-light midribs. Branch charts follow trunk and branch arcs. Redundant bark and
-snow outline layers remain removed to avoid depth conflicts.
+Cedar also uses rounded lobes, arranged in narrower upright tiers. Both species carry camera-facing fan engraving on their fixed geometry; `aLobeTurn` transforms the continuous lobe chart into the camera plane without a front/back seam. Geometry and shadows never rotate with the camera. Plum has quiet charcoal-brown bark without repeating gold lenticels. Every plum branch/twig and cedar branch base is sampled from its emitted parent centreline, with the child base ring contained inside that parent. Redundant bark and snow outline layers remain removed.
 
-`render/snow.glsl` gives ground, roofs and plant snow a shared warm-paper/blue
-relief palette with sparse close-up pigment grain. All detail is anchored to
-the resting surface and fades with its projected pixel footprint. Compute
-derivatives before material branches and seasonal discards; the helper itself
-contains no derivatives and is safe in vertex-stage includes.
+`render/snow.glsl` now reserves uniformly white tops. There are no snow dots, grain, wash noise or drawn blue flecks. `snowBoundary()` adds a restrained blue-gray underside from the actual local normal. Rounded snow drapes and the roof’s rolled lip supply the shape; evergreen connector strips must have their own downward-facing normals. Compute derivatives before material branches and seasonal discards; snow helpers themselves contain no derivatives.
+
+Roof tiles are shallow curved geometry with a rounded ridge, not a grid drawn onto a flat plane. Individual fieldstones form the foundation; stair treads have chamfered physical edges and their own support profile. The roof and step snow have unequal, supported edge drifts.
+
+Tree placement mixes unequal groves, saplings, mature trees and open glades. Three authored cottage beds contain dedicated six-stalk barley clumps with broad drooping leaves and paired grain heads. Separate low green grass fringes beds and paths; wild reeds remain at banks. Bed soil is painted into the terrain, never a separate coplanar mesh. Placement reserves the full entrance, bridge and resident loops and samples dry support at radii 40/128/400.
+
+Water uses broad blue pigment with sparse connected horizontal light shapes. A short reflected ray samples the actual terrain for bank silhouettes; this is a stylised bank reflection, not a full reflection of every tree, house or inhabitant. All shapes and click ripples are painted into the single water material. Large quiet blue areas remain between marks.
 
 Placement samples both the anchor and its footprint. Roots and the lowest rock
 ring conform to the terrain in the shader. Colour, selected contours and shadow
@@ -147,10 +147,10 @@ to make a screenshot cleaner.
 Use the commands in [README.md](README.md). The ecology suite captures the actual
 app at frozen time, including Home, Bridge, Muse, Whole planet and Rain views.
 It also saves close pine, cedar and snow/plum material views. The flicker suite
-checks the user-reported camera, Home and Bridge in both seasons at DPR 1 and 2,
+checks the user-reported camera, Home, Bridge, pine and close steps/plum/cedar/roof/water in both seasons at DPR 1 and 2,
 with repeated frozen draws and a small camera sweep. Its pixel metrics complement
 the geometry audit; finite sampled views cannot prove absence of every possible
-depth conflict. Evidence and thresholds live in `reference/frame-stability.json`.
+depth conflict. Current evidence and unchanged thresholds live in `reference/surface-correction-stability.json`. Historical records are retained separately. Close-view yaw increments scale with viewing distance because rig yaw translates its focus around the planet; the original panorama increments are unchanged. A wider initial plum sweep exceeded the adjacent-change guard and remains documented in `reference/close-plum-wide-sweep.json`.
 Inspect the rendered images directly alongside the concept; the test cannot
 judge composition or material fidelity. Resident browser checks cover the UI,
 saved names, navigation, following, growth and season behaviour. Invariant tests

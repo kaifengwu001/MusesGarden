@@ -44,7 +44,7 @@ void main() {
   float viewDist = length(toCam);
   vec3 v = toCam / viewDist;
   float pixelMeters = viewDist * uPixelAngle / max(dot(n, v), 0.3);
-  // The angle estimate is bounded for the older paint systems. Snow grain
+  // The angle estimate is bounded for the older paint systems. Surface ink
   // must also respect the true footprint on a grazing bank/ground surface.
   // Evaluate derivatives before any wet/material branch.
   vec3 restMeters = dir * uRadius;
@@ -124,7 +124,7 @@ void main() {
 
   vec3 col = land;
   // the water is level whatever the mesh under the shoreline does
-  if (wet > 0.0) col = mix(land, waterColour(dir, vWarped, shore, depth, b, cloud, gust, stroke, warpNormal(dir * uRadius, dir), v, pixelMeters), wet);
+  if (wet > 0.0) col = mix(land, waterColour(dir, vWarped, shore, depth, b, cloud, gust, stroke, warpNormal(dir * uRadius, dir), v, snowPixelMeters), wet);
   col += pal(ROW_LIGHT, 3) * sunRim(n, v) * 0.12 * (1.0 - wet);
   col = applyAerial(col, viewDist, dir);
 
