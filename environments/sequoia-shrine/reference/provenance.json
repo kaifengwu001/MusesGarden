@@ -1,0 +1,21 @@
+{
+  "suppliedBy": "user",
+  "date": "2026-11-02",
+  "references": [
+    {
+      "original": "IMG_4020.png",
+      "file": "sacred-grove-reference.png",
+      "sha256": "501aafe609f52a1084a255d29a11a9c12b28bf35a45068c36ddc0f628853ef1f"
+    },
+    {
+      "original": "IMG_0154.png",
+      "file": "forest-path-reference.png",
+      "sha256": "383a4225127b2c323942df1094a48c513d3fcd5255210ef8e2eddfda39421e80"
+    },
+    {
+      "original": "IMG_2763.png",
+      "file": "shrine-approach-reference.png",
+      "sha256": "25a80364d35707ad1719205056c1903ad34ec4adef0a5a471a4b9a19baa8383c"
+    }
+  ]
+}

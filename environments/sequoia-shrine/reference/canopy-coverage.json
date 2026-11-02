@@ -1,0 +1,285 @@
+{
+  "recordedAt": "2026-11-02T10:03:27.165Z",
+  "seed": 412,
+  "radii": [
+    40,
+    128,
+    400
+  ],
+  "samplesPerRadius": 4096,
+  "maskResolutionMeters": 0.2,
+  "method": "Radial canopy projection from actual placed tree anchors/scales and aKind=1 triangle unions. Excludes painted trails and courts. Both detailed and distant templates use the same placements. Not screenshot pixel coverage or a frame-rate benchmark.",
+  "limitation": "A 0.2m source-space grid approximates triangle coverage. The largest empty-cap bound is sampled on 4096 directions, so unsampled gaps may be larger. Ground curvature is included in the circumscribed crown-cap bound; tree height does not alter radial projection in this shader.",
+  "baseline": {
+    "mode": "baseline",
+    "sourceRoot": "C:\\Users\\Xinra\\Documents\\Codex\\GardenTransfer\\muse_garden_1031\\handoffs\\windows\\sequoia-baseline-2026-11-02T09-45-43-926Z\\sequoia-shrine-worktree\\dirty-files",
+    "sourceHashes": [
+      {
+        "file": "life/grove.ts",
+        "sha256": "0d331c4fbdb3f31e28258d9605be24d6cfa4cd28084376aac1c18b566323ccf1"
+      },
+      {
+        "file": "life/groveGeometry.ts",
+        "sha256": "07722997d8591a22c8c11fdb9e242b3a114026b3b64622bbe5d16e83277cafda"
+      },
+      {
+        "file": "planet/routes.ts",
+        "sha256": "29949abcb4876cdbf50b6c17250c4e02b111b23fe08d1fa68080dd6f984d23e8"
+      },
+      {
+        "file": "planet/terrain.ts",
+        "sha256": "51318e828d45cbd476f328161c4ea7e12dcf7d0f00b696910597bcfe6c032358"
+      }
+    ],
+    "detailedTemplates": [
+      {
+        "triangles": 3984,
+        "heightMeters": 43.042518615722656,
+        "needleProjectionAreaM2": 148.24000000000004,
+        "equivalentDiskRadiusMeters": 6.869225395041652,
+        "maxNeedleRadiusMeters": 8.881157928912398
+      },
+      {
+        "triangles": 3624,
+        "heightMeters": 29.496501922607422,
+        "needleProjectionAreaM2": 85.28000000000002,
+        "equivalentDiskRadiusMeters": 5.210131197364772,
+        "maxNeedleRadiusMeters": 6.732340176753811
+      },
+      {
+        "triangles": 3000,
+        "heightMeters": 15.677659034729004,
+        "needleProjectionAreaM2": 28.560000000000006,
+        "equivalentDiskRadiusMeters": 3.0151169710989763,
+        "maxNeedleRadiusMeters": 3.9688606069754813
+      }
+    ],
+    "coarseTemplates": [
+      {
+        "triangles": 3984,
+        "heightMeters": 43.042518615722656,
+        "needleProjectionAreaM2": 148.24000000000004,
+        "equivalentDiskRadiusMeters": 6.869225395041652,
+        "maxNeedleRadiusMeters": 8.881157928912398
+      },
+      {
+        "triangles": 3624,
+        "heightMeters": 29.496501922607422,
+        "needleProjectionAreaM2": 85.28000000000002,
+        "equivalentDiskRadiusMeters": 5.210131197364772,
+        "maxNeedleRadiusMeters": 6.732340176753811
+      },
+      {
+        "triangles": 3000,
+        "heightMeters": 15.677659034729004,
+        "needleProjectionAreaM2": 28.560000000000006,
+        "equivalentDiskRadiusMeters": 3.0151169710989763,
+        "maxNeedleRadiusMeters": 3.9688606069754813
+      }
+    ],
+    "results": [
+      {
+        "radius": 40,
+        "trees": 345,
+        "habitCounts": [
+          111,
+          172,
+          62
+        ],
+        "eligibleDirections": 3638,
+        "detailedCoveredDirections": 1574,
+        "coarseCoveredDirections": 1574,
+        "detailedCanopyFraction": 0.4326553051126993,
+        "coarseCanopyFraction": 0.4326553051126993,
+        "largestSampledDefinitelyBareCapRadiusMeters": 20.27876601301122,
+        "worstDirection": [
+          -0.33917925300746093,
+          -0.821044921875,
+          0.4591760779837904
+        ],
+        "hypotheticalAllDetailedTriangles": 1251552,
+        "hypotheticalAllCoarseTriangles": 1251552
+      },
+      {
+        "radius": 128,
+        "trees": 606,
+        "habitCounts": [
+          191,
+          288,
+          127
+        ],
+        "eligibleDirections": 4007,
+        "detailedCoveredDirections": 964,
+        "coarseCoveredDirections": 964,
+        "detailedCanopyFraction": 0.24057898677314699,
+        "coarseCanopyFraction": 0.24057898677314699,
+        "largestSampledDefinitelyBareCapRadiusMeters": 50.8689915379565,
+        "worstDirection": [
+          -0.5412127186005423,
+          -0.839111328125,
+          0.05459828053436
+        ],
+        "hypotheticalAllDetailedTriangles": 2185656,
+        "hypotheticalAllCoarseTriangles": 2185656
+      },
+      {
+        "radius": 400,
+        "trees": 633,
+        "habitCounts": [
+          201,
+          298,
+          134
+        ],
+        "eligibleDirections": 4079,
+        "detailedCoveredDirections": 106,
+        "coarseCoveredDirections": 106,
+        "detailedCanopyFraction": 0.025986761461142437,
+        "coarseCanopyFraction": 0.025986761461142437,
+        "largestSampledDefinitelyBareCapRadiusMeters": 175.89948608196198,
+        "worstDirection": [
+          -0.5412127186005423,
+          -0.839111328125,
+          0.05459828053436
+        ],
+        "hypotheticalAllDetailedTriangles": 2282736,
+        "hypotheticalAllCoarseTriangles": 2282736
+      }
+    ]
+  },
+  "current": {
+    "mode": "current",
+    "sourceRoot": "C:\\Users\\Xinra\\Documents\\Codex\\GardenTransfer\\muse_garden_1031\\sequoia-shrine-worktree",
+    "sourceHashes": [
+      {
+        "file": "life/grove.ts",
+        "sha256": "a6b6dfdfb5bda1eb630b487d197b2bfd149aeee74d8ea0b5aa40ec270bdbc87f"
+      },
+      {
+        "file": "life/groveGeometry.ts",
+        "sha256": "68e19b09590e65c70dd34fe74fdbaef3609683eaf68b7e01df49339892c37026"
+      },
+      {
+        "file": "planet/routes.ts",
+        "sha256": "29949abcb4876cdbf50b6c17250c4e02b111b23fe08d1fa68080dd6f984d23e8"
+      },
+      {
+        "file": "planet/terrain.ts",
+        "sha256": "51318e828d45cbd476f328161c4ea7e12dcf7d0f00b696910597bcfe6c032358"
+      }
+    ],
+    "detailedTemplates": [
+      {
+        "triangles": 3984,
+        "heightMeters": 43.042518615722656,
+        "needleProjectionAreaM2": 148.24000000000004,
+        "equivalentDiskRadiusMeters": 6.869225395041652,
+        "maxNeedleRadiusMeters": 8.881157928912398
+      },
+      {
+        "triangles": 3624,
+        "heightMeters": 29.496501922607422,
+        "needleProjectionAreaM2": 85.28000000000002,
+        "equivalentDiskRadiusMeters": 5.210131197364772,
+        "maxNeedleRadiusMeters": 6.732340176753811
+      },
+      {
+        "triangles": 3000,
+        "heightMeters": 15.677659034729004,
+        "needleProjectionAreaM2": 28.560000000000006,
+        "equivalentDiskRadiusMeters": 3.0151169710989763,
+        "maxNeedleRadiusMeters": 3.9688606069754813
+      }
+    ],
+    "coarseTemplates": [
+      {
+        "triangles": 240,
+        "heightMeters": 43,
+        "needleProjectionAreaM2": 157.96000000000004,
+        "equivalentDiskRadiusMeters": 7.0908553519016015,
+        "maxNeedleRadiusMeters": 9.127384622024277
+      },
+      {
+        "triangles": 240,
+        "heightMeters": 29,
+        "needleProjectionAreaM2": 92.56000000000002,
+        "equivalentDiskRadiusMeters": 5.427961225466857,
+        "maxNeedleRadiusMeters": 6.725633418930114
+      },
+      {
+        "triangles": 240,
+        "heightMeters": 15,
+        "needleProjectionAreaM2": 31.760000000000005,
+        "equivalentDiskRadiusMeters": 3.1795474497477145,
+        "maxNeedleRadiusMeters": 4.004088046395631
+      }
+    ],
+    "results": [
+      {
+        "radius": 40,
+        "trees": 789,
+        "habitCounts": [
+          258,
+          469,
+          62
+        ],
+        "eligibleDirections": 3638,
+        "detailedCoveredDirections": 3372,
+        "coarseCoveredDirections": 3421,
+        "detailedCanopyFraction": 0.9268829026937878,
+        "coarseCanopyFraction": 0.940351841671248,
+        "largestSampledDefinitelyBareCapRadiusMeters": 4.420673614910873,
+        "worstDirection": [
+          0.9660341327904132,
+          -0.245361328125,
+          0.08109175632954593
+        ],
+        "hypotheticalAllDetailedTriangles": 2913528,
+        "hypotheticalAllCoarseTriangles": 189360
+      },
+      {
+        "radius": 128,
+        "trees": 3220,
+        "habitCounts": [
+          981,
+          2112,
+          127
+        ],
+        "eligibleDirections": 4007,
+        "detailedCoveredDirections": 3880,
+        "coarseCoveredDirections": 3906,
+        "detailedCanopyFraction": 0.9683054654354879,
+        "coarseCanopyFraction": 0.9747941103069628,
+        "largestSampledDefinitelyBareCapRadiusMeters": 2.3799430453042794,
+        "worstDirection": [
+          0.6189154341323376,
+          -0.217041015625,
+          -0.7548754088783449
+        ],
+        "hypotheticalAllDetailedTriangles": 11943192,
+        "hypotheticalAllCoarseTriangles": 772800
+      },
+      {
+        "radius": 400,
+        "trees": 20992,
+        "habitCounts": [
+          6381,
+          14477,
+          134
+        ],
+        "eligibleDirections": 4079,
+        "detailedCoveredDirections": 4021,
+        "coarseCoveredDirections": 4031,
+        "detailedCanopyFraction": 0.9857808286344693,
+        "coarseCanopyFraction": 0.9882324099043883,
+        "largestSampledDefinitelyBareCapRadiusMeters": 3.4633800924391167,
+        "worstDirection": [
+          0.3110242084240011,
+          -0.608154296875,
+          -0.730350801304892
+        ],
+        "hypotheticalAllDetailedTriangles": 78288552,
+        "hypotheticalAllCoarseTriangles": 5038080
+      }
+    ]
+  }
+}
