@@ -43,7 +43,7 @@ import shadowVertex from './museShadow.vert.glsl?raw';
 
 // Muse, who lives here: a cream plush about as tall as you, built from its
 // reference (museBody.ts: one distance field, meshed off the main thread, or
-// Tripo's sculpt rigged on the same skeleton, museMesh.ts), skinned on
+// the source model's sculpt rigged on the same skeleton, museMesh.ts), skinned on
 // thirteen joints and posed in closed form (museRig.ts), drawn as its skin
 // and SHELLS shells of fur in one instanced draw (muse.vert.glsl,
 // muse.frag.glsl), and casting its shadow into a map of its own about it
@@ -131,7 +131,7 @@ export interface MuseWhere {
 export class Muse {
   readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
   readonly shadowMesh: Mesh<BufferGeometry, ShaderMaterial>;
-  /** Muse's body: the field's own (museBody.ts), or the Tripo sculpt bound to the same skeleton (museTripo.ts). */
+  /** Muse's body: the field's own (museBody.ts), or the imported sculpt bound to the same skeleton (museSculptLoader.ts). */
   private model: MuseModel = 'field';
   private fieldBody: MuseBody | null = null;
   private loading: Promise<void>;
@@ -260,8 +260,8 @@ export class Muse {
   }
 
   /**
-   * Switch Muse's body: the field's own, or a Tripo sculpt on the same
-   * skeleton (Tripo's first, made with its arms hanging, or its T-pose; its
+   * Switch Muse's body: the field's own, or a source model sculpt on the same
+   * skeleton (the first sculpt, made with its arms hanging, or its T-pose; its
    * own paint, the same fur and light). The sculpt is loaded the first time it is asked for; where it
    * cannot be had, Muse keeps the field's.
    */
@@ -275,11 +275,11 @@ export class Muse {
         return;
       }
       try {
-        const { loadTripo } = await import('./museTripo');
-        const sculpt = await loadTripo(model);
+        const { loadSculpt } = await import('./museSculptLoader');
+        const sculpt = await loadSculpt(model);
         if (this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade);
       } catch (error) {
-        console.warn('Muse: the Tripo sculpt could not be loaded; keeping the field body', error);
+        console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
       }
     });
   }

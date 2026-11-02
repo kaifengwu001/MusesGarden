@@ -12,7 +12,7 @@ The app is a Vite + TypeScript + three.js tiny planet. Everything about a view l
 - **Node 24.** The default `node` here is v18, and vite 8 and vitest 5 need a newer one. Prefix commands with `PATH=/Users/kaifengwu/.nvm/versions/node/v24.15.0/bin:$PATH`, or check `ls ~/.nvm/versions/node` if that version has moved. `build-at.sh` finds it by itself.
 - **Ports.** Look before you start anything (`lsof -iTCP -sTCP:LISTEN -n -P | grep 51`):
   - 5198: the main checkout's dev server (`npx vite --port 5198 --strictPort`, run in the background).
-  - 5196 and 5197: the garden-interfaces and terraces worktrees, per `.claude/launch.json`.
+  - 5196 and 5197: the garden-interfaces and terraces worktrees, per the local preview configuration.
   - 5199: Playwright's webServer. It **reuses whatever already listens there**, so `npm run test:gpu` or `npm run shots` in a worktree silently tests another checkout's code. Check who serves 5199 first, or give the worktree's `playwright.config.ts` another PORT (and don't commit that).
   - 5180: belongs to another project.
 - **Other sessions share this folder and this GPU.** Several sessions (Muse, the interfaces, the terraces) work here at once:
@@ -79,16 +79,16 @@ All take a **target**: a URL (`http://localhost:5198`, a published page) or the 
 
 ```bash
 # screenshots: the standard views, a preset, or any list of shots (UI hidden; UI=1 keeps it)
-node .claude/skills/drive-app/scripts/look.mjs http://localhost:5198 views shots/look
-VIEWS="vista,cottage" DPR=2 node .claude/skills/drive-app/scripts/look.mjs http://localhost:5198 views /tmp/x
-node .claude/skills/drive-app/scripts/look.mjs http://localhost:5198 '[{"name":"lakes","preset":"lakes"},{"name":"R400","hash":"g=1&cam=wander"}]' /tmp/x
+node tools/workflows/drive-app/scripts/look.mjs http://localhost:5198 views shots/look
+VIEWS="vista,cottage" DPR=2 node tools/workflows/drive-app/scripts/look.mjs http://localhost:5198 views /tmp/x
+node tools/workflows/drive-app/scripts/look.mjs http://localhost:5198 '[{"name":"lakes","preset":"lakes"},{"name":"R400","hash":"g=1&cam=wander"}]' /tmp/x
 
 # a contact sheet to look at (or send) many shots at once
-node .claude/skills/drive-app/scripts/sheet.mjs out.jpg --cols 3 --width 480 a.png b.png label=c.png
+node tools/workflows/drive-app/scripts/sheet.mjs out.jpg --cols 3 --width 480 a.png b.png label=c.png
 
 # a probe build of any commit (or of the working tree) to serve from disk
-.claude/skills/drive-app/scripts/build-at.sh i13 d5107a0
-.claude/skills/drive-app/scripts/build-at.sh mine
+tools/workflows/drive-app/scripts/build-at.sh i13 d5107a0
+tools/workflows/drive-app/scripts/build-at.sh mine
 ```
 
 - **Where builds go.** Set `BUILDS` to a folder in your scratchpad; the default is `$TMPDIR/muses-garden-builds`.

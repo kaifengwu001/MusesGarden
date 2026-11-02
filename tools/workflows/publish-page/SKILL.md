@@ -30,8 +30,8 @@ scripts/publish.sh 4 67a2742             # an older commit as its own page
 ## Then verify (every page you published)
 
 ```bash
-node .claude/skills/publish-page/scripts/verify-page.mjs https://muses-garden-iteration-18.vercel.app <sha>
-node .claude/skills/publish-page/scripts/verify-page.mjs https://the-meadow-omega.vercel.app <sha>
+node tools/workflows/publish-page/scripts/verify-page.mjs https://muses-garden-iteration-18.vercel.app <sha>
+node tools/workflows/publish-page/scripts/verify-page.mjs https://the-meadow-omega.vercel.app <sha>
 ```
 
 It checks four things:

@@ -11,11 +11,11 @@ import SculptWorker from './museSculpt.worker?worker&inline';
 
 /** The sculpts: Tripo's first (arms hanging, grown into the sides), and its T-poses (arms straight out). */
 export const TRIPO_URLS: Record<SculptKind, string> = {
-  tripo: new URL('../../../src/assets/muse/tripo.glb', import.meta.url).href,
-  tpose: new URL('../../../src/assets/muse/tripo-tpose.glb', import.meta.url).href,
-  tpose2: new URL('../../../src/assets/muse/tripo-tpose2.glb', import.meta.url).href,
-  tpose5: new URL('../../../src/assets/muse/tripo-tpose5.glb', import.meta.url).href,
-  tpose6: new URL('../../../src/assets/muse/tripo-tpose6.glb', import.meta.url).href,
+  tripo: new URL('../../../src/assets/muse/sculpt.glb', import.meta.url).href,
+  tpose: new URL('../../../src/assets/muse/sculpt-tpose.glb', import.meta.url).href,
+  tpose2: new URL('../../../src/assets/muse/sculpt-tpose2.glb', import.meta.url).href,
+  tpose5: new URL('../../../src/assets/muse/sculpt-tpose5.glb', import.meta.url).href,
+  tpose6: new URL('../../../src/assets/muse/sculpt-tpose6.glb', import.meta.url).href,
 };
 
 /**

@@ -5,6 +5,29 @@ Latest review: 2 November 2026, native Windows. Delivery branch:
 from `e5ac0a4`. Active Windows preview port: **5232**. The older external
 checkout on 5231 is not this review target.
 
+## Remote main integration · 2 November 2026
+
+The publication integration combines source `929b322` with remote main
+`335104a`, preserving the intervening UI, environment and asset cleanup work.
+Violet's five optional sculpt URLs now use the renamed shared assets. All five
+load and rig successfully in Chromium, with no captured runtime errors.
+
+The nine targeted correctness checks pass on the integrated source. A separate
+growth timing check exposed an 8.90 ms build slice against the unchanged
+8.60 ms limit, reproduced once. Violet now caps its adaptive build allowance
+at 7 ms so a final atomic tile job has time to finish. The corrected run has
+frame p95 16.70 ms, JS p95 10.20 ms and maximum build slice 7.80 ms. Walking
+and two resizes cover 358 frames with no blank frames or tile drops. The
+expanded globe check still passes, including exact growth return and all
+original resource limits. The seven settled views match the pre-integration
+captures exactly; scenery and cloud width are unchanged.
+
+These runs use native Windows Chromium, ANGLE D3D11 on RTX 4070 SUPER,
+1600×1000, DPR1 and high quality. They are host-specific results, not a new
+cross-device performance guarantee. CPU contracts, scoped client/browser
+TypeScript, lint and the standalone production build also pass. Source
+changes relative to remote main remain inside this environment.
+
 ## Mainline readiness fixes · 2 November 2026
 
 The final source was also checked in an isolated export of GitHub `main` at

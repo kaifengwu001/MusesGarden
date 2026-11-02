@@ -315,7 +315,9 @@ async function boot(): Promise<void> {
   afterFrame.port1.onmessage = () => {
     const backlog = world.queue.countBelow(AHEAD) > BACKLOG;
     budget.begin(clock.frameMs, backlog, frameJsMs + world.queue.lastMs);
-    world.queue.run(budget.next(backlog, performance.now() - frameStart));
+    // A tile job finishes atomically after the deadline. Reserve room for
+    // that final job when the adaptive catch-up allowance reaches its cap.
+    world.queue.run(Math.min(7, budget.next(backlog, performance.now() - frameStart)));
   };
   const frame = (now: number): void => {
     clock.tick(now);

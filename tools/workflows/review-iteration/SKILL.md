@@ -30,7 +30,7 @@ Ask only what blocks you. For anything with a sensible default, act and say so i
 ## 2. Build it: a whole iteration, milestone by milestone
 
 - **Group by system.** Work through the notes in milestones that each touch one system: clouds, water, the cottage, the grass loading.
-- **Commit each milestone** as it lands, in the repo's style. Plain words say what changed, as Kai would see it: "Iteration 13: the field map drawn before the clouds; the cloud mirror shaded only where a lake can read it". No attribution lines (memory no-claude-attribution).
+- **Commit each milestone** as it lands, in the repo's style. Plain words say what changed, as Kai would see it: "Iteration 13: the field map drawn before the clouds; the cloud mirror shaded only where a lake can read it". No attribution lines.
 - **Look first.** Settle a visual note against the references and the views (look-dev) before measuring what it costs. Perf numbers for a look that will still change are wasted.
 - **Then measure the cost** (measure-perf).
 - **Never alter the look for performance.** Resolution doesn't count as the look.

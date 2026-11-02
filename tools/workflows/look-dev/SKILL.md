@@ -36,9 +36,9 @@ Kai checks closely: zoomed in, from the far side of the globe, on a 1× screen, 
 3. **Squint.** Shrink both to 48 × 27 cells, blur, and compare each cell in CIE Lab (mean ΔE76), overall and by band. Then read the heat map: it shows where the difference is (composition, or the colour of one material).
 
    ```bash
-   node .claude/skills/look-dev/scripts/squint.mjs reference/<planet>/vista.jpg http://localhost:5198 shots/squint.png
-   PRESET=vista HASH="cc=0.8" node .claude/skills/look-dev/scripts/squint.mjs <ref> <target> out.png   # extra hash keys
-   node .claude/skills/look-dev/scripts/squint.mjs <ref> render.png out.png        # any screenshot
+   node tools/workflows/look-dev/scripts/squint.mjs reference/<planet>/vista.jpg http://localhost:5198 shots/squint.png
+   PRESET=vista HASH="cc=0.8" node tools/workflows/look-dev/scripts/squint.mjs <ref> <target> out.png   # extra hash keys
+   node tools/workflows/look-dev/scripts/squint.mjs <ref> render.png out.png        # any screenshot
    ```
 
    - The meadow's own test is `npm run squint`: goal 14, guard 26, its score in PROGRESS.md each iteration.
@@ -50,7 +50,7 @@ Kai checks closely: zoomed in, from the far side of the globe, on a 1× screen, 
 4. **Measure colours.** Take median colours region by region from the colour reference, then grade the palette rows in linear light. Use regions that are one material each: a band of far meadow, the lake, a cloud's lit side.
 
    ```bash
-   node .claude/skills/look-dev/scripts/regions.mjs <reference> [<render>] --regions regions.json --out swatches.png
+   node tools/workflows/look-dev/scripts/regions.mjs <reference> [<render>] --regions regions.json --out swatches.png
    ```
 
    It prints, for each region, the median plus shade, mid and light colours (the 10th, 50th and 90th percentile of lightness), which map onto a palette row's columns. Given a render of the same composition, it adds the ΔE beside them.

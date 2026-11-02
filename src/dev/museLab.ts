@@ -28,7 +28,7 @@ import { smoothstep } from '../core/math';
 import { FUR_LENGTH, MUSE_HEIGHT, SHELLS } from '../life/muse';
 import { buildMuseBody, FIELD_FIT, PARENT, type MuseBody, type MuseFit } from '../life/museBody';
 import { SCULPTS, type SculptKind } from '../life/museMesh';
-import { loadTripo } from '../life/museTripo';
+import { loadSculpt } from '../life/museSculptLoader';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
 import { BOUNCE_LENGTH, FISH, FLUFF_LENGTH, GARDEN, COOK, HOP, LIE_BACK, MuseRig, PET, PLOP, RISE, WAKE, WAVE_LENGTH, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
@@ -40,7 +40,7 @@ import { registerShaderChunks } from '../render/glsl';
 // down and its middle 799.5 px across), so the two can be laid side by side
 // and their silhouettes compared. The hash picks the body, the look, the view
 // and the moment:
-//   model=procedural|tripo|tpose|tpose2|tpose5|tpose6 (src/assets/muse/tripo*.glb, rigged on the skeleton by museMesh.ts)
+//   model=procedural|sculpt|tpose|tpose2|tpose5|tpose6 (src/assets/muse/sculpt*.glb, rigged on the skeleton by museMesh.ts)
 //   look=muse|raw|weights|clay|facet|stretch|rough   (Muse's shaders; the file as exported; each vertex coloured by its joints;
 //                           the bare skin in clay; the clay shaded by the triangles as drawn, not the skinned normals;
 //                           how much each part of the skin is stretched (red) or squashed (blue) in the pose;
@@ -160,7 +160,7 @@ act(time);
 
 async function body(): Promise<{ body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array }; grade: Vector3; raw: Mesh | null }> {
   if (!sculpt) return { body: buildMuseBody(), grade: new Vector3(1, 1, 1), raw: null };
-  const loaded = await loadTripo(sculpt);
+  const loaded = await loadSculpt(sculpt);
   return { body: loaded.body, grade: params.get('grade') === '0' ? new Vector3(1, 1, 1) : loaded.grade, raw: loaded.raw };
 }
 
