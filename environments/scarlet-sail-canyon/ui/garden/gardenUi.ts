@@ -20,7 +20,7 @@ import { BasketsSheet } from './baskets';
 import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
 import { button, dayName, el } from './dom';
 import { FindCard, topicColour } from './findCard';
-import '../../../../src/ui/garden/garden.css';
+import './garden.css';
 import { ICONS } from './icons';
 import { Mail } from './mail';
 import { MuseSheet } from './musePage';

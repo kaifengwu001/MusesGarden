@@ -1,0 +1,64 @@
+{
+  "recordedAt": "2026-11-02T09:57:23.832Z",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "dpr": 1,
+  "quality": "high/MSAA4",
+  "time": 12,
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "ticket": {
+    "position": "fixed",
+    "width": 112.454345703125
+  },
+  "pins": {
+    "total": 1,
+    "visible": 1,
+    "hidden": 0,
+    "picks": [
+      {
+        "id": "muse",
+        "z": 0.8998187516562194,
+        "picked": "muse"
+      }
+    ],
+    "toggledOff": true
+  },
+  "views": [
+    "baskets",
+    "find-card",
+    "mail",
+    "globe"
+  ],
+  "errors": [],
+  "baseCommit": "335104a41281246de3c0ca30470bbb50799b35be",
+  "stylesheetSource": "43c067a:src/ui/garden/garden.css",
+  "stylesheetSHA256": "699666EF6D7248275E4286FF8275E686E6CBE69DB76D53F0C9E90089A08460A9",
+  "validation": {
+    "browserTests": 5,
+    "check": "pass",
+    "build": "pass; existing chunk-size warning",
+    "cpuTests": 140,
+    "cpuFiles": 16,
+    "performance": "not measured"
+  },
+  "media": [
+    {
+      "file": "mainline-ui-baskets.png",
+      "sha256": "95AEE7D39FFCC6C8DBBFD43D0C4C75008D9ADF79A0B1FD9D603EC3D715AA59BC"
+    },
+    {
+      "file": "mainline-ui-find-card.png",
+      "sha256": "12FFBE65F8970B1306C908457A2D15F43CA26E8092C3C5E268A20863ED7D3607"
+    },
+    {
+      "file": "mainline-ui-mail.png",
+      "sha256": "6657AB53AE4E9E8352A4DF7A82983BA33424BAC1B2E13965276C4E5025E6A33D"
+    },
+    {
+      "file": "mainline-ui-globe.png",
+      "sha256": "014EA4417264D8C7D7FAC083DA04A1DB8B8AC8A681DDBD4410812CE213A13D7B"
+    }
+  ]
+}
