@@ -64,12 +64,13 @@ ARCHITECTURE.md ("The unfolding"):
   kept finer than the URL writes it and came back a square meter off. The new
   field shifted params.test.ts's random draws onto that case.
 
+Decided (Kai, 2026-11-01): the camera stays held through the growth. Held
+so, the planet fills the window by about R 200 m (u ≈ 0.58), and from there
+on we look at a patch of growing ground, 265 m below at R 400. Easing the
+camera back, or starting the growth farther out, was offered and turned down.
+
 Open (questions for Kai, and what wasn't done):
 
-- Held where it is, the planet fills the window by about R 200 m (u ≈ 0.58).
-  From there on we look at a patch of a growing surface, from 265 m up at
-  R 400. The camera could ease back once the planet fills the window, or
-  start the growth farther out.
 - The page still opens on the meadow as it was (the slider's middle); `#u=0`
   opens it at the start.
 - Up close a veil heap is one smooth dome; from orbit and the bird's-eye it
