@@ -32,3 +32,6 @@ reference/hut-interior/
 dist-environments/
 
 .vite-cache/
+.vite-ukiyoe-cache/
+.vite-ukiyoe-build-cache/
+node_modules

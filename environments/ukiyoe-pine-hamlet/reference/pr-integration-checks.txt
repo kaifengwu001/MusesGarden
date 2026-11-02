@@ -1,0 +1,84 @@
+Integrated environment browser checks
+[WebServer] (node:78146) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 14 tests using 1 worker
+
+  ✓   1 [ukiyoe-pine-hamlet:invariants] › environments/ukiyoe-pine-hamlet/dev/invariants.spec.ts:24:3 › determinism › two loads of the same URL render an identical frame (7.9s)
+  ✓   2 [ukiyoe-pine-hamlet:invariants] › environments/ukiyoe-pine-hamlet/dev/invariants.spec.ts:32:3 › determinism › a frozen frame is identical across re-renders (3.0s)
+  ✓   3 [ukiyoe-pine-hamlet:invariants] › environments/ukiyoe-pine-hamlet/dev/invariants.spec.ts:39:3 › determinism › growth scrub 0.3 → 0.7 → 0.3 returns the identical frame (4.8s)
+  ✓   4 [ukiyoe-pine-hamlet:invariants] › environments/ukiyoe-pine-hamlet/dev/invariants.spec.ts:54:3 › CPU and GPU agree › terrain, water and the tiny-planet warp match their CPU mirrors (3.8s)
+  ✓   5 [ukiyoe-pine-hamlet:invariants] › environments/ukiyoe-pine-hamlet/dev/invariants.spec.ts:67:3 › CPU and GPU agree › picking hits the planet where it is drawn (3.3s)
+  ✓   6 [ukiyoe-pine-hamlet:invariants] › environments/ukiyoe-pine-hamlet/dev/invariants.spec.ts:254:3 › budgets › draw calls stay within budget in Overview and Wander (5.8s)
+  ✓   7 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:29:1 › a living settlement renders with two neighbours and Muse and no shader errors (4.4s)
+  ✓   8 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:57:1 › find, greet, rename and reload a resident without changing meadow storage (3.9s)
+  ✓   9 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:74:1 › residents remain grounded through growth and seed changes (3.6s)
+  ✓  10 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:95:1 › planet and hamlet views work on desktop and a narrow viewport (5.3s)
+  ✓  11 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:140:1 › following yields to both its stop button and garden navigation (3.2s)
+  ✓  12 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:153:1 › a route preview preserves the invitation and restores the home seed (7.3s)
+  ✓  13 [ukiyoe-pine-hamlet:residents] › environments/ukiyoe-pine-hamlet/dev/residents.spec.ts:174:1 › snow and rain change the complete scene and survive reload (5.9s)
+  ✓  14 [ukiyoe-pine-hamlet:ecology] › environments/ukiyoe-pine-hamlet/dev/ecology.spec.ts:6:1 › reference views compile, expose Muse and preserve the seasonal layout (6.0s)
+
+  14 passed (1.2m)
+
+
+Unchanged meadow self-check, DPR 1
+high    orbit             identical  (tilt/fov not fixed (no __world))
+high    bird's-eye 70 m   DIFFER: 185 px of 1296000 (max Δ 128; Δ>4 49, Δ>16 22, Δ>64 5) in x 0–63, y 157–255  (tilt/fov not fixed (no __world))
+high    standing 4.3 m    identical  (tilt/fov not fixed (no __world))
+high    standing, lower   identical  (tilt/fov not fixed (no __world))
+high    meadow 1.6 m      identical  (tilt/fov not fixed (no __world))
+high    meadow, turned    identical  (tilt/fov not fixed (no __world))
+high    lakeside 1.6 m    identical  (tilt/fov not fixed (no __world))
+high    vista             identical  (tilt/fov not fixed (no __world))
+high    cottage           identical  (tilt/fov not fixed (no __world))
+
+
+Unchanged meadow self-check, DPR 2
+high    orbit             identical  (tilt/fov not fixed (no __world))
+high    bird's-eye 70 m   DIFFER: 638 px of 5184000 (max Δ 178; Δ>4 166, Δ>16 50, Δ>64 30) in x 7–120, y 344–473  (tilt/fov not fixed (no __world))
+high    standing 4.3 m    identical  (tilt/fov not fixed (no __world))
+high    standing, lower   identical  (tilt/fov not fixed (no __world))
+high    meadow 1.6 m      identical  (tilt/fov not fixed (no __world))
+high    meadow, turned    identical  (tilt/fov not fixed (no __world))
+high    lakeside 1.6 m    identical  (tilt/fov not fixed (no __world))
+high    vista             identical  (tilt/fov not fixed (no __world))
+high    cottage           identical  (tilt/fov not fixed (no __world))
+
+
+Before/after meadow, DPR 2 (bird view is not a stable baseline)
+high    orbit             identical  (tilt/fov not fixed (no __world))
+high    bird's-eye 70 m   DIFFER: 3096 px of 5184000 (max Δ 208; Δ>4 713, Δ>16 568, Δ>64 350) in x 0–120, y 349–476  (tilt/fov not fixed (no __world))
+high    standing 4.3 m    identical  (tilt/fov not fixed (no __world))
+high    standing, lower   identical  (tilt/fov not fixed (no __world))
+high    meadow 1.6 m      identical  (tilt/fov not fixed (no __world))
+high    meadow, turned    identical  (tilt/fov not fixed (no __world))
+high    lakeside 1.6 m    identical  (tilt/fov not fixed (no __world))
+high    vista             identical  (tilt/fov not fixed (no __world))
+high    cottage           identical  (tilt/fov not fixed (no __world))
+
+
+Meadow runtime artifact SHA-256 comparison
+{
+  "runtimeFiles": 16,
+  "allIdentical": true,
+  "hashes": {
+    "index.html": "43329c578f18a1d43f408bc0ad912b1904661b8b05df2c1dcfe620d56300eaea",
+    "assets/index-Bg7yV0N-.js": "9bd9403963142f40d1baf056db04754786d2a8bcc7139eca307e267d7dad38fe",
+    "assets/index-DAh2DzP5.css": "3714ab55c75cbf4a79ce24cf5d0cf71e2fcf199bc5c20c38ee9fae658ecc41a1",
+    "assets/close-BBM_3A7t.jpg": "1c559b1d108bf1e23d410237adcbe5420f69ab78fd5107a93503f023db032b19",
+    "assets/museTripo-WRt6QMxU.js": "2dc27e7611c45b49313d1720ff7eff073de9292c2558579072046ad7e492d73c",
+    "assets/tripo-tpose2-CQ6AsrlL.glb": "4fe8f5ae9ff2fbb5d132cd630e55d3df547f0c4aedb5b27609af3951c222cf66",
+    "assets/friend-face-ephsYRiD.jpg": "2311df6ee8e8075bb3db5901d857e26a37fe48a514707246efb0be280b1383a8",
+    "assets/tripo-BaZNjt2Q.glb": "637d28c272a7a425c66754e5b31dcafa4a08a5a8f48b748a9bc89ba5ebe4ed97",
+    "assets/muse-face-BbSl-c0t.jpg": "21143c411ad3a437fc7c010525be58d9873277f89699daef700d7144da887b4c",
+    "assets/tripo-tpose6-DxQQy9Rl.glb": "46697605e25030701861098fa4fa35c328aceff63162b795e204d4de429dc238",
+    "assets/terrace-1qlb0u5j.jpg": "026149ecee5262f7af5950034a0434e9eb851dac6770bb4fd62e37ba8dec052f",
+    "assets/tripo-tpose5-DLWe5HKS.glb": "b4552d28df256f7a035c9310c5460506d9082d831a1eea7b8cc9062e59d626f2",
+    "assets/cottage-fQG6izBl.jpg": "b4475c1e83814907c73abeca2bc5a23d5ec814f07d3da8cf9651b1c5e2a4c091",
+    "assets/meadow-9CU__TyR.jpg": "3ff82a7ef4012bf3a1d6fcda923cb5b367270298400fe1c923bc318aad357de7",
+    "assets/tripo-tpose-qKHePZeV.glb": "23e0c475a17fb61281312f6ac22fd0acc4be6b028e0cef784c8bf3abb4c08830",
+    "assets/pier-BVT8CB8w.jpg": "1ef3246f1e9b2a0cdd31e9694e656f3b653c23418cd94d222e18e7daba36a541"
+  }
+}
+Only a non-runtime index JavaScript source map differed.

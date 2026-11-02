@@ -1,0 +1,322 @@
+{
+  "subject": "Rounded pine crown geometry with lobe-local fan marks",
+  "capturedAt": "2026-11-02T03:19:07.271Z",
+  "testCommand": "MEADOW_PORT=5237 npx playwright test --project=ukiyoe-pine-hamlet:flicker",
+  "testResult": {
+    "passed": 4,
+    "failed": 0,
+    "reportedDuration": "1.2m"
+  },
+  "testedSource": {
+    "baseCommit": "c110fd45539f031a29b956bd6e6240a39019d30e",
+    "workingTree": true,
+    "modifiedRuntimeSha256": {
+      "life/hamletGeometry.ts": "2f80f43ae2c6bb0b79847effc242a17d30fd6919792abf96bc98f784b2b5900b",
+      "life/hamletScenery.frag.glsl": "1a26eaa91116a0c88d703b69dfb2a43a4a7d7e60025024c65ad9fef629b82813",
+      "life/hamletScenery.vert.glsl": "87792a27ec51eae4a6c1370fd820f375ec5a90bbf92f265f3d330e6f9442008d",
+      "render/snow.glsl": "85fad89d983b33f8ef46175bbff6f7ded7f6484f3449311f036d7b88e955f3cf"
+    }
+  },
+  "browser": "Playwright Chromium",
+  "renderers": [
+    "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+  ],
+  "setup": {
+    "viewport": [
+      960,
+      600
+    ],
+    "devicePixelRatios": [
+      1,
+      2
+    ],
+    "quality": "high",
+    "frozenTime": 12,
+    "renderScale": 1,
+    "reportedPose": "0.1045,-0.3585,0.6614,0.6505,0.83",
+    "seasons": [
+      "snow",
+      "rain"
+    ],
+    "views": [
+      "reported",
+      "home",
+      "bridge",
+      "pine"
+    ],
+    "pineCamera": {
+      "at": [
+        -9,
+        6.6,
+        -3
+      ],
+      "height": 7.2,
+      "distance": 13,
+      "azimuth": 0.6
+    }
+  },
+  "frozenRedraws": {
+    "referenceComparisons": 48,
+    "sweepComparisons": 144,
+    "totalComparisons": 192,
+    "totalChangedPixels": 0,
+    "maximumChannelDelta": 0
+  },
+  "sweep": {
+    "framesPerView": 9,
+    "viewCount": 16,
+    "totalFrames": 144,
+    "yawRadians": {
+      "from": -0.012,
+      "to": 0.012,
+      "step": 0.003
+    },
+    "analysisResolution": [
+      480,
+      300
+    ],
+    "isolatedFlashRule": "Middle-frame luminance differs from both neighbors by >28/255, while the neighbors differ by <10/255.",
+    "thresholds": {
+      "isolatedFlashShareLessThan": 0.015,
+      "adjacentMeanLuminanceDeltaLessThan": 8,
+      "frameLuminanceDeviationGreaterThan": 12
+    },
+    "observed": {
+      "maximumIsolatedFlashShare": 0.0036875,
+      "maximumAdjacentMeanLuminanceDelta": 6.116944801436531,
+      "minimumFrameLuminanceDeviation": 29.85009024761025
+    }
+  },
+  "cases": [
+    {
+      "dpr": 1,
+      "season": "snow",
+      "view": "reported",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.00275,
+      "maximumAdjacentMeanLuminanceDelta": 5.8073809700542025
+    },
+    {
+      "dpr": 1,
+      "season": "snow",
+      "view": "home",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0029861111111111113,
+      "maximumAdjacentMeanLuminanceDelta": 4.53937593515714
+    },
+    {
+      "dpr": 1,
+      "season": "snow",
+      "view": "bridge",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0028194444444444443,
+      "maximumAdjacentMeanLuminanceDelta": 4.699305151250627
+    },
+    {
+      "dpr": 1,
+      "season": "snow",
+      "view": "pine",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0019097222222222222,
+      "maximumAdjacentMeanLuminanceDelta": 4.699725449535582
+    },
+    {
+      "dpr": 1,
+      "season": "rain",
+      "view": "reported",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0024097222222222224,
+      "maximumAdjacentMeanLuminanceDelta": 4.275956186612447
+    },
+    {
+      "dpr": 1,
+      "season": "rain",
+      "view": "home",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0036875,
+      "maximumAdjacentMeanLuminanceDelta": 3.5207817102008394
+    },
+    {
+      "dpr": 1,
+      "season": "rain",
+      "view": "bridge",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0028055555555555555,
+      "maximumAdjacentMeanLuminanceDelta": 3.7288017755879297
+    },
+    {
+      "dpr": 1,
+      "season": "rain",
+      "view": "pine",
+      "buffer": [
+        960,
+        600
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0019652777777777776,
+      "maximumAdjacentMeanLuminanceDelta": 4.076435782406065
+    },
+    {
+      "dpr": 2,
+      "season": "snow",
+      "view": "reported",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.002923611111111111,
+      "maximumAdjacentMeanLuminanceDelta": 6.116944801436531
+    },
+    {
+      "dpr": 2,
+      "season": "snow",
+      "view": "home",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.003013888888888889,
+      "maximumAdjacentMeanLuminanceDelta": 4.616251809808943
+    },
+    {
+      "dpr": 2,
+      "season": "snow",
+      "view": "bridge",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.002923611111111111,
+      "maximumAdjacentMeanLuminanceDelta": 4.782248121605979
+    },
+    {
+      "dpr": 2,
+      "season": "snow",
+      "view": "pine",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.002125,
+      "maximumAdjacentMeanLuminanceDelta": 4.86739666030142
+    },
+    {
+      "dpr": 2,
+      "season": "rain",
+      "view": "reported",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0020555555555555557,
+      "maximumAdjacentMeanLuminanceDelta": 4.319045499324798
+    },
+    {
+      "dpr": 2,
+      "season": "rain",
+      "view": "home",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0023125,
+      "maximumAdjacentMeanLuminanceDelta": 3.278082639005449
+    },
+    {
+      "dpr": 2,
+      "season": "rain",
+      "view": "bridge",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0023541666666666667,
+      "maximumAdjacentMeanLuminanceDelta": 3.5976349976592594
+    },
+    {
+      "dpr": 2,
+      "season": "rain",
+      "view": "pine",
+      "buffer": [
+        1920,
+        1200
+      ],
+      "frozenTime": 12,
+      "renderScale": 1,
+      "changedPixels": 0,
+      "maximumIsolatedFlashShare": 0.0015625,
+      "maximumAdjacentMeanLuminanceDelta": 3.960934744967355
+    }
+  ],
+  "captureDirectory": "shots/ukiyoe-pine-hamlet/flicker",
+  "limits": [
+    "Finite coverage of the reported pose, Home, Bridge, and close pine canopy in both seasons; not proof for every possible camera or animation time.",
+    "A coplanar conflict can render deterministically. Frozen zero-difference checks complement the authored-geometry surface-ownership tests; they do not replace them.",
+    "The moving-camera flash measure is a conservative proxy. Normal moving outlines contribute nonzero signal; values below the threshold do not prove every edge is perfectly stable."
+  ]
+}
