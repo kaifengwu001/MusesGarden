@@ -1,5 +1,5 @@
 import { smoothstep } from '../../core/math';
-import { dayName, shortDate } from './dom';
+import { basketDay } from './dom';
 
 // The day picker under an open basket: a dot per basket along a track, placed
 // by its day, the oldest at the left end and the newest at the right. Round a
@@ -156,9 +156,8 @@ export function nearestDot(layout: TimelineLayout, x: number): number {
   return best;
 }
 
-/** Over the picked or hovered dot: 'Today, 1 Nov · Ferns and ink', 'Tuesday, 28 Oct', 'Tue 21 Oct · Ferns and ink'. */
+/** Over the picked or hovered dot: 'Today, Nov 1 Sun · Ferns and ink', 'Oct 28 Wed', 'Oct 21 Wed · Ferns and ink'. */
 export function dayLabel(day: string, title?: string, now = new Date()): string {
-  const name = dayName(day, now);
-  const date = /\d/.test(name) ? name : `${name}, ${shortDate(day)}`;
+  const date = basketDay(day, now);
   return title ? `${date} · ${title}` : date;
 }

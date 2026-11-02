@@ -69,6 +69,14 @@ export function dayName(day: string, now = new Date()): string {
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+/** A basket's day: 'Oct 23 Fri', with 'Today, ' or 'Yesterday, ' in front for those (the timeline, a find's card). */
+export function basketDay(day: string, now = new Date()): string {
+  const d = parseDay(day);
+  const date = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
+  const ago = daysAgo(day, now);
+  return ago === 0 ? `Today, ${date}` : ago === 1 ? `Yesterday, ${date}` : date;
+}
+
 /** '31 Oct' (postmarks, captions). */
 export function shortDate(day: string): string {
   return parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });

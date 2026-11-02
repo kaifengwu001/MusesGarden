@@ -24,7 +24,7 @@ import { basketFan, FAN_MAX, freeRect, type Fan } from './basketFan';
 import { basketStep, CLOSED, holdsPointer, type BasketEvent, type BasketState, type Effect, type Picked, type Target } from './basketMachine';
 import { BasketOverlay, type DayEntry } from './basketOverlay';
 import { BasketStage, type Landing, type Pose, type StageFlower } from './basketStage';
-import { button, chipNote, dayName, el, reducedMotion } from './dom';
+import { button, chipNote, el, reducedMotion } from './dom';
 import { cardBody, FindCard } from './findCard';
 import { paintFlower, worldLight, type Light, type Shape } from './flowerPaint';
 import { framingToFit } from './framing';
@@ -48,8 +48,8 @@ import { Visit } from './travel';
 
 /** How a find is framed: the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
-/** The line from a bed up to its card (m); higher than this (m) a card is put away. */
-const STEM = 1.9;
+/** A card stands this high over its bed (m); higher than this (m) a card is put away. */
+const CARD_AT = 1.9;
 const CARD_UNDER = 30;
 /** The cottage's view and Muse's (as world.ts's named views): distance, height, bearing from the front (rad), looked-at point (cottage-local x, y, z, m). */
 const HOME_VIEW = { distance: 26, height: 11, bearing: 0.92, at: [-1.8, 2.6, 1.4] } as const;
@@ -85,12 +85,6 @@ export interface FindMarks {
   readonly selected: readonly string[];
   /** The find whose flower came home last, in focus until another does. */
   readonly focused: string | null;
-}
-
-/** 'Today’s basket', 'Tuesday’s basket', 'The basket of Tue 21 Oct'. */
-export function basketName(day: string): string {
-  const name = dayName(day);
-  return /\d/.test(name) ? `The basket of ${name}` : `${name}’s basket`;
 }
 
 export class GardenUi {
@@ -333,15 +327,15 @@ export class GardenUi {
     const bed = this.current ? this.layout.beds.get(this.current) : undefined;
     if (bed) {
       const foot = this.project(bed.dir, bed.ground + 0.35, width, height);
-      const top = this.project(bed.dir, bed.ground + STEM, width, height);
+      const at = this.project(bed.dir, bed.ground + CARD_AT, width, height);
       const inView = foot !== null && foot.x > -40 && foot.x < width + 40 && foot.y > -40 && foot.y < height + 40;
       const shown = inView && (w.rig.altitude < CARD_UNDER || this.flight.flying);
-      this.card.place(shown ? foot : null, shown ? top : null, dt, width, height);
+      this.card.place(shown ? at : null, dt, width, height);
       // a bed left out of view for a moment, or left far below, closes its card
       const near = w.rig.altitude < CARD_UNDER;
       this.offscreen = (inView && near) || this.flight.flying ? 0 : this.offscreen + dt;
       if (this.offscreen > 0.6 && this.card.shown) this.closeCard();
-    } else this.card.place(null, null, dt, width, height);
+    } else this.card.place(null, dt, width, height);
   }
 
   private project(dir: Vector3, height: number, width: number, h: number): { x: number; y: number } | null {
@@ -479,21 +473,20 @@ export class GardenUi {
     if (!find || !basket || this.current !== id) return;
     const index = basket.finds.indexOf(id);
     this.card.show(find, this.state.interest(find.topic), {
-      basket: basketName(basket.day),
+      day: basket.day,
       index,
       total: basket.finds.length,
       liked: this.state.liked(id),
       shared: this.state.findShared(id),
+      crossing: { back: this.state.step(id, -1)?.into ?? null, forward: this.state.step(id, 1)?.into ?? null },
     });
     this.marks?.open(id);
   }
 
+  /** The find before (-1, older) or after (1, newer) the one whose card is up, as on the baskets' timeline. */
   private step(direction: 1 | -1): void {
-    const order = this.state.browseOrder;
-    if (!this.current || order.length === 0) return;
-    const i = order.indexOf(this.current);
-    const next = order[(i + direction + order.length) % order.length];
-    this.openFind(next, direction);
+    const next = this.current ? this.state.step(this.current, direction) : null;
+    if (next) this.openFind(next.find, direction);
   }
 
   private like(): void {

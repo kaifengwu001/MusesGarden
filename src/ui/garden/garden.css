@@ -364,28 +364,6 @@
   opacity: 1;
 }
 
-.g-stem {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.g-stem line {
-  stroke: var(--paper);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  filter: drop-shadow(0 1px 1.5px rgba(30, 40, 30, 0.35));
-}
-
-.g-stem circle {
-  fill: rgba(251, 248, 238, 0.28);
-  stroke: var(--paper);
-  stroke-width: 1.6;
-  filter: drop-shadow(0 1px 1.5px rgba(30, 40, 30, 0.35));
-}
-
 .g-card {
   --card-w: 290px;
   position: absolute;
@@ -812,7 +790,35 @@
   height: 22px;
 }
 
-.g-findlayer:not(.is-on) .g-step {
+/* an arrow into another day's basket, and its line over it */
+.g-step.is-crossing {
+  background: #d6eaf8;
+  color: #2f6d9e;
+}
+
+.g-step-hint {
+  position: absolute;
+  padding: 3px 10px 4px;
+  border-radius: 999px;
+  background: #d6eaf8;
+  box-shadow: 0 4px 14px rgba(28, 60, 96, 0.14);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: #2f6d9e;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.g-step-hint.is-on {
+  opacity: 1;
+}
+
+.g-findlayer:not(.is-on) .g-step,
+.g-findlayer:not(.is-on) .g-step-hint {
   opacity: 0;
   pointer-events: none;
 }
@@ -906,7 +912,8 @@ body.garden-on .hud {
     --card-w: min(64vw, 240px);
   }
   /* on a phone a card is swiped; it keeps clear of the title and the panel's corner */
-  .g-step {
+  .g-step,
+  .g-step-hint {
     display: none;
   }
   .g-toast {

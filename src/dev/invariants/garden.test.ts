@@ -194,8 +194,20 @@ describe('the garden’s state', () => {
     await state.start();
     expect(state.unread.map((p) => p.id).sort()).toEqual(['inv-pip', 'pc-terrace']);
     expect(state.freshBasket?.day).toBe('2026-10-31');
-    expect(state.browseOrder[0]).toBe(state.baskets[0].finds[0]);
+    expect(state.browseOrder.at(-1), 'browsed as the timeline runs: today’s last').toBe(state.baskets[0].finds.at(-1));
     vi.useRealTimers();
+  });
+
+  it('steps a card back and forward in time, round at the ends, naming the day a step crosses into', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    const [newest, before] = state.baskets;
+    const oldest = state.baskets.at(-1)!;
+    expect(state.step(newest.finds[0], 1)).toEqual({ find: newest.finds[1], into: null });
+    expect(state.step(newest.finds[0], -1)).toEqual({ find: before.finds.at(-1), into: before.day });
+    expect(state.step(before.finds.at(-1)!, 1)).toEqual({ find: newest.finds[0], into: newest.day });
+    expect(state.step(newest.finds.at(-1)!, 1), 'the newest steps round to the oldest').toEqual({ find: oldest.finds[0], into: oldest.day });
+    expect(state.step(oldest.finds[0], -1)).toEqual({ find: newest.finds.at(-1), into: newest.day });
   });
 
   it('likes, stars, and uses an invitation once; tells the source', async () => {

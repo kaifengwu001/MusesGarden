@@ -233,9 +233,23 @@ export class GardenState {
     return [...(this.snapshot?.baskets ?? [])].sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : 0));
   }
 
-  /** Every find in the order you browse them: newest basket first, each in Muse's order. */
+  /** Every find in the order you browse them, as on the baskets' timeline: oldest basket first, each in Muse's order. */
   get browseOrder(): string[] {
-    return this.baskets.flatMap((b) => b.finds.filter((id) => this.findIndex.has(id)));
+    return this.baskets.reverse().flatMap((b) => b.finds.filter((id) => this.findIndex.has(id)));
+  }
+
+  /**
+   * The find a step from `id` goes to, back in time (-1) or forward (1), round at the ends; `into` is the day (ISO)
+   * of its basket when that is another basket than `id`'s.
+   */
+  step(id: string, direction: 1 | -1): { find: string; into: string | null } | null {
+    const order = this.browseOrder;
+    const i = order.indexOf(id);
+    if (i < 0) return null;
+    const find = order[(i + direction + order.length) % order.length];
+    const from = this.find(id)?.basket;
+    const to = this.find(find)?.basket;
+    return { find, into: to !== from ? (this.basket(to ?? '')?.day ?? null) : null };
   }
 
   interest(id: string): Interest | undefined {

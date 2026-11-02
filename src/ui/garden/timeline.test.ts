@@ -126,9 +126,9 @@ describe('the day timeline', () => {
 describe('the label over a day', () => {
   const now = new Date(2026, 10, 1, 12);
   it('names the day and its date, and the basket’s title when it has one', () => {
-    expect(dayLabel('2026-11-01', 'Ferns and ink', now)).toBe('Today, 1 Nov · Ferns and ink');
-    expect(dayLabel('2026-10-31', undefined, now)).toBe('Yesterday, 31 Oct');
-    expect(dayLabel('2026-10-28', 'Rain on the pond', now)).toBe('Wednesday, 28 Oct · Rain on the pond');
-    expect(dayLabel('2026-10-21', 'Ferns and ink', now)).toBe('Wed 21 Oct · Ferns and ink');
+    expect(dayLabel('2026-11-01', 'Ferns and ink', now)).toBe('Today, Nov 1 Sun · Ferns and ink');
+    expect(dayLabel('2026-10-31', undefined, now)).toBe('Yesterday, Oct 31 Sat');
+    expect(dayLabel('2026-10-28', 'Rain on the pond', now)).toBe('Oct 28 Wed · Rain on the pond');
+    expect(dayLabel('2026-10-21', 'Ferns and ink', now)).toBe('Oct 21 Wed · Ferns and ink');
   });
 });
