@@ -3,13 +3,16 @@ import fragmentShader from '../terrace.frag.glsl?raw';
 import vertexShader from '../terrace.vert.glsl?raw';
 import { BUILD, buildTerraces, type BuildInput, type BuildOutput } from './construct';
 import { FIELD } from './field';
+import type { BuildMessage } from './worker';
 
 // The terraces, built (ARCHITECTURE.md, "The terraces' build"): the paddy
 // lab's construction over the whole planet at once (construct.ts), from the
 // planet's mathematics (field.ts), in a worker of its own so the page draws
 // on meanwhile, made into meshes a chunk of a cube face each. Never from the
 // camera: built again only when the world's seed changes, the new meshes put
-// in place of the old in one step once all are ready.
+// in place of the old in one step once all are ready. The worker keeps the
+// last build in the browser and loads it again while the build's code stands
+// (worker.ts).
 
 export class TerraceBuild {
   readonly group = new Group();
@@ -46,16 +49,20 @@ export class TerraceBuild {
     }
     const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     this.worker = worker;
-    worker.onmessage = (e: MessageEvent<BuildOutput>) => {
+    worker.onmessage = (e: MessageEvent<BuildMessage>) => {
       if (this.worker !== worker) return;
-      worker.terminate();
-      this.worker = null;
-      this.install(e.data);
+      const m = e.data;
+      // (a build it is keeping in the browser: the worker let go once that is written)
+      if (m.kind === 'kept' || !m.keeping) {
+        worker.terminate();
+        this.worker = null;
+      }
+      if (m.kind === 'built') this.install(m.out, m.kept, m.ms);
     };
     worker.postMessage(input);
   }
 
-  private install(out: BuildOutput): void {
+  private install(out: BuildOutput, kept = false, ms = 0): void {
     // in place of the old, all at once
     for (const m of [...this.group.children] as Mesh[]) {
       m.geometry.dispose();
@@ -75,7 +82,8 @@ export class TerraceBuild {
       mesh.renderOrder = -10; // before the ground: early-z skips the shading of the ground sunk under them
       this.group.add(mesh);
     }
-    this.stats = out.stats;
+    // (its figures as it was built; whether it was loaded as kept, and how long it took this time)
+    this.stats = { ...out.stats, kept: kept ? 1 : 0, readyMs: Math.round(ms) };
     this.trees = out.trees;
     this.peaks = out.peaks;
     this.houses = out.houses;
