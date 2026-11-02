@@ -140,6 +140,13 @@ const BASKETS: ReadonlyArray<{ back: number; title?: string; at: readonly Area[]
   },
 ];
 
+/** Muse's favourites, for its shelf at home: [the basket's day back, the find in it]. */
+const FAVOURITES: ReadonlyArray<readonly [number, number]> = [
+  [0, 0], [1, 0], [0, 1], [1, 2], [2, 2],
+  [4, 0], [0, 4], [4, 2], [2, 1], [6, 1], [9, 0],
+  [1, 3], [0, 3], [6, 0], [4, 1], [2, 0],
+];
+
 const FRIENDS: ReadonlyArray<Omit<MuseFriend, 'met'> & { metBack: number }> = [
   { id: 'pip', name: 'Pip', coat: '#f2c4a0', shared: ['Ceramics', 'Ferns'], metBack: 12, knownOn: 'instagram' },
   { id: 'juniper', name: 'Juniper', coat: '#c3d6b8', shared: ['Astronomy', 'Skiing'], metBack: 8, knownOn: 'facebook' },
@@ -216,6 +223,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
     baskets,
     finds,
     postcards: POSTCARDS.map(({ back, ...p }) => ({ ...p, day: dayBefore(back, now) })),
+    favourites: FAVOURITES.map(([back, i]) => `basket-${dayBefore(back, now)}-${i}`),
   };
 }
 

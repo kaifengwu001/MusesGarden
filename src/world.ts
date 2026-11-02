@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix3, Matrix4, PerspectiveCamera, Ray, Scene, Vector2, Vector3, Vector4, type IUniform, type Texture, type WebGLRenderer } from 'three';
 import { BuildQueue } from './core/buildQueue';
 import type { FrameClock } from './core/clock';
 import type { Globals } from './core/globals';
@@ -7,11 +7,13 @@ import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
 import { Butterflies } from './life/butterflies';
-import { Clouds, createCloudUniforms } from './life/clouds';
+import { Clouds, createCloudUniforms, type CloudParams } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
+import { VeilFog } from './life/veilFog';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
+import { HutInterior } from './life/hut';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
@@ -20,6 +22,7 @@ import { LOD_DEFAULT, type LodConfig } from './planet/chunks';
 import type { FieldParams } from './planet/fields';
 import { tangentToward, travel } from './planet/geo';
 import { growthState, type GrowthState } from './planet/growth';
+import { unfoldBloom, unfoldCoverage, unfoldGrowth, unveiling } from './planet/unfold';
 import { GrowthBand } from './planet/rest';
 import { Surface } from './planet/surface';
 import { createGroundSample, createTerrainUniforms, generateLayout, gradientFrame, Terrain, type Layout } from './planet/terrain';
@@ -86,7 +89,11 @@ export class World {
   readonly grass: Grass;
   readonly flowers: Flowers;
   homestead: Homestead;
+  /** Muse's hut inside, drawn only while the cutaway is open (view/cutaway.ts); it stands in the homestead's frame. */
+  readonly hut: HutInterior;
   readonly clouds: Clouds;
+  /** The veil over the planet yet to unfold: ground fog, clearing out from the hut (planet/unfold.ts, life/veil.ts). */
+  readonly veilFog: VeilFog;
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
@@ -133,6 +140,10 @@ export class World {
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
+  /** The clouds' settings as drawn: cloudier while the planet unfolds (planet/unfold.ts unfoldCoverage). */
+  private readonly cloudParams: CloudParams = { coverage: 0, altitude: 0, speed: 0, shadow: 0 };
+  /** The radius the camera was last placed for: as the unfolding grows the planet, the camera holds where it is (CameraRig.holdThrough). */
+  private heldR = Number.NaN;
   /** The world's clock, as of the last update (a named view of Muse reads the time it is now, frozen or not). */
   private clock: FrameClock | null = null;
   /** Whether the last update drew the near field (grass or flowers around the focus). */
@@ -164,6 +175,15 @@ export class World {
       // Muse's body where it lies in the grass, pressing it down round it (muse.ts; grass.vert.glsl, flower.vert.glsl)
       uMusePress: { value: Array.from({ length: PRESSES }, () => new Vector4()) },
       uMusePressK: { value: 0 },
+      // Muse's shadow, a map of its own about it (muse.ts; museShadowMap.glsl: the ground, the props, the grass, the flowers)
+      uMuseShadow: { value: null as Texture | null },
+      uMuseShadowFrame: { value: new Matrix3() },
+      uMuseShadowSun: { value: new Vector4() },
+      uMuseShadowWindow: { value: new Vector4() },
+      uMuseShadowFeet: { value: new Vector3() },
+      // looking at Muse's shelf in the cutaway, what stands in front of it dissolves (view/cutaway.ts, life/occlude.glsl)
+      uOcclude: { value: new Vector4() },
+      uOccludeDepth: { value: new Vector2() },
     };
     this.sky = new Sky();
     this.field = new FieldMap(this.shared, tier.maps.field);
@@ -172,17 +192,19 @@ export class World {
     this.grass = new Grass(this.shared, POOL_PAGES.grass);
     this.flowers = new Flowers(this.shared, POOL_PAGES.flowers);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
+    this.hut = new HutInterior(this.shared, this.homestead.faces);
+    this.homestead.group.add(this.hut.group);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
+    this.veilFog = new VeilFog(this.shared);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.butterflies = new Butterflies(this.shared);
     this.muse = new Muse(this.shared);
     this.muse.useModel(store.values.muse.model);
     this.clouds.addShadowCaster(this.birds.shadowMesh);
-    this.clouds.addShadowCaster(this.muse.shadowMesh);
     // (the float's rings on the water are the meadow's own ripples)
     this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.veilFog.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -198,6 +220,7 @@ export class World {
 
   markPosed(): void {
     this.posed = true;
+    this.heldR = Number.NaN;
   }
 
   /** Stand by the first water at the edge of the nearest wetland, looking across its lakes. */
@@ -324,6 +347,8 @@ export class World {
       this.terrain.setLayout(generateLayout(this.store.values.world.seed));
       this.scene.remove(this.homestead.group);
       this.homestead = new Homestead(this.shared, this.store.values.world.seed);
+      this.hut.refit(this.homestead.faces);
+      this.homestead.group.add(this.hut.group);
       this.scene.add(this.homestead.group);
     }
     for (const path of changed) {
@@ -370,6 +395,9 @@ export class World {
     growthState(p.world.growth, p.world.areaMin, p.world.areaMax, this.growth);
     const R = this.growth.radius;
     this.band.update(R, clock.realDt);
+    // the unfolding grows the planet under the camera (planet/unfold.ts): it holds where it is, so the planet grows in the window
+    if (R !== this.heldR && Number.isFinite(this.heldR) && p.world.growth === unfoldGrowth(p.world.unfold)) this.rig.holdThrough(this.heldR, R);
+    this.heldR = R;
 
     // The fields depend on R, the layout and a few params: refresh and re-bake
     // only on change, quickly while changing, fully once still for a moment.
@@ -386,7 +414,7 @@ export class World {
     // Warp: the meadow around the focus curves like a world of visualRadius.
     this.warp.focus.copy(rig.focus);
     this.warp.up.copy(rig.up);
-    this.warp.k = warpForZoom(rig.zoom, R, p.view.visualRadius);
+    this.warp.k = warpForZoom(rig.zoom, R, p.view.visualRadius) * rig.warpScale;
     const g = this.globals;
     g.uTime.value = clock.time;
     g.uRadius.value = R;
@@ -402,6 +430,7 @@ export class World {
 
     // The homestead sits on its clearing, facing its pond; its shadow sweeps away from the sun.
     this.homestead.place(this.tmp.copy(L.cottage).multiplyScalar(R + this.terrain.cottageGround), L.cottage, L.homeBearing);
+    this.hut.update(clock.time);
     // (down the sun the cottage sees, as its walls are lit: render/sun.ts)
     const across = this.east.crossVectors(L.cottage, L.homeBearing);
     const sun = sunAt(p.light.timeOfDay);
@@ -420,8 +449,21 @@ export class World {
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
+    this.muse.walled = !this.hut.shown;
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
-    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
+    this.muse.renderShadow(this.renderer);
+    // (the hut's front door swings open as Muse comes to it, the room seen through it)
+    this.homestead.setDoor(this.muse.door);
+    this.hut.setDoor(this.muse.door);
+    // the veil over the planet yet to unfold: ground fog, clearing out from the hut
+    this.veilFog.update(this.renderer, L.seed, L.cottage, unveiling(p.world.unfold), this.terrain.maxHeight, this.windAxis, rig.camera);
+    // (the drifting clouds, thicker while the planet has yet to unfold)
+    const cp = this.cloudParams;
+    cp.coverage = unfoldCoverage(p.clouds.coverage, p.world.unfold);
+    cp.altitude = p.clouds.altitude;
+    cp.speed = p.clouds.speed;
+    cp.shadow = p.clouds.shadow;
+    this.clouds.update(this.renderer, L.seed, R, clock.time, cp, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -558,7 +600,8 @@ export class World {
     // haze thickens as you come down into the meadow, so the far meadow pales like a painted distance
     L.uFog.value.set(p.style.fogDensity * 0.0028 * (1 + 10 * this.rig.tilt), 0.06 + 0.34 * p.style.fogDensity, this.rig.altitude * 0.95, 0.8);
     L.uFogUp.value.copy(this.rig.up);
-    L.uBloom.value.set(p.world.bloom * (Math.PI + 0.45) - 0.25, 0.07, 0, 0);
+    // (the unfolding brings the flowers out from the hut: planet/unfold.ts; at its end the bloom is the season's)
+    L.uBloom.value.set(Math.min(p.world.bloom, unfoldBloom(p.world.unfold)) * (Math.PI + 0.45) - 0.25, 0.07, 0, 0);
     // Wind: a rotation field fixed to the world, aimed by the direction param at the cottage.
     const c = this.terrain.layout.cottage;
     const north = tangentToward(c, Math.abs(c.y) > 0.98 ? WORLD_X : WORLD_UP, this.tmp);
@@ -665,6 +708,7 @@ export class World {
 
   /** Close fade bands, finish queued work and snap the camera: the next frame is a pure function of state. */
   settle(): void {
+    this.heldR = Number.NaN;
     this.band.settle();
     this.queue.drain();
     this.rig.settle();

@@ -13,6 +13,7 @@ uniform float uRadius;
 #include <meadow_field>
 #include <meadow_wind>
 #include <meadow_muse_press>
+#include <meadow_muse_shadow>
 
 attribute float aPart; // 0 stem, 1 petal, 2 centre
 attribute float aT;    // along the stem 0..1; 1 on the head
@@ -105,8 +106,8 @@ void main() {
     world = top + side * (head.x * scale) + up * (head.y * scale) + fwd * (head.z * scale);
   }
 
-  // colour by species, colony variant and part; cloud and cottage shadows
-  float shadow = max(meadow.z, 0.85 * cottageShadow(dir));
+  // colour by species, colony variant and part; cloud, Muse's and the cottage's shadows
+  float shadow = max(max(meadow.z, museShadowAt(base)), 0.85 * cottageShadow(dir));
   float b = toonLight(dot(up, uSunDir)) * mix(0.55, 1.0, aT) * (1.0 - 0.9 * shadow);
   float v = look.y;
   vec3 col;

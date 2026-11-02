@@ -8,7 +8,7 @@ import { ROW, type Palette } from '../../render/palette';
 // grade post.frag.glsl gives the whole frame (the tone curve, the display's
 // encoding, contrast and brightness). The basket's canvas is not graded, so
 // each flower carries the grade in its colours, and matches its hero where it
-// lands. Left out: a cloud's or the cottage's shadow, the wind, the bloom.
+// lands. Left out: a cloud's, the cottage's or Muse's shadow, the wind, the bloom.
 
 export type Rgb = readonly [number, number, number];
 
@@ -135,7 +135,7 @@ function aerial(light: Light, c: Rgb, distance: number, dir: Vector3): Rgb {
 
 /**
  * Each vertex's colour (r, g, b; graded, display-ready) of a flower painted as its patch paints its hero:
- * findBed.vert.glsl's colour by species, variant and part, with no cloud or cottage shadow on it.
+ * findBed.vert.glsl's colour by species, variant and part, with no cloud, cottage or Muse's shadow on it.
  */
 export function paintFlower(shape: Shape, hero: HeroLook, light: Light): Float32Array {
   const { pal } = light;

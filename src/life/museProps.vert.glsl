@@ -5,10 +5,8 @@
 #include <meadow_warp>
 
 attribute vec3 aColour; // linear
-attribute float aGlow;  // 1 where it glows (the stove's fire)
 
 varying vec3 vColour;
-varying float vGlow;
 varying vec3 vNormal;
 varying vec3 vPlanet;
 varying vec3 vWorld;
@@ -18,7 +16,6 @@ void main() {
   vPlanet = p.xyz;
   vNormal = normalize(mat3(modelMatrix) * normal);
   vColour = aColour;
-  vGlow = aGlow;
   vec3 wp = warpPosition(p.xyz);
   vWorld = wp;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);

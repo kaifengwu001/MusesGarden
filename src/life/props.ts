@@ -1,5 +1,6 @@
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, FrontSide, Matrix4, Mesh, Object3D, ShaderMaterial, Vector3, type IUniform } from 'three';
 import { hash32, unit } from '../core/hash';
+import { smoothstep } from '../core/math';
 import { gnoise } from '../planet/noise';
 import { BANK, HOME_LEVEL } from '../planet/terrain';
 import fragmentShader from './props.frag.glsl?raw';
@@ -43,7 +44,7 @@ import vertexShader from './props.vert.glsl?raw';
 export const FLOOR = 0.72;
 export const COTTAGE = { halfX: 4.12, halfZ: 2.45, wall: 3.45, thickness: 0.36, overhang: 0.45, pitch: Math.PI / 4 } as const;
 /** The walls' outer faces (half sizes, m). */
-const OUTER = { x: COTTAGE.halfX + COTTAGE.thickness / 2, z: COTTAGE.halfZ + COTTAGE.thickness / 2 } as const;
+export const OUTER = { x: COTTAGE.halfX + COTTAGE.thickness / 2, z: COTTAGE.halfZ + COTTAGE.thickness / 2 } as const;
 
 /** The roof as built: eave half sizes, eave line height, rise, half ridge, slope length, ridge height (m). */
 export const ROOF = (() => {
@@ -71,7 +72,8 @@ const SKIRT = 0.09;
  */
 export const TERRACE = { x0: -OUTER.x - 0.1, x1: OUTER.x - 0.2, z0: OUTER.z - 0.3, z1: OUTER.z + 2.1 } as const;
 export const PIER = { x0: -OUTER.x - 3.9, x1: -OUTER.x + 0.9, z0: OUTER.z - 0.8, z1: OUTER.z + 3.0 } as const;
-export const STEPS = { x0: OUTER.x - 2.3, x1: OUTER.x - 0.5, count: 3, rise: FLOOR / 3, tread: 0.33 } as const;
+// (four equal risers: the last step stands a riser over the meadow, not flush with it, where it flickered and the grass grew through)
+export const STEPS = { x0: OUTER.x - 2.3, x1: OUTER.x - 0.5, count: 3, rise: FLOOR / 4, tread: 0.33 } as const;
 /**
  * The tunnel through the pier's face at the waterline: centre x, springing
  * height (local m; a half-round vault above it), half width, and how far it
@@ -83,8 +85,28 @@ export const ARCH = { x: PIER.x0 + 1.0, spring: -0.78, half: 0.55, depth: 1.6 } 
 const BASE = -(HOME_LEVEL + BANK.height + 1.8);
 
 type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
-/** Where the front's openings are, along it from its left end (m), the end window along the right end from its front corner. */
-const FRONT = { window: [1.32, 2.52], door: [4.6, 5.7] } as const;
+/**
+ * Where the front's openings are, along it from its left end (m), the end window along the right end from its front
+ * corner. The door is 1.35 m wide (1.1 until Kai's note of 2026-11-01, widened on its hinge side): Muse, its arms out
+ * as it walks, goes through it clear of the jambs and of the door standing open.
+ */
+export const FRONT = { window: [1.32, 2.52], door: [4.6, 5.95] } as const;
+/**
+ * The front door (local m): its opening across the front (x0 … x1), the plane its planks stand in (z: 0.6 of the wall
+ * in from its face, as fittings builds them) and their half thickness, the hinge it swings in on (its right side, seen
+ * from the porch), and how far it swings open (rad, into the room: square to the wall, out of the way), as Muse comes
+ * to it (museRoam.ts).
+ */
+export const DOORWAY = (() => {
+  const x0 = -OUTER.x + FRONT.door[0];
+  const x1 = -OUTER.x + FRONT.door[1];
+  const z = OUTER.z - COTTAGE.thickness * 0.6;
+  return { x0, x1, z, thick: 0.03, hinge: [x1, z] as const, swing: 0.5 * Math.PI };
+})();
+/** The doorstep under the door (m): its half width (a little past the door either side), its depth out from the wall, its top over the floor. */
+export const DOORSTEP = { half: (DOORWAY.x1 - DOORWAY.x0) / 2 + 0.13, depth: 0.34, height: 0.09 } as const;
+/** The door's sill (m): its top over the floor, and how far down it goes (the meadow showed through under the doorway). */
+const SILL = { top: 0.02, down: 0.08 } as const;
 /** The bench against the front, between the window and the door (local m): its middle, its seat's half length and half depth, the seat's top over the floor. */
 export const BENCH = { x: -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12, z: OUTER.z + 0.22, half: 0.74, depth: 0.19, seat: 0.485 } as const;
 /** The house's front face and its side walls (local m: z, ±x): what stands on the terrace stands clear of them. */
@@ -92,7 +114,7 @@ export const FACE = OUTER.z;
 export const SIDE = OUTER.x;
 /** The chair by the house's left corner (local m: its middle), turned a little toward the pond. */
 export const CHAIR = { x: -OUTER.x - 0.55, z: OUTER.z + 0.45, turn: 0.5 } as const;
-const END_WINDOW = [3.3, 3.85] as const;
+export const END_WINDOW = [3.3, 3.85] as const;
 /** The chimney, just behind the ridge on the back slope, as in the painting: x, z (m) and half width. */
 export const CHIMNEY = { x: 0.1, z: -0.6, half: 0.29 } as const;
 /** How deep the window frames sit in the wall, from its face to the frame's middle (m; the wall is COTTAGE.thickness). */
@@ -125,14 +147,14 @@ class Rand {
  * tile). Boxes: distance to the face's edge, to its sides, height, and a
  * flag (1 the door, 2 the bench).
  */
-type Paint = [number, number, number, number];
+export type Paint = [number, number, number, number];
 
 const e1 = new Vector3();
 const e2 = new Vector3();
 const fn = new Vector3();
 
 /** Accumulates painted geometry: positions, normals, face uv (m) and paint data. */
-class Builder {
+export class Builder {
   readonly pos: number[] = [];
   readonly nrm: number[] = [];
   readonly uv: number[] = [];
@@ -258,7 +280,7 @@ class Builder {
 }
 
 /** An opening in a wall: along the wall from its left end seen from outside (m), and up (m). */
-interface Opening {
+export interface Opening {
   from: number;
   to: number;
   bottom: number;
@@ -266,13 +288,15 @@ interface Opening {
   door: boolean;
 }
 
-/** A wall's outer face: its left end (seen from outside), the axis along it, its outward normal. */
-interface WallFace {
+/** A wall's outer face: its left end (seen from outside), the axis along it, its outward normal, how far its top leans in and how far it bellies out (m). */
+export interface WallFace {
   start: Vector3;
   along: Vector3;
   out: Vector3;
   length: number;
   openings: Opening[];
+  lean: number;
+  belly: number;
 }
 
 /** Distance from (u, v) to a rectangle's outline (0 inside it). */
@@ -282,19 +306,56 @@ function rectDistance(u: number, v: number, o: Opening): number {
   return Math.hypot(du, dv);
 }
 
+/** The walls go well into the ground (local m): on a small planet its curve falls away from the corners. */
+const WALL_FOOT = -0.7;
+
+/**
+ * Where a wall's outer face stands (local m), `u` along it from its left end
+ * and `y` over the clearing, as walls() bends the face: leaning in, bellying
+ * out, with its wobble. The inside of the hut is fitted to it (hut.ts).
+ */
+export function wallAt(f: WallFace, u: number, y: number, out: Vector3): Vector3 {
+  const height = COTTAGE.wall - WALL_FOOT;
+  const v = y - WALL_FOOT;
+  const t = v / height;
+  const ends = Math.min(u, f.length - u);
+  const bulge = f.belly * Math.sin(Math.PI * Math.min(u / f.length, 1)) * Math.sin(Math.PI * t) * Math.min(ends / 0.4, 1);
+  const wobble = 0.012 * gnoise(u * 1.3, v * 1.3, 0.5, 4401) * Math.min(ends / 0.3, 1);
+  return out.copy(f.start).addScaledVector(f.along, u).setY(y).addScaledVector(f.out, bulge + wobble - f.lean * t);
+}
+
+/**
+ * The cutaway's cut (view/cutaway.ts, hut.ts), straight, as Kai asked: the
+ * front and the right end (the walls toward the view) cut low, across the
+ * front's window and its door (their frames, panes and planks cut with them;
+ * the right end's window lies wholly over the cut); the back and the left
+ * end stand whole, with the corners they share; heights over the clearing (m).
+ */
+export const CUT = { front: FLOOR + 1.25, back: COTTAGE.wall } as const;
+
+/** The room's inner faces (local m: x = -CUT_X the left end's, z = -CUT_Z the back's): what lies in front of the back and right of the left end is cut low. */
+const CUT_X = COTTAGE.halfX - COTTAGE.thickness / 2;
+const CUT_Z = COTTAGE.halfZ - COTTAGE.thickness / 2;
+
+/** The cut's height (m over the clearing) at a point of the walls (local m). */
+export function cutAt(x: number, z: number): number {
+  return x > -CUT_X + 0.01 && z > -CUT_Z + 0.01 ? CUT.front : CUT.back;
+}
+
 /** The house's walls: plastered faces with their openings, and the reveals inside the openings. */
 function walls(b: Builder, rand: Rand): WallFace[] {
   const { wall, thickness } = COTTAGE;
   const ex = OUTER.x;
   const ez = OUTER.z;
-  // the walls go well into the ground: on a small planet its curve falls away from the corners
-  const foot = -0.7;
+  const foot = WALL_FOOT;
   const W = (sx: number, sz: number, ax: number, az: number, ox: number, oz: number, length: number, openings: Opening[]): WallFace => ({
     start: new Vector3(sx, foot, sz),
     along: new Vector3(ax, 0, az),
     out: new Vector3(ox, 0, oz),
     length,
     openings,
+    lean: 0,
+    belly: 0,
   });
   // the door and the tall window reach up to just under the eaves, as in the painting
   const top = FLOOR + 2.15;
@@ -317,6 +378,8 @@ function walls(b: Builder, rand: Rand): WallFace[] {
     // hand-built: each wall leans in a touch and bellies out a little
     const lean = rand.range(0.008, 0.02);
     const belly = rand.range(-0.02, 0.03);
+    f.lean = lean;
+    f.belly = belly;
     const at = (u: number, v: number, out: Vector3): Vector3 => {
       const t = v / height;
       const ends = Math.min(u, f.length - u);
@@ -507,7 +570,7 @@ function landing(b: Builder, rand: Rand): void {
   }
   // the doorstep, under the door
   const door = -OUTER.x + (FRONT.door[0] + FRONT.door[1]) / 2;
-  b.box(new Vector3(door, FLOOR + 0.04, OUTER.z + 0.17), new Vector3(0.68, 0.05, 0.17), null, FLOOR, 0, 'xXYZz');
+  b.box(new Vector3(door, FLOOR + DOORSTEP.height - 0.05, OUTER.z + DOORSTEP.depth / 2), new Vector3(DOORSTEP.half, 0.05, DOORSTEP.depth / 2), null, FLOOR, 0, 'xXYZz');
 }
 
 /**
@@ -564,7 +627,7 @@ function pierFace(b: Builder, top: number): void {
   }
 }
 
-/** Wood (door, window frames, bench, chair), glass and iron, from boxes (flags: 1 the door, 2 the bench and the chair). */
+/** Wood (door and its sill, window frames, bench, chair), glass and iron, from boxes (flags: 1 the door, 2 the bench and the chair, 3 the door's sill). */
 function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[]): void {
   const { thickness } = COTTAGE;
   for (const f of faces) {
@@ -577,7 +640,9 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
       const mid = (o.from + o.to) / 2;
       if (o.door) {
         // planks, painted with their iron straps (flag 1), set back in the wall
-        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, 0.03), turn, FLOOR, 1);
+        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, DOORWAY.thick), turn, FLOOR, 1);
+        // its sill (flag 3): a board across the doorway through the wall, from just over the room's floor out under the doorstep
+        wood.box(along(mid, FLOOR + (SILL.top - SILL.down) / 2, thickness / 2), new Vector3(w / 2 + 0.02, (SILL.top + SILL.down) / 2, thickness / 2 + 0.02), turn, FLOOR, 3, 'xXYZz');
         continue;
       }
       // a dark frame and small panes (two across and three up in the tall window, two by two in the small), the glass set back
@@ -627,12 +692,27 @@ const axisZ = new Vector3();
 
 export class Homestead {
   readonly group = new Object3D();
+  /** The walls' outer faces as built (the inside of the hut is fitted to them: hut.ts). */
+  readonly faces: WallFace[];
   private readonly materials: ShaderMaterial[] = [];
+  /**
+   * The cutaway into the hut (view/cutaway.ts): the walls, the roof, and the
+   * windows' and the door's wood and glass drawn with their CUTAWAY builds while
+   * it is open, the roof and the chimney lifting off and dissolving and the
+   * walls and what is in them cut as `uCutaway` runs 0 → 1; shut, the house is
+   * drawn with its own materials.
+   */
+  private readonly cut: Array<{ mesh: Mesh; own: ShaderMaterial; cutaway: ShaderMaterial }> = [];
+  private readonly cutaway: IUniform<number> = { value: 0 };
+  /** How far the front door has swung open (rad): its planks turned about its hinge in the wood's vertex shader. */
+  private readonly door: IUniform<number> = { value: 0 };
+  private roof: Mesh | null = null;
 
   constructor(shared: Record<string, IUniform>, seed: number) {
     const rand = new Rand(seed ^ 0xc0ffee);
     const wallB = new Builder();
     const faces = walls(wallB, rand);
+    this.faces = faces;
     // the chimney: plastered stone just behind the ridge, rising out of the back slope to a cap, leaning a touch
     const lean = new Matrix4().makeRotationZ(rand.range(-0.025, -0.01)).multiply(new Matrix4().makeRotationX(rand.range(-0.012, 0.012)));
     const foot = ROOF.top + CHIMNEY.z - CHIMNEY.half - 0.25; // inside the roof, under its back face's foot
@@ -658,20 +738,52 @@ export class Homestead {
       const mesh = new Mesh(builder.build(), this.material(shared, kind));
       mesh.frustumCulled = false;
       this.group.add(mesh);
+      if (kind === 'wall' || kind === 'roof' || kind === 'wood' || kind === 'glass') this.cut.push({ mesh, own: mesh.material, cutaway: this.material(shared, kind, true) });
+      if (kind === 'roof') this.roof = mesh;
     }
     this.group.matrixAutoUpdate = false;
   }
 
-  private material(shared: Record<string, IUniform>, kind: Kind): ShaderMaterial {
+  private material(shared: Record<string, IUniform>, kind: Kind, cutaway = false): ShaderMaterial {
+    const door = kind === 'wood';
     const mat = new ShaderMaterial({
-      name: kind,
+      name: cutaway ? `${kind} (cutaway)` : kind,
       vertexShader,
       fragmentShader,
-      uniforms: { ...shared, uKind: { value: KIND_ID[kind] } },
+      uniforms: {
+        ...shared,
+        uKind: { value: KIND_ID[kind] },
+        ...(cutaway ? { uCutaway: this.cutaway } : {}),
+        ...(door ? { uDoor: this.door } : {}),
+      },
+      // (the chimney's top, where its flue opens: its middle x, z and its half width, m; the front door's hinge, x and z)
+      defines: {
+        CHIMNEY_TOP: `vec3(${CHIMNEY.x.toFixed(3)}, ${CHIMNEY.z.toFixed(3)}, ${CHIMNEY.half.toFixed(3)})`,
+        ...(cutaway ? { CUTAWAY: '', CUT_FRONT: CUT.front.toFixed(4), CUT_BACK: CUT.back.toFixed(4), CUT_X: CUT_X.toFixed(4), CUT_Z: CUT_Z.toFixed(4) } : {}),
+        ...(door ? { DOOR_HINGE: `vec2(${DOORWAY.hinge[0].toFixed(4)}, ${DOORWAY.hinge[1].toFixed(4)})` } : {}),
+      },
       side: kind === 'roof' ? DoubleSide : FrontSide,
     });
     this.materials.push(mat);
     return mat;
+  }
+
+  /** The cutaway's materials, to compile ahead of their first use (a walk-up to the door). */
+  get cutawayMaterials(): ShaderMaterial[] {
+    return this.cut.map((c) => c.cutaway);
+  }
+
+  /** How far the roof and the chimney have lifted off (0: the house as ever, 1: gone, the room open from above). */
+  setCutaway(amount: number): void {
+    const open = amount > 0;
+    for (const c of this.cut) c.mesh.material = open ? c.cutaway : c.own;
+    this.cutaway.value = amount;
+    if (this.roof) this.roof.visible = amount < 1;
+  }
+
+  /** How far the front door stands open (0 shut … 1 swung right in): eased, as a door swings. */
+  setDoor(open: number): void {
+    this.door.value = DOORWAY.swing * smoothstep(0, 1, open);
   }
 
   /** Seat the homestead: origin on the cottage clearing, up = local vertical, +z toward the pond. */

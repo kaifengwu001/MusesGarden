@@ -14,7 +14,7 @@
 //          of the meadow's bands; the shade a cool lavender grey with the
 //          meadow's green bounced up into the underside; the tips lit
 //          through when the sun is behind; the clouds' shadows passing
-//          over (read a meter aside, off Muse's own shadow in the same map)
+//          over (its own shadow is in a map of its own, which it never reads)
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
@@ -202,10 +202,8 @@ void main() {
   float cloud = 0.0;
 #else
   vec3 sun = localSun(normalize(vPlanet));
-  // the clouds' shadows, read a meter aside: along the sun the map also holds Muse's own
-  vec3 side = cross(up, sun);
-  side = dot(side, side) > 1e-6 ? normalize(side) : uMuseFrame[0];
-  float cloud = 0.85 * cloudShadowAt(vPlanet + side * 1.0, 0.0);
+  // the clouds' shadows where it stands (its own is in a map of its own, which it never reads)
+  float cloud = 0.85 * cloudShadowAt(vPlanet, 0.0);
 #endif
   float ndl = dot(n, sun);
   // the shade: cool, with the meadow's green bounced into the underside

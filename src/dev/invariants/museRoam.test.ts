@@ -44,7 +44,8 @@ describe('Muse roaming the planet', { timeout: 30_000 }, () => {
       }
       // a waddle, a hop (the quickest, up onto the bench): no jumps from one place to another
       expect(worstStep).toBeLessThan(0.2);
-      for (const kind of ['perch', 'stir', 'fish', 'water', 'sleep']) expect(seen.has(kind), kind).toBe(true);
+      // (cooking only in the hut, at the hearth's stove, while you visit)
+      for (const kind of ['perch', 'fish', 'water', 'sleep']) expect(seen.has(kind), kind).toBe(true);
     });
   }
 

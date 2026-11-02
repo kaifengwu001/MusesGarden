@@ -1,4 +1,5 @@
 import { areaOfRadius, growthForArea } from './planet/growth';
+import { UNVEILED } from './planet/unfold';
 
 // One typed parameter schema. Every tunable lives here with its default,
 // range, URL key and the kind of work a change triggers. The panel, control
@@ -79,6 +80,8 @@ export const DEFAULT_GROWTH = Math.round(growthForArea(areaOfRadius(RADIUS_DEFAU
 export const schema = {
   world: {
     seed: int('seed', 'Seed', 412, 0, 9999, 'world'),
+    // how far the planet has unfolded (planet/unfold.ts): the veil and the flowers, then the size; it sets the growth
+    unfold: num('u', 'Unfold', UNVEILED, 0, 1, 0.0001, 'live'),
     growth: num('g', 'Growth', DEFAULT_GROWTH, 0, 1, 0.0001, 'live'),
     areaMin: num('amin', 'Area at g = 0', AREA_MIN, 5_000, 400_000, 1, 'live', { unit: 'm²' }),
     areaMax: num('amax', 'Area at g = 1', AREA_MAX, 50_000, 5_000_000, 1, 'live', { unit: 'm²' }),
@@ -344,8 +347,10 @@ export class ParamStore {
 
   private constrain(path: ParamPath, v: ParamValue): ParamValue {
     const w = this.values.world;
-    if (path === 'world.areaMin') return Math.min(v as number, w.areaMax / AREA_GAP);
-    if (path === 'world.areaMax') return Math.max(v as number, w.areaMin * AREA_GAP);
+    // (against the other bound as the URL writes it, whole square meters, and to a whole one: so the pair
+    // round-trips through the URL as it was set, rather than coming back a square meter off)
+    if (path === 'world.areaMin') return Math.min(v as number, Math.floor(Math.round(w.areaMax) / AREA_GAP));
+    if (path === 'world.areaMax') return Math.max(v as number, Math.ceil(Math.round(w.areaMin) * AREA_GAP));
     return v;
   }
 }

@@ -12,6 +12,7 @@ uniform vec2 uResolution;
 #include <meadow_wind>
 #include <meadow_warp>
 #include <meadow_clouds>
+#include <meadow_muse_shadow>
 #include <meadow_water>
 
 uniform int uDebug;
@@ -58,13 +59,14 @@ void main() {
   float wet = smoothstep(aa, -aa, h);
   float depth = max(-banked(h, shore), 0.0);
 
-  // light: toon bands, the cottage's shadow, cloud shadows with brushed edges
+  // light: toon bands, the cottage's shadow, cloud shadows with brushed edges, Muse's
   float stroke = strokeAt(dir, pixelMeters);
+  vec3 spot = dir * (uRadius + max(h, 0.0));
   // (the cottage's shadow is painted like a cloud's: deep and cool)
 #ifdef AWAY_FROM_HOME
-  float cloud = cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2);
+  float cloud = max(cloudShadowAt(spot, stroke * 2.2), museShadowAt(spot));
 #else
-  float cloud = max(cloudShadowAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2), 0.85 * cottageShadow(dir));
+  float cloud = max(max(cloudShadowAt(spot, stroke * 2.2), museShadowAt(spot)), 0.85 * cottageShadow(dir));
 #endif
   float b = toonLight(dot(n, uSunDir)) * (1.0 - 0.9 * cloud);
 

@@ -10,7 +10,7 @@ const float POND_DEPTH = 1.4;
 const float POND_BANK = 0.9;
 const vec2 HOUSE_FOOTPRINT = vec2(4.45, 2.75); // half sizes (m), terrain.ts
 const vec4 TERRACE_AREA = vec4(-4.5, 4.2, -0.2, 4.8); // x0, x1, z0, z1 (m)
-const vec4 STEPS_AREA = vec4(1.9, 3.9, 4.6, 5.85);
+const vec4 STEPS_AREA = vec4(1.9, 3.9, 4.6, 6.0);
 const vec4 PIER_AREA = vec4(-8.3, -3.3, 1.75, 5.7);
 const vec4 CULVERT = vec4(-7.2, 4.6, 0.5, 1.3); // the channel under the pier's arch: centre x, z, half sizes (m)
 

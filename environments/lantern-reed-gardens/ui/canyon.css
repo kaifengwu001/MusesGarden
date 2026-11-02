@@ -1,0 +1,61 @@
+:root { --ink:#41485f; --ink-soft:#68738c; --paper:#f8f3e6; --sky-pale:#b9c5dc; --coral:#b18d72; }
+.masthead { color:#344c50; max-width:70vw; text-shadow:0 1px 20px #f9f5e777; }
+.masthead h1 { font-size:clamp(36px,5.2vw,76px); max-width:660px; }
+.world-line { font-family:var(--font-ui); font-style:normal; font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+.canyon-community { position:fixed; left:var(--gutter); top:180px; width:262px; padding:19px 20px 10px; background:#f8f3e6e8; border:1px solid #45666a30; border-radius:4px 16px 16px 16px; box-shadow:0 12px 40px #2a53521a; pointer-events:auto; backdrop-filter:blur(12px); }
+.canyon-eyebrow { margin:0 0 7px; text-transform:uppercase; font-size:9px; letter-spacing:.18em; color:#936c51; }
+.canyon-community h2 { font:400 22px/1.15 var(--font-serif); margin:0 0 15px; }
+.canyon-community button { cursor:pointer; border:1px solid #58757438; border-radius:5px; background:transparent; color:inherit; font:inherit; padding:7px 9px; }
+.canyon-community button:hover { background:#dfdacf; }
+.canyon-community button:focus-visible, .canyon-name:focus-visible { outline:2px solid #9d714e; outline-offset:3px; }
+.canyon-places { display:flex; gap:5px; font-size:10px; padding-bottom:13px; border-bottom:1px solid #536e7230; }
+.canyon-residents { display:flex; gap:7px; margin:14px 0 5px; }
+.canyon-resident { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:11px!important; padding:8px 5px!important; }
+.canyon-resident::before { content:''; display:block; width:23px; height:27px; background:var(--coat); border:1px solid #5767654d; border-radius:45% 45% 38% 38%; margin:0 auto 6px; box-shadow:inset -4px -3px 0 #42636612; }
+.canyon-resident[aria-pressed=true] { background:#e7d9c9; border-color:#ac7272; }
+.canyon-resident-detail { border-top:1px solid #536e7230; padding-top:13px; margin-top:13px; }
+.canyon-resident-detail[hidden] { display:none; }
+.canyon-resident-detail h3 { font:400 23px var(--font-serif); margin:0 0 3px; }
+.canyon-activity { font-size:11px; line-height:1.5; margin:0 0 11px; }
+.canyon-name-label { display:flex; align-items:center; gap:9px; font-size:10px; color:#667775; }
+.canyon-name { min-width:0; width:100%; padding:6px 8px; border:1px solid #7587844a; background:#fff9ee; color:#344c50; border-radius:4px; font:12px var(--font-ui); }
+.canyon-resident-actions { display:flex; gap:5px; font-size:10px; margin-top:10px; }
+.canyon-close { margin-left:auto; }
+.canyon-notice { font-size:10px; line-height:1.5; margin:9px 0 0; }
+.canyon-notice:empty { display:none; }
+body.postcard .canyon-community, body.g-mail-open .canyon-community, body.g-away .canyon-community { display:none; }
+@media(max-width:700px) {
+  .masthead h1 { max-width:240px; font-size:38px; }
+  .world-line { max-width:230px; font-size:9px; line-height:1.6; }
+  .canyon-community { top:132px; padding:12px; width:198px; }
+  .canyon-community h2 { font-size:18px; margin-bottom:9px; }
+  .canyon-eyebrow { font-size:8px; }
+  .canyon-places { padding-bottom:8px; }
+  .canyon-places button { padding:6px; font-size:9px; }
+  .canyon-residents { margin-top:9px; }
+  .hints { display:none; }
+}
+@media(max-height:650px) { .canyon-community { top:110px; } .canyon-eyebrow { display:none; } }
+
+.lantern-light { display:flex; gap:5px; margin:12px 0 0; font-size:10px; }
+.lantern-light button { flex:1; }
+.lantern-light button[aria-pressed=true] { background:#e7d5b4; border-color:#b78e52; }
+
+@media(max-width:700px) {
+  .canyon-community { left:16px; right:16px; top:122px; width:auto; padding:10px 12px; display:grid; grid-template-columns:1.15fr 1fr; gap:6px 12px; border-radius:6px 14px 14px 14px; }
+  .canyon-eyebrow,.canyon-community h2 { display:none; }
+  .canyon-places { border:0; padding:0; gap:4px; align-self:center; }
+  .lantern-light { margin:0; gap:4px; align-self:center; }
+  .lantern-light button { padding:6px; }
+  .canyon-residents { grid-column:1/-1; margin:0; gap:7px; }
+  .canyon-resident { display:flex; justify-content:center; align-items:center; gap:8px; padding:5px!important; }
+  .canyon-resident::before { width:15px; height:19px; margin:0; }
+  .canyon-resident-detail { grid-column:1/-1; margin:0; padding-top:7px; display:grid; grid-template-columns:1fr 1fr; gap:5px 10px; }
+  .canyon-resident-detail[hidden] { display:none; }
+  .canyon-resident-detail h3 { font-size:18px; }
+  .canyon-activity { font-size:10px; margin:0; }
+  .canyon-name-label { grid-column:1; }
+  .canyon-resident-actions { grid-column:2; margin:0; }
+  .canyon-resident-actions button { padding:5px; font-size:9px; }
+  .canyon-notice { grid-column:1/-1; margin:0; }
+}

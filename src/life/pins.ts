@@ -176,6 +176,12 @@ export class Pins {
     }
   }
 
+  /** Move a pin that walks about (Muse's) to where it is now: its direction and its ground's height (m). */
+  move(id: string, dir: Vector3, ground: number): void {
+    const pin = this.pins.get(id);
+    if (pin && !(pin.spec.ground === ground && pin.spec.dir.equals(dir))) pin.spec = { ...pin.spec, dir: dir.clone(), ground };
+  }
+
   /** Each frame: show from orbit when on, fade those turning round the back, keep their size on screen. */
   update(dt: number, on: boolean, zoom: number, camera: PerspectiveCamera, warp: WarpFrame, radius: number): void {
     const visible = on && zoom < ORBIT_ZOOM;

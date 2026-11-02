@@ -45,7 +45,7 @@ Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with
 | 7 | No line and dot under the card: the card alone | The line and its dot are gone; the card rises where it stands (ad84ef0). |
 | 8 | (asked) Why some glowing spheres look cut off: each glow is a flat sprite 0.6 m over its find at one depth, so ground rising toward the camera inside its glow hid part of it. Round again, still hidden by what truly stands in front | Each sphere is now depth-tested at the near edge of its own glow (its depth brought toward the camera by its radius, at most half its distance), so the ground inside the glow no longer cuts it, while a hill, the cottage, a cloud or the horizon between still hides it. In a view looking 40° down, 252 pixels were hidden by the ground under the glows; now 6 (503a435). |
 | 9 | The flowers' flight out of the basket looks inconsistent | One ordering slip: sending a flower stored where it was going before reading where it was, so it set off from its goal. On opening every flower sat on its slot from the first frame (moving 0.1 px a frame at most), on another day each new one jumped to its slot in one frame, and on closing each was back in at once; each act also had its own timing. Now every flower starts out of sight in the basket and rides it, turns upright, comes over the rim and reaches out to its slot: 30 frames each, 0.04 s apart, one easing, no jumps, for 1, 3, 5 and 12 flowers and on another day; dropping back in is the same played backward. Closing takes longer for it: 0.90 s with one flower, 1.33 s with twelve (0.73 before); another day takes 0.80 s (1.02 before) (b08c665, 1d639ca). |
-| 10 | (added) The open basket is the teammate's hand-drawn basket (7d7a4f9's rail icon), flat, so the icon grows into the same basket; no 3D model | |
+| 10 | (added) The open basket is the teammate's hand-drawn basket (7d7a4f9's rail icon), flat, so the icon grows into the same basket; no 3D model | The open basket is the rail's own picture (basketDrawing.ts), drawn twice: its back (the inside, the far rim, the handles) and its front (the near wall and rim, split along the rope's top edge traced in 48 rows), the flowers between, a flower flying home over both. The first frame of the opening lies on the rail's icon to within 1 px of place and 2 px of size at 1440×900 and 390×844. At rest no flower shows (0 px in 3,353 flower-frames); 0 % of 1.23 M points pass through the front wall; no jumps. The 3D bowl and toyPaint.ts are gone (cb0fc97, e0a212b). |
 | 11 | (added) The postcards' flight out of the mailbox flashes and isn't smooth | Filmed every composited frame of the opening (CDP screencast): the top card popped in full size in the middle (7.5 % of the screen flashing in one frame), slid back toward the mailbox while fading, then jumped out again. The deck put its cards on the page and then measured the stage, which styled them first in the middle; their start at the mailbox's mouth, set after, became a flight back to it. Now the start is set before they are on the page and settled before they fly: in three filmings the cards leave the mouth and grow into the deck, the most flashing in a frame 0.55 % (the cards' own motion). From the post's first deck (5e0bf24), not the new mailbox. |
 | 12 | (added) In the basket, each flower is drawn as its species' picture (src/assets/garden/flowers); flying home it turns into the planet's own flower, so it lands looking like its patch | |
 
@@ -61,7 +61,178 @@ Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with
 - At eye level, pointing at a far patch through the gaps of a nearer one picks the nearer (8 of 40 points).
 - On a phone the card's arrows are hidden, so the day line over them doesn't show there.
 - In a full basket on a laptop the two outermost previews each cover a neighbour; the rise turns fastest mid-way (0.19 rad a frame); new flowers no longer sparkle on another day.
+- In send-all, a flower standing in the basket steps 4 to 10 px each time another leaves (readyPose's reach follows the live count; as before).
+- For about 10 frames as the basket opens it sits under the rail button's disc while the icon fades out over it.
 - A flower leaving the basket shows its stem in front of the wall for a frame, and in a full fan the outermost stem's foot sits outside the wall (both as before; tracked).
+
+## The unfolding (experiment, branch `unfold`)
+
+Kai's brief (2026-11-01), to test how the world unfolds for a new player: a
+slider for the unfolding in place of the radius slider, starting at the
+meadow's tuned size. At first a cloud of its own covers most of the planet
+but a small area round the hut. It lies beneath the drifting clouds, which
+still pass over the hut and the cleared ground. There are no flowers, just
+grass. As Muse explores, the cloud recedes bit by bit (not a circle), and
+the flowers blossom from the hut outward, until the planet is unveiled and
+in flower. Then the planet grows, and the orbit camera doesn't move away, so
+it grows in the window.
+
+Built on `unfold` (from 4e711ca), in a worktree of its own; as designed in
+ARCHITECTURE.md ("The unfolding"):
+
+- **Unfold** in the control bar (plays over 16 s: 8 to unveil, 8 to grow);
+  URL key `u`; the default ½ is the meadow as it was.
+- **The veil is ground fog** (third round, below): a layer on the meadow,
+  dense at the ground, thinning upward to a top that lies in banks 2–5.5 m
+  high, with wisps streaked along the wind. A sea of it from orbit, a bank
+  of it from the clearing, under the drifting clouds. Its edge recedes
+  raggedly out from the hut (a field of turns baked once per planet). It is
+  marched per pixel in a fullscreen pass. The clouds' code is main's again.
+- **The drifting clouds start thicker** (Kai, after the fog: "not fully
+  cloudy, but definitely higher density"): coverage 0.75 at the start,
+  easing back to the setting (0.45) as the planet unveils, the same to the
+  bit from the middle on.
+- **The flowers:** the existing bloom front, moved by the unfolding (the
+  Bloom slider still sets the season; the lower of the two wins).
+- **Growth:** g from 0.1886 to 1 over the second half, the camera held
+  (`CameraRig.holdThrough`): 667 m from the centre throughout in orbit;
+  70.2 m and 4.3 m over the ground at the bird's-eye and standing stops.
+- **Pixel-identical at the default:** main and the branch draw the same
+  frames in all nine standard views, high and medium, at 1× and 2×. The one
+  exception is Muse's pin on the orbit, whose face differs between two loads
+  of main as well.
+- **Also fixed:** the area bounds' URL round trip. A constrained bound was
+  kept finer than the URL writes it and came back a square meter off. The new
+  field shifted params.test.ts's random draws onto that case.
+
+Decided (Kai, 2026-11-01): the camera stays held through the growth. Held
+so, the planet fills the window by about R 200 m (u ≈ 0.58), and from there
+on we look at a patch of growing ground, 265 m below at R 400. Easing the
+camera back, or starting the growth farther out, was offered and turned down.
+
+Also decided (Kai, 2026-11-01): the page opens on the meadow as it was (the
+slider's middle; `#u=0` opens the start), and ahead of the flowers the grass
+stays the Bloom slider's early-spring grass, a little shorter and paler. Its
+cost is measured once its look is settled.
+
+The veil's look took three rounds. First it was still heaps of the clouds'
+puffs, which up close were smooth domes. Then those heaps turned to fog up
+close and stayed sculpted cloud far off. Kai: "Fog needs work" — they were
+blurry blobs, not fog, and too see-through; the veil should be fog from
+every distance. So it became a ground-fog layer, dense at the ground,
+lying in banks with wisps. The lakes don't mirror it (Kai: no need, it
+covers the lake already).
+
+Measured (2026-11-01, a3d08d4, high, headless Chromium on Metal; best of 7
+interleaved rounds, the machine busy with other sessions, so ±1–2 ms):
+
+- **At the default it is free:** nothing of the fog is drawn and the frames
+  are pixel-identical to main. The A/B against main differed by noise only,
+  either side of zero.
+- **Shown (slider at 0), the fog alone** (the frame with it, less the same
+  frame with it hidden), ms a frame:
+
+  | View | 2880×1800 (DPR 2) | 1440×900 (DPR 1, MSAA) |
+  |---|---|---|
+  | orbit, centred on the hut | 2.4 | 0.65 |
+  | 170 m up | 6.5 | |
+  | bird's-eye | 5.2 | |
+  | the bank, from the cottage height | 7.1 | 1.9 |
+  | the bank, standing | 4.8 | 1.5 |
+  | the vista, at the fog's top | 12.2 | 2.7 |
+  | eye level, inside it | 6.3 | |
+
+- **Where it goes:** a march per pixel, two cube-map reads a step (the ground
+  and the veil's field), fine steps through the thin top of the layer. It is
+  costliest looking across the top (the vista).
+- **Live, with Auto** (from the hut, walking out toward the bank), both runs
+  sat at Auto's lowest resolution (0.50–0.62) with or without the fog, the
+  GPU being shared. Frame p50 was 16.7–18.3 ms with it, 16.7–17.5 without.
+- **Tried and dropped: coarser steps** (0.6 m near, faster growth): 2.5–5.5 ms
+  saved from above and at the vista, almost nothing at the bank. From above
+  the fog went see-through in streaks (142,000 pixels off by more than 16
+  levels at 170 m): its steps passed over the thin layer.
+- **Decided (Kai):** the fog's cost is fine as it is. The unfolding is a
+  once-and-done cinematic, so the fog shows once. Not worth optimizing (a
+  half-resolution fog would have been the next step).
+
+Open (questions for Kai, and what wasn't done):
+
+- At eye level in the clearing (1.6 m), the tiny planet's near horizon hides
+  most of the fog: it shows as a pale strip beyond it. From the standing
+  stop (4.3 m) up, it is a bank round the clearing.
+- The drifting clouds' bases (4–6 m over the water table) dip into the
+  fog's highest banks in places, and are drawn over the fog there.
+- Muse still roams under the veil, and the finds' beds and pins show
+  wherever they are; the engine's growth (Fern's exploration) still sets the
+  size directly, so the slider stands in for Muse's exploring.
+
+## Muse's hut: the interior (in progress)
+
+Started from eeda5d5, on the branch `hut-interior` in a worktree of its own
+(other sessions share the main checkout). Kai's brief (2026-11-01), with two
+references kept out of git: a mock-up of the hut with its roof off, seen from
+above at an angle with the room inside (reference/hut-interior/cutaway.jpg),
+and a red and cream rug (reference/hut-interior/rug.webp). With them, a
+library of Tripo models for the furniture, moved from the Desktop into the
+project (src/assets/interior; the display cabinet's first try is kept in
+reference/hut-interior).
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | An interior for Muse's hut: cozy and lived in | The room inside the cottage's walls (life/hut.ts): a floor and the walls' inner faces fitted to the walls as props.ts builds them, nine pieces of Kai's furniture stood in their places (each model scaled to its height in meters, set square where Tripo made it askew, its picture drawn at 1024²), the rug cut out of Kai's picture. Muse stands in the room while you are there. |
+| 2 | A hearth or stove radiating warm light | The stove's fire lights the room (hut.frag.glsl): warm, flickering, falling off over a few meters and wrapped softly round what it lights, with a candle on the table and the lantern on the desk; daylight soft from above as if the roof were on, a warmer bounce from the floor; the corners, the walls' feet and the floor round what stands on it darker. |
+| 3 | Dark wooden floors and furniture | Dark staggered planks with their grain, seams and a worn path; ochre limewash over stone inside, the stones showing low down. The furniture is Kai's dark wood. |
+| 4 | A large showpiece shelf holding Muse's favourites, opened with the finds' glowing dot, line and card | One big display cabinet along the blind left wall (Kai's later notes). In the room it shows a single glowing dot; tap it and the camera turns to the cabinet (from the front of the room, not straight on) and comes in until it fills half the screen, whatever stands in front of it dissolving (life/occlude.glsl). There a small white dot stands on each favourite (fifteen places, three shelves of five): tap one and its line rises to its card beside the cabinet (the find's card: Muse's favourites, 3 of 15; ← → for the next). The favourites come from the source (`favourites` in the snapshot); without them the garden picks one a topic, newest first. |
+| 5 | You go in by clicking the door while Muse is inside or about the hut | The door is picked on screen (its outline projected, seen from in front); with Muse out, or out in the meadow, a line says so (and offers Find Muse). The cottage button's arrival says to tap the door. |
+| 6 | The camera rises to an almost orthographic cutaway (the roof off, seen from above at an angle) | view/cutaway.ts: from wherever you are, the camera rises and its view narrows to 15°, the roof lifting off and dissolving, until the room is seen as in the mock-up (from 39° round to the right, 69° down); clouds near the line of sight draw back; the tiny-planet warp eases out so the room stands square. Drag turns round the room, the wheel comes closer; Step outside (or Esc) goes back down the same way to exactly where you were, the roof settling on. |
+| 7 | The interior's Tripo models move into the project | src/assets/interior: nine models and the rug. |
+
+Kai's notes on the first pass (2026-11-01), done:
+
+- **The layout after Kai's second mock-up:** the hearth in the middle of the back wall under the chimney, the pots and pans hung high right over the stove, the dish cabinet beside it, the bed in the back corner on the right with its head against the back wall, the low shelf along the right end toward the front, the table on the rug in the middle, the desk under the front window, the armchair by the fire. The back window is closed from inside (the hearth stands in front of it); outside it is still a window.
+- **The chimney is not a solid block:** in the cutaway it settles onto the back wall over the hearth, its top a dark flue with soot round its mouth.
+- **The cut shows the walls' make:** the front and the right end are cut low and straight, just over the front's door and window, the back and the left end stand whole, each high wall's end standing upright where it meets a low one. The cut shows rubble stone in its mortar with the plaster's skin at each face, dark timber plates along the walls' tops and the lintels over the door and the window; the plaster along the cut is broken, its stones showing.
+- **The last step clipped with the grass and flickered:** it lay flush with the meadow (three risers and the ground). Now there are four equal risers, the last step a riser over the meadow, and the grass is kept a little farther from its foot; Muse walks down the four.
+
+Then (2026-11-01, done):
+
+- **A layout editor** (temporary: `?edit` in the address; ui/garden/hutEditor.ts): in the cutaway, Edit layout; tap a piece or pick it from the list and a gizmo square to the hut stands on it to move it (along the walls; its middle slides it over the floor, the up arrow lifts it), turn it about up or scale it (snapping to 5 cm, 15°, 5 % if asked); its light, its shadow on the floor and the favourites' places go with it. Export gives each piece's foot, turn and size as text. **Kai's layout from it** is now the room's: the hearth 1.7 times as big, set into the back wall left of the middle; the low shelf to its right with the pots and pans hung over it; the dish cabinet beyond the hearth; the showpiece cabinet taller (3.24 m); the bed bigger in the back corner on the right; the table low and wide on a bigger rug, turned a little; the desk under the front window.
+- **Scrolling out at the showpiece** goes back to the room's view (Kai's note), as Back to the room and Esc do, and puts an open card away.
+- **The front walls cut lower,** across the window and the door (1.25 m over the floor; the front and the right end alike): the window's frame and panes and the door's planks are cut with the wall (their CUTAWAY builds), the cut stops either side of the openings, and the right end's window lies wholly over it; the lintels are no longer in the cut.
+- **The chimney:** outside it is no longer a solid block (its top is a dark flue with soot round it, the one change to the cottage's look outside besides the steps); in the cutaway it lifts off and dissolves with the roof (it used to slide onto the back wall, which looked strange).
+- **Asleep, Muse lies in the middle of the bed,** its head against the pillow, not over the headboard (55 cm toward the bed's foot from the mattress's middle as Tripo made it), and sunk into the mattress rather than floating over it (12 cm lower).
+- **The cut through the walls** shows their stones in courses as the cottage does outside where its plaster has fallen away (two courses across the wall's thickness on top, the walls' own courses on the upright ends), pale as the cut catches the light, their joints soft (the first cut's rubble was too dark and unlike the walls); **the door cut through** shows thick (12 cm of planks in section, warm as the door outside), the cottage's own door unchanged outside.
+- **The home flag follows the door:** Muse's portrait says at home and the cottage's "out" sign comes down while Muse is about the hut (within 30 m), as the door opens then.
+- **The door opens while Muse is about:** home, or pottering in the meadow within 30 m of the hut (it was shut whenever Muse stepped off the homestead, two thirds of its day); while laying the room out, always.
+- **Muse in the hut answers you** (a tap and it turns to you, a hold and it is petted, hearts and all), and each visit finds it doing one of three things (Kai's note): **asleep on its bed** (a quarter of visits: lying back along it, its head on the pillow, its snore bubble; a tap and it stirs), **greeting you** on the rug (a wave as you come in, its eyes on you, a wave now and then), or **cooking at the hearth's stove**: at the hearth's right front, turned to the pot, the ladle out of its pocket, stirring and tasting as at the porch's stove, four rounds and a look about, again; steam off the pot, and the porch stove left in its embers (museRoam.ts `inside`, museProps.ts: a cook's pot of its own).
+
+The meadow outside the cutaway draws pixel for pixel as before in every standard view, at 2× and 1× (check-frames samecheck against eeda5d5), but for the steps in the cottage view (Kai's fix) and orbit, which differs against itself too (the Muse pin's pop-up). `npm run check` and `npm test` (758 tests, 8 of them new: hut.test.ts) pass.
+
+Known: the models are the stand-ins (see the pipeline test below), about 580k triangles and 28 MB together; the display cabinet is drawn out 1.4 times across to fill the wall, its things with it (a wide cabinet from Tripo would drop in). Muse is lit by the sun outside, not by the fire. The water's mirror still shows the roof. The cutaway's materials compile on the first knock (a hitch then).
+
+**GPU memory (after the merge with Tracy's main, 2026-11-01).** The furniture is fetched when you come near the hut, but it reaches the GPU only when the cutaway first draws it and leaves it when the cutaway shuts, and the ledger now books it so (it had booked the prefetch's 71.8 MB at once, putting the finds test's wander view at 301.5 MB against its 256). Outside, near the hut, it is 229.7 MB as before; inside, 301.5 MB at 1600×1000 (the stand-ins' nine pictures at 1024², 50.6 MB, their meshes about 18 MB, the rug 3.3 MB), over the budget while you are in. Lighter models from Tripo or smaller pictures would bring it in. A second visit uploads the furniture again as the camera starts to rise. `npm run check`, `npm test` (848) and `npm run test:gpu` (14) pass on main.
+
+**Kai's notes after the merge (2026-11-01):**
+
+1. *Remove the stove on the porch, and cooking outside.* The porch stove is gone (museProps.ts: its mesh, its fire's glow), and so is cooking among Muse's outings (museRoam.ts): it cooks only at the hearth, in the hut. With the door shut and Muse hidden, the meadow draws pixel for pixel as before in every standard view at 2× and 1× (check-frames against 4e2910b), but where the stove stood: the cottage view (4,093 px, the stove) and, at 1×, one pixel of the bird's-eye view where the stove's pipe showed past the roof's edge (a build with only the door's shader is identical there); orbit differs against itself (the Muse pin).
+2. *Muse teleported in and out of the house: have it walk in and out as you go in and out, the door swinging open as it comes.* A knock now cuts Muse's day short where it is (museRoam.ts `comeIn`, `cut`): a walk slows to a halt over 0.8 s, a pastime eases out and its tool goes back into its pocket, what can't be cut short (a hop, sitting down, a turn) runs to its end, and it gets up from what it was doing (off the bench, up from the grass or the pier's edge, awake from a nap, the can put away). Then it walks home, up the steps and along the porch, and in through the front door, to the rug to greet you, to the hearth to cook, or to bed: before the bed with its back to it, a yawn, a hop up onto its edge, round and back onto it (sitting on its edge, its legs swung up onto it), lying back, asleep with its head on the pillow. Stepping out cuts that short (awake, round with its legs over the edge, down) and it walks out onto its porch, has a look about, and its days go on from there. Inside it keeps clear of the walls and of what stands on the floor (the room's pieces as laid out: gardenUi.ts `room`); the way in is the doorway's middle; the doorstep is a 9 cm bump under its feet. **The door** swings in on its hinge (its right side seen from the porch, 85°) as Muse comes to it, open by the time it is 1.5 m away, and shuts once it is 1.4 m through (props.vert.glsl: the wood's planks turned in the vertex shader, only while it stands open; the hut's cut door with them). With the cutaway shut, the room is drawn whole through the open door (its walls uncut, the cut and its timber not drawn), and Muse is not drawn while it is in the room behind shut walls, and casts no shadow out through them. If the room is laid out while Muse is away (`?edit`), it is still put there.
+   - New: museVisit.test.ts (8 tests: knocks spread over its day, each pastime there; through the door only, the door open whenever it is in the doorway and shut after; clear of the walls and the furniture; at its pastime; no jumps or snap turns; out onto the porch and on; stepped out of before it got in; the door shut all through its own days). `npm run check`, `npm test` (856) and `npm run test:gpu` (14) pass.
+   - Known: Muse walks at its own pace (0.54 m/s), so from the far side of the door's 30 m it takes up to a minute to get in; the room waits for it.
+3. *Make the door slightly wider so that Muse's arms don't go through the open door.* Muse's mittens swing about 0.52 m either side of its middle as it walks (measured going through), about 1.2 m across with them, through a door 1.1 m wide whose leaf stood 10 cm into the way at its 85° swing. The door is now 1.35 m wide (props.ts FRONT, widened on its hinge side so the bench stays put; the doorstep with it), swings square to the wall (90°), and Muse goes through along the middle of the way left clear by the open door, its arms (0.6 m either side) clear of the far jamb and of the door, and keeps them clear of the door beside it inside (museRoam.ts ARMS, DOOR). The door is open by the time Muse comes within its sweep and shuts only once it is out of it (it had shut by distance along the way). With Muse hidden, against d0c0544 only the cottage view differs (4,222 px: the door and the doorstep), and one pixel by 8/255 in the bird's-eye view; orbit differs by the Muse pin as against itself. museVisit.test.ts now checks Muse's arms against the jambs and the open door, and that the door never swings while Muse is where it swings. `npm run check`, `npm test` (856) and `npm run test:gpu` (14) pass.
+4. *The door's sill looked green: the grass under the house showing through; put a geometry there, brown.* Under the doorway nothing closed the floor between the room's floor (to the wall's inner face) and the terrace (from 6 cm out), so the grass under the house showed as a green seam there, the door open. Now a sill (props.ts fittings, the wood's flag 3: a worn board of the door's warm wood, neither swung with the door nor cut in the cutaway) runs across the doorway through the wall, 2 cm over the floor, from just inside the room out under the doorstep. With Muse hidden, against 88cb425 only the cottage view differs (259 px: the sill's strip before the shut door), and two pixels of the bird's-eye view: green specks on the roof that were the grass under the house seen through pinholes between tile courses, now the sill. Others like them remain on the roof, and a hairline crack between the wall's face and the door's left jamb shows the same grass (older, as are the windows' jambs). `npm run check` and `npm test` (856) pass; of `npm run test:gpu`, the growth scrub's frame budget failed with the machine busy (77 browser processes), as it did for 88cb425 run beside it (33.4 ms both, twice; the sill once passed), the other 13 pass.
+
+**A test of the 3D pipeline (2026-11-01).** Kai made the display cabinet
+twice. The second ("(1)") is properly built: square posts, flat panels,
+modelled doors and handles, separate books, a glass case with a mortar in
+it, in 14.9k triangles, its 2048² texture much sharper (1.17 MB against
+318 KB). The first is melted clay: rounded, wavy posts, its doors painted
+onto a lumpy slab, in 53.9k triangles spent evenly, flat panels included.
+The other eight models are all of the first kind (the eight come to 566k
+triangles), so the advice was to make them again the second way, the
+straight-edged furniture first (table, bed, desk, dish cabinet, both
+shelves). Until then they stand in: each is fitted to its place by size as
+it loads, so a new file drops in under the same name.
 
 ## The garden's controls (2026-11-01)
 
@@ -127,6 +298,34 @@ The first planet stays as it is: its seed, size and look are Kai's to change, an
 other worlds beside it. The rules are in [CLAUDE.md](CLAUDE.md), and `npm test` holds them
 (`params.test.ts`, `cast.test.ts`, `garden.test.ts`). A local garden seeded before this change (`.muse/`)
 has to be deleted and seeded again.
+
+## Muse's shadow, clean and still (2026-11-01)
+
+Kai's note: Muse's shadow could be very low-res and flickering, most of all on
+the terrace and over bare ground, with jagged edges on the ground and on Muse.
+Muse was splatted into the clouds' shadow maps: on the ground and the props it
+was read at the sharper window's texels (about 7–8 cm near the ground), its
+outline a staircase that crawled as Muse moved; the grass and the flowers read
+it through the field map (coarser, and a frame late); and Muse read the map a
+meter aside to miss its own shadow, which a wide pose didn't always.
+
+Now Muse has a map of its own: 512² over the few meters round it (about 5 mm a
+texel standing; its half-width in steps of 0.25 m from 0.9 m, so the texels
+keep their size as it moves), centred among its body's spheres carried down the
+sun, so it travels with Muse and its texels never crawl. The ground, the props,
+the grass, the flowers and the finds' patches read it (the plants where they
+stand, as the field map had them), its edge softened over about 2 cm; Muse
+never reads it, and reads the clouds' shadows where it stands. The shadow is
+as dark as before (0.920 of the lit terrace before, 0.921 now).
+
+Checked: outside Muse's shadow the meadow draws pixel for pixel as before in
+the standard views (the cottage view and bird's-eye differ only in Muse's
+shadow; orbit differs even against itself, by the Muse pin's pop-up). On the
+terrace with a still camera, one-frame flicker went from 47 px a frame (782 at
+worst) to 5 (39). `npm run check`, 750 tests, the GPU invariants (14 pass) and
+the live suite (11) pass. Cost: within the noise of a busy machine (best of 10
+alternating rounds at 2880×1800, at most about 0.3 ms a frame with Muse in
+view; turning it off at runtime moved frames both ways).
 
 ## Muse's life on the engine, in Kai's garden (muse-agent)
 

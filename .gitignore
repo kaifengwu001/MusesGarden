@@ -14,6 +14,8 @@ reference/howls-lake.webp
 reference/muse/
 # the terraces planet's references (paintings and illustrations), kept out of git
 reference/terraces/
+# the hut interior's references (Kai's cutaway mock-up, the rug), kept out of git
+reference/hut-interior/
 
 # local probe scripts
 .*.mjs
