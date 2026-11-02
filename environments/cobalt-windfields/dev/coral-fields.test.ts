@@ -12,10 +12,10 @@ describe('unequal coral fields',()=>{
     const ecology=createWindfieldAnchors(generateLayout(seed),prototypes),rocks=ecology.rocks;
     const local=ecology.coral.flat().filter(a=>a.local),global=ecology.coral.flat().filter(a=>!a.local);
     const localFields=ecology.colonies.filter(c=>c.anchor.local);
-    expect(local.length).toBeGreaterThanOrEqual(350);
-    expect(local.length).toBeLessThanOrEqual(680);
-    expect(global.length).toBeGreaterThan(400);
-    expect(global.length).toBeLessThanOrEqual(3600);
+    expect(local.length).toBeGreaterThanOrEqual(1200);
+    expect(local.length).toBeLessThanOrEqual(1800);
+    expect(global.length).toBeGreaterThan(7500);
+    expect(global.length).toBeLessThanOrEqual(14000);
     expect(localFields.filter(c=>c.members>=45&&c.radius>5).length).toBeGreaterThanOrEqual(3);
     expect(localFields.some(c=>c.members<25)).toBe(true);
     for(const a of local)expect(clearsWindfieldRoutes(a.local![0],a.local![1],Math.max(.28,.40*a.scale))).toBe(true);

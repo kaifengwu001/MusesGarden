@@ -13,6 +13,7 @@ import { Petals } from '../../src/life/petals';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
 import { Residents } from './life/residents';
 import { WindfieldScenery } from './life/windfieldScenery';
+import { WindCloudRibbons } from './life/windCloudRibbons';
 import { WindWildlife, type WildlifeSpecies } from './life/windWildlife';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
@@ -94,6 +95,7 @@ export class World {
   readonly muse: Muse;
   readonly residents: Residents;
   readonly scenery: WindfieldScenery;
+  readonly cloudRibbons: WindCloudRibbons;
   readonly wildlife: WindWildlife;
   followingWildlife: WildlifeSpecies | null = null;
   followingResident: string | null = null;
@@ -188,8 +190,9 @@ export class World {
     this.muse.useModel(store.values.muse.model);
     this.residents = new Residents(this.shared);
     this.scenery = new WindfieldScenery(this.shared, this.terrain);
+    this.cloudRibbons = new WindCloudRibbons(this.shared);
     this.wildlife = new WindWildlife(this.shared, this.terrain);
-    this.scene.add(this.scenery.group, this.wildlife.group);
+    this.scene.add(this.scenery.group, this.wildlife.group, this.cloudRibbons.mesh);
     for (const resident of this.residents.members) {
       this.scene.add(resident.muse.mesh, resident.muse.props.group);
       this.clouds.addShadowCaster(resident.muse.shadowMesh);
@@ -398,6 +401,7 @@ export class World {
     this.butterflies.mesh.visible = false;
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
+    this.cloudRibbons.update(L.seed,R,clock.time,rig.altitude);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));

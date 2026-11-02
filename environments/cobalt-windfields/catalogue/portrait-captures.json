@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "id": "pip",
+      "hash": "q=high&t=12"
+    },
+    {
+      "id": "juniper",
+      "hash": "q=high&t=12"
+    },
+    {
+      "id": "marlo",
+      "hash": "q=high&t=12"
+    },
+    {
+      "id": "host",
+      "hash": "q=high&t=12"
+    }
+  ],
+  "errors": []
+}

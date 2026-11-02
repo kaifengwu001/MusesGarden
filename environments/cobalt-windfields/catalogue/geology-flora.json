@@ -1,0 +1,158 @@
+{
+  "summary": "Cobalt's active scenery uses 13 geological prototypes and two main botanical families: ivory seed sails and red coral, each with three authored variants. This catalogue also includes a windborne seed and the distant coral representation.",
+  "caveats": [
+    "Numbered rock, sail and coral IDs refer to positions in the source prototype or variant inventory, not the number of instances placed on the planet.",
+    "The three sail habits belong to one botanical family, and the three coral habits belong to another; these six variants are not six distinct species.",
+    "Distant coral is a simpler representation of the same coral population, not an additional species.",
+    "These entries cover the studio's scenery forms. Wildlife habitat plants and saved-find flora use separate geometry and materials and are outside this inventory."
+  ],
+  "items": [
+    {
+      "id": "rock-0",
+      "name": "Notched exposed bed",
+      "description": "A low, broad cobalt bed divided by two open crooked joints, with peach sand resting on its upper planes.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[0]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-1",
+      "name": "Broken terraced reef",
+      "description": "Three irregular stepped tiers form broad sloping ledges, with peach sand settled on two shelves.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[1]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-2",
+      "name": "Interrupted long ledge",
+      "description": "Two separated low ledge segments sit beneath a smaller raised shelf and a narrow sand deposit.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[2]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-3",
+      "name": "Blunt jointed outcrop",
+      "description": "A large block with clipped planar corners stands beside a smaller, lower block.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[3]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-4",
+      "name": "Detached split blocks",
+      "description": "Two unequal clipped blocks form a broken pair, with the smaller fragment offset to one side.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[4]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-5",
+      "name": "Inclined fractured wall",
+      "description": "Two inclined slabs have jagged sloping crests above a broad low foot and a peach sand seam.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[5]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-6",
+      "name": "Broken cliff buttress",
+      "description": "Three unequal rising masses form a broken cliff, with a chipped tall crown and sand along the irregular foot.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[6]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-7",
+      "name": "Blunt fallen stone",
+      "description": "A small flattened boulder with blunt clipped faces and a low profile.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[7]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-8",
+      "name": "Broad windward fin",
+      "description": "A broad inclined stone sheet rises beside a lower profile, with a narrow sloping shelf carrying sand.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[8]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-9",
+      "name": "Wind-carved shoulder",
+      "description": "A broad squat mass has a faceted shoulder and an uneven jagged crest.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[9]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-10",
+      "name": "Narrow leaning blade",
+      "description": "A thin tall slab leans above a narrow footprint, ending in an uneven high crest.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[10]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-11",
+      "name": "Eroded low peninsula",
+      "description": "A broad asymmetric low bed has a gently sloping top and an inset patch of peach sand.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[11]",
+      "group": "Rocks"
+    },
+    {
+      "id": "rock-12",
+      "name": "Chipped mineral boulder",
+      "description": "A chunky cobalt boulder has irregular clipped planes and a chipped sloping crown.",
+      "source": "life/windGeology.ts: makeGeologyPrototypes()[12]",
+      "group": "Rocks"
+    },
+    {
+      "id": "sail-0",
+      "name": "Paired kite",
+      "description": "A curved branching tan stem carries two cupped ivory membranes with kite-shaped shoulders and fine midribs.",
+      "source": "life/windGeometry.ts: seedSailGeometry(0)",
+      "group": "Ivory seed sails"
+    },
+    {
+      "id": "sail-1",
+      "name": "Tall fork",
+      "description": "A tall curved stem carries three ivory blades: a slender crown, a branching side sail and a small lower leaf.",
+      "source": "life/windGeometry.ts: seedSailGeometry(1)",
+      "group": "Ivory seed sails"
+    },
+    {
+      "id": "sail-2",
+      "name": "Broad wind flag",
+      "description": "A lower leaning stem supports a broad asymmetric ivory membrane and a smaller side leaf, both cupped and twisted.",
+      "source": "life/windGeometry.ts: seedSailGeometry(2)",
+      "group": "Ivory seed sails"
+    },
+    {
+      "id": "coral-0",
+      "name": "Spreading fan",
+      "description": "A broad red fan has smooth joined branches, rounded blunt tips and open gaps between its forks.",
+      "source": "life/windGeometry.ts: coralGeometry(0)",
+      "group": "Red coral"
+    },
+    {
+      "id": "coral-1",
+      "name": "Narrow upright crown",
+      "description": "A taller, narrower red crown sends rounded branches upward through open rising forks.",
+      "source": "life/windGeometry.ts: coralGeometry(1)",
+      "group": "Red coral"
+    },
+    {
+      "id": "coral-2",
+      "name": "Low windswept fan",
+      "description": "A low wide red fan spreads through leaning branches with joined rounded forks and shallow physical depth.",
+      "source": "life/windGeometry.ts: coralGeometry(2)",
+      "group": "Red coral"
+    },
+    {
+      "id": "drifting-seed",
+      "name": "Windborne seed",
+      "description": "Two crossing slender ivory diamonds form a tiny airborne seed carried through the scenery.",
+      "source": "life/windGeometry.ts: driftingSeedGeometry()",
+      "group": "Supporting forms"
+    },
+    {
+      "id": "coral-lod",
+      "name": "Distant branching coral",
+      "description": "Four simple angular branch tubes with blunt caps preserve the coral silhouette at a distance; this is a level-of-detail model of the existing coral.",
+      "source": "life/windfieldCoralLod.ts: distantCoralGeometry()",
+      "group": "Supporting forms"
+    }
+  ]
+}

@@ -98,10 +98,14 @@ export function createWindfieldEcology(layout: Layout, rocks: WindfieldAnchor[][
     return best;
   };
   let colonySerial=0,localCount=0,globalCount=0;
+  const domainMembers=new Map<string,number>();
+  const remoteQuota=Math.floor(14000/Math.max(1,domains.size-1));
   const growColony=(domain:Domain,cx:number,cz:number,rx:number,rz:number,heading:number,target:number,habit:CoralColony['habit']):void=>{
-    const budget=domain.local?680-localCount:3600-globalCount;
-    target=Math.min(target,budget);if(target<1)return;
-    const lobes=habit==='pocket'?1:3+Math.floor(random()*3),phase=random()*TAU;
+    // Reserve a share for every remote formation so early provinces cannot
+    // consume the entire coral budget and leave the reverse side bare.
+    const budget=domain.local?1800-localCount:Math.min(14000-globalCount,remoteQuota-(domainMembers.get(domain.key)??0));
+    target=Math.min(target,budget,domain.local&&habit==='mat'?Math.max(0,1500-localCount):budget);if(target<1)return;
+    const lobes=habit==='pocket'?1:6+Math.floor(random()*4),phase=random()*TAU;
     const pockets=Array.from({length:lobes},(_,i)=>{
       const along=lobes===1?0:(i/(lobes-1)-.5)*1.3;
       return {x:along*rx,z:Math.sin(i*1.9+phase)*rz*.45,rx:rx*(.35+random()*.3),rz:rz*(.45+random()*.32)};
@@ -129,6 +133,7 @@ export function createWindfieldEcology(layout: Layout, rocks: WindfieldAnchor[][
     const radius=Math.max(...accepted.map(a=>{const [x,z]=coordinate(a);return Math.hypot(x-mean.x,z-mean.z)+a.scale;}));
     colonies.push({id:`coral-field-${colonySerial++}`,anchor,members:accepted.length,radius,habit});
     if(domain.local)localCount+=accepted.length;else globalCount+=accepted.length;
+    domainMembers.set(domain.key,(domainMembers.get(domain.key)??0)+accepted.length);
   };
   for(const domain of domains.values()) {
     if(!domain.hosts.length)continue;
@@ -136,42 +141,45 @@ export function createWindfieldEcology(layout: Layout, rocks: WindfieldAnchor[][
       // Long irregular fields connect several formations. They deliberately
       // leave the village, animal pockets and winding sand path open.
       for(const [x,z,rx,rz,heading,target] of [
-        [-13,40,11,5,.22,145],[-25,22,10,6,-.40,125],
-        [23,33,13,6,.62,145],[-15,-13,13,6,-.62,95],[24,1,8,4,1.1,75],
-      ])growColony(domain,x,z,rx,rz,heading,target,'mat');
+        [-13,40,16,8,.22,220],[-25,22,12,7,-.40,195],
+        [23,33,18,9,.62,220],[-15,-13,15,7,-.62,145],[24,1,10,5,1.1,120],
+        [-28,-35,12,6,.4,95],[21,-48,14,6,-.3,110],
+      ])growColony(domain,x,z,rx,rz,heading,target*2,'mat');
       // A few smaller crowns and sparse ribbons retain differences between
       // lush fields, isolated pockets and empty rock faces.
-      for(let i=0;i<10;i++) {
+      for(let i=0;i<26;i++) {
         const host=domain.hosts[Math.floor(random()*domain.hosts.length)],site=lee(host,Math.floor(random()*3));
         growColony(domain,site[0],site[1]+.9,2+random()*4,.8+random()*2,host.anchor.turn,8+Math.floor(random()*16),i%3===0?'ribbon':'pocket');
       }
     } else {
-      const fertility=random();if(fertility<.27)continue;
+      const fertility=random();
       const largest=domain.hosts.reduce((a,b)=>a.anchor.scale*prototypes[a.type].footprint>b.anchor.scale*prototypes[b.type].footprint?a:b);
       const extent=Math.max(...domain.hosts.map(host=>Math.hypot(host.x-largest.x,host.z-largest.z)+prototypes[host.type].footprint*host.anchor.scale*.35));
       const count=domain.hosts.length;
-      const clusters=count>10?2+(random()<.4?1:0):1;
+      const clusters=count>10?4+(random()<.4?1:0):2;
       for(let c=0;c<clusters;c++) {
         const host=c===0?largest:domain.hosts[Math.floor(random()*count)],site=lee(host,Math.floor(random()*3));
         const habit:CoralColony['habit']=fertility>.73?'mat':random()<.45?'ribbon':'pocket';
-        const rx=habit==='pocket'?2+random()*3:Math.min(15,3+extent*.42)*( .75+random()*.4);
+        const rx=habit==='pocket'?3+random()*4:Math.min(20,5+extent*.55)*( .75+random()*.4);
         const rz=habit==='ribbon'?1+random()*1.7:2+random()*3.5;
-        const target=Math.min(85,Math.round((6+count*2.1)*(habit==='mat'?1.4:.8)));
+        const remaining=remoteQuota-(domainMembers.get(domain.key)??0);
+        const target=Math.min(180,Math.ceil(remaining/(clusters-c)),Math.round((10+count*4.8)*(habit==='mat'?1.4:.9)));
         growColony(domain,site[0],site[1]+.7,rx,rz,host.anchor.turn+(random()-.5)*1.1,target,habit);
       }
     }
     // Sails occupy selected sheltered pockets, not every coral field. Mixed
     // cohorts share a habitat but do not share root points or blade headings.
     for(const host of domain.hosts) {
-      if(host.type===7||random()>(domain.local?.45:.20))continue;
+      if(host.type===7||random()>(domain.local?.96:.92))continue;
       const site=lee(host,Math.floor(random()*prototypes[host.type].leeSites.length));
-      const adultScale=1.03+random()*.82,adultVariant=Math.floor(random()*3),heading=host.anchor.turn+(random()-.5)*2.8;
-      const amount=2+Math.floor(random()*2);
+      const adultScale=1.30+random()*1.10,adultVariant=Math.floor(random()*3),heading=host.anchor.turn+(random()-.5)*2.8;
+      const amount=6+Math.floor(random()*4);
       for(let i=0;i<amount;i++) {
-        const young=i>0,scale=young?adultScale*(.23+random()*.30):adultScale;
-        const side=i===2?-1:1;
-        const x=site[0]+(young?side*(.8+random()*1.3):(random()-.5)*.7)*host.anchor.scale;
-        const z=site[1]+(.6+random()*(young?1.0:.65))*host.anchor.scale;
+        const young=i>1,scale=young?adultScale*(.23+random()*.30):adultScale*(i===1?.78:1);
+        const side=i%2===0?-1:1;
+        const x=site[0]+(i>0?side*(.8+random()*2.2):(random()-.5)*.7)*host.anchor.scale;
+        const z=site[1]+(.6+random()*(young?2.0:1.4))*host.anchor.scale;
+        if(Math.hypot(x-host.x,z-host.z)>=(prototypes[host.type].footprint+3.2)*host.anchor.scale)continue;
         if(inStone(domain,x,z))continue;
         const a=anchorAt(host,x,z,scale,heading+(young?side*(.7+random()*.9):0));
         place(domain,sails,(adultVariant+i)%3,a);

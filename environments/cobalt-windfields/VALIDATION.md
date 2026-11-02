@@ -1,5 +1,186 @@
 # Cobalt Windfields — active validation record
 
+## Visual catalogue — 2 November 2026
+
+User-requested catalogue compiled from the current scene and source geometry.
+`catalogue/index.html` and the 23-page PDF cover 13 rock forms, the three sail
+and three coral habits, three perch plants, native wildlife, residents, ground,
+shelter/props, atmosphere and saved-find forms. 24 fresh world/portrait views
+and 36 source forms in two angles are retained. Source forms are independently
+fitted in fixed studio light, without scene haze, post-processing, live
+articulation or growth deformation; the catalogue states these distinctions.
+
+World captures: 1600×1000, portraits1200×1000, specimens900×750, DPR1, scene
+high/render scale1, seed412/time12. Renderer: Windows RTX4070 SUPER / ANGLE
+D3D11. No collected page/console errors; world/studio WebGL error zero.
+All PDF pages were rendered and visually reviewed; text/presence checks pass.
+Scoped TypeScript/lint passes after removing an unnecessary studio type
+assertion. No gameplay source or shared module was changed for this task.
+Baseline, generation scripts and raw review evidence:
+`handoffs/windows/cobalt-catalogue-20261102-004853/`.
+
+## White clouds with faint yellow tint — 2 November 2026
+
+The user rejected the intervening sky-blue accent and requested white with a
+lighter yellow tint. Current cloud colour blends pale cream `(1.0, 0.98, 0.89)`
+into near-white `(1.0, 1.0, 0.985)` before linear conversion. The explicit blue
+and peach colour terms are removed. Shape, density and motion are unchanged.
+[Current palette](reference/windows-cloud-white.png) shows the actual user
+overview pose. Two hardware captures completed with no collected page/console
+errors and WebGL error zero: Windows RTX4070 SUPER / ANGLE D3D11, 1440×900,
+high quality, DPR/render scale1, frozen time12. The user view was visually
+inspected; no broader suite was rerun for this palette-only edit.
+Baseline and raw review: `handoffs/windows/cobalt-cloud-white-20261102-004507/`.
+The rejected blue experiment remains preserved in
+`handoffs/windows/cobalt-cloud-blue-20261102-004227/`.
+
+## Pale yellow and peach cloud tint — 2 November 2026
+
+After the user said the corrected cloud shape was better, they requested a
+light yellow or light orange tint. The cloud shader now blends pale peach
+shadows `(0.98, 0.80, 0.65)` into light yellow highlights `(1.0, 0.96, 0.80)`
+before linear conversion. Width, geometry and motion retain the reviewed shape.
+[Earlier tint](reference/windows-cloud-tint.png) is actual application evidence
+at the user's latest overview pose. Two hardware browser captures completed
+with no collected page/console errors and WebGL error zero, using Windows
+RTX4070 SUPER / ANGLE D3D11, 1440×900, high quality, DPR/render scale1, time12.
+This palette-only edit was visually checked; no broader suite was rerun.
+Baseline and raw review data: `handoffs/windows/cobalt-cloud-tint-20261102-003804/`.
+
+## Restored cloud shape with moderate width — 2 November 2026
+
+The user rejected the tenfold widening. It is undone; current width is 1.8×
+the preceding soft-cloud revision, retaining that revision's paths, taper,
+density shader and drift. Each ribbon now has two spans across its width,
+with its centre row evaluated on the sphere. Reducing longitudinal segments
+from 96 to 48 preserves the same 3,456 triangles and one draw.
+
+The distortion had a geometric cause: the old two-edge mesh spanned flat
+chords between spherical edge vertices. At tenfold width the face interiors
+could sink inside the planet and be clipped. The enlarged bands also
+overlapped heavily. The earlier test checked vertex radii but missed face
+interiors. A new regression probes triangle centroids and edge midpoints for
+seeds 412/413/5 at R40/128/400, retaining the existing triangle budget and
+requiring the faces to stay near the cloud shell and above the planet.
+
+All **three affected cloud tests, scoped TypeScript/lint and production build
+pass**; the existing build chunk warning remains. Inspected actual-app views:
+[user angle](reference/windows-cloud-shape-user.png) and
+[reverse hemisphere](reference/windows-cloud-shape-reverse.png). Both were
+captured at 1440×900, high quality, DPR/render scale 1, time12, Windows RTX4070
+SUPER / ANGLE D3D11, with no collected page/console errors and WebGL error0.
+An additional frozen orbit repeats exactly and returns to the same hash
+after time12→40→12. The full unrelated browser/CPU suites were not repeated.
+Visual acceptance remains open. Vegetation and geology retain the prior work.
+
+Baseline, captures and raw probe data:
+`handoffs/windows/cobalt-cloud-shape-20261102-003041/`.
+
+## Rejected tenfold cloud width — 2 November 2026 (historical)
+
+The user requested clouds 10× thicker. This attempt made the ribbon half-width
+exactly ten times the preceding revision (.40–.75 radians before taper),
+retaining the soft density shader, drift, depth occlusion and ground fade.
+[Rejected overview](reference/windows-clouds-10x.png) shows the resulting
+broad cloud cover. Both cloud geometry/growth tests pass. One actual-app
+capture at 1440×900, high quality, DPR/render scale 1 and time12 on RTX4070SUPER /
+ANGLE D3D11 completed with no collected page/console errors and WebGL error0.
+No full-suite or performance result is inferred from this small visual edit.
+Baseline and capture data: handoffs/windows/cobalt-cloud-10x-20261102-002335/.
+
+## Fuller clouds and additional planting — 2 November 2026
+
+Follow-up to the user's requests for thicker, more cloud-like strips and still
+more vegetation. The spherical cloud strips are roughly three times wider,
+with soft scalloped density, wispy edges and subtle ivory/grey shading. They
+retain their finite tapered paths, time-driven drift and globe occlusion.
+
+Seed 412 now plans **3,290 sails and 12,603 coral roots**, compared with 1,124
+and 7,467 in the preceding Windows revision. These are pre-clearance/growth/view
+counts. Larger mixed-age sail cohorts and multiple coral pockets per remote
+formation spread the planting. Mature sails range from 1.3–2.4 authored scale;
+the default unbloomed scenery scale rises from .55 to .85 so remote vegetation
+remains legible. Bloom still unfolds plants to their full authored scale.
+Route, root-spacing, host-envelope and exact rock-clearance checks remain.
+The coral ceilings are now 1,800 local and 14,000 remote roots, with a local
+reserve for small pockets. The distant coral template is reduced from 108 to
+52 triangles, preserving its branching volume and exact accepted root set;
+the existing 600,000-triangle distant-coral assertion still passes unchanged.
+
+Fresh actual-app views: [ground planting](reference/windows-fuller-plants-ground.png),
+[cloud overview](reference/windows-fuller-clouds-planet.png), and
+[latest user pose](reference/windows-fuller-clouds-user.png). Windows RTX 4070
+SUPER / ANGLE D3D11, 1440 × 900, high quality, DPR/render scale 1, frozen time
+12 s. All five collected views report WebGL error zero and no collected
+console/page errors. Opening/overview submissions are about 5.20/1.43 million
+triangles; denser plants increase rendering work. These observations do not
+establish a sustained performance result or resolve the specimen memory issue.
+
+**84 CPU tests, scoped TypeScript/lint, production build and all 14 targeted
+hardware browser checks pass.** The fixed-scale orbit repeats exactly and
+returns to its initial hash after time 12 → 40 → 12. The build retains the
+existing chunk-size warning. Initial CPU failures exposed crowding outside
+the sail host envelope and exhausted small-colony reserves; generation was
+corrected while preserving those checks. Sandbox capture initially could not
+find the existing browser or reach localhost; the final run used the installed
+browser and approved local network access. No shared engine or other world
+files changed. Visual acceptance and the previously documented limits remain open.
+
+Recoverable starting dirty state and review data:
+`handoffs/windows/cobalt-cloud-plants-20261102-001308/` in the Windows workspace.
+
+## Windows vegetation, globe coverage and cirrus revision — 2 November 2026
+
+The requested continuation adds denser ivory sail cohorts and larger red coral
+fields, fills remote gaps with irregular rock formations, and adds thin cirrus
+strips that physically wrap around the planet. Visual acceptance remains open.
+
+- Geology now has thirteen prototypes, adding a wind-carved shoulder, narrow
+  leaning blade, eroded low peninsula and chipped mineral boulder. Twenty-two
+  uneven provinces, scattered remnants and a stratified directional gap survey
+  increase coverage without replacing the authored settlement. The seed-412
+  plan contains 3,012 rocks, 1,124 sails and 7,467 coral roots before growth,
+  geometric clearance and view culling; these are not simultaneous draw counts.
+- Local coral has a 1,100-root ceiling and remote coral a 7,200-root ceiling.
+  Remote formations receive individual shares so early provinces cannot exhaust
+  planting and leave the reverse side bare. Cohorts mix adult and young sails;
+  sail coverage no longer disappears at a fixed angular distance. Existing
+  route clearance, root spacing and exact curved-rock exclusion remain active.
+- Eighteen seeded, tapered spherical cloud ribbons drift with frozen-world
+  time, share the planet warp and use depth testing to pass behind the globe.
+  They use 3,456 triangles in one draw, fading away near the ground so the
+  reference sky and foreground foliage stay readable.
+
+Current actual application evidence: [ground](reference/windows-lush-ground.png),
+[user overview](reference/windows-lush-planet.png), and
+[reverse hemisphere](reference/windows-lush-reverse.png). Captured on Windows,
+NVIDIA RTX 4070 SUPER, ANGLE Direct3D11, 1440 × 900, high quality, DPR/render
+scale 1, time frozen at 12 s. No collected page/console errors; all three
+recorded views report WebGL error zero. Draw/triangle observations are not
+a sustained frame-rate measurement. The opening submits about 3.23 million
+triangles; the overview about 0.90 million. Richer scenery increases rendering
+cost and does not resolve the separate 400-find memory-budget failure.
+
+Validation: **84 CPU tests pass**, including sphere-wide directional coverage
+for seeds 412/5/413, cloud geometry/growth, existing root-clearance ray checks,
+surface conflicts, routes and distant coral coverage. **Scoped TypeScript/lint,
+production build and all 14 targeted browser checks pass.** The build retains
+the existing large-chunk warning. Browser runs explicitly use ANGLE D3D11 on
+Windows, not Metal or SwiftShader; existing assertions and image thresholds
+remain unchanged. The historical cross-formation root regression now pins its
+original offending transform instead of a mutable distribution ordinal.
+
+An additional orbit probe with render scale explicitly fixed to 1 repeats
+exactly and returns to the same hash after time 12 → 40 → 12. Its initial
+unfixed/warmup attempt differed; it is retained as failed evidence rather than
+counted as passing. A browser attempt without explicit hardware launch flags
+stalled and was stopped; SwiftShader behavior remains unverified. No shared
+source, other environment or backend files changed. Broader ecosystem,
+account-backed travel, shelter refinement and visual acceptance remain open.
+
+Full baseline, capture helpers, settings, population counts and probe results:
+`handoffs/windows/cobalt-lush-20261101-235627/` in the Windows parent workspace.
+
 Updated 1 November 2026. **Visual acceptance remains open.** The latest revision varies rock fractures and formation footprints, expands coral into large irregular colonies, and retains coral coverage in distant views. The standalone environment passes **79 CPU tests**, scoped and repository-wide checks, **14 targeted browser checks**, the production build and built-page smoke check. Geology, shelter and distant terrain remain more angular and simplified than the references.
 
 ## References and starting evidence

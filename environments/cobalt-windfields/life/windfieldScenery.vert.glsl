@@ -37,7 +37,7 @@ void main(){
    flourish=max(flourish,1.0-smoothstep(disc.w*0.7,disc.w,gap));
   }
  }
- if(aKind<1.5||aKind>2.5&&aKind<3.5)p*=mix(0.55,1.0,flourish);
+ if(aKind<1.5||aKind>2.5&&aKind<3.5)p*=mix(0.85,1.0,flourish);
  vec3 wind=cross(uWindVec.xyz,U);
  float breath=0.7+0.3*sin(uSceneryTime*0.8+aPlacement.y);
  if(aKind<1.5){

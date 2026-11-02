@@ -2,9 +2,21 @@
 
 A standalone playable world: peach sand, varied fractured cobalt outcrops, curved ivory seed sails, large coral fields and sheltered pockets, a rough slate shelter and the two-slab Wind Window. Pip, Juniper and Marlo live near the shelter. Sailbacks walk and open their sails, Kitelets flutter and perch, Sand Stitchers carry dry stems, and light seeds drift through the stone gap.
 
+The outdoor Muse prop shaders are local copies so mainline's indoor-hut
+changes preserve Cobalt's porch stove and warm fire window.
+
+The Windows continuation expands planted colonies and remote geology across
+the globe, with thirteen rock forms and thin drifting cirrus ribbons wrapping
+the planet in orbit. The ribbons fade from close ground views. Current visual
+evidence and Windows validation settings are recorded in `VALIDATION.md`.
+
 The environment began from the Muse body and animation engine at commit `fb21a13`, with locally copied dry-world infrastructure, and is integrated on main commit `ad37acf`. Its saved-find and grass shaders retain local compatible copies so newer meadow shader changes do not change their data contracts. All world-specific code is inside this folder. Shared `src/`, the meadow, Scarlet Sail Canyon and Violet Dunes are not edited by this world.
 
 ## Open
+
+The current [visual catalogue](catalogue/index.html) includes planet views,
+two-angle specimen plates, terrain, wildlife and residents. A 23-page
+[PDF edition](catalogue/output/pdf/cobalt-windfields-catalogue.pdf) is included.
 
 From the repository root, start the development server:
 

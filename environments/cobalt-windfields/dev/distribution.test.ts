@@ -55,6 +55,24 @@ function coralCoverage(scenery: WindfieldScenery): Map<string,number> {
 }
 
 describe('Cobalt distribution diversity and distant coverage', () => {
+  it.each([412,5,413])('fills remote angular gaps with rock and planted formations for seed %i',seed=>{
+    const layout=generateLayout(seed),plan=createWindfieldAnchors(layout,prototypes);
+    const rocks=plan.rocks.flat().filter(anchor=>!anchor.local);
+    expect(rocks.length).toBeGreaterThan(1200);
+    expect(plan.sails.flat().filter(anchor=>!anchor.local).length).toBeGreaterThan(500);
+    // Probe actual directional coverage independently of province labels.
+    // Home has its own authored valley and is excluded from this global check.
+    let widestGap=0;
+    for(let i=0;i<360;i++) {
+      const y=1-2*(i+.5)/360,angle=i*2.399963229728653,r=Math.sqrt(1-y*y);
+      const point=layout.cottage.clone().set(r*Math.cos(angle),y,r*Math.sin(angle));
+      if(point.dot(layout.cottage)>Math.cos(.65))continue;
+      const nearest=Math.max(...rocks.map(anchor=>point.dot(anchor.direction)));
+      widestGap=Math.max(widestGap,Math.acos(Math.min(1,nearest)));
+    }
+    expect(widestGap).toBeLessThan(.42);
+  });
+
   it.each([412,5,413])('places visibly different rock group sizes, extents and shapes for seed %i', seed => {
     const plan=createWindfieldAnchors(generateLayout(seed),prototypes);
     const formations=globalFormations(plan.rocks);

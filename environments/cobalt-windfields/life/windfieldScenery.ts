@@ -147,6 +147,7 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
       const rotatedZ=x*Math.sin(heading)+z*Math.cos(heading);
       const selection=rand();
       let type=selection<.28?7:selection<.48?4:selection<.64?2:selection<.77?0:selection<.90?3:1;
+      if(selection>.54&&rand()<.48)type=9+Math.floor(rand()*4);
       // Few tall signatures, many low fragments; a large cluster is not a
       // scaled copy of a small one with the same number of peaks.
       if(i===0&&count>14&&rand()<.60)type=[5,6,8][Math.floor(rand()*3)];
@@ -179,9 +180,9 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
     return home.clone().multiplyScalar(y).addScaledVector(right,Math.cos(angle)*r).addScaledVector(forward,Math.sin(angle)*r).normalize();
   };
   const provinces:Vector3[]=[];
-  for(let attempt=0;provinces.length<13&&attempt<1000;attempt++) {
+  for(let attempt=0;provinces.length<22&&attempt<1800;attempt++) {
     const centre=sphere();
-    if(centre.dot(home)>.91||provinces.some(other=>other.dot(centre)>.91))continue;
+    if(centre.dot(home)>.91||provinces.some(other=>other.dot(centre)>.95))continue;
     provinces.push(centre);
   }
   const centres:Vector3[]=[];
@@ -200,7 +201,7 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
     const axis=new Vector3().crossVectors(province,Math.abs(province.y)<.9?UP:SIDE).normalize();
     const second=new Vector3().crossVectors(axis,province).normalize();
     const reach=.17+rand()*.38,heading=rand()*TAU;
-    const families=3+Math.floor(rand()*7);
+    const families=5+Math.floor(rand()*7);
     for(let i=0;i<families;i++) {
       const radius=Math.pow(rand(),.7)*reach,angle=rand()*TAU;
       const centre=province.clone().multiplyScalar(Math.cos(radius)).addScaledVector(axis,Math.sin(radius)*Math.cos(angle)).addScaledVector(second,Math.sin(radius)*Math.sin(angle)).normalize();
@@ -213,7 +214,15 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
   }
   // Remnants outside the main provinces make the transition to empty sand
   // uneven instead of repeating the same gap around every large group.
-  for(let i=0;i<24;i++)populate(sphere(),rand()*TAU,1+Math.floor(rand()*4),3+rand()*7,1+rand()*2,rand()<.4?0:1);
+  for(let i=0;i<48;i++)populate(sphere(),rand()*TAU,1+Math.floor(rand()*5),3+rand()*9,1+rand()*2,rand()<.4?0:1);
+  // A stratified sphere-wide survey fills the widest bare gaps, while keeping
+  // small sand clearings between deposits and the authored settlement intact.
+  for(let i=0;i<100;i++) {
+    const y=1-2*(i+.5)/100,angle=i*2.399963229728653+layout.seed*.17,r=Math.sqrt(1-y*y);
+    const centre=home.clone().multiplyScalar(y).addScaledVector(right,Math.cos(angle)*r).addScaledVector(forward,Math.sin(angle)*r).normalize();
+    if(centres.some(other=>other.dot(centre)>Math.cos(.14)))continue;
+    populate(centre,rand()*TAU,6+Math.floor(rand()*10),13+rand()*14,.9+rand()*1.8,rand()<.3?0:1);
+  }
 
   for(let i=0;i<14;i++) {
     const anchor=local(-8,-12+(i%4)*1.3,0.55+rand()*0.55);
@@ -419,7 +428,8 @@ export class WindfieldScenery {
             if(batch.role==='coral'?detail<=0:detail>=1)continue;
             coralLod=(batch.role==='coral'?1:-1)*(1+detail);
           }
-          if(batch.role==='sail'&&dot<Math.cos(Math.min(Math.PI,220/R))) continue;
+          // Sails remain visible across the globe; back-facing instances are
+          // already culled above and depth testing hides the far hemisphere.
           if(batch.role==='seed'&&altitude>65) continue;
         }
         if(!cameraDirection&&batch.role==='coral-far')continue;

@@ -2,7 +2,7 @@ import { Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Ray, Sphere,
 import { afterAll, describe, expect, it } from 'vitest';
 import { WindfieldRootClearance } from '../life/windfieldRootClearance';
 import { makeGeologyPrototypes } from '../life/windGeology';
-import { createWindfieldAnchors, WindfieldScenery } from '../life/windfieldScenery';
+import { WindfieldScenery } from '../life/windfieldScenery';
 import { createGroundSample, generateLayout, Terrain } from '../planet/terrain';
 import type { FieldParams } from '../planet/fields';
 
@@ -71,9 +71,10 @@ describe('Cobalt roots across neighbouring rock formations',()=>{
 
   it('detects the seed-412 coral root covered by a different formation at radius 128',()=>{
     const terrain=new Terrain(generateLayout(412));terrain.update(128,params,.5);
-    const plan=createWindfieldAnchors(terrain.layout,prototypes);
-    const foreign=plan.rocks.flatMap((anchors,type)=>anchors.map(anchor=>({anchor,type}))).find(r=>r.anchor.id==='rock-376')!;
-    const a=foreign.anchor,[lx,lz]=a.offset!,distance=Math.hypot(lx,lz);
+    // Pin the original offending transform, rather than an ordinal ID in the
+    // current distribution: adding formations must not erase this regression.
+    const foreign={type:4,anchor:{direction:new Vector3(.42256442289718676,.7154489379568042,.556392061120617),offset:[-1.7497061737131108,-13.013452792479999],scale:.7535468751280983,turn:1.3566444898777623}};
+    const a=foreign.anchor,[lx,lz]=a.offset,distance=Math.hypot(lx,lz);
     const x=new Vector3().crossVectors(a.direction,Math.abs(a.direction.y)<.9?up:across).normalize(),z=new Vector3().crossVectors(x,a.direction).normalize();
     const direction=a.direction.clone().multiplyScalar(Math.cos(distance/128)).addScaledVector(x,lx/distance*Math.sin(distance/128)).addScaledVector(z,lz/distance*Math.sin(distance/128)).normalize();
     x.addScaledVector(direction,-x.dot(direction)).normalize();z.crossVectors(x,direction).normalize();
