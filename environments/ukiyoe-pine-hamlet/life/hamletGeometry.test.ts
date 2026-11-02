@@ -1,8 +1,8 @@
-import { InstancedBufferGeometry, Mesh, Vector3, type LineSegments } from 'three';
+import { InstancedBufferGeometry, Mesh, Ray, Vector3, type LineSegments } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { FieldParams } from '../planet/fields';
 import { generateLayout, Terrain } from '../planet/terrain';
-import { createHamletAssets, HAMLET_KIND } from './hamletGeometry';
+import { barleyGeometry, cedarGeometry, createHamletAssets, grassGeometry, HAMLET_KIND, pineGeometry, plumGeometry } from './hamletGeometry';
 import { HamletScenery } from './hamletScenery';
 
 const fields: FieldParams = { roll: 1.8, hummocks: 0.12, wetlands: 0.25, waterLevel: 0, grain: 0.4, density: 0.6, patchiness: 0.8, patchSize: 13, weights: [0, 0, 0, 0] };
@@ -48,7 +48,7 @@ describe('ukiyoe natural scenery', () => {
     const terrain = terrainAt(), scenery = new HamletScenery({}, terrain);
     for (const radius of [40, 128, 400]) {
       terrain.update(radius, fields, radius / 256); scenery.update(12, terrain);
-      expect(meshes(scenery)).toHaveLength(7);
+      expect(meshes(scenery)).toHaveLength(9);
       expect(scenery.triangleCount).toBeLessThan(1_500_000);
       expect(scenery.triangleCount).toBeGreaterThan(20_000);
       for (const mesh of meshes(scenery)) {
@@ -75,6 +75,10 @@ describe('ukiyoe natural scenery', () => {
         const chart = geometry.getAttribute('uv'), style = geometry.getAttribute('aPrintStyle'), kind = geometry.getAttribute('aKind'), lobe = geometry.getAttribute('aLobe');
         expect(lobe.count).toBe(position.count);
         expect(Array.from(lobe.array).every(Number.isFinite)).toBe(true);
+        const lobeTurn = geometry.getAttribute('aLobeTurn');
+        expect(lobeTurn.count).toBe(position.count);
+        expect(Array.from(lobeTurn.array).every(Number.isFinite)).toBe(true);
+        for (let i = 0; i < style.count; i++) if (style.getX(i) < 20) expect(lobeTurn.getX(i)).toBe(0);
         expect(chart.count).toBe(position.count);
         expect(style.count).toBe(position.count);
         expect(Array.from(chart.array).every(Number.isFinite)).toBe(true);
@@ -87,7 +91,6 @@ describe('ukiyoe natural scenery', () => {
         // A repeated (0,0)-(1,0)-(0,1) chart would put print seams along every
         // triangle. Tube arc lengths and crown charts must carry real extent.
         if (name === 'pine' || name === 'cedar') {
-          const family = name === 'pine' ? 0 : 1;
           const needleStyles = new Set(Array.from({ length: kind.count }, (_, i) => kind.getX(i) === HAMLET_KIND.needle ? style.getX(i) : -1));
           if (name === 'pine') {
             // Each pine lobe has its own normalised 3D fan coordinates; there
@@ -96,8 +99,9 @@ describe('ukiyoe natural scenery', () => {
             expect(Array.from(lobe.array).reduce((a, b) => Math.max(a, b), -Infinity)).toBeCloseTo(1, 5);
             expect(Array.from(lobe.array).reduce((a, b) => Math.min(a, b), Infinity)).toBeCloseTo(-1, 5);
           } else {
-            expect(needleStyles.has(family)).toBe(true);
-            expect(needleStyles.has(family + 10)).toBe(true);
+            // Cedars now share rounded, locally mapped clouds rather than
+            // retaining the old angular pads and projecting needle cards.
+            expect([...needleStyles].filter(s => s >= 0).every(s => s >= 21 && s < 22)).toBe(true);
           }
           expect(Array.from(chart.array).reduce((a, b) => Math.max(a, b), -Infinity)).toBeGreaterThan(5);
         }
@@ -105,6 +109,80 @@ describe('ukiyoe natural scenery', () => {
         expect(Array.from(asset.ink.getAttribute('aKind').array).every(k => k === HAMLET_KIND.slate)).toBe(true);
         asset.geometry.dispose(); asset.ink.dispose();
       }
+    }
+  });
+
+  it.each([['plum', plumGeometry, 28], ['cedar', cedarGeometry, 40]] as const)('embeds every %s branch and twig base inside its actual emitted parent', (_, create, junctionCount) => {
+    const asset = create(), geometry = asset.geometry;
+    const position = geometry.getAttribute('position');
+    const trunkRange = geometry.userData.branchTrunkRange as [number, number];
+    const junctions = geometry.userData.branchJunctions as { center: number[]; ring: number[][]; parentRange?: [number, number] }[];
+    expect(junctions).toHaveLength(junctionCount);
+    const ray = new Ray(), a = new Vector3(), b = new Vector3(), c = new Vector3(), hit = new Vector3();
+    for (const junction of junctions) for (const point of [junction.center, ...junction.ring]) {
+      const [start, count] = junction.parentRange ?? trunkRange;
+      ray.origin.fromArray(point);
+      for (const direction of [new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1)]) {
+        ray.direction.copy(direction);
+        let distance = Infinity;
+        for (let i = start; i < start + count; i += 3) {
+          a.fromBufferAttribute(position, i); b.fromBufferAttribute(position, i + 1); c.fromBufferAttribute(position, i + 2);
+          if (ray.intersectTriangle(a, b, c, false, hit)) distance = Math.min(distance, hit.distanceTo(ray.origin));
+        }
+        expect(distance, `Detached branch junction at ${point.join(',')}`).toBeGreaterThan(0.001);
+        expect(distance).toBeLessThan(0.50);
+      }
+    }
+    geometry.dispose(); asset.ink.dispose();
+  });
+
+  it('provides a low-cost rooted living grass asset distinct from dry reeds', () => {
+    const grass = grassGeometry(), geometry = grass.geometry;
+    expect(geometry.getAttribute('position').count / 3).toBeLessThan(250);
+    expect(Array.from(geometry.getAttribute('aPrintStyle').array).every(s => s === 15)).toBe(true);
+    expect(Array.from(geometry.getAttribute('aGround').array)).toContain(1);
+    expect(Array.from(geometry.getAttribute('aKind').array).every(k => k === HAMLET_KIND.reed)).toBe(true);
+    geometry.dispose(); grass.ink.dispose();
+  });
+
+  it('rounds exposed snow over its support instead of ending in a vertical plate', () => {
+    const assets = createHamletAssets();
+    for (const name of ['plum', 'reeds', 'rock'] as const) {
+      const geometry = assets[name].geometry;
+      const kind = geometry.getAttribute('aKind'), normal = geometry.getAttribute('normal');
+      const snowUp = Array.from({ length: kind.count }, (_, i) => kind.getX(i) === HAMLET_KIND.snow ? normal.getY(i) : NaN).filter(Number.isFinite);
+      expect(Math.min(...snowUp), `${name}: no snow drape below the outer rim`).toBeLessThan(-0.1);
+      expect(Math.max(...snowUp), `${name}: no rounded upper snow surface`).toBeGreaterThan(0.7);
+      expect(new Set(snowUp.map(n => n.toFixed(2))).size).toBeGreaterThan(10);
+    }
+    for (const asset of Object.values(assets)) { asset.geometry.dispose(); asset.ink.dispose(); }
+  });
+
+  it('gives the cultivated barley compact solid heads within the clump budget', () => {
+    const asset = barleyGeometry(), geometry = asset.geometry;
+    const position = geometry.getAttribute('position'), kind = geometry.getAttribute('aKind'), normal = geometry.getAttribute('normal');
+    expect(position.count / 3).toBeLessThanOrEqual(450);
+    expect(position.count / 3).toBeGreaterThan(300);
+    expect(geometry.boundingBox!.max.y).toBeGreaterThan(0.9);
+    expect(geometry.boundingBox!.max.y).toBeLessThan(1.12);
+    expect(Array.from(kind.array).every(k => k === HAMLET_KIND.reed)).toBe(true);
+    expect(Array.from(geometry.getAttribute('aGround').array).filter(g => g === 1).length).toBeGreaterThan(6);
+    for (let i = 0; i < position.count; i += 3) {
+      const a = new Vector3().fromBufferAttribute(position, i), b = new Vector3().fromBufferAttribute(position, i + 1), c = new Vector3().fromBufferAttribute(position, i + 2);
+      expect(b.sub(a).cross(c.sub(a)).lengthSq()).toBeGreaterThan(1e-14);
+      expect(new Vector3().fromBufferAttribute(normal, i).length()).toBeCloseTo(1, 5);
+    }
+    geometry.dispose(); asset.ink.dispose();
+  });
+
+  it('uses downward normals on evergreen snow undersides rather than dome normals', () => {
+    for (const create of [pineGeometry, cedarGeometry]) {
+      const asset = create(), geometry = asset.geometry;
+      const kind = geometry.getAttribute('aKind'), normal = geometry.getAttribute('normal');
+      let downward = 0;
+      for (let i = 0; i < kind.count; i++) if (kind.getX(i) === HAMLET_KIND.snow && normal.getY(i) < -0.5) downward++;
+      expect(downward).toBeGreaterThan(30);
+      geometry.dispose(); asset.ink.dispose();
     }
   });
 

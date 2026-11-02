@@ -4,9 +4,10 @@ import { expect, test, type Page } from '@playwright/test';
 import type { WebGLRenderer } from 'three';
 import type {} from '../../../src/dev/harnessApi';
 import type { World } from '../world';
+import { DETAIL_VIEWS } from './detailViews';
 
 const REPORTED_POSE = '0.1045,-0.3585,0.6614,0.6505,0.83';
-const VIEWS = ['reported', 'home', 'bridge', 'pine'] as const;
+const VIEWS = ['reported', 'home', 'bridge', 'pine', 'steps', 'plum', 'cedar', 'roof', 'water'] as const;
 type View = typeof VIEWS[number];
 type Season = 'snow' | 'rain';
 
@@ -17,7 +18,7 @@ type Season = 'snow' | 'rain';
  * bound catches patches disappearing for one frame, not every moving ink edge.
  */
 async function inspectView(page: Page, view: View, season: Season) {
-  return page.evaluate(async ({ view, season, reportedPose }) => {
+  return page.evaluate(async ({ view, season, reportedPose, details }) => {
     const m = window.__meadow!;
     const w = (window as unknown as { __world: World }).__world;
     const renderer = (w as unknown as { renderer: WebGLRenderer }).renderer;
@@ -30,7 +31,12 @@ async function inspectView(page: Page, view: View, season: Season) {
       const capture = w as unknown as { frameLocal(view: { at: readonly number[]; height: number; distance: number; azimuth: number }, immediate: boolean): void };
       capture.frameLocal({ at: [-9, 6.6, -3], height: 7.2, distance: 13, azimuth: 0.6 }, true);
       w.markPosed();
-    } else w.cameraPreset(view);
+    } else if (view === 'home' || view === 'bridge') w.cameraPreset(view);
+    else {
+      const capture = w as unknown as { frameLocal(view: { at: readonly number[]; height: number; distance: number; azimuth: number }, immediate: boolean): void };
+      capture.frameLocal(details[view], true);
+      w.markPosed();
+    }
     m.freeze(12);
     // Freeze first: otherwise the adaptive controller can undo the pinned scale.
     m.setScale(1);
@@ -85,9 +91,14 @@ async function inspectView(page: Page, view: View, season: Season) {
     const initialFrame = w.rig.frame.clone(), up = w.rig.up.clone(), zoom = w.rig.zoom;
     const windowFrames: Float32Array[] = [];
     const frames = [];
+    // Rig yaw rotates its focus over the planet, moving the camera as well as
+    // turning it. Match the new close views' projected motion to the historical
+    // 13m pine view; a fixed panorama increment over-translates a 3.8m detail.
+    // Historical cameras and every stability threshold remain unchanged.
+    const detailDistance = view in details ? details[view as keyof typeof details].distance : 13;
+    const yawStep = 0.003 * Math.min(1, detailDistance / 13);
     for (let index = 0; index < 9; index++) {
-      // +/- 0.69 degrees, with no animated time or pitch change mixed in.
-      const yaw = (index - 4) * 0.003;
+      const yaw = (index - 4) * yawStep;
       const q = initialFrame.clone().premultiply(initialFrame.clone().setFromAxisAngle(up, yaw));
       w.rig.applyPose([q.x, q.y, q.z, q.w, zoom].join(','));
       await m.settle();
@@ -124,13 +135,13 @@ async function inspectView(page: Page, view: View, season: Season) {
       renderer: String(gl.getParameter(debugRenderer?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER)),
     };
     return { width, height, view, season, state, referencePng, redraws, frames };
-  }, { view, season, reportedPose: REPORTED_POSE });
+  }, { view, season, reportedPose: REPORTED_POSE, details: DETAIL_VIEWS });
 }
 
 for (const dpr of [1, 2]) test.describe(`frame stability at DPR ${dpr}`, () => {
   test.use({ viewport: { width: 960, height: 600 }, deviceScaleFactor: dpr });
 
-  for (const season of ['snow', 'rain'] as const) test(`${season}: reported pose, house, bridge, and pine remain stable`, async ({ page }) => {
+  for (const season of ['snow', 'rain'] as const) test(`${season}: reported pose and close surface details remain stable`, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -146,7 +157,9 @@ for (const dpr of [1, 2]) test.describe(`frame stability at DPR ${dpr}`, () => {
       mkdirSync(directory, { recursive: true });
       const save = (name: string, data: string): void => writeFileSync(join(directory, name), Buffer.from(data.split(',')[1], 'base64'));
       save('reference.png', evidence.referencePng);
-      for (const frame of evidence.frames) save(`f${String(frame.index).padStart(3, '0')}.png`, frame.image);
+      // Retain beginning/middle/end visual evidence; all nine frames still
+      // participate in the unchanged pixel/motion assertions below.
+      for (const frame of evidence.frames) if (frame.index % 4 === 0) save(`f${String(frame.index).padStart(3, '0')}.png`, frame.image);
       const metrics = { ...evidence, referencePng: undefined, frames: evidence.frames.map(({ image: _image, ...frame }) => frame) };
       writeFileSync(join(directory, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`);
       await test.info().attach(`${season}-${view}-dpr-${dpr}`, { path: join(directory, 'reference.png'), contentType: 'image/png' });
@@ -160,7 +173,7 @@ for (const dpr of [1, 2]) test.describe(`frame stability at DPR ${dpr}`, () => {
       for (const frame of evidence.frames) {
         expect(frame.repeat, `${season}/${view} sweep ${frame.index} changed without camera motion`).toEqual({ changed: 0, over16: 0, max: 0 });
         expect(frame.deviation, 'a blank frame must not count as stable').toBeGreaterThan(12);
-        expect(frame.adjacentMeanDelta, 'a 0.17-degree turn should not replace a large part of the frame').toBeLessThan(8);
+        expect(frame.adjacentMeanDelta, 'a small camera movement should not replace a large part of the frame').toBeLessThan(8);
         expect(frame.flashShare, 'a large patch disappeared and returned in one frame').toBeLessThan(0.015);
       }
     }

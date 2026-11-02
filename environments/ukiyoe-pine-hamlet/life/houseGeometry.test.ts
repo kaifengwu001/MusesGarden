@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Ray, Vector3, type BufferGeometry } from 'three';
-import { BRIDGE, COTTAGE, FACE, FLOOR, ROOF, SIDE, STEPS, TERRACE, bridgeDeckHeight, createHouseGeometry, walkableHeightAt } from './props';
+import { ParamStore } from '../params';
+import { generateLayout, Terrain } from '../planet/terrain';
+import type { FieldParams } from '../planet/fields';
+import { residentDirection } from './residentLife';
+import { BRIDGE, COTTAGE, FACE, FLOOR, ROOF, SIDE, STEPS, TERRACE, bridgeDeckHeight, createHouseGeometry, roofTileHeightAt, walkableHeightAt } from './props';
 
 const a=new Vector3(),b=new Vector3(),c=new Vector3(),point=new Vector3();
 function verticalHits(geometry:BufferGeometry,x:number,z:number):number[]{
@@ -47,6 +51,33 @@ describe('Ukiyo-e home and timber bridge',()=>{
       expect(top).toBeCloseTo(expected,6);
       expect(expected).toBeCloseTo(FLOOR-(i+1)*STEPS.rise,6);
     }
+    geometry.forEach(g=>g.dispose());
+  });
+
+  it('places every complete stair tread above analytical terrain instead of sharing the snow surface',()=>{
+    const geometry=createHouseGeometry({bridge:false,furniture:false}),stone=geometry.get('stone')!;
+    const samples: Array<{x:number;z:number;y:number}>=[];
+    for(let step=0;step<STEPS.count;step++)for(let ix=0;ix<17;ix++)for(let iz=0;iz<7;iz++) {
+      const x=STEPS.x0+(STEPS.x1-STEPS.x0)*(ix+0.317)/17;
+      const z=TERRACE.z1+(step+(iz+0.193)/7)*STEPS.tread;
+      const expected=walkableHeightAt(x,z)!;
+      const tops=verticalHits(stone,x,z);
+      expect(tops,`one stone top at ${x},${z}`).toHaveLength(1);
+      expect(tops[0]).toBeCloseTo(expected,6);
+      samples.push({x,z,y:tops[0]});
+    }
+    const p=new ParamStore().values;
+    const fields:FieldParams={roll:p.terrain.roll,hummocks:p.terrain.hummocks,wetlands:p.terrain.wetlands,waterLevel:p.terrain.waterLevel,grain:p.terrain.grain,density:0,patchiness:p.flowers.patchiness,patchSize:p.flowers.patchSize,weights:[0,0,0,0]};
+    for(const radius of [40,128,400])for(const seed of [166,412,990]) {
+      const terrain=new Terrain(generateLayout(seed));terrain.update(radius,fields,radius/256);
+      for(const {x,z,y} of samples) {
+        const ground=terrain.height(residentDirection(terrain,x,z));
+        const clearance=terrain.cottageGround+y-ground;
+        expect(clearance,`R${radius} seed${seed} stair ${x},${z}`).toBeGreaterThan(0.17);
+      }
+    }
+    // Three visible treads and the veranda make four equal physical risers.
+    expect(FLOOR-STEPS.count*STEPS.rise).toBeCloseTo(STEPS.rise,8);
     geometry.forEach(g=>g.dispose());
   });
 
@@ -143,7 +174,7 @@ describe('Ukiyo-e home and timber bridge',()=>{
       const clearance=y-roofY;
       expect(clearance).toBeGreaterThan(-1e-5);
       expect(clearance).toBeLessThan(0.21);
-      if(Math.abs(clearance)<1e-5)contacts++;
+      if(Math.abs(y-roofTileHeightAt(p.getX(i),p.getZ(i)))<1e-5)contacts++;
     }
     expect(contacts).toBeGreaterThan(100);
     for(let i=0;i<15;i++){
@@ -167,6 +198,31 @@ describe('Ukiyo-e home and timber bridge',()=>{
       expect(hits,`single ridge cover ${x},${z}`).toHaveLength(1);
       expect(hits[0].y).toBeGreaterThan(5.72); // Clears the actual raised ridge tiles.
     }
+    geometry.forEach(g=>g.dispose());
+  });
+
+  it('gives the roof snow a real cool underside and supports the unequal stair drifts',()=>{
+    const geometry=createHouseGeometry({bridge:false,furniture:false}),snow=geometry.get('snow')!;
+    const p=snow.getAttribute('position'),n=snow.getAttribute('normal');
+    let lowerArea=0,stairContacts=0;
+    for(let i=0;i<p.count;i+=3){
+      if([i,i+1,i+2].every(j=>p.getY(j)>ROOF.eave&&Math.abs(p.getZ(j))>1&&n.getY(j)<0.1)){
+        a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);
+        lowerArea+=b.sub(a).cross(c.sub(a)).length()*0.5;
+      }
+    }
+    // A zero-area normal at the edge cannot produce the reference's visible lip.
+    expect(lowerArea).toBeGreaterThan(0.25);
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),z=p.getZ(i),y=p.getY(i);
+      if(z<=TERRACE.z1||z>=TERRACE.z1+STEPS.count*STEPS.tread||y>1)continue;
+      expect(Math.abs(x)).toBeGreaterThan(0.70);
+      const tread=Math.floor((z-TERRACE.z1)/STEPS.tread);
+      const support=FLOOR-(tread+1)*STEPS.rise-Math.max(0,Math.abs(x)-1)*0.075/0.065;
+      expect(y-support).toBeGreaterThan(-1e-5);
+      if(Math.abs(y-support)<1e-5)stairContacts++;
+    }
+    expect(stairContacts).toBeGreaterThan(60);
     geometry.forEach(g=>g.dispose());
   });
 });

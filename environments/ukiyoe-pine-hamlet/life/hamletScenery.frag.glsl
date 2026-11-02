@@ -13,7 +13,7 @@ varying float vKind;
 varying float vVariation;
 varying vec3 vPrint;
 varying vec3 vRestNormal;
-varying vec3 vLobe;
+varying vec2 vFan;
 
 vec3 hamletPigment(vec3 rgb) { return pow(rgb, vec3(2.2)); }
 
@@ -33,45 +33,21 @@ float pineRays(vec2 p, float pixel, float seed) {
   vec2 fromTwig = p + vec2(0.0, 0.88);
   float radius = length(fromTwig);
   float angle = atan(fromTwig.x, fromTwig.y);
-  float count = 38.0 + floor(seed * 6.0);
+  float count = 29.0 + floor(seed * 5.0);
   float phase = angle * count + 0.12 * sin(radius * 6.0 + seed * 9.0);
   float ray = abs(sin(phase)) * radius / count;
   float ends = smoothstep(0.13, 0.30, radius);
   return botanicalStroke(ray, 0.0032, pixel) * ends * (1.0 - smoothstep(0.018, 0.060, pixel));
 }
 
-vec3 pineCloud(vec3 q, vec3 pixel, float variant) {
+vec3 pineCloud(vec2 q, vec2 pixel, float variant) {
   float seed = fract(vPrint.z);
   vec3 green = hamletPigment(mix(vec3(0.29, 0.42, 0.35), vec3(0.36, 0.46, 0.37), seed * 0.55 + variant * 0.2));
-  // Draw the broad front/back faces as one fan and reserve the narrow sides
-  // as quiet pigment. Wrapping a mirrored angular chart around a sphere made
-  // unwanted chevrons at its seam; no such seam is needed for a painted fan.
-  float rays = pineRays(q.xy, max(pixel.x, pixel.y), seed);
-  rays *= smoothstep(0.12, 0.42, abs(q.z));
-  float topFade = 1.0 - smoothstep(0.80, 0.98, q.y);
+  if (vPrint.z >= 21.0) green *= vec3(0.81, 0.91, 0.95);
+  float rays = pineRays(q, max(pixel.x, pixel.y), seed);
+  float topFade = 1.0 - smoothstep(0.88, 1.0, length(q));
   vec3 ink = hamletPigment(vec3(0.12, 0.23, 0.21));
   return mix(green, ink, rays * topFade * 0.84);
-}
-
-vec3 cedarPrint(vec2 uv, float pixel, vec3 pigment) {
-  // Paired rising leaflets on hanging twigs distinguish cedar from radial pine.
-  float row = floor(uv.y / 0.62);
-  vec2 p = (fract(vec2(uv.x + row * 0.19, uv.y) / vec2(0.39, 0.62)) - 0.5) * vec2(0.39, 0.62);
-  float stem = botanicalSegment(p, vec2(-0.035, -0.27), vec2(0.025, 0.27));
-  float leaves = 1.0;
-  for (int i = 0; i < 4; i++) {
-    float y = -0.23 + float(i) * 0.12;
-    vec2 base = vec2(y * 0.11, y);
-    leaves = min(leaves, botanicalSegment(p, base, base + vec2(-0.14, 0.12)));
-    leaves = min(leaves, botanicalSegment(p, base + vec2(0.0, 0.035), base + vec2(0.14, 0.15)));
-  }
-  float distanceToSpray = min(leaves, stem);
-  float outline = botanicalStroke(distanceToSpray, 0.015, pixel);
-  float leaf = botanicalStroke(leaves, 0.006, pixel);
-  float resolved = 1.0 - smoothstep(0.025, 0.080, pixel);
-  vec3 drawn = mix(pigment, hamletPigment(vec3(0.09, 0.22, 0.24)), outline * 0.8);
-  drawn = mix(drawn, hamletPigment(vec3(0.37, 0.46, 0.32)), leaf * 0.83);
-  return mix(pigment, drawn, resolved);
 }
 
 void main() {
@@ -79,13 +55,7 @@ void main() {
   float pixelMeters = max(length(fwidth(vLocal)), 0.0001);
   vec2 chartPixel = max(fwidth(vPrint.xy), vec2(0.0001));
   float printPixel = max(chartPixel.x, chartPixel.y);
-  vec3 lobePixel = max(fwidth(vLobe), vec3(0.0001));
-  vec3 restPixel = max(fwidth(vLocal), vec3(0.0001));
-  // Smooth rest-space normals blend projections without polar singularities.
-  // Evaluating UV derivatives in a chosen projection would be undefined where
-  // a fragment quad crosses a material or projection boundary.
-  vec3 printWeights = pow(abs(normalize(vRestNormal)), vec3(4.0));
-  printWeights /= max(dot(printWeights, vec3(1.0)), 0.0001);
+  vec2 fanPixel = max(fwidth(vFan), vec2(0.0001));
 #endif
   // Every snow blanket is independent geometry; rain reveals the complete
   // underlying needles, branches and slate.
@@ -125,22 +95,18 @@ void main() {
     float paleEdge = abs(sin(wave + 0.8)) / 35.0;
     base = mix(base, hamletPigment(vec3(0.63, 0.47, 0.29)), botanicalStroke(paleEdge, 0.003, printPixel) * broken * resolved * 0.25);
     if (vPrint.z > 1.5 && vPrint.z < 2.5) {
-      base = mix(base, hamletPigment(vec3(0.20, 0.23, 0.22)), 0.63);
-      vec2 p = (fract(vPrint.xy / vec2(0.14, 0.28)) - 0.5) * vec2(0.14, 0.28);
-      float lenticel = botanicalSegment(p, vec2(-0.028, 0.0), vec2(0.028, 0.0));
-      base = mix(base, hamletPigment(vec3(0.63, 0.47, 0.30)), botanicalStroke(lenticel, 0.004, printPixel) * resolved * 0.65);
+      // Plum bark is quiet charcoal brown, with a few long bending fissures.
+      // No repeated horizontal lenticels or gold rings across branch joints.
+      base = hamletPigment(vec3(0.32, 0.30, 0.26));
+      float plumFurrow = abs(sin(u * 14.0 + 0.32 * sin(v * 1.3 + u * 4.0))) / 14.0;
+      mark = botanicalStroke(plumFurrow, 0.0025, printPixel) * resolved * 0.32;
     }
   } else if (vKind < 1.5) {
     base = mix(hamletPigment(vec3(0.18, 0.30, 0.25)), hamletPigment(vec3(0.25, 0.36, 0.28)), vVariation * 0.5);
     vec3 p = vLocal + vec3(vVariation * 0.63);
     if (vPrint.z > 19.5) {
-      base = pineCloud(vLobe, lobePixel, vVariation);
-    } else if (vPrint.z < 1.5) {
-      base = cedarPrint(p.yz * 1.25, max(restPixel.y, restPixel.z) * 1.25, base) * printWeights.x
-        + cedarPrint(p.xz * 1.25, max(restPixel.x, restPixel.z) * 1.25, base) * printWeights.y
-        + cedarPrint(p.xy * 1.25, max(restPixel.x, restPixel.y) * 1.25, base) * printWeights.z;
-    }
-    else {
+      base = pineCloud(vFan, fanPixel, vVariation);
+    }     else {
       // A real folded needle has one pale midrib; its narrow dark sides supply
       // silhouette detail without transparent cards or an extra line pass.
       float midrib = botanicalStroke(abs(vPrint.x), 0.11, chartPixel.x);
@@ -151,16 +117,18 @@ void main() {
     float fleck = hash13(floor(vLocal * 13.0));
     base = mix(base, hamletPigment(vec3(0.62, 0.48, 0.30)), step(0.975, fleck) * resolved * 0.42);
   } else if (vKind < 3.5) {
-    base = hamletPigment(vec3(0.73, 0.55, 0.28));
+    bool grass = vPrint.z >= 15.0 || (vVariation < -0.5 && vVariation > -1.5);
+    bool crop = vVariation < -1.5;
+    base = hamletPigment(grass ? vec3(0.38, 0.49, 0.30) : crop ? vec3(0.62, 0.58, 0.32) : vec3(0.68, 0.55, 0.32));
     float midrib = botanicalStroke(abs(vPrint.x), 0.12, chartPixel.x);
-    base = mix(base, hamletPigment(vec3(0.94, 0.76, 0.42)), midrib * 0.65);
+    base = mix(base, hamletPigment(grass ? vec3(0.58, 0.63, 0.39) : vec3(0.83, 0.73, 0.46)), midrib * 0.40);
     mark = botanicalStroke(abs(abs(vPrint.x) - 0.65), 0.08, chartPixel.x) * 0.21;
   } else if (vKind < 4.5) {
     base = hamletPigment(vec3(0.73, 0.27, 0.18));
     base = mix(base, hamletPigment(vec3(0.27, 0.24, 0.17)), 1.0 - smoothstep(-0.65, -0.18, vPrint.y));
     base = mix(base, hamletPigment(vec3(0.93, 0.52, 0.31)), smoothstep(0.35, 0.9, vPrint.y) * 0.45);
   } else {
-    vec3 color = snowPrint(vLocal, pixelMeters, light);
+    vec3 color = snowBoundary(light, normalize(vRestNormal).y);
     gl_FragColor = vec4(applyAerial(color, distance(cameraPosition, vWorld), direction), 1.0);
     return;
   }

@@ -12,6 +12,7 @@ uniform vec3 uFaceWindow;
 attribute float aKind;
 attribute float aPrintStyle;
 attribute vec3 aLobe;
+attribute float aLobeTurn;
 attribute float aGround;
 attribute vec4 aAnchor;
 attribute vec3 aAcross;
@@ -23,7 +24,7 @@ varying vec3 vLocal;
 varying float vKind;
 varying vec3 vPrint;
 varying vec3 vRestNormal;
-varying vec3 vLobe;
+varying vec2 vFan;
 varying float vVariation;
 
 vec3 hamletRotate(vec3 value, vec3 axis, float angle) {
@@ -62,7 +63,14 @@ void main() {
   vKind = aKind;
   vPrint = vec3(uv, aPrintStyle);
   vRestNormal = normal;
-  vLobe = aLobe;
+  // Project each lobe's own sphere chart into the camera plane. Only the
+  // engraving follows the view: geometry, silhouette and shadow never rotate.
+  // This one continuous chart has no front/back join or blank lateral wedge.
+  vec3 lobeQ = vec3(aLobe.x * cos(aLobeTurn) - aLobe.z * sin(aLobeTurn),
+                    aLobe.y,
+                    aLobe.x * sin(aLobeTurn) + aLobe.z * cos(aLobeTurn));
+  vec3 lobeWorld = hamletRotate(across * lobeQ.x + up0 * lobeQ.y + forward * lobeQ.z, axis, angle);
+  vFan = (viewMatrix * vec4(lobeWorld, 0.0)).xy;
   vVariation = aPlacement.z;
 #ifdef HAMLET_SHADOW
   vec3 L = localSun(up0);
