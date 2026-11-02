@@ -32,6 +32,16 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the mist bands
+
+Started from dbd64b1 (the clouds as bands of mist). Kai (2026-11-02), on the local server: "the mist bands definitely look a lot better, but I think the shapes need a bit more work"; this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | "The curvatures should happen at a much smaller scale, about 40% of current, so that they meander between hills instead of across the whole planet" | |
+| 2 | "They should be able to branch and merge" | |
+| 3 | "There can also be multiple layers of mists at different heights and scales" | |
+
 ### Kai's notes on the clouds, the build cached and a few faults in the flats
 
 Started from 228d47e (the flats divided; the towers, the villages and the clouds). Kai (2026-11-02), checking the planet on the local server, with three screenshots of faults and five paintings of clouds (reference/terraces/clouds-*: thin ribbons of mist meandering between blue-green mountains; flat banks lying in the valleys; a river of mist; a mountain in a sea of scrolled clouds; the scroll-cloud motif, long streamers with curled tips); this table fills in as they are done. Rows 2 to 4 are the screenshots' faults (reference/terraces/kai-notes-*): "everything is good except a few issues in the screenshot", and then, of all I read in them, "the three issues I actually think need fixing".
