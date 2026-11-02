@@ -21,9 +21,10 @@ varying vec4 vFloor;
 varying float vHeight;
 
 void main() {
-  // a floor lies under its water, at its own level this season
+  // (a floor stays at its band's level, the water on it a look of the paint: raised by its water a flooded paddy
+  // stood over its own dam and apart from the paddy beside it, open between)
   Crop c = cropFrom(aPaddy.x, aPaddy.y, aPaddy.z, aPaddy.w, aPart < 0.5 ? aFloor.y : 0.0);
-  vec3 p = aPart < 0.5 ? position + normalize(position) * c.water : position;
+  vec3 p = position;
   vec3 w = warpPosition(p);
   vDir = normalize(p);
   vWarped = w;

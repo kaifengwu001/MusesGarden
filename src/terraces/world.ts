@@ -34,6 +34,8 @@ const WORLD_X = new Vector3(1, 0, 0);
 const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3, land: 4, cells: 5 } as const;
 /** Heights of the named views (m): a bird's-eye view over the terraces, and standing on one. */
 const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
+/** The flats' view (the homestead preset): its height (m) and how far it looks up (rad). */
+const FLATS_VIEW = { height: 30, tilt: 0.35 } as const;
 /** The vista: the camera's height (m), its tilt from straight down (rad), how much wider its view (degrees). */
 const VISTA = { height: 24, tilt: (52 * Math.PI) / 180, widen: 28 } as const;
 /** The rice's pool, in pages of 2048 blades (rice.ts). */
@@ -154,6 +156,15 @@ export class TerraceWorld implements PlanetWorld {
   }
 
   cameraPreset(name: CameraPreset, immediate = true): void {
+    if (name === 'homestead') {
+      // the flats: the planet's widest flat ground, from a little above it, looking across its fields
+      const flats = this.findFlats();
+      this.rig.lookAlong(flats.focus, flats.forward, immediate);
+      this.rig.setZoom(this.rig.zoomForAltitude(FLATS_VIEW.height), immediate);
+      this.rig.lookUp(FLATS_VIEW.tilt, immediate);
+      this.posed = true;
+      return;
+    }
     const stand = this.findStand();
     this.rig.lookAlong(stand.focus, stand.forward, immediate);
     if (name === 'vista') {
@@ -165,6 +176,37 @@ export class TerraceWorld implements PlanetWorld {
     } else if (name === 'muse' || name === 'meadow') this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.standing), immediate);
     else this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.above), immediate);
     this.posed = true;
+  }
+
+  /** The middle of the planet's widest flat ground (the most candidates round it flat), and a way across it. */
+  private findFlats(): { focus: Vector3; forward: Vector3 } {
+    const f = this.field;
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    const n = 3000;
+    const flat = new Uint8Array(n);
+    const dirs: Vector3[] = [];
+    for (let i = 0; i < n; i++) {
+      const z = 1 - (2 * (i + 0.5)) / n;
+      const r = Math.sqrt(1 - z * z);
+      const d = new Vector3(r * Math.cos(golden * i), r * Math.sin(golden * i), z);
+      dirs.push(d);
+      flat[i] = f.slope(d.x, d.y, d.z) < f.p.flat ? 1 : 0;
+    }
+    // (candidates about 4.5 m apart: the flat ones within 12 m of each flat one counted)
+    let best = -1;
+    let at = 0;
+    const near = Math.cos(12 / f.R);
+    for (let i = 0; i < n; i++) {
+      if (!flat[i]) continue;
+      let c = 0;
+      for (let j = 0; j < n; j++) if (flat[j] && dirs[i].dot(dirs[j]) > near) c++;
+      if (c > best) {
+        best = c;
+        at = i;
+      }
+    }
+    const focus = dirs[at].clone();
+    return { focus, forward: tangentToward(focus, Math.abs(focus.y) < 0.95 ? WORLD_UP : WORLD_X, new Vector3()) };
   }
 
   /**

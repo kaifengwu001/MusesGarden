@@ -9,7 +9,7 @@ import { SphereGrid, type Field } from '../../terraces/build/sphere';
 // (not differences of heights), the cube faces' grid shares every edge, every
 // outline's point lies on its level's field (found on the field itself, never
 // interpolated), and a small planet builds paddies, banks, cuts, woods and
-// flats from it.
+// flats from it, with a bank along every step between two farmed floors.
 
 const seed = 0x51ce7a;
 const field = new PlanetField({ ...FIELD, radius: 40, seed });
@@ -89,6 +89,8 @@ describe("the terraces' mathematics", () => {
     expect(out.stats.paddies).toBeGreaterThan(200);
     expect(out.stats.banks).toBeGreaterThan(20);
     expect(out.stats.cutLines).toBeGreaterThan(100);
+    // (every step between two farmed floors has a bank along it, within 12 cm: none left bare)
+    expect(out.bare.length).toBe(0);
     const parts = new Set<number>();
     for (const c of out.chunks) if (c) for (let i = 0; i < c.part.length; i++) parts.add(c.part[i]);
     for (const part of [PART.floor, PART.riser, PART.bund, PART.ridge]) expect(parts.has(part)).toBe(true);

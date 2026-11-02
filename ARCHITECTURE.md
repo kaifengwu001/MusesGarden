@@ -710,16 +710,22 @@ in `src/terraces/`.
   the season from a slow noise at its middle (one in seven its own),
   mapped so that at the season's default front the shares of flooded,
   planted and grown paddies are the aerial's.
-- **Geometry**: the floors level at their band's; the woods' ground at the
-  hills' exact height, its normals from their exact gradient; along each
-  bank a dam (a profile swept between the outline and its offset) and a
-  riser leaning down to the lowest floor beside it; a cross-bank up each
-  cut; where the woods meet the farmed land, a bank of earth; trees
-  jittered over the woods.
-- **The flats** (Kai's aerial of flat rice fields): long strips 9 m wide,
-  bending gently (±0.8 of a strip over 45 m), crossed every 32 m, a track
-  where a slow noise passes zero; each field its own green, thin dark bunds
-  between, the track pale.
+- **Geometry**: the floors level at their band's (the water on them is the
+  paint's look, never a raise: raised, a flooded paddy stood over its own
+  dam); the woods' ground at the hills' exact height, its normals from
+  their exact gradient; along each bank a dam (a profile swept between the
+  outline and its offset) and a riser leaning down to the lowest floor
+  beside it; a cross-bank up each cut; where the woods meet the farmed
+  land, a bank of earth; every ridge's feet down to the lowest floor either
+  side; open banks and ridges carried a little past their ends; trees
+  jittered over the woods. A check counts any step between two farmed
+  floors with no bank within 12 cm (`bare`).
+- **The flats** (Kai's aerial of flat rice fields): the strips are the
+  bands themselves, along the lie of the land, crossed every 32 m by a
+  turn of the planet's axes (wandering a little), a track where a slow
+  noise passes zero; each field at its own band's level (never more than a
+  step off its ground), grown, its own green; where the ground steps a band
+  on the flats, a riser under a thin dark bund; the track pale.
 - **Built in a worker** (worker.ts) when the planet is first visited (about
   37 s on this Mac); 96 meshes, a sixteenth of a cube face each
   (builder.ts). The harness's settle waits for it (`PlanetWorld.whenBuilt`).
