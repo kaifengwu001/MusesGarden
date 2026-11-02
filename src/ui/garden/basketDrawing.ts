@@ -35,6 +35,15 @@ export const DRAWING = {
 
 const EDGE_ROWS = DRAWING.edge.rows.length;
 
+/** Whether a point of the picture (its px) is on its front wall: across the opening, below the near rim's top edge. */
+export function onFrontWall(x: number, y: number): boolean {
+  const { from, to, rows } = DRAWING.edge;
+  if (x < from || x > to || y > DRAWING.content.bottom) return false;
+  const f = ((x - from) / (to - from)) * (rows.length - 1);
+  const i = Math.min(Math.floor(f), rows.length - 2);
+  return y > rows[i] + (rows[i + 1] - rows[i]) * (f - i);
+}
+
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
 void main() {

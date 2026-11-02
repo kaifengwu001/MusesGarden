@@ -21,7 +21,7 @@ import { smoothstep } from '../../core/math';
 import { HEADS } from '../../life/flowers';
 import { SPECIES_MESH } from '../../life/flowerMeshes';
 import type { Fan } from './basketFan';
-import { DRAWING, drawingLayers } from './basketDrawing';
+import { DRAWING, drawingLayers, onFrontWall } from './basketDrawing';
 import type { ButtonLayout } from './basketOverlay';
 import { el } from './dom';
 import { FLOWER_PICTURES, HEAD_SCALE, loadPictures, pictureMesh, pictureTextures, standMesh } from './flowerPictures';
@@ -117,9 +117,11 @@ const SPARKS = 160;
 const SPARK_LIFE = 0.75;
 /** Depths (px): fanned flowers stand in the basket's middle (their stems go down into it), the one under the pointer in front of the others, flowers going home in front of all. */
 const Z = { fan: 0, hover: 100, home: 320 } as const;
-/** The canvas's passes, in order: the basket's back, the flowers in and over it, its front, then what goes home and the sparkles over all. */
+/** The canvas's passes, in order: the basket's back, the flowers in and over it, its front, then what goes home (once out of it) and the sparkles over all. */
 const PASS = { back: 1, inside: 2, front: 3, over: 4 } as const;
 const PASSES = [PASS.back, PASS.inside, PASS.front, PASS.over] as const;
+/** Within a pass: the flowers in the basket, then one going home (its mesh, then its picture over it), then the sparkles. */
+const ORDER = { flower: 1, homeMesh: 2, homePicture: 3, sparks: 4 } as const;
 
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
 const linear = (t: number): number => t;
@@ -259,6 +261,8 @@ interface Homing {
   readonly land: (id: string) => void;
   /** Whether it is seen on its way (false: it lands, unseen, as the camera stops). */
   readonly flies: boolean;
+  /** Whether its foot has come out over the basket's near rim: till then it is drawn behind the front wall. */
+  out: boolean;
 }
 
 /** The basket's place: its rim's middle (px), its size (px per model unit). */
@@ -370,7 +374,7 @@ export class BasketStage {
       }),
     );
     this.sparks.frustumCulled = false;
-    this.sparks.renderOrder = 2;
+    this.sparks.renderOrder = ORDER.sparks;
     this.sparks.visible = false;
     this.sparks.layers.set(PASS.over);
     this.scene.add(this.sparks);
@@ -569,9 +573,10 @@ export class BasketStage {
     const material = this.flowerMaterial.clone();
     const mesh = new Mesh(g, material);
     mesh.frustumCulled = false;
-    // over its mesh while it turns into it
+    mesh.renderOrder = ORDER.homeMesh;
+    // sorted with the pictures, so it keeps its place among them even when opaque
+    mesh.material.transparent = true;
     const picture = pictureMesh(FLOWER_PICTURES[look.species], this.textures[look.species]);
-    picture.renderOrder = 1;
     return { look, picture, mesh, rest: { in: 'basket', k: 0 }, leg: null, homing: null, vanish: null, hover: 0 };
   }
 
@@ -734,7 +739,7 @@ export class BasketStage {
     const was = b.leg;
     const at = was ? this.legPose(was, this.time) : this.restPose(b, this.time);
     b.leg = null;
-    b.homing = { landing, start, u: 0, setOff: at, stopped: null, land, flies: animate };
+    b.homing = { landing, start, u: 0, setOff: at, stopped: null, land, flies: animate, out: false };
     const home = b.mesh.geometry.getAttribute('aHome') as BufferAttribute;
     if (landing.colours.length === home.array.length) b.mesh.geometry.setAttribute('aHome', new BufferAttribute(landing.colours, 3));
     this.leaving.push(b);
@@ -748,6 +753,14 @@ export class BasketStage {
     this.leaving.splice(this.leaving.indexOf(b), 1);
     this.lastLanding = this.time;
     h.land(b.look.id);
+  }
+
+  /** Whether a point on the screen is behind the basket's front wall. */
+  private behindFront(x: number, y: number): boolean {
+    if (this.basketRest === null && !this.basketLeg) return false;
+    const at = this.basketAt;
+    const k = pictureScale(at);
+    return onFrontWall(DRAWING.rim.x + (x - at.x) / k, DRAWING.rim.y + (y - at.y) / k);
   }
 
   private headOf(b: Bloom): Vector3 {
@@ -909,6 +922,10 @@ export class BasketStage {
     const settle = h.stopped === null ? camera + HOMING.after : Math.max(0, h.stopped + HOMING.after - t);
     const left = Math.max(HOMING.least * (1 - h.u), settle);
     h.u = dt >= left ? 1 : h.u + (1 - h.u) * (dt / left);
+    if (!h.out) {
+      const p = this.homePose(h);
+      h.out = !this.behindFront(p.x, p.y);
+    }
     if (h.u >= 1) this.landNow(b);
   }
 
@@ -927,8 +944,7 @@ export class BasketStage {
       const meshShare = h?.flies ? smoothstep(0, TURN.meshIn, h.u) : 0;
       const turned = h?.flies ? smoothstep(TURN.pictureOut[0], TURN.pictureOut[1], h.u) : 0;
       const pictureShare = h && !h.flies ? 0 : 1 - turned;
-      // in the basket, behind its front wall, until its picture has gone
-      const pass = pictureShare > 0 ? PASS.inside : PASS.over;
+      const pass = h?.out ? PASS.over : PASS.inside;
       const top = HEADS[bloom.look.species][0];
       const pic = bloom.picture;
       pic.visible = pictureShare * p.a > 0;
@@ -937,6 +953,7 @@ export class BasketStage {
         standMesh(pic, FLOWER_PICTURES[bloom.look.species], p, { x: p.x + stem.x, y: p.y - stem.y }, top * p.s, HEAD_SCALE + (TURN.headScale - HEAD_SCALE) * turned);
         pic.position.z = p.z;
         pic.layers.set(pass);
+        pic.renderOrder = h ? ORDER.homePicture : ORDER.flower;
         pic.material.uniforms.uAlpha.value = pictureShare * p.a;
       }
       const m = bloom.mesh;
@@ -950,7 +967,6 @@ export class BasketStage {
       m.material.uniforms.uAlpha.value = a;
       m.material.uniforms.uHome.value = smoothstep(0, 0.9, h.u);
       m.material.uniforms.uShade.value = 1 - smoothstep(0.1, HOMING.follow, h.u);
-      m.material.transparent = a < 0.999;
       m.material.depthWrite = a >= 0.999;
     }
     this.sparks.visible = t < this.sparkUntil;
