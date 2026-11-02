@@ -1,13 +1,15 @@
-import { CylinderGeometry, ExtrudeGeometry, Group, Mesh, Quaternion, ShaderMaterial, Shape, SphereGeometry, Vector3, type BufferGeometry, type PerspectiveCamera } from 'three';
+import { CanvasTexture, Group, SRGBColorSpace, Sprite, SpriteMaterial, Vector3, type PerspectiveCamera } from 'three';
+import museFace from '../assets/garden/muse-face.jpg';
+import { smoothstep } from '../core/math';
 import { warpPoint, type WarpFrame } from '../render/warp';
 
-// Pins stuck in the globe, as on a map you keep: a heart-headed pin for
-// each find you liked and a round one with Muse's face for Muse. They show
-// only from orbit (the planet hides those round the back; nothing points
-// at pins off screen), keep a steady size on screen at any height, turn
-// their heads to you (Muse's face, the heart), and pop
-// up or down with a little bounce when they appear, when you toggle them,
-// or when you come down from orbit.
+// Bubbles anchored on the globe, as on a map you keep: Muse's shows its photo,
+// as the rail's portrait does, and each find you liked shows a heart. A round
+// bubble with a cream rim stands upright on screen, its short tail pointing
+// down to a dot on the place it marks. They show only from orbit, fade as the
+// planet turns them round its back, keep a steady size on screen at any
+// height, and pop up or down with a little bounce when they appear or when
+// you come down from orbit.
 
 export type PinKind = 'liked' | 'muse';
 
@@ -19,119 +21,130 @@ export interface PinSpec {
   readonly ground: number;
 }
 
-/** Pins show below this zoom (orbit and a little on the way down), and stand this tall on screen (a share of its height). */
+/** Pins show below this zoom (orbit and a little on the way down); a bubble is this wide on screen (a share of its height). */
 const ORBIT_ZOOM = 0.22;
-const SCREEN = 0.055;
+const SCREEN = 0.058;
 /** Seconds to pop up or down; a pin's delay after the one before it. */
 const POP = 0.42;
 const STAGGER = 0.05;
+/** How squarely the ground under a pin faces the camera (cosine) where its bubble has faded out, and where it is whole. */
+const HORIZON = [0.03, 0.2] as const;
 
-const vertexShader = /* glsl */ `
-varying vec3 vNormal;
-varying vec3 vLocal;
-varying vec3 vView;
-void main() {
-  vLocal = position;
-  vNormal = normalize(normalMatrix * normal);
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  vView = -mv.xyz;
-  gl_Position = projectionMatrix * mv;
-}`;
+/** The bubble's drawing (px): the canvas, the bubble's centre and radius, its rim, the tail's tip, the anchor dot. */
+const ART = { w: 256, h: 320, x: 128, y: 120, r: 100, rim: 11, tip: 262, dot: 288, dotR: 11 } as const;
+const PAPER = '#fbf8ee';
+/** The portrait's crop of the photo (garden.css .g-portrait: 132 % wide, centred, 38 % down). */
+const PHOTO = { size: 1.32, x: 0.5, y: 0.38 } as const;
+/** The garden's heart (icons.ts), on its 24 px grid. */
+const HEART = 'M12 19.6s-7.4-4.4-7.4-9.7A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.4 2.3c0 5.3-7.4 9.7-7.4 9.7Z';
 
-// A painted toy finish: a soft key light from the upper left in view space, two soft bands, a cool
-// shade, a warm rim; Muse's head carries its face (two dark eyes, pink cheeks) on its front.
-const fragmentShader = /* glsl */ `
-uniform vec3 uColour;
-uniform vec3 uShade;
-uniform int uFace;
-varying vec3 vNormal;
-varying vec3 vLocal;
-varying vec3 vView;
-void main() {
-  vec3 n = normalize(vNormal);
-  vec3 v = normalize(vView);
-  float key = dot(n, normalize(vec3(-0.45, 0.75, 0.5)));
-  float lit = smoothstep(-0.15, 0.1, key) * 0.6 + smoothstep(0.45, 0.6, key) * 0.4;
-  vec3 col = mix(uShade, uColour, lit);
-  // a soft dark edge, as an ink line would, so a pin reads against clouds and water alike
-  float edge = 1.0 - max(dot(n, v), 0.0);
-  col *= mix(1.0, 0.62, smoothstep(0.55, 0.95, edge));
-  if (uFace == 1) {
-    // the face on the head's front (+z), as Muse's: eyes a little apart, a smile, cheeks
-    vec2 p = vLocal.xy / 0.34;
-    float front = smoothstep(0.0, 0.35, vLocal.z / 0.34);
-    float eyes = 1.0 - smoothstep(0.075, 0.1, min(length(p - vec2(-0.3, 0.12)), length(p - vec2(0.3, 0.12))));
-    float smile = (1.0 - smoothstep(0.02, 0.045, abs(length(p - vec2(0.0, 0.02)) - 0.16))) * step(p.y, -0.04) * step(abs(p.x), 0.13);
-    float cheeks = 1.0 - smoothstep(0.08, 0.16, min(length(p - vec2(-0.47, -0.08)), length(p - vec2(0.47, -0.08))));
-    col = mix(col, vec3(0.96, 0.66, 0.66), cheeks * 0.45 * front);
-    col = mix(col, vec3(0.17, 0.14, 0.13), max(eyes, smile) * front);
-  }
-  gl_FragColor = vec4(col, 1.0);
-}`;
-
-function heart(): BufferGeometry {
-  const s = new Shape();
-  s.moveTo(0, -0.42);
-  s.bezierCurveTo(-0.08, -0.3, -0.46, -0.08, -0.46, 0.14);
-  s.bezierCurveTo(-0.46, 0.34, -0.3, 0.44, -0.18, 0.44);
-  s.bezierCurveTo(-0.08, 0.44, -0.02, 0.38, 0, 0.3);
-  s.bezierCurveTo(0.02, 0.38, 0.08, 0.44, 0.18, 0.44);
-  s.bezierCurveTo(0.3, 0.44, 0.46, 0.34, 0.46, 0.14);
-  s.bezierCurveTo(0.46, -0.08, 0.08, -0.3, 0, -0.42);
-  const g = new ExtrudeGeometry(s, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.06, bevelSegments: 4, curveSegments: 18 });
-  g.translate(0, 0, -0.06);
-  return g;
+/** Paint a bubble: the rim, the tail and the anchor dot in paper with a soft shadow, then what shows inside the rim. */
+function paint(canvas: HTMLCanvasElement, inside: (g: CanvasRenderingContext2D, r: number) => void): void {
+  const g = canvas.getContext('2d')!;
+  const { x, y, r } = ART;
+  g.clearRect(0, 0, ART.w, ART.h);
+  // one outline, all wound the same way: the round, the tail (in from its right shoulder to a rounded tip and
+  // back up), the dot
+  const s = 0.36 * r;
+  const outline = new Path2D();
+  outline.arc(x, y, r, 0, Math.PI * 2);
+  outline.moveTo(x + s, y + r * 0.9);
+  outline.quadraticCurveTo(x + s * 0.3, ART.tip - 22, x + 5, ART.tip - 3);
+  outline.quadraticCurveTo(x, ART.tip + 2, x - 5, ART.tip - 3);
+  outline.quadraticCurveTo(x - s * 0.3, ART.tip - 22, x - s, y + r * 0.9);
+  outline.closePath();
+  outline.moveTo(x + ART.dotR, ART.dot);
+  outline.arc(x, ART.dot, ART.dotR, 0, Math.PI * 2);
+  g.save();
+  g.shadowColor = 'rgba(28, 60, 96, 0.4)';
+  g.shadowBlur = 16;
+  g.shadowOffsetY = 4;
+  g.fillStyle = PAPER;
+  g.fill(outline);
+  g.restore();
+  const inner = new Path2D();
+  inner.arc(x, y, r - ART.rim, 0, Math.PI * 2);
+  g.save();
+  g.clip(inner);
+  inside(g, r - ART.rim);
+  g.restore();
+  // a faint edge where the rim meets the picture, as on the portrait
+  g.strokeStyle = 'rgba(62, 58, 54, 0.12)';
+  g.lineWidth = 2;
+  g.stroke(inner);
 }
 
-/** A hex colour as the scene's linear light. */
-function linear(hex: number): Vector3 {
-  const [r, g, b] = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((x) => Math.pow(x / 255, 2.2));
-  return new Vector3(r, g, b);
+function look(inside: (g: CanvasRenderingContext2D, r: number) => void): { texture: CanvasTexture; repaint: () => void } {
+  const canvas = document.createElement('canvas');
+  canvas.width = ART.w;
+  canvas.height = ART.h;
+  paint(canvas, inside);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return {
+    texture,
+    repaint: () => {
+      paint(canvas, inside);
+      texture.needsUpdate = true;
+    },
+  };
 }
 
-function material(colour: number, shade: number, face: boolean): ShaderMaterial {
-  return new ShaderMaterial({
-    name: 'pin',
-    vertexShader,
-    fragmentShader,
-    uniforms: { uColour: { value: linear(colour) }, uShade: { value: linear(shade) }, uFace: { value: face ? 1 : 0 } },
-    // drawn after the clouds (transparent, a later render order) so a pin is never lost under one
-    transparent: true,
-    depthWrite: true,
+/** Muse's photo, cropped as the portrait crops it, on paper until it loads. */
+function museLook(): CanvasTexture {
+  const photo = new Image();
+  const { texture, repaint } = look((g, r) => {
+    g.fillStyle = PAPER;
+    g.fillRect(ART.x - r, ART.y - r, 2 * r, 2 * r);
+    if (!photo.complete || photo.naturalWidth === 0) return;
+    const d = 2 * r;
+    const size = PHOTO.size * d;
+    g.drawImage(photo, ART.x - r + (d - size) * PHOTO.x, ART.y - r + (d - size) * PHOTO.y, size, size);
   });
+  photo.onload = repaint;
+  photo.src = museFace;
+  return texture;
+}
+
+/** A pink heart on blush paper, lit softly from the upper left. */
+function likedLook(): CanvasTexture {
+  return look((g, r) => {
+    const paper = g.createRadialGradient(ART.x - r * 0.35, ART.y - r * 0.4, r * 0.1, ART.x, ART.y, r * 1.05);
+    paper.addColorStop(0, '#fff3ef');
+    paper.addColorStop(1, '#f6dcda');
+    g.fillStyle = paper;
+    g.fillRect(ART.x - r, ART.y - r, 2 * r, 2 * r);
+    const k = (1.42 * r) / 24;
+    g.translate(ART.x - 12 * k, ART.y - 13.4 * k);
+    g.scale(k, k);
+    const pink = g.createLinearGradient(6, 7, 17, 20);
+    pink.addColorStop(0, '#f799b4');
+    pink.addColorStop(0.55, '#ec6b91');
+    pink.addColorStop(1, '#d9557c');
+    g.fillStyle = pink;
+    g.fill(new Path2D(HEART));
+  }).texture;
 }
 
 interface Pin {
   spec: PinSpec;
-  group: Group;
-  head: Mesh;
+  sprite: Sprite;
   shown: number;
   target: number;
   delay: number;
 }
 
-const up = new Vector3();
 const p = new Vector3();
-const head = new Vector3();
-const scale = new Vector3();
-const q = new Quaternion();
-const Y = new Vector3(0, 1, 0);
+const toCamera = new Vector3();
 
 export class Pins {
   readonly group = new Group();
   private readonly pins = new Map<string, Pin>();
-  private readonly needle = new CylinderGeometry(0.035, 0.012, 1.05, 10, 1).translate(0, 0.525, 0);
-  private readonly heartGeometry = heart();
-  private readonly ball = new SphereGeometry(0.34, 32, 20);
-  private readonly materials = {
-    needle: material(0xc9ccd3, 0x7d8494, false),
-    liked: material(0xe9645a, 0xa83a3e, false),
-    muse: material(0xf6eedf, 0xc9b9a3, true),
-  };
+  private readonly looks: Record<PinKind, CanvasTexture>;
   private visible = false;
 
   constructor() {
-    this.group.renderOrder = 10;
+    this.looks = { muse: museLook(), liked: likedLook() };
     this.group.visible = false;
   }
 
@@ -140,7 +153,8 @@ export class Pins {
     const keep = new Set(specs.map((s) => s.id));
     for (const [id, pin] of this.pins) {
       if (!keep.has(id)) {
-        this.group.remove(pin.group, pin.head);
+        this.group.remove(pin.sprite);
+        pin.sprite.material.dispose();
         this.pins.delete(id);
       }
     }
@@ -151,16 +165,14 @@ export class Pins {
         existing.spec = spec;
         continue;
       }
-      const group = new Group();
-      const needle = new Mesh(this.needle, this.materials.needle);
-      const head = new Mesh(spec.kind === 'muse' ? this.ball : this.heartGeometry, spec.kind === 'muse' ? this.materials.muse : this.materials.liked);
-      needle.renderOrder = head.renderOrder = 10;
-      group.add(needle);
-      group.matrixAutoUpdate = false;
-      head.matrixAutoUpdate = false;
-      this.group.add(group, head);
-      // (one that arrives while the pins show pops up at once)
-      this.pins.set(spec.id, { spec, group, head, shown: 0, target: this.visible ? 1 : 0, delay: STAGGER * k++ });
+      // over everything from orbit (clouds, Muse, the cottage); round the back of the planet only by fading
+      const sprite = new Sprite(new SpriteMaterial({ map: this.looks[spec.kind], transparent: true, depthTest: false, depthWrite: false, fog: false }));
+      sprite.center.set(0.5, 1 - ART.dot / ART.h);
+      sprite.renderOrder = 10;
+      sprite.visible = false;
+      this.group.add(sprite);
+      // (one that arrives while the pins show pops up too)
+      this.pins.set(spec.id, { spec, sprite, shown: 0, target: this.visible ? 1 : 0, delay: STAGGER * k++ });
     }
   }
 
@@ -170,7 +182,7 @@ export class Pins {
     if (pin && !(pin.spec.ground === ground && pin.spec.dir.equals(dir))) pin.spec = { ...pin.spec, dir: dir.clone(), ground };
   }
 
-  /** Each frame: show from orbit when on, keep their size on screen, turn their heads to you. */
+  /** Each frame: show from orbit when on, fade those turning round the back, keep their size on screen. */
   update(dt: number, on: boolean, zoom: number, camera: PerspectiveCamera, warp: WarpFrame, radius: number): void {
     const visible = on && zoom < ORBIT_ZOOM;
     if (visible !== this.visible) {
@@ -189,40 +201,37 @@ export class Pins {
         else pin.shown = pin.target > pin.shown ? Math.min(1, pin.shown + dt / POP) : Math.max(0, pin.shown - dt / (0.6 * POP));
       }
       const pop = pin.target > 0 ? popUp(pin.shown) : pin.shown * pin.shown;
-      pin.group.visible = pop > 0.001;
-      if (!pin.group.visible) continue;
+      const { sprite, spec } = pin;
+      warpPoint(warp, p.copy(spec.dir).multiplyScalar(radius + spec.ground), p);
+      const fade = smoothstep(HORIZON[0], HORIZON[1], toCamera.subVectors(camera.position, p).normalize().dot(spec.dir));
+      sprite.visible = pop > 0.001 && fade > 0.001;
+      if (!sprite.visible) continue;
       any = true;
-      const { dir, ground } = pin.spec;
-      up.copy(dir);
-      warpPoint(warp, p.copy(dir).multiplyScalar(radius + ground), p);
-      const size = p.distanceTo(camera.position) * halfHeight * 2 * SCREEN * pop;
-      // the needle stands along the local up; the head on its top faces the camera, upright on screen
-      // (a heart seen from straight above would be a sliver)
-      q.setFromUnitVectors(Y, up);
-      pin.group.matrix.compose(p, q, scale.setScalar(size));
-      pin.group.matrixWorldNeedsUpdate = true;
-      head.copy(p).addScaledVector(up, (pin.spec.kind === 'muse' ? 1.28 : 1.3) * size);
-      pin.head.matrix.compose(head, camera.quaternion, scale);
-      pin.head.matrixWorldNeedsUpdate = true;
-      pin.head.visible = true;
+      sprite.material.opacity = fade;
+      const width = p.distanceTo(camera.position) * halfHeight * 2 * SCREEN * pop * (ART.w / (2 * ART.r));
+      sprite.position.copy(p);
+      sprite.scale.set(width, (width * ART.h) / ART.w, 1);
     }
-    for (const pin of this.pins.values()) if (!pin.group.visible) pin.head.visible = false;
     this.group.visible = any;
   }
 
-  /** The pin under a screen point (px from the top left of a viewport w × h), if any. */
+  /** The pin whose bubble is under a screen point (px from the top left of a viewport w × h), if any. */
   pick(x: number, y: number, w: number, h: number, camera: PerspectiveCamera): PinSpec | null {
     let best: PinSpec | null = null;
-    let bestD = 30;
+    let bestD = Infinity;
     const v = new Vector3();
-    for (const pin of this.pins.values()) {
-      if (!pin.group.visible) continue;
-      v.setFromMatrixPosition(pin.head.matrix).project(camera);
+    const halfHeight = Math.tan((camera.fov * Math.PI) / 360);
+    for (const { sprite, spec } of this.pins.values()) {
+      if (!sprite.visible || sprite.material.opacity < 0.5) continue;
+      v.copy(sprite.position).project(camera);
       if (v.z > 1) continue;
-      const d = Math.hypot(((v.x + 1) / 2) * w - x, ((1 - v.y) / 2) * h - y);
-      if (d < bestD) {
+      // the bubble stands over its anchor on screen
+      const height = (sprite.scale.y / (2 * halfHeight * sprite.position.distanceTo(camera.position))) * h;
+      const r = (height * ART.r) / ART.h;
+      const d = Math.hypot(((v.x + 1) / 2) * w - x, ((1 - v.y) / 2) * h - ((ART.dot - ART.y) / ART.h) * height - y);
+      if (d < Math.max(1.15 * r, 14) && d < bestD) {
         bestD = d;
-        best = pin.spec;
+        best = spec;
       }
     }
     return best;

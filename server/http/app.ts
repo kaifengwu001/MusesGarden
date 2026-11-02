@@ -170,11 +170,14 @@ function routesFor({ queries, commands, now, media, subscribe }: Garden): readon
       switch (r.type) {
         case 'like-find':
           return result(await commands.like(museId, { find: r.id as DiscoveryId }, r.liked));
-        case 'like-postcard': {
+        case 'like-postcard':
+        case 'favorite-postcard': {
           const card = queries.garden(museId, now())?.postcards.find((p) => p.id === r.id);
           if (!card) throw new HttpError(404, 'no such postcard');
-          // An invitation is a postcard you travel with, not a photo Muse took: there is nothing to like.
-          return card.invitation ? json({ ok: true }) : result(await commands.like(museId, { photo: r.id as PhotoId }, r.liked));
+          // An invitation is a postcard you travel with, not a photo Muse took: there is nothing to like or star.
+          if (card.invitation) return json({ ok: true });
+          const photo = r.id as PhotoId;
+          return result(await (r.type === 'like-postcard' ? commands.like(museId, { photo }, r.liked) : commands.favorite(museId, photo, r.favorite)));
         }
         case 'share-interest':
           return result(await commands.setHidden(museId, `topic:${r.id}`, !r.shared));
@@ -183,6 +186,8 @@ function routesFor({ queries, commands, now, media, subscribe }: Garden): readon
           return result(await commands.setHidden(museId, `discovery:${r.id}`, !r.shared));
         case 'use-invitation':
           return result(await commands.useInvitation(museId, r.id as InvitationId));
+        case 'set-reach':
+          return result(await commands.setReach(museId, r.reach));
       }
     },
     media: async ({ params }) => {

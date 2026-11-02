@@ -7,6 +7,7 @@
   --coral: #e05a4f;
   --card: rgba(251, 248, 238, 0.8);
   --font-serif: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-hand: 'Caveat', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
   --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --gutter: clamp(16px, 3.4vw, 52px);

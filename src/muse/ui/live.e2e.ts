@@ -6,7 +6,9 @@ import { dirAlong } from './route';
 // The dev tools on the real engine, over the garden's interface: advance the clock from the dev tools, and the 3D
 // Muse goes where the engine's view says. Screenshots for a human eye go to shots/muse-live/.
 
-const API = 'http://localhost:8787/api';
+/** The engine (playwright.live.config.ts starts it; MUSE_PORT moves it). */
+const ENGINE = `http://localhost:${process.env.MUSE_PORT ?? 8787}`;
+const API = `${ENGINE}/api`;
 const SHOTS = 'shots/muse-live';
 const HERO = 'hero' as MuseId;
 /** Out on the planet the drawn Muse walks toward the engine's spot and never lags it by more than a jump (rad, body.ts). */

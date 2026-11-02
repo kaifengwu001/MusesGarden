@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { MuseEventBody, MuseState } from '../../../src/muse/contract';
+import type { MuseEventBody, MuseState, Reach } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
 import { DAY, HOUR, T0, apply, at, constant, draws, find, fold, interest, muse, ofKind, pastHangout, topics } from './testkit';
 
 const shared = ['Lichen', 'Moss', 'Fern'];
 
-function pair(sociability: number, a = shared, b = shared): [MuseState, MuseState] {
-  return [muse('ada', { sociability, interests: topics(...a) }), muse('bo', { sociability, interests: topics(...b) })];
+/** Two Muses whose owners take in everyone, unless the test says otherwise. */
+function pair(sociability: number, a = shared, b = shared, reach: readonly [Reach, Reach] = ['everyone', 'everyone']): [MuseState, MuseState] {
+  return [muse('ada', { sociability, interests: topics(...a), reach: reach[0] }), muse('bo', { sociability, interests: topics(...b), reach: reach[1] })];
 }
 
 function meetUntilFriends(a: MuseState, b: MuseState, seed: number | null, limit = 200): number {
@@ -32,7 +33,9 @@ describe('meeting strangers beyond', () => {
   });
 
   it('meets more often the more sociable each Muse is', () => {
-    const rates = [0.2, 0.5, 0.9].map((s) => policy.encounterRate(muse('ada', { sociability: s, interests: topics(...shared) }), muse('bo', { sociability: 0.6, interests: topics(...shared) }), 'beyond'));
+    const rates = [0.2, 0.5, 0.9].map((s) =>
+      policy.encounterRate(muse('ada', { sociability: s, interests: topics(...shared), reach: 'everyone' }), muse('bo', { sociability: 0.6, interests: topics(...shared), reach: 'everyone' }), 'beyond'),
+    );
     expect(rates[0]).toBeLessThan(rates[1]);
     expect(rates[1]).toBeLessThan(rates[2]);
   });
@@ -45,7 +48,7 @@ describe('meeting strangers beyond', () => {
   });
 
   it('judges similarity only from what each Muse shares publicly', () => {
-    const privateOnly = { interests: [interest('Lichen')], hidden: ['topic:Lichen' as const] };
+    const privateOnly = { interests: [interest('Lichen')], hidden: ['topic:Lichen' as const], reach: 'everyone' as const };
     expect(policy.encounterRate(muse('ada', privateOnly), muse('bo', privateOnly), 'beyond')).toBe(0);
   });
 });
@@ -314,5 +317,59 @@ describe('owners introducing and unsharing', () => {
     const inv = host.social.invitations.get(invitation!.id)!;
     expect(inv.state).toBe('sent');
     expect(policy.invitationStep(inv, 'use', inv.guest, at(T0 + 30 * DAY))).toMatchObject({ ok: true });
+  });
+});
+
+describe('the friend group', () => {
+  const connect = ([a, b]: [MuseState, MuseState]): [MuseState, MuseState] =>
+    apply(a, b, { self: [{ kind: 'owners.connected', other: b.seed.id, on: 'instagram' }], other: [{ kind: 'owners.connected', other: a.seed.id, on: 'instagram' }] }, T0);
+  const meets = (a: MuseState, b: MuseState) => ({ beyond: policy.encounterRate(a, b, 'beyond') > 0, online: policy.encounterRate(a, b, 'online') > 0 });
+
+  it.each<[Reach, Reach, boolean]>([
+    ['everyone', 'everyone', true],
+    ['everyone', 'known', false],
+    ['shared', 'everyone', false],
+    ['known', 'known', false],
+  ])('meets a stranger beyond only when both owners take in everyone (%s, %s)', (ra, rb, met) => {
+    const [a, b] = pair(0.8, shared, shared, [ra, rb]);
+    expect(meets(a, b)).toEqual({ beyond: met, online: false });
+    expect(meets(b, a)).toEqual({ beyond: met, online: false });
+  });
+
+  it.each<[Reach, Reach, boolean]>([
+    ['known', 'known', true],
+    ['everyone', 'known', true],
+    ['known', 'shared', false],
+    ['shared', 'everyone', false],
+  ])('meets the Muse of an owner known online, there or beyond, only when both owners take in Instagram and Facebook friends (%s, %s)', (ra, rb, met) => {
+    const [a, b] = connect(pair(0.8, shared, shared, [ra, rb]));
+    expect(meets(a, b)).toEqual({ beyond: met, online: met });
+    expect(meets(b, a)).toEqual({ beyond: met, online: met });
+  });
+
+  it('hides a friend outside the group from visits without ending the friendship, and widening brings it back', () => {
+    const made = (a: MuseState, b: MuseState): MuseEventBody[][] => [
+      [{ kind: 'relationship.changed', other: b.seed.id, to: 'friends', origin: 'known-on' }],
+      [{ kind: 'relationship.changed', other: a.seed.id, to: 'friends', origin: 'known-on' }],
+    ];
+    const [a0, b0] = connect(pair(0.8, shared, shared, ['known', 'known']));
+    const [self, other] = made(a0, b0);
+    const [a, friend] = apply(a0, b0, { self, other }, T0);
+    const offer = (s: MuseState, f: MuseState) => policy.visitOffer(s, [{ state: f }], T0);
+
+    expect(offer(a, friend)).toBe('first-meeting');
+    const narrowed = { ...a, reach: 'shared' as const };
+    expect(offer(narrowed, friend)).toBe('none');
+    expect(policy.chooseVisit(narrowed, [{ state: friend }], T0, draws(1))).toBeNull();
+    expect(offer(a, { ...friend, reach: 'shared' }), 'the other owner narrowing hides it too').toBe('none');
+    expect(narrowed.social.relationships.get(friend.seed.id)?.status).toBe('friends');
+    expect(offer({ ...narrowed, reach: 'everyone' }, friend)).toBe('first-meeting');
+  });
+
+  it('keeps friends the owners shared Muse with, however narrow the group', () => {
+    const [a0, b0] = pair(0.8, shared, shared, ['shared', 'shared']);
+    const [a, b] = apply(a0, b0, policy.ownerLink(a0, b0, 'introduce', T0), T0);
+    expect(policy.visitOffer(a, [{ state: b }], T0)).toBe('first-meeting');
+    expect(policy.visitOffer(b, [{ state: a }], T0)).toBe('first-meeting');
   });
 });

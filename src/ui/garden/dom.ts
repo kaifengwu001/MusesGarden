@@ -19,6 +19,11 @@ export function button(className: string, label: string, html = '', onClick?: (e
   return b;
 }
 
+/** Muse's status as the portrait's chip says it: in lower case, but a Muse's name at the start keeps its capital. */
+export function chipNote(note: string, names: readonly string[]): string {
+  return names.some((name) => note.startsWith(`${name} `)) ? note : note.charAt(0).toLowerCase() + note.slice(1);
+}
+
 /** A switch; with `words` ([on, off]) it shows the state in words beside it and keeps the label for screen readers. */
 export function toggle(label: string, on: boolean, onChange: (on: boolean) => void, words?: [string, string]): HTMLLabelElement {
   const row = el('label', 'g-toggle');
@@ -62,6 +67,31 @@ export function dayName(day: string, now = new Date()): string {
   if (ago === 1) return 'Yesterday';
   if (ago > 1 && ago < 7) return d.toLocaleDateString('en-GB', { weekday: 'long' });
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** 'Oct 23 Fri'. */
+function monthDay(day: string): string {
+  const d = parseDay(day);
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
+}
+
+/** A basket's day on the timeline: 'Oct 23 Fri', with 'Today, ' or 'Yesterday, ' in front for those. */
+export function basketDay(day: string, now = new Date()): string {
+  const ago = daysAgo(day, now);
+  const date = monthDay(day);
+  return ago === 0 ? `Today, ${date}` : ago === 1 ? `Yesterday, ${date}` : date;
+}
+
+/** A basket's day in a sentence: 'today', 'yesterday', 'Oct 23 Fri'. */
+export function basketWhen(day: string, now = new Date()): string {
+  const ago = daysAgo(day, now);
+  return ago === 0 ? 'today' : ago === 1 ? 'yesterday' : monthDay(day);
+}
+
+/** A basket as a sentence names it: 'today’s basket', 'yesterday’s basket', 'Oct 23 Fri basket'. */
+export function basketCalled(day: string, now = new Date()): string {
+  const ago = daysAgo(day, now);
+  return ago === 0 ? 'today’s basket' : ago === 1 ? 'yesterday’s basket' : `${monthDay(day)} basket`;
 }
 
 /** '31 Oct' (postmarks, captions). */

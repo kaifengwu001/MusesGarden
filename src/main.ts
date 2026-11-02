@@ -149,10 +149,13 @@ async function boot(): Promise<void> {
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
   const garden = new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
 
-  // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
-  // click, double-click and hold go on everywhere else
+  // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; one on a find or a
+  // pin is the garden's: a tap, a double-click or a hold there opens its card. The meadow's own click, double-click
+  // and hold go on everywhere else.
   const onMuse = (x: number, y: number): { side: number } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
   let pettingMuse = false;
+  let gardenTapped = false;
+  let heldOnGarden: { x: number; y: number } | null = null;
   attachInput(canvas, {
     drag: (dx, dy) => {
       // (the hut's layout editor's gizmo, when it has the pointer; in Muse's hut a drag turns round the room)
@@ -170,11 +173,13 @@ async function boot(): Promise<void> {
     },
     tap: (x, y) => {
       if (garden.gizmo) return;
+      gardenTapped = false;
       if (onMuse(x, y)) {
         world.muse.tap(clock.time);
         return;
       }
-      if (garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
+      gardenTapped = garden.tap(x, y, canvas.clientWidth, canvas.clientHeight);
+      if (gardenTapped) {
         userPosed = true;
         return;
       }
@@ -188,6 +193,8 @@ async function boot(): Promise<void> {
         world.muse.tap(clock.time);
         return;
       }
+      // (the camera may have started for a find after the first click: a second click is the find's all the same)
+      if (gardenTapped || garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) return;
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) {
         garden.interrupt();
@@ -203,6 +210,10 @@ async function boot(): Promise<void> {
         world.muse.hold(clock.time, touch.side);
         return;
       }
+      if (garden.claims(x, y, canvas.clientWidth, canvas.clientHeight)) {
+        heldOnGarden = { x, y };
+        return;
+      }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit && hit.water >= 0) world.bloomStart(hit.dir);
     },
@@ -211,6 +222,11 @@ async function boot(): Promise<void> {
       if (pettingMuse) {
         pettingMuse = false;
         world.muse.letGo(clock.time);
+        return;
+      }
+      if (heldOnGarden) {
+        garden.tap(heldOnGarden.x, heldOnGarden.y, canvas.clientWidth, canvas.clientHeight);
+        heldOnGarden = null;
         return;
       }
       world.bloomEnd();

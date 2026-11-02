@@ -11,6 +11,7 @@ import type {
   MuseId,
   MuseState,
   PhotoId,
+  Reach,
   RegionKey,
   TopicKey,
 } from '../../../src/muse/contract';
@@ -69,6 +70,7 @@ export interface MuseSpec {
   readonly hidden?: readonly HiddenRef[];
   readonly collected?: readonly string[];
   readonly socialMsToday?: number;
+  readonly reach?: Reach;
 }
 
 export function muse(id: string, spec: MuseSpec = {}): MuseState {
@@ -83,6 +85,7 @@ export function muse(id: string, spec: MuseSpec = {}): MuseState {
     soulVersion: 0,
     basketTime: null,
     hidden: new Set(spec.hidden ?? []),
+    reach: spec.reach ?? 'shared',
     working: false,
     episode: null,
     episodes: 0,
@@ -100,6 +103,7 @@ export function muse(id: string, spec: MuseSpec = {}): MuseState {
     reflections: [],
     experiencesSinceReflection: 0,
     likes: new Map(),
+    favoritePhotos: new Set(),
     day: { day: '2026-11-02', restMs: 0, socialMs: spec.socialMsToday ?? 0, workMs: 0, photos: 0, trips: 0, baskets: 0 },
     social: emptySocial(),
   };

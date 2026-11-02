@@ -116,17 +116,24 @@ export function lastEventId(raw: string | string[] | undefined): number | null {
   throw bad('Last-Event-ID must be a whole number');
 }
 
-const reactionType = oneOf('type', ['like-find', 'like-postcard', 'share-interest', 'share-find', 'use-invitation']);
+const reactionType = oneOf('type', ['like-find', 'like-postcard', 'favorite-postcard', 'share-interest', 'share-find', 'use-invitation', 'set-reach']);
+const reach = oneOf('reach', ['shared', 'known', 'everyone']);
 
-/** A reaction from the garden. Its id names a find, a postcard or an interest: any printable text, looked up, never parsed. */
+/**
+ * A reaction from the garden. Its id names a find, a postcard or an interest: any printable text, looked up, never
+ * parsed. Setting the friend group names none, so it has no id.
+ */
 export function reaction(body: unknown): Reaction {
   const type = reactionType(field(body, 'type'));
+  if (type === 'set-reach') return { type, reach: reach(field(body, 'reach')) };
   const raw = field(body, 'id');
   if (typeof raw !== 'string' || !/^[^\p{Cc}]{1,256}$/u.test(raw)) throw bad('id must be text of at most 256 characters');
   switch (type) {
     case 'like-find':
     case 'like-postcard':
       return { type, id: raw, liked: flag(field(body, 'liked'), 'liked') };
+    case 'favorite-postcard':
+      return { type, id: raw, favorite: flag(field(body, 'favorite'), 'favorite') };
     case 'share-interest':
     case 'share-find':
       return { type, id: raw, shared: flag(field(body, 'shared'), 'shared') };

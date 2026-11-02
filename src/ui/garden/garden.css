@@ -1,6 +1,6 @@
 /* The garden's interface (ui/garden): the meadow's own chrome (paper, ink,
    Fraunces in italics, soft blue shadows), and the things you hold (the
-   post box, postcards, invitations, the travel ticket) drawn as objects:
+   post box, postcards, invitations, the travel tickets) drawn as objects:
    paper with grain and weight, wax, card stock, a painted model. */
 
 .garden {
@@ -23,7 +23,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- the rail: Muse, find Muse, home, baskets, pins ---------------------- */
+/* ---- the rail: Muse, find Muse, home, baskets ---------------------------- */
 
 .g-rail {
   position: fixed;
@@ -57,9 +57,9 @@
 
 .g-portrait .g-status {
   position: absolute;
-  left: 50%;
+  /* hangs from the portrait's right edge, so a long status runs inward, never off the screen */
+  right: -6px;
   bottom: -12px;
-  transform: translateX(-50%);
   padding: 1px 8px 2px;
   border-radius: 999px;
   background: var(--paper);
@@ -116,6 +116,12 @@
 .g-railbtn svg {
   width: 22px;
   height: 22px;
+}
+
+.g-railbtn .g-basket-icon {
+  width: 36px;
+  height: 27px;
+  object-fit: contain;
 }
 
 .g-railbtn:hover {
@@ -226,7 +232,7 @@
   transform: rotate(-11deg) scale(1);
 }
 
-/* ---- the post box and the travel ticket ---------------------------------- */
+/* ---- the post box ---------------------------------------------------------- */
 
 .g-postbox {
   position: fixed;
@@ -241,6 +247,26 @@
   width: 100%;
   height: 100%;
   display: block;
+  pointer-events: none;
+}
+
+/* The illustrated mailbox stays sharp above the open mail viewer. */
+.g-postbox-visual {
+  position: absolute;
+  inset: 0;
+}
+
+.g-postbox-illustration {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.g-postbox.is-illustrated.is-open {
+  z-index: 11;
+}
+
+.g-postbox.is-illustrated.is-open .g-postbox-hit {
   pointer-events: none;
 }
 
@@ -290,6 +316,27 @@
 
 .g-postbox-count.is-on {
   transform: scale(1);
+}
+
+/* A little paper count tag, readable against the painted red mailbox. */
+.g-postbox.is-illustrated .g-postbox-count {
+  margin: -14px 0 0 -13px;
+  min-width: 26px;
+  height: 25px;
+  padding: 0 7px;
+  border: 1.5px solid #795a40;
+  border-radius: 5px 7px 5px 4px;
+  background: #f5e9c9;
+  box-shadow: 0 2px 3px rgba(65, 40, 26, 0.22);
+  color: #51382c;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  transform: rotate(-7deg) scale(0);
+}
+
+.g-postbox.is-illustrated .g-postbox-count.is-on {
+  transform: rotate(-7deg) scale(1);
 }
 
 /* an invitation's wax seal, pressed on the box */
@@ -349,89 +396,6 @@
   }
 }
 
-.g-ticket {
-  appearance: none;
-  position: fixed;
-  right: calc(var(--gutter) * 0.3 + 64px);
-  bottom: calc(var(--gutter) * 0.2 + 192px);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 46px;
-  padding: 0 14px 0 20px;
-  border: 0;
-  border-radius: 6px;
-  background:
-    var(--grain),
-    linear-gradient(100deg, #fbf6ea 0 22%, #f6eedb 22% 100%);
-  -webkit-mask: radial-gradient(circle at 0 50%, transparent 6px, #000 6.5px) left / 51% 100% no-repeat, radial-gradient(circle at 100% 50%, transparent 6px, #000 6.5px) right / 51% 100% no-repeat;
-  mask: radial-gradient(circle at 0 50%, transparent 6px, #000 6.5px) left / 51% 100% no-repeat, radial-gradient(circle at 100% 50%, transparent 6px, #000 6.5px) right / 51% 100% no-repeat;
-  filter: drop-shadow(0 5px 10px rgba(30, 44, 66, 0.22));
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 15px;
-  color: var(--ink);
-  cursor: pointer;
-  transform: rotate(-5deg);
-  transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
-  z-index: 6;
-}
-
-.g-ticket::before {
-  content: '';
-  position: absolute;
-  left: 22%;
-  top: 6px;
-  bottom: 6px;
-  border-left: 1.5px dashed rgba(62, 58, 54, 0.28);
-}
-
-.g-ticket svg {
-  width: 20px;
-  height: 20px;
-  margin-left: 6px;
-  color: #2e6e9e;
-}
-
-.g-ticket:hover {
-  transform: rotate(-2deg) translateY(-2px);
-}
-
-.g-ticket .g-ticket-seal {
-  position: absolute;
-  right: -3px;
-  top: -7px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 30%, rgba(255, 210, 190, 0.6), transparent 42%), radial-gradient(#c9503f 55%, #94302a);
-  box-shadow: 0 2px 4px rgba(80, 20, 10, 0.35);
-  transform: scale(0);
-  transition: transform 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
-}
-
-.g-ticket.has-invite .g-ticket-seal {
-  transform: scale(1);
-}
-
-.g-ticket.has-invite {
-  animation: g-nudge 5s ease-in-out infinite 2s;
-}
-
-@keyframes g-nudge {
-  0%,
-  86%,
-  100% {
-    transform: rotate(-5deg);
-  }
-  90% {
-    transform: rotate(-9deg) translateY(-2px);
-  }
-  95% {
-    transform: rotate(-2deg);
-  }
-}
-
 /* ---- a find's card, over its bed ------------------------------------------ */
 
 .g-findlayer {
@@ -447,28 +411,6 @@
   opacity: 1;
 }
 
-.g-stem {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.g-stem line {
-  stroke: var(--paper);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  filter: drop-shadow(0 1px 1.5px rgba(30, 40, 30, 0.35));
-}
-
-.g-stem circle {
-  fill: rgba(251, 248, 238, 0.28);
-  stroke: var(--paper);
-  stroke-width: 1.6;
-  filter: drop-shadow(0 1px 1.5px rgba(30, 40, 30, 0.35));
-}
-
 .g-card {
   --card-w: 290px;
   position: absolute;
@@ -481,7 +423,8 @@
   border-radius: 16px;
   background: var(--grain), var(--paper);
   box-shadow: var(--shadow-card);
-  pointer-events: auto;
+  /* (only while it is up: a card put away stands where it was, unseen, and must not take the clicks meant for the meadow) */
+  pointer-events: none;
   touch-action: pan-y;
   user-select: none;
   transform-origin: 50% 100%;
@@ -494,6 +437,7 @@
 
 .g-card.is-up {
   opacity: 1;
+  pointer-events: auto;
   transform: translateX(var(--swipe, 0px)) rotate(calc(var(--swipe, 0px) * 0.035deg));
 }
 
@@ -895,7 +839,35 @@
   height: 22px;
 }
 
-.g-findlayer:not(.is-on) .g-step {
+/* an arrow into another day's basket, and its line over it */
+.g-step.is-crossing {
+  background: #d6eaf8;
+  color: #2f6d9e;
+}
+
+.g-step-hint {
+  position: absolute;
+  padding: 3px 10px 4px;
+  border-radius: 999px;
+  background: #d6eaf8;
+  box-shadow: 0 4px 14px rgba(28, 60, 96, 0.14);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: #2f6d9e;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.g-step-hint.is-on {
+  opacity: 1;
+}
+
+.g-findlayer:not(.is-on) .g-step,
+.g-findlayer:not(.is-on) .g-step-hint {
   opacity: 0;
   pointer-events: none;
 }
@@ -978,12 +950,6 @@ body.garden-on .hud {
     width: 116px;
     height: 136px;
   }
-  .g-ticket {
-    right: 46px;
-    bottom: 244px;
-    height: 40px;
-    font-size: 14px;
-  }
   body.garden-on .lil-gui.meadow-panel.lil-root {
     top: calc(var(--gutter) * 0.5);
     bottom: auto;
@@ -995,7 +961,8 @@ body.garden-on .hud {
     --card-w: min(64vw, 240px);
   }
   /* on a phone a card is swiped; it keeps clear of the title and the panel's corner */
-  .g-step {
+  .g-step,
+  .g-step-hint {
     display: none;
   }
   .g-toast {
@@ -1209,7 +1176,7 @@ body.garden-on .hud {
   resize: vertical;
 }
 
-/* ---- sheets: the baskets, Muse's page, travel ------------------------------ */
+/* ---- sheets: Muse's page, travel ------------------------------------------ */
 
 .g-scrim {
   position: fixed;
@@ -1303,7 +1270,6 @@ body.garden-on .hud {
   overscroll-behavior: contain;
 }
 
-.g-sheet-note,
 .g-intro {
   margin: 14px 0 0;
   font-family: var(--font-serif);
@@ -1324,154 +1290,6 @@ body.garden-on .hud {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
-}
-
-/* the baskets' timeline */
-.g-timeline {
-  position: relative;
-  margin: 8px 0 0;
-  padding: 0 0 0 22px;
-  list-style: none;
-}
-
-.g-timeline::before {
-  content: '';
-  position: absolute;
-  left: 6px;
-  top: 14px;
-  bottom: 18px;
-  border-left: 1.5px dashed rgba(62, 58, 54, 0.22);
-}
-
-.g-day {
-  position: relative;
-  margin: 0 0 6px;
-}
-
-.g-day::before {
-  content: '';
-  position: absolute;
-  left: -21px;
-  top: 17px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 1.5px solid rgba(62, 58, 54, 0.4);
-}
-
-.g-day.is-fresh::before {
-  background: var(--coral);
-  border-color: var(--coral);
-  box-shadow: 0 0 0 4px rgba(224, 90, 79, 0.16);
-}
-
-.g-day-row {
-  appearance: none;
-  position: relative;
-  display: block;
-  width: 100%;
-  padding: 10px 34px 12px 12px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.g-day-row:hover {
-  background: rgba(62, 58, 54, 0.05);
-}
-
-.g-day-when {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 18px;
-  font-weight: 400;
-}
-
-.g-new {
-  padding: 1px 7px 2px;
-  border-radius: 999px;
-  background: var(--coral);
-  font-family: var(--font-ui);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #fff;
-}
-
-.g-day-title {
-  margin: 2px 0 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  color: rgba(62, 58, 54, 0.82);
-}
-
-.g-thumbs {
-  display: flex;
-  gap: 6px;
-  margin: 10px 0 8px;
-}
-
-.g-thumb {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  flex: none;
-  border-radius: 9px;
-  background: var(--paper-deep) center / cover;
-  box-shadow: 0 2px 6px rgba(30, 44, 66, 0.14), inset 0 0 0 1px rgba(62, 58, 54, 0.06);
-}
-
-.g-thumb i {
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--paper);
-}
-
-.g-thumb.is-liked::after {
-  content: '♥';
-  position: absolute;
-  left: 3px;
-  top: 1px;
-  font-size: 11px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-.g-day-meta {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.g-day-go {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ink-soft);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.g-day-go svg {
-  width: 20px;
-  height: 20px;
-}
-
-.g-day-row:hover .g-day-go {
-  opacity: 1;
 }
 
 /* Muse's page */
@@ -1769,90 +1587,70 @@ body.garden-on .hud {
   font-weight: 600;
 }
 
-.g-prefs {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.g-privacy-list + h3 {
   margin-top: 14px;
 }
 
-.g-prefs .g-toggle,
-.g-demo .g-toggle {
-  justify-content: space-between;
-  padding: 10px 2px;
-  border-bottom: 1px solid var(--ink-faint);
-  font-size: 13.5px;
+.g-reach {
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
 }
 
-.g-demo {
-  margin-top: 18px;
-}
-
-.g-demo-label {
-  margin: 0;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-/* travel */
-.g-worlds {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 6px;
-}
-
-.g-world {
-  overflow: hidden;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(30, 44, 66, 0.14);
-}
-
-.g-world-pic {
-  aspect-ratio: 2 / 1;
-  background: center / cover;
-}
-
-.g-world-text {
-  padding: 12px 16px 16px;
-}
-
-.g-world-text h3 {
-  margin: 0;
+.g-reach legend {
+  margin: 0 0 8px;
+  padding: 0;
   font-family: var(--font-serif);
-  font-weight: 380;
-  font-size: 24px;
+  font-size: 17px;
 }
 
-.g-world-who {
-  margin: 2px 0 6px;
+.g-reach-steps {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 18px;
+  background: rgba(62, 58, 54, 0.06);
+}
+
+.g-reach-step {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 7px 8px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.g-reach-step input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.g-reach-step.is-on {
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgba(28, 60, 96, 0.12);
+}
+
+.g-reach-step:has(input:focus-visible) {
+  outline: 2px solid #2e6e9e;
+  outline-offset: 1px;
+}
+
+.g-reach-line {
+  margin: 8px 2px 0;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--ink-soft);
 }
 
-.g-world-blurb {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.g-once {
-  margin: 0 0 10px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--gold);
-}
-
-.g-board,
-.g-invite-go,
 .g-visit-home {
   appearance: none;
   display: inline-flex;
@@ -1871,48 +1669,24 @@ body.garden-on .hud {
   transition: transform 0.2s ease;
 }
 
-.g-board:hover,
-.g-invite-go:hover,
 .g-visit-home:hover {
   transform: translateY(-1px);
 }
 
-.g-board svg,
-.g-invite-go svg,
 .g-visit-home svg {
   width: 18px;
   height: 18px;
 }
 
-.g-travel-empty {
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-  padding: 30px 10px;
-  text-align: center;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-
-.g-stub {
-  padding: 14px 28px;
-  border: 1.5px dashed rgba(62, 58, 54, 0.3);
-  border-radius: 8px;
-  font-size: 18px;
-  transform: rotate(-4deg);
-}
-
-/* ---- the post: stack, focus, album ------------------------------------------- */
+/* ---- the post: today's deck, the pages, the tickets ----------------------------- */
 
 .g-mail {
   position: fixed;
   inset: 0;
   z-index: 10;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   pointer-events: none;
   visibility: hidden;
 }
@@ -1938,6 +1712,7 @@ body.garden-on .hud {
 
 .g-mail-head {
   position: relative;
+  grid-column: 1 / -1;
   display: flex;
   align-items: baseline;
   gap: 14px;
@@ -1979,65 +1754,133 @@ body.garden-on .hud {
   gap: 8px;
 }
 
-.g-mail-tool {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 14px;
-  border: 0;
+.g-segments {
+  display: flex;
+  padding: 4px;
   border-radius: 999px;
-  background: rgba(251, 248, 238, 0.9);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  color: var(--ink);
-  text-shadow: none;
-  cursor: pointer;
-  transition: transform 0.2s ease;
+  background: var(--grain), rgba(239, 228, 204, 0.94);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.18),
+    inset 0 1px 2px rgba(80, 60, 30, 0.16);
 }
 
-.g-mail-tool svg {
+.g-segment {
+  appearance: none;
+  height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  text-shadow: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.g-segment:hover {
+  color: var(--ink);
+}
+
+.g-segment[aria-pressed='true'] {
+  background: var(--grain), linear-gradient(180deg, #fffdf6, #f6efdf);
+  box-shadow:
+    0 2px 6px rgba(60, 44, 20, 0.2),
+    inset 0 -1px 0 rgba(80, 60, 30, 0.08);
+  color: var(--ink);
+}
+
+.g-mail-close {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(251, 248, 238, 0.92);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.g-mail-close svg {
   width: 19px;
   height: 19px;
 }
 
-.g-mail-close {
-  width: 40px;
-  padding: 0;
-  justify-content: center;
-}
-
-.g-mail-tool.is-catching {
-  animation: g-catch 0.4s ease;
-}
-
-@keyframes g-catch {
-  50% {
-    transform: scale(1.14);
-  }
+/* the desk: the deck, the heart and star beside it, or a page of cards */
+.g-mail-desk {
+  position: relative;
+  min-height: 0;
+  container-type: size;
+  --deck-w: min(780px, 100cqw - 190px, (100cqh - 40px) / 0.8);
 }
 
 .g-mail-stage {
-  position: relative;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
 }
 
-.g-mail.is-album .g-mail-stage {
+.g-mail.is-board .g-mail-stage,
+.g-mail.is-board .g-mail-side,
+.g-mail.is-board .g-mail-empty {
   visibility: hidden;
 }
 
-/* a postcard: card stock, a white border round the photo, a soft shadow with a lift at one corner */
+/* nothing from today: a quiet line where the deck would be */
+.g-mail-empty {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(380px, 80%);
+  display: none;
+  padding: 26px 30px 24px;
+  border-radius: 6px;
+  background: var(--grain), linear-gradient(170deg, #fbf5e6, #efe4cc);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+  transform: translate(-50%, -50%) rotate(-1.5deg);
+}
+
+.g-mail.is-empty .g-mail-empty {
+  display: block;
+}
+
+.g-mail-quiet {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 22px;
+}
+
+.g-mail-hint {
+  margin: 8px 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+/* a postcard: a polaroid, the whole photo in an even edge with a deep strip under it, a soft shadow with a lift at
+   one corner; --pc-h is its height over its width */
 .g-pc {
-  --w: min(460px, 74vw, calc((100vh - 260px) * 1.5));
+  --w: var(--deck-w);
+  --pc-h: 0.8;
   position: absolute;
   left: 50%;
   top: 50%;
   width: var(--w);
-  aspect-ratio: 3 / 2;
-  margin: calc(var(--w) / -3) 0 0 calc(var(--w) / -2);
+  aspect-ratio: 1 / var(--pc-h);
+  margin: calc(var(--w) * var(--pc-h) / -2) 0 0 calc(var(--w) / -2);
   perspective: 1600px;
   transform: translate(var(--x, 0px), var(--y, 0px)) rotate(var(--r, 0deg)) scale(var(--s, 1));
   transition:
@@ -2050,12 +1893,11 @@ body.garden-on .hud {
   user-select: none;
 }
 
-.g-pc.is-focus {
-  --w: min(780px, 88vw, calc((100vh - 230px) * 1.5));
+.g-pc.is-top {
   touch-action: none;
 }
 
-/* a card deep in a pile lies hidden under the last one that shows */
+/* a card deep in the deck lies hidden under the last one that shows */
 .g-pc.is-buried {
   opacity: 0;
   pointer-events: none;
@@ -2078,11 +1920,10 @@ body.garden-on .hud {
     opacity 0.25s ease 0.15s;
 }
 
-.g-pc.is-away {
-  opacity: 0;
-  transition:
-    transform 0.42s cubic-bezier(0.5, 0, 0.8, 0.4),
-    opacity 0.4s ease 0.05s;
+/* an envelope's ticket on its way to the others */
+.g-pc.is-pocketed {
+  pointer-events: none;
+  transition: transform 0.6s cubic-bezier(0.45, 0, 0.25, 1);
 }
 
 .g-pc-inner {
@@ -2111,10 +1952,11 @@ body.garden-on .hud {
     0 28px 60px -20px rgba(20, 24, 30, 0.3);
 }
 
+/* the polaroid: an edge 4.2% of its width at the sides, 5% at the top; the photo 3:2; the strip takes the rest */
 .g-pc-front {
-  padding: 3.2%;
+  padding: 5% 4.2% 0;
   box-sizing: border-box;
-  background: var(--grain), linear-gradient(160deg, #fffdf6, #f3ecdb);
+  background: var(--grain), linear-gradient(170deg, var(--snap-top, #fdfaf1), var(--snap-low, #f1eadb));
 }
 
 .g-pc-front::after {
@@ -2128,10 +1970,26 @@ body.garden-on .hud {
 .g-pc-photo {
   display: block;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
-  border-radius: 1px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
+}
+
+/* written in the strip, in pen */
+.g-pc-caption {
+  height: calc(var(--w) * (var(--pc-h) - 0.05 - 0.916 * 2 / 3));
+  margin: 0;
+  padding: 0 4%;
+  overflow: hidden;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: calc(var(--w) * 0.052);
+  line-height: calc(var(--w) * (var(--pc-h) - 0.05 - 0.916 * 2 / 3));
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #353541;
+  transform: rotate(-0.8deg);
 }
 
 .g-pc-back {
@@ -2260,19 +2118,9 @@ body.garden-on .hud {
   border-bottom: 1px solid rgba(62, 58, 54, 0.25);
 }
 
-.g-pc.is-liked .g-pc-front::before {
-  content: '♥';
-  position: absolute;
-  right: 5.5%;
-  top: 5%;
-  z-index: 2;
-  font-size: calc(var(--w) * 0.05);
-  color: #fff;
-  text-shadow: 0 2px 6px rgba(150, 40, 30, 0.45);
-}
-
-/* an invitation: an envelope with a wax seal; its card slides up when it opens */
+/* an invitation: an envelope with a wax seal; its ticket slides out when it opens */
 .g-env {
+  --pc-h: 0.6667;
   perspective: 1400px;
 }
 
@@ -2292,52 +2140,38 @@ body.garden-on .hud {
     0 28px 60px -20px rgba(20, 24, 30, 0.3);
 }
 
-.g-invite {
+/* the ticket inside, drawn to the envelope's size; sealed, it doesn't show */
+.g-env-ticket {
   position: absolute;
-  left: 6%;
-  right: 6%;
-  top: 4.5%;
-  height: 91%;
-  overflow: hidden;
-  box-sizing: border-box;
-  padding: 3.6% 7% 3%;
-  border-radius: 3px;
-  background: var(--grain), #fffcf3;
-  box-shadow:
-    inset 0 0 0 calc(var(--w) * 0.012) #fffcf3,
-    inset 0 0 0 calc(var(--w) * 0.015) var(--gold),
-    0 2px 8px rgba(0, 0, 0, 0.12);
-  text-align: center;
+  left: 50%;
+  top: 9%;
+  --tw: calc(var(--w) * 0.66);
+  margin-left: calc(var(--tw) / -2);
+  visibility: hidden;
 }
 
-/* opening: the flap lifts, the card is drawn up out of the envelope, the envelope drops away behind
-   it and the card settles where the envelope was */
-.g-env.is-open .g-invite {
-  animation: g-invite-out 1.5s cubic-bezier(0.35, 0.9, 0.35, 1) 0.3s both;
+/* opening: the flap lifts, the ticket is drawn up out of the envelope, the envelope drops away behind
+   it and the ticket settles, ready to fly to the others */
+.g-env.is-open .g-env-ticket {
+  visibility: visible;
+  animation: g-ticket-out 0.9s cubic-bezier(0.35, 0.9, 0.35, 1) 0.15s both;
 }
 
-@keyframes g-invite-out {
+@keyframes g-ticket-out {
   0% {
     transform: translateY(0);
   }
-  42% {
-    transform: translateY(-40%);
+  55% {
+    transform: translateY(-34%);
   }
   100% {
-    transform: translateY(0) scale(1.03);
+    transform: translateY(18%) scale(1.03);
   }
 }
 
 .g-env.is-open .g-env-pocket,
 .g-env.is-open .g-env-body::before {
-  animation: g-env-away 1.5s ease 0.3s both;
-}
-
-/* gone from sight, the envelope's front, flap and seal still lie over the card: clicks pass through them */
-.g-env.is-open .g-env-pocket,
-.g-env.is-open .g-env-flap,
-.g-env.is-open .g-env-seal {
-  pointer-events: none;
+  animation: g-env-away 0.9s ease 0.15s both;
 }
 
 @keyframes g-env-away {
@@ -2351,71 +2185,6 @@ body.garden-on .hud {
     opacity: 0;
     transform: translateY(16%);
   }
-}
-
-.g-invite-kicker {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: calc(var(--w) * 0.028);
-  color: var(--gold);
-}
-
-.g-invite-world {
-  margin: 1% 0 0;
-  font-family: var(--font-serif);
-  font-weight: 330;
-  font-size: calc(var(--w) * 0.06);
-  line-height: 1.05;
-  letter-spacing: -0.015em;
-}
-
-.g-invite-from {
-  margin: 1% 0 2.4%;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: calc(var(--w) * 0.026);
-  color: var(--ink-soft);
-}
-
-.g-invite-pic {
-  aspect-ratio: 3.4 / 1;
-  border-radius: 3px;
-  background: center / cover;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-}
-
-.g-invite-blurb {
-  margin: 2.4% 4% 2.4%;
-  font-size: calc(var(--w) * 0.024);
-  line-height: 1.45;
-}
-
-.g-invite-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-}
-
-.g-invite-later {
-  appearance: none;
-  padding: 9px 14px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(62, 58, 54, 0.07);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.g-invite-once {
-  margin: 2.4% 0 0;
-  font-size: calc(var(--w) * 0.017);
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--gold);
 }
 
 /* the envelope's front: two side folds and a bottom fold over the card */
@@ -2511,74 +2280,117 @@ body.garden-on .hud {
   opacity: 0;
 }
 
-/* the bar under a card up close */
-.g-mail-bar {
-  position: relative;
+/* the heart and the star beside the top card, level with its photo's top edge (the top card: 10px up, 0.8 of its
+   width tall, its photo 5% of its width down); each one's word shows to its right on hover */
+.g-mail-side {
+  position: absolute;
+  left: calc(50% + var(--deck-w) / 2 + 26px);
+  top: calc(50% - var(--deck-w) * 0.4 - 10px + var(--deck-w) * 0.05);
   display: flex;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 var(--gutter) calc(var(--gutter) * 0.6);
+  flex-direction: column;
+  gap: 14px;
   opacity: 0;
-  transform: translateY(10px);
   pointer-events: none;
-  transition:
-    opacity 0.25s ease,
-    transform 0.35s ease;
+  transition: opacity 0.25s ease;
 }
 
-.g-mail[data-view='focus'] .g-mail-bar {
+.g-mail-side.is-on {
   opacity: 1;
-  transform: none;
   pointer-events: auto;
 }
 
-.g-mail-bar.is-invitation .g-mail-act:not(.g-mail-step) {
-  display: none;
+.g-mark {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--grain), radial-gradient(circle at 38% 30%, #fffdf6, #efe4cc 75%);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.22),
+    inset 0 -2px 3px rgba(80, 60, 30, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 
-.g-mail-act {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 42px;
-  padding: 0 16px 0 13px;
-  border: 0;
+.g-mark:hover {
+  transform: scale(1.06);
+}
+
+.g-mark svg {
+  width: 26px;
+  height: 26px;
+}
+
+.g-mark-like.is-on {
+  color: #e8708f;
+}
+
+.g-mark-star.is-on {
+  color: #f0b429;
+}
+
+.g-mark.is-on svg {
+  animation: g-mark-pop 0.42s cubic-bezier(0.2, 1.6, 0.4, 1);
+  filter: drop-shadow(0 1px 1px rgba(120, 60, 20, 0.3));
+}
+
+@keyframes g-mark-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.g-mark-word {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  padding: 5px 12px 6px;
   border-radius: 999px;
-  background: rgba(251, 248, 238, 0.92);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  background: rgba(251, 248, 238, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
   font-family: var(--font-serif);
   font-style: italic;
   font-size: 14.5px;
+  white-space: nowrap;
   color: var(--ink);
-  cursor: pointer;
+  opacity: 0;
+  transform: translate(-6px, -50%);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.25s ease;
 }
 
-.g-mail-act svg {
-  width: 19px;
-  height: 19px;
+.g-mark:hover .g-mark-word,
+.g-mark:focus-visible .g-mark-word {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
-.g-mail-act.is-liked {
-  color: var(--coral);
-}
-
-.g-mail-step {
-  width: 42px;
-  padding: 0;
-  justify-content: center;
-}
-
-/* the album: every card, held at its corners on a page */
+/* the pages, Favorite and Album: a scrapbook's, dotted paper with each card a polaroid taped or clipped on,
+   some with a scribbled frame or a sticker; each card's trimmings are sized by its width (cqw) */
 .g-album {
   position: absolute;
   left: 50%;
-  top: calc(var(--gutter) * 0.6 + 74px);
-  max-height: calc(100vh - var(--gutter) * 1.6 - 74px);
-  width: min(980px, calc(100vw - 2 * var(--gutter)));
+  top: 0;
+  max-height: calc(100% - var(--gutter) * 0.6);
+  width: min(980px, calc(100% - 2 * var(--gutter)));
   overflow-y: auto;
   border-radius: 10px;
-  background: var(--grain), linear-gradient(170deg, #f4ecda, #ebdfc4);
+  background:
+    var(--grain),
+    radial-gradient(circle, rgba(62, 58, 54, 0.13) 1px, transparent 1.5px) 11px 11px / 22px 22px,
+    linear-gradient(170deg, #f7f1e3, #eee3cb);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(62, 58, 54, 0.08);
   opacity: 0;
   transform: translate(-50%, 16px);
@@ -2588,7 +2400,7 @@ body.garden-on .hud {
     transform 0.4s ease;
 }
 
-.g-mail.is-album .g-album {
+.g-mail.is-board .g-album {
   opacity: 1;
   transform: translate(-50%, 0);
   pointer-events: auto;
@@ -2596,90 +2408,438 @@ body.garden-on .hud {
 
 .g-album-page {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 34px 26px;
-  padding: 36px 34px 44px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 54px 40px;
+  padding: 56px 46px 64px;
 }
 
 .g-album-slot {
   appearance: none;
   position: relative;
-  aspect-ratio: 3 / 2;
+  display: block;
   padding: 0;
   border: 0;
-  background: #fffdf6;
-  box-shadow: 0 6px 14px rgba(40, 30, 20, 0.2);
+  background: none;
+  container-type: inline-size;
   transform: rotate(var(--r));
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 
-.g-album-slot:hover {
+.g-album-slot:hover,
+.g-album-slot:focus-visible {
+  z-index: 1;
   transform: rotate(0deg) scale(1.04);
 }
 
-.g-album-slot img {
-  position: absolute;
-  inset: 5px;
-  width: calc(100% - 10px);
-  height: calc(100% - 10px);
+.g-album-slot:focus-visible {
+  outline: none;
+}
+
+.g-album-slot:focus-visible .g-snap {
+  outline: 2px solid #2e6e9e;
+  outline-offset: 3px;
+}
+
+/* the polaroid: the deck's card in small, the same edges */
+.g-snap {
+  position: relative;
+  display: block;
+  padding: 5% 4.2% 0;
+  background: var(--grain), linear-gradient(170deg, var(--snap-top, #fdfaf1), var(--snap-low, #f1eadb));
+  box-shadow:
+    0 1px 1px rgba(40, 30, 20, 0.12),
+    0 7px 16px -4px rgba(40, 30, 20, 0.28);
+}
+
+.g-snap img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
-}
-
-.g-corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  background: linear-gradient(to bottom right, #3f3a33 50%, transparent 50%);
-  opacity: 0.86;
-}
-
-.g-corner-tl {
-  left: -4px;
-  top: -4px;
-}
-
-.g-corner-tr {
-  right: -4px;
-  top: -4px;
-  transform: rotate(90deg);
-}
-
-.g-corner-br {
-  right: -4px;
-  bottom: -4px;
-  transform: rotate(180deg);
-}
-
-.g-corner-bl {
-  left: -4px;
-  bottom: -4px;
-  transform: rotate(270deg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
 }
 
 .g-album-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 9px);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-  text-align: center;
-  color: var(--ink);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 13.9cqw;
+  padding: 0 3cqw;
+  white-space: nowrap;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 7cqw;
+  color: #353541;
+}
+
+/* (room under the line for the pen's tails, which overflow would clip) */
+.g-album-place {
+  min-width: 0;
+  padding: 0.1em 0 0.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .g-album-heart {
-  position: absolute;
-  right: 10px;
-  top: 9px;
-  color: #fff;
-  filter: drop-shadow(0 1px 3px rgba(150, 40, 30, 0.55));
+  flex: none;
+  margin-left: 0.3em;
+  color: #e8708f;
 }
 
-.g-album-heart svg {
-  width: 18px;
-  height: 18px;
+/* washi tape: see-through, torn at both ends */
+.g-tape {
+  position: absolute;
+  z-index: 2;
+  width: 38cqw;
+  height: 10.5cqw;
+  background: var(--tape);
+  opacity: 0.84;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  clip-path: polygon(0% 7%, 3% 0%, 97% 0%, 100% 10%, 98% 22%, 100% 36%, 97.5% 50%, 100% 64%, 98% 78%, 100% 92%, 97% 100%, 3% 100%, 0% 90%, 2.2% 76%, 0% 62%, 2.5% 48%, 0% 34%, 2% 20%);
+}
+
+.g-tape-stripes {
+  background: repeating-linear-gradient(-45deg, var(--tape) 0 2.2cqw, var(--tape-2) 2.2cqw 4.4cqw);
+}
+
+.g-tape-dots {
+  background:
+    radial-gradient(circle, var(--tape-2) 0.8cqw, transparent 1cqw) 0 0 / 3.8cqw 3.8cqw,
+    var(--tape);
+}
+
+.g-tape-gingham {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 50%, transparent 0) 0 0 / 4.2cqw 4.2cqw,
+    linear-gradient(rgba(255, 255, 255, 0.5) 50%, transparent 0) 0 0 / 4.2cqw 4.2cqw,
+    var(--tape);
+}
+
+.g-tape-top {
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -55%) rotate(var(--turn));
+}
+
+.g-tape-tl {
+  left: 4cqw;
+  top: 4cqw;
+  transform: translate(-50%, -50%) rotate(calc(-42deg + var(--turn)));
+}
+
+.g-tape-tr {
+  right: 4cqw;
+  top: 4cqw;
+  transform: translate(50%, -50%) rotate(calc(42deg + var(--turn)));
+}
+
+.g-tape-bl {
+  left: 4cqw;
+  bottom: 4cqw;
+  transform: translate(-50%, 50%) rotate(calc(42deg + var(--turn)));
+}
+
+.g-tape-br {
+  right: 4cqw;
+  bottom: 4cqw;
+  transform: translate(50%, 50%) rotate(calc(-42deg + var(--turn)));
+}
+
+/* a clip on the top edge: a binder clip's body over it (36 of its 56 down), a paper clip's lower half (26 of 60) */
+.g-clip {
+  position: absolute;
+  z-index: 3;
+  left: var(--at);
+  top: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 1.5px 1.2px rgba(30, 20, 10, 0.32));
+}
+
+.g-clip svg,
+.g-sticker svg,
+.g-scribble svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* (a crayon line's edge may run a hair past its drawing) */
+.g-scribble svg {
+  overflow: visible;
+}
+
+.g-clip-binder {
+  width: 22cqw;
+  height: calc(22cqw * 56 / 60);
+  transform: translate(-50%, -64.3%) rotate(var(--turn));
+  transform-origin: 50% 64.3%;
+}
+
+.g-clip-paper {
+  width: 7.5cqw;
+  height: 22.5cqw;
+  transform: translate(-50%, -43.3%) rotate(var(--turn));
+  transform-origin: 50% 43.3%;
+}
+
+/* a frame scribbled round the polaroid; its drawing reaches 9 past each edge of a 100 by 80 polaroid */
+.g-scribble {
+  position: absolute;
+  z-index: 1;
+  left: -9%;
+  top: -11.25%;
+  width: 118%;
+  height: 122.5%;
+  pointer-events: none;
+}
+
+/* a sticker on a corner: die-cut ones with a white edge and a shadow, doodles straight on in ink */
+.g-sticker {
+  position: absolute;
+  z-index: 4;
+  width: 21cqw;
+  height: 21cqw;
+  pointer-events: none;
+  transform: rotate(var(--turn));
+}
+
+.g-sticker.is-cut {
+  filter: drop-shadow(1.3px 0 0 #fff) drop-shadow(-1.3px 0 0 #fff) drop-shadow(0 1.3px 0 #fff) drop-shadow(0 -1.3px 0 #fff)
+    drop-shadow(0 2px 2px rgba(40, 30, 20, 0.28));
+}
+
+.g-sticker-tl {
+  left: -7cqw;
+  top: -7cqw;
+}
+
+.g-sticker-tr {
+  right: -7cqw;
+  top: -7cqw;
+}
+
+.g-sticker-bl {
+  left: -10cqw;
+  bottom: -8cqw;
+}
+
+.g-sticker-br {
+  right: -10cqw;
+  bottom: -8cqw;
+}
+
+.g-album-empty {
+  margin: 0;
+  padding: 54px 30px;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+/* the tickets, under the switch: each invitation not yet used, in its host's colours */
+.g-tickets {
+  --tw: 248px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-height: 0;
+  width: calc(var(--tw) + var(--gutter) + 24px);
+  box-sizing: border-box;
+  padding: 22px var(--gutter) 24px 24px;
+  overflow-y: auto;
+}
+
+.g-mail.has-tickets .g-tickets {
+  display: flex;
+}
+
+.g-mail .g-tickets {
+  opacity: 0;
+  transform: translateX(12px);
+  transition:
+    opacity 0.3s ease 0.2s,
+    transform 0.45s ease 0.2s;
+}
+
+.g-mail.is-open .g-tickets {
+  opacity: 1;
+  transform: none;
+}
+
+/* a ticket: paper in the host's colour, a stub with its planet behind a perforation, notched at the tear */
+.g-ticket {
+  --stub: 28%;
+  appearance: none;
+  position: relative;
+  display: flex;
+  flex: none;
+  width: var(--tw);
+  height: calc(var(--tw) * 0.5);
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--tw) * 0.03);
+  background:
+    var(--grain),
+    linear-gradient(90deg, color-mix(in srgb, var(--coat) 82%, #6e5a40) 0 var(--stub), transparent var(--stub)),
+    linear-gradient(170deg, color-mix(in srgb, var(--coat) 48%, #fffaf0), color-mix(in srgb, var(--coat) 70%, #f6eedb));
+  -webkit-mask:
+    radial-gradient(circle at var(--stub) 0, transparent calc(var(--tw) * 0.032), #000 calc(var(--tw) * 0.034)) top / 100% 51% no-repeat,
+    radial-gradient(circle at var(--stub) 100%, transparent calc(var(--tw) * 0.032), #000 calc(var(--tw) * 0.034)) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle at var(--stub) 0, transparent calc(var(--tw) * 0.032), #000 calc(var(--tw) * 0.034)) top / 100% 51% no-repeat,
+    radial-gradient(circle at var(--stub) 100%, transparent calc(var(--tw) * 0.032), #000 calc(var(--tw) * 0.034)) bottom / 100% 51% no-repeat;
+  filter: drop-shadow(0 calc(var(--tw) * 0.03) calc(var(--tw) * 0.05) rgba(20, 24, 30, 0.32));
+  color: var(--ink);
+  text-align: left;
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+button.g-ticket {
+  cursor: pointer;
+}
+
+button.g-ticket:hover,
+button.g-ticket:focus-visible {
+  transform: rotate(0deg) translateY(-3px) scale(1.02);
+}
+
+button.g-ticket:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
+/* the perforation */
+.g-ticket::before {
+  content: '';
+  position: absolute;
+  left: var(--stub);
+  top: calc(var(--tw) * 0.05);
+  bottom: calc(var(--tw) * 0.05);
+  border-left: 1.5px dashed rgba(62, 58, 54, 0.32);
+}
+
+/* a soft sheen on the paper */
+.g-ticket::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.3), transparent 40% 75%, rgba(0, 0, 0, 0.05));
+  pointer-events: none;
+}
+
+.g-ticket-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--tw) * 0.012);
+  width: var(--stub);
+}
+
+.g-ticket-planet {
+  width: calc(var(--tw) * 0.23);
+  aspect-ratio: 1;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(30, 20, 10, 0.25));
+}
+
+.g-ticket-admit {
+  font-size: calc(var(--tw) * 0.034);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fffcf3;
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.45);
+}
+
+.g-ticket-main {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: calc(var(--tw) * 0.06) calc(var(--tw) * 0.05) 0 calc(var(--tw) * 0.055);
+}
+
+.g-ticket-world {
+  font-family: var(--font-serif);
+  font-weight: 380;
+  font-size: calc(var(--tw) * 0.08);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variation-settings: 'SOFT' 60;
+}
+
+.g-ticket-host {
+  margin-top: calc(var(--tw) * 0.012);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: calc(var(--tw) * 0.064);
+  color: color-mix(in srgb, var(--coat) 30%, #3e3a36);
+}
+
+.g-ticket-once {
+  margin-top: calc(var(--tw) * 0.022);
+  font-size: calc(var(--tw) * 0.033);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(62, 58, 54, 0.62);
+}
+
+/* a rubber stamp: Travel, plain on hover */
+.g-ticket-go {
+  position: absolute;
+  right: calc(var(--tw) * 0.035);
+  bottom: calc(var(--tw) * 0.03);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--tw) * 0.012);
+  padding: calc(var(--tw) * 0.006) calc(var(--tw) * 0.025);
+  border: 1.5px solid rgba(184, 68, 58, 0.55);
+  border-radius: calc(var(--tw) * 0.016);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: calc(var(--tw) * 0.046);
+  color: rgba(184, 68, 58, 0.7);
+  transform: rotate(-8deg);
+  mix-blend-mode: multiply;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.g-ticket-go svg {
+  width: calc(var(--tw) * 0.06);
+  height: calc(var(--tw) * 0.06);
+}
+
+button.g-ticket:hover .g-ticket-go,
+button.g-ticket:focus-visible .g-ticket-go {
+  opacity: 1;
+}
+
+/* a ticket that has just come out of its envelope: hidden until it lands, then it settles */
+.g-ticket.is-incoming {
+  visibility: hidden;
+}
+
+.g-ticket.is-landed {
+  animation: g-ticket-land 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes g-ticket-land {
+  0% {
+    transform: rotate(var(--tilt, 0deg)) scale(1.06);
+  }
+  100% {
+    transform: rotate(var(--tilt, 0deg));
+  }
 }
 
 /* ---- travel: the ticket between worlds, and the visit's banner ---------------- */
@@ -2819,8 +2979,7 @@ body.garden-on .hud {
 }
 
 .garden.is-away .g-rail,
-.garden.is-away .g-postbox,
-.garden.is-away .g-ticket {
+.garden.is-away .g-postbox {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
@@ -2843,22 +3002,57 @@ body.garden-on .hud {
     order: 3;
     flex-basis: 100%;
   }
+  /* on a phone the tickets run in a row under the switch, and the heart and star sit under the card */
+  .g-mail {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .g-mail-tools {
+    order: 4;
+    flex-basis: 100%;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+  .g-segment {
+    padding: 0 11px;
+    font-size: 13.5px;
+  }
+  .g-tickets {
+    grid-row: 2;
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    padding: 12px 16px 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    --tw: 206px;
+  }
+  /* its own row, so with no tickets it doesn't fall into theirs, which is as tall as nothing */
+  .g-mail-desk {
+    grid-row: 3;
+    --deck-w: min(780px, 100cqw - 24px, (100cqh - 110px) / 0.8);
+  }
   .g-pc {
-    --w: min(92vw, calc((100vh - 300px) * 1.5));
+    top: 42%;
   }
-  .g-pc.is-focus {
-    --w: min(94vw, calc((100vh - 260px) * 1.5));
+  .g-mail-side {
+    left: 50%;
+    top: calc(42% - 10px + var(--deck-w) * 0.4 + 20px);
+    flex-direction: row;
+    gap: 22px;
+    transform: translateX(-50%);
   }
-  .g-mail-act span {
+  .g-mark {
+    width: 48px;
+    height: 48px;
+  }
+  .g-mark-word {
     display: none;
-  }
-  .g-mail-act {
-    padding: 0 13px;
   }
   .g-album-page {
     grid-template-columns: repeat(2, 1fr);
-    gap: 26px 16px;
-    padding: 24px 18px 36px;
+    gap: 40px 24px;
+    padding: 36px 24px 46px;
   }
   .g-visit {
     flex-wrap: wrap;
@@ -2885,7 +3079,6 @@ body.g-mail-open .hints,
 body.g-mail-open .controlbar,
 body.g-mail-open .lil-gui.meadow-panel,
 body.g-mail-open .g-rail,
-body.g-mail-open .g-ticket,
 body.g-mail-open .hud {
   opacity: 0 !important;
   pointer-events: none !important;
@@ -2906,112 +3099,315 @@ body.postcard .garden {
   display: none;
 }
 
-/* ---- opening a basket (basketFlight.ts): the basket, its finds on their way, where they land ---- */
+/* ---- the basket (basketStage.ts draws it, basketOverlay.ts is what you touch) ---- */
 
-.g-fly {
+.g-basket {
   position: fixed;
   inset: 0;
-  z-index: 8;
-  overflow: hidden;
+  z-index: 5;
   pointer-events: none;
 }
 
-.g-fly-basket {
+/* while it is out: the planet dims a little toward the edges, and no drag or wheel reaches it */
+.g-basket-scrim {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 156px;
-  height: 120px;
-  transform-origin: 50% 50%;
-  will-change: transform, opacity;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 46%, rgba(30, 42, 60, 0) 34%, rgba(30, 42, 60, 0.26) 100%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
 }
 
-.g-fly-basket svg {
-  display: block;
+.g-basket.is-out .g-basket-scrim {
+  opacity: 1;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.g-basket-stage,
+.g-basket-hits {
+  position: absolute;
+  inset: 0;
+}
+
+.g-basket-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  visibility: hidden;
 }
 
-.g-fly-basket.is-front {
-  filter: drop-shadow(0 16px 20px rgba(30, 42, 60, 0.24));
+.g-basket-canvas.is-on {
+  visibility: visible;
 }
 
-/* the lid's two flaps, hinged at the rim's ends, swing up and out as it opens */
-.g-fly-lid {
-  position: absolute;
-  top: 37px;
-  width: 70px;
-  height: 17px;
-  border-radius: 50%;
-  background: linear-gradient(#ebc68c, #c48d52);
-  box-shadow: inset 0 -2px 0 rgba(120, 80, 40, 0.35), 0 1px 0 rgba(92, 60, 30, 0.35);
-}
-
-.g-fly-lid.is-left {
-  left: 8px;
-  transform-origin: 3px 50%;
-  transform: rotate(calc(var(--open, 0) * -112deg));
-}
-
-.g-fly-lid.is-right {
-  right: 8px;
-  transform-origin: calc(100% - 3px) 50%;
-  transform: rotate(calc(var(--open, 0) * 112deg));
-}
-
-.g-fly-find {
+.g-basket-hit {
+  appearance: none;
   position: absolute;
   left: 0;
   top: 0;
-  width: 58px;
-  height: 58px;
-  border: 3px solid #fbf7ee;
-  border-radius: 12px;
-  background: var(--paper-deep) center / cover;
-  box-shadow: 0 8px 18px rgba(30, 44, 66, 0.26);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+.g-basket-hit.is-basket {
+  border-radius: 28% 28% 42% 42%;
+}
+
+.g-basket.is-out .g-basket-hit {
+  pointer-events: auto;
+}
+
+.g-basket-hit:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(46, 110, 158, 0.35);
+}
+
+.g-basket-more {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 1px 7px 2px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 3px 10px rgba(28, 60, 96, 0.18);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink);
   opacity: 0;
-  will-change: transform;
+  transition: opacity 0.2s ease;
 }
 
-.g-fly-find i {
+.g-basket.is-out .g-basket-more.is-on {
+  opacity: 1;
+}
+
+/* a flower's preview: its find's card, light, above it (the basket's beside it) */
+.g-peek {
   position: absolute;
-  right: -6px;
-  bottom: -6px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px #fbf7ee;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  width: 236px;
+  box-sizing: border-box;
+  padding: 9px 10px 8px;
+  border-radius: 14px;
+  background: var(--grain), var(--paper);
+  box-shadow: 0 14px 34px rgba(30, 42, 60, 0.2), 0 2px 6px rgba(30, 42, 60, 0.1);
+  font-size: 13px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.14s ease,
+    visibility 0s linear 0.14s;
 }
 
-/* on its way down a find passes in front of the basket */
-.g-fly-find.is-leaving {
-  z-index: 1;
+.g-basket.is-out .g-peek.is-on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.14s ease;
 }
 
-/* where a find lands: a ring on the ground in its interest's colour, spreading and fading */
-.g-fly-ring {
+.g-peek .g-media {
+  max-height: 150px;
+}
+
+.g-peek .g-headline {
+  font-size: 15px;
+}
+
+.g-peek .g-dek,
+.g-peek .g-note {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.g-peek-day {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.g-peek-do {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* the baskets by day, under the basket */
+.g-days {
   position: absolute;
-  width: 84px;
-  height: 36px;
-  margin: -18px 0 0 -42px;
-  border: 3px solid #fffaf0;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--ring) 55%, transparent), transparent);
-  box-shadow: 0 0 16px 2px var(--ring), inset 0 0 12px var(--ring);
-  animation: g-fly-ring 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  height: 58px;
+  padding-top: 24px;
+  box-sizing: border-box;
+  touch-action: none;
+  cursor: grab;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.2, 1.3, 0.4, 1);
 }
 
-@keyframes g-fly-ring {
-  from {
-    transform: scale(0.15);
-    opacity: 1;
-  }
-  45% {
-    opacity: 0.9;
-  }
-  to {
-    transform: scale(1.6);
-    opacity: 0;
-  }
+.g-basket.is-out .g-days {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.g-days:active {
+  cursor: grabbing;
+}
+
+.g-days:focus-visible {
+  outline: none;
+}
+
+.g-days:focus-visible .g-days-track {
+  box-shadow: 0 0 0 3px rgba(46, 110, 158, 0.35);
+}
+
+.g-days.is-single .g-days-track {
+  opacity: 0;
+}
+
+.g-days-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(251, 248, 238, 0.7);
+  box-shadow: 0 1px 6px rgba(28, 60, 96, 0.18);
+}
+
+.g-days-dot {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 1px 4px rgba(28, 60, 96, 0.3);
+  transition:
+    left 0.12s ease-out,
+    transform 0.2s ease;
+}
+
+.g-days-dot.is-new {
+  box-shadow:
+    0 0 0 2px var(--coral),
+    0 1px 4px rgba(28, 60, 96, 0.3);
+}
+
+.g-days-dot.is-hover {
+  transform: scale(1.35);
+}
+
+.g-days-dot.is-picked {
+  transform: scale(1.6);
+  background: #2e6e9e;
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 1px 5px rgba(28, 60, 96, 0.35);
+}
+
+.g-days-tick {
+  position: absolute;
+  top: 7px;
+  width: 1px;
+  height: 6px;
+  background: rgba(251, 248, 238, 0.75);
+  transition: left 0.12s ease-out;
+}
+
+.g-days-tick span {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--paper);
+  text-shadow: 0 1px 3px rgba(20, 34, 50, 0.55);
+}
+
+.g-days-label {
+  position: absolute;
+  top: 0;
+  margin: 0;
+  padding: 1px 9px 2px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 3px 10px rgba(28, 60, 96, 0.16);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--ink);
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: left 0.12s ease-out;
+}
+
+.g-days-label.is-hover {
+  color: #2e6e9e;
+}
+
+/* Let the postcards return to the open mailbox before hiding the viewer. */
+.g-mail.is-closing {
+  pointer-events: none;
+}
+
+.g-mail.is-closing .g-mail-head,
+.g-mail.is-closing .g-mail-side,
+.g-mail.is-closing .g-tickets,
+.g-mail.is-closing .g-album {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.g-mail.is-closing .g-mail-scrim {
+  opacity: 0;
+}
+
+.g-mail.is-closing .g-pc {
+  pointer-events: none;
+  transition:
+    transform 0.5s cubic-bezier(0.4, 0, 0.7, 1),
+    opacity 0.14s ease 0.36s;
+}
+
+/* the rail's icon steps aside while the basket is out of it */
+.g-basketbtn svg,
+.g-basketbtn .g-basket-icon {
+  transition: opacity 0.16s ease;
+}
+
+.g-basketbtn.is-away svg,
+.g-basketbtn.is-away .g-basket-icon {
+  opacity: 0;
+}
+
+/* while the basket is out, the meadow's own chrome and the post step back */
+body.g-basket-open .masthead,
+body.g-basket-open .hints,
+body.g-basket-open .controlbar,
+body.g-basket-open .lil-gui.meadow-panel,
+body.g-basket-open .g-postbox,
+body.g-basket-open .hud {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease;
 }
