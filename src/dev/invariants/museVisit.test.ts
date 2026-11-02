@@ -1,14 +1,16 @@
 import { BufferAttribute, BufferGeometry, type Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { fit, PIECES } from '../../life/hut';
-import { MuseRoam, type Indoors, type Room } from '../../life/museRoam';
+import { ARMS, MuseRoam, type Indoors, type Room } from '../../life/museRoam';
 import { COTTAGE, DOORWAY, FLOOR, OUTER } from '../../life/props';
 import type { FieldParams } from '../../planet/fields';
 import { generateLayout, Terrain } from '../../planet/terrain';
 
 // Muse coming into its hut when you knock and going out when you step out
 // (museRoam.ts comeIn, goOut): it walks in and out only through the door,
-// which is open whenever it is in the doorway and shut once it is through;
+// which is open whenever it is in the doorway and shut once it is through,
+// its arms clear of the jambs and of the door standing open, and the door
+// never swinging while Muse is where it swings;
 // it keeps clear of the walls and of what stands on the floor; it gets to
 // what it does there (greeting you, cooking at the hearth, asleep on its
 // bed); it never jumps from one place to another or snaps round, whatever it
@@ -92,6 +94,13 @@ function follow(roam: MuseRoam, terrain: Terrain, camera: Vector3, t0: number, t
       const inDoorway = c.x > DOORWAY.x0 + 0.25 && c.x < DOORWAY.x1 - 0.25 && c.z > 0;
       if (!inRoom && !inDoorway) trouble('in a wall');
       if (!inRoom && inDoorway && Math.abs(c.z - DOORWAY.z) < 0.5 && roam.doorAt(t) < 0.9) trouble('the door not open');
+      // (Kai's note: its arms clear of the jambs, and of the door standing open, going through and beside it)
+      if (!inRoom && inDoorway && (c.x - ARMS < DOORWAY.x0 - 0.01 || c.x + ARMS > DOORWAY.x1 - DOORWAY.thick + 0.01)) trouble('its arms through a jamb or the door');
+      const door = roam.doorAt(t);
+      if (door > 0 && c.z < DOORWAY.z && c.z > DOORWAY.z - (DOORWAY.x1 - DOORWAY.x0) && c.x + ARMS > DOORWAY.x1 - DOORWAY.thick + 0.01) trouble('its arm through the open door');
+      // (nor does the door swing while Muse is where it swings)
+      const reach = Math.hypot(c.x - DOORWAY.hinge[0], c.z - DOORWAY.hinge[1]) - ARMS;
+      if (door > 0.02 && door < 0.98 && c.z < DOORWAY.z + 0.3 && reach < DOORWAY.x1 - DOORWAY.x0 - 0.02) trouble(`the door swinging into it (${door.toFixed(2)})`);
       // standing on the floor, clear of what stands there (on its bed it is up off the floor)
       if (raised < 0.2) for (const k of things) if (c.x > k.x0 + 0.1 && c.x < k.x1 - 0.1 && c.z > k.z0 + 0.1 && c.z < k.z1 - 0.1) trouble('in the furniture');
     }

@@ -85,19 +85,26 @@ export const ARCH = { x: PIER.x0 + 1.0, spring: -0.78, half: 0.55, depth: 1.6 } 
 const BASE = -(HOME_LEVEL + BANK.height + 1.8);
 
 type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
-/** Where the front's openings are, along it from its left end (m), the end window along the right end from its front corner. */
-export const FRONT = { window: [1.32, 2.52], door: [4.6, 5.7] } as const;
+/**
+ * Where the front's openings are, along it from its left end (m), the end window along the right end from its front
+ * corner. The door is 1.35 m wide (1.1 until Kai's note of 2026-11-01, widened on its hinge side): Muse, its arms out
+ * as it walks, goes through it clear of the jambs and of the door standing open.
+ */
+export const FRONT = { window: [1.32, 2.52], door: [4.6, 5.95] } as const;
 /**
  * The front door (local m): its opening across the front (x0 … x1), the plane its planks stand in (z: 0.6 of the wall
- * in from its face, as fittings builds them), the hinge it swings in on (its right side, seen from the porch), and how
- * far it swings open (rad, into the room), as Muse comes to it (museRoam.ts).
+ * in from its face, as fittings builds them) and their half thickness, the hinge it swings in on (its right side, seen
+ * from the porch), and how far it swings open (rad, into the room: square to the wall, out of the way), as Muse comes
+ * to it (museRoam.ts).
  */
 export const DOORWAY = (() => {
   const x0 = -OUTER.x + FRONT.door[0];
   const x1 = -OUTER.x + FRONT.door[1];
   const z = OUTER.z - COTTAGE.thickness * 0.6;
-  return { x0, x1, z, hinge: [x1, z] as const, swing: 0.47 * Math.PI };
+  return { x0, x1, z, thick: 0.03, hinge: [x1, z] as const, swing: 0.5 * Math.PI };
 })();
+/** The doorstep under the door (m): its half width (a little past the door either side), its depth out from the wall, its top over the floor. */
+export const DOORSTEP = { half: (DOORWAY.x1 - DOORWAY.x0) / 2 + 0.13, depth: 0.34, height: 0.09 } as const;
 /** The bench against the front, between the window and the door (local m): its middle, its seat's half length and half depth, the seat's top over the floor. */
 export const BENCH = { x: -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12, z: OUTER.z + 0.22, half: 0.74, depth: 0.19, seat: 0.485 } as const;
 /** The house's front face and its side walls (local m: z, ±x): what stands on the terrace stands clear of them. */
@@ -561,7 +568,7 @@ function landing(b: Builder, rand: Rand): void {
   }
   // the doorstep, under the door
   const door = -OUTER.x + (FRONT.door[0] + FRONT.door[1]) / 2;
-  b.box(new Vector3(door, FLOOR + 0.04, OUTER.z + 0.17), new Vector3(0.68, 0.05, 0.17), null, FLOOR, 0, 'xXYZz');
+  b.box(new Vector3(door, FLOOR + DOORSTEP.height - 0.05, OUTER.z + DOORSTEP.depth / 2), new Vector3(DOORSTEP.half, 0.05, DOORSTEP.depth / 2), null, FLOOR, 0, 'xXYZz');
 }
 
 /**
@@ -631,7 +638,7 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
       const mid = (o.from + o.to) / 2;
       if (o.door) {
         // planks, painted with their iron straps (flag 1), set back in the wall
-        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, 0.03), turn, FLOOR, 1);
+        wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, DOORWAY.thick), turn, FLOOR, 1);
         continue;
       }
       // a dark frame and small panes (two across and three up in the tall window, two by two in the small), the glass set back

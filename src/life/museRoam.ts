@@ -4,7 +4,7 @@ import { angleBetween, tangentToward, travel } from '../planet/geo';
 import { createGroundSample, type Terrain } from '../planet/terrain';
 import { Answers, rampIntegral, withTool } from './museLife';
 import { COOK, FISH, HOP, LIE_BACK, PLOP, POCKET, RISE, STEP, WAKE, WAVE_LENGTH, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
-import { BENCH, CHAIR, COTTAGE, DOORWAY, FACE, FLOOR, OUTER, PIER, SIDE, STEPS, TERRACE } from './props';
+import { BENCH, CHAIR, COTTAGE, DOORSTEP, DOORWAY, FACE, FLOOR, OUTER, PIER, SIDE, STEPS, TERRACE } from './props';
 
 // Muse's life on the planet (muse.ts draws it): it roams the meadow at
 // random and does what it likes where it is, more often close to its hut.
@@ -62,15 +62,24 @@ const INDOOR = { rounds: 4, pause: 6, wave: 0.6, again: 24, watch: 6 } as const;
 /** What Muse is doing in its hut when you come in: cooking at the hearth's stove, standing in the room greeting you, asleep on its bed. */
 export type Indoors = 'cook' | 'greet' | 'sleep';
 /**
- * Its hut inside (local m): the room's half sizes to the walls' inner faces; the doorway's middle, how far either
- * side of it Muse keeps going through (its girth inside the door's width), and where it stands before the door on
- * the porch; the doorstep it steps over (its half width, its depth out from the wall, its height).
+ * Its hut inside (local m): the room's half sizes to the walls' inner faces. Going through its door: Muse's half width
+ * with its arms out as it walks (its mittens' reach and their size: Kai saw them go through the open door); the door's
+ * width; the middle of the way through, between the far jamb and the door standing open on its hinge side, and how far
+ * either side of it Muse's middle may go with its arms clear of both; where it stands before the door on the porch.
  */
 const ROOM = { x: COTTAGE.halfX - COTTAGE.thickness / 2, z: COTTAGE.halfZ - COTTAGE.thickness / 2 } as const;
-const DOOR = { x: (DOORWAY.x0 + DOORWAY.x1) / 2, way: 0.2, porch: OUTER.z + 0.85 } as const;
-const DOORSTEP = { half: 0.68, depth: 0.34, height: 0.09 } as const;
-/** The door swinging open as Muse comes to it: open by the time it is this far from it (m), taking this long (s); shutting once it is this far past (m), taking this long (s). */
-const SWING = { ahead: 1.5, open: 0.8, past: 1.4, shut: 0.9 } as const;
+export const ARMS = 0.6;
+const DOOR = (() => {
+  const width = DOORWAY.x1 - DOORWAY.x0;
+  const clear = DOORWAY.x1 - DOORWAY.thick;
+  return { width, clear, x: (DOORWAY.x0 + clear) / 2, way: Math.max(0.02, (clear - DOORWAY.x0) / 2 - ARMS), porch: OUTER.z + 0.85 };
+})();
+/**
+ * The door swinging: open, taking this long (s), by the time Muse comes within its sweep (as far round its hinge as it
+ * reaches, and Muse's arms, with a margin: m) and a little before (m along its way); shutting, taking this long (s),
+ * once Muse is out of it for good.
+ */
+const SWING = { open: 0.8, shut: 0.9, margin: 0.15, lead: 0.3 } as const;
 /** Cut short (you knocked, or stepped out of its hut): a walk slows to a halt over this long (s), a pastime's motions ease out over this long (s). */
 const HALT = 0.8;
 const EASE = 0.7;
@@ -365,7 +374,7 @@ export class MuseRoam {
 
   /** The doorstep under its feet going in or out (m over the floor): up onto it from the doorway and the porch, smoothly. */
   private doorstep(x: number, z: number): number {
-    if (Math.abs(x - DOOR.x) > DOORSTEP.half) return 0;
+    if (Math.abs(x - (DOORWAY.x0 + DOORWAY.x1) / 2) > DOORSTEP.half) return 0;
     const z1 = OUTER.z + DOORSTEP.depth;
     return DOORSTEP.height * smoothstep(OUTER.z - 0.08, OUTER.z + 0.06, z) * (1 - smoothstep(z1 - 0.04, z1 + 0.1, z));
   }
@@ -374,8 +383,9 @@ export class MuseRoam {
   private deckFree(x: number, z: number): boolean {
     const room = this.room;
     if (room && z < FACE + GIRTH && z > -OUTER.z && Math.abs(x) < SIDE) {
-      // (through the doorway along its middle)
+      // (through the doorway along its middle; inside, beside the door standing open, its arms clear of it)
       if (z > ROOM.z - 0.1) return Math.abs(x - DOOR.x) < DOOR.way;
+      if (z > DOORWAY.z - DOOR.width - 0.1 && x + ARMS > DOOR.clear) return false;
       if (Math.abs(x) > ROOM.x - GIRTH || z < -ROOM.z + GIRTH) return false;
       return room.things.every((t) => x < t.x0 - GIRTH || x > t.x1 + GIRTH || z < t.z0 - GIRTH || z > t.z1 + GIRTH);
     }
@@ -742,6 +752,16 @@ export class MuseRoam {
     const start = this.length;
     const through = this.doorCrossing(path);
     if (through !== null) {
+      // (open by the time it comes within the door's sweep, shutting once it is out of it for good)
+      let near = through;
+      let far = through;
+      const c = { x: 0, z: 0 };
+      path.points.forEach((p, i) => {
+        this.terrain.cottageLocal(p, c);
+        if (!this.swept(c.x, c.z, SWING.margin)) return;
+        near = Math.min(near, path.at[i]);
+        far = Math.max(far, path.at[i]);
+      });
       // (when it is so far along: the walk's own ramps inverted)
       const when = (d: number): number => {
         if (d <= 0) return 0;
@@ -755,9 +775,9 @@ export class MuseRoam {
         }
         return (lo + hi) / 2;
       };
-      const open = start + when(through - SWING.ahead);
+      const open = start + when(near - SWING.lead);
       const from = Math.max(this.cutAt, open - SWING.open);
-      this.doorways.push({ from, open: Math.max(open, from + 0.3), shut: Math.max(start + when(through + SWING.past), open), through: start + when(through) });
+      this.doorways.push({ from, open: Math.max(open, from + 0.3), shut: Math.max(start + when(far) + 0.2, open), through: start + when(through) });
     }
     const segment = this.push({
       name,
@@ -803,6 +823,11 @@ export class MuseRoam {
     });
     this.facing = endFacing ?? path.heading(length, new Vector3());
     this.here = to;
+  }
+
+  /** Would the door, swinging, touch Muse here (local m), to within a margin (m)? Within its sweep round the hinge (and Muse's arms), on the room's side of its plane (or within reach of it). */
+  private swept(x: number, z: number, margin = 0): boolean {
+    return z < DOORWAY.z + ARMS + margin && Math.hypot(x - DOORWAY.hinge[0], z - DOORWAY.hinge[1]) < DOOR.width + ARMS + margin;
   }
 
   /** Where a path goes through the hut's front door (m along it), if it does. */
@@ -1224,6 +1249,7 @@ export class MuseRoam {
     this.roomWays = [
       { x: DOOR.x, z: DOOR.porch },
       { x: DOOR.x, z: ROOM.z - 0.6 },
+      { x: DOOR.x, z: DOORWAY.z - DOOR.width - 0.2 },
     ];
     for (const t of room.things) {
       for (const [x, z] of [
