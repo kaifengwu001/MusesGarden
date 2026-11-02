@@ -708,38 +708,61 @@ in `src/terraces/`.
   bands, a band's piece parted exactly along a cut; the pieces joined into
   paddies (union-find, the cuts' edges barriers); each paddy's place in
   the season from a slow noise at its middle (one in seven its own),
-  mapped so that at the season's default front the shares of flooded,
-  planted and grown paddies are the aerial's.
+  mapped so that at the season's default front the paddies share the lab's
+  six looks as the lab measured them from Kai's aerial (36 % flooded, 8 %
+  flooded and shallow, 10 % just planted, 18 % growing, 18 % grown, 10 %
+  grown deep); none fallow.
 - **Geometry**: the floors level at their band's (the water on them is the
-  paint's look, never a raise: raised, a flooded paddy stood over its own
+  paint's colour, never a raise: raised, a flooded paddy stood over its own
   dam); the woods' ground at the hills' exact height, its normals from
   their exact gradient; along each bank a dam (a profile swept between the
   outline and its offset) and a riser leaning down to the lowest floor
   beside it; a cross-bank up each cut; where the woods meet the farmed
   land, a bank of earth; every ridge's feet down to the lowest floor either
   side; open banks and ridges carried a little past their ends; trees
-  jittered over the woods. A check counts any step between two farmed
+  jittered over the woods. A check counts any step between two terraced
   floors with no bank within 12 cm (`bare`).
-- **The flats** (Kai's aerial of flat rice fields): the strips are the
-  bands themselves, along the lie of the land, crossed every 32 m by a
-  turn of the planet's axes (wandering a little), a track where a slow
-  noise passes zero; each field at its own band's level (never more than a
-  step off its ground), grown, its own green; where the ground steps a band
-  on the flats, a riser under a thin dark bund; the track pale.
+- **The flats** (the lab's plots, after Kai's aerial of flat rice fields):
+  each flat patch (its vertices joined across the grid's triangles; 16 on
+  the planet) is a lattice of its own on the plane at its middle: strips
+  9 m apart across the way its land falls on the whole (the dominant way
+  of the hills' broader gradient over it, so a valley's two sides agree),
+  crossed every 32 m along it, both bending a little over about 60 m. A
+  field is a cell, cut exactly along the lattice's lines (root-found like
+  every outline, shared with the bunds along them), level at the band its
+  ground's mean lies in, grown, its own green. Thin dark bunds along the
+  lines (on the higher field, down to the lower), every fourth crossing a
+  pale track in their place, each line traced over its own patch's squares
+  only; the bands' outlines are no steps on the flats (no banks there), and
+  where the flats meet the terraces a bund runs along the edge. A check
+  counts the fields standing more than 1.5 steps over or under some of
+  their ground (`fieldsOver`, `fieldsUnder`, `fieldsWorst`).
 - **Built in a worker** (worker.ts) when the planet is first visited (about
-  37 s on this Mac); 96 meshes, a sixteenth of a cube face each
+  30 s on this Mac); 96 meshes, a sixteenth of a cube face each
   (builder.ts). The harness's settle waits for it (`PlanetWorld.whenBuilt`).
 
-### Drawing (terrace.*.glsl, water.glsl, trees, rice)
+### Drawing (terrace.*.glsl, rice, trees)
 
-- Each part painted as it is (`aPart`): the floors (the crop by its stage,
-  the water over it a still mirror of the sky over a muddy body, the rows
-  along the band, the wash's blooms), the risers, the dams, the ridges, the
-  earth, the woods' floor (rock where steeper than 1.3), the tracks.
-  `dbg=land` colours the parts flat.
+- Painted as the paddy lab paints (Kai, 2026-11-01: the planet had lost
+  the lab's look): each part one colour from the lab's palette (`aPart`):
+  each paddy and field by its stage from the lab's six looks (rice.glsl
+  `paddyLook`: flooded white with a touch of lilac, one in five a shallow
+  grey, just planted lime, growing, grown, grown deep), the dams and the
+  cross-banks cream, the risers olive, the earth (the woods' edge, the
+  flats' bunds) dark, the woods' ground two greens a noise mixes (rock where
+  steeper than 1.3), the tracks pale. All lit as the lab lights them
+  (`labLight`: three.js's hemisphere light and sun on a matt surface,
+  Lambert over π, the lab's colours and strengths, tinted by the time of
+  day), then the haze of distance. `dbg=land` colours the parts flat.
+- No grade but the paper grain: a planet may carry its own final grade
+  (`PlanetWorld.grade`, render/post.ts), and the terraces' is the lab's,
+  which draws straight to the canvas: no tone curve, bloom, contrast or
+  dimming, so the colours measured from the aerial reach the screen as
+  measured. The meadow keeps the style's grade, its frames unchanged.
 - The trees (tree.*.glsl) are traced billboards where the build placed
   them; the rice blades near the camera read a map of the floors drawn
-  from above (paddyMap.ts): their floor and crop.
+  from above (paddyMap.ts): their floor and crop, each blade its paddy's
+  look under the same light, darker at its root.
 
 ## Module map
 
@@ -780,7 +803,7 @@ in `src/terraces/`.
         sun.ts/.glsl       the sun each place sees (fixed to the planet)
         warp.glsl / .ts    tiny-planet warp (GPU and its exact CPU mirror), its curvature by zoom
         sky.ts/.glsl       backdrop and dome, sun glow
-        post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
+        post.ts/.glsl      HDR target, bloom chain, tone curve (a planet may do without it and the bloom), paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
       terraces/            the second planet: its mathematics (build/field.ts), the paddy lab's construction on it (build/: the grid, bands and cuts, the build in a worker), its paint, trees and rice
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking

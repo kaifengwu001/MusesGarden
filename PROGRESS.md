@@ -38,9 +38,39 @@ Started from aeeb0c7 (gaps and flats). Kai (2026-11-01), sending the aerial, the
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | "Why has there been such a degradation to the paddies since the lab?" | |
-| 2 | "Where is the field? It's so mangled with the paddies I can't even tell which one is which. Why are they colliding and criss-crossing?" | |
+| 1 | "Why has there been such a degradation to the paddies since the lab?" | Three causes, two fixed. **The paint** was still the old world's, not the lab's: each floor a silver-grey mirror of the sky under the paintings' muted greens, rows, washes and blooms, the dams lime, all in toon bands; then the meadow's final grade over it (an S-curve, a little more saturation, contrast 1.1, brightness 0.95, bloom on the whites). The lab draws its measured colours flat, lit by a hemisphere and a sun, straight to the canvas. The planet now paints as the lab does: each paddy one colour by its stage from the lab's six looks (at the season's default front in the lab's shares: 36 % flooded white with a touch of lilac, 8 % a shallow grey, 10 % just planted lime, 18 % growing, 18 % grown, 10 % grown deep; none fallow), the dams cream, the risers olive, the earth and the woods' ground the lab's, lit by the lab's light (`labLight`); the rice blades near the camera their paddy's colour under the same light. A planet now carries its own final grade, and the terraces' is the lab's: none (no tone curve, bloom, contrast or dimming; the paper grain stays). The meadow's frames are unchanged pixel for pixel. From above, the colours now land on the lab's (table below). **The flats**: note 2. **The land**, not fixed, Kai's choice: the planet's hills are the lab's noise, but its land comes out gentler than the lab's canvas (seed 5) that Kai tuned on: 36 % of the planet slopes under 0.1, where the bands go wide and wander into the blobby paddies round the flats (the canvas: 19 %), and 2 % is woods (13 %). At 50 m of relief (from 36) the planet takes the canvas's mix (table below): narrower terraces and real woods (4,342 trees against 511), but a lumpier outline from orbit and far fewer flats (5 patches, 47 fields). Not built: docs/checkpoints/terraces-6/relief-36-vs-50.jpg. Checkpoints: lab-vs-planet.jpg |
+| 2 | "Where is the field? It's so mangled with the paddies I can't even tell which one is which. Why are they colliding and criss-crossing?" | The fields had been the bands themselves (on near-flat ground a band is a big wandering blob: the homestead's field was one, 60 m across), cut by a turn of the planet's axes every 32 m and by a track where a slow noise passed zero: three sets of lines drawn without regard to each other or to the terraces' banks, with the bands' steps on the flats drawn as dark bunds too, so lines ran every which way through the fields and on into the paddies, all painted alike. Now the fields are the lab's plots: each flat patch (16 on the planet) a lattice of its own on the plane at its middle, strips 9 m apart across the way its land falls on the whole and crossed every 32 m along it, both bending a little; a field is a cell, level at the band its ground lies in on the whole, its own green; thin dark bunds between fields, every fourth crossing a pale track; nothing else crosses the flats (no band steps, no lines from elsewhere), and a bund runs along their edge where they meet the terraces. 169 fields. Checkpoints: homestead-before-after.jpg, fields-4-widest-patches-60m.jpg, close-12m-4m-eye-vista.jpg |
 
+
+Measured (07b25a6, Chrome on this Mac):
+
+| | the lab (from above) | the planet before | the planet now |
+|---|---|---|---|
+| flooded (sRGB) | 0.90 0.89 0.92 | 0.65 0.72 0.73 (a silver-grey mirror) | 0.92 0.91 0.94 (0.90–0.95) |
+| dams | 0.74 0.76 0.63 | 0.76 0.82 0.63 | 0.77 0.79 0.61 |
+| just planted | 0.54 0.62 0.33 | 0.54 0.64 0.46 | 0.54 0.62 0.30 |
+| growing | 0.37 0.46 0.24 | 0.44 0.56 0.37 | 0.35 0.45 0.20 |
+| grown, deep | 0.27 0.36 0.18 … 0.13 0.21 0.09 | 0.34 0.48 0.26, 0.24 0.37 0.24 | 0.21 0.31 0.14 |
+
+(k-means of the frames from above, eight colours: the lab's top view against the planet's 60 m view from the default stand; the whites a touch brighter as the planet's sun stands 4° higher.)
+
+| share of the ground by slope | flats < 0.06 | 0.06–0.1 | 0.1–0.15 | 0.15–0.3 | woods > 0.3 |
+|---|---|---|---|---|---|
+| the lab's canvas (seed 5, relief 36) | 8.0 % | 10.7 % | 17.2 % | 50.9 % | 13.2 % |
+| the planet, relief 36 (as built) | 15.4 % | 20.4 % | 27.6 % | 34.6 % | 1.9 % |
+| the planet, relief 42 | 11.6 % | 16.6 % | 23.6 % | 43.4 % | 4.9 % |
+| the planet, relief 46 | 9.9 % | 14.5 % | 21.1 % | 46.3 % | 8.2 % |
+| the planet, relief 50 | 8.6 % | 12.6 % | 19.3 % | 47.5 % | 12.1 % |
+
+- The build: 30.0 s in Chrome (38.9 before: the floors' rows, no longer painted, are no longer worked out), 11.88 M triangles (11.99), 8.08 M vertices; 16 flat patches, 169 fields; `bare` 0.
+- The fields' floors against their ground: 41 fields stand more than 1.5 steps over some of their ground and 35 under it; the worst stands 5 steps (1.9 m) off it, where a patch's land turns away from the way its strips run.
+- Gaps against a red sky, the 80 views: 1 pixel in 1 view (a slit on a skyline between two risers), as before.
+- The meadow, against 7d21e88 (check-frames samecheck): identical in all nine standard views, High and Medium at 2×, High at 1× with MSAA.
+- `npm run check`, `npm test` (118), `npm run test:gpu` (12, one skipped) and `npm run shots` (15, the meadow's) pass.
+
+Trades: none in the look. The paint follows the lab's; nothing changed for speed.
+
+Still open: the land's mix (relief, above: Kai's choice); the lab's cast shadows (its sun's shadows of the dams, risers and trees on the floors: the planet's light casts none); a field standing well off its ground where its patch's land turns; the track stepping where it crosses fields at different levels; the terraces' squint test still measures against the painting's target, which no longer describes the look (the lab's does); the 1-pixel slit; the build's 30 s and 11.9 M triangles (the perf round); the river, towers, houses, birds and fog.
 ### Gaps and flats
 
 Started from 4e936ca (the mathematical planet). Kai (2026-11-01), asked what the next round should take on: "Gaps and flats first". This table fills in as they are done.
