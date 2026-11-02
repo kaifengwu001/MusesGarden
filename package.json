@@ -26,7 +26,10 @@
     "check:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && eslint environments/scarlet-sail-canyon",
     "dev:cobalt": "vite --host 127.0.0.1 --port 5217 --strictPort",
     "build:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && vite build --config environments/cobalt-windfields/vite.config.ts",
-    "check:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && eslint environments/cobalt-windfields"
+    "check:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && eslint environments/cobalt-windfields",
+    "dev:tulip": "vite --host 127.0.0.1 --port 5241 --strictPort",
+    "build:tulip": "tsc -p environments/tulip-windmill-meadows/tsconfig.json && vite build --config environments/tulip-windmill-meadows/vite.config.ts",
+    "check:tulip": "tsc -p environments/tulip-windmill-meadows/tsconfig.json && eslint environments/tulip-windmill-meadows"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

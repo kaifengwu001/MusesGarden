@@ -3,8 +3,8 @@ import type { GardenState } from '../../garden/state';
 import type { Invitation } from '../../../../src/garden/types';
 import type { ParamPath, ParamStore, ParamValue } from '../../params';
 import type { World } from '../../world';
-import { button, el, nextFrame, wait } from '../../../../src/ui/garden/dom';
-import { ICONS } from '../../../../src/ui/garden/icons';
+import { button, el, nextFrame, wait } from './dom';
+import { ICONS } from './icons';
 import { Sheet } from '../../../../src/ui/garden/sheet';
 
 // Travel: the worlds you are invited to, each good for one visit (a guest

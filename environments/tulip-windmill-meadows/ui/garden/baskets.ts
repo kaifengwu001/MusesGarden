@@ -1,7 +1,7 @@
 import type { GardenState } from '../../garden/state';
-import { dayName, el } from '../../../../src/ui/garden/dom';
-import { topicColour } from '../../../../src/ui/garden/findCard';
-import { ICONS } from '../../../../src/ui/garden/icons';
+import { dayName, el } from './dom';
+import { topicColour } from './findCard';
+import { ICONS } from './icons';
 import { Sheet } from '../../../../src/ui/garden/sheet';
 
 // The baskets Muse has handed you, newest first, down a timeline: each day

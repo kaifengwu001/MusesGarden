@@ -4,14 +4,14 @@ import type { Terrain } from '../planet/terrain';
 import { warpPoint, type WarpFrame } from '../../../src/render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from '../../../src/life/museBody';
 import { SCULPTS, type SculptKind } from '../../../src/life/museMesh';
-import BodyWorker from '../../../src/life/museBody.worker?worker&inline';
-import fragmentShader from '../../../src/life/muse.frag.glsl?raw';
+import BodyWorker from '../../../src/life/museBody.worker.ts?worker&inline';
+import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from '../../../src/life/muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from '../../../src/life/museRig';
 import { MuseRoam, PACE, type Roaming } from './museRoam';
-import shadowFragment from '../../../src/life/museShadow.frag.glsl?raw';
-import shadowVertex from '../../../src/life/museShadow.vert.glsl?raw';
+import shadowFragment from './museShadow.frag.glsl?raw';
+import shadowVertex from './museShadow.vert.glsl?raw';
 
 // Muse, who lives here: a cream plush about as tall as you, built from its
 // reference (museBody.ts: one distance field, meshed off the main thread, or

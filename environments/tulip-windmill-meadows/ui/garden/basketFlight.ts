@@ -2,7 +2,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { smoothstep } from '../../../../src/core/math';
 import type { Bed } from '../../garden/placement';
 import type { Flight, Framing } from '../../../../src/view/flight';
-import { el } from '../../../../src/ui/garden/dom';
+import { el } from './dom';
 
 // Opening a basket. It flies from where you picked it to the middle of the
 // screen and opens; its finds rise out of it as small pictures and wait

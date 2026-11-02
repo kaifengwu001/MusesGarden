@@ -1,10 +1,10 @@
 import { worldArt } from '../../../../src/garden/art';
 import type { GardenState } from '../../garden/state';
 import type { Postcard } from '../../../../src/garden/types';
-import { button, dayName, el, nextFrame, shortDate, wait } from '../../../../src/ui/garden/dom';
-import { ICONS } from '../../../../src/ui/garden/icons';
-import { PILE_SHOWN, stackSlot, underSlot, type Slot } from '../../../../src/ui/garden/pile';
-import type { PostBox } from '../../../../src/ui/garden/postbox';
+import { button, dayName, el, nextFrame, shortDate, wait } from './dom';
+import { ICONS } from './icons';
+import { PILE_SHOWN, stackSlot, underSlot, type Slot } from './pile';
+import type { PostBox } from './postbox';
 
 // The post: what comes out of the post box. Its door drops and the cards
 // fly out of its mouth into a loose stack on the table, the newest on top;

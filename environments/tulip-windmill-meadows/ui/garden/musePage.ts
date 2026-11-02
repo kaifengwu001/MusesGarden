@@ -1,7 +1,7 @@
 import type { GardenState } from '../../garden/state';
-import { agoPhrase, el, shortDate, toggle } from '../../../../src/ui/garden/dom';
-import { topicColour } from '../../../../src/ui/garden/findCard';
-import { ICONS } from '../../../../src/ui/garden/icons';
+import { agoPhrase, el, shortDate, toggle } from './dom';
+import { topicColour } from './findCard';
+import { ICONS } from './icons';
 import { Sheet } from '../../../../src/ui/garden/sheet';
 
 // Muse's page: who it is (the line its soul.md gives, all it carries into

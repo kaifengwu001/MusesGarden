@@ -2,7 +2,7 @@ import { ShaderChunk } from 'three';
 import cloudLumps from '../../../src/life/cloudLumps.glsl?raw';
 import clouds from '../../../src/life/clouds.glsl?raw';
 import field from '../../../src/life/field.glsl?raw';
-import find from '../../../src/life/findState.glsl?raw';
+import find from '../life/findState.glsl?raw';
 import musePress from '../../../src/life/musePress.glsl?raw';
 import wind from '../../../src/life/wind.glsl?raw';
 import cubesphere from '../../../src/planet/cubesphere.glsl?raw';

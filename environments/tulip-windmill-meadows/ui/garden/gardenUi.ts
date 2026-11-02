@@ -8,7 +8,7 @@ import { GardenState } from '../../garden/state';
 import type { Basket, Postcard } from '../../../../src/garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
 import type { MuseDirection } from '../../life/muse';
-import { Pins, type PinSpec } from '../../../../src/life/pins';
+import { Pins, type PinSpec } from '../../life/pins';
 import type { ParamStore } from '../../params';
 import { tangentToward, travel } from '../../../../src/planet/geo';
 import { createGroundSample, type Layout } from '../../planet/terrain';
@@ -17,13 +17,13 @@ import { Flight, type Framing } from '../../../../src/view/flight';
 import type { World } from '../../world';
 import { BasketsSheet } from './baskets';
 import { BasketFlight, framingToFit, type Arrival } from './basketFlight';
-import { button, dayName, el } from '../../../../src/ui/garden/dom';
-import { FindCard, topicColour } from '../../../../src/ui/garden/findCard';
-import '../../../../src/ui/garden/garden.css';
-import { ICONS } from '../../../../src/ui/garden/icons';
+import { button, dayName, el } from './dom';
+import { FindCard, topicColour } from './findCard';
+import './garden.css';
+import { ICONS } from './icons';
 import { Mail } from './mail';
 import { MuseSheet } from './musePage';
-import { PostBox } from '../../../../src/ui/garden/postbox';
+import { PostBox } from './postbox';
 import { TravelSheet, Visit } from './travel';
 
 // The garden's interface over the meadow: Muse's finds as patches of flowers
