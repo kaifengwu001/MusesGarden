@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLOWER_PICTURES, HEAD_SCALE, standPicture, type Point } from './flowerPictures';
+import { FLOWER_PICTURES, FLOWER_SETS, HEAD_SCALE, standPicture, type Point } from './flowerPictures';
 
 // A picture stands on its flower's stem as the screen shows it: the overlay's button sits on its head, its stem
 // reaches down to its foot, and its head keeps the shape it was drawn with.
@@ -14,13 +14,13 @@ const STEMS: ReadonlyArray<{ name: string; foot: Point; head: Point; stem: numbe
 
 const near = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
 
-describe('a flower’s picture', () => {
-  for (const [species, p] of FLOWER_PICTURES.entries()) {
+describe.each(Object.entries(FLOWER_SETS))('a flower’s picture, %s', (_, set) => {
+  for (const [species, p] of set.entries()) {
     for (const { name, foot, head, stem } of STEMS) {
       it(`of species ${species}, ${name}: stands with its foot on the stem’s foot and its bloom on its head`, () => {
         const at = standPicture(p, foot, head, stem);
-        expect(near(at(...p.foot), foot)).toBeLessThan(1e-6);
-        expect(near(at(...p.bloom), head)).toBeLessThan(1e-6);
+        expect(near(at(p.foot[0], p.foot[1]), foot)).toBeLessThan(1e-6);
+        expect(near(at(p.bloom[0], p.bloom[1]), head)).toBeLessThan(1e-6);
       });
 
       it(`of species ${species}, ${name}: keeps its head’s drawn shape, sized by the stem`, () => {
@@ -38,7 +38,9 @@ describe('a flower’s picture', () => {
       });
     }
   }
+});
 
+describe('a flower’s picture', () => {
   it('shrinks its head with its scale, still on its stem', () => {
     const p = FLOWER_PICTURES[0];
     const { foot, head, stem } = STEMS[1];

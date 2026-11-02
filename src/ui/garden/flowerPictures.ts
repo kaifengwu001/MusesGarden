@@ -1,7 +1,11 @@
 import { BufferAttribute, BufferGeometry, CustomBlending, DynamicDrawUsage, Mesh, OneFactor, OneMinusSrcAlphaFactor, ShaderMaterial, Texture } from 'three';
+import blueClusterLeaves from '../../assets/garden/flowers/blue-cluster-leaves-v2.png';
 import blueCluster from '../../assets/garden/flowers/blue-cluster-v1.png';
+import pinkCupLeaves from '../../assets/garden/flowers/pink-cup-leaves-v2.png';
 import pinkCup from '../../assets/garden/flowers/pink-cup-v1.png';
+import whiteStarLeaves from '../../assets/garden/flowers/white-star-leaves-v2.png';
 import whiteStar from '../../assets/garden/flowers/white-star-v1.png';
+import yellowButtonLeaves from '../../assets/garden/flowers/yellow-button-leaves-v2.png';
 import yellowButton from '../../assets/garden/flowers/yellow-button-v1.png';
 import { el } from './dom';
 
@@ -17,25 +21,36 @@ export interface FlowerPicture {
   readonly box: readonly [number, number, number, number];
   /** The middle of its stem's end. */
   readonly foot: readonly [number, number];
-  /** The row its head starts at: below it, only its stem. */
+  /** The row its head (and any leaves) starts at: below it, only its stem. */
   readonly neck: number;
-  /** Its head's middle (the centroid of its pixels), and its radius (nine tenths of them lie within it). */
+  /** Its head's middle (the centroid of its petals' pixels), and its radius (nine tenths of them lie within it). */
   readonly bloom: readonly [number, number];
   readonly head: number;
 }
 
-/** By species, in flowerMeshes.ts's order. */
-export const FLOWER_PICTURES: readonly FlowerPicture[] = [
-  { src: pinkCup, box: [319, 41, 989, 1221], foot: [690.5, 1198], neck: 548, bloom: [656.8, 280.7], head: 262.6 },
-  { src: whiteStar, box: [295, 58, 998, 1221], foot: [725, 1197], neck: 680, bloom: [652.3, 391.4], head: 262.9 },
-  { src: yellowButton, box: [473, 215, 826, 1148], foot: [696.5, 1124], neck: 490, bloom: [649.3, 349.1], head: 146 },
-  { src: blueCluster, box: [341, 69, 986, 1225], foot: [648.5, 1203], neck: 648, bloom: [657.2, 378.4], head: 288.6 },
-];
+/** The sets of pictures, each by species in flowerMeshes.ts's order: the plain flowers, and the flowers with leaves. */
+export const FLOWER_SETS = {
+  plain: [
+    { src: pinkCup, box: [319, 41, 989, 1221], foot: [690.5, 1198], neck: 548, bloom: [656.8, 280.7], head: 262.6 },
+    { src: whiteStar, box: [295, 58, 998, 1221], foot: [725, 1197], neck: 680, bloom: [652.3, 391.4], head: 262.9 },
+    { src: yellowButton, box: [473, 215, 826, 1148], foot: [696.5, 1124], neck: 490, bloom: [649.3, 349.1], head: 146 },
+    { src: blueCluster, box: [341, 69, 986, 1225], foot: [648.5, 1203], neck: 648, bloom: [657.2, 378.4], head: 288.6 },
+  ],
+  leaves: [
+    { src: pinkCupLeaves, box: [213, 38, 992, 1223], foot: [692, 1196], neck: 948, bloom: [660.4, 268.3], head: 256.1 },
+    { src: whiteStarLeaves, box: [221, 56, 1043, 1221], foot: [726, 1194], neck: 979, bloom: [655.8, 409.9], head: 296.3 },
+    { src: yellowButtonLeaves, box: [322, 215, 950, 1148], foot: [697.5, 1123], neck: 991, bloom: [653.5, 335.3], head: 145.6 },
+    { src: blueClusterLeaves, box: [340, 68, 988, 1225], foot: [648.5, 1203], neck: 1025, bloom: [657, 367.3], head: 289.9 },
+  ],
+} as const satisfies Record<string, readonly FlowerPicture[]>;
+
+/** The set the basket draws. */
+export const FLOWER_PICTURES: readonly FlowerPicture[] = FLOWER_SETS.leaves;
 
 /** A picture's head is drawn this much of the size its stem's length would give it. */
 export const HEAD_SCALE = 0.7;
 /** The least its stem is drawn of its length (a stem seen nearly end on). */
-const LEAST_STRETCH = 0.2;
+const LEAST_STRETCH = 0.05;
 /** Its texture's longer side (px): about what the screen shows of it at its largest. */
 const TEXTURE_SIDE = 512;
 
