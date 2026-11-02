@@ -5,16 +5,17 @@
 // cream, the risers olive; earth where the woods meet the farmed land and
 // along the flats' bunds; the woods' own ground under the trees, rock where
 // it is too steep for them; a track's packed earth; a village's ground, packed
-// earth and grass in patches. The clouds' shadows passing over (the meadow's,
-// life/clouds.glsl). Then the haze of distance.
+// earth and grass in patches. The mist's shadows passing over (mist.glsl).
+// Then the haze of distance.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
 #include <meadow_toon>
 #include <meadow_fog>
 #include <meadow_warp>
-#include <meadow_clouds>
+#include <meadow_sun>
 #include <terraces_common>
+#include <terraces_mist>
 #include <terraces_rice>
 
 uniform int uDebug;
@@ -58,8 +59,7 @@ void main() {
     // a dam's top and sides, a ridge along a cut
     albedo = pal(TR_EARTH, 0);
   }
-  // (the shadow's edge roughened a little, brushed)
-  float shade = cloudShadowAt(dir * (uRadius + vHeight), 0.6 * gnoise(dir * uRadius * 0.9, uTerrainSeed + 943u));
+  float shade = mistShadowAt(dir * (uRadius + vHeight));
   vec3 col = labLight(albedo, n, up, shade);
   col = applyAerial(col, viewDist, dir);
   if (uDebug == 4) {

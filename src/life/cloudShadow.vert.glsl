@@ -25,9 +25,6 @@ flat varying float vRadius;
 flat varying uint vSeed;
 flat varying vec3 vSideA; // directions on the puff's outline, seen down the light
 flat varying vec3 vSideB;
-#ifdef CLOUD_FLAT
-flat varying float vChord; // an oblate puff's chord down the light, × a sphere's (clouds.glsl CLOUD_FLAT)
-#endif
 
 void main() {
   int row = gl_InstanceID / 8;
@@ -48,9 +45,6 @@ void main() {
   vec3 b = cross(up, a);
   float stretch = 1.0;
   vSideA = a;
-#ifdef CLOUD_FLAT
-  vChord = CLOUD_FLAT;
-#endif
 #else
   // down the light to the water table
   vec3 L = localSun(up);
@@ -62,15 +56,7 @@ void main() {
   a = al > 1e-4 ? a / al : normalize(cross(g, abs(g.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   vec3 b = cross(g, a);
   // a sphere's shadow is drawn out along the light by 1 / sin(elevation)
-#ifdef CLOUD_FLAT
-  // (an oblate puff's less, as it is less tall: by √(1 + f² cot² elevation); its chord down the light f / √(f² cos²
-  // elevation + sin² elevation) of a sphere's)
-  float se = max(dot(L, g), 0.2);
-  float stretch = sqrt(1.0 + CLOUD_FLAT * CLOUD_FLAT * (1.0 / (se * se) - 1.0));
-  vChord = CLOUD_FLAT / sqrt(CLOUD_FLAT * CLOUD_FLAT * (1.0 - se * se) + se * se);
-#else
   float stretch = 1.0 / max(dot(L, g), 0.2);
-#endif
   vSideA = normalize(a - L * dot(a, L));
 #endif
   vSideB = b;

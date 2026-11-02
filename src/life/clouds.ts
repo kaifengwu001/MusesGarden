@@ -6,7 +6,6 @@ import {
   PerspectiveCamera,
   Vector2,
   BufferAttribute,
-  BufferGeometry,
   CustomBlending,
   DataTexture,
   FloatType,
@@ -124,22 +123,6 @@ const FRINGE = { reach: 0.24, share: 0.35 } as const;
 /** Puff arrangements to pick from. */
 const TEMPLATES = 64;
 
-/**
- * A planet's own form for its clouds, in place of the meadow's heaps: ribbons, long thin bands along the wind,
- * meandering (the terraces: Kai's paintings of mist winding between the mountains). Each band is drawn as a sheet
- * (`bands`: the planet paints it) and casts its shadow by a run of flat lobes under it (oblate, `flat` of their width
- * tall: the shadow shaders' CLOUD_FLAT), their billboards not drawn at all. The streamlines `sep` apart (rad) and the
- * clouds along them `spacing` of the heaps' spacing apart, so a streak's lobes run together into one band; each
- * streak swinging across its line by up to `meander[0]` of a cloud's size, over stretches of about `meander[1]` m,
- * each its own way. A band keeps one height along it (its own), over the ground under it.
- */
-export interface CloudForm {
-  readonly flat: number;
-  readonly sep: number;
-  readonly spacing: number;
-  readonly meander: readonly [number, number];
-}
-
 export interface CloudParams {
   coverage: number;
   /** Height of the cloud bases above the meadow (m, at R = 128). */
@@ -223,11 +206,6 @@ interface Slot {
   /** Size factor: each streak has its own girth, and swells and thins along its length. */
   girth: number;
   seed: number;
-  /** (A form's) its line's seed, its place along the line (m), the line itself and its place in the line's points (fractional). */
-  line: number;
-  s: number;
-  ref: Line | null;
-  at: number;
 }
 
 function rng(seed: number): () => number {
@@ -245,28 +223,6 @@ function makePuffs(rand: () => number): Puff[] {
   for (let i = 0; i < 4; i++) add((i / 3 - 0.5) * 1.5 * e + (rand() - 0.5) * 0.2, 0.2 + 0.06 * rand(), (rand() - 0.5) * 0.5, 0.34 + 0.1 * rand());
   for (let i = 0; i < 3; i++) add((i / 2 - 0.5) * 0.85 * e + (rand() - 0.5) * 0.2, 0.44 + 0.14 * rand(), (rand() - 0.5) * 0.35, 0.36 + 0.12 * rand());
   add((rand() - 0.5) * 0.5 * e, 0.72 + 0.16 * rand(), (rand() - 0.5) * 0.2, 0.28 + 0.1 * rand());
-  return puffs;
-}
-
-/** A value along a line's points at a fractional place (held at its ends). */
-function alongLine(values: Float32Array, at: number): number {
-  const k = Math.min(Math.max(at, 0), values.length - 1.001);
-  const i = Math.floor(k);
-  return values[i] + (values[i + 1] - values[i]) * (k - i);
-}
-
-/** How long a ribbon's stretch of lobes runs (× a cloud's size): its lobes RIBBON_RUN / 7 of it apart. */
-const RIBBON_RUN = 1.3;
-/** A form's bands as sheets: their samples' spacing along a band (m), its breadth (× a cloud's size, at full girth), the most vertices (three across each sample). */
-const BAND = { step: 1.5, breadth: 0.44, vertices: 60000 } as const;
-
-/** A stretch of a ribbon (CloudForm): lobes in a row along the flow, wide and low (their shadows flattened), smaller toward its ends. */
-function makeRibbon(rand: () => number): Puff[] {
-  const puffs: Puff[] = [];
-  for (let i = 0; i < PUFFS; i++) {
-    const u = i / (PUFFS - 1) - 0.5;
-    puffs.push({ x: RIBBON_RUN * u + (rand() - 0.5) * 0.04, y: 0.07 + 0.02 * rand(), z: (rand() - 0.5) * 0.06, r: (0.21 + 0.04 * rand()) * (1 - 0.25 * (2 * u) ** 2), phase: rand() * Math.PI * 2 });
-  }
   return puffs;
 }
 
@@ -343,10 +299,10 @@ function flowAt(flow: Flow, d: Vector3, out: Vector3): Vector3 {
  * (after Jobard and Lefer), the spacing itself wandering between 0.7× and
  * 1.3× so the streaks do not run like a fingerprint.
  */
-function traceStreamlines(flow: Flow, rand: () => number, noiseSeed: number, sep: number = STREAM.sep): Vector3[][] {
-  const sepAt = (p: Vector3): number => sep * (1 + 0.3 * clamp(2.5 * gnoise(p.x * 1.7, p.y * 1.7, p.z * 1.7, noiseSeed + 7), -1, 1));
-  const cell = sep * 1.3;
-  const step = STREAM.step * sep;
+function traceStreamlines(flow: Flow, rand: () => number, noiseSeed: number): Vector3[][] {
+  const sepAt = (p: Vector3): number => STREAM.sep * (1 + 0.3 * clamp(2.5 * gnoise(p.x * 1.7, p.y * 1.7, p.z * 1.7, noiseSeed + 7), -1, 1));
+  const cell = STREAM.sep * 1.3;
+  const step = STREAM.step * STREAM.sep;
   const cells = Math.ceil(2 / cell) + 1;
   const grid = new Map<number, Vector3[]>();
   const key = (p: Vector3): number => {
@@ -484,10 +440,9 @@ function quad(): InstancedBufferGeometry {
 interface Placed {
   slot: Slot;
   fade: number;
-  /** Distance of its base from the planet centre, and its size (m); how far the ground under its middle raised it (m). */
+  /** Distance of its base from the planet centre, and its size (m). */
   base: number;
   size: number;
-  lift: number;
   up: Vector3;
   along: Vector3;
   distance: number;
@@ -512,8 +467,8 @@ export class Clouds {
   private readonly mirrorScene: Scene;
   private readonly mirrorCamera = new PerspectiveCamera();
   private readonly mirror = new Matrix4();
-  /** Where the lakes can read the mirror: the mirror pass shades only there (none on a planet without lakes). */
-  private readonly waterMask: WaterMask | null;
+  /** Where the lakes can read the mirror: the mirror pass shades only there. */
+  private readonly waterMask: WaterMask;
   private readonly wind: IUniform<Vector4>;
   /** The pixels drawn this frame (globals: the render scale's part of the screen-sized targets). */
   private readonly view: IUniform<Vector2>;
@@ -530,7 +485,7 @@ export class Clouds {
   private slotsR = Number.NaN;
   private threshold = 0;
   private thresholdKey = '';
-  private readonly placed: Placed[] = Array.from({ length: MAX_CLOUDS }, () => ({ slot: null as unknown as Slot, fade: 1, base: 0, size: 0, lift: 0, up: new Vector3(), along: new Vector3(), distance: 0 }));
+  private readonly placed: Placed[] = Array.from({ length: MAX_CLOUDS }, () => ({ slot: null as unknown as Slot, fade: 1, base: 0, size: 0, up: new Vector3(), along: new Vector3(), distance: 0 }));
   private readonly order: Placed[] = [];
   /** Per row: 1 when the ground does not hide the cloud from the camera. */
   private readonly inSight = new Uint8Array(MAX_CLOUDS);
@@ -542,22 +497,13 @@ export class Clouds {
   private readonly projection = { value: new Matrix4() };
   /** Clouds shown (perf stat). */
   count = 0;
-  /**
-   * A form's bands as sheets, made again each frame along the same lines as its lobes (none for the meadow's heaps):
-   * per vertex its place (planet space) and aBand: across the band (−1 … 1), along it (m), its line's seed (0 … 1), its
-   * breadth (m).
-   */
-  readonly bands: BufferGeometry | null = null;
 
   /**
    * `uniforms` must already be in `shared` (materials copy it when they are
    * made). Sizes: a face of the shadow cube and of the cover-from-below
-   * cube, and the sharper window of the shadows. `lakes`: whether lakes read
-   * the clouds (their mirror and the cover from below; a planet without lakes,
-   * the terraces, does without both). `form`: a planet's own form for its
-   * clouds (CloudForm; none, the meadow's heaps).
+   * cube, and the sharper window of the shadows.
    */
-  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number, localSize: number, private readonly lakes = true, private readonly form: CloudForm | null = null) {
+  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number, localSize: number) {
     const cube = (size: number): WebGLCubeRenderTarget =>
       new WebGLCubeRenderTarget(size, { type: HalfFloatType, format: RedFormat, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
     this.shadowCube = cube(shadowSize);
@@ -573,7 +519,7 @@ export class Clouds {
     uniforms.uCloudLayerCube.value = this.layerCube.texture;
     uniforms.uCloudLumps.value = this.lumps.texture;
 
-    this.waterMask = lakes ? new WaterMask(shared) : null;
+    this.waterMask = new WaterMask(shared);
     this.wind = shared.uWindVec as IUniform<Vector4>;
     this.view = shared.uResolution as IUniform<Vector2>;
     const cloudMaterial = (mirror: boolean): ShaderMaterial =>
@@ -581,8 +527,8 @@ export class Clouds {
         name: mirror ? 'clouds (mirror)' : 'clouds',
         vertexShader,
         fragmentShader,
-        uniforms: mirror ? { ...shared, uProjection: this.projection, uWaterMask: { value: this.waterMask?.texture ?? null } } : { ...shared, uProjection: this.projection },
-        defines: { ...(mirror ? { MIRROR_PASS: 1, MASK_CELL } : {}), ...this.flatDefine() },
+        uniforms: mirror ? { ...shared, uProjection: this.projection, uWaterMask: { value: this.waterMask.texture } } : { ...shared, uProjection: this.projection },
+        defines: mirror ? { MIRROR_PASS: 1, MASK_CELL } : {},
         // a mirrored camera turns the billboards' winding
         side: mirror ? DoubleSide : FrontSide,
         transparent: true,
@@ -615,7 +561,7 @@ export class Clouds {
         name: radial ? 'cloud cover' : 'cloud shadows',
         vertexShader: shadowVertex,
         fragmentShader: shadowFragment,
-        defines: { ...(radial ? { RADIAL: 1 } : {}), ...this.flatDefine() },
+        defines: radial ? { RADIAL: 1 } : {},
         uniforms: {
           uCloudData: uniforms.uCloudData,
           uCloudLook: uniforms.uCloudLook,
@@ -639,114 +585,6 @@ export class Clouds {
     };
     this.shadowScene = new Scene().add(splats(false));
     this.layerScene = new Scene().add(splats(true));
-    if (form) {
-      const bands = new BufferGeometry();
-      bands.setAttribute('position', new BufferAttribute(new Float32Array(3 * BAND.vertices), 3));
-      bands.setAttribute('aBand', new BufferAttribute(new Float32Array(4 * BAND.vertices), 4));
-      bands.setIndex(new BufferAttribute(new Uint32Array(12 * BAND.vertices), 1));
-      bands.setDrawRange(0, 0);
-      this.bands = bands;
-    }
-  }
-
-  /** How far a form's streak swings across its line (m) at a cloud's slot, al m along from it: the same for every cloud there, so its clouds run together. */
-  private swing(slot: Slot, al: number, radius: number): number {
-    return this.swingAt(slot.line, slot.s + al, radius);
-  }
-
-  /** How far a form's streak swings across its line (m), s m along the line (its seed h). */
-  private swingAt(h: number, s: number, radius: number): number {
-    const f = this.form as CloudForm;
-    const amp = f.meander[0] * SIZE * Math.sqrt(radius / 128);
-    return amp * 1.6 * gnoise(s / f.meander[1] + 97 * unit(hash32(h + 11)), 97 * unit(hash32(h + 12)), 0.5, (h + 13) >>> 0);
-  }
-
-  /**
-   * A form's bands as sheets: along each line, wherever it is cloudy, a sample every BAND.step m, as broad as its lobes
-   * there (its girth, tapering to its ends), across its line as its streak meanders there, at its line's height over
-   * the ground under it, drifting as its lobes do; three vertices across each sample.
-   */
-  private updateBands(radius: number, time: number, speed: number, altitude: number, windAxis: Vector3, ground?: (dir: Vector3) => number): void {
-    const g = this.bands as BufferGeometry;
-    const f = this.form as CloudForm;
-    const pos = (g.getAttribute('position') as BufferAttribute).array as Float32Array;
-    const band = (g.getAttribute('aBand') as BufferAttribute).array as Float32Array;
-    const index = (g.getIndex() as BufferAttribute).array as Uint32Array;
-    const scale = radius / 128;
-    const sizeScale = Math.sqrt(scale);
-    const perPoint = radius * STREAM.step * f.sep;
-    const dir = new Vector3();
-    const tan = new Vector3();
-    const side = new Vector3();
-    const way = new Vector3();
-    const across = new Vector3();
-    const at = new Vector3();
-    let nv = 0;
-    let ni = 0;
-    for (const line of this.lines) {
-      const pts = line.points;
-      const length = (pts.length - 1) * perPoint;
-      const base = radius + altitude * (0.75 + 0.5 * unit(hash32(line.seed + 1))) * Math.pow(scale, 0.35);
-      const angle = (time * speed) / base;
-      const seed = unit(hash32(line.seed + 21));
-      let prev = -1;
-      for (let s = 0; s <= length; s += BAND.step) {
-        const k = s / perPoint;
-        const c = alongLine(line.cloudy, k);
-        const breadth = BAND.breadth * SIZE * sizeScale * alongLine(line.girth, k) * Math.sqrt(clamp((c - this.threshold) / FADE, 0, 1));
-        if (breadth < 0.3 || nv + 3 > BAND.vertices) {
-          prev = -1;
-          continue;
-        }
-        const i = Math.min(Math.floor(k), pts.length - 2);
-        dir.lerpVectors(pts[i], pts[i + 1], k - i).normalize().applyAxisAngle(windAxis, angle);
-        tan.subVectors(pts[i + 1], pts[i]).applyAxisAngle(windAxis, angle);
-        tan.addScaledVector(dir, -tan.dot(dir)).normalize();
-        side.crossVectors(dir, tan);
-        // (its middle: across its line by its swing; over the ground there; its way along it, turned by the swing)
-        const sw = this.swingAt(line.seed, s, radius);
-        at.copy(dir).multiplyScalar(base).addScaledVector(side, sw).normalize();
-        const height = base + (ground ? ground(at) : 0);
-        way.copy(tan).addScaledVector(side, this.swingAt(line.seed, s + 0.5, radius) - this.swingAt(line.seed, s - 0.5, radius)).normalize();
-        across.crossVectors(at, way).normalize();
-        for (let j = 0; j < 3; j++) {
-          const x = j - 1;
-          const v = nv + j;
-          const px = at.x * height + across.x * x * 0.5 * breadth;
-          const py = at.y * height + across.y * x * 0.5 * breadth;
-          const pz = at.z * height + across.z * x * 0.5 * breadth;
-          const l = Math.hypot(px, py, pz);
-          pos[3 * v] = (px / l) * height;
-          pos[3 * v + 1] = (py / l) * height;
-          pos[3 * v + 2] = (pz / l) * height;
-          band[4 * v] = x;
-          band[4 * v + 1] = s;
-          band[4 * v + 2] = seed;
-          band[4 * v + 3] = breadth;
-        }
-        if (prev >= 0) {
-          for (let j = 0; j < 2; j++) {
-            index[ni++] = prev + j;
-            index[ni++] = nv + j;
-            index[ni++] = nv + j + 1;
-            index[ni++] = prev + j;
-            index[ni++] = nv + j + 1;
-            index[ni++] = prev + j + 1;
-          }
-        }
-        prev = nv;
-        nv += 3;
-      }
-    }
-    g.setDrawRange(0, ni);
-    (g.getAttribute('position') as BufferAttribute).needsUpdate = true;
-    (g.getAttribute('aBand') as BufferAttribute).needsUpdate = true;
-    (g.getIndex() as BufferAttribute).needsUpdate = true;
-  }
-
-  /** A form's flattening, for the shaders (none for the meadow's heaps). */
-  private flatDefine(): Record<string, string> {
-    return this.form ? { CLOUD_FLAT: this.form.flat.toFixed(4) } : {};
   }
 
   /** Something else that casts its shadow into the clouds' map (the birds): drawn after the puffs, additively, with uCubeFace. */
@@ -783,10 +621,9 @@ export class Clouds {
     const rand = rng(seed ^ 0x5eed);
     const flow = makeFlow(rand);
     const s = hash32(seed ^ 0xc10d) % 100000;
-    const sep = this.form ? this.form.sep : STREAM.sep;
-    const lines = traceStreamlines(flow, rand, s, sep);
-    const window = Math.round(0.3 / (STREAM.step * sep));
-    const step = STREAM.step * sep;
+    const lines = traceStreamlines(flow, rand, s);
+    const window = Math.round(0.3 / (STREAM.step * STREAM.sep));
+    const step = STREAM.step * STREAM.sep;
     this.lines = lines.map((points, li): Line => {
       const offset = (rand() - 0.5) * 0.28;
       const raw = points.map((d) => {
@@ -815,7 +652,7 @@ export class Clouds {
       });
       return { points, cloudy, girth, seed: hash32(seed + li * 7919) };
     });
-    this.templates = Array.from({ length: TEMPLATES }, () => (this.form ? makeRibbon(rand) : makePuffs(rand)));
+    this.templates = Array.from({ length: TEMPLATES }, () => makePuffs(rand));
     this.seed = seed;
     this.slotsR = Number.NaN;
   }
@@ -823,8 +660,8 @@ export class Clouds {
   /** Places for clouds along the streamlines at this R: about three quarters of a cloud's length apart. */
   private layoutSlots(radius: number): void {
     const size = SIZE * Math.sqrt(radius / 128);
-    const spacing = this.form ? (this.form.spacing * 0.75 * 2.9 * size) / radius : (0.75 * 2.9 * size) / radius;
-    const step = STREAM.step * (this.form ? this.form.sep : STREAM.sep);
+    const spacing = (0.75 * 2.9 * size) / radius;
+    const step = STREAM.step * STREAM.sep;
     let count = 0;
     for (const line of this.lines) {
       const pts = line.points;
@@ -834,24 +671,17 @@ export class Clouds {
         const i = Math.min(Math.floor(at), pts.length - 2);
         const f = at - i;
         // slots are reused frame to frame (R changes every frame while the planet grows)
-        const slot = (this.slots[count++] ??= { dir: new Vector3(), along: new Vector3(), cloudiness: 0, girth: 1, seed: 0, line: 0, s: 0, ref: null, at: 0 });
+        const slot = (this.slots[count++] ??= { dir: new Vector3(), along: new Vector3(), cloudiness: 0, girth: 1, seed: 0 });
         const dir = slot.dir.lerpVectors(pts[i], pts[i + 1], f).normalize();
         const along = slot.along.subVectors(pts[i + 1], pts[i]);
         along.addScaledVector(dir, -along.dot(dir)).normalize();
+        // a little off the line, to either side, so neighbouring streaks do not run in step
         slot.seed = hash32(line.seed + j * 131);
-        slot.line = line.seed;
-        slot.s = (j + 0.5) * spacing * radius;
-        // a little off the line, to either side, so neighbouring streaks do not run in step (a form's streaks
-        // meander instead, its clouds kept on the line so they run together)
-        if (!this.form) {
-          const side = this.across.crossVectors(dir, along);
-          dir.addScaledVector(side, (unit(hash32(slot.seed + 5)) - 0.5) * 0.4 * STREAM.sep).normalize();
-          along.addScaledVector(dir, -along.dot(dir)).normalize();
-        }
+        const side = this.across.crossVectors(dir, along);
+        dir.addScaledVector(side, (unit(hash32(slot.seed + 5)) - 0.5) * 0.4 * STREAM.sep).normalize();
+        along.addScaledVector(dir, -along.dot(dir)).normalize();
         slot.girth = line.girth[i] + (line.girth[i + 1] - line.girth[i]) * f;
         slot.cloudiness = line.cloudy[i] + (line.cloudy[i + 1] - line.cloudy[i]) * f;
-        slot.ref = line;
-        slot.at = at;
       }
     }
     this.slots.length = count;
@@ -887,7 +717,7 @@ export class Clouds {
    * the faces of the cube maps that hold some of it are drawn (the others are
    * never read this frame).
    */
-  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, focus: Vector3, seen: number, ground?: (dir: Vector3) => number): void {
+  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, focus: Vector3, seen: number): void {
     if (!this.lumpsBaked) this.bakeLumps(renderer);
     if (seed !== this.seed) this.build(seed);
     if (radius !== this.slotsR) this.layoutSlots(radius);
@@ -922,23 +752,16 @@ export class Clouds {
         girth = slot.girth * (0.7 + 0.55 * smoothstep(this.threshold, this.threshold + 0.3, c));
       } else {
         fade = smoothstep(this.threshold - FRINGE.reach, this.threshold, c);
-        // (a form's bands taper away at their ends: no cloudlets past them)
-        if (this.form || fade <= 0 || unit(hash32(h + 9)) > FRINGE.share) continue;
+        if (fade <= 0 || unit(hash32(h + 9)) > FRINGE.share) continue;
         girth = 0.38 + 0.2 * fade;
       }
       const at = this.placed[this.order.length];
       at.slot = slot;
       at.fade = fade;
-      // (a form's band keeps one height along it: its line's)
-      at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32((this.form ? slot.line : h) + 1))) * Math.pow(scale, 0.35);
+      at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32(h + 1))) * Math.pow(scale, 0.35);
       at.size = SIZE * sizeScale * girth * (0.9 + 0.2 * unit(hash32(h + 2))) * (0.35 + 0.65 * fade);
       const angle = (time * speed) / at.base;
       at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
-      // (over hills: its base the altitude over the ground under it, as it drifts; it drifts at its altitude's own
-      // pace still, as every cloud does: the ground's height in its pace, with the time since the page opened, moved
-      // clouds over a slope ahead or back of the rest, ever more)
-      at.lift = ground ? ground(at.up) : 0;
-      if (ground) at.base += at.lift;
       at.along.copy(slot.along).applyAxisAngle(windAxis, angle);
       at.along.addScaledVector(at.up, -at.along.dot(at.up)).normalize();
       at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
@@ -973,34 +796,10 @@ export class Clouds {
       const { x: mx, y: my, z: mz } = this.centre;
       for (let k = 0; k < PUFFS; k++) {
         const puff = puffs[k];
-        let r = puff.r * size * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * at.fade;
-        if (this.form) {
-          // (a band's lobe: as broad as the band where it stands, its girth and its cloudiness there, so the band swells,
-          // thins and tapers to its ends evenly, overlapping clouds agreeing; none too small to meet its neighbours)
-          const line = at.slot.ref as Line;
-          const perPoint = radius * STREAM.step * this.form.sep;
-          const k2 = at.slot.at + (puff.x * SIZE * sizeScale) / perPoint;
-          const c2 = alongLine(line.cloudy, k2);
-          r = puff.r * SIZE * sizeScale * alongLine(line.girth, k2) * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * Math.sqrt(clamp((c2 - this.threshold) / FADE, 0, 1));
-          // (none too narrow to meet the lobes beside it, nor one alone, its band's cloudy stretch shorter than a
-          // lobe's room either side of it)
-          const apart = (RIBBON_RUN / (PUFFS - 1)) * SIZE * sizeScale;
-          const room = (1.6 * apart) / perPoint;
-          if (r < 0.6 * apart || (alongLine(line.cloudy, k2 - room) <= this.threshold && alongLine(line.cloudy, k2 + room) <= this.threshold)) r = 0;
-        }
-        let up = base + puff.y * size;
-        // (a form's band: its clouds' lobes as far apart whatever their girth, so they run together evenly; its width
-        // swells and thins)
-        const al = puff.x * (this.form ? SIZE * sizeScale : size);
-        let ac = puff.z * size;
-        if (this.form) {
-          // (a band's lobe: across its line as its streak meanders there, and over the ground under it)
-          ac += this.swing(at.slot, al, radius);
-          if (ground) {
-            this.q.set(ux * base + ax * al + cx * ac, uy * base + ay * al + cy * ac, uz * base + az * al + cz * ac).normalize();
-            up += ground(this.q) - at.lift;
-          }
-        }
+        const r = puff.r * size * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * at.fade;
+        const up = base + puff.y * size;
+        const al = puff.x * size;
+        const ac = puff.z * size;
         const x = ux * up + ax * al + cx * ac;
         const y = uy * up + ay * al + cy * ac;
         const z = uz * up + az * al + cz * ac;
@@ -1053,7 +852,6 @@ export class Clouds {
       heights += base + 0.45 * size - radius;
     });
     this.uniforms.uCloudData.value.needsUpdate = true;
-    if (this.bands) this.updateBands(radius, time, speed, p.altitude, windAxis, ground);
     this.projection.value.copy(camera.projectionMatrix);
     this.uniforms.uCloudEye.value.copy(camera.position);
     this.count = this.inSight.subarray(0, n).reduce((a, v) => a + v, 0);
@@ -1074,8 +872,8 @@ export class Clouds {
       this.renderCube(renderer, this.shadowCube, this.shadowScene, faces);
       this.renderWindow(renderer, focus, radius, camera.position.length() - radius);
     } else this.uniforms.uShadowWindow.value.w = 0;
-    if (orbit > 0 && this.lakes) this.renderCube(renderer, this.layerCube, this.layerScene, faces);
-    if (orbit < 1 && this.lakes) this.renderMirror(renderer, camera, radius, warp, n);
+    if (orbit > 0) this.renderCube(renderer, this.layerCube, this.layerScene, faces);
+    if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearColor(this.clearColour, clearAlpha);
     renderer.setRenderTarget(previous);
   }
@@ -1173,7 +971,7 @@ export class Clouds {
       const tanY = Math.tan((camera.fov * Math.PI) / 360);
       const tanX = tanY * camera.aspect;
       const spread = ((RUFFLE * this.wind.value.w * vh) / (2 * tanY)) * (1 + tanX * tanX + tanY * tanY);
-      this.waterMask?.render(renderer, camera, this.bufferSize, view, spread);
+      this.waterMask.render(renderer, camera, this.bufferSize, view, spread);
     }
     // cleared to transparent black: the water reads it as premultiplied colour
     renderer.setRenderTarget(this.mirrorTarget);
