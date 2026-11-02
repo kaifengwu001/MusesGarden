@@ -32,6 +32,19 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's paddy lab: the terraces from a clean plate
+
+Started from c14319c. Kai (2026-11-01), stopping the sixth round's build (a band squeezed between two woods had been cleaned into a 1.7 m cliff drawn as a staircase): "Start a clean plate paddie lab page. There, create a flat canvas. Use perlin noise at several scales to create a mathematical height map. Then, terrace the map by intersecting at height intervals (regular +- a noise offset) and finding the outlines, offsetting the outlines by the dam thickness (again, base value + variable noise), then extruding / building the dams that way. Finally, fill in the top surfaces." This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | A clean-plate paddy lab page with a flat canvas | |
+| 2 | A mathematical height map: Perlin noise at several scales | |
+| 3 | Terrace it: intersect at height intervals (regular ± a noise offset) and find the outlines | |
+| 4 | Offset the outlines by the dam thickness (a base value + variable noise) | |
+| 5 | Extrude and build the dams from them | |
+| 6 | Fill in the top surfaces | |
+
 ### Kai's notes on the sixth round: a clean-slate rewrite of the terraces' construction
 
 Started from ead85c4. Kai (2026-11-01), with a screenshot of the flats from above (kept out of git: reference/terraces/kai-notes-broken-geometry.webp): "geometry are still broken. Also some geometry seems to re-construct based on zoom and camera distance, but the re-construction is not perfect, which introduces even more brokenness. The faultlines also still exist. Seems like the code creating the terraces is deeply messy and has a lot of legacy issues. This is not the first time I'm suggesting a clean slate re-write."
