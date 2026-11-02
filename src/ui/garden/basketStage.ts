@@ -5,8 +5,6 @@ import {
   CustomBlending,
   DoubleSide,
   Euler,
-  Group,
-  LatheGeometry,
   Mesh,
   OneFactor,
   OneMinusSrcAlphaFactor,
@@ -16,8 +14,6 @@ import {
   Scene,
   ShaderMaterial,
   SRGBColorSpace,
-  TorusGeometry,
-  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three';
@@ -25,21 +21,23 @@ import { smoothstep } from '../../core/math';
 import { HEADS } from '../../life/flowers';
 import { SPECIES_MESH } from '../../life/flowerMeshes';
 import type { Fan } from './basketFan';
+import { DRAWING, drawingLayers } from './basketDrawing';
 import type { ButtonLayout } from './basketOverlay';
 import { el } from './dom';
-import { paint } from './toyPaint';
 
-// The basket as a real thing: a wicker basket with a handle, in the post
-// box's toy paint, and in it the finds' flowers, the meadow's own flower
-// meshes painted as their patches paint them (flowerPaint.ts). It flies out
-// of the rail's icon to the middle, its flowers rise into a fan over it and
-// bob there; they drop back in and it flies home; a flower picked comes down
-// into its patch on the planet just as the camera stops over it, the size,
-// the turn and the colour its patch's hero has there, so the patch takes over
-// from it in one frame. One full-screen canvas of its own over the planet
-// (pointer events go through it), drawn only while the basket is out,
-// made once when the page is idle and never let go. Its camera is
-// orthographic in CSS pixels; poses are kept with y down, as the screen is.
+// The basket as the rail's icon draws it (basketDrawing.ts), and in it the
+// finds' flowers, the meadow's own flower meshes painted as their patches
+// paint them (flowerPaint.ts). It grows out of the rail's icon to the middle,
+// its flowers rise into a fan over it and bob there; they drop back in and it
+// goes home into the icon; a flower picked comes down into its patch on the
+// planet just as the camera stops over it, the size, the turn and the colour
+// its patch's hero has there, so the patch takes over from it in one frame.
+// One full-screen canvas of its own over the planet (pointer events go
+// through it), drawn only while the basket is out, made once when the page is
+// idle and never let go. Its camera is orthographic in CSS pixels; poses are
+// kept with y down, as the screen is. The flowers' poses in the basket are
+// kept in a frame of the basket's own (model units, its rim RIM in radius),
+// tipped toward you as far as the picture shows it.
 
 /** A find's flower in the basket: its species' mesh, painted by vertex (graded, display-ready), and its hero's size. */
 export interface StageFlower {
@@ -81,21 +79,20 @@ export interface StageHost {
 type Rect = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
 type Where = (t: number) => Pose;
 
-/** The basket model's size (model units): its rim's radius, and the box it fills (rim to rim, foot to handle). */
+/** The rim's radius in the basket's frame (model units). */
 const RIM = 0.52;
-const MODEL = { width: 2 * (RIM + 0.05), height: 0.98, middle: 0.07 } as const;
 /**
  * A flower in the basket, out of sight: lying on its bottom (model units: its stem this long, its foot this deep and
  * this far to one side, raised this much, rad), a little toward the front, where the front wall hides it.
  */
-const IN_BASKET = { stem: 0.6, foot: -0.3, reach: 0.3, raised: 0.12, front: 0.08, spread: 0.12 } as const;
+const IN_BASKET = { stem: 0.6, foot: -0.35, reach: 0.3, raised: 0.12, front: 0.08, spread: 0.12 } as const;
 /** A flower ready to go home, standing in the basket: its stem this long (model units), its foot this deep and this far out, leaning out. */
 const READY = { stem: 0.7, foot: -0.3, reach: 0.22, lean: 0.24 } as const;
 /** A fanned flower's stem against the fan's spacing, and how it is turned toward you. */
 const FAN_STEM = 2.3;
 const FAN_TIP = 0.55;
-/** The basket as it sits: tipped toward you to show its inside, turned a little; smaller while flowers go home. */
-const BASKET_TILT = new Euler(0.42, -0.32, 0);
+/** The basket's frame: tipped toward you as the picture shows it; smaller while flowers go home. */
+const BASKET_TILT = new Euler(DRAWING.rim.tilt, 0, 0);
 const SMALL = 0.72;
 /**
  * Seconds: the basket's flights, a flower's rise out of the basket to its slot (and its drop back in, the same way
@@ -113,6 +110,9 @@ const SPARKS = 160;
 const SPARK_LIFE = 0.75;
 /** Depths (px): fanned flowers stand in the basket's middle (their stems go down into it), flowers going home in front of all. */
 const Z = { fan: 0, home: 320 } as const;
+/** The canvas's passes, in order: the basket's back, the flowers in and over it, its front, then what goes home and the sparkles over all. */
+const PASS = { back: 1, inside: 2, front: 3, over: 4 } as const;
+const PASSES = [PASS.back, PASS.inside, PASS.front, PASS.over] as const;
 
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
 const linear = (t: number): number => t;
@@ -208,50 +208,6 @@ function speciesGeometry(species: number): BufferGeometry {
   return g;
 }
 
-/** The basket: a wicker bowl coiled in rows of two tones, a rim and a handle, its inside dark. */
-function basketModel(): Group {
-  const light = paint(0xdcae6c, 0x96683a, 0.12, 0x5b3d22);
-  const dark = paint(0xbd8a4e, 0x7c522c, 0.12, 0x5b3d22);
-  const rim = paint(0xe6be80, 0xa0703f, 0.08, 0x5b3d22);
-  const group = new Group();
-  // its outline from the foot up (radius, height)
-  const outline = [
-    [0, -0.4],
-    [0.26, -0.4],
-    [0.36, -0.36],
-    [0.44, -0.25],
-    [0.49, -0.11],
-    [0.515, 0],
-  ];
-  const bowl = new LatheGeometry(
-    outline.map(([r, y]) => new Vector2(r, y)),
-    44,
-  );
-  group.add(new Mesh(bowl, paint(0xa97543, 0x6b4526, 0.1, 0x4f331c)));
-  const radiusAt = (y: number): number => {
-    for (let k = 1; k < outline.length; k++) {
-      const [r1, y1] = outline[k];
-      const [r0, y0] = outline[k - 1];
-      if (y <= y1) return r0 + ((r1 - r0) * (y - y0)) / Math.max(y1 - y0, 1e-6);
-    }
-    return RIM;
-  };
-  for (let k = 0; k < 6; k++) {
-    const y = -0.355 + k * 0.066;
-    const row = new Mesh(new TorusGeometry(radiusAt(y) + 0.012, 0.034, 6, 44), k % 2 ? dark : light);
-    row.rotation.x = Math.PI / 2;
-    row.position.y = y;
-    group.add(row);
-  }
-  const lip = new Mesh(new TorusGeometry(RIM + 0.005, 0.048, 8, 48), rim);
-  lip.rotation.x = Math.PI / 2;
-  group.add(lip);
-  const handle = new Mesh(new TorusGeometry(RIM - 0.02, 0.038, 8, 40, Math.PI), rim);
-  handle.rotation.y = 0.12;
-  group.add(handle);
-  return group;
-}
-
 /** A pose from a point (px, y down), a turn, a size and an opacity. */
 const pose = (x: number, y: number, z: number, q: Quaternion, s: number, a = 1): Pose => ({ x, y, z, q, s, a });
 
@@ -294,17 +250,31 @@ interface Homing {
   readonly land: (id: string) => void;
 }
 
-/** The basket's place: its middle (px), its size (px per model unit). */
+/** The basket's place: its rim's middle (px), its size (px per model unit). */
 interface BasketPose {
   readonly x: number;
   readonly y: number;
   readonly s: number;
 }
 
+/** Screen px per px of the picture, at this pose. */
+const pictureScale = (at: BasketPose): number => (at.s * RIM) / DRAWING.rim.radius;
+
+/** The pose that draws the picture with its top left here, `k` screen px per px of it. */
+const pictureAt = (left: number, top: number, k: number): BasketPose => ({ x: left + DRAWING.rim.x * k, y: top + DRAWING.rim.y * k, s: (DRAWING.rim.radius * k) / RIM });
+
+/** The pose that draws the picture's opaque part with its middle here, this tall. */
+function contentAt(x: number, y: number, height: number): BasketPose {
+  const { left, top, right, bottom } = DRAWING.content;
+  const k = height / (bottom - top);
+  return pictureAt(x - ((left + right) / 2) * k, y - ((top + bottom) / 2) * k, k);
+}
+
 interface BasketLeg {
   readonly from: BasketPose;
   readonly to: () => BasketPose;
-  readonly start: number;
+  /** Stage s (null: the next frame, so that frame draws it where it sets off from). */
+  start: number | null;
   readonly span: number;
   readonly arc: number;
   readonly ease: (t: number) => number;
@@ -324,7 +294,7 @@ export class BasketStage {
   private failed = false;
   private readonly scene = new Scene();
   private readonly camera = new OrthographicCamera(0, 1, 0, -1, -4000, 4000);
-  private readonly basket = basketModel();
+  private readonly basket = drawingLayers();
   private readonly geometries = [0, 1, 2, 3].map(speciesGeometry);
   private readonly flowerMaterial = new ShaderMaterial({
     vertexShader: flowerVertex,
@@ -357,7 +327,6 @@ export class BasketStage {
   private drawn = false;
   private width = 1;
   private height = 1;
-  private readonly tq = new Quaternion();
   private readonly tv = new Vector3();
   private readonly basketTurn = new Quaternion().setFromEuler(BASKET_TILT);
 
@@ -368,9 +337,10 @@ export class BasketStage {
     this.canvas = el('canvas', 'g-basket-canvas');
     this.canvas.setAttribute('aria-hidden', 'true');
     parent.append(this.canvas);
-    this.basket.quaternion.copy(this.basketTurn);
-    this.basket.visible = false;
-    this.scene.add(this.basket);
+    this.basket.back.layers.set(PASS.back);
+    this.basket.front.layers.set(PASS.front);
+    this.basket.group.visible = false;
+    this.scene.add(this.basket.group);
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(new Float32Array(SPARKS * 3), 3));
     geometry.setAttribute('aVelocity', new BufferAttribute(new Float32Array(SPARKS * 3), 3));
@@ -389,6 +359,7 @@ export class BasketStage {
     );
     this.sparks.frustumCulled = false;
     this.sparks.visible = false;
+    this.sparks.layers.set(PASS.over);
     this.scene.add(this.sparks);
     window.addEventListener('resize', () => this.resize());
     if ('requestIdleCallback' in window) window.requestIdleCallback(() => this.ready(), { timeout: 4000 });
@@ -402,18 +373,21 @@ export class BasketStage {
       const r = new WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: true, premultipliedAlpha: true });
       r.outputColorSpace = SRGBColorSpace;
       r.setClearColor(0x000000, 0);
+      r.autoClear = false;
       this.renderer = r;
       this.resize();
       // every program now, not at the first open
       const probe = this.flower({ id: '', species: 0, colours: new Float32Array(this.geometries[0].getAttribute('position').count * 3), size: 1 });
       this.scene.add(probe.mesh);
-      this.basket.visible = true;
+      this.basket.group.visible = true;
       this.sparks.visible = true;
       r.compile(this.scene, this.camera);
+      // the picture too, if it has come (else it goes up at its first frame)
+      if (this.basket.texture.version > 0) r.initTexture(this.basket.texture);
       this.scene.remove(probe.mesh);
       probe.mesh.geometry.dispose();
       probe.mesh.material.dispose();
-      this.basket.visible = false;
+      this.basket.group.visible = false;
       this.sparks.visible = false;
     } catch (error) {
       console.warn('garden: the basket could not get a canvas of its own', error);
@@ -455,7 +429,8 @@ export class BasketStage {
       for (const [k, b] of this.order()) this.settleIn(b, { in: 'fan', k });
       return;
     }
-    this.moveBasket('centre', T.out, 0.22, easeBack);
+    // out of the rail, its first frame is the icon's picture just where the icon is
+    this.moveBasket('centre', T.out, 0.22, easeBack, wasHome ? null : t);
     this.rise(t + (wasHome ? 0.3 : 0.08));
   }
 
@@ -592,17 +567,18 @@ export class BasketStage {
     return b;
   }
 
+  /** The basket in the rail: the picture just where the icon draws it (the icon's box, the picture contained in it). */
   private railPose(): BasketPose {
-    const r = this.rail;
-    if (!r) return { x: this.width - 40, y: this.height / 2, s: 20 };
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2, s: (r.width * 0.62) / MODEL.width };
+    const r = this.rail ?? { left: this.width - 58, top: this.height / 2 - 14, width: 36, height: 27 };
+    const k = Math.min(r.width / DRAWING.width, r.height / DRAWING.height);
+    return pictureAt(r.left + (r.width - DRAWING.width * k) / 2, r.top + (r.height - DRAWING.height * k) / 2, k);
   }
 
+  /** The basket out: the picture as tall as the fan's basket, in its middle (its handles reach a little past its sides). */
   private restingBasket(rest: 'centre' | 'small' | null): BasketPose {
     const fan = this.fan;
     if (rest === null || !fan) return this.railPose();
-    const s = ((fan.basket.right - fan.basket.left) / MODEL.width) * (rest === 'small' ? SMALL : 1);
-    return { x: fan.basket.x, y: fan.basket.y - MODEL.middle * s, s };
+    return contentAt(fan.basket.x, fan.basket.y, (fan.basket.bottom - fan.basket.top) * (rest === 'small' ? SMALL : 1));
   }
 
   private place(rest: 'centre' | 'small' | null): void {
@@ -612,7 +588,7 @@ export class BasketStage {
     this.host.basketHome(rest === null);
   }
 
-  private moveBasket(rest: 'centre' | 'small' | null, span: number, arc: number, ease: (t: number) => number, start = this.time): void {
+  private moveBasket(rest: 'centre' | 'small' | null, span: number, arc: number, ease: (t: number) => number, start: number | null = this.time): void {
     const from = { ...this.basketAt };
     this.basketRest = rest;
     if (rest !== null) this.host.basketHome(false);
@@ -866,6 +842,7 @@ export class BasketStage {
       if (this.basketRest !== null) this.basketAt = this.restingBasket(this.basketRest);
       return;
     }
+    leg.start ??= t;
     if (t < leg.start) return;
     const u = clamp01((t - leg.start) / leg.span);
     const to = leg.to();
@@ -923,15 +900,15 @@ export class BasketStage {
     const r = this.renderer;
     if (!r) return;
     const at = this.basketAt;
-    const b = this.basket;
+    const b = this.basket.group;
     b.visible = this.basketRest !== null || this.basketLeg !== null;
-    const wobble = Math.sin(t * 9) * 0.04 * this.basketHover;
     b.position.set(at.x, -at.y, 0);
-    b.scale.setScalar(at.s * (1 + 0.04 * this.basketHover));
-    b.quaternion.copy(this.basketTurn).multiply(this.tq.setFromAxisAngle(this.tv.set(0, 0, 1), wobble));
+    b.scale.setScalar(pictureScale(at) * (1 + 0.04 * this.basketHover));
+    b.rotation.z = Math.sin(t * 9) * 0.04 * this.basketHover;
     for (const bloom of [...this.blooms.values(), ...this.leaving]) {
       const p = this.pose(bloom, t);
       const m = bloom.mesh;
+      m.layers.set(bloom.homing ? PASS.over : PASS.inside);
       m.position.set(p.x, -p.y, p.z);
       m.quaternion.copy(p.q);
       m.scale.setScalar(Math.max(p.s, 1e-4));
@@ -945,7 +922,11 @@ export class BasketStage {
     this.sparks.material.uniforms.uTime.value = t;
     this.canvas.classList.add('is-on');
     this.drawn = true;
-    r.render(this.scene, this.camera);
+    r.clear();
+    for (const pass of PASSES) {
+      this.camera.layers.set(pass);
+      r.render(this.scene, this.camera);
+    }
   }
 
   private clear(): void {
@@ -964,9 +945,11 @@ export class BasketStage {
     }
     const shown = this.basketRest !== null || this.basketLeg !== null;
     const at = this.basketAt;
+    const k = pictureScale(at);
+    const { left, top, right, bottom } = DRAWING.content;
     return {
       flowers,
-      basket: shown ? { x: at.x, y: at.y + MODEL.middle * at.s, width: MODEL.width * at.s, height: MODEL.height * at.s } : null,
+      basket: shown ? { x: at.x + ((left + right) / 2 - DRAWING.rim.x) * k, y: at.y + ((top + bottom) / 2 - DRAWING.rim.y) * k, width: (right - left) * k, height: (bottom - top) * k } : null,
     };
   }
 }

@@ -109,6 +109,7 @@ export class GardenUi {
   private readonly homeButton: HTMLButtonElement;
   private readonly basketsButton: HTMLButtonElement;
   private readonly sign: HTMLElement;
+  private readonly basketIcon: HTMLImageElement;
   private readonly basketDot: HTMLElement;
   private readonly toastEl: HTMLElement;
   private toastTimer = 0;
@@ -190,12 +191,12 @@ export class GardenUi {
     this.homeButton.append(this.sign);
     this.basketsButton = button('g-railbtn g-basketbtn', 'Baskets', '', () => this.railBasket());
     this.basketsButton.dataset.label = 'Baskets';
-    const basketIcon = el('img', 'g-basket-icon');
-    basketIcon.src = basketImage;
-    basketIcon.alt = '';
-    basketIcon.draggable = false;
+    this.basketIcon = el('img', 'g-basket-icon');
+    this.basketIcon.src = basketImage;
+    this.basketIcon.alt = '';
+    this.basketIcon.draggable = false;
     this.basketDot = el('span', 'g-dot');
-    this.basketsButton.append(basketIcon, this.basketDot);
+    this.basketsButton.append(this.basketIcon, this.basketDot);
     this.rail.append(this.portrait, find, this.homeButton, this.basketsButton);
     this.root.append(this.rail);
 
@@ -668,8 +669,9 @@ export class GardenUi {
     return framing;
   }
 
+  /** Where the basket is in the rail: its icon, the same picture the stage draws. */
   private railRect(): DOMRect {
-    return this.basketsButton.getBoundingClientRect();
+    return this.basketIcon.getBoundingClientRect();
   }
 
   /** The fan for the basket out (or `basket`), on this screen and clear of the rail; the stage and timeline follow it. */

@@ -714,13 +714,15 @@ so any view can be shared.
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
-                           baskets), the post box (a model in its own canvas, toyPaint.ts its paint), the post
+                           baskets), the post box (the hand-drawn mailbox in SVG, postboxIllustration.ts), the post
                            (mail.ts: today's deck, the heart and star, the Favorite and Album pages, the tickets),
                            Muse's page, the visit stand-in, and the basket: its phases as one pure step
-                           (basketMachine.ts; gardenUi.ts carries out its effects), a wicker basket and the finds'
-                           own flower meshes in a full-screen canvas of its own drawn only while it is out
-                           (basketStage.ts; flowerPaint.ts paints each flower as its patch paints its hero, through
-                           the frame's grade, so it matches where it lands), and what you touch over it
-                           (basketOverlay.ts: the scrim, a button over each flower, the preview, the day timeline;
-                           basketFan.ts and timeline.ts lay them out)
+                           (basketMachine.ts; gardenUi.ts carries out its effects), the rail icon's hand-drawn
+                           basket, flat, as two layers of the one picture split along its near rim
+                           (basketDrawing.ts), with the finds' own flower meshes drawn between them, in a
+                           full-screen canvas of its own drawn only while it is out (basketStage.ts; flowerPaint.ts
+                           paints each flower as its patch paints its hero, through the frame's grade, so it
+                           matches where it lands), and what you touch over it (basketOverlay.ts: the scrim, a
+                           button over each flower, the preview, the day timeline; basketFan.ts and timeline.ts
+                           lay them out)
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
