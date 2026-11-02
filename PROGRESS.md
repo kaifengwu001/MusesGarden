@@ -84,6 +84,36 @@ every distance. So it became a ground-fog layer, dense at the ground,
 lying in banks with wisps. The lakes don't mirror it (Kai: no need, it
 covers the lake already).
 
+Measured (2026-11-01, a3d08d4, high, headless Chromium on Metal; best of 7
+interleaved rounds, the machine busy with other sessions, so ±1–2 ms):
+
+- **At the default it is free:** nothing of the fog is drawn and the frames
+  are pixel-identical to main. The A/B against main differed by noise only,
+  either side of zero.
+- **Shown (slider at 0), the fog alone** (the frame with it, less the same
+  frame with it hidden), ms a frame:
+
+  | View | 2880×1800 (DPR 2) | 1440×900 (DPR 1, MSAA) |
+  |---|---|---|
+  | orbit, centred on the hut | 2.4 | 0.65 |
+  | 170 m up | 6.5 | |
+  | bird's-eye | 5.2 | |
+  | the bank, from the cottage height | 7.1 | 1.9 |
+  | the bank, standing | 4.8 | 1.5 |
+  | the vista, at the fog's top | 12.2 | 2.7 |
+  | eye level, inside it | 6.3 | |
+
+- **Where it goes:** a march per pixel, two cube-map reads a step (the ground
+  and the veil's field), fine steps through the thin top of the layer. It is
+  costliest looking across the top (the vista).
+- **Live, with Auto** (from the hut, walking out toward the bank), both runs
+  sat at Auto's lowest resolution (0.50–0.62) with or without the fog, the
+  GPU being shared. Frame p50 was 16.7–18.3 ms with it, 16.7–17.5 without.
+- **Tried and dropped: coarser steps** (0.6 m near, faster growth): 2.5–5.5 ms
+  saved from above and at the vista, almost nothing at the bank. From above
+  the fog went see-through in streaks (142,000 pixels off by more than 16
+  levels at 170 m): its steps passed over the thin layer.
+
 Open (questions for Kai, and what wasn't done):
 
 - At eye level in the clearing (1.6 m), the tiny planet's near horizon hides
@@ -94,7 +124,6 @@ Open (questions for Kai, and what wasn't done):
 - Muse still roams under the veil, and the finds' beds and pins show
   wherever they are; the engine's growth (Fern's exploration) still sets the
   size directly, so the slider stands in for Muse's exploring.
-- Not measured yet: what the veil costs (look first).
 
 ## Muse's hut: the interior (in progress)
 
