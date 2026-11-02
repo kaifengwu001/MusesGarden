@@ -39,6 +39,10 @@ Started from d894754 (the paddy lab's second round). Kai (2026-11-01), on the la
 | # | Note | What changed |
 |---|---|---|
 | 1 | Bring the lab's construction to the planet | |
+| 2 | Kai, stopping the first port (the lab's construction run on a grid over the cube's faces, on the old planet's hills: its slope and the river's edge read off a coarser grid, its crossings interpolated between samples, the old ground's baked mesh and paint left along the river): "it looks like all of our labs work seems to be for nothing and we have gone right back to the old look. the curves and edges are all jagged and messed up" | |
+| 3 | "DO NOT measure the planet based on meshes" | |
+| 4 | "REWORK the hill generation with the new logic" | |
+| 5 | "ABANDON the old planet world segmentation and adopt a purely mathematic method for calculating this. Then, the hills can be derived from the mathematics then." | |
 
 ### Kai's paddy lab, second round: organic banks, cuts, and the slope deciding
 
