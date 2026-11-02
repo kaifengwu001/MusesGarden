@@ -30,21 +30,34 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
-## The garden's controls, the second look (in progress)
+## The garden's controls, the second look (2026-11-01)
 
 Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with screenshots; this table fills in as they are done.
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | Post: no heart on the photo's corner (the filled heart beside the card says it already); the heart and the star level with the photo's top edge | |
-| 2 | Basket: the preview above the flower under the pointer, clear of the basket and the other flowers; a flower under the pointer doesn't turn | |
-| 3 | Dates read "Oct 23 Fri". Basket titles: Muse names each day (tracked as "Muse names each day's basket", Agent backend) | |
-| 4 | A landed flower lights under the pointer, and a click on it always opens its card before any other click | |
-| 5 | Card arrows: left goes back in time, right forward, as on the timeline; each card shows its day; at a day's end a line over the arrow says "Going to Oct 22 Thu basket" and the arrow turns light blue | |
-| 6 | The lit flower holds still while the meadow sways | |
-| 7 | No line and dot under the card: the card alone | |
-| 8 | (asked) Why some glowing spheres look cut off: each glow is a flat sprite 0.6 m over its find at one depth, so ground rising toward the camera inside its glow hid part of it. Round again, still hidden by what truly stands in front | |
-| 9 | The flowers' flight out of the basket looks inconsistent | |
+| 1 | Post: no heart on the photo's corner (the filled heart beside the card says it already); the heart and the star level with the photo's top edge | The heart on a liked card's photo is gone; the Favorite and Album boards keep theirs after the caption. On a desktop the heart and the star start at the photo's top edge (255.1 px for both at 1440×900; the heart was at 429.6); a phone keeps its row under the card. Laid over the teammate's hand-drawn mailbox (7d7a4f9), every line of it kept (8263739, 7e40608). |
+| 2 | Basket: the preview above the flower under the pointer, clear of the basket and the other flowers; a flower under the pointer doesn't turn | The preview sits above its flower, centred and on screen, clear of the other flowers and the basket where there is room (in a full fan at 1440×900 the two outermost cover a neighbour: no room above). The turn under the pointer is gone: it came from the stage's clock since load, up to 2.94 rad the frame the pointer arrived; now 0.000 rad on every frame, the flower only lifting 6 px and growing ×1.12. A finger's first tap still previews (9fd9402, 9c34b70). |
+| 3 | Dates read "Oct 23 Fri". Basket titles: Muse names each day (tracked as "Muse names each day's basket", Agent backend) | A basket's day reads "Oct 23 Fri", with "Today, Nov 1 Sun" and "Yesterday, Oct 31 Sat" (basketDay in dom.ts; the post keeps its own dates): on the timeline, on the card ("Oct 23 Fri basket · 2 of 2") and in the arrows' line. Muse naming its days is tracked for the engine (ad84ef0). |
+| 4 | A landed flower lights under the pointer, and a click on it always opens its card before any other click | Two causes. A click found its patch by the ground the pointer's ray reached, behind the flowers, so a click on a head missed and the meadow took it (a gust, a glide); and a closed card stayed on the page unseen, taking clicks where it last stood (30 of 104 test points). Now a patch is picked as drawn: the nearest flower head along the ray, the lit hero triangle by triangle, else its column from the ground to its heads; a click, a double-click or a held press on a patch or a pin opens its card. Of 104 points on patches' visible pixels: hover lit 11 and a click opened 6 before, both 96 after, and the meadow fired on 47 before, none after; every hover lit the card the click opened. The 8 misses are at eye level, a far patch seen through the gaps of a nearer one (4b56fad). |
+| 5 | Card arrows: left goes back in time, right forward, as on the timeline; each card shows its day; at a day's end a line over the arrow says "Going to Oct 22 Thu basket" and the arrow turns light blue | Left goes back in time and right forward, as on the timeline, round at the ends; swipes and the arrow keys follow it (browseOrder now runs oldest first). An arrow that crosses into another day's basket turns light blue under a line, "Going to Oct 26 Mon basket", on each side and at the wrap (ad84ef0). |
+| 6 | The lit flower holds still while the meadow sways | While lit (in focus or landing) the hero no longer bends, flutters or nods in the wind; its squash as it lands stays, and its patch sways round it. Drawn alone over 60 frames of wind it moves 0.00 px (13.5 px before). The card itself moved one pixel at rest in 2 of 6 runs: a framed patch projects to the screen's exact middle, an odd card width puts its edge on a half pixel, and the camera's float noise flipped the rounding; it now keeps its pixel until it truly moves (efd1167, ad84ef0). |
+| 7 | No line and dot under the card: the card alone | The line and its dot are gone; the card rises where it stands (ad84ef0). |
+| 8 | (asked) Why some glowing spheres look cut off: each glow is a flat sprite 0.6 m over its find at one depth, so ground rising toward the camera inside its glow hid part of it. Round again, still hidden by what truly stands in front | Each sphere is now depth-tested at the near edge of its own glow (its depth brought toward the camera by its radius, at most half its distance), so the ground inside the glow no longer cuts it, while a hill, the cottage, a cloud or the horizon between still hides it. In a view looking 40° down, 252 pixels were hidden by the ground under the glows; now 6 (503a435). |
+| 9 | The flowers' flight out of the basket looks inconsistent | One ordering slip: sending a flower stored where it was going before reading where it was, so it set off from its goal. On opening every flower sat on its slot from the first frame (moving 0.1 px a frame at most), on another day each new one jumped to its slot in one frame, and on closing each was back in at once; each act also had its own timing. Now every flower starts out of sight in the basket and rides it, turns upright, comes over the rim and reaches out to its slot: 30 frames each, 0.04 s apart, one easing, no jumps, for 1, 3, 5 and 12 flowers and on another day; dropping back in is the same played backward. Closing takes longer for it: 0.90 s with one flower, 1.33 s with twelve (0.73 before); another day takes 0.80 s (1.02 before) (b08c665, 1d639ca). |
+
+### Checked (the second look)
+
+- On ui at 7e40608: npm run check clean; 897 unit tests pass, 3 skipped (three workers: under this machine's load chunks.test.ts times out with more); npm run test:gpu 14 pass, 1 skipped, and the growth-scrubbing frame budget failed once under load and passes alone (the base failed it the same way); the live tests 11 of 11 against a fresh Muse server.
+- The basket lane's meadow samecheck against 045d1f7, pins held back and baskets visited: 27 of 27 identical.
+- Recordings, before and after: scratchpad tweak-basket/recordings (1440×900 and 390×844).
+
+### Known issues (the second look)
+
+- At eye level, pointing at a far patch through the gaps of a nearer one picks the nearer (8 of 40 points).
+- The arrows' line for today's basket reads "Going to Today, Nov 1 Sun basket".
+- In a full basket on a laptop the two outermost previews each cover a neighbour; the rise turns fastest mid-way (0.19 rad a frame); new flowers no longer sparkle on another day.
+- A flower leaving the basket shows its stem in front of the wall for a frame, and in a full fan the outermost stem's foot sits outside the wall (both as before; tracked).
 
 ## The garden's controls (2026-11-01)
 
