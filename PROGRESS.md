@@ -32,6 +32,17 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's paddy lab, second round: organic banks, cuts, and the slope deciding
+
+Started from 6b58cd8 (the paddy lab). Kai (2026-11-01), with two references (kept out of git: reference/terraces/paddy-aerial.jpg, an aerial of terraces by colour; reference/terraces/paddy-yuanyang.jpg, Yuanyang's flooded terraces); this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | The noise on the bank offset is applied to different points on the same bank, so the banks look more organic | |
+| 2 | The paddy bank height and the level difference are a bit too high | |
+| 3 | The slope decides: too steep, trees; too flat, regular rice farmland; terraces between | |
+| 4 | Next step: cuts that blend naturally into the banks. Paddies on the same level: instead of one precise line at a precise height cut up, the banks offset in and out organically and curve in at the cuts to complete a paddy; cuts tend to cascade across levels (study the reference) | |
+
 ### Kai's paddy lab: the terraces from a clean plate
 
 Started from c14319c. Kai (2026-11-01), stopping the sixth round's build (a band squeezed between two woods had been cleaned into a 1.7 m cliff drawn as a staircase): "Start a clean plate paddie lab page. There, create a flat canvas. Use perlin noise at several scales to create a mathematical height map. Then, terrace the map by intersecting at height intervals (regular +- a noise offset) and finding the outlines, offsetting the outlines by the dam thickness (again, base value + variable noise), then extruding / building the dams that way. Finally, fill in the top surfaces." This table fills in as they are done.
