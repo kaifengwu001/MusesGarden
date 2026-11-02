@@ -5,8 +5,8 @@ import { gnoise } from '../planet/noise';
 // The terraces' mist as strokes (Kai, 2026-11-02, against the blue-green landscape: the bands' meanders "too
 // simplistic and mechanical", their widths not growing and shrinking "as dynamically as the painting"). Each band is
 // a stroke of its own, as the painting's ribbons are brushed: it runs along the wind, meandering as a river does (a
-// sine-generated curve, Kinoshita's, its sinuosity and wavelength wandering along it, so calm stretches give way to
-// coiling ones and its bends lean), steered round the hills its layer meets (toward the side where it clears the
+// sine-generated curve, Kinoshita's, its sinuosity and wavelength wandering along it: mostly long calm runs, as the
+// painting's are, now and then a coiling stretch that folds back on itself; its bends lean), steered round the hills its layer meets (toward the side where it clears the
 // ground more, ahead), so it winds along the valleys between them, now and then ending in a curl; its breadth swells into broad bodies and pinches to
 // thin necks along it, scalloped along one edge, tapering to a point at its tail. Some fork, a branch peeling off; some
 // run with a sibling stacked beside them, as the painting's ribbons lie in parallel runs; the rest merge where they
@@ -118,12 +118,18 @@ export function makeStrokes(P: StrokeParams, seed: number, radius: number, axis:
     let phi = rnd() * Math.PI * 2;
     let curled = 0;
     let steered = 0;
+    let M = P.wavelength[0];
+    let w0 = P.sinuosity[0];
     const n = Math.max(2, Math.floor(Ls / STEP) + 1);
     for (let i = 0; i < n; i++) {
       const s = i * STEP;
       // its heading: the meander (a sine-generated curve, its sinuosity and wavelength wandering), eased in over `ramp`
-      const M = P.wavelength[0] + (P.wavelength[1] - P.wavelength[0]) * (0.5 + 0.5 * Math.max(-1, Math.min(1, 1.6 * noise(s / 90 + o[0], o[1]))));
-      const w = (P.sinuosity[0] + (P.sinuosity[1] - P.sinuosity[0]) * smoothstep(-0.35, 0.35, noise(s / 55 + o[2], o[3]))) * smoothstep(0, Math.max(ramp, 1e-3), s);
+      // (its wavelength and sinuosity wander over 60–90 m: worked out every 2 m)
+      if (i % 4 === 0) {
+        M = P.wavelength[0] + (P.wavelength[1] - P.wavelength[0]) * (0.5 + 0.5 * Math.max(-1, Math.min(1, 1.6 * noise(s / 90 + o[0], o[1]))));
+        w0 = P.sinuosity[0] + (P.sinuosity[1] - P.sinuosity[0]) * Math.pow(smoothstep(-0.3, 0.5, noise(s / 60 + o[2], o[3])), 2.2);
+      }
+      const w = w0 * smoothstep(0, Math.max(ramp, 1e-3), s);
       phi += (2 * Math.PI * STEP) / M;
       let a = follow ? follow[Math.min(i, follow.length - 1)] : alpha0 + w * Math.sin(phi) + w * w * w * skew * (SKEW * Math.cos(3 * phi) - FLAT * Math.sin(3 * phi));
       // (its end curled: the last of it turning tighter and tighter, a scroll's hook)
@@ -186,12 +192,18 @@ export function makeStrokes(P: StrokeParams, seed: number, radius: number, axis:
   for (let k = 0; k < want; k++) {
     // a stroke where its layer clears the ground and it does not pile on another (a few tries)
     let found: Traced | null = null;
-    for (let tries = 0; tries < 12 && !found; tries++) {
+    for (let tries = 0; tries < 30 && !found; tries++) {
       const z = 2 * rnd() - 1;
       const a = 2 * Math.PI * rnd();
       const r = Math.sqrt(1 - z * z);
-      const t = trace([r * Math.cos(a), r * Math.sin(a), z], (rnd() - 0.5) * 0.6, between(P.length), P.half * (0.7 + 0.6 * rnd()), 0, 0, null);
-      if (clear(t) >= 0.6 && overlap(t) <= 0.3) found = t;
+      const start: V3 = [r * Math.cos(a), r * Math.sin(a), z];
+      const alpha0 = (rnd() - 0.5) * 0.6;
+      const length = between(P.length);
+      const half = P.half * (0.7 + 0.6 * rnd());
+      // (none traced that starts under the ground)
+      if (clearance(start) <= 1) continue;
+      const t = trace(start, alpha0, length, half, 0, 0, null);
+      if (clear(t) >= 0.55 && overlap(t) <= 0.2) found = t;
     }
     if (!found) continue;
     strokes.push(found);

@@ -11,6 +11,7 @@ uniform float uRadius;
 #include <meadow_fog>
 #include <meadow_warp>
 #include <terraces_common>
+#include <terraces_fog>
 #include <terraces_rice>
 
 uniform sampler2D uMap;
@@ -32,5 +33,6 @@ void main() {
   vec3 col = mix(albedo, labLight(albedo, n, up), 0.75);
   float above = length(vPlanet) - uRadius;
   col = mix(col, applyAerial(col, dist, dir), mix(1.0, 0.4, smoothstep(5.0, 55.0, above)));
+  col = applyHeightFog(col, dist, above);
   gl_FragColor = vec4(col, 1.0);
 }

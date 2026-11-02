@@ -29,6 +29,13 @@ import { Rice, RICE } from './rice';
 import { Trees } from './trees';
 import { TerraceMist } from './mist';
 
+/**
+ * The height fog (Kai, 2026-11-02: "a general height based fog", fog.glsl): its density at its base (1/m), its base's
+ * height and its scale height (m over the radius): settled in the valleys (the ground is under −9 m over a quarter of
+ * the planet), thinning up the hills by e every 6 m: across a valley 60 m wide at −10 m, a third of the land hazed.
+ */
+const HEIGHT_FOG = { density: 0.0085, base: -16, scale: 6 } as const;
+
 /** Kai's models, made light by scripts/terraces-models.mjs (a unit tall, two levels of detail each). */
 const MODEL_URLS = (kind: 'mountain' | 'house'): string[] => [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/${kind}${k}.glb`, import.meta.url).href);
 
@@ -103,16 +110,17 @@ export class TerraceWorld implements PlanetWorld {
   readonly towers: ModelSet;
   readonly houses: ModelSet;
   private placedModels: Float32Array | null = null;
-  /** The terraces' clouds: layers of mist, winding between the hills (mist.ts), their shadows on the ground. */
-  readonly mist = new TerraceMist();
+  /** The terraces' clouds: a layer of mist, its strokes winding between the hills (mist.ts), mirrored in the paddies' water. */
+  readonly mist: TerraceMist;
   readonly rice: Rice;
   readonly objects: TerraceBuild;
   readonly paddyMap: PaddyMap;
-  /** The world's own: its noise's seed, the season's front, the rice blades' near field (paddy.glsl, rice.vert.glsl, terrace.frag.glsl). */
+  /** The world's own: its noise's seed, the season's front, the rice blades' near field, the height fog (paddy.glsl, rice.vert.glsl, terrace.frag.glsl, fog.glsl). */
   private readonly own = {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
+    uHeightFog: { value: new Vector4(HEIGHT_FOG.density, HEIGHT_FOG.base, HEIGHT_FOG.scale, 0) },
   };
   private posed = false;
   private noiseSeed = -1;
@@ -136,11 +144,12 @@ export class TerraceWorld implements PlanetWorld {
       ...globals,
       ...this.look,
       ...this.own,
-      ...this.mist.uniforms,
       uGustRot: { value: new Vector4(1, 0, 1, 0) },
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
     };
+    // (the mist first: its uniforms join the shared ones every material copies)
+    this.mist = new TerraceMist(this.shared);
     this.sky = new Sky();
     this.trees = new Trees(this.shared);
     this.paddyMap = new PaddyMap(this.shared);
@@ -149,8 +158,7 @@ export class TerraceWorld implements PlanetWorld {
     this.objects = new TerraceBuild(this.shared);
     this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 32, 140);
     this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
-    this.mist.makeShells(this.shared);
-    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist.group);
+    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist.mesh);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
     if (only !== null) {
@@ -347,7 +355,8 @@ export class TerraceWorld implements PlanetWorld {
     this.rice.update(this.renderer, { seed: p.world.seed, radius: R, radiusHi: this.band.radiusHi, focus: rig.up, frustum: this.frustum, warp: this.warp, queue: this.queue, near: riceNear }, riceNear, p.wind.sheen * 1.2);
     this.own.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
     // the mist: its layers drifting with the wind, by the panel's coverage, speed and shadow
-    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, p.clouds.shadow, this.windAxis, R + rig.altitude);
+    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, this.windAxis);
+    this.own.uHeightFog.value.w = rig.altitude;
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }

@@ -1,22 +1,25 @@
 // The terraces as built, painted as the paddy lab paints them (src/dev/
 // paddyLab/): each part its own colour, measured from Kai's aerial, lit as
 // the lab lights them (rice.glsl). Each paddy and each field on the flats one
-// colour, its look by its stage; the dams and the ridges along the cuts
-// cream, the risers olive; earth where the woods meet the farmed land and
-// along the flats' bunds; the woods' own ground under the trees, rock where
-// it is too steep for them; a track's packed earth; a village's ground, packed
-// earth and grass in patches. The mist's shadows passing over (mist.glsl).
-// Then the haze of distance.
+// colour, its look by its stage, and its water showing as much as its look
+// says (Kai: white is full water, dark green dense grass): the sky mirrored
+// in it and the mist over it (mist.glsl), a little rippled; the dams and the
+// ridges along the cuts cream, the risers olive; earth where the woods meet
+// the farmed land and along the flats' bunds; the woods' own ground under
+// the trees, rock where it is too steep for them; a track's packed earth; a
+// village's ground, packed earth and grass in patches. No shadows of the mist
+// (Kai). Then the haze of distance, and the height fog.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
 #include <meadow_toon>
 #include <meadow_fog>
 #include <meadow_warp>
-#include <meadow_sun>
 #include <terraces_common>
+#include <terraces_fog>
 #include <terraces_mist>
 #include <terraces_rice>
+uniform float uTime;
 
 uniform int uDebug;
 
@@ -37,9 +40,11 @@ void main() {
   int part = int(vPart + 0.5);
   vec3 up = warpNormal(dir * (uRadius + vHeight), dir);
   vec3 albedo;
+  float water = 0.0;
   if (part == 0) {
-    // a paddy, or a field on the flats: its look now (vPaddy: its own variant, its place in the season)
+    // a paddy, or a field on the flats: its look now (vPaddy: its own variant, its place in the season), and its water
     albedo = paddyLook(vPaddy.y, vPaddy.x);
+    water = paddyWater(vPaddy.y);
   } else if (part == 1) {
     albedo = pal(TR_EARTH, 1);
   } else if (part == 4) {
@@ -59,9 +64,29 @@ void main() {
     // a dam's top and sides, a ridge along a cut
     albedo = pal(TR_EARTH, 0);
   }
-  float shade = mistShadowAt(dir * (uRadius + vHeight));
-  vec3 col = labLight(albedo, n, up, shade);
+  vec3 col = labLight(albedo, n, up);
+  if (water > 0.0) {
+    // (its water: the sky mirrored in it, the mist over it mirrored too, a little rippled by the wind; over its own
+    // shallow grey as much as the angle lets the mirror through, as painted water always mirrors a good deal)
+    vec3 v = toCam / viewDist;
+    vec3 t1 = normalize(cross(up, abs(up.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+    vec3 t2 = cross(up, t1);
+    vec3 q = dir * uRadius;
+    float slow = uTime * 0.35;
+    vec2 ripple = 0.018 * vec2(gnoise(q / 1.6 + vec3(0.0, 0.0, slow), uTerrainSeed + 951u), gnoise(q / 1.6 + vec3(7.1, 0.0, slow), uTerrainSeed + 952u));
+    vec3 wn = normalize(up + ripple.x * t1 + ripple.y * t2);
+    vec3 r = reflect(-v, wn);
+    // (the sky it mirrors a little paler than the sky's own, as the lab's flooded white is, but blue enough for the
+    // mist mirrored in it to show white, as flooded terraces mirror their clouds)
+    vec3 sky = mix(mix(pal(ROW_SKY, 1), pal(ROW_SKY, 0), pow(clamp(dot(r, up), 0.0, 1.0), 0.62)), pal(TR_RICE, 0), 0.15) * uShadeTint;
+    vec4 mist = mistReflected(dir * (uRadius + vHeight), r);
+    vec3 mirror = sky * (1.0 - mist.a) * 1.08 + mist.rgb * 1.18;
+    float fres = 0.02 + 0.98 * pow(1.0 - max(dot(v, wn), 0.0), 5.0);
+    vec3 shallow = labLight(pal(TR_RICE, 1), up, up);
+    col = mix(col, mix(shallow, mirror, mix(0.7, 1.0, fres)), water);
+  }
   col = applyAerial(col, viewDist, dir);
+  col = applyHeightFog(col, viewDist, vHeight);
   if (uDebug == 4) {
     // (dbg=land: each part flat: floors by their paddy, risers dark blue, dams yellow, earth brown, ridges white,
     // the woods green, tracks orange, villages lilac)

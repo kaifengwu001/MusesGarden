@@ -15,6 +15,7 @@ uniform float uRadius;
 #include <meadow_wind>
 #include <terraces_paddy>
 #include <terraces_rice>
+#include <terraces_fog>
 
 uniform sampler2D uPool;     // per blade, a page a row: direction xyz, ln birth threshold
 uniform sampler2D uPoolRest; // per blade: its seed in [0, 1), four to a texel
@@ -42,9 +43,10 @@ void main() {
   float seed = texelFetch(uPoolRest, ivec2(slot >> 2, page), 0)[slot & 3];
   float d = chordAngle(dir, uRiceNear.xyz) * uRadius;
   vec4 crop = texelFetch(uRiceCrop, ivec2(slot, drawn), 0);
-  // thinning by rank toward the edge (a blue-noise subset), and at the very edge each at a distance of its own;
-  // seedlings stand sparse in their water, in even rows of clumps (the same subset), a grown crop dense
-  float keep = mix(1.0, uRiceFade.y, smoothstep(uRiceFade.x, uRice.y, d)) * mix(0.14, 1.0, smoothstep(0.12, 0.7, crop.r));
+  // thinning by rank toward the edge (a blue-noise subset), and at the very edge each at a distance of its own; by
+  // its paddy's look (Kai: "white is full water, dark green is very dense grass, and everything in between"): none
+  // in a flooded paddy, seedlings sparse in their water, a crop the denser the further grown, grown deep the densest
+  float keep = mix(1.0, uRiceFade.y, smoothstep(uRiceFade.x, uRice.y, d)) * pow(1.0 - paddyWater(crop.a), 1.6);
   float born = presence(0.5 * (blade.w - uRice.z - log(keep))) * step(rnd(seed, 9.0), 1.0 - smoothstep(uRice.y * 0.78, uRice.y, d));
   if (born <= 0.002 || crop.r <= 0.01) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
@@ -86,6 +88,7 @@ void main() {
 
   vec3 wp = warpPosition(p);
   col = applyAerial(col, length(cameraPosition - wp), dir);
+  col = applyHeightFog(col, length(cameraPosition - wp), floorH + h * y);
   vColour = col;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }

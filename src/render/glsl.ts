@@ -12,6 +12,7 @@ import rest from '../planet/rest.glsl?raw';
 import terrain from '../planet/terrain.glsl?raw';
 import water from '../planet/water.glsl?raw';
 import terracesCommon from '../terraces/common.glsl?raw';
+import terracesFog from '../terraces/fog.glsl?raw';
 import terracesMist from '../terraces/mist.glsl?raw';
 import terracesPaddy from '../terraces/paddy.glsl?raw';
 import terracesRice from '../terraces/rice.glsl?raw';
@@ -43,6 +44,7 @@ const chunks: Record<string, string> = {
   meadow_muse_press: musePress,
   // the terraces (terraces/), a second planet on the same foundations
   terraces_common: terracesCommon,
+  terraces_fog: terracesFog,
   terraces_mist: terracesMist,
   terraces_paddy: terracesPaddy,
   terraces_rice: terracesRice,

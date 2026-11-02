@@ -33,7 +33,7 @@ import vertexShader from './rice.vert.glsl?raw';
 // the paddy's layout is far too much work to run again at every vertex.
 
 /** Blades per m² at full density, their width (m), the near field's radius (m), and the most pages drawn at once. */
-export const RICE = { density: 120, width: 0.034, near: 24, maxPages: 256, fade: { full: 0.45, edge: 0.24 } } as const;
+export const RICE = { density: 160, width: 0.034, near: 24, maxPages: 256, fade: { full: 0.45, edge: 0.24 } } as const;
 const PAGE = 2048;
 
 /** A blade template: x across [-0.5, 0.5], y up [0, 1], narrowing to its tip. */

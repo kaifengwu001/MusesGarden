@@ -15,6 +15,16 @@ vec3 paddyLook(float maturity, float variant) {
   return mix(c, pal(TR_RICE, 5), smoothstep(0.985, 0.995, maturity));
 }
 
+// How much of a paddy's floor shows its water, by its look (Kai: "white is full water, dark green is very dense
+// grass, and everything in between"): all of it flooded, under half just planted, a fifth growing, a little grown,
+// none grown deep; its stages changing where paddyLook's do. The rest is its crop.
+float paddyWater(float maturity) {
+  float w = mix(1.0, 0.45, smoothstep(0.0, 0.02, maturity));
+  w = mix(w, 0.2, smoothstep(0.29, 0.31, maturity));
+  w = mix(w, 0.06, smoothstep(0.64, 0.66, maturity));
+  return mix(w, 0.0, smoothstep(0.985, 0.995, maturity));
+}
+
 // The lab's light (src/dev/paddyLab/lab.ts), as three.js lights a matt surface of colour albedo with normal n where
 // up is up: the sky's hemisphere (its sky above, its ground's bounce below; 1.6) and the sun (2.2), Lambert, over π.
 // Their colours the lab's, in linear light; the time of day tints them as it does the rest of the planet.
