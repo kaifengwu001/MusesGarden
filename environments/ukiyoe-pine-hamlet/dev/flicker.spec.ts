@@ -6,7 +6,7 @@ import type {} from '../../../src/dev/harnessApi';
 import type { World } from '../world';
 
 const REPORTED_POSE = '0.1045,-0.3585,0.6614,0.6505,0.83';
-const VIEWS = ['reported', 'home', 'bridge'] as const;
+const VIEWS = ['reported', 'home', 'bridge', 'pine'] as const;
 type View = typeof VIEWS[number];
 type Season = 'snow' | 'rain';
 
@@ -25,6 +25,10 @@ async function inspectView(page: Page, view: View, season: Season) {
     if (view === 'reported') {
       w.rig.lookUp(0, true);
       w.rig.applyPose(reportedPose);
+      w.markPosed();
+    } else if (view === 'pine') {
+      const capture = w as unknown as { frameLocal(view: { at: readonly number[]; height: number; distance: number; azimuth: number }, immediate: boolean): void };
+      capture.frameLocal({ at: [-9, 6.6, -3], height: 7.2, distance: 13, azimuth: 0.6 }, true);
       w.markPosed();
     } else w.cameraPreset(view);
     m.freeze(12);
@@ -126,7 +130,7 @@ async function inspectView(page: Page, view: View, season: Season) {
 for (const dpr of [1, 2]) test.describe(`frame stability at DPR ${dpr}`, () => {
   test.use({ viewport: { width: 960, height: 600 }, deviceScaleFactor: dpr });
 
-  for (const season of ['snow', 'rain'] as const) test(`${season}: reported pose, house, and bridge remain stable`, async ({ page }) => {
+  for (const season of ['snow', 'rain'] as const) test(`${season}: reported pose, house, bridge, and pine remain stable`, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));

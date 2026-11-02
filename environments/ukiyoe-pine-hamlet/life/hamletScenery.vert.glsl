@@ -11,6 +11,7 @@ uniform vec3 uFaceWindow;
 #endif
 attribute float aKind;
 attribute float aPrintStyle;
+attribute vec3 aLobe;
 attribute float aGround;
 attribute vec4 aAnchor;
 attribute vec3 aAcross;
@@ -22,6 +23,7 @@ varying vec3 vLocal;
 varying float vKind;
 varying vec3 vPrint;
 varying vec3 vRestNormal;
+varying vec3 vLobe;
 varying float vVariation;
 
 vec3 hamletRotate(vec3 value, vec3 axis, float angle) {
@@ -60,6 +62,7 @@ void main() {
   vKind = aKind;
   vPrint = vec3(uv, aPrintStyle);
   vRestNormal = normal;
+  vLobe = aLobe;
   vVariation = aPlacement.z;
 #ifdef HAMLET_SHADOW
   vec3 L = localSun(up0);

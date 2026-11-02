@@ -72,7 +72,9 @@ describe('ukiyoe natural scenery', () => {
       const assets = createHamletAssets(coarse);
       for (const [name, asset] of Object.entries(assets)) {
         const geometry = asset.geometry, position = geometry.getAttribute('position');
-        const chart = geometry.getAttribute('uv'), style = geometry.getAttribute('aPrintStyle'), kind = geometry.getAttribute('aKind');
+        const chart = geometry.getAttribute('uv'), style = geometry.getAttribute('aPrintStyle'), kind = geometry.getAttribute('aKind'), lobe = geometry.getAttribute('aLobe');
+        expect(lobe.count).toBe(position.count);
+        expect(Array.from(lobe.array).every(Number.isFinite)).toBe(true);
         expect(chart.count).toBe(position.count);
         expect(style.count).toBe(position.count);
         expect(Array.from(chart.array).every(Number.isFinite)).toBe(true);
@@ -87,9 +89,17 @@ describe('ukiyoe natural scenery', () => {
         if (name === 'pine' || name === 'cedar') {
           const family = name === 'pine' ? 0 : 1;
           const needleStyles = new Set(Array.from({ length: kind.count }, (_, i) => kind.getX(i) === HAMLET_KIND.needle ? style.getX(i) : -1));
-          expect(needleStyles.has(family)).toBe(true);
-          expect(needleStyles.has(family + 10)).toBe(true);
-          expect(Math.max(...Array.from(chart.array))).toBeGreaterThan(5);
+          if (name === 'pine') {
+            // Each pine lobe has its own normalised 3D fan coordinates; there
+            // are no detached needle blades or tiled motifs on a canopy pad.
+            expect([...needleStyles].filter(s => s >= 0).every(s => s >= 20 && s < 21)).toBe(true);
+            expect(Array.from(lobe.array).reduce((a, b) => Math.max(a, b), -Infinity)).toBeCloseTo(1, 5);
+            expect(Array.from(lobe.array).reduce((a, b) => Math.min(a, b), Infinity)).toBeCloseTo(-1, 5);
+          } else {
+            expect(needleStyles.has(family)).toBe(true);
+            expect(needleStyles.has(family + 10)).toBe(true);
+          }
+          expect(Array.from(chart.array).reduce((a, b) => Math.max(a, b), -Infinity)).toBeGreaterThan(5);
         }
         // Printed bark and snow lips have no coincident LineSegments pass.
         expect(Array.from(asset.ink.getAttribute('aKind').array).every(k => k === HAMLET_KIND.slate)).toBe(true);

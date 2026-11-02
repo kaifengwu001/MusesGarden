@@ -103,11 +103,24 @@ sites extend mixed clusters around the globe. The local pine and cedar meshes
 carry more needle detail; separate cheaper remote templates provide distant
 forest mass. These are near/far placement classes, not camera-switched LOD.
 
-Pine needles use irregular fan marks, cedar uses paired leaf sprays, plum uses
-dark bark with lenticels, and reeds have light midribs. The botanical drawings
-live on the material surface; resting-position projection avoids stretched
-crown-top UVs. Branch charts follow the trunk and branch arcs. Redundant bark
-and snow outline layers were removed to avoid depth conflicts.
+The user's later pine references (06–09 in `reference/`) supersede the pine
+interpretation of the original generated vegetation kit. Each pine crown is a
+cluster of overlapping round lobes, with a scalloped cloud silhouette and air
+between branch tiers. Each lobe owns one fan drawing from its lower attachment;
+never scatter small needle symbols across an angular canopy pad. The rejected
+version is preserved in `reference/rejected-angular-pines/`.
+
+`pineLobe()` builds closed rounded surfaces with smooth normals and per-lobe
+`aLobe` coordinates. Snow follows those same domes with a shallow contacting lip.
+Local pines keep seven unequal lobes per branch group; remote pines use simpler
+three-lobe groups and fewer tiers to preserve the total geometry budget. Each
+twig starts at its parent endpoint rather than duplicating the common approach.
+The material uses one coherent fan chart per lobe; mixing perpendicular ray
+drawings created an unwanted woven pattern in an intermediate capture.
+
+Cedar uses paired leaf sprays, plum has dark bark with lenticels, and reeds have
+light midribs. Branch charts follow trunk and branch arcs. Redundant bark and
+snow outline layers remain removed to avoid depth conflicts.
 
 `render/snow.glsl` gives ground, roofs and plant snow a shared warm-paper/blue
 relief palette with sparse close-up pigment grain. All detail is anchored to
