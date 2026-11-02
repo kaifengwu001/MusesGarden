@@ -102,6 +102,13 @@ export interface Dress {
   sleeve?: number;
   /** How much further out its arms hang than tpose6's (rad, in the plane of its front: a wide garment's flare clears them). */
   hangOut?: number;
+  /**
+   * Cap sleeves over arms of their own pieces (10's: a fold of the shirt over the arm's top, two layers): from
+   * this far out (H, where the sleeve leaves the shoulder) to where the arm comes out from under it, the sleeve
+   * and the arm in it turn by how far out they are, so the sleeve's layers go together and the arm stays in it
+   * (cut with the arm, the fold split open at the shoulder).
+   */
+  sleeves?: number;
   /** Pieces kept whole as fur or cloth when this much of them (by area) is one or the other (a garment's speckles, a paw's shade). */
   whole?: number;
 }
@@ -287,12 +294,12 @@ export const DRESSED = {
   muse8: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Green; a crown of flowers, a woven grass apron with a leaf on it. */
   muse9: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
-  /** Teal; an orange shirt with a round collar, buttons and short sleeves (cut with the arm), a camera on a strap, a bow at its back; its arms are pieces of their own. */
-  muse10: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.31, [0.38, 0.6]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Teal; an orange shirt with a round collar, buttons and cap sleeves (a fold over the arm's top: they turn with it by how far out they are), a camera on a strap, a bow at its back; its arms are pieces of their own. */
+  muse10: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.25 } },
   /** Grey; a yellow T-shirt with short sleeves (cut with the arm), a navy nightcap with a star at its tip; a round tail; its arms are pieces of their own, its plate grown into its head. */
-  muse11: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.31, [0.38, 0.6]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  muse11: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.26 } },
   /** Pink; a green wrap top with short sleeves (cut with the arm) and a bow at its side, a green headband with a bow, sandals; its arms are pieces of their own. */
-  muse12: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.3, [0.38, 0.6]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  muse12: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.25 } },
 } as const satisfies Record<string, Sculpt>;
 export type DressedKind = keyof typeof DRESSED;
 
@@ -506,7 +513,7 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   }
   // (a dressed muse's joints measured off it, its arms' turns solved; and the pieces no seed of the cut is on, a sleeve's
   // cuff or a strap, which take their weights from the skin under them)
-  const measured = dress ? measureFit(P, bodyTriangles, cuts, sculpt.fit, dress.hangOut) : null;
+  const measured = dress ? measureFit(P, bodyTriangles, cuts, sculpt.fit, dress.hangOut, dress.sleeves) : null;
   const fit = measured?.fit ?? sculpt.fit;
   // (and the pieces wholly an arm's: its own, or a paw out of a sleeve, whose weight rises from where it comes out)
   const own = dress ? armPieces(bodyTriangles, cuts, find) : null;
@@ -558,9 +565,34 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     const into = graded ? harmonic(neighbours, Float32Array.from(along, (d, i) => (inside[i] < 0.5 ? 0 : d >= sculpt.ramp ? 1 : NaN))) : null;
     const beyond = graded ? inward(pos, neighbours, Float32Array.from(inside, (v) => 1 - v)) : null;
     const near = beyond ? harmonic(neighbours, Float32Array.from(beyond, (d, i) => (inside[i] >= 0.5 ? 1 : d >= SHOULDER.reach || fine.face[i] ? 0 : NaN))) : null;
+    // (cap sleeves: the sleeve and the arm in it, by how far out along the arm they are, the sleeve's cloth only round
+    // the arm's axis)
+    const out = measured?.out[side === 1 ? 0 : 1] ?? 0;
+    const capped = (i: number): number => {
+      if (dress?.sleeves === undefined) return -1;
+      const own = mine?.has(pieceOf(i)) === true;
+      if (!own && !(cloth && cloth[i] > 0.5)) return -1;
+      const d = [pos[i * 3] - pivot[0], pos[i * 3 + 1] - pivot[1], pos[i * 3 + 2] - pivot[2]];
+      const k = (d[0] * u[0] + d[1] * u[1] + d[2] * u[2]) / (lu * lu);
+      const off = Math.hypot(d[0] - k * u[0], d[1] - k * u[1], d[2] - k * u[2]);
+      const round = own ? 1 : 1 - smooth01((off - SLEEVE.reach) / SLEEVE.fade);
+      return round * smooth01((side * pos[i * 3] - dress.sleeves) / Math.max(0.02, out - dress.sleeves));
+    };
     for (let i = 0; i < total; i++) {
       // (over the shoulder, not the side under the arm: that stays where it is)
       const over = smooth01((pos[i * 3 + 1] - pivot[1] + SHOULDER.under) / (2 * SHOULDER.under));
+      const cap = capped(i);
+      if (cap >= 0) {
+        if (cap <= 0) continue;
+        const t = ((pos[i * 3] - pivot[0]) * u[0] + (pos[i * 3 + 1] - pivot[1]) * u[1] + (pos[i * 3 + 2] - pivot[2]) * u[2]) / lu;
+        const bend = smooth01((t - lu + ELBOW) / (2 * ELBOW));
+        const carried = (1 - cap) * SHOULDER.body * over * smooth01(cap / 0.2);
+        full[i * JOINTS + upper] += cap * (1 - bend);
+        full[i * JOINTS + fore] += cap * bend;
+        full[i * JOINTS + shoulder] += carried;
+        armShare[i] += cap + carried;
+        continue;
+      }
       if (inside[i] < 0.5) {
         if (!near || fine.face[i]) continue;
         const share = SHOULDER.body * near[i] * over;
@@ -2400,6 +2432,9 @@ function fusedPlate(P: Float64Array, index: ArrayLike<number>, weld: Int32Array,
   return plate;
 }
 
+/** A cap sleeve's cloth weighed with its arm (H): as far from the arm's axis as this, fading over the next. */
+const SLEEVE = { reach: 0.13, fade: 0.04 } as const;
+
 /** How far from the fur's colour a plate grown into the hood is (ΔE, as furDistance). */
 const PLATE_PAINT = 12;
 
@@ -2479,7 +2514,7 @@ function furFromPaint(P: Float64Array, triangles: number[], source: number[], pa
  * Then the arms' turns solved so that hung and at the top of a wave they
  * point as tpose6's do (its fit is the one Kai approved).
  */
-function measureFit(P: Float64Array, triangles: number[], cuts: Float32Array[], base: MuseFit, hangOut = 0): { fit: MuseFit; out: number[] } {
+function measureFit(P: Float64Array, triangles: number[], cuts: Float32Array[], base: MuseFit, hangOut = 0, sleeves?: number): { fit: MuseFit; out: number[] } {
   const J = JOINT;
   const rest = base.rest.map((r) => [r[0], r[1], r[2]] as [number, number, number]);
   let hand: [number, number, number] = base.hand ? [base.hand[0], base.hand[1], base.hand[2]] : [0.51, 0.41, 0];
@@ -2514,7 +2549,7 @@ function measureFit(P: Float64Array, triangles: number[], cuts: Float32Array[], 
     let reach = 0.2;
     for (const v of used) if (cut[v] < 0.5 && Math.abs(P[v * 3 + 1] - mid[1]) < r && Math.abs(P[v * 3 + 2] - mid[2]) < r) reach = Math.max(reach, side * P[v * 3]);
     out[side === 1 ? 0 : 1] = reach;
-    const root = edges > 0 ? sx / edges : reach;
+    const root = sleeves !== undefined ? (sleeves + reach) / 2 : edges > 0 ? sx / edges : reach;
     const line = rows.slice(0, end + 1).filter((r) => r[0] >= root + 0.02 && r[3] > 0);
     if (line.length < 4) continue;
     const tip = rows[end][0] + ARM_PATH.step;

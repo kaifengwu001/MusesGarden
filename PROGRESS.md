@@ -55,9 +55,14 @@ lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all twelve 
   petted (> <, hearts, its fur up if held long); it turns to you. 60 fps at 1600 × 900, ready in about 4 s;
   the camera stands back far enough to see the whole row.
 - **10–12** (teal in an orange shirt with a camera, grey in a T-shirt and a nightcap, pink in a wrap top and
-  a headband): arms of their own pieces in short sleeves, which are cut with the arm. 11's plate is grown
-  into its head, which is round it back to front: a plate is now a shallow dome (no deeper than 0.25 H), so
-  the head isn't taken for it.
+  a headband): arms of their own pieces under cap sleeves. 11's plate is grown into its head, which is round
+  it back to front: a plate is now a shallow dome (no deeper than 0.25 H), so the head isn't taken for it.
+- **Kai: 10's shoulder looked odd.** Its sleeve is a cap, a fold of the shirt over the arm's top, two layers:
+  cut with the arm, the fold split open at the shoulder (a notch, the shirt's inside showing from above) and
+  the sleeve swung out as a stiff flap. Now a cap sleeve and the arm in it turn by how far out along the arm
+  they are (`Dress.sleeves`: from where the sleeve leaves the shoulder to where the arm comes out), the cloth
+  only round the arm's axis, so the layers go together and the sleeve drapes down the hanging arm, smooth in
+  clay from every side; 11's and 12's too (12 had the same notch, smaller).
 - **Kai's notes, first look:** 5's sleeve didn't follow its arm (now cut with it); 2's arm left a hole in its
   side (its arm sat in sleeves of the smock's that run into its body: it now turns where it comes out of
   them, and fills them as it hangs).
