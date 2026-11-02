@@ -179,7 +179,9 @@ URL's `g` still work on their own.
   pond and pier in it): grass, no flowers (the bloom front at b = 0).
 - **0 → ½:** the fog's edge recedes raggedly and the bloom front moves out
   from the hut behind it, both at an even pace in distance from the hut (so
-  the side you face from orbit unveils steadily).
+  the side you face from orbit unveils steadily). The drifting clouds start
+  thicker (coverage 0.75: not overcast) and ease back to the setting's
+  (`unfoldCoverage`, the same to the bit from ½ on).
 - **u = ½ (the default):** the meadow as tuned, unveiled and all in flower.
   It draws pixel-identical to main.
 - **½ → 1:** the planet grows from R 128 m to R 400 m (g linear in u). The

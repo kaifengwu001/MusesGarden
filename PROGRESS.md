@@ -53,6 +53,10 @@ ARCHITECTURE.md ("The unfolding"):
   of it from the clearing, under the drifting clouds. Its edge recedes
   raggedly out from the hut (a field of turns baked once per planet). It is
   marched per pixel in a fullscreen pass. The clouds' code is main's again.
+- **The drifting clouds start thicker** (Kai, after the fog: "not fully
+  cloudy, but definitely higher density"): coverage 0.75 at the start,
+  easing back to the setting (0.45) as the planet unveils, the same to the
+  bit from the middle on.
 - **The flowers:** the existing bloom front, moved by the unfolding (the
   Bloom slider still sets the season; the lower of the two wins).
 - **Growth:** g from 0.1886 to 1 over the second half, the camera held

@@ -5,7 +5,7 @@ import { DEFAULT_GROWTH, schema } from '../../params';
 import { FIRST_PLANET } from '../../planet/firstPlanet';
 import { travel } from '../../planet/geo';
 import { generateLayout } from '../../planet/terrain';
-import { unfoldBloom, unfoldGrowth, UNVEILED, unveiling } from '../../planet/unfold';
+import { unfoldBloom, unfoldCoverage, unfoldGrowth, UNVEILED, unveiling, VEILED_COVERAGE } from '../../planet/unfold';
 import { CameraRig } from '../../view/camera';
 
 function veilOf(seed: number): { veil: Veil; hut: Vector3; noise: number } {
@@ -37,6 +37,24 @@ describe('the unfolding (planet/unfold.ts)', () => {
     expect(unfoldBloom(UNVEILED)).toBe(1);
     expect(unfoldGrowth(UNVEILED)).toBe(DEFAULT_GROWTH);
     expect(FIRST_PLANET.growth).toBe(DEFAULT_GROWTH);
+    // (and the drifting clouds are the setting's, to the bit, whatever the setting)
+    for (const c of [0, 0.3, schema.clouds.coverage.def, 0.75, 0.9, 1]) for (const u of [UNVEILED, 0.7, 1]) expect(unfoldCoverage(c, u)).toBe(c);
+  });
+
+  it('starts cloudier, not overcast, and thins back to the setting as the planet unveils', () => {
+    const c = schema.clouds.coverage.def;
+    expect(unfoldCoverage(c, 0)).toBe(VEILED_COVERAGE);
+    expect(VEILED_COVERAGE).toBeGreaterThan(c + 0.2);
+    expect(VEILED_COVERAGE).toBeLessThan(0.9);
+    let last = Infinity;
+    for (let i = 0; i <= 100; i++) {
+      const v = unfoldCoverage(c, (i / 100) * UNVEILED);
+      expect(v).toBeLessThanOrEqual(last);
+      expect(v).toBeGreaterThanOrEqual(c);
+      last = v;
+    }
+    // a setting already cloudier than that stays as it is
+    expect(unfoldCoverage(0.9, 0)).toBe(0.9);
   });
 
   it('starts under the veil with no flowers, at the meadow’s tuned size', () => {

@@ -7,7 +7,7 @@ import { smoothstep } from './core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
 import { Butterflies } from './life/butterflies';
-import { Clouds, createCloudUniforms } from './life/clouds';
+import { Clouds, createCloudUniforms, type CloudParams } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
@@ -22,7 +22,7 @@ import { LOD_DEFAULT, type LodConfig } from './planet/chunks';
 import type { FieldParams } from './planet/fields';
 import { tangentToward, travel } from './planet/geo';
 import { growthState, type GrowthState } from './planet/growth';
-import { unfoldBloom, unfoldGrowth, unveiling } from './planet/unfold';
+import { unfoldBloom, unfoldCoverage, unfoldGrowth, unveiling } from './planet/unfold';
 import { GrowthBand } from './planet/rest';
 import { Surface } from './planet/surface';
 import { createGroundSample, createTerrainUniforms, generateLayout, gradientFrame, Terrain, type Layout } from './planet/terrain';
@@ -140,6 +140,8 @@ export class World {
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
+  /** The clouds' settings as drawn: cloudier while the planet unfolds (planet/unfold.ts unfoldCoverage). */
+  private readonly cloudParams: CloudParams = { coverage: 0, altitude: 0, speed: 0, shadow: 0 };
   /** The radius the camera was last placed for: as the unfolding grows the planet, the camera holds where it is (CameraRig.holdThrough). */
   private heldR = Number.NaN;
   /** The world's clock, as of the last update (a named view of Muse reads the time it is now, frozen or not). */
@@ -455,7 +457,13 @@ export class World {
     this.hut.setDoor(this.muse.door);
     // the veil over the planet yet to unfold: ground fog, clearing out from the hut
     this.veilFog.update(this.renderer, L.seed, L.cottage, unveiling(p.world.unfold), this.terrain.maxHeight, this.windAxis, rig.camera);
-    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
+    // (the drifting clouds, thicker while the planet has yet to unfold)
+    const cp = this.cloudParams;
+    cp.coverage = unfoldCoverage(p.clouds.coverage, p.world.unfold);
+    cp.altitude = p.clouds.altitude;
+    cp.speed = p.clouds.speed;
+    cp.shadow = p.clouds.shadow;
+    this.clouds.update(this.renderer, L.seed, R, clock.time, cp, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
