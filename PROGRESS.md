@@ -41,6 +41,7 @@ Started from 27961a4 (the mist in three layers). Kai (2026-11-02), with the blue
 | 1 | "Layers are too high up" | |
 | 2 | "Too sparse" | |
 | 3 | "Shape of cloud needs refinement: not curving / detailed enough. See reference and match as close as possible" | |
+| 4 | (Kai, on the work in progress) "Reduce count by 30%" | |
 
 ### Kai's notes on the mist bands
 
