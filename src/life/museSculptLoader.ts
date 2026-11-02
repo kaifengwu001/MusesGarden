@@ -20,6 +20,7 @@ export const SCULPT_URLS: Record<SculptKind, string> = {
 
 /** The muses in clothes (museMesh.ts DRESSED). */
 export const DRESSED_URLS: Record<DressedKind, string> = {
+  muse0: new URL('../assets/muse/muses/muse0.glb', import.meta.url).href,
   muse1: new URL('../assets/muse/muses/muse1.glb', import.meta.url).href,
   muse2: new URL('../assets/muse/muses/muse2.glb', import.meta.url).href,
   muse3: new URL('../assets/muse/muses/muse3.glb', import.meta.url).href,

@@ -43,7 +43,7 @@ import { registerShaderChunks } from '../render/glsl';
 // and their silhouettes compared. The hash picks the body, the look, the view
 // and the moment:
 //   model=procedural|sculpt|tpose|tpose2|tpose5|tpose6 (src/assets/muse/sculpt*.glb, rigged on the skeleton by museMesh.ts)
-//         muse1 … muse12 (the muses in clothes, src/assets/muse/muses/: museMesh.ts DRESSED)
+//         muse0 … muse12 (the muses in clothes, src/assets/muse/muses/: museMesh.ts DRESSED)
 //   lineup=1: the muses in clothes in a row, each idling, each answering a tap or a hold (museLineup.ts)
 //   look=muse|raw|weights|clay|facet|stretch|rough|kind   (Muse's shaders; the file as exported; each vertex coloured by its joints;
 //                           the bare skin in clay; the clay shaded by the triangles as drawn, not the skinned normals;

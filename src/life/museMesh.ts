@@ -271,12 +271,14 @@ export type SculptKind = keyof typeof SCULPTS;
 const DRESSED_CUT = (x: number, y: readonly [number, number] = [0, 1], z = 0.2): Sculpt['cut'] => ({ arm: { x, y }, body: { x: 0.2, y: [0.3, 0.68], z: [-z, z] } });
 
 /**
- * Muses in clothes (src/assets/muse/muses/muse1–12.glb), sculpts again: each
+ * Muses in clothes (src/assets/muse/muses/muse0–12.glb), sculpts again: each
  * in tpose6's near T-pose, scaled so its eyes are at tpose6's height (a hat
  * reaches above 1). Their fits are tpose6's until measured off them
  * (measureFit), their cuts out from where the arm (or its sleeve) is clear.
  */
 export const DRESSED = {
+  /** Lilac; a coral cap, a navy coat with cap sleeves and big buttons, a satchel on a strap across it; one piece, its arms and its plate grown in. */
+  muse0: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Brown; a green wrap tunic with short sleeves, a gold bow at its side, a flute in its pocket; a stick of a tail. Its paws are pieces of their own, out of the sleeves. */
   muse1: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.37), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Cream; a red scalloped collar over a linen smock with pockets; its arms are pieces of their own, set into sleeves of the smock's that run into its body (they turn where they come out of them, and so fill them as they hang); a round tail. */

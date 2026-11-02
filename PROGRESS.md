@@ -32,10 +32,10 @@ as the latest alone (a fix between iterations).
 
 ## The muses in clothes (2026-11-02, in the lab)
 
-Kai's liked concepts, made into models (`src/assets/muse/muses/muse1–12.glb`: nine, then three more),
-rigged as Muse is (museMesh.ts `DRESSED`): one at a time at `museLab.html#model=muse1` … `muse12` (all the
-lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all twelve in a row at
-`museLab.html#lineup=1` (museLineup.ts).
+Kai's liked concepts, made into models (`src/assets/muse/muses/muse0–12.glb`: nine, then three, then muse 0),
+rigged as Muse is (museMesh.ts `DRESSED`): one at a time at `museLab.html#model=muse0` … `muse12` (all the
+lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all of them with the original Muse
+(tpose6) in two rows of seven at `museLab.html#lineup=1` (museLineup.ts).
 
 - **Prepared.** Each face is found by its eyes (a hat is wider than a plate), and the sculpt scaled so its
   eyes are at tpose6's height (a hat reaches above 1). The sculpt's eyes and mouth are left out and Muse's
@@ -54,6 +54,14 @@ lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all twelve 
   seeded times (a yawn, its fur shaken out, a hop, a long look round). A tap: a wave, or a bounce; a hold:
   petted (> <, hearts, its fur up if held long); it turns to you. 60 fps at 1600 × 900, ready in about 4 s;
   the camera stands back far enough to see the whole row.
+- **Two rows of seven (Kai).** The original Muse (tpose6, graded to the reference's cream as in the meadow)
+  and muses 0–12 in reading order, the back row first: the original, 0–5 behind, 6–12 in front. As in a
+  class photo, the back row stands half a place over, spread by its distance from the camera against the
+  front row's (seen in perspective its places close in toward the middle, and on the left its muses hid
+  behind the front ones), and the camera looks down 18°, so every face shows. A tap or a hold reaches a
+  back-row muse through the gaps; scripts can name a muse (`museLineup.tap('muse5')`).
+- **Muse 0** (lilac; a coral cap, a navy coat with cap sleeves, a satchel on a strap): one piece, its arms
+  and its plate grown in; rigged as it came, clean in clay hanging, waving and yawning.
 - **10–12** (teal in an orange shirt with a camera, grey in a T-shirt and a nightcap, pink in a wrap top and
   a headband): arms of their own pieces under cap sleeves. 11's plate is grown into its head, which is round
   it back to front: a plate is now a shallow dome (no deeper than 0.25 H), so the head isn't taken for it.
