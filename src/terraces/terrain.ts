@@ -172,6 +172,8 @@ export interface TerrainUniforms {
   uTerraceBake: { value: Texture | null };
   uTerraceLife: { value: Texture | null };
   uTerraceLayout: { value: Texture | null };
+  /** The natural height's exact gradient (m per m, xyz on the planet): the bake's gradient pass. */
+  uTerraceGrad: { value: Texture | null };
   /** A cell's band (m), its riser between (m), each cell's spread of it. */
   uTerraceShape: { value: Vector4 };
   /** Each wall's jitter, the share of walls left out, the cuts along a band between (m). */
@@ -198,6 +200,7 @@ export function createTerrainUniforms(): TerrainUniforms {
     uTerraceBake: { value: null },
     uTerraceLife: { value: null },
     uTerraceLayout: { value: null },
+    uTerraceGrad: { value: null },
     uTerraceShape: { value: new Vector4(TERRACE.band, TERRACE.riser[0], TERRACE.riser[1], TERRACE.spread) },
     uTerraceLevels: { value: new Vector4(TERRACE.jitter, TERRACE.merge, TERRACE.cuts[0], TERRACE.cuts[1]) },
     uTerraceWall: { value: new Vector4(TERRACE.batter, TERRACE.bund, TERRACE.bundHeight, TERRACE.crest) },

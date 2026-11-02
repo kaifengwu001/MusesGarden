@@ -22,7 +22,8 @@ import { createFieldUniforms, type FieldUniforms } from './fields';
 //   flora    flowers per m² for the four species, at half resolution
 //            (colonies are meters wide)
 // Another planet may ask for a third, full-resolution cube (its layout:
-// the terraces' cells), baked after the two and reading the terrain too.
+// the terraces' cells), baked after the two and reading the terrain too,
+// and a fourth (its gradient: the terraces' height's, exact).
 // Re-baked only when the fields change: the seed, a parameter, or R while
 // the planet grows. A full bake is heavy (~10 ms of GPU on an M1 Pro), so
 // while things are changing a quarter-size set is baked every frame, and the
@@ -44,14 +45,15 @@ interface BakeSet {
   readonly terrain: WebGLCubeRenderTarget;
   readonly flora: WebGLCubeRenderTarget;
   readonly layout: WebGLCubeRenderTarget | null;
+  readonly gradient: WebGLCubeRenderTarget | null;
   key: string;
 }
 
-function bakeSet(size: number, layout: boolean): BakeSet {
-  return { size, terrain: cube(size), flora: cube(size / 2), layout: layout ? cube(size) : null, key: '' };
+function bakeSet(size: number, layout: boolean, gradient: boolean): BakeSet {
+  return { size, terrain: cube(size), flora: cube(size / 2), layout: layout ? cube(size) : null, gradient: gradient ? cube(size) : null, key: '' };
 }
 
-/** What a bake draws: its fragment shader (passes 0 and 1, as bake.frag.glsl, and 2 with a layout) and the uniforms its fields write. */
+/** What a bake draws: its fragment shader (passes 0 and 1, as bake.frag.glsl, 2 with a layout, 3 with a gradient) and the uniforms its fields write. */
 export interface BakeProgram<U> {
   /** The material's name, and the GPU memory ledger's. */
   readonly name: string;
@@ -59,6 +61,8 @@ export interface BakeProgram<U> {
   readonly uniforms: U;
   /** A third pass at full resolution, reading the terrain (the terraces' cells). */
   readonly layout?: boolean;
+  /** A fourth pass at full resolution (pass 3: the terraces' height's gradient). */
+  readonly gradient?: boolean;
 }
 
 /** Fields a bake can draw: they write its uniforms. */
@@ -82,9 +86,10 @@ export class TerrainBake<U extends object = FieldUniforms> {
   /** The meadow's fields by default; another planet passes its own (terraces/bake.frag.glsl). */
   constructor(size: number, program?: BakeProgram<U>) {
     const p = program ?? ({ name: 'terrain bake', fragmentShader, uniforms: createFieldUniforms() } as unknown as BakeProgram<U>);
-    this.full = bakeSet(size, p.layout === true);
-    this.quick = bakeSet(size / 2, p.layout === true);
-    const bytes = (s: number): number => 6 * 8 * (s * s + (s / 2) ** 2 + (p.layout === true ? s * s : 0));
+    this.full = bakeSet(size, p.layout === true, p.gradient === true);
+    this.quick = bakeSet(size / 2, p.layout === true, p.gradient === true);
+    const extra = (p.layout === true ? 1 : 0) + (p.gradient === true ? 1 : 0);
+    const bytes = (s: number): number => 6 * 8 * (s * s + (s / 2) ** 2 + extra * s * s);
     gpuMemory.set(p.name, bytes(size) + bytes(size / 2));
     this.uniforms = p.uniforms;
     const material = new ShaderMaterial({
@@ -112,9 +117,14 @@ export class TerrainBake<U extends object = FieldUniforms> {
   }
 
   /** The cubes themselves (to read back: the terraces' survey). */
-  targets(full: boolean): { terrain: WebGLCubeRenderTarget; flora: WebGLCubeRenderTarget; layout: WebGLCubeRenderTarget | null } {
+  targets(full: boolean): { terrain: WebGLCubeRenderTarget; flora: WebGLCubeRenderTarget; layout: WebGLCubeRenderTarget | null; gradient: WebGLCubeRenderTarget | null } {
     const set = full ? this.full : this.quick;
-    return { terrain: set.terrain, flora: set.flora, layout: set.layout };
+    return { terrain: set.terrain, flora: set.flora, layout: set.layout, gradient: set.gradient };
+  }
+
+  /** The gradient pass's cube (a program that asked for one). */
+  gradientTexture(full: boolean): Texture | null {
+    return (full ? this.full : this.quick).gradient?.texture ?? null;
   }
 
   /** The layout pass's cube (a program that asked for one). */
@@ -134,9 +144,10 @@ export class TerrainBake<U extends object = FieldUniforms> {
       [set.flora, 1],
     ];
     if (set.layout) passes.push([set.layout, 2]);
+    if (set.gradient) passes.push([set.gradient, 3]);
     for (const [target, pass] of passes) {
       this.pass.value = pass;
-      // the flora (and layout) pass reads the terrain it follows; the terrain pass must not
+      // the passes after it read the terrain they follow; the terrain pass must not
       // have its own target bound as a sampler (a feedback loop drops the draw)
       this.baked.value = pass >= 1 ? set.terrain.texture : null;
       this.sizeU.value = target.width;

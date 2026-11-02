@@ -132,7 +132,7 @@ vec4 terraceVertex(vec3 dir, float dist) {
     float gather = (1.0 - smoothstep(uTerraceMesh.z, uTerraceMesh.w, spacing / p.band)) * smoothstep(0.5 * spacing, 1.5 * spacing + 0.5, p.edge);
     if (gather > 0.0) {
       float slope;
-      vec3 up = uphillAt(dir, p.natural, slope);
+      vec3 up = uphillAt(dir, slope);
       // the edges across the band from its outer wall: the bund's crest and foot, the riser's foot, the inner
       // wall (where the grid is too coarse for the bund, the wall's top and foot only)
       float bw = uTerraceWall.y;

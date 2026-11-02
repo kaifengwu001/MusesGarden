@@ -29,7 +29,7 @@ import { Houses } from './houses';
 import { Rice, RICE } from './rice';
 import { Towers } from './towers';
 import { Trees } from './trees';
-import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
+import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, R_REF, seasonFront, TerraceTerrain } from './terrain';
 import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
 import { findTerraceVista } from './vista';
 import { CubeReadback } from './bakeReader';
@@ -138,13 +138,14 @@ export class TerraceWorld implements PlanetWorld {
     private readonly store: ParamStore,
     tier: Tier,
   ) {
-    this.bake = new TerrainBake(tier.maps.bake, { name: 'terraces bake', fragmentShader, uniforms: createTerraceFieldUniforms(), layout: true });
+    this.bake = new TerrainBake(tier.maps.bake, { name: 'terraces bake', fragmentShader, uniforms: createTerraceFieldUniforms(), layout: true, gradient: true });
     this.terrain = new TerraceTerrain(generateTerraceLayout(store.values.world.seed));
     this.refreshFieldParams();
     this.look.uPalette.value = this.palette.texture;
     this.terrainUniforms.uTerraceBake.value = this.bake.terrainTexture(false);
     this.terrainUniforms.uTerraceLife.value = this.bake.floraTexture(false);
     this.terrainUniforms.uTerraceLayout.value = this.bake.layoutTexture(false);
+    this.terrainUniforms.uTerraceGrad.value = this.bake.gradientTexture(false);
     this.shared = {
       ...globals,
       ...this.look,
@@ -280,7 +281,7 @@ export class TerraceWorld implements PlanetWorld {
   /** Set up the ground for this world before the first frame does (a named view reads it, and the villages). */
   private prepare(): void {
     const world = this.store.values.world;
-    growthState(world.growth, world.areaMin, world.areaMax, this.growth);
+    this.pinGrowth(world.growth, world.areaMin, world.areaMax);
     if (this.growth.radius !== this.fieldsR || this.fieldKey !== this.fieldsKey || !this.fieldsFull) this.refreshFields(true);
   }
 
@@ -368,6 +369,7 @@ export class TerraceWorld implements PlanetWorld {
     this.terrainUniforms.uTerraceBake.value = this.bake.terrainTexture(full);
     this.terrainUniforms.uTerraceLife.value = this.bake.floraTexture(full);
     this.terrainUniforms.uTerraceLayout.value = this.bake.layoutTexture(full);
+    this.terrainUniforms.uTerraceGrad.value = this.bake.gradientTexture(full);
     // the villages, once the ground holds still (they read the ground: a few ms)
     const key = `${R}/${this.fieldKey}`;
     if (full && key !== this.villagesFor) {
@@ -378,10 +380,20 @@ export class TerraceWorld implements PlanetWorld {
     }
   }
 
+  /**
+   * The planet's size: in this world it never changes (Kai: the diameter stays, so the terraces are built once),
+   * whatever the growth parameter says; the rest of the growth state as the parameters give it.
+   */
+  private pinGrowth(g: number, areaMin: number, areaMax: number): void {
+    growthState(g, areaMin, areaMax, this.growth);
+    this.growth.radius = R_REF;
+    this.growth.area = 4 * Math.PI * R_REF * R_REF;
+  }
+
   update(clock: FrameClock, aspect: number, viewportHeight: number): void {
     this.clock = clock;
     const p = this.store.values;
-    growthState(p.world.growth, p.world.areaMin, p.world.areaMax, this.growth);
+    this.pinGrowth(p.world.growth, p.world.areaMin, p.world.areaMax);
     const R = this.growth.radius;
     this.band.update(R, clock.realDt);
     if (this.terrain.layout.seed !== p.world.seed) this.terrain = new TerraceTerrain(generateTerraceLayout(p.world.seed));
@@ -527,15 +539,15 @@ export class TerraceWorld implements PlanetWorld {
     this.gust(dir, time);
   }
 
-  private readback: { key: string; terrain: CubeReadback; layout: CubeReadback } | null = null;
+  private readback: { key: string; terrain: CubeReadback; gradient: CubeReadback } | null = null;
 
-  /** The bakes read back to the CPU (the terraces' survey), once per full bake. */
-  private bakesRead(): { terrain: CubeReadback; layout: CubeReadback } {
+  /** The bakes read back to the CPU (the terraces' build), once per full bake. */
+  private bakesRead(): { terrain: CubeReadback; gradient: CubeReadback } {
     const key = `${this.fieldsR}/${this.fieldsKey}/${this.fieldsFull}`;
     if (this.readback?.key !== key) {
       const t = this.bake.targets(this.fieldsFull);
-      if (!t.layout) throw new Error('the terraces bake has no layout');
-      this.readback = { key, terrain: CubeReadback.read(this.renderer, t.terrain), layout: CubeReadback.read(this.renderer, t.layout) };
+      if (!t.gradient) throw new Error('the terraces bake has no gradient');
+      this.readback = { key, terrain: CubeReadback.read(this.renderer, t.terrain), gradient: CubeReadback.read(this.renderer, t.gradient) };
     }
     return this.readback;
   }
@@ -544,7 +556,7 @@ export class TerraceWorld implements PlanetWorld {
     this.band.settle();
     this.queue.drain();
     this.rig.settle();
-    growthState(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax, this.growth);
+    this.pinGrowth(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax);
     this.refreshFields(true);
   }
 }

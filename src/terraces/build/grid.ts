@@ -3,11 +3,13 @@ import type { CubeReadback } from '../bakeReader';
 
 // The terraces' build (build/): one grid over the whole planet, every cube
 // face at once, read from the terrain bake (bake.frag.glsl: natural height,
-// slope, wild, flat). A face holds (n × n) samples on its corners' lattice
-// (s, t = −1 … 1 inclusive), so two faces sample their shared edge at the
-// very same directions; after smoothing, those shared samples are averaged
-// over the faces holding them, so every face reads the same values there and
-// whatever is built from them meets across the edge exactly.
+// wild, flat) and its gradient pass (the height's exact gradient, from the
+// hills' own derivatives: never differences of heights). A face holds
+// (n × n) samples on its corners' lattice (s, t = −1 … 1 inclusive), so two
+// faces sample their shared edge at the very same directions; after
+// smoothing, those shared samples are averaged over the faces holding them,
+// so every face reads the same values there and whatever is built from them
+// meets across the edge exactly.
 
 /** A cube face's direction at (s, t) in [−1, 1] (faceDirection in bake.frag.glsl), unit. */
 export function faceDirection(face: number, s: number, t: number, out: Vector3): Vector3 {
@@ -24,7 +26,7 @@ export interface Grid {
   /** Samples per face side, the planet's radius (m). */
   readonly n: number;
   readonly R: number;
-  /** Per face, per sample: its direction (xyz), the bake's natural height (m), smoothed (m), slope, wild, flat. */
+  /** Per face, per sample: its direction (xyz), the bake's natural height (m), smoothed (m), the smoothed hills' slope, wild, flat. */
   readonly dir: Float32Array[];
   readonly h: Float32Array[];
   readonly hs: Float32Array[];
@@ -42,12 +44,12 @@ export interface Grid {
 /** The grid's spacing it aims at (m: the walls run between samples, placed exactly on the hills' contours), and work per step. */
 export const GRID = { smooth: 1.0, spacing: 0.7, slice: 20000 } as const;
 
-/** The grid of the planet at R from the terrain bake, n samples a face side; a step of work at a time. */
-export function* readGrid(bake: CubeReadback, R: number, n: number): Generator<void, Grid, void> {
+/** The grid of the planet at R from the terrain bake and its gradient, n samples a face side; a step of work at a time. */
+export function* readGrid(bake: CubeReadback, gradient: CubeReadback, R: number, n: number): Generator<void, Grid, void> {
   const N = n * n;
   const dir: Float32Array[] = [];
   const h: Float32Array[] = [];
-  const slope: Float32Array[] = [];
+  const grad: Float32Array[][] = [[], [], []];
   const wild: Float32Array[] = [];
   const flat: Float32Array[] = [];
   const area: Float32Array[] = [];
@@ -57,7 +59,7 @@ export function* readGrid(bake: CubeReadback, R: number, n: number): Generator<v
   for (let f = 0; f < 6; f++) {
     const d = new Float32Array(N * 3);
     const hh = new Float32Array(N);
-    const sl = new Float32Array(N);
+    const g = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
     const wl = new Float32Array(N);
     const fl = new Float32Array(N);
     for (let j = 0; j < n; j++) {
@@ -69,11 +71,14 @@ export function* readGrid(bake: CubeReadback, R: number, n: number): Generator<v
         d[3 * k + 2] = v.z;
         bake.sample4(v, px);
         hh[k] = px[0];
-        sl[k] = px[1];
         wl[k] = px[2];
         fl[k] = px[3];
+        gradient.sample4(v, px);
+        g[0][k] = px[0];
+        g[1][k] = px[1];
+        g[2][k] = px[2];
       }
-      done += n;
+      done += 2 * n;
       if (done > GRID.slice) {
         done = 0;
         yield;
@@ -81,7 +86,7 @@ export function* readGrid(bake: CubeReadback, R: number, n: number): Generator<v
     }
     dir.push(d);
     h.push(hh);
-    slope.push(sl);
+    for (let c = 0; c < 3; c++) grad[c].push(g[c]);
     wild.push(wl);
     flat.push(fl);
   }
@@ -127,17 +132,33 @@ export function* readGrid(bake: CubeReadback, R: number, n: number): Generator<v
     }
     gid.push(g);
   }
-  // the hills smoothed (a Gaussian, each face on its own), then every shared sample given the faces' mean
+  // the hills smoothed (a Gaussian, each face on its own) and their gradient with them (the smoothed hills'
+  // own: a blur's gradient is the gradient blurred), then every shared sample given the faces' mean
   const sigma = GRID.smooth / spacing;
   const hs: Float32Array[] = [];
   for (let f = 0; f < 6; f++) {
     hs.push(blur(h[f], n, sigma));
+    for (let c = 0; c < 3; c++) grad[c][f] = blur(grad[c][f], n, sigma);
     yield;
   }
   agree(hs, gid, n);
-  agree(slope, gid, n);
+  for (let c = 0; c < 3; c++) agree(grad[c], gid, n);
   agree(wild, gid, n);
   agree(flat, gid, n);
+  // the smoothed hills' slope: their gradient's length on the planet (the blur mixed in its neighbours' tangents)
+  const slope: Float32Array[] = [];
+  for (let f = 0; f < 6; f++) {
+    const s = new Float32Array(N);
+    const d = dir[f];
+    for (let k = 0; k < N; k++) {
+      const gx = grad[0][f][k];
+      const gy = grad[1][f][k];
+      const gz = grad[2][f][k];
+      const up = gx * d[3 * k] + gy * d[3 * k + 1] + gz * d[3 * k + 2];
+      s[k] = Math.hypot(gx - up * d[3 * k], gy - up * d[3 * k + 1], gz - up * d[3 * k + 2]);
+    }
+    slope.push(s);
+  }
   return { n, R, dir, h, hs, slope, wild, flat, gid, area, spacing };
 }
 

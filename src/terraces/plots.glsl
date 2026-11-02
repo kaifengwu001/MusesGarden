@@ -26,6 +26,7 @@
 uniform samplerCube uTerraceBake;   // natural height (m), slope, wild, flat
 uniform samplerCube uTerraceLife;   // fog layer A, fog layer B, its cell's season, its cell's slope
 uniform samplerCube uTerraceLayout; // its cell's key, along the cell's contour way (m), up its slope (m), to its edge (m)
+uniform samplerCube uTerraceGrad;   // the natural height's gradient (m per m, xyz), -
 uniform vec4 uTerraceShape;  // a cell's band (m), its riser between (m), each cell's spread of it
 uniform vec4 uTerraceLevels; // each wall's jitter (a level's share), the share of walls left out, the cuts along a band between (m)
 uniform vec4 uTerraceWall;   // a riser's batter (m per m of height), a bund's width (m), its height (m), its flat top's share
@@ -204,18 +205,22 @@ float flatFloorAt(vec3 dir, vec3 tAlong, vec3 tUp, float along, float up) {
   return floor(textureLod(uTerraceBake, d, 0.0).r / 0.05 + 0.5) * 0.05;
 }
 
-// The ground's way uphill at dir (a unit tangent) and its slope, from the bake 2 m round it (a step long
-// enough that the baked height's rounding does not turn it).
-vec3 uphillAt(vec3 dir, float h, out float slope) {
+// The natural height's gradient at dir (m per m), exact: baked from the hills' own derivatives (the
+// gradient pass), on the planet there (between texels the filter mixes neighbouring tangents a little).
+vec3 gradientAt(vec3 dir) {
+  vec3 g = textureLod(uTerraceGrad, dir, 0.0).xyz;
+  return g - dir * dot(g, dir);
+}
+
+// The ground's way uphill at dir (a unit tangent) and its slope.
+vec3 uphillAt(vec3 dir, out float slope) {
+  vec3 g = gradientAt(dir);
+  slope = length(g);
+  if (slope > 1e-5) return g / slope;
   vec3 a;
   vec3 b;
   gradientFrame(dir, a, b);
-  float e = 2.0;
-  float ha = textureLod(uTerraceBake, normalize(dir + a * (e / uRadius)), 0.0).r - textureLod(uTerraceBake, normalize(dir - a * (e / uRadius)), 0.0).r;
-  float hb = textureLod(uTerraceBake, normalize(dir + b * (e / uRadius)), 0.0).r - textureLod(uTerraceBake, normalize(dir - b * (e / uRadius)), 0.0).r;
-  vec3 g = (a * ha + b * hb) / (2.0 * e);
-  slope = length(g);
-  return slope > 1e-5 ? g / slope : a;
+  return a;
 }
 
 // The cell's way and slope at dir (unit tangents), from the layout's change round it.
@@ -284,7 +289,7 @@ Plot plotFrom(vec3 dir, vec3 inside, vec4 base, vec4 lay, vec4 life, bool bands)
     if (bands) return p;
     // the point of its outer wall straight downhill, moved along the wall toward the band's edges
     float slope;
-    vec3 up = uphillAt(dir, base.r, slope);
+    vec3 up = uphillAt(dir, slope);
     vec3 along = cross(dir, up);
     float c = 2.0 * p.fl - 1.0;
     float r = sqrt(max(1.0 - c * c, 0.0));

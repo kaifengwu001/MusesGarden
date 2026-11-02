@@ -53,9 +53,8 @@ void main() {
     }
   }
 
-  float slope;
-  vec3 up = uphillAt(dir, textureLod(uTerraceBake, dir, 0.0).r, slope);
-  vec3 n = normalize(dir - up * slope);
+  // (the hills' own normal, from their exact gradient)
+  vec3 n = normalize(dir - gradientAt(dir));
 
   vec3 w = warpPosition(p);
   vDir = normalize(p);

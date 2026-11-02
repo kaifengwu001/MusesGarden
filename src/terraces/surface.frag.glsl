@@ -79,16 +79,9 @@ void main() {
   float water = plotWater(p, c);
   float wild = smoothstep(0.35, 0.65, p.wild);
 
-  // the ground's tangent frame and the hills' downhill way, from the screen-space change of their
-  // (smooth) height
-  vec3 a1;
-  vec3 a2;
-  gradientFrame(dir, a1, a2);
-  vec3 px = dFdx(dir) * uRadius;
-  vec3 py = dFdy(dir) * uRadius;
-  mat2 J = mat2(dot(px, a1), dot(py, a1), dot(px, a2), dot(py, a2));
-  vec2 g = abs(determinant(J)) > 1e-12 ? inverse(J) * vec2(dFdx(p.natural), dFdy(p.natural)) : vec2(0.0);
-  vec3 downhill = length(g) > 1e-6 ? -normalize(a1 * g.x + a2 * g.y) : a1;
+  // the hills' downhill way, from their exact gradient
+  float slopeHere;
+  vec3 downhill = -uphillAt(dir, slopeHere);
 
   // light: a floor, a riser's face (leaning back uphill as steep as it is), the hills' own
   vec3 P = dir * (uRadius + max(ground, water));

@@ -3,7 +3,7 @@ import { hash32, mix, salt, unit } from '../core/hash';
 import { clamp, smoothstep } from '../core/math';
 import { uvToSphere } from '../planet/cubesphere';
 import { normalQuantile, octavePair, type OctavePair } from '../planet/fields';
-import { gnoise } from '../planet/noise';
+import { gnoise, latticeHash } from '../planet/noise';
 import { enumerateCell } from '../planet/rest';
 
 // The terraces' fields in rest space, as the meadow's are (planet/fields.ts):
@@ -66,9 +66,7 @@ export const PEAKS = { density: 1 / 3400, ranges: 0.38, group: [1, 4], height: [
  * and the slope of its banks (m), how far its course swings either side (m, one spread), and its valley:
  * the floor kept flat this far either side of its middle (m), the hills risen in full by the second.
  */
-export const RIVER = { width: [7, 13], depth: 1.5, bank: 2.5, meander: 38, valley: [10, 40] } as const;
-/** The finite-difference step (m) of the river's distance (its offset over its gradient). */
-const RIVER_STEP = 2;
+export const RIVER = { width: [7, 13], depth: 1.5, bank: 2.5, meander: 38, valley: [10, 40], reach: 0.5 } as const;
 export const peakClass = { salt: salt('karst peaks'), jitter: 0.9 } as const;
 
 /** Where the land use turns wild: crowns and gullies in spreads of the hills' local relief, the hilltops' least height (m), the steepest terrace. */
@@ -173,13 +171,65 @@ export interface WildParts {
 const wildOut: WildParts = { woods: 0, steep: 0, crown: 0, gully: 0, tower: 0 };
 const landBase: TerraceBase = { natural: 0, slope: 0, wild: 0, flat: 0 };
 const d1 = new Vector3();
-const d2 = new Vector3();
-const t1 = new Vector3();
-const t2 = new Vector3();
 const UP = new Vector3(0, 1, 0);
 const X = new Vector3(1, 0, 0);
-/** The finite-difference step (m) of the baked slope; the CPU uses the same. */
-export const SLOPE_STEP = 1.5;
+const gc = new Float64Array(24);
+const nc = new Float64Array(8);
+const fade = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
+const fadeD = (t: number): number => 30 * t * t * (t - 1) * (t - 1);
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+/**
+ * Gradient noise (planet/noise.ts gnoise, value for value) and its gradient (∂/∂x, ∂/∂y, ∂/∂z) into g:
+ * the corners' gradients blended as their values are, plus each fade's slope times the change across it.
+ * Mirrors gnoiseGrad in fields.glsl.
+ */
+export function gnoiseGrad(x: number, y: number, z: number, seed: number, g: Vector3): number {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fy = y - iy;
+  const fz = z - iz;
+  const s = seed >>> 0;
+  for (let c = 0; c < 8; c++) {
+    const dx = c & 1;
+    const dy = (c >> 1) & 1;
+    const dz = (c >> 2) & 1;
+    // Perlin's table (gradDot's): the corner's gradient, then its value
+    const k = (latticeHash(ix + dx, iy + dy, iz + dz, s) >>> 4) & 15;
+    gc[3 * c] = gc[3 * c + 1] = gc[3 * c + 2] = 0;
+    gc[3 * c + (k < 8 ? 0 : 1)] += (k & 1) === 0 ? 1 : -1;
+    gc[3 * c + (k < 4 ? 1 : k === 12 || k === 14 ? 0 : 2)] += (k & 2) === 0 ? 1 : -1;
+    nc[c] = gc[3 * c] * (fx - dx) + gc[3 * c + 1] * (fy - dy) + gc[3 * c + 2] * (fz - dz);
+  }
+  const u = fade(fx);
+  const v = fade(fy);
+  const w = fade(fz);
+  const x00 = lerp(nc[0], nc[1], u);
+  const x10 = lerp(nc[2], nc[3], u);
+  const x01 = lerp(nc[4], nc[5], u);
+  const x11 = lerp(nc[6], nc[7], u);
+  const y0 = lerp(x00, x10, v);
+  const y1 = lerp(x01, x11, v);
+  const du = lerp(lerp(nc[1] - nc[0], nc[3] - nc[2], v), lerp(nc[5] - nc[4], nc[7] - nc[6], v), w);
+  const dv = lerp(x10 - x00, x11 - x01, w);
+  const dw = y1 - y0;
+  const blend = (a: number): number => lerp(lerp(lerp(gc[a], gc[3 + a], u), lerp(gc[6 + a], gc[9 + a], u), v), lerp(lerp(gc[12 + a], gc[15 + a], u), lerp(gc[18 + a], gc[21 + a], u), v), w);
+  g.set(blend(0) + fadeD(fx) * du, blend(1) + fadeD(fy) * dv, blend(2) + fadeD(fz) * dw);
+  return lerp(y0, y1, w);
+}
+
+/** A direction-space gradient made a gradient on the planet: in the tangent plane at dir, per meter (R m). */
+function onPlanet(g: Vector3, dir: Vector3, R: number): Vector3 {
+  return g.addScaledVector(dir, -g.dot(dir)).divideScalar(R);
+}
+
+/** smoothstep's slope at x. */
+function smoothstepD(e0: number, e1: number, x: number): number {
+  const t = (x - e0) / (e1 - e0);
+  return t <= 0 || t >= 1 ? 0 : (6 * t * (1 - t)) / (e1 - e0);
+}
 
 /** Everything the bake writes for one direction (pass 0). */
 export interface TerraceBase {
@@ -215,11 +265,19 @@ export class TerraceFields {
   peaks: Peak[] = [];
   readonly peakTexture: DataTexture;
   private peaksFor = '';
-  private readonly rt = new Vector3();
-  private readonly ra = new Vector3();
-  private readonly rb = new Vector3();
-  /** The river at the last direction asked (riverAt). */
-  readonly river = { distance: 0, width: 0, valley: 1 };
+  /** The river at the last direction asked (riverAt): also the gradient of the distance on the planet (per meter). */
+  readonly river = { distance: 0, width: 0, valley: 1, grad: new Vector3(), widthGrad: new Vector3() };
+  private readonly ga = new Vector3();
+  private readonly gb = new Vector3();
+  private readonly gh = new Vector3();
+  private readonly rg = new Vector3();
+  private readonly ta = new Vector3();
+  private readonly tb = new Vector3();
+  private readonly tq = new Vector3();
+  private readonly tg = new Vector3();
+  /** The mound peaksAt found tallest at the last direction asked: its tower (an index into peaks, −1 none) and how far out on it (× its radius). */
+  private moundPeak = -1;
+  private moundS = 0;
   /** How near a tower's foot the last direction asked lies (peaksAt): its mound's profile there, 0..1. */
   mound = 0;
 
@@ -349,22 +407,53 @@ export class TerraceFields {
     return hillOut;
   }
 
-  /** The river's signed offset (m) from the middle of its course: its circle swung by the meander. */
-  riverOffset(dir: Vector3): number {
-    const s = clamp(dir.dot(this.riverAxis), -1, 1);
-    return this.radius * Math.asin(s) + (RIVER.meander / NOISE_STD) * this.pair(dir, this.riverPair, SEED.river);
+  /** A pattern at its two bracketing octaves (as pair()), and its gradient in direction space into g. */
+  private pairGrad(dir: Vector3, pr: OctavePair, base: number, g: Vector3): number {
+    const f0 = 2 ** pr.level;
+    const s = this.seed + base + pr.level + 16;
+    const a = gnoiseGrad(dir.x * f0, dir.y * f0, dir.z * f0, s >>> 0, this.ga);
+    const b = gnoiseGrad(dir.x * 2 * f0, dir.y * 2 * f0, dir.z * 2 * f0, (s + 1) >>> 0, this.gb);
+    const norm = Math.sqrt((1 - pr.t) ** 2 + pr.t ** 2);
+    g.copy(this.ga).multiplyScalar((f0 * (1 - pr.t)) / norm).addScaledVector(this.gb, (2 * f0 * pr.t) / norm);
+    return (a * (1 - pr.t) + b * pr.t) / norm;
   }
 
-  /** The river near a direction: the distance to its middle (m), its width there (m), and how far its valley's hills have risen (0 on its floor … 1). */
-  riverAt(dir: Vector3): { distance: number; width: number; valley: number } {
-    const o = this.riverOffset(dir);
-    gradientFrame(dir, this.ra, this.rb);
-    const e = RIVER_STEP / this.radius;
-    const o1 = this.riverOffset(this.rt.copy(dir).addScaledVector(this.ra, e).normalize());
-    const o2 = this.riverOffset(this.rt.copy(dir).addScaledVector(this.rb, e).normalize());
-    const g = Math.hypot(o1 - o, o2 - o) / RIVER_STEP;
-    this.river.distance = Math.abs(o) / Math.max(g, 0.35);
-    this.river.width = RIVER.width[0] + (RIVER.width[1] - RIVER.width[0]) * clamp(0.5 + 1.6 * this.pair(dir, this.riverWidthPair, SEED.riverWidth), 0, 1);
+  /** The river's signed offset (m) from the middle of its course (its circle swung by the meander), and its gradient on the planet into g (per meter). */
+  riverOffset(dir: Vector3, g: Vector3 = this.rg): number {
+    const s = clamp(dir.dot(this.riverAxis), -1, 1);
+    const k = RIVER.meander / NOISE_STD;
+    const p = this.pairGrad(dir, this.riverPair, SEED.river, g);
+    // (R·asin(dir · axis) changes as R·axis / √(1 − s²) with the direction)
+    g.multiplyScalar(k).addScaledVector(this.riverAxis, this.radius / Math.sqrt(Math.max(1 - s * s, 1e-6)));
+    onPlanet(g, dir, this.radius);
+    return this.radius * Math.asin(s) + k * p;
+  }
+
+  /** The river near a direction: the distance to its middle (m: the offset over its gradient, exact), its width there (m), and how far its valley's hills have risen (0 on its floor … 1). */
+  riverAt(dir: Vector3): TerraceFields["river"] {
+    const o = this.riverOffset(dir, this.rg);
+    const g0 = this.rg.length();
+    const g = Math.max(g0, 0.35);
+    this.river.distance = Math.abs(o) / g;
+    this.river.grad.copy(this.rg).multiplyScalar(Math.sign(o) / g);
+    // within the valley the distance's slope also has the offset's gradient changing in it (−|o|/g² ∇g):
+    // ∇g from the offset's gradient half a meter either way
+    if (this.river.distance < RIVER.valley[1] + 5 && g0 > 0.35) {
+      gradientFrame(dir, this.ta, this.tb);
+      const e = RIVER.reach / this.radius;
+      const slopeAt = (t: Vector3, k: number): number => {
+        this.riverOffset(this.tq.copy(dir).addScaledVector(t, k * e).normalize(), this.tg);
+        return this.tg.length();
+      };
+      const ga = (slopeAt(this.ta, 1) - slopeAt(this.ta, -1)) / (2 * RIVER.reach);
+      const gb = (slopeAt(this.tb, 1) - slopeAt(this.tb, -1)) / (2 * RIVER.reach);
+      const k = -Math.abs(o) / (g * g);
+      this.river.grad.addScaledVector(this.ta, k * ga).addScaledVector(this.tb, k * gb);
+    }
+    // its width: narrow to wide along it, and how that changes (per meter)
+    const wp = 0.5 + 1.6 * this.pairGrad(dir, this.riverWidthPair, SEED.riverWidth, this.river.widthGrad);
+    this.river.width = RIVER.width[0] + (RIVER.width[1] - RIVER.width[0]) * clamp(wp, 0, 1);
+    onPlanet(this.river.widthGrad, dir, this.radius).multiplyScalar(wp > 0 && wp < 1 ? 1.6 * (RIVER.width[1] - RIVER.width[0]) : 0);
     this.river.valley = smoothstep(RIVER.valley[0], RIVER.valley[1], this.river.distance);
     return this.river;
   }
@@ -392,14 +481,21 @@ export class TerraceFields {
     const R = this.radius;
     let h = 0;
     this.mound = 0;
-    for (const pk of this.peaks) {
+    this.moundPeak = -1;
+    this.peaks.forEach((pk, i) => {
       const c = dir.dot(pk.dir);
-      if (c < Math.cos(Math.min(Math.PI, (PEAK_REACH * pk.radius) / R))) continue;
+      if (c < Math.cos(Math.min(Math.PI, (PEAK_REACH * pk.radius) / R))) return;
       const chord = 2 * Math.asin(Math.min(1, 0.5 * Math.sqrt(Math.max(0, 2 - 2 * c))));
-      const share = peakProfile((chord * R) / pk.radius);
-      h = Math.max(h, PEAKS.mound[1] * pk.height * share);
+      const s = (chord * R) / pk.radius;
+      const share = peakProfile(s);
+      const m = PEAKS.mound[1] * pk.height * share;
+      if (m > h) {
+        h = m;
+        this.moundPeak = i;
+        this.moundS = s;
+      }
       this.mound = Math.max(this.mound, share);
-    }
+    });
     return h;
   }
 
@@ -408,6 +504,46 @@ export class TerraceFields {
     const raw = this.hillParts(dir).total;
     this.riverAt(dir);
     return this.valleyFloor(this.inValley(raw, this.river.valley)) - this.channel() + this.peaksAt(dir);
+  }
+
+  /**
+   * The natural height (m) and its gradient on the planet (in the tangent plane at dir, m per m) into out,
+   * exact: each part with its own derivative, the chain rule through the river's valley and the soft
+   * valley floor (mirrors naturalGrad in fields.glsl). The slope is its length: no differences of heights.
+   */
+  naturalGrad(dir: Vector3, out: Vector3): number {
+    const R = this.radius;
+    // the hills' octaves
+    let raw = 0;
+    const gr = this.gh.set(0, 0, 0);
+    for (let k = 0; k < HILL_OCTAVES; k++) {
+      if (this.hill[k] < 1e-4) continue;
+      const f = HILL_BASE_FREQ * 2 ** k;
+      raw += this.hill[k] * gnoiseGrad(dir.x * f, dir.y * f, dir.z * f, (this.seed + SEED.hills + k) >>> 0, this.ga);
+      gr.addScaledVector(this.ga, this.hill[k] * f);
+    }
+    onPlanet(gr, dir, R);
+    // the river's valley laid flat (raw·valley + C·(1 − valley)), its channel cut
+    const r = this.riverAt(dir);
+    const C = this.floor - 2.5 * this.floorSoft;
+    const iv = raw + (C - raw) * (1 - r.valley);
+    out.copy(gr).multiplyScalar(r.valley).addScaledVector(r.grad, (raw - C) * smoothstepD(RIVER.valley[0], RIVER.valley[1], r.distance));
+    // the soft valley floor: its slope the logistic of how far over the floor
+    const x = (iv - this.floor) / this.floorSoft;
+    out.multiplyScalar(x > 30 ? 1 : 1 / (1 + Math.exp(-x)));
+    const half = 0.5 * r.width;
+    const channel = RIVER.depth * (1 - smoothstep(half, half + RIVER.bank, r.distance));
+    // (the channel's edge moves with its width: ∇ of depth·(1 − smoothstep(w/2, w/2 + bank, dist)))
+    const edge = RIVER.depth * smoothstepD(half, half + RIVER.bank, r.distance);
+    out.addScaledVector(r.grad, edge).addScaledVector(r.widthGrad, -0.5 * edge);
+    // the tallest mound there: A·e^(−s²), s out from its tower in its radii
+    const mound = this.peaksAt(dir);
+    if (this.moundPeak >= 0 && this.moundS > 1e-6) {
+      const pk = this.peaks[this.moundPeak];
+      const away = this.gb.copy(dir).multiplyScalar(dir.dot(pk.dir)).sub(pk.dir).normalize();
+      out.addScaledVector(away, (-2 * this.moundS * mound) / pk.radius);
+    }
+    return this.valleyFloor(iv) - channel + mound;
   }
 
   /** Everything the bake's terrain pass writes for a direction (mirrors bake.frag.glsl). */
@@ -421,11 +557,9 @@ export class TerraceFields {
     const peak = this.peaksAt(dir);
     const mound = this.mound;
     const h = this.valleyFloor(raw) - this.channel() + peak;
-    gradientFrame(dir, t1, t2);
-    const e = SLOPE_STEP / this.radius;
-    const h1 = this.natural(d1.copy(dir).addScaledVector(t1, e).normalize());
-    const h2 = this.natural(d2.copy(dir).addScaledVector(t2, e).normalize());
-    const slope = Math.hypot(h1 - h, h2 - h) / SLOPE_STEP;
+    // (the slope from the height's own gradient, exact: the hills and the terraces read the same)
+    this.naturalGrad(dir, d1);
+    const slope = d1.length();
     out.natural = h;
     out.slope = slope;
     // (no trees in the river's water; along its banks, yes)

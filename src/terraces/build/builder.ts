@@ -30,16 +30,17 @@ export class TerraceBuild {
   }
 
   /** Build the planet's terraces if what they depend on changed (key), a step of work at a time on the queue. */
-  update(terrain: TerraceTerrain, bakes: { terrain: CubeReadback }, villages: readonly Village[], key: string, queue: BuildQueue): void {
+  update(terrain: TerraceTerrain, bakes: { terrain: CubeReadback; gradient: CubeReadback }, villages: readonly Village[], key: string, queue: BuildQueue): void {
     if (key === this.builtFor) return;
     this.builtFor = key;
-    queue.add('terraces:build', 0, this.job(terrain, bakes.terrain, villages));
+    queue.add('terraces:build', 0, this.job(terrain, bakes, villages));
   }
 
-  private *job(terrain: TerraceTerrain, bake: CubeReadback, villages: readonly Village[]): Generator<void, void, void> {
+  private *job(terrain: TerraceTerrain, bakes: { terrain: CubeReadback; gradient: CubeReadback }, villages: readonly Village[]): Generator<void, void, void> {
     const R = terrain.radius;
+    const bake = bakes.terrain;
     // (samples a face side: GRID.spacing apart, no finer than the bake)
-    const grid = yield* readGrid(bake, R, Math.min(bake.size, Math.ceil((R * Math.PI) / 2 / GRID.spacing)) + 1);
+    const grid = yield* readGrid(bake, bakes.gradient, R, Math.min(bake.size, Math.ceil((R * Math.PI) / 2 / GRID.spacing)) + 1);
     const yard = (d: Vector3): number => houseDistance(villages, d, R);
     const layout = yield* labelGrid(grid, terrain.plots, terrain.layout.noiseSeed, terrain.seasonFront, yard);
     const geometries = yield* buildMesh(grid, layout, terrain.layout.noiseSeed);

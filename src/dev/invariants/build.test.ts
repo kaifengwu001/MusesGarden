@@ -1,4 +1,4 @@
-import type { Vector3 } from 'three';
+import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { CubeReadback } from '../../terraces/bakeReader';
 import { readGrid, type Grid } from '../../terraces/build/grid';
@@ -26,6 +26,18 @@ const bake = {
     return out;
   },
 } as unknown as CubeReadback;
+const g = new Vector3();
+const gradient = {
+  size: 64,
+  sample4(d: Vector3, out: Float32Array): Float32Array {
+    terrain.fields.naturalGrad(d, g);
+    out[0] = g.x;
+    out[1] = g.y;
+    out[2] = g.z;
+    out[3] = 0;
+    return out;
+  },
+} as unknown as CubeReadback;
 
 function run<T>(job: Generator<void, T, void>): T {
   for (;;) {
@@ -35,7 +47,7 @@ function run<T>(job: Generator<void, T, void>): T {
 }
 
 for (const k of Object.keys(CROSSINGS)) delete CROSSINGS[k];
-const grid: Grid = run(readGrid(bake, terrain.radius, 65));
+const grid: Grid = run(readGrid(bake, gradient, terrain.radius, 65));
 const layout: Layout = run(labelGrid(grid, terrain.plots, 7, terrain.seasonFront, () => 1e9));
 const meshes = run(buildMesh(grid, layout, 7));
 

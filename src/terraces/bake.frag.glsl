@@ -6,6 +6,8 @@
 //                     middle) and slope (half resolution: a cell's are its own)
 //   pass 2 (layout):  its cell's key, where it lies along the cell's way and
 //                     up its slope (m), its distance to the cell's edge (m)
+//   pass 3 (gradient): the natural height's exact gradient (m per m: xyz on
+//                     the planet, as the direction's), -
 #include <meadow_noise>
 uniform float uRadius;
 #include <terraces_common>
@@ -33,7 +35,9 @@ void main() {
   } else if (uPass == 1) {
     Cell c = cellAt(dir);
     gl_FragColor = vec4(terraceFog(dir), seasonAt(c.centre), cellSlope(c));
-  } else {
+  } else if (uPass == 2) {
     gl_FragColor = terraceLayout(dir);
+  } else {
+    gl_FragColor = terraceGradient(dir);
   }
 }
