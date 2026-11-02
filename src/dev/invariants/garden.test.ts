@@ -205,11 +205,11 @@ describe('the garden’s state', () => {
     await state.start();
     const [newest, before] = state.baskets;
     const oldest = state.baskets.at(-1)!;
-    expect(state.step(newest.finds[0], 1)).toEqual({ find: newest.finds[1], into: null });
-    expect(state.step(newest.finds[0], -1)).toEqual({ find: before.finds.at(-1), into: before.day });
-    expect(state.step(before.finds.at(-1)!, 1)).toEqual({ find: newest.finds[0], into: newest.day });
-    expect(state.step(newest.finds.at(-1)!, 1), 'the newest steps round to the oldest').toEqual({ find: oldest.finds[0], into: oldest.day });
-    expect(state.step(oldest.finds[0], -1)).toEqual({ find: newest.finds.at(-1), into: newest.day });
+    expect(state.step(newest.finds[0], 1)).toEqual({ find: newest.finds[1], into: null, wraps: false });
+    expect(state.step(newest.finds[0], -1)).toEqual({ find: before.finds.at(-1), into: before.day, wraps: false });
+    expect(state.step(before.finds.at(-1)!, 1)).toEqual({ find: newest.finds[0], into: newest.day, wraps: false });
+    expect(state.step(newest.finds.at(-1)!, 1), 'the newest steps round to the oldest').toEqual({ find: oldest.finds[0], into: oldest.day, wraps: true });
+    expect(state.step(oldest.finds[0], -1)).toEqual({ find: newest.finds.at(-1), into: newest.day, wraps: true });
   });
 
   it('likes, stars, and uses an invitation once; tells the source', async () => {

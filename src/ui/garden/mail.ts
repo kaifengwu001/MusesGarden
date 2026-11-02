@@ -1,7 +1,7 @@
 import { hashOf, worldArt } from '../../garden/art';
 import type { GardenState } from '../../garden/state';
 import type { Postcard } from '../../garden/types';
-import { button, dayName, el, nextFrame, reducedMotion, shortDate, wait } from './dom';
+import { button, dayName, el, reducedMotion, shortDate, wait } from './dom';
 import { ICONS } from './icons';
 import type { PostBox } from './postbox';
 
@@ -64,6 +64,39 @@ interface Drag {
 const THROW_DISTANCE = 110;
 const THROW_SPEED = 0.5;
 const THROW_MS = 400;
+
+/**
+ * A card leaving the mailbox: how long its whole way takes (ms), the gap between cards (ms), its size and tilt in the
+ * mouth (as small as the cards drawn inside the box), how far it is drawn out of the mouth before it flies (px), and when.
+ */
+const FLY_OUT = { ms: 1150, stagger: 260, s: 0.075, r: -14, pull: 70, pulled: 0.3 } as const;
+
+const transformAt = (at: { x: number; y: number; r: number; s: number }): string =>
+  `translate(${at.x}px, ${at.y}px) rotate(${at.r}deg) scale(${at.s})`;
+
+/**
+ * Out of the mailbox's mouth (`from`, px from the stage's middle) into its place in the deck: drawn out of the mouth a
+ * little, still small, then flying there as it grows to full size. Its place is already set, so it rests there after.
+ */
+function flyOut(node: HTMLElement, from: { x: number; y: number }, to: Slot, delay: number): void {
+  const away = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  const pulled = {
+    x: from.x + ((to.x - from.x) / away) * FLY_OUT.pull,
+    y: from.y + ((to.y - from.y) / away) * FLY_OUT.pull - FLY_OUT.pull * 0.4,
+    r: FLY_OUT.r * 1.3,
+    s: FLY_OUT.s * 1.8,
+  };
+  const start = { ...from, r: FLY_OUT.r, s: FLY_OUT.s };
+  node.animate(
+    [
+      { transform: transformAt(start), opacity: 0, offset: 0 },
+      { transform: transformAt(start), opacity: 1, offset: 0.03, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' },
+      { transform: transformAt(pulled), opacity: 1, offset: FLY_OUT.pulled, easing: 'cubic-bezier(0.45, 0, 0.2, 1)' },
+      { transform: transformAt(to), opacity: 1, offset: 1 },
+    ],
+    { duration: FLY_OUT.ms, delay, fill: 'backwards' },
+  );
+}
 
 function place(node: HTMLElement, at: Slot): void {
   node.style.setProperty('--x', `${at.x}px`);
@@ -331,6 +364,7 @@ export class Mail {
     const stage = this.stage.getBoundingClientRect();
     for (const node of this.stage.children) {
       const e = node as HTMLElement;
+      for (const flight of e.getAnimations()) flight.cancel();
       e.classList.remove('is-flipped', 'is-open', 'is-dragging', 'is-thrown');
       e.style.transition = '';
       e.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
@@ -365,7 +399,6 @@ export class Mail {
   // ---- the deck ---------------------------------------------------------------------
 
   private layDeck(cards: Postcard[], top: number, mouth?: { x: number; y: number }): void {
-    const operation = this.operation;
     this.cards = cards;
     this.top = cards.length > 0 ? Math.min(top, cards.length - 1) : 0;
     const nodes = cards.map((card, i) => {
@@ -373,40 +406,26 @@ export class Mail {
       node.dataset.index = String(i);
       return node;
     });
-    if (mouth) {
-      // at the mouth before they are on the page: measuring the stage with them in it would style them first in the
-      // middle, and they would fly from there back to the mouth before flying out
-      const stage = this.stage.getBoundingClientRect();
-      for (const node of nodes) {
-        node.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
-        node.style.setProperty('--y', `${mouth.y - stage.top - stage.height / 2}px`);
-        node.style.setProperty('--s', '0.075');
-        node.style.setProperty('--r', '-20deg');
-        node.style.opacity = '0';
-      }
-    }
+    // each in its place in the deck before it is on the page, so nothing transitions there from the middle
+    nodes.forEach((node, i) => this.arrange(node, i));
+    const from = mouth ? this.fromMouth(mouth) : null;
     this.stage.replaceChildren(...nodes);
     this.el.classList.toggle('is-empty', cards.length === 0);
-    if (mouth) {
-      // their start, styled now, so the flight below is a change from it
-      void this.stage.offsetWidth;
-      // the deepest that shows lands first, the top card last
-      void nextFrame().then(() => {
-        if (operation !== this.operation) return;
-        nodes.forEach((node, i) => {
-          const depth = Math.min(this.depth(i), DECK.length - 1);
-          this.later(
-            () => {
-              if (this.closing || !node.isConnected) return;
-              node.style.opacity = '';
-              this.arrange(node, i);
-            },
-            (DECK.length - 1 - depth) * 90,
-          );
-        });
+    if (from) {
+      // the deepest that shows comes out first, the top card last
+      const shown = Math.min(cards.length, DECK.length);
+      nodes.forEach((node, i) => {
+        const depth = this.depth(i);
+        if (depth < shown) flyOut(node, from, slot(depth), (shown - 1 - depth) * FLY_OUT.stagger);
       });
-    } else nodes.forEach((node, i) => this.arrange(node, i));
+    }
     this.paint();
+  }
+
+  /** The mailbox's mouth, from the middle of the stage the deck sits in. */
+  private fromMouth(mouth: { x: number; y: number }): { x: number; y: number } {
+    const stage = this.stage.getBoundingClientRect();
+    return { x: mouth.x - stage.left - stage.width / 2, y: mouth.y - stage.top - stage.height / 2 };
   }
 
   private depth(i: number): number {

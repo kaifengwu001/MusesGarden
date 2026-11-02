@@ -245,14 +245,15 @@ export class GardenState {
    * The find a step from `id` goes to, back in time (-1) or forward (1), round at the ends; `into` is the day (ISO)
    * of its basket when that is another basket than `id`'s.
    */
-  step(id: string, direction: 1 | -1): { find: string; into: string | null } | null {
+  step(id: string, direction: 1 | -1): { find: string; into: string | null; wraps: boolean } | null {
     const order = this.browseOrder;
     const i = order.indexOf(id);
     if (i < 0) return null;
-    const find = order[(i + direction + order.length) % order.length];
+    const next = i + direction;
+    const find = order[(next + order.length) % order.length];
     const from = this.find(id)?.basket;
     const to = this.find(find)?.basket;
-    return { find, into: to !== from ? (this.basket(to ?? '')?.day ?? null) : null };
+    return { find, into: to !== from ? (this.basket(to ?? '')?.day ?? null) : null, wraps: next < 0 || next >= order.length };
   }
 
   /**

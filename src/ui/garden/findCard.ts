@@ -1,5 +1,5 @@
 import type { Find, Interest } from '../../garden/types';
-import { basketCalled, button, duration, el, toggle } from './dom';
+import { basketCalled, basketWhen, button, duration, el, toggle } from './dom';
 import { ICONS } from './icons';
 
 // A find's card, standing over its bed: tap a bed and the card rises there,
@@ -24,8 +24,13 @@ export interface CardContext {
   liked: boolean;
   /** Whether other Muses may see it. */
   shared: boolean;
-  /** The day (ISO) of the basket a step back (older) or forward (newer) goes into; null within this basket. */
-  crossing: { back: string | null; forward: string | null };
+  /** The basket a step back (older) or forward (newer) goes into, by its day (ISO), and whether that step goes round the end; null within this basket. */
+  crossing: { back: Crossing | null; forward: Crossing | null };
+}
+
+export interface Crossing {
+  readonly day: string;
+  readonly wraps: boolean;
 }
 
 export interface CardActions {
@@ -134,14 +139,20 @@ const LEAVE = 0.45;
 /** `v` (px) to the pixel, or `last` while `v` is still within a little over half a pixel of it. */
 const steady = (v: number, last: number): number => (Math.abs(v - last) < 0.6 ? last : Math.round(v));
 
-/** An arrow whose step goes into another day's basket (`day`, ISO; null: it stays in this one): blue, its line over it. */
-function crossing(arrow: HTMLButtonElement, hint: HTMLElement, day: string | null, label: string): void {
-  const text = day ? `Going to ${basketCalled(day)}` : '';
-  arrow.classList.toggle('is-crossing', day !== null);
+/** What the line over an arrow says as its step goes into another basket: the next or the previous, or round the end. */
+const CROSSING = {
+  forward: { step: 'Going to the next basket', round: 'Going back to the first basket' },
+  back: { step: 'Going to the previous basket', round: 'Going to the latest basket' },
+} as const;
+
+/** An arrow whose step goes into another day's basket (null: it stays in this one): blue, its line over it. */
+function crossing(arrow: HTMLButtonElement, hint: HTMLElement, way: keyof typeof CROSSING, into: Crossing | null, label: string): void {
+  const text = into ? `${into.wraps ? CROSSING[way].round : CROSSING[way].step} (${basketWhen(into.day)})` : '';
+  arrow.classList.toggle('is-crossing', into !== null);
   arrow.setAttribute('aria-label', text || label);
   arrow.title = text || label;
   hint.textContent = text;
-  hint.classList.toggle('is-on', day !== null);
+  hint.classList.toggle('is-on', into !== null);
 }
 
 export class FindCard {
@@ -206,8 +217,8 @@ export class FindCard {
     this.card.className = `g-card g-card--${find.media.kind}`;
     const called = context.from ?? basketCalled(context.day);
     this.kicker.textContent = `${called[0].toUpperCase()}${called.slice(1)} · ${context.index + 1} of ${context.total}`;
-    crossing(this.prev, this.prevHint, context.crossing.back, 'Earlier find');
-    crossing(this.next, this.nextHint, context.crossing.forward, 'Later find');
+    crossing(this.prev, this.prevHint, 'back', context.crossing.back, 'Earlier find');
+    crossing(this.next, this.nextHint, 'forward', context.crossing.forward, 'Later find');
     this.openLink.href = find.media.url;
     this.openLink.querySelector('span')!.textContent = find.media.kind === 'article' ? 'Read' : 'Open';
     this.openLink.title = `Open on ${find.media.source}`;

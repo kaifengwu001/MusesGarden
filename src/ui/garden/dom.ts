@@ -82,6 +82,12 @@ export function basketDay(day: string, now = new Date()): string {
   return ago === 0 ? `Today, ${date}` : ago === 1 ? `Yesterday, ${date}` : date;
 }
 
+/** A basket's day in a sentence: 'today', 'yesterday', 'Oct 23 Fri'. */
+export function basketWhen(day: string, now = new Date()): string {
+  const ago = daysAgo(day, now);
+  return ago === 0 ? 'today' : ago === 1 ? 'yesterday' : monthDay(day);
+}
+
 /** A basket as a sentence names it: 'today’s basket', 'yesterday’s basket', 'Oct 23 Fri basket'. */
 export function basketCalled(day: string, now = new Date()): string {
   const ago = daysAgo(day, now);

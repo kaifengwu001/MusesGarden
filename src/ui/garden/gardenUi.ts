@@ -30,7 +30,7 @@ import { basketStep, CLOSED, holdsPointer, type BasketEvent, type BasketState, t
 import { BasketOverlay, type DayEntry } from './basketOverlay';
 import { BasketStage, type Landing, type Pose, type StageFlower } from './basketStage';
 import { button, chipNote, el, reducedMotion } from './dom';
-import { cardBody, FindCard, topicRgb } from './findCard';
+import { cardBody, FindCard, topicRgb, type Crossing } from './findCard';
 import { paintFlower, worldLight, type Light, type Shape } from './flowerPaint';
 import { framingToFit } from './framing';
 import { HutEditor } from './hutEditor';
@@ -788,9 +788,15 @@ export class GardenUi {
       total: basket.finds.length,
       liked: this.state.liked(id),
       shared: this.state.findShared(id),
-      crossing: { back: this.state.step(id, -1)?.into ?? null, forward: this.state.step(id, 1)?.into ?? null },
+      crossing: { back: this.crossingOf(id, -1), forward: this.crossingOf(id, 1) },
     });
     this.marks?.open(id);
+  }
+
+  /** The basket a step from `id` goes into, if it leaves `id`'s basket. */
+  private crossingOf(id: string, direction: 1 | -1): Crossing | null {
+    const step = this.state.step(id, direction);
+    return step?.into ? { day: step.into, wraps: step.wraps } : null;
   }
 
   /** The find before (-1, older) or after (1, newer) the one whose card is up, as on the baskets' timeline. */
