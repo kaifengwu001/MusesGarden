@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayLabel, MIN_SPREAD, nearestDot, timelineLayout } from './timeline';
+import { basketCalled } from './dom';
 
 /** The track under the basket on a 390 px phone. */
 const W = 330;
@@ -130,5 +131,14 @@ describe('the label over a day', () => {
     expect(dayLabel('2026-10-31', undefined, now)).toBe('Yesterday, Oct 31 Sat');
     expect(dayLabel('2026-10-28', 'Rain on the pond', now)).toBe('Oct 28 Wed · Rain on the pond');
     expect(dayLabel('2026-10-21', 'Ferns and ink', now)).toBe('Oct 21 Wed · Ferns and ink');
+  });
+});
+
+describe('a basket named in a sentence', () => {
+  const now = new Date(2026, 10, 1, 12);
+  it('says today’s and yesterday’s, and the date for any other day', () => {
+    expect(basketCalled('2026-11-01', now)).toBe('today’s basket');
+    expect(basketCalled('2026-10-31', now)).toBe('yesterday’s basket');
+    expect(basketCalled('2026-10-23', now)).toBe('Oct 23 Fri basket');
   });
 });

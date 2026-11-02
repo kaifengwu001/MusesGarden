@@ -69,12 +69,23 @@ export function dayName(day: string, now = new Date()): string {
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-/** A basket's day: 'Oct 23 Fri', with 'Today, ' or 'Yesterday, ' in front for those (the timeline, a find's card). */
-export function basketDay(day: string, now = new Date()): string {
+/** 'Oct 23 Fri'. */
+function monthDay(day: string): string {
   const d = parseDay(day);
-  const date = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleDateString('en-US', { weekday: 'short' })}`;
+}
+
+/** A basket's day on the timeline: 'Oct 23 Fri', with 'Today, ' or 'Yesterday, ' in front for those. */
+export function basketDay(day: string, now = new Date()): string {
   const ago = daysAgo(day, now);
+  const date = monthDay(day);
   return ago === 0 ? `Today, ${date}` : ago === 1 ? `Yesterday, ${date}` : date;
+}
+
+/** A basket as a sentence names it: 'today’s basket', 'yesterday’s basket', 'Oct 23 Fri basket'. */
+export function basketCalled(day: string, now = new Date()): string {
+  const ago = daysAgo(day, now);
+  return ago === 0 ? 'today’s basket' : ago === 1 ? 'yesterday’s basket' : `${monthDay(day)} basket`;
 }
 
 /** '31 Oct' (postmarks, captions). */

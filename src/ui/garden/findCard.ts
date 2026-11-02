@@ -1,5 +1,5 @@
 import type { Find, Interest } from '../../garden/types';
-import { basketDay, button, duration, el, toggle } from './dom';
+import { basketCalled, button, duration, el, toggle } from './dom';
 import { ICONS } from './icons';
 
 // A find's card, standing over its bed: tap a bed and the card rises there,
@@ -116,7 +116,7 @@ const steady = (v: number, last: number): number => (Math.abs(v - last) < 0.6 ? 
 
 /** An arrow whose step goes into another day's basket (`day`, ISO; null: it stays in this one): blue, its line over it. */
 function crossing(arrow: HTMLButtonElement, hint: HTMLElement, day: string | null, label: string): void {
-  const text = day ? `Going to ${basketDay(day)} basket` : '';
+  const text = day ? `Going to ${basketCalled(day)}` : '';
   arrow.classList.toggle('is-crossing', day !== null);
   arrow.setAttribute('aria-label', text || label);
   arrow.title = text || label;
@@ -184,7 +184,8 @@ export class FindCard {
     this.findId = find.id;
     this.content.replaceChildren(cardBody(find, interest));
     this.card.className = `g-card g-card--${find.media.kind}`;
-    this.kicker.textContent = `${basketDay(context.day)} basket · ${context.index + 1} of ${context.total}`;
+    const called = basketCalled(context.day);
+    this.kicker.textContent = `${called[0].toUpperCase()}${called.slice(1)} · ${context.index + 1} of ${context.total}`;
     crossing(this.prev, this.prevHint, context.crossing.back, 'Earlier find');
     crossing(this.next, this.nextHint, context.crossing.forward, 'Later find');
     this.openLink.href = find.media.url;
