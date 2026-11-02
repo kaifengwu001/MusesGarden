@@ -105,6 +105,8 @@ export const DOORWAY = (() => {
 })();
 /** The doorstep under the door (m): its half width (a little past the door either side), its depth out from the wall, its top over the floor. */
 export const DOORSTEP = { half: (DOORWAY.x1 - DOORWAY.x0) / 2 + 0.13, depth: 0.34, height: 0.09 } as const;
+/** The door's sill (m): its top over the floor, and how far down it goes (the meadow showed through under the doorway). */
+const SILL = { top: 0.02, down: 0.08 } as const;
 /** The bench against the front, between the window and the door (local m): its middle, its seat's half length and half depth, the seat's top over the floor. */
 export const BENCH = { x: -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12, z: OUTER.z + 0.22, half: 0.74, depth: 0.19, seat: 0.485 } as const;
 /** The house's front face and its side walls (local m: z, ±x): what stands on the terrace stands clear of them. */
@@ -625,7 +627,7 @@ function pierFace(b: Builder, top: number): void {
   }
 }
 
-/** Wood (door, window frames, bench, chair), glass and iron, from boxes (flags: 1 the door, 2 the bench and the chair). */
+/** Wood (door and its sill, window frames, bench, chair), glass and iron, from boxes (flags: 1 the door, 2 the bench and the chair, 3 the door's sill). */
 function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[]): void {
   const { thickness } = COTTAGE;
   for (const f of faces) {
@@ -639,6 +641,8 @@ function fittings(wood: Builder, glass: Builder, iron: Builder, faces: WallFace[
       if (o.door) {
         // planks, painted with their iron straps (flag 1), set back in the wall
         wood.box(along(mid, o.bottom + h / 2, thickness * 0.6), new Vector3(w / 2, h / 2, DOORWAY.thick), turn, FLOOR, 1);
+        // its sill (flag 3): a board across the doorway through the wall, from just over the room's floor out under the doorstep
+        wood.box(along(mid, FLOOR + (SILL.top - SILL.down) / 2, thickness / 2), new Vector3(w / 2 + 0.02, (SILL.top + SILL.down) / 2, thickness / 2 + 0.02), turn, FLOOR, 3, 'xXYZz');
         continue;
       }
       // a dark frame and small panes (two across and three up in the tall window, two by two in the small), the glass set back

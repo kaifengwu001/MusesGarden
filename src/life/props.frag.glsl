@@ -10,7 +10,7 @@
 //            next course above it; moss gathering olive and yellow-green over much of it, thickest in the lower
 //            courses and in patches higher up; pale beaded capping tiles on
 //            the hips and the ridge; the tiles' ends along the eaves
-//   wood     a warm plank door with iron straps, dark frames, a tan bench
+//   wood     a warm plank door with iron straps on a sill of the same wood, dark frames, a tan bench
 //            and chair
 //   glass    small panes: the meadow's yellow-green below, the sky above
 //   landing  the terrace, pier and steps plastered like the walls, their
@@ -271,6 +271,12 @@ void main() {
       float rivet = strap * step(0.6, fract(uv.x / 0.09));
       base = mix(base, pal(ROW_ROOF, 4), strap);
       base = mix(base, pal(ROW_ROOF, 4) * 1.6, rivet * 0.5);
+      col = painted(base, sunlight(n, sun, max(cloud, eave)), vec3(0.72, 0.72, 0.76));
+      col *= 1.0 - 0.35 * eave;
+    } else if (vPaint.w > 2.5) {
+      // the door's sill: a worn board of the door's warm wood
+      float grain = gnoise(vec3(uv.x * 26.0, uv.y * 2.0, 6.6), 984u);
+      vec3 base = mix(pal(ROW_ROOF, 2), pal(ROW_ROOF, 3), 0.3 + 0.3 * grain) * 0.9;
       col = painted(base, sunlight(n, sun, max(cloud, eave)), vec3(0.72, 0.72, 0.76));
       col *= 1.0 - 0.35 * eave;
     } else if (vPaint.w > 1.5) {
