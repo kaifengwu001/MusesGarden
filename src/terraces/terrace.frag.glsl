@@ -1,8 +1,9 @@
 // The terraces as built, painted: each paddy's floor (its water mirroring the
-// sky and the walls above it, its crop over the water as tall as it has
-// grown, or mud, or fallow grass), the risers' faces lit as the walls they
-// are, the bunds' grassy tops and the ridges along the cuts catching the
-// light, the skirts' earth; the haze of distance and the valley fog over it.
+// sky, its crop over the water as tall as it has grown, or mud, or fallow
+// grass), the risers' faces lit as the walls they are, the dams' grassy tops
+// and the ridges along the cuts catching the light, the earth where the woods
+// meet the farmed land, the woods' own ground under the trees; the haze of
+// distance over it.
 #include <meadow_common>
 #include <meadow_noise>
 uniform float uRadius;
@@ -12,14 +13,11 @@ uniform float uPixelAngle;
 #include <meadow_warp>
 #include <terraces_common>
 #include <meadow_wind>
-#include <terraces_plots>
 #include <terraces_paddy>
-#include <terraces_village>
-#include <terraces_ground>
 #include <terraces_rice>
-#include <terraces_fog>
 #include <terraces_water>
 
+uniform int uDebug;
 uniform vec4 uRiceLook; // wind sheen, -, -, -
 uniform vec4 uRiceNear; // the blades' focus (direction), their reach (m)
 
@@ -79,7 +77,7 @@ void main() {
     if (c.water > 0.0) {
       vec3 vw = normalize(cameraPosition - vWarped);
       float tint = smoothstep(0.3, 0.9, fract(c.variant * 5.31));
-      under = paddyWater(dir, vWarped, nUp, vw, bUp, waves.x, tint);
+      under = paddyWater(dir, nUp, vw, bUp, waves.x, tint);
       // (softened into a pale silver wash, as the paddy painting lays its flooded fields: the mirror's darks kept, quieter)
       under = mix(under, mix(pal(TR_WATER, 0), pal(TR_WATER, 6), 0.5), 0.4);
     }
@@ -118,20 +116,30 @@ void main() {
     col = mix(col, pal(TR_EARTH, 4), 0.2 * smoothstep(0.1, 0.6, -tuft));
     col *= mix(0.72, 1.04, up) * (0.94 + 0.08 * tuft);
   } else if (part == 4) {
-    // a skirt: earth where the terraced land ends
+    // earth: a bank where the woods meet the farmed land
     col = tone3(pal(TR_EARTH, 3), mix(pal(TR_EARTH, 3), pal(TR_EARTH, 5), 0.5), pal(TR_EARTH, 5), b) * (0.92 + 0.1 * tuft);
+  } else if (part == 6) {
+    // the woods' own ground under the trees (the hills' height itself, its normal from their gradient: the build
+    // worked both out): the forest floor, the rock where it is too steep for them (vFloor.y: its slope)
+    float rock = smoothstep(1.3, 2.4, vFloor.y);
+    vec3 floorForest = tone3(pal(TR_FOREST, 1), pal(TR_FOREST, 6), pal(TR_FOREST, 3), b);
+    vec3 cliff = tone3(pal(TR_PEAK, 0), mix(pal(TR_PEAK, 0), pal(TR_PEAK, 3), 0.5), pal(TR_PEAK, 3), b);
+    col = mix(floorForest, cliff, rock) * (0.94 + 0.08 * tuft);
+  } else if (part == 7) {
+    // a track through the flats: packed earth, pale, worn, a cart's two ruts in it
+    col = tone3(pal(TR_EARTH, 6), mix(pal(TR_EARTH, 6), pal(TR_EARTH, 4), 0.4), pal(TR_EARTH, 4), b);
+    col *= 0.92 + 0.1 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u);
   } else {
-    // a bund's top and sides, a ridge along a cut: grass over earth, catching the light as pale lines
+    // a dam's top and sides, a ridge along a cut or between plots: grass over earth, catching the light as pale lines
     col = tone3(pal(TR_EARTH, 7), mix(pal(TR_EARTH, 0), pal(TR_EARTH, 7), 0.4), pal(TR_EARTH, 1), b);
     col *= 0.94 + 0.08 * tuft;
-    // a path along it (vFloor.y: how much of one there): packed earth, pale, worn, grass at its edges
-    if (vFloor.y > 0.01) {
-      vec3 path = tone3(pal(TR_EARTH, 6), mix(pal(TR_EARTH, 6), pal(TR_EARTH, 4), 0.4), pal(TR_EARTH, 4), b);
-      path *= 0.92 + 0.1 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u);
-      col = mix(col, path, smoothstep(0.3, 0.75, vFloor.y) * (part == 2 ? 1.0 : 0.3));
-    }
   }
   col = applyAerial(col, viewDist, dir);
-  col = applyValleyFog(col, P);
+  if (uDebug == 4) {
+    // (dbg=land: each part flat: floors by their paddy, risers dark blue, dams yellow, earth brown, ridges white,
+    // the woods green, tracks orange)
+    vec3 parts[8] = vec3[8](vec3(0.3) + 0.6 * vec3(fract(vPaddy.x * 7.1), fract(vPaddy.x * 3.3), fract(vPaddy.x * 5.7)), vec3(0.1, 0.1, 0.5), vec3(0.9, 0.85, 0.1), vec3(0.8, 0.6, 0.1), vec3(0.45, 0.25, 0.1), vec3(1.0), vec3(0.1, 0.5, 0.1), vec3(1.0, 0.5, 0.0));
+    col = parts[clamp(part, 0, 7)];
+  }
   gl_FragColor = vec4(col, 1.0);
 }

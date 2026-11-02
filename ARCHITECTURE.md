@@ -661,152 +661,79 @@ so any view can be shared.
 
 ## The terraces: a second planet
 
-A second planet to visit (the Travel button, `pl=terraces` in the URL),
-built on the same foundations: rest space, growth, the bake, CDLOD, the
-warp, the painted light. Its own code is in `src/terraces/`. Gentle hills of
-rice terraces, a river winding round the planet with its valley's flat
-fields, trees in clumps on the hilltops and in the gullies, villages of
-Kai's house models, karst towers of Kai's mountain models, fog in the
-valleys. Since
-Kai's notes on the third pass the starting points are three paintings: the
-valley (reference/terraces/valley-painting.webp: towers in mist, a river
-between terraced hills, white houses), the planet from above
-(planet-painting.webp) and, for the paddies, a planet covered in terraces;
-the palette is measured from the first two (references are kept out of git).
-The vista is still framed like, and squinted against, the earlier green
-terraces painting recoloured (vista-target.png) until it is re-searched for
-the valley painting.
+A second planet to visit (the Travel button, `pl=terraces` in the URL), its
+radius fixed at 128 m, built once. Its ground is mathematics (Kai,
+2026-11-01): the paddy lab's construction (src/dev/paddyLab/) on hills
+generated the lab's way, nothing on it measured off a mesh or a baked
+texture. The world it replaced (its baked fields, cells, plots, ground mesh
+and paint, its river, villages, towers, birds and fog) was abandoned; what
+of it comes back will come back as mathematics on these hills. Its code is
+in `src/terraces/`.
 
-Kai's models (scripts/terraces-models.mjs: five karst mountains and five
-houses, as sent under reference/terraces/models/) are simplified to two
-levels of detail (meshoptimizer, across their textures' seams: Tripo's many
-small islands lock the simplifier otherwise), stood on their base at a unit
-height, their colour textures resized to 1024², quantized and compressed
-(KHR_mesh_quantization, EXT_meshopt_compression): src/assets/terraces/,
-6 MB for all ten. `ModelSet` (models.ts) stands them on the planet rigid
-(not bent with it: a tower bent round a small planet flares at its top),
-turned about the site's up, stretched across, each in full detail near the
-camera and its lighter copy far off, lit softly by the planet's sun over
-their own painted texture, with the haze and the valley fog
-(model.vert/frag.glsl). `only=` in the URL (dev) shows one part of the
-planet at a time (terraces, rice, houses, towers, trees, birds, fog).
+### The planet's mathematics (build/field.ts)
 
-### Land use: forest above, villages, terraces, the valley floor
+- **The hills**: gradient noise at four scales in meters (260, 80, 28 and
+  10 m, weights 1, 0.35, 0.1, 0.035; 36 m of relief: the lab's hillside),
+  read at the point on the sphere at R, so the hills are the same shape
+  every way and wrap round the planet without a seam; their gradient worked
+  out exactly from each octave's own (`gnoiseGrad`).
+- **The terrace field**: the height less a slow noise (±0.35 of a step over
+  14 m); each level its own wander besides (±0.4 of a step over 9 m);
+  levels 0.38 m apart, each moved by up to 0.075 of a step.
+- **The smoothed slope**: the gradient of the octaves 12 m and broader,
+  wandering ±30 % over 13 m. Over 0.3 is the woods, under 0.06 the flats,
+  the terraces between.
 
-Every point of the planet is sorted the way the Hani terraces are laid out
-(forest at the top, the village below it, terraces down the slopes, the
-valley floor at the bottom), from fields baked in rest space
-(terraces/fields.*), in this order:
+### The construction (build/sphere.ts, bands.ts, construct.ts)
 
-0. **The river:** its course a circle round an axis swung either side by a
-   meandering offset in meters (fields.ts `riverOffset`); its distance is
-   the offset over its gradient. Its channel is cut 1.5 m down, its valley
-   floor kept flat 10 m either side of its middle, the hills risen in full
-   by 40 m. The bake's `flat` runs from 1 at the top of its bank to 2 in its
-   middle, so the plots end at the bank and the ground's paint draws its
-   water (silver, bluer and darker than a paddy's, its banks' darks along
-   its edges); no trees in the water.
-1. **Towers:** sites from a progressive point set (a constant number per
-   km² as the planet grows), kept where a macro range field allows them and
-   off the river; each one of Kai's mountain models (towers.ts), 26–78 m
-   tall, turned and stretched, standing on a low mound of the ground (12 %
-   of its height) with trees round its foot.
-2. **Too steep to terrace:** where a terrace would be narrower than about
-   1.8 m (slope over 0.6): forest.
-3. **Crowns:** where the hills' finer octaves (their local relief) stand
-   well above their surroundings, and the ground is well above the valley
-   floors: the hilltops, forest. Real terraces keep the forest above them
-   (it holds the water that feeds them).
-4. **Gullies:** where the local relief is well below its surroundings on a
-   slope: a line of trees down the gully.
-5. **Woods:** stretches of whole hillside left to forest, by a macro noise
-   (the Forest share).
-6. **Valley floors (flats):** the flat floors between the hills (the lowest
-   fifth of the hills, and the river's valley; a field of its own, baked as
-   `flat`), laid out as plots, not contour terraces.
-7. **Villages:** sites from a second point set on the flats near the foot of
-   the hills; Kai's house models on level ground (houses.ts), each on its own
-   yard, the painted courtyard inside it, not paddy.
+- **Outlines** are found on a grid over the cube's faces (samples 0.45 m
+  apart, evenly in angle; a shared edge's samples one; each square's middle
+  sampled too, four triangles round it), used only to find them: every
+  crossing is root-found on the field itself along the arc between two
+  samples (regula falsi, Illinois), once per field, level and edge, shared
+  by the triangles either side and by the outline through it. A piece's
+  corner on a grid edge takes its side from where that edge's own crossing
+  lies; only a corner inside a triangle has the field worked out there.
+- **The lab's steps**, each on the exact fields: the classes (small patches
+  of woods or flats terraced like the land round them), the bands (a
+  point's band the highest level whose field is ≥ 0 there), the cuts
+  (along the unshifted banks every 7–20 m, cascading band to band down the
+  fall line), each paddy's bank shifted in or out by up to 0.45 of a step
+  and swung to the next one's over 1.2 m at a cut (the nearest bank point
+  found from the last one along its chain, guarded by each segment's
+  clearance, so the result is the true nearest whatever the order), the
+  bands again with the shifts, small rings levelled, the cuts' lines up
+  their bands.
+- **Pieces**: each triangle cut into the woods, the flats' fields and the
+  bands, a band's piece parted exactly along a cut; the pieces joined into
+  paddies (union-find, the cuts' edges barriers); each paddy's place in
+  the season from a slow noise at its middle (one in seven its own),
+  mapped so that at the season's default front the shares of flooded,
+  planted and grown paddies are the aerial's.
+- **Geometry**: the floors level at their band's; the woods' ground at the
+  hills' exact height, its normals from their exact gradient; along each
+  bank a dam (a profile swept between the outline and its offset) and a
+  riser leaning down to the lowest floor beside it; a cross-bank up each
+  cut; where the woods meet the farmed land, a bank of earth; trees
+  jittered over the woods.
+- **The flats** (Kai's aerial of flat rice fields): long strips 9 m wide,
+  bending gently (±0.8 of a strip over 45 m), crossed every 32 m, a track
+  where a slow noise passes zero; each field its own green, thin dark bunds
+  between, the track pale.
+- **Built in a worker** (worker.ts) when the planet is first visited (about
+  37 s on this Mac); 96 meshes, a sixteenth of a cube face each
+  (builder.ts). The harness's settle waits for it (`PlanetWorld.whenBuilt`).
 
-The hills are round as they come (direction-space octaves with no twirl or
-grain: Kai found the swirled hills stretched and squeezed from above) and
-gentle (13 m: the bands are wide and sweep, as in Kai's paddy painting); at
-R 128 the planet is about 38 % terraced, 23 % flats, 37 % wild and 9 %
-river.
-8. **Everything else is terraced.**
+### Drawing (terrace.*.glsl, water.glsl, trees, rice)
 
-### Terraces built on the hills
-
-The terraces are objects built on the hills, not the hills' mesh bent into
-steps (Kai, after the second pass). The hills' own mesh is sunk 2.6 m under
-built land (`objectsSink`, ground.glsl) and the terraces stand on it as
-meshes, built cell by cell round the camera (terraces/objects.ts, out to
-220 m), a few milliseconds a step on the build queue, nearest first.
-
-**Cells** are only units of work: a warped Voronoi of points in space (about
-56 m), keyed by a hash of their lattice place (cells.ts, cells.glsl; the
-lattice place offset before hashing: unoffset, two cells mirrored through
-the axes share a key). Everything a cell builds is planet-wide, so the
-terraces run on across cells without a seam; each cell builds only its own
-part, cut exactly at its edge.
-
-**The survey** (terraces/survey.ts) reads the bakes back on the CPU
-(bakeReader.ts) on a 0.5 m grid in a chart round the cell's own extent (found
-on a 4 m grid by the layout's key, each point checked against the cell
-itself, with a 10 m frame for the smoothing). Per grid point: the hills'
-height smoothed (a Gaussian, σ 1.1 m), the land (not wild, not flat; or, in
-the flats' survey, flat and not courtyard), and the side of the cell's edge.
-
-- **Levels:** the planet's, the same everywhere: a step of 0.85 m with a
-  small jitter, now and then one left out (a band two levels wide between
-  walls half again as tall, Kai's wider paddies).
-- **Walls:** the smoothed hills' contours at the levels (marching squares),
-  uphill on their left.
-- **Lenses** (Kai: paddies all of a width, now and then a wider one): where
-  a band is wider than 6.5–10 m (its slope smoothed over 2 m), a lower
-  terrace grows inside it along its lower wall, up to half way across; its
-  wall is a contour of the share across the band less the lens's share, so
-  where the band narrows it curves into the lower wall. Its floor stands a
-  fifth of the way up the band.
-- **Cuts** (the breaks between paddies on a level): wherever a wall's
-  planet-wide cut field crosses a step, a gentle arc across the band the
-  shortest way, to the nearest point of its upper wall (an uphill trace
-  where there is none in reach); a cut that meets another of its band ends
-  on it.
-- **Paddies:** each band (and lens) flooded on the grid with the cuts as
-  fences, each part named by the wall stretch most of it borders (its
-  wall's level and its step along the cut field), so a paddy keeps its id
-  and crop whichever cell builds it.
-- **Flats:** a cell's block of rows 9–16 m wide along its way, cut into
-  plots 1–2.3 rows long, a little askew; each plot level with the ground
-  under its middle; the cell's edge a raised road.
-
-**The meshes** (floors.ts, terraceMesh.ts): every grid square of the land
-clipped exactly (as two triangles, Sutherland–Hodgman) at the land's edge,
-the cell's edge, the band's levels, the lens's wall and the band's cuts;
-whole squares of one paddy merged into rectangles. Walls: a riser from the
-floor below, battered back, down into the sunk ground, to a bund along the
-edge of the floor above (a bund keeps its band's height beside a lens, so a
-lens's wall meets it level). Ridges along the cuts wherever they part two
-paddies, over the higher floor. Skirts where the land ends. Per vertex the
-paddy's constants (colour, place in the season, its plants' and water's
-share): its crop at any season is worked out in the shaders (paddy.glsl
-cropFrom), so the season slider moves without a rebuild.
-
-**Drawing:** the terraces draw before the ground (early-z skips the sunk
-ground's shading); where the ground lies sunk all the way its paint reads
-its plot only as far as its band. Each floor: its water, mirroring the sky
-and the walls behind it (a short march against the planet's levels, read
-against the paddy's own floor: water.glsl), under its crop (cover by the
-plants' height: seedlings are dots on their water, a grown crop closes over
-it). Rice blades stand near the camera (rice.ts), reading the built paddies
-from a map drawn round the focus (paddyMap.ts): each blade as tall as its
-paddy's plants, fewer where they are young. Beyond the built reach the
-ground's paint (plots.glsl, the implicit layout of the first passes) draws
-the terraces far off.
-
-**The vista** is searched on the terraces as built (TerraceTerrain.builtAt:
-the band and the paddy's crop at a point, without a survey).
+- Each part painted as it is (`aPart`): the floors (the crop by its stage,
+  the water over it a still mirror of the sky over a muddy body, the rows
+  along the band, the wash's blooms), the risers, the dams, the ridges, the
+  earth, the woods' floor (rock where steeper than 1.3), the tracks.
+  `dbg=land` colours the parts flat.
+- The trees (tree.*.glsl) are traced billboards where the build placed
+  them; the rice blades near the camera read a map of the floors drawn
+  from above (paddyMap.ts): their floor and crop.
 
 ## Module map
 
@@ -849,7 +776,7 @@ the band and the paddy's crop at a point, without a survey).
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      terraces/            the second planet: fields and bakes (hills, river, towers' sites), cells, the survey (walls, lenses, cuts, paddies, flats), floors, meshes and paths built round the camera, rice, Kai's models (towers, houses), villages, forest, birds, the vista search
+      terraces/            the second planet: its mathematics (build/field.ts), the paddy lab's construction on it (build/: the grid, bands and cuts, the build in a worker), its paint, trees and rice
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

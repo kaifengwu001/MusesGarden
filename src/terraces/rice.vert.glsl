@@ -13,16 +13,14 @@ uniform float uRadius;
 #include <meadow_rest>
 #include <terraces_common>
 #include <meadow_wind>
-#include <terraces_plots>
 #include <terraces_paddy>
 #include <terraces_rice>
-#include <terraces_fog>
 
 uniform sampler2D uPool;     // per blade, a page a row: direction xyz, ln birth threshold
 uniform sampler2D uPoolRest; // per blade: its seed in [0, 1), four to a texel
 uniform sampler2D uPageList; // the pages drawn, four to a texel
 uniform float uPageSize;
-uniform sampler2D uRiceCrop; // per drawn blade: plants' height (m), floor over the hills (m), colour, stage
+uniform sampler2D uRiceCrop; // per drawn blade: plants' height (m), its floor (m), colour, stage
 uniform sampler2D uRiceWind; // per drawn blade: the wind's bend (xyz), sheen
 uniform vec4 uRice;          // blade width (m), near radius (m), ln density (per m²), wind sheen
 uniform vec4 uRiceFade;      // full-density radius (m), kept fraction at the edge
@@ -53,7 +51,7 @@ void main() {
     return;
   }
   vec4 wind = texelFetch(uRiceWind, ivec2(slot, drawn), 0);
-  float floorH = textureLod(uTerraceBake, dir, 0.0).r + crop.g;
+  float floorH = crop.g;
   float h = crop.r * (0.72 + 0.46 * rnd(seed, 1.0));
   float w = uRice.x * (0.75 + 0.5 * rnd(seed, 2.0)) * mix(0.8, 1.2, smoothstep(0.1, 0.6, crop.r));
 
@@ -94,6 +92,6 @@ void main() {
 
   vec3 wp = warpPosition(p);
   col = applyAerial(col, length(cameraPosition - wp), dir);
-  vColour = applyValleyFog(col, p);
+  vColour = col;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }

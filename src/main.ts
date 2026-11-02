@@ -450,6 +450,8 @@ async function boot(): Promise<void> {
         if (world === meadow) await meadow.muse.ready;
         world.settle();
         update();
+        await world.whenBuilt?.();
+        update();
         world.settle();
         await post.warm(world.scene, world.rig.camera);
       },

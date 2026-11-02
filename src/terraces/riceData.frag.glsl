@@ -4,7 +4,7 @@
 //   pass 0 (crop): from the paddy map of the built terraces (paddyMap.ts),
 //                  its plants' height (m; 0 where nothing grows: off a floor,
 //                  on a bund, a riser or a ridge, fallow or flooded), its
-//                  floor over the hills' own height (m), its colour, its stage
+//                  floor (m), its colour, its stage
 //   pass 1 (wind): the wind's shared bend (xyz, planet space), the sheen
 #include <meadow_common>
 #include <meadow_noise>
@@ -15,7 +15,7 @@ uniform float uRadius;
 uniform sampler2D uPool;     // per blade, a page a row: direction xyz, ln birth threshold
 uniform sampler2D uPageList; // the pages drawn, four to a texel
 uniform int uPass;
-uniform sampler2D uPaddyMap; // plants' height, floor over the hills, colour, stage
+uniform sampler2D uPaddyMap; // plants' height, its floor, colour, stage
 uniform vec4 uMapCentre;     // the map's focus direction, angular radius Θ
 uniform vec3 uMapT1;
 

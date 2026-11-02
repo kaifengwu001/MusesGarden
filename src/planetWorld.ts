@@ -39,6 +39,8 @@ export interface PlanetWorld {
   update(clock: FrameClock, aspect: number, viewportHeight: number): void;
   /** Close fade bands, finish queued work and snap the camera: the next frame is a pure function of state. */
   settle(): void;
+  /** Work done off the page's thread (the terraces' build in its worker): resolved once it is in place. */
+  whenBuilt?(): Promise<void>;
   pick(ndcX: number, ndcY: number): Pick | null;
   ripple(dir: Vector3, time: number): void;
   gust(dir: Vector3, time: number): void;

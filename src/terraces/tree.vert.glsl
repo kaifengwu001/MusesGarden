@@ -1,21 +1,13 @@
-// A tree of the forest (trees.ts): kept where the land use is wild (and
-// born at this size), sized by its seed, smaller on the cliffs; one
-// camera-facing billboard in front of its bounding sphere, which covers the
-// sphere's outline on screen. The fragment shader traces the tree itself.
+// A tree of the forest (trees.ts): where the terraces' build placed it, on
+// its ground, sized by its seed; one camera-facing billboard in front of its
+// bounding sphere, which covers the sphere's outline on screen. The fragment
+// shader traces the tree itself.
 #include <meadow_common>
-#include <meadow_noise>
 #include <meadow_warp>
 uniform float uRadius;
-#include <meadow_rest>
-#include <terraces_common>
-#include <terraces_plots>
-#include <terraces_paddy>
-#include <terraces_village>
-#include <terraces_ground>
 
-attribute vec4 aTree;  // direction, ln birth threshold
+attribute vec4 aTree;  // direction, its ground (m)
 attribute float aSeed; // [0, 1)
-uniform float uTreeDensity;
 
 varying vec3 vPoint;        // on the billboard, view space
 flat varying vec3 vGround;  // the trunk's foot, view space
@@ -25,21 +17,11 @@ flat varying vec4 vShape;   // crown radius (m), height (m), seed, the share of 
 void main() {
   vPoint = vec3(0.0);
   vec3 dir = aTree.xyz;
-  vec4 b = textureLod(uTerraceBake, dir, 0.0);
-  // the forest thins at its edge into scattered trees; on cliffs a few small ones cling on
-  // (the forest is full where it is wild: crowns touch; at its edge it thins into single trees; the
-  // peaks' cliffs hold smaller trees, fewer of them on the sheerest faces)
-  float keep = smoothstep(0.3, 0.8, b.b);
-  float rock = smoothstep(1.6, 3.2, b.g);
-  if (presence(0.5 * (aTree.w - log(uTreeDensity))) < 0.5 || fract(aSeed * 13.17) > keep || fract(aSeed * 7.31) < rock * 0.6) {
-    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
-    return;
-  }
-  float size = mix(0.72, 1.28, fract(aSeed * 3.97)) * mix(1.0, 0.7, smoothstep(1.0, 2.0, b.g));
+  float size = mix(0.72, 1.28, fract(aSeed * 3.97));
   float rc = 1.9 * size;
   // low crowns: in a wood the trunks hide under the canopy
   float H = mix(3.4, 5.6, fract(aSeed * 5.3)) * size;
-  float ground = terraceHeightCoarse(dir);
+  float ground = aTree.w;
   vec3 foot = dir * (uRadius + ground - 0.3);
   vec3 mid = dir * (uRadius + ground + 0.5 * H);
   vec3 g = warpPosition(foot);
@@ -59,6 +41,6 @@ void main() {
   vPoint = c + (right * position.x + camUp * position.y) * half_;
   vGround = g;
   vUp = up;
-  vShape = vec4(rc, H, aSeed, rock);
+  vShape = vec4(rc, H, aSeed, 0.0);
   gl_Position = projectionMatrix * viewMatrix * vec4(vPoint, 1.0);
 }

@@ -1,8 +1,8 @@
 // A tree, traced (trees.ts): a crown of five lumpy spheres heaped on a
 // trunk, lit in soft toon bands, darker low in the crown and toward its
-// outline (a painted edge), each tree a little its own green; then the haze
-// and the valley fog. Writes the depth of what it hit, so the ground and the
-// other trees sort with it.
+// outline (a painted edge), each tree a little its own green; then the haze.
+// Writes the depth of what it hit, so the ground and the other trees sort
+// with it.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -10,8 +10,6 @@ uniform float uRadius;
 #include <meadow_toon>
 #include <meadow_fog>
 #include <terraces_common>
-#include <terraces_plots>
-#include <terraces_fog>
 
 uniform mat4 uProjection;
 
@@ -102,7 +100,6 @@ void main() {
   }
   vec3 planet = unwarpPosition(hit);
   col = applyAerial(col, length(hit - ro), normalize(planet));
-  col = applyValleyFog(col, planet);
   gl_FragColor = vec4(col, 1.0);
   vec4 clip = uProjection * viewMatrix * vec4(hit, 1.0);
   gl_FragDepth = clamp(clip.z / clip.w * 0.5 + 0.5, 0.0, 1.0);
