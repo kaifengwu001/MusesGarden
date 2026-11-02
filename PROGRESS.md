@@ -32,6 +32,16 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the mist layers
+
+Started from 27961a4 (the mist in three layers). Kai (2026-11-02), with the blue-green landscape again (reference/terraces/clouds-ribbons-blue-green.webp) "to match as close as possible"; this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | "Layers are too high up" | |
+| 2 | "Too sparse" | |
+| 3 | "Shape of cloud needs refinement: not curving / detailed enough. See reference and match as close as possible" | |
+
 ### Kai's notes on the mist bands
 
 Started from dbd64b1 (the clouds as bands of mist). Kai (2026-11-02), on the local server: "the mist bands definitely look a lot better, but I think the shapes need a bit more work"; this table fills in as they are done.
