@@ -67,34 +67,38 @@ const THROW_MS = 400;
 
 /**
  * A card leaving the mailbox: how long its whole way takes (ms), the gap between cards (ms), its size and tilt in the
- * mouth (as small as the cards drawn inside the box), how far it is drawn out of the mouth before it flies (px), and when.
+ * mouth (as small as the cards drawn inside the box), and how far its way bends up out of the mouth (px).
  */
-const FLY_OUT = { ms: 1150, stagger: 260, s: 0.075, r: -14, pull: 70, pulled: 0.3 } as const;
+const FLY_OUT = { ms: 1150, stagger: 260, s: 0.075, r: -14, pull: 70 } as const;
 
 const transformAt = (at: { x: number; y: number; r: number; s: number }): string =>
   `translate(${at.x}px, ${at.y}px) rotate(${at.r}deg) scale(${at.s})`;
 
 /**
- * Out of the mailbox's mouth (`from`, px from the stage's middle) into its place in the deck: drawn out of the mouth a
- * little, still small, then flying there as it grows to full size. Its place is already set, so it rests there after.
+ * Out of the mailbox's mouth (`from`, px from the stage's middle) into its place in the deck, growing to full size on
+ * the way: one movement that starts slow out of the mouth and never stops until it lands. Its way bends through a
+ * point just out of the mouth, placed by distance so its speed carries through the bend. Its place is already set, so
+ * it rests there after.
  */
 function flyOut(node: HTMLElement, from: { x: number; y: number }, to: Slot, delay: number): void {
   const away = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-  const pulled = {
+  const bend = {
     x: from.x + ((to.x - from.x) / away) * FLY_OUT.pull,
     y: from.y + ((to.y - from.y) / away) * FLY_OUT.pull - FLY_OUT.pull * 0.4,
     r: FLY_OUT.r * 1.3,
     s: FLY_OUT.s * 1.8,
   };
   const start = { ...from, r: FLY_OUT.r, s: FLY_OUT.s };
+  const out = Math.hypot(bend.x - start.x, bend.y - start.y);
+  const at = out / (out + Math.hypot(to.x - bend.x, to.y - bend.y));
   node.animate(
     [
       { transform: transformAt(start), opacity: 0, offset: 0 },
-      { transform: transformAt(start), opacity: 1, offset: 0.03, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' },
-      { transform: transformAt(pulled), opacity: 1, offset: FLY_OUT.pulled, easing: 'cubic-bezier(0.45, 0, 0.2, 1)' },
+      { transform: transformAt(start), opacity: 1, offset: 0.01 },
+      { transform: transformAt(bend), opacity: 1, offset: Math.min(0.3, Math.max(0.05, at)) },
       { transform: transformAt(to), opacity: 1, offset: 1 },
     ],
-    { duration: FLY_OUT.ms, delay, fill: 'backwards' },
+    { duration: FLY_OUT.ms, delay, fill: 'backwards', easing: 'cubic-bezier(0.45, 0, 0.25, 1)' },
   );
 }
 
