@@ -373,9 +373,9 @@ export class Mail {
       node.dataset.index = String(i);
       return node;
     });
-    this.stage.replaceChildren(...nodes);
-    this.el.classList.toggle('is-empty', cards.length === 0);
     if (mouth) {
+      // at the mouth before they are on the page: measuring the stage with them in it would style them first in the
+      // middle, and they would fly from there back to the mouth before flying out
       const stage = this.stage.getBoundingClientRect();
       for (const node of nodes) {
         node.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
@@ -384,6 +384,12 @@ export class Mail {
         node.style.setProperty('--r', '-20deg');
         node.style.opacity = '0';
       }
+    }
+    this.stage.replaceChildren(...nodes);
+    this.el.classList.toggle('is-empty', cards.length === 0);
+    if (mouth) {
+      // their start, styled now, so the flight below is a change from it
+      void this.stage.offsetWidth;
       // the deepest that shows lands first, the top card last
       void nextFrame().then(() => {
         if (operation !== this.operation) return;
