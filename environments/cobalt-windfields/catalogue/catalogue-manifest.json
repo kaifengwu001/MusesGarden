@@ -1,0 +1,542 @@
+{
+  "created": "2026-11-02",
+  "base": "782075f6d0f4222460b51e28fd0191bcc412c9f3",
+  "preservedSourceFiles": 793,
+  "changedPreexistingFiles": [
+    "environments/cobalt-windfields/README.md",
+    "environments/cobalt-windfields/VALIDATION.md"
+  ],
+  "stagedPatchUnchanged": true,
+  "files": [
+    {
+      "path": "cover.png",
+      "bytes": 178639,
+      "sha256": "0465a56a91f657c3da804028d1e6a638f770c94985cdd239b7df54549b938fc9"
+    },
+    {
+      "path": "editorial.json",
+      "bytes": 19392,
+      "sha256": "2271f8904deec77f0480e55e7517f2fa916687f0531950ca818fdeb9bb43dfcb"
+    },
+    {
+      "path": "geology-flora.json",
+      "bytes": 6837,
+      "sha256": "c049ddd8ef1ebc476bc9105831003ae98ee5536fc74b68804d4a8fe3f80fd86d"
+    },
+    {
+      "path": "images/garden-overhead.png",
+      "bytes": 1771485,
+      "sha256": "dc948d3231469a0a177bce192e05b38747121acbc1e6cbceec7b90f19736b1a0"
+    },
+    {
+      "path": "images/host-muse.png",
+      "bytes": 1423899,
+      "sha256": "36669a8b2a73e1696ec1824504d88314772d2b6b90ff38f93e070ac5f4700b06"
+    },
+    {
+      "path": "images/planet-0.png",
+      "bytes": 1260827,
+      "sha256": "1067239969f4241ddff965f72c247655cfd0b4c44a6be5b62186d77314b522d0"
+    },
+    {
+      "path": "images/planet-1.png",
+      "bytes": 1316920,
+      "sha256": "a4908e872f243bb4bf808cb7b326775747220670250892b69d6e14e7d3cf4ca4"
+    },
+    {
+      "path": "images/planet-2.png",
+      "bytes": 1295259,
+      "sha256": "8ee57900f518e3396b27f277c7bfebf3fc536696d37b3cf82b78701baba6ffdc"
+    },
+    {
+      "path": "images/planet-3.png",
+      "bytes": 1295730,
+      "sha256": "f0182a0359c73702bb1ab9d284b5f5f01b13f5c735d61b3498bfbfecbd5dd137"
+    },
+    {
+      "path": "images/planet-4.png",
+      "bytes": 1260652,
+      "sha256": "eab97d1c18a8dfed8c6874e523612b370ef9b457b7f9959e2b172156daac1b61"
+    },
+    {
+      "path": "images/planet-5.png",
+      "bytes": 1281544,
+      "sha256": "0007b1903289c051c652e351a3c417763953190554bd57cd29b5b503b247fc40"
+    },
+    {
+      "path": "images/plant-garden.png",
+      "bytes": 1770985,
+      "sha256": "e3d04e30ead1b359f85626b512d6528afc67cdfc0b56dce6208b285b0c044665"
+    },
+    {
+      "path": "images/portrait-host.png",
+      "bytes": 1041984,
+      "sha256": "330098dff073a83d546e088cc9764de4fd0140e68b34f86d854b234157e18457"
+    },
+    {
+      "path": "images/portrait-juniper.png",
+      "bytes": 1141404,
+      "sha256": "1f953bd0f8691bc176d12d6f5b3471fc250f34e1bde45f8968f9086f291a3fe2"
+    },
+    {
+      "path": "images/portrait-marlo.png",
+      "bytes": 1064287,
+      "sha256": "ce77ad0f5a1912d27e57f83a3fd3ed9deef6a9f062b6c87dc0ed3af816f5c68b"
+    },
+    {
+      "path": "images/portrait-pip.png",
+      "bytes": 1103869,
+      "sha256": "6500b376affe50886ceb7e6a5e0065e4aef5ca721b5c076da5bfe7219281814b"
+    },
+    {
+      "path": "images/resident-juniper.png",
+      "bytes": 1396972,
+      "sha256": "a8af49f5ad6f4d12fda6d1548d57883e372bd6dcef0ad949449662f5be48b7fe"
+    },
+    {
+      "path": "images/resident-marlo.png",
+      "bytes": 1381159,
+      "sha256": "b8ed2fe980766af7f21ad333fe364995d864e7d520c5d14efcc27cdb91f33a91"
+    },
+    {
+      "path": "images/resident-pip.png",
+      "bytes": 1424537,
+      "sha256": "b35f3db10e9c04f9c98b80f919c5078e64d163230a411efc294484a716cef76c"
+    },
+    {
+      "path": "images/rock-belt.png",
+      "bytes": 1700443,
+      "sha256": "073f63665c6b065ac5f763be7b3c191237f8844dc562907695e405bf5a7d7741"
+    },
+    {
+      "path": "images/sand-close.png",
+      "bytes": 1462574,
+      "sha256": "9de9012125dcddfdc24f61f6e30634d3234d1650648a84b4bdb1d408b454c06f"
+    },
+    {
+      "path": "images/shelter-side.png",
+      "bytes": 1525496,
+      "sha256": "3a0d91b74e380b51ece06cbb21304504bbf5a0ce5ae71e68481cf16bdd375e21"
+    },
+    {
+      "path": "images/shelter.png",
+      "bytes": 1434940,
+      "sha256": "bfae6453e1d4821b1547bbd20baf3799c0c23e4156241dfc6b42e61ec94394d8"
+    },
+    {
+      "path": "images/specimen-coral-0-155.png",
+      "bytes": 28515,
+      "sha256": "55715378b10d20aaf0f1236b65a6e25de2402033db1824688b3db919234f8731"
+    },
+    {
+      "path": "images/specimen-coral-0-35.png",
+      "bytes": 33587,
+      "sha256": "e276a8b90a16538fe7549dee760109a07d8f2aadeffbc86f1d5b9d2eaebdda3f"
+    },
+    {
+      "path": "images/specimen-coral-1-155.png",
+      "bytes": 29427,
+      "sha256": "4daecd180da424cbd300b6c2574669f544b89b0b4c3369cc14c9cf8d0bb170f8"
+    },
+    {
+      "path": "images/specimen-coral-1-35.png",
+      "bytes": 33814,
+      "sha256": "fce20289a527f6e753a484dfddfac8254971c2c49dc4c2bb9c024ad376405b9d"
+    },
+    {
+      "path": "images/specimen-coral-2-155.png",
+      "bytes": 25056,
+      "sha256": "f6afa823fc7b9bf6c67b235387c246d89ffa803a9e5924c9fca5a970b78d9f6d"
+    },
+    {
+      "path": "images/specimen-coral-2-35.png",
+      "bytes": 32197,
+      "sha256": "2cea2e7f7d7b47eb897046e478018974544b05a7d452d5c7ada582cccb26b161"
+    },
+    {
+      "path": "images/specimen-coral-distant-155.png",
+      "bytes": 9918,
+      "sha256": "8d4c0d2c75ebcba3f9bc33b80caebc582ff6eae146109fb37ab932327fb949a2"
+    },
+    {
+      "path": "images/specimen-coral-distant-35.png",
+      "bytes": 9922,
+      "sha256": "56843c795ba90b154c6251deab1cdf0c82a0dfabf078f72e8ea882ac8c2f70dd"
+    },
+    {
+      "path": "images/specimen-drifting-seed-155.png",
+      "bytes": 18206,
+      "sha256": "5b7696e1749ca0b9f6d2bc0eadf89c224f1543db67ff232f8e3b31bab3cc2e3c"
+    },
+    {
+      "path": "images/specimen-drifting-seed-35.png",
+      "bytes": 16559,
+      "sha256": "2c2e25079da0ade74e955976c028c1404084ee8f906b1381f02d82a4258d602c"
+    },
+    {
+      "path": "images/specimen-find-bed-0-155.png",
+      "bytes": 15294,
+      "sha256": "855b36fd784cdbe59f5a9ebc174e31bef1b231520e35c15ea01fe5b409028119"
+    },
+    {
+      "path": "images/specimen-find-bed-0-35.png",
+      "bytes": 14847,
+      "sha256": "286def4e07dbd92b564f52827074e38a39033785abe2a6c42f9ed4a364d3964b"
+    },
+    {
+      "path": "images/specimen-find-bed-1-155.png",
+      "bytes": 13562,
+      "sha256": "9f9b8ad605ec65c1274fec9ad6cecd1f6a95d7717e8bd656bb113e3382783e17"
+    },
+    {
+      "path": "images/specimen-find-bed-1-35.png",
+      "bytes": 12913,
+      "sha256": "3ea2cda0f441aa9627d8de6e5b8c95d085171302b95b36acbf7a895e8b223c91"
+    },
+    {
+      "path": "images/specimen-find-bed-2-155.png",
+      "bytes": 15296,
+      "sha256": "05ff8f5b9e62171898bde2a7f15a2c62104e515207556919cf634a5aad32599e"
+    },
+    {
+      "path": "images/specimen-find-bed-2-35.png",
+      "bytes": 14868,
+      "sha256": "b84a86a11cfd63a3b0f63d775eacb104fba4bdeb0d03fc49dbb599afa44e0e9e"
+    },
+    {
+      "path": "images/specimen-find-bed-3-155.png",
+      "bytes": 13573,
+      "sha256": "0a330e56d882054adbfecf5c265980fea168b6fef4b2b6b57c727caaecd41c13"
+    },
+    {
+      "path": "images/specimen-find-bed-3-35.png",
+      "bytes": 13491,
+      "sha256": "e822c1cf2336d872a02c0a4237191327ce5aa9b19075f402bc4476a336dfff12"
+    },
+    {
+      "path": "images/specimen-find-coral-155.png",
+      "bytes": 15246,
+      "sha256": "b9ad64841db4eb394840f92e88b82dbd3d93b2195cacd1e550a74fb2a8ff2015"
+    },
+    {
+      "path": "images/specimen-find-coral-35.png",
+      "bytes": 14764,
+      "sha256": "26e0f4f920d51533d4b62024b8ebd7269060d92725b25ae627868909f62d0158"
+    },
+    {
+      "path": "images/specimen-find-sail-155.png",
+      "bytes": 13553,
+      "sha256": "780e76db601eee9526b6f140d11ccf9dfa495150cfed5be09449746ab2e051e0"
+    },
+    {
+      "path": "images/specimen-find-sail-35.png",
+      "bytes": 12873,
+      "sha256": "627c11673ce2a2b5b211358118a867ec59fec83b0fd32f939351e1be74e7f4f6"
+    },
+    {
+      "path": "images/specimen-find-stone-155.png",
+      "bytes": 10998,
+      "sha256": "2807eb610d38a0cda76889dfa307d0f492e617cca7818630aaba87e434ca7747"
+    },
+    {
+      "path": "images/specimen-find-stone-35.png",
+      "bytes": 14187,
+      "sha256": "2d3e5d7a66e45387cb734b5edfc0ea3ddef56abe47c59ff74fc786fbc72db043"
+    },
+    {
+      "path": "images/specimen-kitelet-155.png",
+      "bytes": 9371,
+      "sha256": "715569270097b6ac5c0676a8e7c9be3656f7fc87248899cf95f20f08f4231973"
+    },
+    {
+      "path": "images/specimen-kitelet-35.png",
+      "bytes": 10060,
+      "sha256": "2b157ff71565aa42e310186a19a7b89c28f0cf6d3686acd6a35a6eec8673c87a"
+    },
+    {
+      "path": "images/specimen-litter-pocket-155.png",
+      "bytes": 11109,
+      "sha256": "f7a636f0fcba88888b97ca688925a5da44b9cfcb85105b0c767a39ede9f62317"
+    },
+    {
+      "path": "images/specimen-litter-pocket-35.png",
+      "bytes": 13614,
+      "sha256": "39677ffce309f51e2333573ca4b653e7e1fd7b61be95192450feb39bf90a9308"
+    },
+    {
+      "path": "images/specimen-perch-0-155.png",
+      "bytes": 10664,
+      "sha256": "16dcbf74fc3f84991e7dce6cf07c62a8fe83acf08cb50569a3ef346e04744c03"
+    },
+    {
+      "path": "images/specimen-perch-0-35.png",
+      "bytes": 16215,
+      "sha256": "c3412f5d1fc371bfbea9f896c749a4017c079a0ebf1e40a36ea25ff033371cf9"
+    },
+    {
+      "path": "images/specimen-perch-1-155.png",
+      "bytes": 20289,
+      "sha256": "8ba4459f5e89189d2ca907a179ba520261129b0f356771ccc40c4a0ef5e57f54"
+    },
+    {
+      "path": "images/specimen-perch-1-35.png",
+      "bytes": 16151,
+      "sha256": "6a32932867acc42beecfd7f37aab2fc7e856770aa8311c099d257a9cde4cbf77"
+    },
+    {
+      "path": "images/specimen-perch-2-155.png",
+      "bytes": 16336,
+      "sha256": "2e02e3f7180fee49d165c1d71fbb78fa34d365a43d2508e2f1134e0d4888a2bd"
+    },
+    {
+      "path": "images/specimen-perch-2-35.png",
+      "bytes": 16813,
+      "sha256": "561e6fa350a2c9b1aac677cb20d5a25c24345b89541d524e0dd0731a003b0240"
+    },
+    {
+      "path": "images/specimen-rock-0-155.png",
+      "bytes": 80147,
+      "sha256": "4fc52dc7594b3b8b4e8ad3966eb3b16895cc95ec14bb1fa2dd86f16d7f5bf197"
+    },
+    {
+      "path": "images/specimen-rock-0-35.png",
+      "bytes": 96122,
+      "sha256": "8c54d29bef6ba112923c88850470f2bcde59e5f0d9fba83539570f77e1ff6084"
+    },
+    {
+      "path": "images/specimen-rock-1-155.png",
+      "bytes": 74854,
+      "sha256": "ffcbfaaec74c6fc3195bdd7a097ea5ff2604b572364f7c19426e1e7a2c761489"
+    },
+    {
+      "path": "images/specimen-rock-1-35.png",
+      "bytes": 104377,
+      "sha256": "f15d1e2d3df5da4df2fd8beb25da765590097664a686e8ac4f7fe9f5a8993642"
+    },
+    {
+      "path": "images/specimen-rock-10-155.png",
+      "bytes": 100223,
+      "sha256": "474ee6a847ef1c7a26b15330acd67c39d29d764c46d2f0a40148f4e4c8473c2b"
+    },
+    {
+      "path": "images/specimen-rock-10-35.png",
+      "bytes": 107172,
+      "sha256": "879fd636301ef94c1fe06e0d26470340d5e51d984cc7dd76badaa1cbaf8e5a22"
+    },
+    {
+      "path": "images/specimen-rock-11-155.png",
+      "bytes": 62320,
+      "sha256": "64bbe216af5f31f0bf8582489b5376681575fc9bc3a6de47bc9f49501d41e14c"
+    },
+    {
+      "path": "images/specimen-rock-11-35.png",
+      "bytes": 87119,
+      "sha256": "6927a6eb8cff0b54b4f01bdc01ef0dde87e97b90e18aeaf2b1267431afd75723"
+    },
+    {
+      "path": "images/specimen-rock-12-155.png",
+      "bytes": 118183,
+      "sha256": "69481655f30726da0ebe49bfd54f33f0aa701150b121e62985f7477c2a128e5b"
+    },
+    {
+      "path": "images/specimen-rock-12-35.png",
+      "bytes": 144793,
+      "sha256": "05e049a0e43cda5e75e1d717a62575c936efabb74cffd3ea0a0760214e5fa9ee"
+    },
+    {
+      "path": "images/specimen-rock-2-155.png",
+      "bytes": 71557,
+      "sha256": "5da940f3a7cd7a1705f0d2332c34603a50e4d8c95e882c3fb15dc7beb62ccb9f"
+    },
+    {
+      "path": "images/specimen-rock-2-35.png",
+      "bytes": 92765,
+      "sha256": "4061d4f1657a3a5bb37093fa40bb3de323042659af9594fa3e3942a524ded342"
+    },
+    {
+      "path": "images/specimen-rock-3-155.png",
+      "bytes": 113494,
+      "sha256": "7e07bf207292eb79e8c97147a232d1f85fe676b8d4a14a25de78577c87532d78"
+    },
+    {
+      "path": "images/specimen-rock-3-35.png",
+      "bytes": 132804,
+      "sha256": "ee1cb56a9065c7129ed5629abbc917a4624ae848b36e5ab524c68ae63503fa6b"
+    },
+    {
+      "path": "images/specimen-rock-4-155.png",
+      "bytes": 120393,
+      "sha256": "046179eba1d91853ebfd6b00e370ce3215adfdc5b0abb0db5aa7bb54be772ded"
+    },
+    {
+      "path": "images/specimen-rock-4-35.png",
+      "bytes": 117051,
+      "sha256": "a08896d5ec4d7ebb662f6f0d20dece963041410e38ba4b99148808c5b09cdeda"
+    },
+    {
+      "path": "images/specimen-rock-5-155.png",
+      "bytes": 83663,
+      "sha256": "2e6d937c926ee0a3d2df4e97c237a795b4230bca3bca3333a5dc9c57c17716f8"
+    },
+    {
+      "path": "images/specimen-rock-5-35.png",
+      "bytes": 116457,
+      "sha256": "250cc753d55ff74e4a5c2aa6f51b939b741a1d39d28a948e92f93181b021caf9"
+    },
+    {
+      "path": "images/specimen-rock-6-155.png",
+      "bytes": 112189,
+      "sha256": "49058602351bdcd7147f9741881dceb8e009d6bac1e35052c480a1820d64fdf1"
+    },
+    {
+      "path": "images/specimen-rock-6-35.png",
+      "bytes": 125737,
+      "sha256": "5f752d12312e0a97b9958c5e15230d1dd89978189e87923f1950b8a406967950"
+    },
+    {
+      "path": "images/specimen-rock-7-155.png",
+      "bytes": 87712,
+      "sha256": "6400afa32b03340d68465b99c5b69687541d40dad642f72beedddb67624e9f05"
+    },
+    {
+      "path": "images/specimen-rock-7-35.png",
+      "bytes": 105377,
+      "sha256": "5c0233c04b49a5c6ac3039392d6767d161fee38d59619755b8a8271c8f8ff721"
+    },
+    {
+      "path": "images/specimen-rock-8-155.png",
+      "bytes": 94798,
+      "sha256": "ebc5e334b7c6ff81bb258c038b7a43dc488b76f0275bbb5971200b08beb75c03"
+    },
+    {
+      "path": "images/specimen-rock-8-35.png",
+      "bytes": 128625,
+      "sha256": "5fcf71f1a3b90930b061a68bb4df49b796575d6493f6be16500e5344ae0db01e"
+    },
+    {
+      "path": "images/specimen-rock-9-155.png",
+      "bytes": 105713,
+      "sha256": "124d70956e97254d19d719ea464a9660b9f6782fffb3c6fc4f1d56d9171d7eee"
+    },
+    {
+      "path": "images/specimen-rock-9-35.png",
+      "bytes": 119073,
+      "sha256": "cc3c164734bbb228532159041fcd6af79a258ff61a1a239626474d960ea48f54"
+    },
+    {
+      "path": "images/specimen-sail-0-155.png",
+      "bytes": 32979,
+      "sha256": "c2d601b6032e41c70c12f15cc318b7261c6fd1e5082244cb490959d5144feecf"
+    },
+    {
+      "path": "images/specimen-sail-0-35.png",
+      "bytes": 29602,
+      "sha256": "70b742d00240f4138136482765320ce0c4370902319b8e6fa852a0396b9eb716"
+    },
+    {
+      "path": "images/specimen-sail-1-155.png",
+      "bytes": 33998,
+      "sha256": "fdc1c2ac4bbc0d7df7b57c048889cc389ee4ab5aca103d629dd63b2213a8ff29"
+    },
+    {
+      "path": "images/specimen-sail-1-35.png",
+      "bytes": 32081,
+      "sha256": "6b5e69765dfa06950463cdee57fc1495cdfa3ca6930d60e539ceff5472e46c99"
+    },
+    {
+      "path": "images/specimen-sail-2-155.png",
+      "bytes": 35355,
+      "sha256": "4db8f16a900c69f8fe0df754f0285451afe918599e2f84ce147ba94470b96e22"
+    },
+    {
+      "path": "images/specimen-sail-2-35.png",
+      "bytes": 25859,
+      "sha256": "f5abf360a1c3abb2019ea3d0d4c87c05e253a9a717c29dac0406a9ff34b55b35"
+    },
+    {
+      "path": "images/specimen-sailback-155.png",
+      "bytes": 19685,
+      "sha256": "b86bec678e0157a3bf4ed0c1f157c08c17d0cd47505838d8001cb4e086c7ac1e"
+    },
+    {
+      "path": "images/specimen-sailback-35.png",
+      "bytes": 19548,
+      "sha256": "65a70d6189f9fd9c08a05e4b3da846a889b1f35871f2299ca1b06ebb0e869c78"
+    },
+    {
+      "path": "images/specimen-sand-stitcher-155.png",
+      "bytes": 14585,
+      "sha256": "0b0a9f5193684781a4580b89d1519ce4f2bd66576b81f2de0dd4bc52a1dea50e"
+    },
+    {
+      "path": "images/specimen-sand-stitcher-35.png",
+      "bytes": 13811,
+      "sha256": "eb0828bff383dc3805aa49dff844b242055b7d65e68e5004e8014bf0bce2bcc9"
+    },
+    {
+      "path": "images/specimen-shelter-155.png",
+      "bytes": 97205,
+      "sha256": "5af38b3ae93d0e83262c9da9e1cb68ec996605b9598df22a48ab4fee26c388df"
+    },
+    {
+      "path": "images/specimen-shelter-35.png",
+      "bytes": 122244,
+      "sha256": "2dbfee232f79e668e5d5ecb8ccbc0427f7d1798e6f5a7961e99542f970195558"
+    },
+    {
+      "path": "images/wild-kitelet.png",
+      "bytes": 1449052,
+      "sha256": "f81dd175fa09247a8eea98fe010985d9afcffdf1792ed368aaf95a63e1175fb4"
+    },
+    {
+      "path": "images/wild-sailback.png",
+      "bytes": 1539664,
+      "sha256": "4543d6e57c4604512c4c13649eaed6815c06a0562f81931c4a58d6ca868ec5bb"
+    },
+    {
+      "path": "images/wild-sand-stitcher.png",
+      "bytes": 1434172,
+      "sha256": "b909b3bdb63ce775581ef6d440b96762380a40aad3266f3d0561a2a537a05cc7"
+    },
+    {
+      "path": "images/wind-window.png",
+      "bytes": 1639054,
+      "sha256": "ac0848d9672f305cb561b6b31ddc4ef58891da884e9365fe82fa901e3bbafcfc"
+    },
+    {
+      "path": "index.html",
+      "bytes": 95777,
+      "sha256": "ff25faf6bb4735a18b9e29d7185baf5111738eb5d1b1bb2535caa32776ad770e"
+    },
+    {
+      "path": "output/pdf/cobalt-windfields-catalogue.pdf",
+      "bytes": 10222209,
+      "sha256": "94aa4a4780010d331cd5e4761d31c6510a32844e93418771faeb13fd555fa5e3"
+    },
+    {
+      "path": "pdf-manifest.json",
+      "bytes": 1341,
+      "sha256": "c661e21f9ab12a9017b889153d9465c3322e081d3fb5be0ec12a4f477f47d2a2"
+    },
+    {
+      "path": "portrait-captures.json",
+      "bytes": 284,
+      "sha256": "63c9cfcbd59fdd8d46eeb6d24418106672867cccb6452b1ec4b1f86a57de4d77"
+    },
+    {
+      "path": "README.txt",
+      "bytes": 2467,
+      "sha256": "1ec818af5f662a063fe1b20c143ed78c757ea5ac6c240c30ca189a7bbd8668bc"
+    },
+    {
+      "path": "specimen-captures.json",
+      "bytes": 12223,
+      "sha256": "2c6aa7a09f85994795de963994fd730866d28c08f1615be5514dd00782519d9c"
+    },
+    {
+      "path": "world-captures.json",
+      "bytes": 24978,
+      "sha256": "5829b648f560d5b1116888585e7f95744962f193662380197ba4d3b15bcf2302"
+    }
+  ]
+}

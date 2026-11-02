@@ -56,3 +56,5 @@ records the meadow commit it was copied from.
 [Lantern Reed Gardens](lantern-reed-gardens/README.md) is available at http://localhost:5225/environments/lantern-reed-gardens/ using `npm run dev:lantern`. Its storage and build output are independent of other worlds. The original meadow remains at `/`.
 
 [Scarlet Sail Canyon](scarlet-sail-canyon/README.md) is served on port 5227. Its code, build output and resident storage are independent of the original meadow.
+
+[Cobalt Windfields](cobalt-windfields/README.md) is served on port 5217 with `npm run dev:cobalt`. Its blue rock formations, peach sand, native plants, wildlife and local residents live entirely inside its own environment folder.

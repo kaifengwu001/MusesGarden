@@ -1,0 +1,445 @@
+{
+  "created": "2026-11-02T08:54:23.926Z",
+  "viewport": [
+    900,
+    750
+  ],
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "glError": 0,
+  "note": "Source geometry and production material fragments in fixed studio light; no aerial fog, live articulation, growth deformation or post-processing. Saved finds use native PART palette branches from their production vertex shading. Young beds include species scale; central finds are fixed nominal samples at production specimen scale. Each specimen is fitted independently, not at a common scale.",
+  "list": [
+    {
+      "id": "rock-0",
+      "name": "Notched exposed bed",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        12.355380058288574,
+        3.0140000581741333,
+        5.409840106964111
+      ],
+      "triangles": 336
+    },
+    {
+      "id": "rock-1",
+      "name": "Broken terraced reef",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        13.571000099182129,
+        4.999750137329102,
+        7.171519994735718
+      ],
+      "triangles": 358
+    },
+    {
+      "id": "rock-2",
+      "name": "Interrupted long ledge",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        12.790745258331299,
+        3.218500018119812,
+        4.377679824829102
+      ],
+      "triangles": 144
+    },
+    {
+      "id": "rock-3",
+      "name": "Blunt jointed outcrop",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        5.380000114440918,
+        3.799999952316284,
+        4.050000071525574
+      ],
+      "triangles": 64
+    },
+    {
+      "id": "rock-4",
+      "name": "Detached split blocks",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        4.350000023841858,
+        2.950000047683716,
+        2.799999952316284
+      ],
+      "triangles": 68
+    },
+    {
+      "id": "rock-5",
+      "name": "Inclined fractured wall",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        15.706999778747559,
+        9.75,
+        6.416000127792358
+      ],
+      "triangles": 366
+    },
+    {
+      "id": "rock-6",
+      "name": "Broken cliff buttress",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        11.692559719085693,
+        12.34999966621399,
+        7.1600000858306885
+      ],
+      "triangles": 264
+    },
+    {
+      "id": "rock-7",
+      "name": "Blunt fallen stone",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        1.649999976158142,
+        1.0600000023841858,
+        1.1200000047683716
+      ],
+      "triangles": 32
+    },
+    {
+      "id": "rock-8",
+      "name": "Broad windward fin",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        15.46500015258789,
+        10,
+        5.135999917984009
+      ],
+      "triangles": 364
+    },
+    {
+      "id": "rock-9",
+      "name": "Wind-carved shoulder",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        10.176000118255615,
+        5.299999952316284,
+        4.291000127792358
+      ],
+      "triangles": 32
+    },
+    {
+      "id": "rock-10",
+      "name": "Narrow leaning blade",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        5.949999809265137,
+        9.5,
+        2.9989999532699585
+      ],
+      "triangles": 32
+    },
+    {
+      "id": "rock-11",
+      "name": "Eroded low peninsula",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        11.817080020904541,
+        3.7139999866485596,
+        6.3084800243377686
+      ],
+      "triangles": 190
+    },
+    {
+      "id": "rock-12",
+      "name": "Chipped mineral boulder",
+      "category": "Geology",
+      "source": "life/windGeology.ts: makeGeologyPrototypes",
+      "dimensions": [
+        4.300000190734863,
+        4.8465049266815186,
+        3.4000000953674316
+      ],
+      "triangles": 36
+    },
+    {
+      "id": "sail-0",
+      "name": "Seed sail / paired",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: seedSailGeometry(0)",
+      "dimensions": [
+        1.5174741744995117,
+        4.023530156351626,
+        1.0926752388477325
+      ],
+      "triangles": 648
+    },
+    {
+      "id": "sail-1",
+      "name": "Seed sail / branching",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: seedSailGeometry(1)",
+      "dimensions": [
+        1.870884895324707,
+        4.273335916688666,
+        1.147755891084671
+      ],
+      "triangles": 972
+    },
+    {
+      "id": "sail-2",
+      "name": "Seed sail / broad",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: seedSailGeometry(2)",
+      "dimensions": [
+        1.6165976524353027,
+        3.892598729580641,
+        1.4421760141849518
+      ],
+      "triangles": 648
+    },
+    {
+      "id": "coral-0",
+      "name": "Coral fan / variant 1",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: coralGeometry(0)",
+      "dimensions": [
+        1.182545244693756,
+        0.9009486180730164,
+        0.1631315052509308
+      ],
+      "triangles": 3300
+    },
+    {
+      "id": "coral-1",
+      "name": "Coral fan / variant 2",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: coralGeometry(1)",
+      "dimensions": [
+        0.8487379550933838,
+        1.0619402480078861,
+        0.13050177693367004
+      ],
+      "triangles": 3164
+    },
+    {
+      "id": "coral-2",
+      "name": "Coral fan / variant 3",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: coralGeometry(2)",
+      "dimensions": [
+        1.3309560418128967,
+        0.6903037977172062,
+        0.14514923095703125
+      ],
+      "triangles": 3128
+    },
+    {
+      "id": "coral-distant",
+      "name": "Coral / distant render mesh",
+      "category": "Level of detail",
+      "source": "life/windfieldCoralLod.ts: distantCoralGeometry; distant representation, not a separate species",
+      "dimensions": [
+        0.8728986382484436,
+        0.8873633720213547,
+        0.1327698603272438
+      ],
+      "triangles": 52
+    },
+    {
+      "id": "drifting-seed",
+      "name": "Drifting ivory seed",
+      "category": "Flora",
+      "source": "life/windGeometry.ts: driftingSeedGeometry",
+      "dimensions": [
+        0.09000000357627869,
+        0.21000000089406967,
+        0.09000000357627869
+      ],
+      "triangles": 4
+    },
+    {
+      "id": "shelter",
+      "name": "Slate shelter and canvas porch",
+      "category": "Architecture",
+      "source": "life/props.ts: shelterGeometry(412)",
+      "dimensions": [
+        13.058999061584473,
+        5.027914345264435,
+        9.128999710083008
+      ],
+      "triangles": 2756
+    },
+    {
+      "id": "sailback",
+      "name": "Sailback",
+      "category": "Wildlife",
+      "source": "life/wildlifeGeometry.ts: wildlifeGeometry('sailback')",
+      "dimensions": [
+        0.14830459654331207,
+        0.2677500051795505,
+        0.45000000298023224
+      ],
+      "triangles": 1094
+    },
+    {
+      "id": "kitelet",
+      "name": "Kitelet",
+      "category": "Wildlife",
+      "source": "life/wildlifeGeometry.ts: wildlifeGeometry('kitelet')",
+      "dimensions": [
+        0.22021670639514923,
+        0.023360146209597588,
+        0.17427484691143036
+      ],
+      "triangles": 338
+    },
+    {
+      "id": "sand-stitcher",
+      "name": "Sand Stitcher",
+      "category": "Wildlife",
+      "source": "life/wildlifeGeometry.ts: wildlifeGeometry('sand-stitcher')",
+      "dimensions": [
+        0.1382230967283249,
+        0.06830986600834876,
+        0.14861679822206497
+      ],
+      "triangles": 764
+    },
+    {
+      "id": "perch-0",
+      "name": "Kitelet perch / variant 1",
+      "category": "Habitat",
+      "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('kitelet',0)",
+      "dimensions": [
+        0.5955046713352203,
+        1.133570816135034,
+        0.8956721425056458
+      ],
+      "triangles": 464
+    },
+    {
+      "id": "perch-1",
+      "name": "Kitelet perch / variant 2",
+      "category": "Habitat",
+      "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('kitelet',1)",
+      "dimensions": [
+        0.8202599883079529,
+        1.254006411647424,
+        0.8366420865058899
+      ],
+      "triangles": 660
+    },
+    {
+      "id": "perch-2",
+      "name": "Kitelet perch / variant 3",
+      "category": "Habitat",
+      "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('kitelet',2)",
+      "dimensions": [
+        0.744350790977478,
+        1.133570816135034,
+        0.7741234302520752
+      ],
+      "triangles": 660
+    },
+    {
+      "id": "litter-pocket",
+      "name": "Sand Stitcher litter pocket",
+      "category": "Habitat",
+      "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('sand-stitcher')",
+      "dimensions": [
+        0.5733067691326141,
+        0.0508959861472249,
+        0.39453671872615814
+      ],
+      "triangles": 150
+    },
+    {
+      "id": "find-bed-0",
+      "name": "Find bed / coral roots",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: nativeBedGeometry(0); findBeds species size 1; native palette branches",
+      "dimensions": [
+        0.3225681632757187,
+        0.3411468896083534,
+        0.02387207094579935
+      ],
+      "triangles": 300
+    },
+    {
+      "id": "find-bed-1",
+      "name": "Find bed / ivory seed sail",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: nativeBedGeometry(1); findBeds species size 1; native palette branches",
+      "dimensions": [
+        0.19967999309301376,
+        0.5213694027042948,
+        0.05447113886475563
+      ],
+      "triangles": 134
+    },
+    {
+      "id": "find-bed-2",
+      "name": "Find bed / young coral roots",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: nativeBedGeometry(2); findBeds species size 0.84; native palette branches",
+      "dimensions": [
+        0.2709575742483139,
+        0.2865641323151067,
+        0.020794611424207687
+      ],
+      "triangles": 300
+    },
+    {
+      "id": "find-bed-3",
+      "name": "Find bed / young seed sail",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: nativeBedGeometry(3); findBeds species size 0.78; native palette branches",
+      "dimensions": [
+        0.17508940771222115,
+        0.40667440212564543,
+        0.042487581726163626
+      ],
+      "triangles": 134
+    },
+    {
+      "id": "find-coral",
+      "name": "Saved find / coral roots",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: buildNativeFindMesh; example 0.8m form, kin 0, self412, 1.45 specimen display scale; native palette branches",
+      "dimensions": [
+        1.1005271673202515,
+        1.1639146036468446,
+        0.08341444283723831
+      ],
+      "triangles": 300
+    },
+    {
+      "id": "find-sail",
+      "name": "Saved find / ivory seed sail",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: buildNativeFindMesh; example 0.8m form, kin 1, self412, 1.45 specimen display scale; native palette branches",
+      "dimensions": [
+        0.44543998688459396,
+        1.1630548213142902,
+        0.12151253968477249
+      ],
+      "triangles": 134
+    },
+    {
+      "id": "find-stone",
+      "name": "Saved find / cobalt fragment",
+      "category": "Saved finds",
+      "source": "life/nativeFindFlora.ts: buildNativeFindMesh; example 0.5m form, kin 0, self412, 1.45 specimen display scale; native palette branches",
+      "dimensions": [
+        0.6234999895095825,
+        0.7431250233203173,
+        0.49300000071525574
+      ],
+      "triangles": 12
+    }
+  ],
+  "errors": []
+}

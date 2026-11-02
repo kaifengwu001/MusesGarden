@@ -1,0 +1,384 @@
+{
+  "title": "Cobalt Windfields",
+  "subtitle": "A visual catalogue of the current environment",
+  "date": "2 November 2026",
+  "sourceRoot": "environments/cobalt-windfields/",
+  "sourceNotes": [
+    "Descriptions were checked against the active world and its source modules. Old compatibility names are not treated as visible scene contents.",
+    "World views show the current local working tree, including denser planting, expanded geology and the latest white clouds with a faint yellow tint.",
+    "The standard world uses seed 412 and a planet radius of approximately 128 metres. Placement and visible populations change with seed, growth, camera distance and clearance.",
+    "Studio plates use the source geometry and production material fragments under fixed lighting. They omit aerial haze, live articulation, growth deformation and post-processing; specimens are fitted individually rather than shown at a common scale.",
+    "Wildlife consists of eleven authored local animals near the settlement and wind corridor. These are ambient creatures, not a planet-wide population simulation.",
+    "Pip, Juniper and Marlo are local animated residents. Their names may be changed in the browser. Saved finds and garden content use the example gallery unless a backend is explicitly connected.",
+    "The construction notes predate some Windows additions. Current geometry and placement code take precedence over older prototype counts in those notes."
+  ],
+  "sections": [
+    {
+      "id": "terrain",
+      "title": "Ground and landform",
+      "intro": "Warm, dry sand ties the blue geology and pale vegetation together. Broad relief remains readable from orbit; fine ripples and grains emerge at ground level.",
+      "items": [
+        {
+          "id": "peach-sand",
+          "name": "Peach sand",
+          "description": "Matte rose and peach washes pass across the ground, with lighter dune crests and cool muted shading in the hollows.",
+          "source": "planet/meadow.glsl: meadowPaint",
+          "imageId": "sand-close"
+        },
+        {
+          "id": "sand-ripples",
+          "name": "Wind ripples and grains",
+          "description": "Irregular wind-laid ridges break into patches. Fine grains appear nearby and fade with distance, keeping the planet surface calm when viewed from above.",
+          "source": "planet/meadow.glsl: meadowPaint",
+          "imageId": "sand-close"
+        },
+        {
+          "id": "sand-banks",
+          "name": "Sand banks and corridor",
+          "description": "Broad cross-wind banks and dune shoulders frame a lower passage through the authored opening, with gentle continuous slopes around the settlement.",
+          "source": "planet/terrain.ts: localSandRelief",
+          "imageId": "wind-window"
+        },
+        {
+          "id": "home-plateau",
+          "name": "Settlement plateau",
+          "description": "A dry, flattened clearing supports the shelter and its paths. The terrace, lookout and steps keep clear walking and sitting areas for the residents.",
+          "source": "planet/terrain.ts: homestead, clearingAt; life/props.ts: shelterSupportGeometry",
+          "imageId": "shelter"
+        }
+      ]
+    },
+    {
+      "id": "architecture",
+      "title": "Shelter and everyday objects",
+      "intro": "The home is built into cobalt bedrock, using rough stone, timber and suspended cloth. Its small domestic objects establish the scale of the landscape.",
+      "items": [
+        {
+          "id": "shelter",
+          "name": "Slate shelter",
+          "description": "Chipped stone walls and three heavy bedding slabs form a low refuge. Uneven roof shoulders, recessed timberwork and exposed rock edges soften its outline.",
+          "source": "life/props.ts: shelterGeometry",
+          "imageId": "shelter",
+          "studioId": "shelter"
+        },
+        {
+          "id": "canvas-porch",
+          "name": "Canvas porch",
+          "description": "A coral-brown woven awning hangs in a shallow curve above the terrace. Rope hems and slender supports define the cloth's edge.",
+          "source": "life/props.ts: shelterGeometry; life/props.frag.glsl",
+          "imageId": "shelter"
+        },
+        {
+          "id": "lookout-steps",
+          "name": "Dry lookout and steps",
+          "description": "A weathered stone ledge extends beside the shelter, with a low timber guard and three steps linking the supported deck to the sand.",
+          "source": "life/props.ts: shelterSupportGeometry, PIER, STEPS",
+          "imageId": "shelter-side"
+        },
+        {
+          "id": "door-screen",
+          "name": "Door and slatted screen",
+          "description": "A timber door and open slatted screen sit inside the dark entrance, behind the clear porch route.",
+          "source": "life/props.ts: shelterGeometry",
+          "imageId": "shelter"
+        },
+        {
+          "id": "windbreak",
+          "name": "Timber windbreak",
+          "description": "Uneven vertical slats form a permeable screen along the exposed flank of the home.",
+          "source": "life/props.ts: shelterGeometry",
+          "imageId": "shelter-side"
+        },
+        {
+          "id": "bench-chair",
+          "name": "Bench and chair",
+          "description": "A simple timber bench and a slightly turned chair provide resting places on the terrace and lookout.",
+          "source": "life/props.ts: BENCH, CHAIR, shelterGeometry",
+          "imageId": "shelter"
+        },
+        {
+          "id": "lantern",
+          "name": "Hanging lantern",
+          "description": "One small warm lantern hangs beside the entrance, adding a restrained golden accent to the blue stone.",
+          "source": "life/props.ts: shelterGeometry",
+          "imageId": "shelter"
+        },
+        {
+          "id": "stove-pot",
+          "name": "Porch stove and soup pot",
+          "description": "A small iron stove stands on short legs, with a warm fire window, narrow pipe and soup pot. Muse uses a ladle when cooking.",
+          "source": "life/museProps.ts: MuseProps; life/museRoam.ts: STOVE, cook routine",
+          "imageId": "shelter"
+        }
+      ]
+    },
+    {
+      "id": "wildlife",
+      "title": "Wildlife",
+      "intro": "Three local species share the stone corridor and sheltered planting. All are displayed at three times their authored size so their silhouettes remain readable in the landscape.",
+      "items": [
+        {
+          "id": "sailback",
+          "name": "Sailback",
+          "description": "Three cobalt-plated quadrupeds carry two ivory back sails, padded feet and a tapered tail. They walk among the Wind Ribs, open their sails, skim briefly and fold them again.",
+          "source": "life/wildlifeGeometry.ts: sailback; life/windWildlife.ts: WILDLIFE_HABITATS, wildlifeMotion",
+          "imageId": "wild-sailback",
+          "studioId": "sailback"
+        },
+        {
+          "id": "kitelet",
+          "name": "Kitelet",
+          "description": "Five tiny ivory-bodied flyers have four coral diamond wings. They flutter and glide over the Seed Flats, then settle on the cupped leaves of their perches.",
+          "source": "life/wildlifeGeometry.ts: kitelet; life/windWildlife.ts: WILDLIFE_HABITATS, wildlifeMotion",
+          "imageId": "wild-kitelet",
+          "studioId": "kitelet"
+        },
+        {
+          "id": "sand-stitcher",
+          "name": "Sand Stitcher",
+          "description": "Three small four-footed animals wear paired curved blue shell panels above peach faces. Each carries one straight dry stem, lowers it into a lee pocket and returns through the coral.",
+          "source": "life/wildlifeGeometry.ts: stitcher; life/windWildlife.ts: WILDLIFE_HABITATS, wildlifeMotion",
+          "imageId": "wild-sand-stitcher",
+          "studioId": "sand-stitcher"
+        }
+      ]
+    },
+    {
+      "id": "habitats",
+      "title": "Perches and gathered stems",
+      "intro": "The animals have physical places to land and leave material. These small structures connect their movement to the surrounding vegetation and sand.",
+      "items": [
+        {
+          "id": "perch-0",
+          "name": "Seed-cup perch A",
+          "description": "A broad ivory cup rises on a crooked stem, with a strong midrib and a side sail. Its centre provides a landing point for a Kitelet.",
+          "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('kitelet', 0)",
+          "imageId": "wild-kitelet",
+          "studioId": "perch-0"
+        },
+        {
+          "id": "perch-1",
+          "name": "Seed-cup perch B",
+          "description": "A longer, narrower cup turns upward more steeply. A tall side sail and small lower leaf vary the silhouette.",
+          "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('kitelet', 1)",
+          "studioId": "perch-1"
+        },
+        {
+          "id": "perch-2",
+          "name": "Seed-cup perch C",
+          "description": "A wider, shorter cup twists across its stem, accompanied by offset side leaves. Five perch instances draw from these three forms.",
+          "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('kitelet', 2); life/windWildlife.ts: plans",
+          "studioId": "perch-2"
+        },
+        {
+          "id": "litter-pocket",
+          "name": "Gathered dry stems",
+          "description": "Loose tan twigs lie low in sheltered sand pockets. A Sand Stitcher's carried stem appears in the pile during its placement sequence.",
+          "source": "life/wildlifeGeometry.ts: wildlifeHabitatGeometry('sand-stitcher'); life/wildWildlife.vert.glsl",
+          "imageId": "wild-sand-stitcher",
+          "studioId": "litter-pocket"
+        }
+      ]
+    },
+    {
+      "id": "residents",
+      "title": "Muse and the neighbours",
+      "intro": "The plush residents share the same character family but have distinct coats and identities. They remain near the settlement on clear walking routes.",
+      "items": [
+        {
+          "id": "host-muse",
+          "name": "Muse",
+          "description": "The cream-coloured host walks, rests, cooks and naps around the home. Its presence and working state can follow the connected garden source.",
+          "source": "life/muse.ts; life/museRoam.ts; ui/garden/gardenUi.ts",
+          "imageId": "host-muse"
+        },
+        {
+          "id": "resident-pip",
+          "name": "Pip - Sail gardener",
+          "description": "A pale peach neighbour with a gentle walking and resting routine in the clearing. Pip can greet the visitor, be petted and be followed.",
+          "source": "life/residentLife.ts: DEFAULT_RESIDENTS; life/residents.ts",
+          "imageId": "resident-pip"
+        },
+        {
+          "id": "resident-juniper",
+          "name": "Juniper - Wind listener",
+          "description": "A pale mint neighbour who follows a separate safe lane near the shelter, pausing and responding to the visitor.",
+          "source": "life/residentLife.ts: DEFAULT_RESIDENTS; life/residents.ts",
+          "imageId": "resident-juniper"
+        },
+        {
+          "id": "resident-marlo",
+          "name": "Marlo - Cloud watcher",
+          "description": "A pale blue neighbour living on the other side of the clearing. Marlo shares the residents' greetings, petting and camera-follow interactions.",
+          "source": "life/residentLife.ts: DEFAULT_RESIDENTS; life/residents.ts",
+          "imageId": "resident-marlo"
+        }
+      ]
+    },
+    {
+      "id": "atmosphere",
+      "title": "Sky, cloud and light",
+      "intro": "The atmosphere balances a pale yellow sky with quiet white cloud shapes. The ground view and orbit view use complementary cloud layers.",
+      "items": [
+        {
+          "id": "butter-sky",
+          "name": "Pale butter sky",
+          "description": "A soft yellow gradient brightens toward the horizon, with a subtle sun glow and warm haze behind the landscape.",
+          "source": "render/sky.ts; render/sky.frag.glsl; render/palette.ts",
+          "imageId": "wind-window"
+        },
+        {
+          "id": "painted-cirrus",
+          "name": "Painted sky wisps",
+          "description": "Long ivory shapes drift across the background. Their finite tapered ends and uneven shoulders keep the sky from reading as a set of uniform stripes.",
+          "source": "render/sky.frag.glsl: wisp",
+          "imageId": "wind-window"
+        },
+        {
+          "id": "cloud-ribbons",
+          "name": "Planet-wrapping cirrus",
+          "description": "Eighteen soft white ribbons with a faint yellow tint curl around the planet. They retain their tapered shapes and gradually disappear as the camera approaches the ground.",
+          "source": "life/windCloudRibbons.ts: cloudRibbonGeometry, WindCloudRibbons",
+          "imageId": "planet-0"
+        },
+        {
+          "id": "painted-light",
+          "name": "Matte light and distance haze",
+          "description": "Late-morning light, soft toon bands and restrained paper grain unite the materials. Distant forms recede into a pale blue-grey haze.",
+          "source": "render/palette.ts; render/fog.glsl; params.ts; main.ts",
+          "imageId": "rock-belt"
+        }
+      ]
+    },
+    {
+      "id": "saved-finds",
+      "title": "Saved finds and planted beds",
+      "intro": "Saved finds take on native Cobalt forms. They are garden records represented by small specimens and companion planting, separate from the ambient colonies.",
+      "items": [
+        {
+          "id": "find-coral",
+          "name": "Coral find specimen",
+          "description": "A compact rounded fan of branching coral marks a saved find, with its own scale, lean and orientation.",
+          "source": "life/nativeFindFlora.ts: nativeGeometry, buildNativeFindMesh",
+          "studioId": "find-coral"
+        },
+        {
+          "id": "find-sail",
+          "name": "Ivory sail find specimen",
+          "description": "A small branched stem carries two asymmetric ivory sails, echoing the taller plants of the windfields.",
+          "source": "life/nativeFindFlora.ts: nativeGeometry, buildNativeFindMesh",
+          "studioId": "find-sail"
+        },
+        {
+          "id": "find-stone",
+          "name": "Cobalt fragment specimen",
+          "description": "A compact angular stone with an uneven crown represents a saved find in the stone family.",
+          "source": "life/nativeFindFlora.ts: nativeGeometry, buildNativeFindMesh",
+          "studioId": "find-stone"
+        },
+        {
+          "id": "find-bed-0",
+          "name": "Coral root bed",
+          "description": "Low coral fans cluster around a central specimen, leaving its middle clear and readable.",
+          "source": "life/nativeFindFlora.ts: nativeBedGeometry(0); life/findBeds.ts",
+          "studioId": "find-bed-0"
+        },
+        {
+          "id": "find-bed-1",
+          "name": "Ivory seed-sail bed",
+          "description": "Small ivory sails form companion planting around a saved specimen.",
+          "source": "life/nativeFindFlora.ts: nativeBedGeometry(1); life/findBeds.ts",
+          "studioId": "find-bed-1"
+        },
+        {
+          "id": "find-bed-2",
+          "name": "Young coral root bed",
+          "description": "A second coral bed variant repeats the rounded branching habit at the small garden scale.",
+          "source": "life/nativeFindFlora.ts: nativeBedGeometry(2); life/findBeds.ts",
+          "studioId": "find-bed-2"
+        },
+        {
+          "id": "find-bed-3",
+          "name": "Young seed-sail bed",
+          "description": "A second seed-sail bed variant keeps the same native leaf language in the planted garden records.",
+          "source": "life/nativeFindFlora.ts: nativeBedGeometry(3); life/findBeds.ts",
+          "studioId": "find-bed-3"
+        },
+        {
+          "id": "find-markers",
+          "name": "Distant find markers and pins",
+          "description": "Saved specimens transition to small glowing markers high above the ground. Optional pins identify liked finds and Muse's location.",
+          "source": "life/findForms.ts; ui/garden/gardenUi.ts; shared src/life/pins.ts",
+          "imageId": "garden-overhead"
+        }
+      ]
+    },
+    {
+      "id": "conditional-effects",
+      "title": "Small signs of life",
+      "intro": "These accents appear during particular activities and interactions, so a frozen landscape view may not show them.",
+      "items": [
+        {
+          "id": "petting-hearts",
+          "name": "Petting hearts",
+          "description": "Small hearts rise around a Muse character while it responds to sustained petting.",
+          "source": "life/museProps.ts: MuseProps.update",
+          "imageId": "resident-pip"
+        },
+        {
+          "id": "humming-notes",
+          "name": "Humming notes",
+          "description": "Musical-note motes accompany a quiet humming moment, including Muse's bench routine.",
+          "source": "life/museProps.ts: MuseProps.update; life/museRoam.ts: bench routine",
+          "imageId": "host-muse"
+        },
+        {
+          "id": "sleep-motes",
+          "name": "Nap bubble and sleep marks",
+          "description": "A little bubble and floating sleep marks accompany a resting character's nap.",
+          "source": "life/museProps.ts: MuseProps.update",
+          "imageId": "host-muse"
+        },
+        {
+          "id": "cooking-steam",
+          "name": "Cooking steam",
+          "description": "Soft puffs rise from the porch pot while Muse cooks and stirs.",
+          "source": "life/museProps.ts: MuseProps.update; life/museRoam.ts: cook routine",
+          "imageId": "shelter"
+        }
+      ]
+    }
+  ],
+  "inactive": [
+    {
+      "name": "Conventional meadow grass and flowers",
+      "reason": "Inherited systems remain in the code, but Cobalt disables their near-field drawing. The visible native flora is authored separately.",
+      "source": "world.ts: refreshFieldParams, update"
+    },
+    {
+      "name": "Generic birds and butterflies",
+      "reason": "Their inherited meshes are explicitly hidden. Sailbacks, Kitelets and Sand Stitchers are the active ambient fauna.",
+      "source": "world.ts: update"
+    },
+    {
+      "name": "Water, lakes, ponds, culverts and lily pads",
+      "reason": "Compatibility data and controls remain, but the current terrain is entirely dry. The former pier is a stone lookout.",
+      "source": "planet/terrain.ts: sample; life/props.ts; params.ts"
+    },
+    {
+      "name": "Puffy cloud layer",
+      "reason": "Its default coverage is zero. The current visible cloud design uses painted sky wisps and physical cirrus ribbons; shadow infrastructure is retained.",
+      "source": "params.ts: clouds.coverage; life/clouds.ts: update"
+    },
+    {
+      "name": "Fishing and watering accessories",
+      "reason": "The rod, float, fish and watering can belong to inherited animation assets. Fishing and watering have zero activity weight in Cobalt's local routine.",
+      "source": "life/museRoam.ts: LIKES; life/museProps.ts"
+    },
+    {
+      "name": "Roof chimney, snow and generic falling petals",
+      "reason": "These are retained constants, palette data or unused scene systems, not current Cobalt environment features. The small porch stove pipe is active.",
+      "source": "life/props.ts: CHIMNEY; render/palette.ts; world.ts"
+    }
+  ]
+}

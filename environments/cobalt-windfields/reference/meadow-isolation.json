@@ -1,0 +1,33 @@
+{
+  "base": "ad37acf",
+  "conditions": {
+    "quality": "medium",
+    "devicePixelRatio": 1,
+    "width": 1440,
+    "height": 900
+  },
+  "unchangedPaths": [
+    "src",
+    "index.html",
+    "vite.config.ts",
+    "package-lock.json"
+  ],
+  "identicalViews": [
+    "orbit",
+    "standing 4.3 m",
+    "standing, lower",
+    "meadow 1.6 m",
+    "meadow, turned",
+    "lakeside 1.6 m",
+    "vista",
+    "cottage"
+  ],
+  "inconclusiveView": {
+    "name": "bird's-eye 70 m",
+    "reason": "View also differs against itself around Muse by the cottage; consistent with pose timing.",
+    "firstSelfCheckPixels": 1227,
+    "repeatedSelfCheckPixels": 300,
+    "baseComparisonPixels": 1120
+  },
+  "pageErrors": []
+}
