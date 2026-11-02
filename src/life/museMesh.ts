@@ -277,8 +277,8 @@ const DRESSED_CUT = (x: number, y: readonly [number, number] = [0, 1], z = 0.2):
  * (measureFit), their cuts out from where the arm (or its sleeve) is clear.
  */
 export const DRESSED = {
-  /** Lilac; a coral cap, a navy coat with cap sleeves and big buttons, a satchel on a strap across it; one piece, its arms and its plate grown in. */
-  muse0: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Lilac; a coral cap, a navy coat with puffed sleeves (cut with the arm at the shoulder, its weight rising over a longer ramp, so the sleeve hangs down the arm and the arm flows from the shoulder) and big buttons, a satchel on a strap across it; one piece, its arms and its plate grown in. */
+  muse0: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.28, [0.36, 0.6]), ramp: 0.12, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Brown; a green wrap tunic with short sleeves, a gold bow at its side, a flute in its pocket; a stick of a tail. Its paws are pieces of their own, out of the sleeves. */
   muse1: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.37), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Cream; a red scalloped collar over a linen smock with pockets; its arms are pieces of their own, set into sleeves of the smock's that run into its body (they turn where they come out of them, and so fill them as they hang); a round tail. */
@@ -497,6 +497,25 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     corners.push(index[t], index[t + 1], index[t + 2]);
     if (!onFace) bodySource.push(t / 3);
   }
+  // (a dressed muse's face as one closed surface: its sculpt may leave it open, its eyes' sockets empty once its
+  // eyes are left out, slits where a plate grown into the hood meets it; each such opening of the face's own piece
+  // patched, the patch the face's where it meets the face. A plate of its own sits in the hood's opening, which
+  // stays open.)
+  if (parts) {
+    const kept = [...bodyTriangles, ...faceTriangles];
+    const onFace = new Set(faceTriangles);
+    const facePieces = new Set(faceTriangles.map((v) => find(v)));
+    const corner = new Int32Array(ids.size);
+    for (let i = count - 1; i >= 0; i--) corner[weld[i]] = i;
+    for (const loop of faceOpenings(P, kept, parts.eye)) {
+      if (!facePieces.has(find(loop[0]))) continue;
+      for (const tri of fillOpening(P, loop)) {
+        const toFace = tri.filter((v) => onFace.has(v)).length >= 2;
+        (toFace ? faceTriangles : bodyTriangles).push(...tri);
+        (toFace ? faceCorners : bodyCorners).push(...tri.map((v) => corner[v]));
+      }
+    }
+  }
   if (parts) parts.platePoints(faceTriangles.map((v) => [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]]));
 
   // the face's plate ironed: a sculpt may have its own mouth carved into it, which would show under the paint
@@ -689,6 +708,9 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   const under = smoothField(nrm, neighbours, COAT_SMOOTH);
   // (a dressed muse's fur pressed flat under its clothes: a paw in a sleeve, a belly under a vest)
   const pressed = cloth ? pressedFur(pos, nrm, fineIndex, cloth) : null;
+  // (a plate grown into the hood shares its rim with the hood: there the hood's skin is the plate's, exactly, or the
+  // coat's inset opens a crack along the seam, the plate's field finding its rim only to within a voxel or so)
+  const rim = fused && fused.size > 0 ? new VertexGrid(pos, fine.face, RIM_CELL) : null;
   for (let i = 0; i < total; i++) {
     const x = pos[i * 3];
     const y = pos[i * 3 + 1];
@@ -696,7 +718,7 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
     open[i] = openness(x, y, z, nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2], (a, b, c) => shape.sample(a, b, c));
     if (fine.face[i]) continue;
     const onPlate = z > 0 ? plate.nearest(x, y, z, near) : -1;
-    const closest = onPlate >= 0 ? Math.hypot(near[0] - x, near[1] - y, near[2] - z) : Infinity;
+    const closest = Math.min(onPlate >= 0 ? Math.hypot(near[0] - x, near[1] - y, near[2] - z) : Infinity, rim ? rim.nearest(x, y, z) : Infinity);
     const coat = smooth01((closest - ON_FACE) / FACE_EDGE) * (cloth ? 1 - cloth[i] : 1);
     fur[i] = coat * smooth01(y / 0.035) * (pressed ? pressed[i] : 1);
     // in under the coat, the soles kept on the ground: near it, only sideways
@@ -2312,6 +2334,110 @@ function faceParts(box: Map<number, number[]>): FaceParts | null {
   };
 }
 
+/**
+ * The openings in a dressed muse's skin about its face: the loops of edges
+ * only one triangle has (each in order, against the triangles' own turn, so a
+ * patch over it turns as they do), about the face's middle (within FACE_HOLE
+ * of the eyes' height, in front), and no wider than a face: its eyes'
+ * sockets, the slits where the plate meets the hood. A garment's openings (a
+ * neck, a cuff) are wider or lower, and stay open.
+ */
+function faceOpenings(P: Float64Array, triangles: number[], eye: number[]): number[][] {
+  const n = P.length / 3;
+  const half = new Map<number, number>();
+  const key = (a: number, b: number): number => a * n + b;
+  for (let t = 0; t < triangles.length; t += 3) {
+    for (let e = 0; e < 3; e++) {
+      const a = triangles[t + e];
+      const b = triangles[t + ((e + 1) % 3)];
+      half.set(key(a, b), (half.get(key(a, b)) ?? 0) + 1);
+    }
+  }
+  // each open edge a → b, followed backwards: the loop runs b → a, as a triangle across it would
+  const back = new Map<number, number[]>();
+  for (const k of half.keys()) {
+    const a = Math.floor(k / n);
+    const b = k % n;
+    if (half.has(key(b, a))) continue;
+    const list = back.get(b) ?? [];
+    list.push(a);
+    back.set(b, list);
+  }
+  // walked edge by edge, each loop cut out as it closes, so two openings that meet at a vertex (a pinch: 11's face
+  // and the slit under its chin) come out as two
+  const found: number[][] = [];
+  for (const start of [...back.keys()]) {
+    const path = [start];
+    const at = new Map([[start, 0]]);
+    for (;;) {
+      const w = back.get(path[path.length - 1])?.pop();
+      if (w === undefined) break;
+      const k = at.get(w);
+      if (k === undefined) {
+        at.set(w, path.length);
+        path.push(w);
+        continue;
+      }
+      const loop = [w, ...path.splice(k + 1)];
+      for (const v of loop.slice(1)) at.delete(v);
+      found.push(loop);
+    }
+  }
+  const loops: number[][] = [];
+  for (const loop of found) {
+    if (loop.length < 3) continue;
+    let [x0, x1, y0, y1, z0, z1, cx, cy, cz] = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity, 0, 0, 0];
+    for (const w of loop) {
+      const [x, y, z] = [P[w * 3], P[w * 3 + 1], P[w * 3 + 2]];
+      [x0, x1, y0, y1, z0, z1] = [Math.min(x0, x), Math.max(x1, x), Math.min(y0, y), Math.max(y1, y), Math.min(z0, z), Math.max(z1, z)];
+      [cx, cy, cz] = [cx + x / loop.length, cy + y / loop.length, cz + z / loop.length];
+    }
+    if (Math.abs(cx) < FACE_HOLE.across && Math.abs(cy - eye[1]) < FACE_HOLE.height && cz > 0 && Math.max(x1 - x0, z1 - z0) < FACE_HOLE.wide) loops.push(loop);
+  }
+  return loops;
+}
+
+/** The face's openings (H): within this far of its middle across and of its eyes' height, in front, and no wider than a face. */
+const FACE_HOLE = { across: 0.3, height: 0.17, wide: 0.42 } as const;
+
+/**
+ * An opening patched: the triangulation of its loop with the least area
+ * (dynamic programming over its stretches, Barequet and Sharir's), so a
+ * socket is capped flat and a slit is zipped shut across, each triangle
+ * turning as the loop does. No new vertices: the refinement rounds it.
+ */
+function fillOpening(P: Float64Array, loop: number[]): number[][] {
+  const n = loop.length;
+  const area = (i: number, j: number, k: number): number => {
+    const [a, b, c] = [loop[i] * 3, loop[j] * 3, loop[k] * 3];
+    const u = [P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]];
+    const v = [P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]];
+    return Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
+  };
+  const best = Array.from({ length: n }, () => new Float64Array(n));
+  const split = Array.from({ length: n }, () => new Int32Array(n));
+  for (let len = 2; len < n; len++) {
+    for (let i = 0; i + len < n; i++) {
+      const j = i + len;
+      best[i][j] = Infinity;
+      for (let m = i + 1; m < j; m++) {
+        const w = best[i][m] + best[m][j] + area(i, m, j);
+        if (w < best[i][j]) [best[i][j], split[i][j]] = [w, m];
+      }
+    }
+  }
+  const out: number[][] = [];
+  const emit = (i: number, j: number): void => {
+    if (j - i < 2) return;
+    const m = split[i][j];
+    out.push([loop[i], loop[m], loop[j]]);
+    emit(i, m);
+    emit(m, j);
+  };
+  emit(0, n - 1);
+  return out;
+}
+
 /** CIELAB of a linear RGB colour (D65), into out. */
 function toLab(r: number, g: number, b: number, out: number[]): void {
   const f = (t: number): number => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
@@ -2830,6 +2956,44 @@ function holdFace(pos: Float32Array, index: ArrayLike<number>, full: Float32Arra
     full[i * JOINTS + JOINT.head] += f;
   }
 }
+
+/** Some vertices (a mask of them) on a grid, to find how near the nearest is (within a cell of the point's, H; else Infinity). */
+class VertexGrid {
+  private readonly cells = new Map<string, number[]>();
+
+  constructor(
+    private readonly pos: Float32Array,
+    mask: boolean[],
+    private readonly cell: number,
+  ) {
+    for (let i = 0; i < mask.length; i++) if (mask[i]) this.list(this.key(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], 0, 0, 0), true)?.push(i);
+  }
+
+  private key(x: number, y: number, z: number, dx: number, dy: number, dz: number): string {
+    return `${Math.floor(x / this.cell) + dx},${Math.floor(y / this.cell) + dy},${Math.floor(z / this.cell) + dz}`;
+  }
+
+  private list(key: string, make = false): number[] | undefined {
+    let l = this.cells.get(key);
+    if (!l && make) this.cells.set(key, (l = []));
+    return l;
+  }
+
+  nearest(x: number, y: number, z: number): number {
+    let best = Infinity;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          for (const i of this.list(this.key(x, y, z, dx, dy, dz)) ?? []) best = Math.min(best, Math.hypot(this.pos[i * 3] - x, this.pos[i * 3 + 1] - y, this.pos[i * 3 + 2] - z));
+        }
+      }
+    }
+    return best;
+  }
+}
+
+/** The grid of a grown-in plate's vertices (H): a cell a little more than the coat's reach from the plate. */
+const RIM_CELL = 0.05;
 
 /** Over how far from a grown-in plate the hood round it gives way from the head's to its own weights (H). */
 const HOLD_FACE = 0.05;

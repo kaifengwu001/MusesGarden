@@ -60,8 +60,18 @@ lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all of them
   front row's (seen in perspective its places close in toward the middle, and on the left its muses hid
   behind the front ones), and the camera looks down 18°, so every face shows. A tap or a hold reaches a
   back-row muse through the gaps; scripts can name a muse (`museLineup.tap('muse5')`).
-- **Muse 0** (lilac; a coral cap, a navy coat with cap sleeves, a satchel on a strap): one piece, its arms
-  and its plate grown in; rigged as it came, clean in clay hanging, waving and yawning.
+- **Muse 0** (lilac; a coral cap, a navy coat with puffed sleeves, a satchel on a strap): one piece, its arms
+  and its plate grown in.
+- **Kai: holes under 0's face; its lowered arm odd, could flow better.** The holes were the sculpt's own: its
+  face left open where it meets the hood (two slits under the cheeks, one along the top) and its eyes' sockets
+  empty once its eyes were left out (4's and 11's faces had some too). Each opening of the face's own piece is
+  now patched before it is rigged (the least-area triangulation of its loop, loops cut apart where two meet at
+  a vertex, as 11's face and the slit under its chin do); a plate of its own keeps the hood's opening round it
+  open. Along a grown-in plate's rim the hood's skin is the plate's exactly (the coat's inset had opened a
+  crack there, the plate's field finding its rim only to a voxel or so). 0's sleeve is now cut with its arm at
+  the shoulder, its weight rising over a longer ramp (0.12 H), so the sleeve hangs down the arm and the arm
+  flows from the shoulder (it had hung from under a sleeve held out as a lump). The other faces are unchanged
+  but for their sockets capped under the painted eyes; tpose6 rigs byte for byte as before.
 - **10–12** (teal in an orange shirt with a camera, grey in a T-shirt and a nightcap, pink in a wrap top and
   a headband): arms of their own pieces under cap sleeves. 11's plate is grown into its head, which is round
   it back to front: a plate is now a shallow dome (no deeper than 0.25 H), so the head isn't taken for it.
