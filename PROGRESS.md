@@ -63,6 +63,12 @@ lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all twelve 
   they are (`Dress.sleeves`: from where the sleeve leaves the shoulder to where the arm comes out), the cloth
   only round the arm's axis, so the layers go together and the sleeve drapes down the hanging arm, smooth in
   clay from every side; 11's and 12's too (12 had the same notch, smaller).
+- **Kai: 11's hand streaks when raised, and its face has a gap.** 11 holds its arms further forward than the
+  rest (to 0.24 H in front), past the cut's body seeds (0.2), so each arm was cut through its middle and
+  folded into a fin as it rose; its cut reaches 0.3 in front now. A plate grown into the hood (4, 8, 11) was
+  the head's alone while the hood beside it was partly the chest's, so their seam opened as the head tilted
+  back (a yawn, a pet); the hood round such a plate now turns with the head, giving way to its own weights
+  over 5 cm.
 - **Kai's notes, first look:** 5's sleeve didn't follow its arm (now cut with it); 2's arm left a hole in its
   side (its arm sat in sleeves of the smock's that run into its body: it now turns where it comes out of
   them, and fills them as it hangs).

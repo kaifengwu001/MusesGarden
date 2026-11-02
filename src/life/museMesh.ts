@@ -265,9 +265,10 @@ export type SculptKind = keyof typeof SCULPTS;
 /**
  * A dressed muse's arms' cut (H): out from x on its arm or sleeve (between
  * two heights, where a sleeve or an armhole is all that is that far out),
- * and the body well away from it, as tpose6's.
+ * and the body well away from it, as tpose6's (in front of and behind z: an
+ * arm held further forward than tpose6's needs it further out).
  */
-const DRESSED_CUT = (x: number, y: readonly [number, number] = [0, 1]): Sculpt['cut'] => ({ arm: { x, y }, body: { x: 0.2, y: [0.3, 0.68], z: [-0.2, 0.2] } });
+const DRESSED_CUT = (x: number, y: readonly [number, number] = [0, 1], z = 0.2): Sculpt['cut'] => ({ arm: { x, y }, body: { x: 0.2, y: [0.3, 0.68], z: [-z, z] } });
 
 /**
  * Muses in clothes (src/assets/muse/muses/muse1–12.glb), sculpts again: each
@@ -296,8 +297,8 @@ export const DRESSED = {
   muse9: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Teal; an orange shirt with a round collar, buttons and cap sleeves (a fold over the arm's top: they turn with it by how far out they are), a camera on a strap, a bow at its back; its arms are pieces of their own. */
   muse10: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.25 } },
-  /** Grey; a yellow T-shirt with short sleeves (cut with the arm), a navy nightcap with a star at its tip; a round tail; its arms are pieces of their own, its plate grown into its head. */
-  muse11: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.26 } },
+  /** Grey; a yellow T-shirt with cap sleeves, a navy nightcap with a star at its tip; a round tail; its arms are pieces of their own, held further forward than the others' (to 0.24 H in front), its plate grown into its head. */
+  muse11: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45, [0, 1], 0.3), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.26 } },
   /** Pink; a green wrap top with short sleeves (cut with the arm) and a bow at its side, a green headband with a bow, sandals; its arms are pieces of their own. */
   muse12: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.25 } },
 } as const satisfies Record<string, Sculpt>;
@@ -651,6 +652,9 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   if (mirror) mirrorWeights(full, mirror);
   // (a dressed muse: a loose piece weighs as the skin under it, so a sleeve's cuff goes with the arm in it; a small
   // thing of cloth or wood, and a hat, go whole, as the mean of their weights)
+  // (a plate grown into the hood: the hood round it turns with the head as the plate does, else their seam opens
+  // as the head tilts back)
+  if (fused && fused.size > 0) holdFace(pos, fineIndex, full, fine.face);
   const beneath = loose ? underSkin(pos, fineIndex, loose, pieceOf) : null;
   if (beneath) carryWeights(full, beneath);
   // (a loose piece mostly on an arm, a sleeve's cuff, goes whole with it: read from the skin under it, its edge on the
@@ -2802,6 +2806,31 @@ function pressedFur(pos: Float32Array, nrm: Float32Array, index: ArrayLike<numbe
 
 /** Fur under cloth (H): pressed flat where the cloth is this near, free where it is this far (the fur's length and a little). */
 const PRESSED = { flat: 0.012, free: 0.05 } as const;
+
+/**
+ * The skin round a plate grown into the hood (4's, 8's, 11's) weighed toward the head, as the plate is: the two
+ * were one surface, split at the plate's rim, and where their weights differ the rim opens as the head turns
+ * on the chest. Wholly the head's at the rim, the body's own again HOLD_FACE out from it.
+ */
+function holdFace(pos: Float32Array, index: ArrayLike<number>, full: Float32Array, face: boolean[]): void {
+  const plate: number[] = [];
+  for (let t = 0; t < index.length; t += 3) if (face[index[t]] && face[index[t + 1]] && face[index[t + 2]]) plate.push(index[t], index[t + 1], index[t + 2]);
+  if (plate.length === 0) return;
+  const field = new MeshField(pos, plate, DRESSED_BOX, 0.01);
+  const near = [0, 0, 0];
+  for (let i = 0; i < face.length; i++) {
+    if (face[i]) continue;
+    const [x, y, z] = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
+    if (field.nearest(x, y, z, near) < 0) continue;
+    const f = 1 - smooth01(Math.hypot(near[0] - x, near[1] - y, near[2] - z) / HOLD_FACE);
+    if (f <= 0) continue;
+    for (let j = 0; j < JOINTS; j++) full[i * JOINTS + j] *= 1 - f;
+    full[i * JOINTS + JOINT.head] += f;
+  }
+}
+
+/** Over how far from a grown-in plate the hood round it gives way from the head's to its own weights (H). */
+const HOLD_FACE = 0.05;
 
 /** The loose pieces mostly on an arm (their weights, as carried, more an arm's than the body's). */
 function onArms(full: Float32Array, loose: Set<number>, pieceOf: (i: number) => number): Set<number> {
