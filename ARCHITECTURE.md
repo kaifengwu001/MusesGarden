@@ -202,6 +202,15 @@ shaded by height rather than by the heap's own sun shadow, which drew the
 lobes' flat intersections as straight edges. The camera erodes only the lobes
 it comes within a few meters of.
 
+**Up close the veil is fog** (`veilFog`, cloud.frag.glsl): all fog nearer than
+70 m, all cloud past 220 m. Each lobe thins to nothing toward its edge,
+inside its lumpy outline. The fog's opacity is the depth of fog the view
+goes through above the ground (7 m hides two thirds of what lies behind), so
+it frays where it meets the ground. It is lit paler and flatter than cloud,
+grey-blue low down and white above. Each of these varies smoothly across the
+lobes, so no lobe's edge shows through, and the lakes mirror it the same. It
+is drawn after the clouds' own light, which it leaves to the bit.
+
 ## Chunks and the GPU data path (as built)
 
 Changed during the build: terrain is evaluated on the GPU from rest-space

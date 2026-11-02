@@ -50,6 +50,10 @@ ARCHITECTURE.md ("The unfolding"):
 - **The veil:** about 490 still heaps of the clouds' own puffs, clearing heap
   by heap out from the hut, in the clouds' rows (drawn, sorted and mirrored
   with them). It takes the drifting clouds' shadows and casts none.
+- **Up close it's fog** (Kai: "something fog like"): nearer than 70 m the
+  veil's lobes thin away to their edges, it is as opaque as the depth of fog
+  the view goes through above the ground, so it frays at its foot, and it
+  is lit paler and flatter. Past 220 m it is cloud again: orbit is unchanged.
 - **The flowers:** the existing bloom front, moved by the unfolding (the
   Bloom slider still sets the season; the lower of the two wins).
 - **Growth:** g from 0.1886 to 1 over the second half, the camera held
@@ -69,14 +73,17 @@ so, the planet fills the window by about R 200 m (u ≈ 0.58), and from there
 on we look at a patch of growing ground, 265 m below at R 400. Easing the
 camera back, or starting the growth farther out, was offered and turned down.
 
+Also decided (Kai, 2026-11-01): the page opens on the meadow as it was (the
+slider's middle; `#u=0` opens the start), and ahead of the flowers the grass
+stays the Bloom slider's early-spring grass, a little shorter and paler. Up
+close the veil should look like fog, not a smooth dome. Its cost is measured
+once its look is settled.
+
 Open (questions for Kai, and what wasn't done):
 
-- The page still opens on the meadow as it was (the slider's middle); `#u=0`
-  opens it at the start.
-- Up close a veil heap is one smooth dome; from orbit and the bird's-eye it
-  reads as cloud.
-- Ahead of the flowers the grass is the Bloom slider's early-spring grass
-  (a little shorter and paler).
+- Inside the veil (walking into it) the lobes round you give way: the fog
+  stands round you rather than closing in, and by a lake at eye level the
+  water's horizon shows hard against it.
 - Muse still roams under the veil, and the finds' beds and pins show
   wherever they are; the engine's growth (Fern's exploration) still sets the
   size directly, so the slider stands in for Muse's exploring.
