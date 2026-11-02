@@ -32,6 +32,15 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Gaps and flats
+
+Started from 4e936ca (the mathematical planet). Kai (2026-11-01), asked what the next round should take on: "Gaps and flats first". This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | The gaps: none against a red sky from any side (the last round left 66 pixels in 4 of 30 views, slits where bank ends meet along skylines) | |
+| 2 | The flats, after Kai's aerial of flat rice fields (long strips along gently curving lines, crossed more widely, each field its own green, thin dark bunds, a pale track winding through), without the trenches the last round left (a field's level floor sunk between the terraces where a flat strip runs along a ridge) | |
+
 ### The paddy lab's terraces brought to the planet
 
 Started from d894754 (the paddy lab's second round). Kai (2026-11-01), on the lab: "Bring it to the planet". This table fills in as they are done.
