@@ -32,6 +32,23 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the clouds, the build cached and a few faults in the flats
+
+Started from 228d47e (the flats divided; the towers, the villages and the clouds). Kai (2026-11-02), checking the planet on the local server, with three screenshots of faults and five paintings of clouds (reference/terraces/clouds-*: thin ribbons of mist meandering between blue-green mountains; flat banks lying in the valleys; a river of mist; a mountain in a sea of scrolled clouds; the scroll-cloud motif, long streamers with curled tips); this table fills in as they are done. Rows 2 to 7 are the faults as read from the screenshots (reference/terraces/kai-notes-*).
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | (on hiding the clouds until the ground has built) "leave as is" | |
+| 2 | "Everything is good except a few issues in the screenshot": the flats' grooves poke out of the slopes of the terraces below a plain, as dark ticks | |
+| 3 | (the same) a plain's strips fan to a point where its section narrows, in slivers | |
+| 4 | (the same) the grooves run on across the track, sunk slots in its surface | |
+| 5 | (the same) a few lines loop back: one turning back to the track it left, one closed on itself beside it | |
+| 6 | (the same) on a hilltop, cuts into the top paddy that stop in its middle | |
+| 7 | (the same) cream specks where ridges' ends poke through the earth at the woods' edge | |
+| 8 | "Cache the geometry build next time so that no rebuild is required unless geometry changed" | |
+| 9 | "There seems to be a bug where groups of clouds rotate against each other" | |
+| 10 | "Let's work on the shapes of the clouds: they are currently full, fat cumulus clouds. See reference for meandering, thinner clouds" | |
+
 ### Kai's notes on the flats: truly flat, divided as the aerials divide them
 
 Started from fbbf35e (the paddies painted as the lab paints them). Kai (2026-11-01), sending two aerials of flat rice fields (long fields in strips along a winding track; strips curving in families round a hut); this table fills in as they are done.
