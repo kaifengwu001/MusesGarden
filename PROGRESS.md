@@ -30,7 +30,7 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
-## The garden's controls, the second look (2026-11-01)
+## The garden's controls, the second look (in progress)
 
 Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with screenshots; this table fills in as they are done.
 
@@ -45,6 +45,7 @@ Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with
 | 7 | No line and dot under the card: the card alone | The line and its dot are gone; the card rises where it stands (ad84ef0). |
 | 8 | (asked) Why some glowing spheres look cut off: each glow is a flat sprite 0.6 m over its find at one depth, so ground rising toward the camera inside its glow hid part of it. Round again, still hidden by what truly stands in front | Each sphere is now depth-tested at the near edge of its own glow (its depth brought toward the camera by its radius, at most half its distance), so the ground inside the glow no longer cuts it, while a hill, the cottage, a cloud or the horizon between still hides it. In a view looking 40° down, 252 pixels were hidden by the ground under the glows; now 6 (503a435). |
 | 9 | The flowers' flight out of the basket looks inconsistent | One ordering slip: sending a flower stored where it was going before reading where it was, so it set off from its goal. On opening every flower sat on its slot from the first frame (moving 0.1 px a frame at most), on another day each new one jumped to its slot in one frame, and on closing each was back in at once; each act also had its own timing. Now every flower starts out of sight in the basket and rides it, turns upright, comes over the rim and reaches out to its slot: 30 frames each, 0.04 s apart, one easing, no jumps, for 1, 3, 5 and 12 flowers and on another day; dropping back in is the same played backward. Closing takes longer for it: 0.90 s with one flower, 1.33 s with twelve (0.73 before); another day takes 0.80 s (1.02 before) (b08c665, 1d639ca). |
+| 10 | (added) The open basket is the teammate's hand-drawn basket (7d7a4f9's rail icon), flat, so the icon grows into the same basket; no 3D model | |
 
 ### Checked (the second look)
 
