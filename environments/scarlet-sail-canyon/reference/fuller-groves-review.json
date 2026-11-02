@@ -1,7 +1,7 @@
 {
   "recordedAt": "2026-11-02T08:51:18.874Z",
   "head": "791263247a656a90c8950f4ef866eac564f2ea1f",
-  "baseline": "C:\\Users\\Xinra\\Documents\\Codex\\GardenTransfer\\muse_garden_1031\\handoffs\\windows\\scarlet-fuller-groves-2026-11-02T08-46-25-904Z",
+  "baseline": "handoffs/windows/scarlet-fuller-groves-2026-11-02T08-46-25-904Z",
   "before": {
     "recordedAt": "2026-11-02T08:47:30.903Z",
     "backend": "ANGLE D3D11",

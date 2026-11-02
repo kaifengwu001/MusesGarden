@@ -111,8 +111,12 @@ The user requested a larger tree population. Current evidence superseding moss-t
 
 **User-rejected color experiment; reverted.** These images are historical, not the current cloud palette.
 
-Current cloud-color evidence: [before](yellow-clouds-before.png), [user view after](yellow-clouds-user-view.png), [whole planet](yellow-clouds-globe.png), [metadata](yellow-clouds-review.json). Five noon cloud palette cells now give butter-yellow bodies, cream shading and near-white highlights. These supersede the earlier cool cloud shading; tree/terrain distribution is unchanged. Actual captures use RTX4070SUPER / ANGLE D3D11, 1280×800, DPR1, high/MSAA4, time12, without collected errors. See [validation](../VALIDATION.md) for the scoped check/build and color-bound browser result.
+Historical cloud-color evidence: [before](yellow-clouds-before.png), [user view after](yellow-clouds-user-view.png), [whole planet](yellow-clouds-globe.png), [metadata](yellow-clouds-review.json). Five noon cloud palette cells gave butter-yellow bodies, cream shading and near-white highlights during this rejected experiment; tree/terrain distribution was unchanged. Actual captures used RTX4070SUPER / ANGLE D3D11, 1280×800, DPR1, high/MSAA4, time12, without collected errors. See [validation](../VALIDATION.md) for the scoped check/build and color-bound browser result.
 
 ## Restored colors and denser clouds — 2 November 2026
 
 Current appearance: [before](denser-clouds-before.png), [globe after](denser-clouds-globe.png), [close after](denser-clouds-close.png), [metadata](denser-clouds-review.json). Original noon cloud colors restored; coverage default raised from0.48 to0.78. At the matched seed/size/time, cloud assemblies increase from95 to124. These supersede yellow-clouds-*; the yellow version was explicitly rejected. Renderer RTX4070SUPER / ANGLE D3D11, 1280×800, DPR1, high/MSAA4, time12. See [validation](../VALIDATION.md) for scoped check/build, two focused browser checks and existing diagnostic limits.
+
+## Current-main merge verification — 2 November 2026
+
+[Shelter](mainline-close.png), [globe](mainline-globe.png) and [merge-comparison metadata](mainline-review.json) verify integration with upstream main4259aea. Both frozen canvas hashes match the pre-merge source exactly; all four retained local shader files match their original source hashes. RTX4070SUPER / ANGLE D3D11, 1280×800, DPR1, high/MSAA4, time12, no captured errors. [Validation](../VALIDATION.md) records 140 CPU and five focused browser passes, scoped check/build and the initial shader-include failure that was corrected.

@@ -167,3 +167,15 @@ The user rejected the yellow color and requested more cloud density. The exact p
 Matched seed412/R128/time12 captures show **124 cloud assemblies instead of 95**, about 31% more. In the user's overview, drawn clouds increase from 82 to107; in the close view, from71 to90. Actual [before](reference/denser-clouds-before.png), [globe after](reference/denser-clouds-globe.png), [close after](reference/denser-clouds-close.png) and [metadata/source hashes](reference/denser-clouds-review.json) record the restored cool shading and fuller surrounding bands. RTX4070SUPER / ANGLE D3D11, 1280×800, DPR1, high/MSAA4; no captured page or console errors.
 
 Scoped TypeScript/ESLint and build pass, retaining the existing chunk-size warning. Two focused native-D3D11 browser checks pass: frozen-frame redraw and MSAA color bounds. No broader CPU/browser rerun is claimed for these two parameter/palette edits. Earlier initial-globe/time-return hash diagnostics remain unresolved. Baseline `handoffs/windows/scarlet-denser-clouds-2026-11-02T09-12-23-828Z` preserves prior work/index. Only two source files plus documentation changed; preview5227 retained, no publication.
+
+## Commit and current-main integration — 2 November 2026
+
+The user authorized committing the complete Scarlet refinement and merging into local `main`. Source commit `05b773c` contains the reviewed source, reference evidence and continuation docs. It was merged without textual conflicts with fetched `origin/main` at `4259aea` (38 commits newer than the original base), producing merge commit `54830ea` in an isolated integration worktree.
+
+Mainline changed the shared character-shadow and stove shaders. Local copies retain Scarlet's additive shadow depth and porch glow. The first integration browser run exposed a missing `meadow_muse_shadow` include in the newer shared grass shader; that run failed and was stopped. Preserving the matching original grass vertex shader locally resolved it. All four local shaders match their pre-merge source hashes; shared engine/server/lockfile content is unchanged from upstream main.
+
+- **140 CPU tests across 16 files pass.** Scoped TypeScript/ESLint and the final standalone build pass; existing chunk-size warning remains.
+- **Five focused browser checks pass on the corrected merged version:** ecology, repeat-load determinism, frozen redraw, growth return and MSAA color bounds. Native ANGLE D3D11 on RTX4070SUPER, one worker.
+- Paired pre/post-mainline captures at 1280×800, DPR1, high/MSAA4, frozen time12 have **identical canvas hashes in both shelter and globe views** (`f5165d52` and `87d34632`). Both report no page/console errors. Actual [shelter](reference/mainline-close.png), [globe](reference/mainline-globe.png) and [metadata/shader hashes](reference/mainline-review.json) were reviewed.
+
+This confirms those two merge-comparison views, not the older unresolved strict first-globe and custom time-return diagnostics. No thresholds or goldens were relaxed. Validation used temporary port5267; normal preview5227 remains the review entry point. The integration is local; no remote push or deployment was requested.

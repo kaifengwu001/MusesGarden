@@ -1,0 +1,536 @@
+{
+  "recordedAt": "2026-11-02T09:29:50.638Z",
+  "sourceCommit": "05b773c4e352d32a81566c8ca29fa7840f29668a",
+  "upstreamMain": "4259aea7d0ebb95b83f9ab2c889515d2e0561ac8",
+  "mergeCommit": "54830eaab5a19299a05bcc3db004968b658cf9af",
+  "before": {
+    "recordedAt": "2026-11-02T09:27:42.872Z",
+    "backend": "ANGLE D3D11",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "dpr": 1,
+    "errors": [],
+    "views": [
+      {
+        "state": "q=high&t=12&pose=-0.0859,-0.0242,0.6199,0.7796,0.624",
+        "stats": {
+          "frameMs": 16.599999999999454,
+          "jsMs": 2.600000001490116,
+          "gpuMs": 5.449632,
+          "drawCalls": 102,
+          "triangles": 3780941,
+          "trianglesSubmitted": 3780941,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 21,
+          "geometries": 108,
+          "programs": 34,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 427,
+          "lodMin": 2,
+          "lodMax": 5,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5688,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "hash": "f5165d52:1280x800",
+        "batches": [
+          {
+            "name": "Mature scarlet fan trees",
+            "count": 144,
+            "triangles": 146016
+          },
+          {
+            "name": "Fractured chalk slabs",
+            "count": 628,
+            "triangles": 74732
+          },
+          {
+            "name": "Ivory comb-ferns",
+            "count": 110,
+            "triangles": 66000
+          },
+          {
+            "name": "Connected chalk escarpments",
+            "count": 68,
+            "triangles": 123352
+          },
+          {
+            "name": "Creeping olive leaf carpets",
+            "count": 699,
+            "triangles": 433380
+          },
+          {
+            "name": "Scarlet lobed understory",
+            "count": 349,
+            "triangles": 146580
+          },
+          {
+            "name": "Twin-crown scarlet fan trees",
+            "count": 140,
+            "triangles": 141120
+          },
+          {
+            "name": "Young scarlet fan groves",
+            "count": 141,
+            "triangles": 117594
+          },
+          {
+            "name": "Twiggy olive shrubs",
+            "count": 160,
+            "triangles": 99200
+          },
+          {
+            "name": "Connected chalk escarpments 2",
+            "count": 60,
+            "triangles": 78060
+          },
+          {
+            "name": "Connected chalk escarpments 3",
+            "count": 73,
+            "triangles": 125268
+          },
+          {
+            "name": "Connected chalk escarpments 4",
+            "count": 60,
+            "triangles": 52620
+          },
+          {
+            "name": "Broad living ground colonies and chalk seams",
+            "count": 3164,
+            "triangles": 329056
+          },
+          {
+            "name": "Coral and olive gardens rooted in moss",
+            "count": 578,
+            "triangles": 238136
+          },
+          {
+            "name": "Ivory and olive gardens rooted in moss",
+            "count": 664,
+            "triangles": 302784
+          }
+        ]
+      },
+      {
+        "state": "cam=overview&q=high&t=12&pose=0.1384,-0.1251,-0.3539,0.9165,0",
+        "stats": {
+          "frameMs": 16.5,
+          "jsMs": 1.2999999970197678,
+          "gpuMs": 2.414592,
+          "drawCalls": 50,
+          "triangles": 2535299,
+          "trianglesSubmitted": 2535299,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 111,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 23,
+          "lodMin": 1,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5688,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "hash": "87d34632:1280x800",
+        "batches": [
+          {
+            "name": "Mature scarlet fan trees",
+            "count": 144,
+            "triangles": 146016
+          },
+          {
+            "name": "Fractured chalk slabs",
+            "count": 628,
+            "triangles": 74732
+          },
+          {
+            "name": "Ivory comb-ferns",
+            "count": 110,
+            "triangles": 66000
+          },
+          {
+            "name": "Connected chalk escarpments",
+            "count": 68,
+            "triangles": 123352
+          },
+          {
+            "name": "Creeping olive leaf carpets",
+            "count": 699,
+            "triangles": 433380
+          },
+          {
+            "name": "Scarlet lobed understory",
+            "count": 349,
+            "triangles": 146580
+          },
+          {
+            "name": "Twin-crown scarlet fan trees",
+            "count": 140,
+            "triangles": 141120
+          },
+          {
+            "name": "Young scarlet fan groves",
+            "count": 141,
+            "triangles": 117594
+          },
+          {
+            "name": "Twiggy olive shrubs",
+            "count": 160,
+            "triangles": 99200
+          },
+          {
+            "name": "Connected chalk escarpments 2",
+            "count": 60,
+            "triangles": 78060
+          },
+          {
+            "name": "Connected chalk escarpments 3",
+            "count": 73,
+            "triangles": 125268
+          },
+          {
+            "name": "Connected chalk escarpments 4",
+            "count": 60,
+            "triangles": 52620
+          },
+          {
+            "name": "Broad living ground colonies and chalk seams",
+            "count": 3164,
+            "triangles": 329056
+          },
+          {
+            "name": "Coral and olive gardens rooted in moss",
+            "count": 578,
+            "triangles": 238136
+          },
+          {
+            "name": "Ivory and olive gardens rooted in moss",
+            "count": 664,
+            "triangles": 302784
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "recordedAt": "2026-11-02T09:27:49.579Z",
+    "backend": "ANGLE D3D11",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "dpr": 1,
+    "errors": [],
+    "views": [
+      {
+        "state": "q=high&t=12&pose=-0.0859,-0.0242,0.6199,0.7796,0.624",
+        "stats": {
+          "frameMs": 16.699999999999818,
+          "jsMs": 2.300000000745058,
+          "gpuMs": 5.574656,
+          "drawCalls": 102,
+          "triangles": 3780941,
+          "trianglesSubmitted": 3780941,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 21,
+          "geometries": 108,
+          "programs": 34,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 427,
+          "lodMin": 2,
+          "lodMax": 5,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5050.199999999255,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "hash": "f5165d52:1280x800",
+        "batches": [
+          {
+            "name": "Mature scarlet fan trees",
+            "count": 144,
+            "triangles": 146016
+          },
+          {
+            "name": "Fractured chalk slabs",
+            "count": 628,
+            "triangles": 74732
+          },
+          {
+            "name": "Ivory comb-ferns",
+            "count": 110,
+            "triangles": 66000
+          },
+          {
+            "name": "Connected chalk escarpments",
+            "count": 68,
+            "triangles": 123352
+          },
+          {
+            "name": "Creeping olive leaf carpets",
+            "count": 699,
+            "triangles": 433380
+          },
+          {
+            "name": "Scarlet lobed understory",
+            "count": 349,
+            "triangles": 146580
+          },
+          {
+            "name": "Twin-crown scarlet fan trees",
+            "count": 140,
+            "triangles": 141120
+          },
+          {
+            "name": "Young scarlet fan groves",
+            "count": 141,
+            "triangles": 117594
+          },
+          {
+            "name": "Twiggy olive shrubs",
+            "count": 160,
+            "triangles": 99200
+          },
+          {
+            "name": "Connected chalk escarpments 2",
+            "count": 60,
+            "triangles": 78060
+          },
+          {
+            "name": "Connected chalk escarpments 3",
+            "count": 73,
+            "triangles": 125268
+          },
+          {
+            "name": "Connected chalk escarpments 4",
+            "count": 60,
+            "triangles": 52620
+          },
+          {
+            "name": "Broad living ground colonies and chalk seams",
+            "count": 3164,
+            "triangles": 329056
+          },
+          {
+            "name": "Coral and olive gardens rooted in moss",
+            "count": 578,
+            "triangles": 238136
+          },
+          {
+            "name": "Ivory and olive gardens rooted in moss",
+            "count": 664,
+            "triangles": 302784
+          }
+        ]
+      },
+      {
+        "state": "cam=overview&q=high&t=12&pose=0.1384,-0.1251,-0.3539,0.9165,0",
+        "stats": {
+          "frameMs": 16.600000000000364,
+          "jsMs": 1.2999999970197678,
+          "gpuMs": 1.876992,
+          "drawCalls": 50,
+          "triangles": 2535299,
+          "trianglesSubmitted": 2535299,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 111,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 23,
+          "lodMin": 1,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5050.199999999255,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "hash": "87d34632:1280x800",
+        "batches": [
+          {
+            "name": "Mature scarlet fan trees",
+            "count": 144,
+            "triangles": 146016
+          },
+          {
+            "name": "Fractured chalk slabs",
+            "count": 628,
+            "triangles": 74732
+          },
+          {
+            "name": "Ivory comb-ferns",
+            "count": 110,
+            "triangles": 66000
+          },
+          {
+            "name": "Connected chalk escarpments",
+            "count": 68,
+            "triangles": 123352
+          },
+          {
+            "name": "Creeping olive leaf carpets",
+            "count": 699,
+            "triangles": 433380
+          },
+          {
+            "name": "Scarlet lobed understory",
+            "count": 349,
+            "triangles": 146580
+          },
+          {
+            "name": "Twin-crown scarlet fan trees",
+            "count": 140,
+            "triangles": 141120
+          },
+          {
+            "name": "Young scarlet fan groves",
+            "count": 141,
+            "triangles": 117594
+          },
+          {
+            "name": "Twiggy olive shrubs",
+            "count": 160,
+            "triangles": 99200
+          },
+          {
+            "name": "Connected chalk escarpments 2",
+            "count": 60,
+            "triangles": 78060
+          },
+          {
+            "name": "Connected chalk escarpments 3",
+            "count": 73,
+            "triangles": 125268
+          },
+          {
+            "name": "Connected chalk escarpments 4",
+            "count": 60,
+            "triangles": 52620
+          },
+          {
+            "name": "Broad living ground colonies and chalk seams",
+            "count": 3164,
+            "triangles": 329056
+          },
+          {
+            "name": "Coral and olive gardens rooted in moss",
+            "count": 578,
+            "triangles": 238136
+          },
+          {
+            "name": "Ivory and olive gardens rooted in moss",
+            "count": 664,
+            "triangles": 302784
+          }
+        ]
+      }
+    ]
+  },
+  "media": [
+    {
+      "file": "mainline-close.png",
+      "sha256": "069bc89e9fcbfda9c25899682f15b06e3b39d120b041bc7031c31a393c48e1fb"
+    },
+    {
+      "file": "mainline-globe.png",
+      "sha256": "173a2bd7eded413ec9280b17ba49fefff8c6d53d00ad852257a967638a41a7ad"
+    }
+  ],
+  "shaders": [
+    {
+      "file": "grass.vert.glsl",
+      "sha256": "f6a7c2971bfb68f7f80db76fdb75b4c06b05e7924a6a05bd8f5ee144db862b2a",
+      "matchesPreMergeSource": true
+    },
+    {
+      "file": "museShadow.frag.glsl",
+      "sha256": "314515509506a394a0c69b1b314106968cb6d16c9ba9b6cc0179b8c29352d137",
+      "matchesPreMergeSource": true
+    },
+    {
+      "file": "museProps.vert.glsl",
+      "sha256": "2a7a9708181c5c4dfe950388277752ed07923ca895ba4cba95d856f0f4c853d7",
+      "matchesPreMergeSource": true
+    },
+    {
+      "file": "museProps.frag.glsl",
+      "sha256": "e9e6358ac6869a70c2edc122e270e05195bc4adb39d0e3cfb36a28efa38574e6",
+      "matchesPreMergeSource": true
+    }
+  ],
+  "matchingFrames": [
+    true,
+    true
+  ],
+  "validation": {
+    "cpuTests": 140,
+    "cpuFiles": 16,
+    "browserTests": 5,
+    "check": "pass",
+    "build": "pass; existing chunk-size warning"
+  },
+  "limitations": [
+    "Earlier strict initial-globe and custom time-return diagnostics are not cleared by this paired mainline comparison."
+  ]
+}

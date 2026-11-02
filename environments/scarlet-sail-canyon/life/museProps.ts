@@ -35,8 +35,9 @@ import lineFragment from '../../../src/life/museLine.frag.glsl?raw';
 import lineVertex from '../../../src/life/museLine.vert.glsl?raw';
 import moteFragment from '../../../src/life/museMotes.frag.glsl?raw';
 import moteVertex from '../../../src/life/museMotes.vert.glsl?raw';
-import fragmentShader from '../../../src/life/museProps.frag.glsl?raw';
-import vertexShader from '../../../src/life/museProps.vert.glsl?raw';
+// Scarlet retains its porch stove and the aGlow/uGlow fire treatment.
+import fragmentShader from './museProps.frag.glsl?raw';
+import vertexShader from './museProps.vert.glsl?raw';
 import { COOK, FISH, STIR, cookBeats, fishBeats, sleepBeats, type MuseRig } from '../../../src/life/museRig';
 import { STOVE, type Roaming } from './museRoam';
 import { FLOOR } from './props';
