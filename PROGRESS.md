@@ -38,12 +38,21 @@ Started from 27961a4 (the mist in three layers). Kai (2026-11-02), with the blue
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | "Layers are too high up" | |
-| 2 | "Too sparse" | |
-| 3 | "Shape of cloud needs refinement: not curving / detailed enough. See reference and match as close as possible" | |
-| 4 | (Kai, on the work in progress) "Reduce count by 30%" | |
-| 5 | (the same) "The way they meander is still a bit too simplistic and mechanical compared to the example" | |
-| 6 | (the same) "Their widths also don't grow and shrink as dynamically as the painting" | |
+| 1 | "Layers are too high up" | Three layers low among the hills, each at its height over the land's form rather than over the planet's radius: in the valleys (2.5 m under the land's broadest form, nearly level, the hills rising through it), up the hills' sides (0.5 m over a form half way to the hills'), and 3 m over the hills themselves (following their form 85 % of the way). They had been at −5, 2 and 16 m over the radius, the highest above every hill. |
+| 2 | "Too sparse" | The mist covered 32.7 % of the planet seen from above at its densest (row 4 took it back). |
+| 3 | "Shape of cloud needs refinement: not curving / detailed enough. See reference and match as close as possible" | Each band is now a stroke of its own, as the painting brushes its ribbons (mistStrokes.ts). It runs along the wind, meanders (row 5) and swells and pinches (row 6), is scalloped along one edge and pointed at its tail, and two in five end in a curl that turns tighter and tighter, the scroll clouds' hook. A third fork, a branch peeling off; a third have a sibling stacked beside them, as the painting's ribbons lie in parallel runs; strokes merge where they cross. Painted cream, greyer toward the edge, with a fine darker outline (colours measured from the painting: core #EEEADB, edge #D6D4C6, outline #C2C5BE), crisp-edged, crisper still where a ribbon meets a slope. Each layer's strokes are drawn once a seed into its cube map as the distance from their edges, so the edges stay crisp near and far. |
+| 4 | (Kai, on the work in progress) "Reduce count by 30%" | The strokes cover 21.5 % of the planet seen from above, against the 32.7 % of the bands Kai saw: about 30 % less (measured in Node over 30,000 points, a stroke counted where its layer clears the ground). |
+| 5 | (the same) "The way they meander is still a bit too simplistic and mechanical compared to the example" | The bands had been the contour lines of one smooth field, so neighbours wiggled in step, all at one size. Each stroke now follows a path of its own, meandering as a river does: a sine-generated curve (Kinoshita's) whose sinuosity (20° to 85°) and wavelength (22–48 m) wander along it, so calm stretches give way to coiling ones, its bends leaning to one side. It is steered round the hills its layer meets, so it winds along the valleys between them. |
+| 6 | (the same) "Their widths also don't grow and shrink as dynamically as the painting" | A stroke's breadth now swells into long broad bodies up to 1.7× its own and pinches to necks of half, over 20–30 m along it. Its tail tapers to a point, it thins through its tightest bends and into its curl, and one edge is scalloped by up to 35 %. Before, widths varied by ±15 %. |
+
+Measured (04f0a49, Chrome on this Mac):
+
+- The mist from above (30,000 points over the planet, a stroke counted where its layer clears the ground): 21.5 % of the planet (1.7 / 6.9 / 14.5 % by layer, valleys to hills), against 32.7 % for the bands Kai saw before (the layers' noise bands at 18–26 m). The strokes: 41, 89 and 122 by layer (18, 34 and 50 of them branches or siblings), made in about 0.3 s once a seed.
+- `npm run check` and `npm test` (122, three new: the same strokes for a seed, the fewer shown the first of the more; none where a layer never clears the ground; every segment on the sphere, broad bodies and thin necks both) pass. Nothing outside src/terraces has changed since the last meadow proof (ea9c684: identical in all nine views, High and Medium at 2×, High at 1×), so the meadow is unchanged; the GPU tests and shots were not run again.
+
+Trades: none in the look. Not measured again: the shells' cost (their shader is simpler than the 0.2–1.2 ms version's: one lookup where it had three and the presence's arithmetic).
+
+Still open: the top layer lies close over the hills, so seen at an angle its ribbons look laid on them rather than floating level as the painting's do (Kai's call: level would leave fewer over the hills); from above, where all three layers meet over the low flats, the strokes pile into a tangle; the strokes keep their shapes as they drift; they are made on the main thread, a hitch of about 0.3 s at the first frame and at each step of the coverage or wind sliders; the colours are the painting's cream (no gold or teal). Checkpoints: docs/checkpoints/terraces-10/ (the strokes from 70 m, 30 m, the vista, straight down over two places and from orbit, beside the painting).
 
 ### Kai's notes on the mist bands
 
