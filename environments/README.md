@@ -62,3 +62,5 @@ records the meadow commit it was copied from.
 [Tulipwind Meadows](tulip-windmill-meadows/README.md) is served on port 5241 with `npm run dev:tulip`. Dense tulip ribbons, turning windmills and varied cottage gardens form a separate cultivated planet.
 
 [Cherry Blossom Waterways](cherry-blossom-waterways/README.md) is served on port 5249 with `npm run dev:cherry`. It combines pink and ivory cherry groves, green willows, blue canals, a tiled pavilion and duck flocks.
+
+[Sequoia Shrine](sequoia-shrine/README.md) is served on port 5245 with `npm run dev:sequoia`. Dense ancient forest covers a planet of widely separated shrines, connected hiking trails and a separate cedar home for Muse.

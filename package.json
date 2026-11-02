@@ -32,7 +32,11 @@
     "check:tulip": "tsc -p environments/tulip-windmill-meadows/tsconfig.json && eslint environments/tulip-windmill-meadows",
     "dev:cherry": "vite --port 5249 --strictPort",
     "check:cherry": "tsc -p environments/cherry-blossom-waterways/tsconfig.json && eslint environments/cherry-blossom-waterways",
-    "build:cherry": "tsc -p environments/cherry-blossom-waterways/tsconfig.json && vite build --config environments/cherry-blossom-waterways/vite.config.ts"
+    "build:cherry": "tsc -p environments/cherry-blossom-waterways/tsconfig.json && vite build --config environments/cherry-blossom-waterways/vite.config.ts",
+    "dev:sequoia": "vite --host 127.0.0.1 --port 5245 --strictPort",
+    "check:sequoia": "tsc -p environments/sequoia-shrine/tsconfig.json && eslint environments/sequoia-shrine",
+    "build:sequoia": "tsc -p environments/sequoia-shrine/tsconfig.json && vite build --config environments/sequoia-shrine/vite.config.ts",
+    "test:sequoia:browser": "playwright test --config environments/sequoia-shrine/playwright.config.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

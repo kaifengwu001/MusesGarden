@@ -1,0 +1,30 @@
+{
+  "recordedAt": "2026-11-02T09:25:40.913Z",
+  "baseline": "C:\\Users\\Xinra\\Documents\\Codex\\GardenTransfer\\muse_garden_1031\\handoffs\\windows\\sequoia-baseline-2026-11-02T09-00-49-582Z\\sequoia-shrine-worktree",
+  "changedExisting": [
+    "environments/sequoia-shrine/CONSTRUCTION.md",
+    "environments/sequoia-shrine/README.md",
+    "environments/sequoia-shrine/VALIDATION.md",
+    "environments/sequoia-shrine/dev/forest.spec.ts",
+    "environments/sequoia-shrine/dev/grove.test.ts",
+    "environments/sequoia-shrine/dev/invariants/scale.test.ts",
+    "environments/sequoia-shrine/life/grove.ts",
+    "environments/sequoia-shrine/life/muse.ts",
+    "environments/sequoia-shrine/life/museProps.ts",
+    "environments/sequoia-shrine/life/museRoam.ts",
+    "environments/sequoia-shrine/life/props.vert.glsl",
+    "environments/sequoia-shrine/main.ts",
+    "environments/sequoia-shrine/planet/meadow.glsl",
+    "environments/sequoia-shrine/planet/terrain.glsl",
+    "environments/sequoia-shrine/planet/terrain.ts",
+    "environments/sequoia-shrine/reference/README.md",
+    "environments/sequoia-shrine/ui/garden/gardenUi.ts",
+    "environments/sequoia-shrine/ui/garden/travel.ts",
+    "environments/sequoia-shrine/ui/sequoia.css",
+    "environments/sequoia-shrine/world.ts"
+  ],
+  "missing": [],
+  "outsideEnvironmentChanges": [],
+  "stagedUnchanged": true,
+  "captureSourceMismatch": []
+}

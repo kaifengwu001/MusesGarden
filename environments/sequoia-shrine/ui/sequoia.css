@@ -1,0 +1,10 @@
+:root { --ink: #25443e; --paper: #ecebd9; }
+.masthead { color: #e7e8cf; text-shadow: 0 1px 10px #183c36; }
+.masthead h1 { font-size: clamp(30px, 4.3vw, 61px); letter-spacing: -.045em; }
+.world-line { color: #d5dfd0; }
+.grove-places { position: absolute; top: 144px; left: 44px; right:18px; display: flex; flex-wrap:wrap; gap: 6px; pointer-events: auto; }
+.grove-places button { border: 1px solid #aebca3; border-radius: 4px; background: #e7e7d6e8; color: #284b44; padding: 9px 13px; font-family: inherit; cursor: pointer; }
+.grove-places button:hover { background: #fbf6df; }
+.control-bar { background: #e8ead7e8; }
+.hints { color: #dce6ce; text-shadow: 0 1px 4px #244f45; }
+@media(max-width:700px) { .grove-places {top:110px;left:18px;gap:4px}.grove-places button {padding:8px;font-size:11px} }
