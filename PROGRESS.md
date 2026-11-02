@@ -44,6 +44,9 @@ Started from fbbf35e (the paddies painted as the lab paints them). Kai (2026-11-
 | 4 | "The surfaces of the cells rise above the divides, but the surfaces should be co-planar with each other" | |
 | 5 | (Kai, 2026-11-02, on the work in progress) "Still getting paddies invading into flat areas: how did we avoid that in the lab?" | |
 | 6 | "Flat cells are still too large, and their divides not curved enough" | |
+| 7 | (Kai, 2026-11-02) "Once you are done with a good flat, continue to populate the planet with mountain groups (2-4 items) on hill tops" | |
+| 8 | "some larger flats being converted to villages (fill buildings + trees)" | |
+| 9 | "and a cloud layer that's just hanging above ground (like meadows, but much more cloudy)" | |
 
 ### Kai's notes on the planet's paddies against the lab
 
