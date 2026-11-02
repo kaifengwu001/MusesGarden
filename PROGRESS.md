@@ -32,10 +32,10 @@ as the latest alone (a fix between iterations).
 
 ## The muses in clothes (2026-11-02, in the lab)
 
-Kai's nine liked concepts, made into models (`src/assets/muse/muses/muse1–9.glb`), rigged as Muse is
-(museMesh.ts `DRESSED`): one at a time at `museLab.html#model=muse1` … `muse9` (all the lab's looks, and
-`look=kind`: fur cream, cloth blue, face pink), and all nine in a row at `museLab.html#lineup=1`
-(museLineup.ts).
+Kai's liked concepts, made into models (`src/assets/muse/muses/muse1–12.glb`: nine, then three more),
+rigged as Muse is (museMesh.ts `DRESSED`): one at a time at `museLab.html#model=muse1` … `muse12` (all the
+lab's looks, and `look=kind`: fur cream, cloth blue, face pink), and all twelve in a row at
+`museLab.html#lineup=1` (museLineup.ts).
 
 - **Prepared.** Each face is found by its eyes (a hat is wider than a plate), and the sculpt scaled so its
   eyes are at tpose6's height (a hat reaches above 1). The sculpt's eyes and mouth are left out and Muse's
@@ -52,7 +52,12 @@ Kai's nine liked concepts, made into models (`src/assets/muse/muses/muse1–9.gl
   goes whole if it is on an arm; small things and hats go whole.
 - **The lineup.** Each idles on its own clock (breath, blinks, its weight shifting, glances) with a habit at
   seeded times (a yawn, its fur shaken out, a hop, a long look round). A tap: a wave, or a bounce; a hold:
-  petted (> <, hearts, its fur up if held long); it turns to you. 60 fps at 1600 × 900, ready in about 4 s.
+  petted (> <, hearts, its fur up if held long); it turns to you. 60 fps at 1600 × 900, ready in about 4 s;
+  the camera stands back far enough to see the whole row.
+- **10–12** (teal in an orange shirt with a camera, grey in a T-shirt and a nightcap, pink in a wrap top and
+  a headband): arms of their own pieces in short sleeves, which are cut with the arm. 11's plate is grown
+  into its head, which is round it back to front: a plate is now a shallow dome (no deeper than 0.25 H), so
+  the head isn't taken for it.
 - **Kai's notes, first look:** 5's sleeve didn't follow its arm (now cut with it); 2's arm left a hole in its
   side (its arm sat in sleeves of the smock's that run into its body: it now turns where it comes out of
   them, and fills them as it hangs).

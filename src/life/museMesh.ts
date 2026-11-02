@@ -263,7 +263,7 @@ export type SculptKind = keyof typeof SCULPTS;
 const DRESSED_CUT = (x: number, y: readonly [number, number] = [0, 1]): Sculpt['cut'] => ({ arm: { x, y }, body: { x: 0.2, y: [0.3, 0.68], z: [-0.2, 0.2] } });
 
 /**
- * Muses in clothes (src/assets/muse/muses/muse1–9.glb), sculpts again: each
+ * Muses in clothes (src/assets/muse/muses/muse1–12.glb), sculpts again: each
  * in tpose6's near T-pose, scaled so its eyes are at tpose6's height (a hat
  * reaches above 1). Their fits are tpose6's until measured off them
  * (measureFit), their cuts out from where the arm (or its sleeve) is clear.
@@ -287,6 +287,12 @@ export const DRESSED = {
   muse8: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
   /** Green; a crown of flowers, a woven grass apron with a leaf on it. */
   muse9: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.42), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Teal; an orange shirt with a round collar, buttons and short sleeves (cut with the arm), a camera on a strap, a bow at its back; its arms are pieces of their own. */
+  muse10: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.31, [0.38, 0.6]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Grey; a yellow T-shirt with short sleeves (cut with the arm), a navy nightcap with a star at its tip; a round tail; its arms are pieces of their own, its plate grown into its head. */
+  muse11: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.31, [0.38, 0.6]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
+  /** Pink; a green wrap top with short sleeves (cut with the arm) and a bow at its side, a green headband with a bow, sandals; its arms are pieces of their own. */
+  muse12: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.3, [0.38, 0.6]), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } },
 } as const satisfies Record<string, Sculpt>;
 export type DressedKind = keyof typeof DRESSED;
 
@@ -2214,7 +2220,8 @@ function faceParts(box: Map<number, number[]>): FaceParts | null {
   }
   let plate = -1;
   for (const [r, b] of box) {
-    if (features.has(r) || b[0] > -eye[0] || b[1] < eye[0] || b[2] > eye[1] - 0.05 || b[3] < eye[1] + 0.04 || Math.abs(b[5] - eye[3]) > 0.08 || b[1] - b[0] > 0.5) continue;
+    // (a shallow dome in front: a head grown round its plate is round it, back to front)
+    if (features.has(r) || b[0] > -eye[0] || b[1] < eye[0] || b[2] > eye[1] - 0.05 || b[3] < eye[1] + 0.04 || Math.abs(b[5] - eye[3]) > 0.08 || b[1] - b[0] > 0.5 || b[5] - b[4] > 0.25) continue;
     const pb = box.get(plate);
     if (!pb || (b[1] - b[0]) * (b[3] - b[2]) < (pb[1] - pb[0]) * (pb[3] - pb[2])) plate = r;
   }

@@ -29,6 +29,9 @@ export const DRESSED_URLS: Record<DressedKind, string> = {
   muse7: new URL('../assets/muse/muses/muse7.glb', import.meta.url).href,
   muse8: new URL('../assets/muse/muses/muse8.glb', import.meta.url).href,
   muse9: new URL('../assets/muse/muses/muse9.glb', import.meta.url).href,
+  muse10: new URL('../assets/muse/muses/muse10.glb', import.meta.url).href,
+  muse11: new URL('../assets/muse/muses/muse11.glb', import.meta.url).href,
+  muse12: new URL('../assets/muse/muses/muse12.glb', import.meta.url).href,
 };
 
 /**

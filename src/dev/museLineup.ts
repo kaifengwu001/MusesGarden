@@ -61,6 +61,9 @@ const HABITS: readonly { kind: MoveKind | 'look'; every: number }[] = [
   { kind: 'look', every: 12 },
   { kind: 'bounce', every: 18 },
   { kind: 'fluff', every: 15 },
+  { kind: 'look', every: 11 },
+  { kind: 'yawn', every: 12 },
+  { kind: 'bounce', every: 16 },
 ];
 const HABIT_LENGTH: Record<string, number> = { look: 3.2, fluff: FLUFF_LENGTH, bounce: BOUNCE_LENGTH, yawn: YAWN_LENGTH };
 /** Its spheres (its own frame: joint, offset up from it, radius) for picking it, as on the lab's stage. */
@@ -246,7 +249,14 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.setClearColor(new Color(1, 1, 1));
 const scene = new Scene();
 const camera = new PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 60);
-camera.position.set(0, 1.45, 10.2);
+/** Far enough back to see the whole row across the window (and as far up, the row seen from a little above). */
+const fit = (): void => {
+  const half = ((KINDS.length - 1) * SPACING) / 2 + 0.6;
+  const across = Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
+  const far = Math.max(4, half / Math.tan(across));
+  camera.position.set(0, 0.52 + 0.091 * far, far);
+};
+fit();
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 0.52, 0);
 controls.enableDamping = true;
