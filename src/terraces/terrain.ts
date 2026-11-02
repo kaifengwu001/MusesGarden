@@ -5,7 +5,6 @@ import type { GroundSample } from '../planet/terrain';
 import { TerraceCells } from './cells';
 import { TerraceFields, type TerraceBase, type TerraceFieldParams } from './fields';
 import { createCropSample, createPlotSample, PLOTS, SEASON, TERRACE, TerracePlots, type CropSample, type PlotSample } from './plots';
-import { CUTS } from './survey';
 
 // The terraced ground on the CPU: the camera's footing, picking, placement
 // and tests read it. Its twins on the GPU are plots.glsl, paddy.glsl and
@@ -13,6 +12,8 @@ import { CUTS } from './survey';
 // layout bake holds.
 
 export const R_REF = 128;
+/** The step of the cuts' field builtAt reads (the vista's model of the paddies, not their build: build/labels.ts). */
+const BUILT_CUT_STEP = 0.24;
 /** The mesh's finest grid (m: the leaves' 2 m over 16 steps), and how coarse it is at a distance (at most d / 22: CDLOD's ranges, chunks.ts). */
 export const MESH = { finest: 0.125, perMeter: 1 / 22, gather: [0.45, 0.55] } as const;
 
@@ -113,7 +114,7 @@ export class TerraceTerrain {
     out.flat = b.flat;
     const w = this.plots.walls(0, b.natural / TERRACE.step + this.plots.offset(0), builtWalls);
     out.level = Math.round(w.lo);
-    const at = Math.floor(this.plots.cutField(dir, out.level) / CUTS.step);
+    const at = Math.floor(this.plots.cutField(dir, out.level) / BUILT_CUT_STEP);
     builtPlot.id = this.plots.hash(0, out.level, at, 0, 47);
     builtPlot.season = this.plots.seasonOf(out.level, at);
     this.plots.cropOf(builtPlot, this.seasonFront, out.crop);

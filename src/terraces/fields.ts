@@ -72,7 +72,7 @@ const RIVER_STEP = 2;
 export const peakClass = { salt: salt('karst peaks'), jitter: 0.9 } as const;
 
 /** Where the land use turns wild: crowns and gullies in spreads of the hills' local relief, the hilltops' least height (m), the steepest terrace. */
-export const WILD = { crown: [0.7, 1.1], crownHeight: [5, 9], gully: [-0.85, -1.25], gullySlope: [0.1, 0.22], steep: [0.72, 0.86] } as const;
+export const WILD = { crown: [0.7, 1.1], crownHeight: [5, 9], gully: [-0.85, -1.25], gullySlope: [0.1, 0.22], steep: [0.26, 0.34] } as const;
 
 export interface TerraceFieldParams {
   /** Hill amplitude (m). */

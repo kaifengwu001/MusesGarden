@@ -30,14 +30,11 @@ import { Rice, RICE } from './rice';
 import { Towers } from './towers';
 import { Trees } from './trees';
 import { createTerrainUniforms, createTerraceSample, generateTerraceLayout, seasonFront, TerraceTerrain } from './terrain';
-import { createVillageUniforms, houseDistance, placeVillages, writeVillageUniforms, type Village } from './villages';
+import { createVillageUniforms, placeVillages, writeVillageUniforms, type Village } from './villages';
 import { findTerraceVista } from './vista';
 import { CubeReadback } from './bakeReader';
-import { createCellSample } from './cells';
-import { floorPieces, type FloorPiece } from './floors';
-import { TerraceObjects } from './objects';
+import { TerraceBuild } from './build/builder';
 import { PaddyMap } from './paddyMap';
-import { surveyCell, type CellSurvey } from './survey';
 
 const NOON = new Palette(TERRACE_ROWS);
 const NOON_SUN = NOON.get(ROW.LIGHT, 0);
@@ -100,7 +97,7 @@ export class TerraceWorld implements PlanetWorld {
   readonly towers: Towers;
   readonly trees: Trees;
   readonly rice: Rice;
-  readonly objects: TerraceObjects;
+  readonly objects: TerraceBuild;
   readonly paddyMap: PaddyMap;
   readonly birds: TerraceBirds;
   /** The villages on the planet at its size (placed again whenever the ground is baked in full). */
@@ -167,7 +164,7 @@ export class TerraceWorld implements PlanetWorld {
     this.paddyMap = new PaddyMap(this.shared);
     Object.assign(this.shared, this.paddyMap.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
-    this.objects = new TerraceObjects(this.shared);
+    this.objects = new TerraceBuild(this.shared);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.objects.group, this.rice.mesh, this.houses.mesh, this.towers.group, this.trees.mesh, this.birds.mesh);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone:
     // terraces, rice, houses, towers, trees, birds, fog; the ground always)
@@ -445,7 +442,7 @@ export class TerraceWorld implements PlanetWorld {
     // the terraces as built, round the focus, once the ground is baked in full (until then the paint)
     if (this.fieldsFull) {
       const key = `${this.fieldsR}/${this.fieldsKey}`;
-      this.objects.update(this.terrain, this.bakesRead(), this.villages, rig.up, `${key}/${this.villages.length}`, this.queue);
+      this.objects.update(this.terrain, this.bakesRead(), this.villages, `${key}/${this.villages.length}`, this.queue);
       this.terrainUniforms.uObjects.value.set(this.objects.centre.x, this.objects.centre.y, this.objects.centre.z, this.objects.reach);
       // the rice reads the built paddies round the focus from their map
       this.paddyMap.render(this.renderer, this.objects.group, rig.up, rig.forward, R, `${key}/${this.objects.group.children.length}/${this.terrain.seasonFront.toFixed(3)}`);
@@ -541,42 +538,6 @@ export class TerraceWorld implements PlanetWorld {
       this.readback = { key, terrain: CubeReadback.read(this.renderer, t.terrain), layout: CubeReadback.read(this.renderer, t.layout) };
     }
     return this.readback;
-  }
-
-  /** Dev: the terraces surveyed in the cells round a direction (within `reach` m). */
-  surveyNear(dir: Vector3, reach: number, mode: 'terraces' | 'flats' = 'terraces'): CellSurvey[] {
-    this.prepare();
-    const rb = this.bakesRead();
-    const t = this.terrain;
-    const R = t.radius;
-    const size = R / t.cells.frequency;
-    const seen = new Set<string>();
-    const out: CellSurvey[] = [];
-    const a = new Vector3();
-    const b = new Vector3();
-    gradientFrame(dir, a, b);
-    const q = new Vector3();
-    for (let x = -reach; x <= reach; x += 8) {
-      for (let y = -reach; y <= reach; y += 8) {
-        q.copy(dir).multiplyScalar(R).addScaledVector(a, x).addScaledVector(b, y).normalize();
-        const c = t.cells.at(q, createCellSample());
-        const id = `${c.x},${c.y},${c.z}`;
-        if (seen.has(id)) continue;
-        seen.add(id);
-        const at = createCellSample();
-        const inCell = (d: Vector3): number => {
-          t.cells.at(d, at);
-          return at.x === c.x && at.y === c.y && at.z === c.z ? at.edge : -at.edge;
-        };
-        out.push(surveyCell(c, R, size, rb.terrain, rb.layout, t.plots, t.seasonFront, mode, (d) => houseDistance(this.villages, d, R), inCell));
-      }
-    }
-    return out;
-  }
-
-  /** Dev: a surveyed cell's floor pieces. */
-  floors(s: CellSurvey, piece: (p: FloorPiece) => void, plain: (i: number, j: number, paddy: number) => void): void {
-    floorPieces(s, piece, plain);
   }
 
   settle(): void {

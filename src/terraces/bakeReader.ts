@@ -107,6 +107,29 @@ export class CubeReadback {
     return a * (1 - ty) + b * ty;
   }
 
+  /** All four channels at a direction into out (r, g, b, a), filtered as sample() does. */
+  sample4(dir: Vector3, out: Float32Array): Float32Array {
+    faceOf(dir.x, dir.y, dir.z, at);
+    const n = this.size;
+    const fx = Math.min(Math.max(((at.s + 1) / 2) * n - 0.5, 0), n - 1);
+    const fy = Math.min(Math.max(((at.t + 1) / 2) * n - 0.5, 0), n - 1);
+    const x0 = Math.min(Math.floor(fx), n - 2);
+    const y0 = Math.min(Math.floor(fy), n - 2);
+    const tx = fx - x0;
+    const ty = fy - y0;
+    const d = this.faces[at.face];
+    const i00 = (y0 * n + x0) * 4;
+    const i10 = i00 + 4;
+    const i01 = i00 + n * 4;
+    const i11 = i01 + 4;
+    for (let c = 0; c < 4; c++) {
+      const a = halfToFloat(d[i00 + c]) * (1 - tx) + halfToFloat(d[i10 + c]) * tx;
+      const b = halfToFloat(d[i01 + c]) * (1 - tx) + halfToFloat(d[i11 + c]) * tx;
+      out[c] = a * (1 - ty) + b * ty;
+    }
+    return out;
+  }
+
   /** Channel c of the texel nearest a direction (no filtering: a cell's key). */
   nearest(dir: Vector3, c: number): number {
     faceOf(dir.x, dir.y, dir.z, at);

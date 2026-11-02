@@ -32,7 +32,9 @@ describe('terraces', () => {
     const terraced = samples.filter((s) => tame(s) && s.kind === PLOT_TERRACE).length;
     const flats = samples.filter((s) => tame(s) && s.kind === PLOT_FLAT).length;
     const wild = samples.filter((s) => s.wild > 0.5).length;
-    expect(terraced / samples.length).toBeGreaterThan(0.25);
+    // (slopes over about 0.3 are woods since the terraces' build: a band there would be narrower than two of the
+    // build's grid samples, so the planet is about a fifth terraced, not the quarter this asked before)
+    expect(terraced / samples.length).toBeGreaterThan(0.18);
     expect(flats / samples.length).toBeGreaterThan(0.04);
     expect(wild / samples.length).toBeGreaterThan(0.2);
   });
