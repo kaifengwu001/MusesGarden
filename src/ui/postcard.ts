@@ -1,6 +1,6 @@
 import type { Vector3 } from 'three';
 import type { ParamStore } from '../params';
-import { seasonFor } from './format';
+import { seasonOf } from './format';
 
 // Postcard mode: the view framed by a soft paper border, with a caption card
 // naming the place, the season and where on the planet you are looking.
@@ -48,7 +48,7 @@ export class Postcard {
   update(focus: Vector3, radius: number): void {
     if (!this.store.values.ui.postcard) return;
     const p = this.store.values;
-    const text = `${seasonFor(p.world.bloom)} · ${coordinates(focus)} · R ${Math.round(radius)} m`;
+    const text = `${seasonOf(p)} · ${coordinates(focus)} · R ${Math.round(radius)} m`;
     if (text !== this.last) {
       this.last = text;
       this.detail.textContent = text;

@@ -1,4 +1,5 @@
 import { areaOfRadius, growthForArea } from './planet/growth';
+import { UNVEILED } from './planet/unfold';
 
 // One typed parameter schema. Every tunable lives here with its default,
 // range, URL key and the kind of work a change triggers. The panel, control
@@ -79,6 +80,8 @@ export const DEFAULT_GROWTH = Math.round(growthForArea(areaOfRadius(RADIUS_DEFAU
 export const schema = {
   world: {
     seed: int('seed', 'Seed', 412, 0, 9999, 'world'),
+    // how far the planet has unfolded (planet/unfold.ts): the veil and the flowers, then the size; it sets the growth
+    unfold: num('u', 'Unfold', UNVEILED, 0, 1, 0.0001, 'live'),
     growth: num('g', 'Growth', DEFAULT_GROWTH, 0, 1, 0.0001, 'live'),
     areaMin: num('amin', 'Area at g = 0', AREA_MIN, 5_000, 400_000, 1, 'live', { unit: 'm²' }),
     areaMax: num('amax', 'Area at g = 1', AREA_MAX, 50_000, 5_000_000, 1, 'live', { unit: 'm²' }),

@@ -167,6 +167,41 @@ The press-and-hold layer is a list of (direction, angular radius, start time)
 discs stored in rest space. It survives growth and always covers the same
 flowers.
 
+### The unfolding (branch `unfold`, an experiment)
+
+How the planet opens up to a new player as Muse explores it: one value
+u ∈ [0, 1], the control bar's **Unfold** in place of the radius slider
+(`planet/unfold.ts`). It writes the growth; the panel's Growth and the
+URL's `g` still work on their own.
+
+- **u = 0:** the meadow at its tuned size (R 128 m), under a low **veil** of
+  cloud everywhere but a ragged clearing about 45 m round the hut (its pond
+  and pier in it): grass, no flowers (the bloom front at b = 0).
+- **0 → ½:** the veil clears heap by heap and the bloom front moves out from
+  the hut behind it, both at an even pace in distance from the hut (so the
+  side you face from orbit unveils steadily).
+- **u = ½ (the default):** the meadow as tuned, unveiled and all in flower.
+  It draws pixel-identical to main.
+- **½ → 1:** the planet grows from R 128 m to R 400 m (g linear in u). The
+  camera holds where it is (`CameraRig.holdThrough`): in orbit it keeps its
+  distance from the centre, so the planet grows in the window (and fills it
+  by about R 200 m); over the meadow it keeps its height, as the zoom stops do.
+  Only growth the unfolding writes is held, not a URL, a preset or the engine.
+
+**The veil** (`life/veil.ts`): about 490 still heaps of the clouds' own puffs
+on a Fibonacci lattice 22 m apart (at R 128; they scale with R), each six
+broad lobes round two, sunk to their middles in the ground: low domes, up to
+about 9 m, closing over the ground between them. Each heap's turn to clear is
+its distance from the hut pushed about by a broad noise (bays and fingers)
+and a little of its own (islands that linger, holes that open early); then
+its lobes shrink away one by one. The heaps go into the clouds' rows
+(`clouds.ts`), so they are drawn, sorted and mirrored with the drifting ones.
+They stay out of the shadow and cover maps, and take the drifting clouds'
+shadows instead (the drifting clouds pass over them). Their hollows are
+shaded by height rather than by the heap's own sun shadow, which drew the
+lobes' flat intersections as straight edges. The camera erodes only the lobes
+it comes within a few meters of.
+
 ## Chunks and the GPU data path (as built)
 
 Changed during the build: terrain is evaluated on the GPU from rest-space
@@ -328,6 +363,9 @@ click is what you see.
 - One zoom parameter dollies smoothly down to **Wander**, a third-person glide
   about 1.6 m above the grass at FOV 55°.
 - Double-click glides the focus along a great circle.
+- **As the unfolding grows the planet** (branch `unfold`), the camera holds:
+  its distance from the centre in orbit, its height over the meadow from the
+  bird's-eye stop down, easing between them (`CameraRig.holdThrough`).
 - **Vista** (`view/vista.ts`, the Vista button): a stand and heading framed
   like the reference still: meadow to the top of the frame, a band of lake
   across the middle, meadow in front, a cloud over the far meadow. The planet
@@ -694,6 +732,7 @@ so any view can be shared.
       core/                clock, hash sync, quality tiers, build queue and its budget, hashing, GPU memory ledger, shared uniforms
       planet/
         growth.ts          g → A → R, inverse
+        unfold.ts          the unfolding (branch unfold): the veil and the bloom out from the hut, then the growth
         cubesphere.ts/.glsl spherified cube, closed-form inverse, analytic area element
         rest.ts/.glsl      progressive point sets, birth radii, growth fade band
         chunks.ts          face quadtrees, CDLOD selection, symmetric morph (CPU mirror), culling
@@ -713,6 +752,7 @@ so any view can be shared.
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
         clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow and cover cube maps, mirror pass
+        veil.ts            the veil over the planet yet to unfold (branch unfold): still heaps in the clouds' rows, clearing out from the hut
         cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings

@@ -21,6 +21,7 @@ import { LOD_DEFAULT, type LodConfig } from './planet/chunks';
 import type { FieldParams } from './planet/fields';
 import { tangentToward, travel } from './planet/geo';
 import { growthState, type GrowthState } from './planet/growth';
+import { unfoldBloom, unfoldGrowth, unveiling } from './planet/unfold';
 import { GrowthBand } from './planet/rest';
 import { Surface } from './planet/surface';
 import { createGroundSample, createTerrainUniforms, generateLayout, gradientFrame, Terrain, type Layout } from './planet/terrain';
@@ -136,6 +137,8 @@ export class World {
   private readonly windAxis = new Vector3();
   private readonly washTmp = new Color();
   private posed = false;
+  /** The radius the camera was last placed for: as the unfolding grows the planet, the camera holds where it is (CameraRig.holdThrough). */
+  private heldR = Number.NaN;
   /** The world's clock, as of the last update (a named view of Muse reads the time it is now, frozen or not). */
   private clock: FrameClock | null = null;
   /** Whether the last update drew the near field (grass or flowers around the focus). */
@@ -211,6 +214,7 @@ export class World {
 
   markPosed(): void {
     this.posed = true;
+    this.heldR = Number.NaN;
   }
 
   /** Stand by the first water at the edge of the nearest wetland, looking across its lakes. */
@@ -385,6 +389,9 @@ export class World {
     growthState(p.world.growth, p.world.areaMin, p.world.areaMax, this.growth);
     const R = this.growth.radius;
     this.band.update(R, clock.realDt);
+    // the unfolding grows the planet under the camera (planet/unfold.ts): it holds where it is, so the planet grows in the window
+    if (R !== this.heldR && Number.isFinite(this.heldR) && p.world.growth === unfoldGrowth(p.world.unfold)) this.rig.holdThrough(this.heldR, R);
+    this.heldR = R;
 
     // The fields depend on R, the layout and a few params: refresh and re-bake
     // only on change, quickly while changing, fully once still for a moment.
@@ -442,6 +449,9 @@ export class World {
     // (the hut's front door swings open as Muse comes to it, the room seen through it)
     this.homestead.setDoor(this.muse.door);
     this.hut.setDoor(this.muse.door);
+    // the veil over the planet yet to unfold, clearing out from the hut (life/veil.ts)
+    this.clouds.veil.build(L.seed, L.cottage);
+    this.clouds.veil.progress = unveiling(p.world.unfold);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;
@@ -579,7 +589,8 @@ export class World {
     // haze thickens as you come down into the meadow, so the far meadow pales like a painted distance
     L.uFog.value.set(p.style.fogDensity * 0.0028 * (1 + 10 * this.rig.tilt), 0.06 + 0.34 * p.style.fogDensity, this.rig.altitude * 0.95, 0.8);
     L.uFogUp.value.copy(this.rig.up);
-    L.uBloom.value.set(p.world.bloom * (Math.PI + 0.45) - 0.25, 0.07, 0, 0);
+    // (the unfolding brings the flowers out from the hut: planet/unfold.ts; at its end the bloom is the season's)
+    L.uBloom.value.set(Math.min(p.world.bloom, unfoldBloom(p.world.unfold)) * (Math.PI + 0.45) - 0.25, 0.07, 0, 0);
     // Wind: a rotation field fixed to the world, aimed by the direction param at the cottage.
     const c = this.terrain.layout.cottage;
     const north = tangentToward(c, Math.abs(c.y) > 0.98 ? WORLD_X : WORLD_UP, this.tmp);
@@ -686,6 +697,7 @@ export class World {
 
   /** Close fade bands, finish queued work and snap the camera: the next frame is a pure function of state. */
   settle(): void {
+    this.heldR = Number.NaN;
     this.band.settle();
     this.queue.drain();
     this.rig.settle();

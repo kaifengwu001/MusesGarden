@@ -214,6 +214,26 @@ export class CameraRig {
     this.changed = true;
   }
 
+  /**
+   * Hold the camera where it is while the planet's radius goes from r0 to r1 (the unfolding grows it,
+   * planet/unfold.ts). In orbit it keeps its distance from the planet's centre, so the planet grows in the window;
+   * down over the meadow it keeps its height over the ground, as the stops do; between the bird's-eye height and the
+   * height where the view starts to tilt it eases from one to the other. Shrinking, it can come no farther out than
+   * the overview.
+   */
+  holdThrough(r0: number, r1: number): void {
+    const keep = (z: number): number => {
+      const top0 = this.overviewAltitude * r0;
+      const alt0 = top0 * Math.pow(EYE_HEIGHT / top0, z);
+      const alt1 = Math.max(EYE_HEIGHT, alt0 - smoothstep(STOPS_M[0], TILT_HEIGHTS[0], alt0) * (r1 - r0));
+      const top1 = this.overviewAltitude * r1;
+      return clamp(Math.log(alt1 / top1) / Math.log(EYE_HEIGHT / top1), 0, 1);
+    };
+    this.zoom = keep(this.zoom);
+    this.zoomTarget = keep(this.zoomTarget);
+    this.changed = true;
+  }
+
   /** Look up by `angle` (rad) from the zoom's tilt until the next move (named views). */
   lookUp(angle: number, immediate = true): void {
     this.pitchTarget = angle;

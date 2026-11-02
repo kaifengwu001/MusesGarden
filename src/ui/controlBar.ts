@@ -1,11 +1,13 @@
 import type { ParamPath, ParamStore } from '../params';
 
-// The compact control bar: Grow, Bloom, wind, camera (Overview or Wander, and
+// The compact control bar: Unfold, Bloom, wind, camera (Overview or Wander, and
 // the Vista), seed and reset. Every control writes through the param store, so the URL, the panel
-// and the bar always agree. Grow and Bloom animate their value to the far end
-// over about 8 s (or back, when already there).
+// and the bar always agree. Unfold and Bloom animate their value to the far end
+// (or back, when already there): Bloom over about 8 s, Unfold over 16 (8 to unveil, 8 to grow).
 
 const PLAY_SECONDS = 8;
+/** The unfolding plays slower: it unveils the planet, then grows it (planet/unfold.ts). */
+const UNFOLD_SECONDS = 16;
 
 interface Player {
   path: ParamPath;
@@ -13,6 +15,7 @@ interface Player {
   direction: number;
   playing: boolean;
   label: string;
+  seconds: number;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -44,7 +47,8 @@ export class ControlBar {
     this.el.setAttribute('aria-label', 'Controls');
 
     this.el.append(
-      this.group(this.player('world.growth', 'Grow'), this.slider('world.growth', 0, 1, 0.0001, 'Growth')),
+      // (the unfolding in place of the radius slider: it unveils the planet, then grows it; planet/unfold.ts)
+      this.group(this.player('world.unfold', 'Unfold', UNFOLD_SECONDS), this.slider('world.unfold', 0, 1, 0.0001, 'Unfold')),
       this.group(this.player('world.bloom', 'Bloom'), this.slider('world.bloom', 0, 1, 0.001, 'Bloom')),
       this.group(el('span', 'cb-label', 'Wind'), this.slider('wind.strength', 0, 1, 0.01, 'Wind strength'), this.slider('wind.direction', 0, 360, 1, 'Wind direction', 'cb-dir')),
     );
@@ -71,11 +75,11 @@ export class ControlBar {
     this.cameraButton.textContent = store.values.view.mode === 'wander' ? 'Overview' : 'Wander';
   }
 
-  /** Advance Grow / Bloom playback; call once per frame with wall-clock dt. */
+  /** Advance Unfold / Bloom playback; call once per frame with wall-clock dt. */
   tick(realDt: number): void {
     for (const p of this.players) {
       if (!p.playing) continue;
-      const v = (this.store.get(p.path) as number) + (p.direction * realDt) / PLAY_SECONDS;
+      const v = (this.store.get(p.path) as number) + (p.direction * realDt) / p.seconds;
       const done = p.direction > 0 ? v >= 1 : v <= 0;
       this.store.set(p.path, Math.min(1, Math.max(0, v)));
       if (done) this.stop(p);
@@ -92,9 +96,9 @@ export class ControlBar {
     return g;
   }
 
-  private player(path: ParamPath, label: string): HTMLButtonElement {
+  private player(path: ParamPath, label: string, seconds = PLAY_SECONDS): HTMLButtonElement {
     const button = el('button', 'cb-button cb-play', label);
-    const player: Player = { path, button, direction: 1, playing: false, label };
+    const player: Player = { path, button, direction: 1, playing: false, label, seconds };
     button.addEventListener('click', () => {
       if (player.playing) {
         this.stop(player);

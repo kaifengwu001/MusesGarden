@@ -30,6 +30,57 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The unfolding (experiment, branch `unfold`)
+
+Kai's brief (2026-11-01), to test how the world unfolds for a new player: a
+slider for the unfolding in place of the radius slider, starting at the
+meadow's tuned size. At first a cloud of its own covers most of the planet
+but a small area round the hut. It lies beneath the drifting clouds, which
+still pass over the hut and the cleared ground. There are no flowers, just
+grass. As Muse explores, the cloud recedes bit by bit (not a circle), and
+the flowers blossom from the hut outward, until the planet is unveiled and
+in flower. Then the planet grows, and the orbit camera doesn't move away, so
+it grows in the window.
+
+Built on `unfold` (from 4e711ca), in a worktree of its own; as designed in
+ARCHITECTURE.md ("The unfolding"):
+
+- **Unfold** in the control bar (plays over 16 s: 8 to unveil, 8 to grow);
+  URL key `u`; the default ½ is the meadow as it was.
+- **The veil:** about 490 still heaps of the clouds' own puffs, clearing heap
+  by heap out from the hut, in the clouds' rows (drawn, sorted and mirrored
+  with them). It takes the drifting clouds' shadows and casts none.
+- **The flowers:** the existing bloom front, moved by the unfolding (the
+  Bloom slider still sets the season; the lower of the two wins).
+- **Growth:** g from 0.1886 to 1 over the second half, the camera held
+  (`CameraRig.holdThrough`): 667 m from the centre throughout in orbit;
+  70.2 m and 4.3 m over the ground at the bird's-eye and standing stops.
+- **Pixel-identical at the default:** main and the branch draw the same
+  frames in all nine standard views, high and medium, at 1× and 2×. The one
+  exception is Muse's pin on the orbit, whose face differs between two loads
+  of main as well. The veil is lit in a block of its own after the clouds'
+  light: lit inside it, it moved one pixel of a drifting cloud by one step.
+- **Also fixed:** the area bounds' URL round trip. A constrained bound was
+  kept finer than the URL writes it and came back a square meter off. The new
+  field shifted params.test.ts's random draws onto that case.
+
+Open (questions for Kai, and what wasn't done):
+
+- Held where it is, the planet fills the window by about R 200 m (u ≈ 0.58).
+  From there on we look at a patch of a growing surface, from 265 m up at
+  R 400. The camera could ease back once the planet fills the window, or
+  start the growth farther out.
+- The page still opens on the meadow as it was (the slider's middle); `#u=0`
+  opens it at the start.
+- Up close a veil heap is one smooth dome; from orbit and the bird's-eye it
+  reads as cloud.
+- Ahead of the flowers the grass is the Bloom slider's early-spring grass
+  (a little shorter and paler).
+- Muse still roams under the veil, and the finds' beds and pins show
+  wherever they are; the engine's growth (Fern's exploration) still sets the
+  size directly, so the slider stands in for Muse's exploring.
+- Not measured yet: what the veil costs (look first).
+
 ## Muse's hut: the interior (in progress)
 
 Started from eeda5d5, on the branch `hut-interior` in a worktree of its own
