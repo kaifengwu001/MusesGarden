@@ -15,13 +15,14 @@ class MeshBuilder {
   private readonly uv: number[] = [];
   private readonly kind: number[] = [];
   private readonly printStyle: number[] = [];
+  private readonly lobe: number[] = [];
   private readonly ground: number[] = [];
   private readonly lp: number[] = [];
   private readonly ln: number[] = [];
   private readonly lk: number[] = [];
   private readonly lg: number[] = [];
 
-  tri(a: Vector3, b: Vector3, c: Vector3, kind: number, grounded: readonly number[] = [0, 0, 0], normals?: readonly Vector3[], chart?: readonly (readonly number[])[], style = this.species): void {
+  tri(a: Vector3, b: Vector3, c: Vector3, kind: number, grounded: readonly number[] = [0, 0, 0], normals?: readonly Vector3[], chart?: readonly (readonly number[])[], style = this.species, lobe?: readonly Vector3[]): void {
     const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
     if (normal.lengthSq() < 0.5) return;
     for (const [i, point] of [a, b, c].entries()) {
@@ -30,6 +31,7 @@ class MeshBuilder {
       this.n.push(n.x, n.y, n.z);
       this.uv.push(chart?.[i][0] ?? point.x, chart?.[i][1] ?? point.y);
       this.printStyle.push(style);
+      this.lobe.push(...(lobe?.[i].toArray() ?? [0, 0, 0]));
       this.kind.push(kind);
       this.ground.push(grounded[i]);
     }
@@ -118,6 +120,56 @@ class MeshBuilder {
     }
   }
 
+  /** One rounded pine fan. Several intersecting lobes make a scalloped cloud.
+   * Its local coordinates belong to this lobe, not a repeating world texture. */
+  pineLobe(center: Vector3, size: number, phase: number, turn: number, snowy: boolean): void {
+    const sides = this.coarse ? 10 : 20;
+    const rows = this.coarse ? 4 : 8;
+    const rx = size * 0.70, ry = size * 0.73, rz = size * 0.60;
+    const rotate = (v: Vector3): Vector3 => v.applyAxisAngle(V(0, 1, 0), turn);
+    const vertex = (angle: number, latitude: number, snow = false) => {
+      const q = V(Math.cos(latitude) * Math.cos(angle), Math.sin(latitude), Math.cos(latitude) * Math.sin(angle));
+      // The lower half is gently flattened, with no planar top or rim facets.
+      const lower = q.y < 0 ? 0.64 : 1;
+      const local = V(q.x * rx, q.y * ry * lower, q.z * rz);
+      const n = V(q.x / rx, q.y / (ry * lower), q.z / rz).normalize();
+      const p = rotate(local).add(center);
+      const normal = rotate(n);
+      if (snow) p.addScaledVector(normal, 0.045 * size);
+      return { p, normal, q };
+    };
+    const emit = (a: ReturnType<typeof vertex>, c: ReturnType<typeof vertex>, d: ReturnType<typeof vertex>, snow = false): void => {
+      const winding = c.p.clone().sub(a.p).cross(d.p.clone().sub(a.p)).dot(a.normal.clone().add(c.normal).add(d.normal));
+      const p1 = winding < 0 ? d : c, p2 = winding < 0 ? c : d;
+      this.tri(a.p, p1.p, p2.p, snow ? HAMLET_KIND.snow : HAMLET_KIND.needle, [0, 0, 0],
+        [a.normal, p1.normal, p2.normal], undefined, 20 + (phase % 1) * 0.9, [a.q, p1.q, p2.q]);
+    };
+    for (let j = 0; j < rows; j++) for (let i = 0; i < sides; i++) {
+      const a = i * TAU / sides, c = (i + 1) * TAU / sides;
+      const lo = -Math.PI / 2 + j * Math.PI / rows, hi = -Math.PI / 2 + (j + 1) * Math.PI / rows;
+      const p = vertex(a, lo), q = vertex(c, lo), r = vertex(c, hi), t = vertex(a, hi);
+      if (j > 0) emit(p, q, r);
+      if (j < rows - 1) emit(p, r, t);
+    }
+    if (!snowy) return;
+    // Conforming snow uses the same dome, leaving the lower fan visible.
+    // Its shallow lip meets the foliage rather than floating as a broad plate.
+    const snowRows = this.coarse ? 1 : 4;
+    const edge = (a: number): number => 0.48 + 0.055 * Math.sin(a * 3 + phase) + 0.035 * Math.sin(a * 5 - phase);
+    for (let j = 0; j < snowRows; j++) for (let i = 0; i < sides; i++) {
+      const a = i * TAU / sides, c = (i + 1) * TAU / sides;
+      const lat = (angle: number, row: number): number => edge(angle) + (Math.PI / 2 - edge(angle)) * row / snowRows;
+      const p = vertex(a, lat(a, j), true), q = vertex(c, lat(c, j), true);
+      const r = vertex(c, lat(c, j + 1), true), t = vertex(a, lat(a, j + 1), true);
+      emit(p, q, r, true);
+      if (j < snowRows - 1) emit(p, r, t, true);
+      if (j === 0) {
+        const b0 = vertex(a, edge(a)), b1 = vertex(c, edge(c));
+        emit(b0, b1, q, true); emit(b0, q, p, true);
+      }
+    }
+  }
+
   /** A narrow, folded blade has thickness in silhouette without a cylindrical needle's cost. */
   blade(base: Vector3, tip: Vector3, width: number, kind: number, turn = 0, root = false): void {
     const axis = tip.clone().sub(base);
@@ -174,6 +226,7 @@ class MeshBuilder {
     geometry.setAttribute('uv', new Float32BufferAttribute(this.uv, 2));
     geometry.setAttribute('aKind', new Float32BufferAttribute(this.kind, 1));
     geometry.setAttribute('aPrintStyle', new Float32BufferAttribute(this.printStyle, 1));
+    geometry.setAttribute('aLobe', new Float32BufferAttribute(this.lobe, 3));
     geometry.setAttribute('aGround', new Float32BufferAttribute(this.ground, 1));
     const ink = new BufferGeometry();
     ink.setAttribute('position', new Float32BufferAttribute(this.lp, 3));
@@ -181,6 +234,7 @@ class MeshBuilder {
     ink.setAttribute('uv', new Float32BufferAttribute(new Float32Array(this.lk.length * 2), 2));
     ink.setAttribute('aKind', new Float32BufferAttribute(this.lk, 1));
     ink.setAttribute('aPrintStyle', new Float32BufferAttribute(new Float32Array(this.lk.length), 1));
+    ink.setAttribute('aLobe', new Float32BufferAttribute(new Float32Array(this.lk.length * 3), 3));
     ink.setAttribute('aGround', new Float32BufferAttribute(this.lg, 1));
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
     ink.computeBoundingSphere();
@@ -224,27 +278,27 @@ export function pineGeometry(coarse = false): HamletAsset {
     { start: trunk[5], end: V(2.1, 8.25, 0.2), a: 0.2 },
   ];
   branches.forEach(({ start, end, a }, i) => {
-    if (coarse && (i === 2 || i === 6)) return;
+    if (coarse && (i === 1 || i === 2 || i === 5 || i === 6)) return;
     const bend = start.clone().lerp(end, 0.5).add(V(0, -0.22, 0.16));
     b.tube([start, bend, end], [0.22 - i * 0.016, 0.12 - i * 0.008, 0.035], HAMLET_KIND.bark, 6);
-    const size = 1.01 - i * 0.031;
-    const tips = coarse ? 3 : 5;
-    for (let k = 0; k < tips; k++) {
-      const aa = a + (k - (tips - 1) / 2) * (coarse ? 1.4 : 0.92);
-      const tip = end.clone().add(V(Math.cos(aa) * (0.51 + (k % 2) * 0.43), 0.04 + (k % 3) * 0.22, Math.sin(aa) * 0.92));
-      b.tube([end.clone().lerp(bend, 0.17), end, tip], [0.05, 0.035, 0.01], HAMLET_KIND.bark, 4);
-      tuft(b, tip, size * (coarse ? 1.22 : 1), i * 1.3 + k, 22);
-    }
-    const inner = bend.clone().lerp(end, 0.28).add(V(-0.15, 0.15, 0.1));
-    if (!coarse) tuft(b, inner, size * 0.83, i * 1.7, 18);
-    b.tube([bend, inner.clone().add(V(0, -0.1, 0))], [0.06, 0.02], HAMLET_KIND.bark, 4);
-    // Connected lobed snow rests into the substantial needle volume; its dark
-    // underside and projecting needles remain visible around the white cap.
-    b.snowCap(end.clone().add(V(0.1, 0.65, 0.02)), 1.18 - i * 0.032, 0.86 - i * 0.025, 0.37, a, i);
-    if (!coarse && i % 2 === 0) b.snowCap(inner.clone().add(V(0, 0.42, 0)), size * 0.61, size * 0.55, 0.22, a, i + 0.8);
+    const size = 1.08 - i * 0.032;
+    const across = V(Math.cos(a), 0, Math.sin(a)), depth = V(-Math.sin(a), 0, Math.cos(a));
+    // Back row rises behind the lower foreground lobes, like the overlapping
+    // fans in the reference. Unequal diameters break a row of identical balls.
+    const lobes = coarse
+      ? [[-0.86, 0.05, 0.45, 0.97], [0.05, -0.17, 0.70, 1.18], [0.94, 0.16, 0.39, 0.88]]
+      : [[-0.74, -0.27, 0.52, 0.91], [0.04, -0.39, 0.77, 1.08], [0.82, -0.22, 0.48, 0.85],
+         [-1.18, 0.25, 0.29, 0.72], [-0.43, 0.35, 0.37, 0.95], [0.40, 0.37, 0.38, 0.98], [1.10, 0.28, 0.26, 0.72]];
+    lobes.forEach(([x, z, y, scale], k) => {
+      const center = end.clone().addScaledVector(across, x * size).addScaledVector(depth, z * size).add(V(0, y * size, 0));
+      const root = center.clone().add(V(0, -scale * size * 0.43, 0));
+      b.tube([end, root], [0.035, 0.012], HAMLET_KIND.bark, 4);
+      b.pineLobe(center, size * scale, i * 1.71 + k * 0.63, a + k * 0.17, k !== 3 && k !== 6);
+    });
   });
-  tuft(b, trunk[6], 0.78, 3.4, 18);
-  b.snowCap(trunk[6].clone().add(V(0, 0.34, 0)), 0.65, 0.57, 0.17, 0.2, 0.7);
+  for (const [x, z, y, size] of [[-0.48, 0.04, 0.17, 0.71], [0.03, -0.08, 0.40, 0.91], [0.58, 0.11, 0.14, 0.64]]) {
+    b.pineLobe(trunk[6].clone().add(V(x, y, z)), size, 3.4 + x, 0.2, true);
+  }
   return b.finish(1.15);
 }
 

@@ -11,11 +11,20 @@ self-contained art reference.
 | [03 · Rainy homestead](03-muse-rainy-homestead.png) | The same setting without snow, with rain and muted natural materials. |
 | [04 · Home and bridge kit](04-home-and-bridge-kit.png) | Timber/shoji construction, roof tiles, snow accumulation, bridge rails and stone steps. |
 | [05 · Vegetation and terrain kit](05-vegetation-and-terrain-kit.png) | Natural pine and cedar structure, bare plum, fine reeds and slate. |
+| [06 · Pine fan drawing](06-pine-fan-drawing.png) | User correction: each rounded foliage lobe is one coherent radial fan. |
+| [07 · Scalloped pine fans](07-pine-scalloped-fans.png) | Overlapping curved cloud units and rays attached to the lower twig origin. |
+| [08 · Pine cloud silhouette](08-pine-cloud-silhouette.png) | Primary pine shape: rounded clustered lobes, open branch tiers, restrained flat pigment. |
+| [09 · Pine woodblock detail](09-pine-woodblock-detail.png) | Primary close pine drawing: fine dark radial needles, muted green, scalloped foliage. |
 
 The requested style is quiet and natural. The earlier alien-world explorations
 are not this planet’s visual brief. Muse must stay recognisable in the app; this
 pack is construction guidance rather than a set of flat backgrounds to display
 in place of the working world.
+
+The user explicitly rejected the angular pine pads with scattered needle motifs
+on 1 November. References 06–09 take precedence for pine shape and marks. The
+foliage lobe itself is the fan; do not treat its drawing as a repeating texture
+stamp. Earlier rejected app captures remain in `rejected-angular-pines/`.
 
 ## Actual app evidence
 
@@ -33,6 +42,13 @@ Material close-ups: [snow pine](checkpoint-pine-snow.png),
 view. [Frame stability evidence](frame-stability.json) records the tested source
 hashes, GPU, resolutions, frozen redraws and motion thresholds. Earlier Home and
 Rain captures remain in `pre-material-refinement/` for before/after comparison.
+
+The later pine correction also captures [canopy detail](checkpoint-pine-canopy-rain.png),
+[side](checkpoint-pine-side-rain.png), [above in rain](checkpoint-pine-above-rain.png),
+and [above in snow](checkpoint-pine-above-snow.png). These show crown volume and
+snow contact independently of the opening Home composition. Its current motion
+evidence is [pine frame stability](pine-frame-stability.json), including the
+close pine camera; `frame-stability.json` is the earlier material-pass record.
 
 [First-pass Home](first-pass/home.png), [Home with UI](first-pass/home-ui.png),
 [Bridge](first-pass/bridge.png), [Muse](first-pass/muse.png),

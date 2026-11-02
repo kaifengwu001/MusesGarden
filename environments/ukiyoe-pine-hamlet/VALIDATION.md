@@ -54,6 +54,42 @@ the mobile test so comparison images use the same clean capture workflow.
 
 ## Remaining limits
 
+### Pine silhouette correction, evening of 1 November 2026
+
+The user rejected the previous angular pine pads and scattered needle pattern.
+Their four new references (06–09) now define the pine target: overlapping rounded
+cloud/fan lobes with coherent radial lines. The rejected app views are retained
+in `reference/rejected-angular-pines/`; passing earlier tests was not visual
+acceptance.
+
+Pine crowns were rebuilt as closed rounded lobes with smooth normals. Local
+branch groups overlap seven unequal lobes; distant groups retain three lobes
+and fewer tiers. One fan drawing belongs to each lobe, with quiet side/top
+pigment rather than crossed projection patterns. Twig forks meet their bases;
+snow follows the same domes with contacting lips. The whole-tree, side, overhead
+and close-canopy captures were inspected in snow and rain.
+
+Scoped TypeScript/lint, all **69 CPU tests**, ecology capture and production build
+pass. The instantiated colour geometry remains below 1.5M triangles at radii
+40, 128 and 400; no budget assertion was increased. Shared `src/` and other
+worlds remain unchanged. The existing large-chunk advisory remains.
+
+Repeated-load, repeated-draw and growth-roundtrip determinism pass, as do the
+draw-call budget and desktop/mobile view check. The first repeated-load attempt
+timed out during navigation while the local disk filled; after clearing only
+generated sweep-frame PNGs, the unchanged test passes in 8 seconds. Per-view
+reference images and compact motion metrics were retained. Historical growth
+performance limits below were not changed by this art correction.
+
+The expanded flicker suite passes **4/4 tests**, covering reported pose, Home,
+Bridge and the close pine in both seasons at DPR 1/2. All **192 frozen comparisons
+have zero changed pixels**. The maximum isolated-frame signal is 0.36875%,
+below its 1.5% bound. Current evidence is in
+[pine-frame-stability.json](reference/pine-frame-stability.json); the earlier
+material-pass metrics remain separate. Motion thresholds are finite checks,
+not a guarantee for every camera or GPU. This is a stylised 3D interpretation;
+no user acceptance of the revised art is implied.
+
 ### Surface and material refinement on 1 November 2026
 
 The current server on port 5237 runs the PR integration checkout. All runtime

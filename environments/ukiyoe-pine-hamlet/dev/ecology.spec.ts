@@ -28,11 +28,18 @@ test('reference views compile, expose Muse and preserve the seasonal layout', as
   await page.evaluate(()=>{const w=(window as unknown as {__world:World}).__world;w.setSeason('rain');w.cameraPreset('home');});
   await page.evaluate(async()=>window.__meadow?.settle());
   await page.screenshot({path:'shots/ukiyoe-pine-hamlet/rain.png'});
-  // Material evidence needs nearer views than the overall Home composition.
+  // Whole-tree views preserve the crown silhouette and the open branch tiers.
+  // Side/above views check that the drawn fans belong to real rounded volumes;
+  // the separate canopy close-up makes their needle marks legible.
   // These exercise real instanced plants, lighting and terrain, not asset previews.
   const materials = [
-    { file: 'pine-snow', season: 'snow', at: [-9, 4.5, -3], height: 5, distance: 8, azimuth: -0.6 },
-    { file: 'pine-rain', season: 'rain', at: [-9, 4.5, -3], height: 5, distance: 8, azimuth: -0.6 },
+    { file: 'pine-snow', season: 'snow', at: [-9, 5, -3], height: 6, distance: 24, azimuth: 0.25 },
+    { file: 'pine-rain', season: 'rain', at: [-9, 5, -3], height: 6, distance: 24, azimuth: 0.25 },
+    { file: 'pine-side-snow', season: 'snow', at: [-9, 5, -3], height: 6, distance: 22, azimuth: 2.17 },
+    { file: 'pine-side-rain', season: 'rain', at: [-9, 5, -3], height: 6, distance: 22, azimuth: 2.17 },
+    { file: 'pine-above-snow', season: 'snow', at: [-9, 5, -3], height: 28, distance: 4, azimuth: -0.6 },
+    { file: 'pine-above-rain', season: 'rain', at: [-9, 5, -3], height: 28, distance: 4, azimuth: -0.6 },
+    { file: 'pine-canopy-rain', season: 'rain', at: [-9, 6.6, -3], height: 7.2, distance: 13, azimuth: 0.6 },
     { file: 'cedar-rain', season: 'rain', at: [25, 3.2, 0], height: 4, distance: 7, azimuth: 1.2 },
     { file: 'snow-detail', season: 'snow', at: [-10, 1.0, 6], height: 2.8, distance: 5, azimuth: -0.5 },
   ] as const;
