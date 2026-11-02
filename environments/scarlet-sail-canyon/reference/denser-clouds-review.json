@@ -1,0 +1,217 @@
+{
+  "recordedAt": "2026-11-02T09:15:30.738Z",
+  "baseline": "C:\\Users\\Xinra\\Documents\\Codex\\GardenTransfer\\muse_garden_1031\\handoffs\\windows\\scarlet-denser-clouds-2026-11-02T09-12-23-828Z",
+  "before": {
+    "capturedAt": "2026-11-02T09:13:03.936Z",
+    "errors": [],
+    "views": [
+      {
+        "id": "user-view",
+        "state": "cam=overview&q=high&t=12&pose=0.5183,-0.3846,0.6201,0.446,0",
+        "hash": "9cc52472:1280x800",
+        "stats": {
+          "frameMs": 16.700000000000728,
+          "jsMs": 1.2000000029802322,
+          "gpuMs": 2.197504,
+          "drawCalls": 48,
+          "triangles": 2531937,
+          "trianglesSubmitted": 2531937,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 104,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 22,
+          "lodMin": 1,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 4869.60000000149,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 82,
+          "total": 95
+        }
+      },
+      {
+        "id": "close",
+        "state": "cam=overview&q=high&t=12&pose=0.5183,-0.3846,0.6201,0.446,0.22",
+        "hash": "3425f53f:1280x800",
+        "stats": {
+          "frameMs": 16.700000000000728,
+          "jsMs": 1.2999999970197678,
+          "gpuMs": 2.646016,
+          "drawCalls": 48,
+          "triangles": 2730593,
+          "trianglesSubmitted": 2730593,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 104,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 119,
+          "lodMin": 2,
+          "lodMax": 3,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 4869.60000000149,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 71,
+          "total": 95
+        }
+      }
+    ]
+  },
+  "after": {
+    "capturedAt": "2026-11-02T09:13:27.884Z",
+    "errors": [],
+    "views": [
+      {
+        "id": "user-view",
+        "state": "cam=overview&q=high&t=12&pose=0.5183,-0.3846,0.6201,0.446,0",
+        "hash": "cc43f801:1280x800",
+        "stats": {
+          "frameMs": 16.699999999999818,
+          "jsMs": 1.300000000745058,
+          "gpuMs": 3.601408,
+          "drawCalls": 48,
+          "triangles": 2531995,
+          "trianglesSubmitted": 2531995,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 104,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 22,
+          "lodMin": 1,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5230.39999999851,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 107,
+          "total": 124
+        }
+      },
+      {
+        "id": "close",
+        "state": "cam=overview&q=high&t=12&pose=0.5183,-0.3846,0.6201,0.446,0.22",
+        "hash": "192b9615:1280x800",
+        "stats": {
+          "frameMs": 16.600000000000364,
+          "jsMs": 1.0999999977648258,
+          "gpuMs": 6.530048,
+          "drawCalls": 48,
+          "triangles": 2730651,
+          "trianglesSubmitted": 2730651,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 104,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 119,
+          "lodMin": 2,
+          "lodMax": 3,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5230.39999999851,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 90,
+          "total": 124
+        }
+      }
+    ]
+  },
+  "media": [
+    {
+      "file": "denser-clouds-before.png",
+      "sha256": "a84795e12c71f8994d2b5e87fb8ca13690ecc3b4a5794d703332816ec9f7dd05"
+    },
+    {
+      "file": "denser-clouds-globe.png",
+      "sha256": "0c0d5418bf6e0e8f724a47f97bfc3e1f5d4da13ec7ce50fea7a0287c4a93b035"
+    },
+    {
+      "file": "denser-clouds-close.png",
+      "sha256": "825c414bb84b3ea11b0390cc904a210f1a928d810c4534784667c71447a23bf1"
+    }
+  ],
+  "sources": [
+    {
+      "file": "render/palette.ts",
+      "sha256": "73842b5f60875eac123e588af190343cf7f2da01d865b6a38c8c68e89fea71b8"
+    },
+    {
+      "file": "params.ts",
+      "sha256": "0d53687fb8de27cfab579c5eee9ec2b3f16119601df9bd4ff9889e400d24a19c"
+    }
+  ],
+  "notes": [
+    "User rejected yellow: original five noon cloud colors restored exactly.",
+    "Default coverage0.48 to0.78;95 to124 assemblies in matched captures, altitude32 and cap512 retained.",
+    "Earlier initial-globe and custom time-return hash diagnostics remain open."
+  ]
+}

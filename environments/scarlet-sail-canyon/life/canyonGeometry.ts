@@ -1,4 +1,4 @@
-import { BufferGeometry, CatmullRomCurve3, Float32BufferAttribute, Ray, ShapeUtils, Vector2, Vector3 } from 'three';
+import { BufferGeometry, CatmullRomCurve3, Float32BufferAttribute, Ray, Quaternion, ShapeUtils, Vector2, Vector3 } from 'three';
 
 /** Small non-indexed mesh builder. Hard faces remain hard; foliage is genuinely thin geometry. */
 export class CanyonGeometry {
@@ -7,8 +7,11 @@ export class CanyonGeometry {
   private uvs: number[] = [];
   private kinds: number[] = [];
   private plantBases: number[] = [];
+  private supportSlopes: number[] = [];
 
-  triangle(a: Vector3, b: Vector3, c: Vector3, kind: number, uv: readonly (readonly [number, number])[] = [[0, 0], [1, 0], [0, 1]], smoothNormals?: readonly Vector3[], plantBase=0): void {
+  get vertexCount():number{return this.positions.length/3;}
+
+  triangle(a: Vector3, b: Vector3, c: Vector3, kind: number, uv: readonly (readonly [number, number])[] = [[0, 0], [1, 0], [0, 1]], smoothNormals?: readonly Vector3[], plantBase:number|readonly number[]=0,supportSlope:readonly [number,number]=[0,0]): void {
     const n = new Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
     for (const [i, p] of [a, b, c].entries()) {
       this.positions.push(p.x, p.y, p.z);
@@ -16,7 +19,8 @@ export class CanyonGeometry {
       this.normals.push(normal.x, normal.y, normal.z);
       this.uvs.push(uv[i][0], uv[i][1]);
       this.kinds.push(kind);
-      this.plantBases.push(plantBase);
+      this.plantBases.push(typeof plantBase==='number'?plantBase:plantBase[i]);
+      this.supportSlopes.push(...supportSlope);
     }
   }
 
@@ -65,16 +69,17 @@ export class CanyonGeometry {
     geometry.setAttribute('uv',new Float32BufferAttribute(this.uvs,2));
     geometry.setAttribute('aKind',new Float32BufferAttribute(this.kinds,1));
     geometry.setAttribute('aPlantBase',new Float32BufferAttribute(this.plantBases,1));
+    geometry.setAttribute('aSupportSlope',new Float32BufferAttribute(this.supportSlopes,2));
     geometry.computeBoundingSphere();
     return geometry;
   }
 }
 
 /** One thin living blade: folds flow outward from the stem into an uneven, lobed rim. */
-export function addFanLeaf(b: CanyonGeometry, origin: Vector3, length: number, turn: number, kind = 1, spread = 1.64, tilt = 0.12, columns = 64, rows = 6): void {
+export function addFanLeaf(b: CanyonGeometry, origin: Vector3, length: number, turn: number, kind = 1, spread = 1.64, tilt = 0.12, columns = 64, rows = 6, variation = 0): void {
   const point=(u:number,v:number):Vector3=>{
     const a=(u*2-1)*spread;
-    const edge=1+0.05*Math.sin(a*1.1)+0.014*Math.sin(a*3.7)+0.018*Math.cos(a*12.0);
+    const edge=1+0.09*Math.sin(a*1.1+variation*0.7)+0.028*Math.cos(a*7.0+variation)+0.012*Math.sin(a*14.0+variation);
     const r=v*length*edge;
     const x=Math.sin(a)*r;
     const y=(0.22+0.72*Math.cos(a))*r-0.17*length*v*v*v+0.008*length*Math.sin(a*15.0)*Math.pow(v,4);
@@ -102,23 +107,33 @@ function curve(a:Vector3,b:Vector3,c:Vector3,d:Vector3,segments:number):Vector3[
   });
 }
 
-/** Mature and young templates share the same biology, with different branch proportions. */
+/** Three growth habits: swept mature crown, branching twin fans and a low young grove. */
 export function fanTreeGeometry(variant=0): BufferGeometry {
   const b=new CanyonGeometry();
-  const young=variant===1;
-  const crown=new Vector3(1.65,5.05,0.38);
-  const stem=curve(new Vector3(),new Vector3(-0.45,1.75,-0.15),new Vector3(1.9,3.65,0.18),crown,14);
-  b.tube(stem,stem.map((_,i)=>0.25*Math.pow(1-i/16,1.25)+0.045),0,8,true);
-  addFanLeaf(b,crown,young?3.4:4.2,-0.09,1,1.64,0.12);
-  // A living side branch grows from the trunk, rather than an unsupported disk.
-  const bud=new Vector3(young?-1.15:-0.62,young?3.75:2.9,young?0.46:-0.25);
-  const branch=curve(stem[5],new Vector3(0.18,2.25,0.05),new Vector3(-0.7,2.9,0.3),bud,7);
-  b.tube(branch,branch.map((_,i)=>0.11*(1-i/8)+0.016),0,5,true);
-  addFanLeaf(b,bud,young?1.72:1.13,-0.58,1,1.49,0.2,20,4);
-  // Slender exposed woody ribs spread continuously into the lower crown.
-  for(const side of [-1,1]){
-    const rib=curve(stem[11],crown.clone().add(new Vector3(side*0.22,-0.06,0)),crown.clone().add(new Vector3(side*0.5,0.35,0.15)),crown.clone().add(new Vector3(side*0.9,0.65,0.24)),4);
-    b.tube(rib,rib.map((_,i)=>0.045*(1-i/5)+0.006),0,4,true);
+  const habit=((variant%3)+3)%3;
+  const crown=habit===2?new Vector3(0.78,2.7,0.2):habit===1?new Vector3(0.55,3.2,0.25):new Vector3(1.65,5.05,0.38);
+  const stem=curve(new Vector3(),new Vector3(-0.45,crown.y*0.35,-0.15),new Vector3(crown.x*1.15,crown.y*0.72,0.18),crown,12);
+  b.tube(stem,stem.map((_,i)=>(habit===2?0.16:0.25)*Math.pow(1-i/14,1.25)+0.035),0,7,true);
+  const fan=(root:Vector3,length:number,turn:number,spread:number,tilt:number,phase:number,columns=48):void=>{
+    addFanLeaf(b,root,length,turn,1,spread,tilt,columns,5,phase);
+  };
+  if(habit===1){
+    const left=new Vector3(-1.45,4.7,-0.1),right=new Vector3(2.2,5.35,0.52);
+    for(const [end,length,turn,phase] of [[left,3.3,-0.38,1.2],[right,2.85,0.2,2.8]] as const){
+      const branch=curve(stem[8],crown.clone().add(new Vector3(0,0.65,0)),end.clone().add(new Vector3(0,-0.65,-0.1)),end,6);
+      b.tube(branch,branch.map((_,i)=>0.13*(1-i/7)+0.02),0,5,true);
+      fan(end,length,turn,1.58,0.2,phase,40);
+    }
+  }else{
+    fan(crown,habit===2?2.45:4.35,habit===2?0.22:-0.09,habit===2?1.45:1.68,habit===2?0.32:0.1,habit===2?2.3:0.2,habit===2?40:60);
+    const bud=habit===2?new Vector3(-0.9,1.35,0.4):new Vector3(-0.62,2.9,-0.25);
+    const branch=curve(stem[4],new Vector3(0.18,bud.y*0.75,0.05),bud.clone().add(new Vector3(-0.1,-0.45,0.1)),bud,6);
+    b.tube(branch,branch.map((_,i)=>0.09*(1-i/7)+0.014),0,5,true);
+    fan(bud,habit===2?1.28:1.25,-0.58,1.49,0.2,1.6,22);
+    for(const side of [-1,1]){
+      const rib=curve(stem[10],crown.clone().add(new Vector3(side*0.22,-0.06,0)),crown.clone().add(new Vector3(side*0.5,0.35,0.15)),crown.clone().add(new Vector3(side*0.9,0.65,0.24)),3);
+      b.tube(rib,rib.map((_,i)=>0.04*(1-i/4)+0.006),0,4,true);
+    }
   }
   return b.build();
 }
@@ -239,120 +254,314 @@ function makeCoral(branches:number):BufferGeometry{
 
 export function coralGeometry():BufferGeometry{return makeCoral(6);}
 
-/** Small smooth-edged leaves overlap in irregular tufts, including a closed low leafy skirt. */
-function makeSage(leaves:number):BufferGeometry{
+/** A shallow living mat, with a broken lobed rim, an uneven ridge and real
+ * thickness. Short tapered fibres break its silhouette; there are no leaf
+ * cards or rounded cushion primitives. UVs stay planar for fine fibre grain.
+ */
+export function mossGeometry(variant=0):BufferGeometry{
   const b=new CanyonGeometry();
-  const densityScale=Math.sqrt(leaves/64);
-  for(let shoot=0;shoot<3;shoot++){
-    const a=shoot*Math.PI*2/3;
-    b.tube([new Vector3(),new Vector3(Math.cos(a)*0.2*densityScale,0.16*densityScale,Math.sin(a)*0.2*densityScale)],[0.013,0.005],8,4,true);
+  const habit=((variant%3)+3)%3,segments=16;
+  const outer=Array.from({length:segments},(_,i)=>{
+    const a=i/segments*Math.PI*2;
+    const lobe=habit===2?0.76+0.25*Math.cos(a*3+0.65)+0.07*Math.sin(a*7):1+0.12*Math.sin(a*3+habit)+0.085*Math.cos(a*7+0.4);
+    const x=(habit===0?0.87:habit===1?0.64:0.76)*Math.cos(a)*lobe;
+    const z=(habit===0?0.41:habit===1?0.57:0.61)*Math.sin(a)*lobe;
+    return new Vector3(x,0.013+0.005*(0.5+0.5*Math.sin(a*5+habit)),z);
+  });
+  const inner=outer.map((p,i)=>new Vector3(p.x*(0.50+0.07*Math.sin(i*1.3)),0.145+0.035*(0.5+0.5*Math.sin(i*1.7+habit)),p.z*(0.55+0.06*Math.cos(i*1.9))));
+  const vertices=[...outer,...inner,new Vector3(-0.035,0.127+habit*0.005,0.018)];
+  const faces:number[][]=[];
+  for(let i=0;i<segments;i++){
+    const j=(i+1)%segments;
+    faces.push([i,segments+j,j],[i,segments+i,segments+j],[segments+i,segments*2,segments+j]);
   }
-  const R=0.52*densityScale,H=0.42*densityScale;
-  const skirt=Math.max(4,Math.round(leaves*0.18)),crown=leaves-skirt;
-  for(let leaf=0;leaf<leaves;leaf++){
-    const low=leaf>=crown;
-    const angle=low?(leaf-crown)*Math.PI*2/skirt:leaf*2.3999632297;
-    const elevation=low?0.025:1-(leaf+0.5)/crown;
-    const radial=Math.sqrt(1-elevation*elevation);
-    const outline=0.95+0.06*Math.sin(angle*3+0.4);
-    const centre=new Vector3(Math.cos(angle)*radial*R*outline,0.032+elevation*H+0.02*Math.sin(angle*3)*radial,Math.sin(angle)*radial*R*outline);
-    const outward=new Vector3(Math.cos(angle)*radial/R,elevation/H,Math.sin(angle)*radial/R).normalize();
-    const azimuth=new Vector3(-Math.sin(angle),0,Math.cos(angle));
-    const meridian=new Vector3().crossVectors(outward,azimuth).normalize();
-    const turn=low?0.06*Math.sin(leaf):0.8*Math.sin(leaf*2.3)+leaf*0.17;
-    const along=azimuth.clone().multiplyScalar(Math.cos(turn)).addScaledVector(meridian,Math.sin(turn));
-    const across=new Vector3().crossVectors(outward,along).normalize();
-    const length=0.09+(leaf%4)*0.01;
-    const width=0.067+(leaf%3)*0.009;
-    const midpoint=centre.clone().addScaledVector(outward,0.012);
-    const samples=14;
-    const ring=Array.from({length:samples},(_,i)=>{
-      const a=i*Math.PI*2/samples;
-      const r=1+0.022*Math.sin(a*3+leaf);
-      const p=centre.clone().addScaledVector(along,Math.cos(a)*length*r).addScaledVector(across,Math.sin(a)*width*r).addScaledVector(outward,0.002+0.004*Math.sin(a*3+leaf*0.8));
-      p.y=Math.max(0.002,p.y);
-      return p;
-    });
-    const normal=(i:number):Vector3=>outward.clone().addScaledVector(along,Math.cos(i*Math.PI*2/samples)*0.09).addScaledVector(across,Math.sin(i*Math.PI*2/samples)*0.10).normalize();
-    const uv=(i:number):[number,number]=>[0.5+Math.sin(i*Math.PI*2/samples)*0.5,0.5+Math.cos(i*Math.PI*2/samples)*0.5];
-    for(let i=0;i<samples;i++){
-      const j=(i+1)%samples;
-      b.triangle(midpoint,ring[i],ring[j],8,[[0.5,0.5],uv(i),uv(j)],[outward,normal(i),normal(j)]);
+  const normals=vertices.map(()=>new Vector3());
+  for(const ids of faces){
+    const [a,c,d]=ids.map(i=>vertices[i]);
+    const n=c.clone().sub(a).cross(d.clone().sub(a));
+    for(const i of ids)normals[i].add(n);
+  }
+  for(const n of normals)n.normalize();
+  const uv=(p:Vector3):readonly [number,number]=>[p.x/2.2+0.5,p.z/1.6+0.5];
+  const face=(a:Vector3,c:Vector3,d:Vector3,smooth?:readonly Vector3[]):void=>b.triangle(a,c,d,9,[uv(a),uv(c),uv(d)],smooth);
+  for(const ids of faces)face(vertices[ids[0]],vertices[ids[1]],vertices[ids[2]],ids.map(i=>normals[i]));
+  for(let i=0;i<segments;i++){
+    const j=(i+1)%segments,a=outer[i],c=outer[j],bottomA=a.clone().setY(-0.035),bottomC=c.clone().setY(-0.035);
+    // Only this buried skirt is vertical. The visible body feathers down
+    // through a wide sloping fringe to a millimetre-thin, irregular rim.
+    face(a,c,bottomC,[normals[i],normals[j],normals[j]]);
+    face(a,bottomC,bottomA,[normals[i],normals[j],normals[i]]);
+  }
+  for(let i=0;i<24;i++){
+    const edge=i%segments,j=(edge+1)%segments,t=0.18+0.18*(i%3);
+    const base=outer[edge].clone().multiplyScalar(1-t-0.17).addScaledVector(outer[j],0.17).addScaledVector(inner[j],t);
+    const angle=i*2.3999632297+habit,across=new Vector3(Math.cos(angle),0,Math.sin(angle));
+    const left=base.clone().addScaledVector(across,-0.005),right=base.clone().addScaledVector(across,0.005);
+    const tip=base.clone().add(new Vector3(0.007*Math.sin(i),0.018+0.014*(i%3)/2,0.007*Math.cos(i)));
+    face(left,tip,right);
+  }
+  const geometry=b.build();
+  geometry.userData.rigidShoots=[{start:0,count:b.vertexCount}];
+  return geometry;
+}
+
+/** Branching olive growth, with individually cupped leaves instead of a spherical leaf shell.
+ * The mat's longest runners creep sideways; the shrub grows a few unequal upright shoots.
+ * Lower-detail shelf copies retain the same silhouette and footprint as close specimens.
+ */
+function makeSage(leaves:number,upright=false):BufferGeometry{
+  const b=new CanyonGeometry();
+  const components:{start:number;count:number}[]=[];
+  const shoots=leaves<40?4:6;
+  const counts=Array.from({length:shoots},(_,i)=>Math.floor(leaves/shoots)+(i<leaves%shoots?1:0));
+  for(let shoot=0;shoot<shoots;shoot++){
+    const start=b.vertexCount;
+    const angle=shoot*2.3999632297+0.3;
+    const forward=new Vector3(Math.cos(angle),0,Math.sin(angle));
+    const side=new Vector3(-Math.sin(angle),0,Math.cos(angle));
+    const reach=upright?0.28+0.09*(shoot%3):0.55+0.14*(shoot%3);
+    const height=upright?0.42+0.12*((shoot*2)%4):0.11+0.065*((shoot*2)%3);
+    const point=(t:number):Vector3=>forward.clone().multiplyScalar(reach*(t*0.86+0.14*t*t)).addScaledVector(side,0.1*Math.sin(t*Math.PI)*(shoot%2?1:-1)).setY(0.01+height*(upright?t:t*(1.24-0.24*t)));
+    const twig=Array.from({length:4},(_,i)=>point(i/3));
+    b.tube(twig,[0.015,0.012,0.007,0.0025],8,3,true);
+    for(let leaf=0;leaf<counts[shoot];leaf++){
+      const t=0.10+(leaf+0.5)/counts[shoot]*0.88;
+      const root=point(t);
+      const sign=leaf%2?1:-1;
+      const along=forward.clone().multiplyScalar(0.34).addScaledVector(side,sign*(0.68+0.08*Math.sin(leaf))).setY(upright?0.4:0.18+0.15*Math.sin(leaf*1.7+shoot)).normalize();
+      const across=new Vector3().crossVectors(new Vector3(0,1,0),along).normalize();
+      const normal=new Vector3().crossVectors(along,across).normalize();
+      const length=(upright?0.22:0.25)*(0.82+0.18*Math.sin(t*Math.PI))*(leaves<40?1.08:1);
+      const width=(upright?0.085:0.103)*(0.85+0.15*Math.sin(leaf*2.1+shoot));
+      const centre=root.clone().addScaledVector(along,length*0.51).addScaledVector(normal,0.025);
+      const outline=[[0,0],[0.22,-0.74],[0.5,-1],[0.82,-0.66],[1,0],[0.78,0.74],[0.45,0.95],[0.16,0.6]];
+      const ring=outline.map(([v,u])=>root.clone().addScaledVector(along,length*v).addScaledVector(across,width*u).addScaledVector(normal,0.005*Math.sin(v*Math.PI)+0.008*Math.sin(v*7+shoot)*Math.abs(u)));
+      for(let i=0;i<ring.length;i++){
+        const j=(i+1)%ring.length;
+        b.triangle(centre,ring[i],ring[j],8,[[0.5,0.51],[0.5+outline[i][1]*0.5,outline[i][0]],[0.5+outline[j][1]*0.5,outline[j][0]]],[normal,normal.clone().addScaledVector(across,outline[i][1]*0.25).normalize(),normal.clone().addScaledVector(across,outline[j][1]*0.25).normalize()]);
+      }
     }
+    components.push({start,count:b.vertexCount-start});
   }
-  return b.build();
+  const geometry=b.build();
+  geometry.userData.rigidShoots=components;
+  return geometry;
 }
 
 export const CHALK_SHELF_CENTRE_HEIGHT = 3.22;
 export const CHALK_SHELF_FOOTPRINT = { halfX:6.28, halfZ:3.44, plantingRadius:1.5, maxHeight:5.64 } as const;
 
-const SAGE_LEDGE_SEAMS = [
-  {x:-3.4,z:-1.55,scale:0.85,turn:0.2},
-  {x:3.4,z:-1.65,scale:0.82,turn:1.4},
-  {x:-3.9,z:0.7,scale:0.9,turn:2.2},
-  {x:3.9,z:0.65,scale:0.9,turn:-0.4},
-  {x:-3.0,z:2.5,scale:0.82,turn:0.9},
-  {x:2.25,z:2.6,scale:0.88,turn:2.8},
-] as const;
+export const CHALK_SHELF_VARIANTS = 4;
+export type ChalkShelfPlanting = {
+  x:number;z:number;scale:number;turn:number;
+  /** Footprint changes independently of the living mat's thickness. */
+  spread?:readonly [number,number];
+}&({species:'moss';variant:number}|{species:'sage'|'coral'|'ivory';variant?:never});
 
-/** Overlapping small shrubs trace the ledges; accent fronds grow out of these seams. */
-export const CHALK_SHELF_PLANTINGS = [
-  ...SAGE_LEDGE_SEAMS.flatMap((seam,index)=>[-0.35,0,0.32].map((offset,i)=>({
-    species:'sage' as const,
-    x:seam.x+Math.cos(seam.turn)*offset,
-    z:seam.z+Math.sin(seam.turn)*offset,
-    scale:seam.scale*[0.9,1.12,0.86][i],
-    turn:seam.turn+index*0.4+i*0.75,
-  }))),
-  {species:'coral',x:-3.15,z:0.9,scale:0.7,turn:0.3},
-  {species:'coral',x:3.05,z:0.8,scale:0.68,turn:1.7},
-  {species:'coral',x:-3.1,z:2.4,scale:0.75,turn:2.7},
-  {species:'ivory',x:-2.0,z:0.7,scale:0.65,turn:0.8},
-  {species:'ivory',x:2.5,z:-0.15,scale:0.62,turn:2.1},
-] as const;
+// These are different ecological compositions, not the same corner stamps
+// with a changed yaw. Large mats are single connected meshes, so their joins
+// cannot produce coplanar overlaps. Empty chalk is an intentional fourth habit.
+const SHELF_PLANTINGS:readonly (readonly ChalkShelfPlanting[])[] = [
+  [
+    {species:'moss',x:0,z:0,scale:1,spread:[1.75,1.85],turn:0.3,variant:1},
+    {species:'moss',x:-3.4,z:-1.7,scale:0.35,turn:Math.PI/6,variant:2},
+    {species:'moss',x:3.95,z:0.45,scale:0.46,turn:2.5,variant:2},
+    {species:'sage',x:-3.4,z:-1.55,scale:0.55,turn:0.4},
+    {species:'sage',x:-2.3,z:0.6,scale:1.0,turn:1.0},
+    {species:'coral',x:-3.1,z:2.4,scale:0.75,turn:2.7},
+    {species:'ivory',x:-2.0,z:0.7,scale:0.8,turn:0.8},
+  ],
+  [
+    {species:'moss',x:0,z:0.2,scale:1,spread:[1.8,0.55],turn:-0.2,variant:2},
+    {species:'moss',x:-3.5,z:0.4,scale:0.5,spread:[1.5,0.5],turn:Math.PI/3,variant:0},
+    {species:'moss',x:-3.85,z:0.3,scale:0.24,turn:Math.PI,variant:1},
+    {species:'sage',x:-3.9,z:0.7,scale:1.1,turn:2.2},
+    {species:'coral',x:-3.15,z:0.9,scale:0.35,turn:0.3},
+    {species:'coral',x:-2.6,z:1.15,scale:0.5,turn:1.4},
+  ],
+  [
+    {species:'moss',x:0.65,z:-0.45,scale:0.7,turn:0.6,variant:1},
+    {species:'moss',x:-0.7,z:0.75,scale:0.26,turn:2.1,variant:2},
+    {species:'moss',x:-1.15,z:0.22,scale:0.38,turn:1.3,variant:0},
+    {species:'moss',x:1.1,z:0.75,scale:0.18,turn:0.1,variant:1},
+    {species:'moss',x:3.9,z:-1.45,scale:0.45,turn:Math.PI*5/6,variant:2},
+    {species:'sage',x:3.4,z:-1.65,scale:1.0,turn:1.4},
+    {species:'sage',x:3.95,z:0.45,scale:0.6,turn:-0.4},
+    {species:'ivory',x:2.5,z:-0.15,scale:0.9,turn:2.1},
+  ],
+  [
+    {species:'moss',x:-0.75,z:-0.5,scale:0.22,turn:0.7,variant:0},
+    {species:'sage',x:3.5,z:-1.7,scale:0.35,turn:1.0},
+  ],
+];
+
+/** Stable authored layouts are also exposed to independent contact audits. */
+export function chalkShelfPlantings(variant=0):readonly ChalkShelfPlanting[]{
+  return SHELF_PLANTINGS[((variant%CHALK_SHELF_VARIANTS)+CHALK_SHELF_VARIANTS)%CHALK_SHELF_VARIANTS];
+}
+export const CHALK_SHELF_PLANTINGS = chalkShelfPlantings();
 
 /** Bake plants against the final rock triangles, so a later cliff change cannot float their roots. */
-function addShelfPlants(b:CanyonGeometry):void{
+function addShelfPlants(b:CanyonGeometry,variant:number):void{
   const rock=b.build(),positions=rock.getAttribute('position');
   const ray=new Ray(new Vector3(),new Vector3(0,-1,0));
   const a=new Vector3(),c=new Vector3(),d=new Vector3(),hit=new Vector3();
+  const supportCache=new Map<string,number>();
   const topAt=(x:number,z:number):number=>{
+    const key=`${x.toFixed(6)},${z.toFixed(6)}`;
+    const cached=supportCache.get(key);
+    if(cached!==undefined)return cached;
     ray.origin.set(x,20,z);
     let height=-Infinity;
     for(let i=0;i<positions.count;i+=3){
       a.fromBufferAttribute(positions,i);c.fromBufferAttribute(positions,i+1);d.fromBufferAttribute(positions,i+2);
       if(ray.intersectTriangle(a,c,d,false,hit))height=Math.max(height,hit.y);
     }
+    supportCache.set(key,height);
     return height;
   };
-  const templates={sage:makeSage(8),coral:makeCoral(2),ivory:makeCombFern(1,12)};
-  for(const planting of CHALK_SHELF_PLANTINGS){
+  const templates={sage:makeSage(32),coral:makeCoral(2),ivory:makeCombFern(1,12)};
+  const mossTemplates=[mossGeometry(),mossGeometry(1),mossGeometry(2)];
+  for(const planting of chalkShelfPlantings(variant)){
     const {x,z,scale,turn,species}=planting;
     const height=topAt(x,z);
     if(!Number.isFinite(height))continue;
-    const geometry=templates[species];
+    const geometry=species==='moss'?mossTemplates[planting.variant]:templates[species];
+    const [spreadX,spreadZ]=planting.spread??[1,1];
     const p=geometry.getAttribute('position'),n=geometry.getAttribute('normal'),uv=geometry.getAttribute('uv'),kind=geometry.getAttribute('aKind');
-    const point=(i:number):Vector3=>new Vector3(x+(p.getX(i)*Math.cos(turn)+p.getZ(i)*Math.sin(turn))*scale,height+(p.getY(i)-0.01)*scale,z+(p.getZ(i)*Math.cos(turn)-p.getX(i)*Math.sin(turn))*scale);
-    const normal=(i:number):Vector3=>new Vector3(n.getX(i)*Math.cos(turn)+n.getZ(i)*Math.sin(turn),n.getY(i),n.getZ(i)*Math.cos(turn)-n.getX(i)*Math.sin(turn));
-    for(let i=0;i<p.count;i+=3){
-      b.triangle(point(i),point(i+1),point(i+2),kind.getX(i),[[uv.getX(i),uv.getY(i)],[uv.getX(i+1),uv.getY(i+1)],[uv.getX(i+2),uv.getY(i+2)]],[normal(i),normal(i+1),normal(i+2)],height);
+    const emit=(start:number,count:number,rotation:Quaternion):void=>{
+      const point=(i:number):Vector3=>new Vector3(p.getX(i)*scale*spreadX,(p.getY(i)-0.01)*scale,p.getZ(i)*scale*spreadZ).applyQuaternion(rotation).add(new Vector3(x,height,z));
+      const normal=(i:number):Vector3=>new Vector3(n.getX(i)/spreadX,n.getY(i),n.getZ(i)/spreadZ).normalize().applyQuaternion(rotation);
+      const up=new Vector3(0,1,0).applyQuaternion(rotation);
+      for(let i=start;i<start+count;i+=3){
+        const points=[point(i),point(i+1),point(i+2)];
+        // Moss hugs one continuous fitted plane. Scaling the shelf changes
+        // that plane's tilt while its body/fibre thickness stays fixed. This
+        // never samples a different cliff height for neighbouring vertices.
+        const support=species==='moss'?points.map(v=>height-(up.x*(v.x-x)+up.z*(v.z-z))/up.y):height;
+        b.triangle(points[0],points[1],points[2],kind.getX(i),[[uv.getX(i),uv.getY(i)],[uv.getX(i+1),uv.getY(i+1)],[uv.getX(i+2),uv.getY(i+2)]],[normal(i),normal(i+1),normal(i+2)],support,species==='moss'?[-up.x/up.y,-up.z/up.y]:[0,0]);
+      }
+    };
+    if(species!=='sage'&&species!=='moss'){
+      emit(0,p.count,new Quaternion().setFromAxisAngle(new Vector3(0,1,0),turn));
+      continue;
+    }
+    // A shoot is a rigid biological component: neighbouring leaf vertices
+    // must never inherit different cliff levels. Fit a modest local cap tilt,
+    // then turn whole shoots along a ledge or omit them across a sharp drop.
+    const dx=(topAt(x+0.08,z)-topAt(x-0.08,z))/0.16;
+    const dz=(topAt(x,z+0.08)-topAt(x,z-0.08))/0.16;
+    const capNormal=Number.isFinite(dx+dz)&&Math.hypot(dx,dz)<0.6?new Vector3(-dx,1,-dz).normalize():new Vector3(0,1,0);
+    const tilt=new Quaternion().setFromUnitVectors(new Vector3(0,1,0),capNormal);
+    const components=geometry.userData.rigidShoots as {start:number;count:number}[];
+    for(const component of components){
+      for(const offset of [0,Math.PI/3,-Math.PI/3,Math.PI*2/3]){
+        const rotation=tilt.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(0,1,0),turn+offset));
+        let supported=true;
+        for(let i=component.start;i<component.start+component.count;i++){
+          const foot=new Vector3(p.getX(i)*scale*spreadX,0,p.getZ(i)*scale*spreadZ).applyQuaternion(rotation);
+          const ground=topAt(x+foot.x,z+foot.z);
+          if(!Number.isFinite(ground)||Math.abs(ground-height-foot.y)>(species==='moss'?0.035:0.16)){supported=false;break;}
+          if(species==='moss'&&p.getY(i)>0.12){
+            const point=new Vector3(p.getX(i)*scale*spreadX,(p.getY(i)-0.01)*scale,p.getZ(i)*scale*spreadZ).applyQuaternion(rotation);
+            const up=new Vector3(0,1,0).applyQuaternion(rotation);
+            const plane=height-(up.x*point.x+up.z*point.z)/up.y,cap=topAt(x+point.x,z+point.z);
+            // A tiny colony has the same material anatomy as a broad mat;
+            // its raised core must stay above the rock at either relief limit.
+            if([0.27,2.05].some(stretch=>plane*stretch+height+point.y-plane-cap*stretch<=0.002)){supported=false;break;}
+          }
+        }
+        if(supported){emit(component.start,component.count,rotation);break;}
+      }
     }
   }
   for(const geometry of Object.values(templates))geometry.dispose();
+  for(const geometry of mossTemplates)geometry.dispose();
   rock.dispose();
 }
 
 /** One connected chalk mass with an irregular rim, high rear ribs and lower erosion ledges. */
-export function chalkShelfGeometry(): BufferGeometry {
+export function chalkShelfGeometry(variant=0): BufferGeometry {
   const b=new CanyonGeometry();
-  addChalkMass(b,{x:0,z:0,width:10.2,depth:5.5,height:3.05,phase:0.6,segments:28,centralPad:CHALK_SHELF_CENTRE_HEIGHT});
-  addChalkMass(b,{x:-3.4,z:-1.5,width:3.4,depth:2.5,height:4.18,phase:1.9,segments:10});
-  addChalkMass(b,{x:3.4,z:-1.65,width:2.8,depth:2.3,height:4.76,phase:4.2,segments:10});
-  addChalkMass(b,{x:-3.1,z:2.0,width:3.3,depth:1.75,height:1.35,phase:0.3,segments:7});
-  addChalkMass(b,{x:2.15,z:2.08,width:3.7,depth:1.65,height:1.66,phase:2.9,segments:7});
-  addShelfPlants(b);
+  const habit=((variant%CHALK_SHELF_VARIANTS)+CHALK_SHELF_VARIANTS)%CHALK_SHELF_VARIANTS;
+  const masses:readonly (readonly ChalkMass[])[]=[
+    [
+      {x:0,z:0,width:10.2,depth:5.5,height:3.05,phase:0.6,segments:28,centralPad:CHALK_SHELF_CENTRE_HEIGHT},
+      {x:-3.4,z:-1.5,width:3.4,depth:2.5,height:4.18,phase:1.9,segments:10},
+      {x:3.4,z:-1.65,width:2.8,depth:2.3,height:4.76,phase:4.2,segments:10},
+      {x:-3.1,z:2.0,width:3.3,depth:1.75,height:1.35,phase:0.3,segments:7},
+      {x:2.15,z:2.08,width:3.7,depth:1.65,height:1.66,phase:2.9,segments:7},
+    ],
+    [
+      {x:0,z:0,width:9.6,depth:5.2,height:2.85,phase:1.4,segments:25,centralPad:CHALK_SHELF_CENTRE_HEIGHT},
+      {x:-3.4,z:-1.5,width:2.7,depth:2.3,height:3.75,phase:2.5,segments:9},
+      {x:3.4,z:-1.65,width:3.3,depth:2.4,height:4.45,phase:3.6,segments:11},
+      {x:-3.1,z:2.0,width:2.6,depth:1.4,height:1.05,phase:1.7,segments:6},
+      {x:2.15,z:1.95,width:4.1,depth:1.65,height:2.05,phase:4.1,segments:8},
+    ],
+    [
+      {x:0,z:0,width:9.9,depth:5.3,height:3.0,phase:4.2,segments:27,centralPad:CHALK_SHELF_CENTRE_HEIGHT},
+      {x:-3.4,z:-1.5,width:3.2,depth:2.7,height:4.55,phase:2.9,segments:11},
+      {x:3.4,z:-1.65,width:2.5,depth:2.1,height:4.98,phase:4.8,segments:9},
+      {x:-3.4,z:1.9,width:2.9,depth:1.65,height:1.85,phase:2.2,segments:8},
+      {x:2.0,z:2.05,width:4.1,depth:1.6,height:1.1,phase:0.8,segments:7},
+    ],
+    [
+      {x:0,z:0,width:8.7,depth:4.8,height:2.7,phase:2.7,segments:23,centralPad:CHALK_SHELF_CENTRE_HEIGHT},
+      {x:-3.4,z:-1.5,width:3.7,depth:2.4,height:3.9,phase:4.5,segments:11},
+      {x:3.4,z:-1.65,width:2.0,depth:2.2,height:3.5,phase:1.2,segments:8},
+      {x:-3.1,z:2.0,width:2.4,depth:1.5,height:1.1,phase:3.1,segments:6},
+      {x:2.15,z:2.08,width:3.0,depth:1.5,height:2.2,phase:1.7,segments:9},
+    ],
+  ];
+  for(const mass of masses[habit])addChalkMass(b,mass);
+  addShelfPlants(b,habit);
   return b.build();
 }
 
-/** Low dense sage cushions with tiny overlapping matte leaves. */
-export function lichenGeometry():BufferGeometry{return makeSage(64);}
+/** Spreading moss-like runners and twiggy shrubs share their small olive leaf anatomy. */
+export function lichenGeometry(variant=0):BufferGeometry{return makeSage(64,variant===1);}
+
+/** Raised moss plus small rooted understory. Keeping them in one assembly
+ * gives foliage precisely the same emergence, ground plane and support as
+ * the living mat rather than independently scattering plants over bare soil. */
+export function plantedMossGeometry(variant=0):BufferGeometry{
+  const b=new CanyonGeometry(),moss=mossGeometry(1);
+  const ray=new Ray(new Vector3(),new Vector3(0,-1,0));
+  const a=new Vector3(),c=new Vector3(),d=new Vector3(),hit=new Vector3();
+  const mossPositions=moss.getAttribute('position');
+  const topAt=(x:number,z:number):number=>{
+    ray.origin.set(x,2,z);
+    let height=-Infinity;
+    for(let i=0;i<mossPositions.count;i+=3){
+      a.fromBufferAttribute(mossPositions,i);c.fromBufferAttribute(mossPositions,i+1);d.fromBufferAttribute(mossPositions,i+2);
+      if(ray.intersectTriangle(a,c,d,false,hit))height=Math.max(height,hit.y);
+    }
+    return height;
+  };
+  const emit=(source:BufferGeometry,x:number,y:number,z:number,scale:number,turn:number):void=>{
+    const p=source.getAttribute('position'),n=source.getAttribute('normal'),uv=source.getAttribute('uv'),kind=source.getAttribute('aKind');
+    const rotation=new Quaternion().setFromAxisAngle(new Vector3(0,1,0),turn);
+    const point=(i:number):Vector3=>new Vector3(p.getX(i),p.getY(i),p.getZ(i)).multiplyScalar(scale).applyQuaternion(rotation).add(new Vector3(x,y,z));
+    const normal=(i:number):Vector3=>new Vector3(n.getX(i),n.getY(i),n.getZ(i)).applyQuaternion(rotation);
+    for(let i=0;i<p.count;i+=3)b.triangle(point(i),point(i+1),point(i+2),kind.getX(i),[[uv.getX(i),uv.getY(i)],[uv.getX(i+1),uv.getY(i+1)],[uv.getX(i+2),uv.getY(i+2)]],[normal(i),normal(i+1),normal(i+2)]);
+  };
+  emit(moss,0,0,0,1,0);
+  const roots:{x:number;y:number;z:number;kind:number}[]=[];
+  const plant=(source:BufferGeometry,x:number,z:number,scale:number,turn:number):void=>{
+    const y=topAt(x,z)-0.018;
+    roots.push({x,y,z,kind:source.getAttribute('aKind').getX(0)});
+    emit(source,x,y,z,scale,turn);source.dispose();
+  };
+  if(variant===0){
+    plant(makeCoral(2),-0.18,0.05,0.72,0.7);
+    plant(makeSage(12,true),0.2,-0.12,0.43,2.2);
+  }else{
+    plant(makeCombFern(1,8),0.14,0.03,0.51,1.4);
+    plant(makeSage(16,true),-0.21,-0.08,0.46,0.4);
+  }
+  moss.dispose();
+  const result=b.build();
+  result.userData.plantRoots=roots;
+  return result;
+}

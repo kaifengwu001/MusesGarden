@@ -261,12 +261,21 @@ export class Terrain {
     const rise = CHALK_STEP * smoothstep(0.2, 0.7, uphill * fade);
     const down = Math.max(2 * smoothstep(18, 54, localX), 3 * opening) * fade;
     const downFloor = Math.floor(down);
-    const fall = CHALK_STEP * (downFloor + smoothstep(0.32, 0.68, down - downFloor));
+    // The opening traverses three beds in fourteen metres. A narrow phase
+    // ramp packs a full bed into ~1m, which the terrain LOD cannot represent.
+    // Retain the levels while giving these regional risers ~2m of run.
+    const fall = CHALK_STEP * (downFloor + smoothstep(0.18, 0.82, down - downFloor));
     h = Math.max(0.35, h + rise - fall);
     const band = edge / 8;
     const whole = Math.floor(band);
-    const steps = CHALK_STEP * (whole + smoothstep(0.25, 0.55, band - whole));
-    return Math.min(Math.max(h, this.cottageLevel - steps), this.cottageLevel + steps);
+    // Interpolate the actual shelf endpoints. Clamping a full-height ramp
+    // afterwards truncates small drops to a fraction of a grid cell, turning
+    // a shallow ledge into alternating triangle teeth under camera movement.
+    const low = CHALK_STEP * whole;
+    const high = low + CHALK_STEP;
+    const from = Math.min(Math.max(h, this.cottageLevel - low), this.cottageLevel + low);
+    const to = Math.min(Math.max(h, this.cottageLevel - high), this.cottageLevel + high);
+    return from + (to - from) * smoothstep(0.25, 0.55, band - whole);
   }
 
   /** Ground height above the base sphere before the retained home offset. */

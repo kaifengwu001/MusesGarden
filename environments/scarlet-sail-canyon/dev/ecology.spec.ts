@@ -45,14 +45,20 @@ test('layered canyon and all three native species render and can be observed', a
   const ecology = await page.evaluate(() => {
     const w = (window as unknown as { __world: {
       fauna: { species: { id: string; count: number }[]; group: { children: unknown[] } };
-      scenery: { group: { children: { isMesh?: boolean; geometry: { instanceCount: number } }[] } };
+      scenery: { group: { children: { isMesh?: boolean; name: string; geometry: { instanceCount: number } }[] } };
     } }).__world;
-    return { species: w.fauna.species, animals: w.fauna.group.children.length, scenery: w.scenery.group.children.filter(b => b.isMesh).map(b => b.geometry.instanceCount) };
+    const batches=w.scenery.group.children.filter(b=>b.isMesh);
+    return { species: w.fauna.species, animals: w.fauna.group.children.length, shelves: batches.filter(b=>b.name.startsWith('Connected chalk escarpments')).map(b=>b.geometry.instanceCount), trees:batches.filter(b=>/scarlet fan/i.test(b.name)).reduce((sum,b)=>sum+b.geometry.instanceCount,0), treeVariants:batches.filter(b=>/scarlet fan/i.test(b.name)).length };
   });
   expect(ecology.species.map(s => s.id)).toEqual(['chalkstep', 'fern-sifter', 'dewwing']);
   expect(ecology.animals).toBeGreaterThanOrEqual(11);
-  expect(ecology.scenery[0]).toBeGreaterThan(250);
-  expect(ecology.scenery[3]).toBeGreaterThan(250);
+  // Regional gaps deliberately replace uniform coverage; retain substantial
+  // woodland and all four instantiated rock/plant compositions.
+  expect(ecology.trees).toBeGreaterThan(150);
+  expect(ecology.treeVariants).toBeGreaterThanOrEqual(3);
+  expect(ecology.shelves).toHaveLength(4);
+  expect(ecology.shelves.every(count=>count>0)).toBe(true);
+  expect(ecology.shelves.reduce((sum,count)=>sum+count,0)).toBeGreaterThan(150);
   expect(errors).toEqual([]);
   test.info().annotations.push({ type: 'ecology', description: JSON.stringify(ecology) });
 });

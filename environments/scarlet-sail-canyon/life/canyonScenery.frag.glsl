@@ -15,9 +15,8 @@ varying vec3 vLocal;
 varying vec2 vUv;
 varying float vKind;
 varying float vVariation;
-varying float vPresence;
 vec3 linearColor(vec3 c){return pow(c,vec3(2.2));}
-float inkLine(float value,float width){float w=max(fwidth(value),0.001);return 1.0-smoothstep(width,width+w*1.2,abs(value));}
+float inkLine(float value,float width,float footprint){return 1.0-smoothstep(width,width+max(footprint,0.0001),abs(value));}
 float nativeAngle(vec3 a,vec3 b){return 2.0*asin(min(length(a-b)*0.5,1.0));}
 float nativeBloom(vec3 dir){
  float bloom=smoothstep(uBloom.x+uBloom.y,uBloom.x-uBloom.y,nativeAngle(dir,uCottage.xyz));
@@ -43,7 +42,7 @@ vec2 chalkJoint(float column,float level,float variant){
  vec2 r=jointHash(vec2(column+variant*29.0,level+variant*11.0));
  // Neighbouring segments share these exact endpoints: long fractures stay
  // connected while their angular turns have irregular lengths and offsets.
- return vec2(column+0.5+(r.x-0.5)*0.2,level+0.2+r.y*0.6);
+ return vec2(column+0.5+(r.x-0.5)*0.58,level+0.12+r.y*0.76);
 }
 float chalkFractures(vec2 p,float variant,float aa){
  float ink=0.0;
@@ -82,10 +81,15 @@ float chalkFractures(vec2 p,float variant,float aa){
  return ink;
 }
 void main(){
- // Screen-door coverage lets distant groves emerge continuously as the planet grows.
- // It keeps an opaque depth buffer, so thin leaves never need transparency sorting.
- float coverage = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
- if (coverage > vPresence) discard;
+ // Derivatives are evaluated before material decisions.
+ // Thin marks fade with their footprint rather than becoming moving stipple.
+ vec2 uvPixel=max(fwidth(vUv),vec2(0.0001));
+ vec3 localDx=dFdx(vLocal),localDy=dFdy(vLocal);
+ float localPixel=max(length(localDx),length(localDy));
+ vec3 localN=abs(normalize(cross(localDx,localDy)));
+ float closeDetail=1.0-smoothstep(0.025,0.13,localPixel);
+ // The placement batch grows complete opaque forms into the world. No
+ // screen-space stipple remains on partially emerged trees or cliff faces.
  vec3 n=normalize(vPlanetNormal);if(!gl_FrontFacing)n=-n;
  vec3 dir=normalize(vPlanet);
  vec3 sun=localSun(dir);
@@ -93,61 +97,110 @@ void main(){
  float light=toonLight(dot(n,sun))*(1.0-cloud*0.45);
  vec3 base;float mark=0.0;vec3 shade=vec3(0.59,0.67,0.8);
  if(vKind<0.5){
-  base=linearColor(vec3(0.68,0.59,0.47));
-  float grain=fract(vUv.x*11.0+0.026*sin(vUv.y*1.8))-0.5;
-  mark=inkLine(grain,0.006)*0.18;
+  base=mix(linearColor(vec3(0.59,0.53,0.42)),linearColor(vec3(0.75,0.68,0.54)),0.3+0.5*vVariation);
+  float grain=fract(vUv.x*13.0+0.07*sin(vUv.y*1.3)+0.025*sin(vUv.y*4.7))-0.5;
+  float striation=inkLine(grain,0.009,uvPixel.x*13.0+uvPixel.y*0.2);
+  mark=striation*(0.14+0.10*closeDetail);
+  base*=0.97+0.06*gnoise(vLocal*vec3(5.0,0.8,5.0),937u);
+  shade=vec3(0.55,0.58,0.62);
  }else if(vKind<1.5){
-  base=mix(linearColor(vec3(0.79,0.24,0.24)),linearColor(vec3(0.94,0.39,0.32)),vVariation*0.7);
-  float sector=fract(vUv.x*17.0+0.5)-0.5;
-  float veins=sector+0.012*sin(vUv.y*9.0+vUv.x*4.0);
-  mark=inkLine(veins,0.004)*smoothstep(0.04,0.22,vUv.y)*0.21;
-  float branches=fract(vUv.y*12.0+abs(sector)*0.7)-0.5;
-  mark+=inkLine(branches,0.003)*smoothstep(0.25,0.65,vUv.y)*0.035;
-  mark+=inkLine(vUv.y-0.99,0.004)*0.17;
-  base*=0.96+0.055*cos(vUv.x*106.8);
-  light=max(light,0.43+0.19*max(dot(-n,sun),0.0));
-  shade=vec3(0.67,0.51,0.59);
+  base=mix(linearColor(vec3(0.76,0.27,0.25)),linearColor(vec3(0.91,0.39,0.31)),vVariation*0.7);
+  float ribs=13.0+floor(vVariation*3.0);
+  float sector=fract(vUv.x*ribs+0.5)-0.5;
+  float veins=sector+0.022*sin(vUv.y*7.0+vUv.x*9.0);
+  mark=inkLine(veins,0.007,uvPixel.x*ribs+uvPixel.y*0.17)*smoothstep(0.03,0.18,vUv.y)*0.30;
+  float branches=fract(vUv.y*8.0-abs(sector)*1.4+vVariation)-0.5;
+  mark+=inkLine(branches,0.006,uvPixel.y*8.0+uvPixel.x*ribs*1.4)*smoothstep(0.25,0.7,vUv.y)*0.075*closeDetail;
+  mark+=inkLine(vUv.y-0.992,0.002,uvPixel.y)*0.23;
+  float fold=cos(vUv.x*ribs*6.2831853+0.15*sin(vUv.y*5.0));
+  base*=0.96+0.045*fold+0.025*closeDetail*gnoise(vLocal*8.0,617u);
+  base=mix(base,linearColor(vec3(0.90,0.44,0.32)),(1.0-smoothstep(0.0,0.22,vUv.y))*0.24);
+  light=max(light,0.39+0.18*max(dot(-n,sun),0.0));
+  shade=vec3(0.65,0.50,0.56);
  }else if(vKind<2.5){
   float cap=smoothstep(0.28,0.78,dot(n,dir));
-  base=mix(linearColor(vec3(0.65,0.73,0.81)),linearColor(vec3(0.94,0.94,0.87)),0.2+cap*0.8);
-  float mineral=gnoise(vLocal*vec3(0.85,1.35,0.95)+vVariation*vec3(7.0,3.0,5.0),391u);
-  float powder=gnoise(vLocal*17.0+vec3(vVariation*9.0),783u);
-  base*=0.975+0.035*vVariation+0.09*mineral+0.025*powder;
-  vec3 localN=abs(normalize(cross(dFdx(vLocal),dFdy(vLocal))));
+  base=mix(linearColor(vec3(0.69,0.75,0.81)),linearColor(vec3(0.94,0.93,0.86)),0.1+cap*0.9);
+  float mineral=gnoise(vLocal*vec3(0.7,1.1,0.8)+vVariation*vec3(7.0,3.0,5.0),391u);
+  float wash=gnoise(vLocal*vec3(2.4,0.32,2.4)+vVariation*4.0,392u);
+  float powder=gnoise(vLocal*18.0+vec3(vVariation*9.0),783u)*closeDetail;
+  base*=0.965+0.025*vVariation+0.065*mineral+0.023*powder;
   vec2 plane=localN.y>0.62?vLocal.xz:(localN.z>localN.x?vLocal.xy:vLocal.zy);
-  vec2 joints=plane*(localN.y>0.62?vec2(0.72):vec2(0.72,0.82))+vVariation*vec2(7.1,4.6);
-  // Derivatives inside a per-pixel crack/branch decision are undefined.
-  // Capture the footprint once before those branches so frozen frames agree.
-  float jointAA=max(length(fwidth(joints))*0.65,0.001);
+  vec2 jointScale=localN.y>0.62?vec2(0.58):vec2(0.64,0.58);
+  vec2 joints=plane*jointScale+vVariation*vec2(7.1,4.6);
+  float jointAA=max(localPixel*max(jointScale.x,jointScale.y)*0.68,0.0006);
   float fractures=chalkFractures(joints,vVariation,jointAA);
-  vec3 blueGrey=linearColor(vec3(0.32,0.41,0.49));
-  base=mix(base,blueGrey,fractures*mix(0.25,0.14,cap));
-  shade=vec3(0.47,0.53,0.72);
+  vec3 blueGrey=linearColor(vec3(0.30,0.38,0.43));
+  base=mix(base,blueGrey,fractures*mix(0.49,0.32,cap));
+  // Mineral seams stain a narrow area beside a fracture; the entire face
+  // stays chalk, with thin dark joints instead of heavy black wireframes.
+  float seam=chalkFractures(joints,vVariation,jointAA+0.017)*(1.0-fractures);
+  base=mix(base,linearColor(vec3(0.67,0.70,0.67)),seam*0.14);
+  // Chalk keeps a faint mineral wash. Moss is separate raised geometry;
+  // broad olive paint here previously looked like flat vegetation decals.
+  float mineralWash=smoothstep(0.24,0.43,mineral+wash*0.25)*cap;
+  base=mix(base,linearColor(vec3(0.70,0.73,0.68)),mineralWash*0.10);
+  float hatch=inkLine(fract(dot(plane,vec2(16.0,5.0))+wash*0.6)-0.5,0.025,localPixel*17.0);
+  float brokenHatch=smoothstep(0.03,0.30,gnoise(vLocal*vec3(3.8,1.1,3.8),645u));
+  base*=1.0-hatch*brokenHatch*smoothstep(0.05,0.38,wash)*(1.0-light)*0.055*closeDetail;
+  shade=vec3(0.55,0.62,0.77);
  }else if(vKind<3.5){
   bool coral=vKind>3.2;
-  base=coral?linearColor(vec3(0.80,0.30,0.25)):linearColor(vec3(0.98,0.97,0.86));
-  mark=inkLine(vUv.x-0.5,coral?0.009:0.008)*(coral?0.18:0.12);
-  if(coral)base*=0.96+0.06*gnoise(vLocal*5.0,609u);
-  light=max(light,coral?0.36:0.5);
+  base=coral?mix(linearColor(vec3(0.74,0.29,0.24)),linearColor(vec3(0.88,0.42,0.31)),vVariation):linearColor(vec3(0.97,0.95,0.81));
+  mark=inkLine(vUv.x-0.5,coral?0.008:0.006,uvPixel.x)*(coral?0.28:0.20);
+  float rib=fract(vUv.y*6.0-abs(vUv.x-0.5)*2.5)-0.5;
+  mark+=inkLine(rib,0.012,uvPixel.y*6.0+uvPixel.x*2.5)*(coral?0.06:0.10)*closeDetail;
+  base*=0.97+0.055*gnoise(vLocal*8.0,609u)*closeDetail;
+  light=max(light,coral?0.34:0.48);
+  shade=coral?vec3(0.63,0.53,0.52):vec3(0.66,0.72,0.67);
  }else if(vKind<4.5){
   base=linearColor(vec3(0.77,0.25,0.23));
   float seam=fract(vUv.x/2.4)-0.5;
-  mark=inkLine(seam,0.004)*0.10;
+  mark=inkLine(seam,0.004,uvPixel.x/2.4)*0.10;
   float weave=sin(vUv.x*210.0)*sin(vUv.y*210.0);
-  base*=1.0+0.025*weave*(1.0-smoothstep(0.004,0.02,max(fwidth(vUv.x),fwidth(vUv.y))));
+  base*=1.0+0.025*weave*(1.0-smoothstep(0.004,0.02,max(uvPixel.x,uvPixel.y)));
  }else if(vKind<5.5){
   base=linearColor(vec3(0.73,0.64,0.48));
-  mark=inkLine(fract(vUv.x*8.0)-0.5,0.025)*0.18;
-  base*=0.96+0.04*sin(vUv.y*30.0);
+  mark=inkLine(fract(vUv.x*8.0)-0.5,0.025,uvPixel.x*8.0)*0.18;
+  base*=0.96+0.04*sin(vUv.y*30.0)*closeDetail;
  }else if(vKind<6.5){
   base=linearColor(vec3(0.26,0.29,0.28));
  }else if(vKind<7.5){
   base=linearColor(vec3(0.96,0.79,0.45));light=max(light,0.75);
+ }else if(vKind<8.5){
+  // Olive leaf islands have individual veins and a light worn margin.
+  // Geometry supplies irregular layered shoots rather than a sphere normal.
+  float leafTone=clamp(vVariation*0.45+0.35+gnoise(vLocal*4.5,631u)*0.30,0.0,1.0);
+  base=mix(linearColor(vec3(0.35,0.43,0.25)),linearColor(vec3(0.61,0.64,0.36)),leafTone);
+  float midrib=inkLine(vUv.x-0.5,0.008,uvPixel.x);
+  float ribs=fract(vUv.y*5.5-abs(vUv.x-0.5)*2.6)-0.5;
+  mark=midrib*0.26+inkLine(ribs,0.012,uvPixel.y*5.5+uvPixel.x*2.6)*0.12*closeDetail;
+  float margin=smoothstep(0.35,0.49,abs(vUv.x-0.5));
+  base=mix(base,linearColor(vec3(0.66,0.67,0.40)),margin*0.19);
+  base*=0.97+0.06*gnoise(vLocal*19.0,634u)*closeDetail;
+  light=max(light,0.30);
+  shade=vec3(0.56,0.66,0.52);
  }else{
-  float leafTone=clamp(vVariation*0.6+0.2+gnoise(vLocal*10.0,631u)*0.18,0.0,1.0);
-  base=mix(linearColor(vec3(0.29,0.40,0.26)),linearColor(vec3(0.52,0.59,0.37)),leafTone);
-  mark=inkLine(vUv.x-0.5,0.006)*0.17;
-  light=max(light,0.32);
+  // Dense short moss fibers cover a low, irregular physical mat. There are
+  // no leaf midribs or rock fractures on this separate living surface.
+  float tuft=gnoise(vLocal*vec3(10.0,4.0,10.0)+vVariation*3.0,661u);
+  float mossGrain=gnoise(vLocal*vec3(75.0,31.0,75.0),662u);
+  float fine=1.0-smoothstep(0.006,0.035,localPixel);
+  base=mix(linearColor(vec3(0.36,0.43,0.21)),linearColor(vec3(0.60,0.63,0.34)),clamp(0.48+tuft*0.40+vVariation*0.12,0.0,1.0));
+  base*=0.98+0.09*mossGrain*fine;
+  // Tiny interrupted blades make a fibrous skin, without long parallel
+  // striations. Their subpixel limit blends back to the average moss pigment.
+  vec2 fiberCell=vUv*76.0;
+  vec2 fiberRandom=jointHash(floor(fiberCell)+vVariation*37.0);
+  vec2 fiberPoint=fract(fiberCell)-0.5-(fiberRandom-0.5)*0.58;
+  vec2 fiberAxis=normalize(vec2((fiberRandom.x-0.5)*1.6,1.0));
+  float along=dot(fiberPoint,fiberAxis);
+  float across=dot(fiberPoint,vec2(-fiberAxis.y,fiberAxis.x));
+  float bladeDistance=max(abs(across)-0.055,abs(along)-(0.12+fiberRandom.y*0.17));
+  float fiberPixel=max(uvPixel.x,uvPixel.y)*76.0;
+  float fiberDetail=1.0-smoothstep(0.30,0.80,fiberPixel);
+  float blade=(1.0-smoothstep(0.0,max(0.018,fiberPixel*0.65),bladeDistance))*fiberDetail;
+  base*=1.0+blade*mix(-0.17,0.16,smoothstep(-0.12,0.14,along));
+  shade=vec3(0.50,0.61,0.42);
  }
  // Bloom brings the native foliage into colour; it never introduces a
  // different world's flowers. The geometry and rock contact remain stable.

@@ -6,7 +6,7 @@ import { clumps, Fields, type ClumpSettings, type FieldParams } from '../planet/
 import type { RestPoint } from '../../../src/planet/rest';
 import type { Layout } from '../planet/terrain';
 import { SPECIES_MESH } from './flowerMeshes';
-import fragmentShader from '../../../src/life/grass.frag.glsl?raw';
+import fragmentShader from './nativePlant.frag.glsl?raw';
 import vertexShader from './flower.vert.glsl?raw';
 import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterLook, type ScatterView } from '../../../src/life/scatter';
 

@@ -16,6 +16,13 @@ import { ChunkSelection, NODE_FLOATS, type LodConfig, type LodView } from '../..
 import fragmentShader from './surface.frag.glsl?raw';
 import vertexShader from './surface.vert.glsl?raw';
 
+/** Keep steep chalk beds resolved farther away while retaining CDLOD morphs. */
+export function canyonSurfaceLod(cfg: LodConfig): LodConfig {
+  return cfg.grid < 33 || cfg.rangeFactor < 8
+    ? { ...cfg, grid: Math.max(33, cfg.grid), rangeFactor: Math.max(8, cfg.rangeFactor) }
+    : cfg;
+}
+
 /** A grid × grid vertex patch over [0,1]², split along the (x,y)→(x+1,y+1) diagonals. */
 export function createGrid(grid: number): BufferGeometry {
   const positions = new Float32Array(grid * grid * 3);
@@ -103,7 +110,7 @@ export class Surface {
       new ShaderMaterial({ name: away ? 'surface (away from home)' : 'surface', vertexShader, fragmentShader, uniforms, defines: away ? { AWAY_FROM_HOME: 1 } : {} });
     this.near = new SurfacePart(this.selection.capacity, material(false));
     this.away = new SurfacePart(this.selection.capacity, material(true));
-    this.setGrid(grid);
+    this.setGrid(Math.max(33, grid));
     this.mesh.add(this.near.mesh, this.away.mesh);
   }
 
@@ -119,9 +126,10 @@ export class Surface {
   }
 
   update(view: LodView, cfg: LodConfig): void {
-    this.setGrid(cfg.grid);
+    const resolved = canyonSurfaceLod(cfg);
+    this.setGrid(resolved.grid);
     const sel = this.selection;
-    sel.select(view, cfg);
+    sel.select(view, resolved);
     this.near.count = 0;
     this.away.count = 0;
     const d = sel.data;
