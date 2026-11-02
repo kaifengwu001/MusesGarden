@@ -42,6 +42,8 @@ Started from ead85c4. Kai (2026-11-01), with a screenshot of the flats from abov
 | 2 | Geometry re-constructs with zoom and camera distance, imperfectly, which breaks it more | |
 | 3 | The fault lines still exist | |
 | 4 | The terraces' construction needs a clean-slate rewrite | |
+| 5 | (added) Kai, mid-round: measure the slope from the height data that drives both the hills and the paddies, not from the mesh (inaccurate and heavy) | |
+| 6 | (added) Kai, mid-round: in this world the diameter will not change, so no rebuilds are needed | |
 
 The plan (the causes are in the old design itself, not in its parameters): the terraces were built cell by cell round the camera (every cell's edge a seam: the fault lines), out to 220 m, with the ground's paint drawing a different layout beyond (as the camera moves the built and the painted swap: the re-construction). The new construction builds the whole planet's terraces once from one global grid, never from the camera: (1) the terrain bake read back on every cube face at once, the faces' shared edges made identical; (2) every grid point given a label (a band, a paddy in it, a lens, a plot of the flats, or wild, river, yard), the small rings and slivers merged on the label map; (3) the label map turned into geometry square by square, each crossing point computed once on its grid edge from that edge's two samples, so neighbouring pieces share their vertices exactly (floors, risers, bunds, ridges, paths, skirts: watertight by construction, no breaks); (4) every terrace drawn as geometry at every distance, the old paint of terraces retired; rebuilt only when the planet's size changes.
 
