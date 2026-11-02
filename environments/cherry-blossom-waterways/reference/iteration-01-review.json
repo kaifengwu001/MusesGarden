@@ -1,0 +1,593 @@
+{
+  "recordedAt": "2026-11-02T08:48:53.347Z",
+  "backend": "ANGLE D3D11",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "errors": [],
+  "views": [
+    {
+      "id": "water-garden",
+      "hash": "7ed94c5c:1440x900",
+      "state": "q=high&hud=0&t=12",
+      "stats": {
+        "frameMs": 16.600000000000364,
+        "jsMs": 1.300000000745058,
+        "gpuMs": 1.665024,
+        "drawCalls": 24,
+        "triangles": 921271,
+        "trianglesSubmitted": 921271,
+        "grassInstances": 15017,
+        "flowerInstances": 886,
+        "textures": 26,
+        "geometries": 35,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 15,
+        "lodMin": 0,
+        "lodMax": 1,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed willow",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 641,
+          "triangles": 553824
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 222,
+          "triangles": 216228
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 156,
+          "triangles": 68640
+        },
+        {
+          "name": "Distant willow",
+          "count": 21,
+          "triangles": 16296
+        }
+      ],
+      "trees": 1040
+    },
+    {
+      "id": "globe",
+      "hash": "f1877d3f:1440x900",
+      "state": "q=high&hud=0&t=12",
+      "stats": {
+        "frameMs": 16.599999999999454,
+        "jsMs": 0.6999999992549419,
+        "gpuMs": 2.295808,
+        "drawCalls": 24,
+        "triangles": 923831,
+        "trianglesSubmitted": 923831,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 26,
+        "geometries": 35,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 20,
+        "lodMin": 1,
+        "lodMax": 1,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed willow",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 641,
+          "triangles": 553824
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 222,
+          "triangles": 216228
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 156,
+          "triangles": 68640
+        },
+        {
+          "name": "Distant willow",
+          "count": 21,
+          "triangles": 16296
+        }
+      ],
+      "trees": 1040
+    },
+    {
+      "id": "far-side",
+      "hash": "46a007d6:1440x900",
+      "state": "q=high&hud=0&t=12",
+      "stats": {
+        "frameMs": 16.699999999999818,
+        "jsMs": 4.399999998509884,
+        "gpuMs": 0.851968,
+        "drawCalls": 24,
+        "triangles": 916663,
+        "trianglesSubmitted": 916663,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 27,
+        "geometries": 35,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 6,
+        "lodMin": 0,
+        "lodMax": 0,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Detailed willow",
+          "count": 0,
+          "triangles": 0
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 641,
+          "triangles": 553824
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 222,
+          "triangles": 216228
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 156,
+          "triangles": 68640
+        },
+        {
+          "name": "Distant willow",
+          "count": 21,
+          "triangles": 16296
+        }
+      ],
+      "trees": 1040
+    },
+    {
+      "id": "weeping-canopy",
+      "hash": "fd818db3:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12",
+      "stats": {
+        "frameMs": 150,
+        "jsMs": 1.4000000022351742,
+        "gpuMs": 4.187136,
+        "drawCalls": 38,
+        "triangles": 3279072.7142857146,
+        "trianglesSubmitted": 3797879,
+        "grassInstances": 267978,
+        "flowerInstances": 6994,
+        "textures": 39,
+        "geometries": 43,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 92,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 39,
+          "triangles": 434460
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 18,
+          "triangles": 210528
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 14,
+          "triangles": 66192
+        },
+        {
+          "name": "Detailed willow",
+          "count": 6,
+          "triangles": 46296
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 602,
+          "triangles": 520128
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 204,
+          "triangles": 198696
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 142,
+          "triangles": 62480
+        },
+        {
+          "name": "Distant willow",
+          "count": 15,
+          "triangles": 11640
+        }
+      ],
+      "trees": 1040
+    },
+    {
+      "id": "repeat-home",
+      "hash": "7ea2d43a:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12",
+      "stats": {
+        "frameMs": 66.69999999999982,
+        "jsMs": 1.199999999254942,
+        "gpuMs": 2.33472,
+        "drawCalls": 38,
+        "triangles": 3645994.9541284405,
+        "trianglesSubmitted": 4271735,
+        "grassInstances": 315400,
+        "flowerInstances": 8693,
+        "textures": 39,
+        "geometries": 43,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 140,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 39,
+          "triangles": 434460
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 20,
+          "triangles": 233920
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 13,
+          "triangles": 61464
+        },
+        {
+          "name": "Detailed willow",
+          "count": 4,
+          "triangles": 30864
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 602,
+          "triangles": 520128
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 202,
+          "triangles": 196748
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 143,
+          "triangles": 62920
+        },
+        {
+          "name": "Distant willow",
+          "count": 17,
+          "triangles": 13192
+        }
+      ],
+      "trees": 1040
+    },
+    {
+      "id": "petal-drift",
+      "hash": "2ca5ed45:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=18",
+      "stats": {
+        "frameMs": 16.699999999999818,
+        "jsMs": 2,
+        "gpuMs": 2.5856,
+        "drawCalls": 38,
+        "triangles": 3645994.9541284405,
+        "trianglesSubmitted": 4271735,
+        "grassInstances": 315400,
+        "flowerInstances": 8693,
+        "textures": 39,
+        "geometries": 43,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 140,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 18,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 39,
+          "triangles": 434460
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 20,
+          "triangles": 233920
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 13,
+          "triangles": 61464
+        },
+        {
+          "name": "Detailed willow",
+          "count": 4,
+          "triangles": 30864
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 602,
+          "triangles": 520128
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 202,
+          "triangles": 196748
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 143,
+          "triangles": 62920
+        },
+        {
+          "name": "Distant willow",
+          "count": 17,
+          "triangles": 13192
+        }
+      ],
+      "trees": 1040
+    },
+    {
+      "id": "time-return",
+      "hash": "7ea2d43a:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12",
+      "stats": {
+        "frameMs": 16.600000000000364,
+        "jsMs": 1.4000000022351742,
+        "gpuMs": 2.69312,
+        "drawCalls": 38,
+        "triangles": 3645994.9541284405,
+        "trianglesSubmitted": 4271735,
+        "grassInstances": 315400,
+        "flowerInstances": 8693,
+        "textures": 39,
+        "geometries": 43,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 140,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 5586.199999999255,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "batches": [
+        {
+          "name": "Detailed spreading cherry",
+          "count": 39,
+          "triangles": 434460
+        },
+        {
+          "name": "Detailed weeping cherry",
+          "count": 20,
+          "triangles": 233920
+        },
+        {
+          "name": "Detailed young cherry",
+          "count": 13,
+          "triangles": 61464
+        },
+        {
+          "name": "Detailed willow",
+          "count": 4,
+          "triangles": 30864
+        },
+        {
+          "name": "Distant spreading cherry",
+          "count": 602,
+          "triangles": 520128
+        },
+        {
+          "name": "Distant weeping cherry",
+          "count": 202,
+          "triangles": 196748
+        },
+        {
+          "name": "Distant young cherry",
+          "count": 143,
+          "triangles": 62920
+        },
+        {
+          "name": "Distant willow",
+          "count": 17,
+          "triangles": 13192
+        }
+      ],
+      "trees": 1040
+    }
+  ],
+  "parity": {
+    "heightError": 0.0021712322035596365,
+    "waterError": 0.016311471880800177,
+    "warpError": 0.000009413897819202651,
+    "samples": 64
+  },
+  "timeReturn": true
+}

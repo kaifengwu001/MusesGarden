@@ -26,7 +26,10 @@
     "check:scarlet": "tsc -p environments/scarlet-sail-canyon/tsconfig.json && eslint environments/scarlet-sail-canyon",
     "dev:cobalt": "vite --host 127.0.0.1 --port 5217 --strictPort",
     "build:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && vite build --config environments/cobalt-windfields/vite.config.ts",
-    "check:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && eslint environments/cobalt-windfields"
+    "check:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && eslint environments/cobalt-windfields",
+    "dev:cherry": "vite --port 5249 --strictPort",
+    "check:cherry": "tsc -p environments/cherry-blossom-waterways/tsconfig.json && eslint environments/cherry-blossom-waterways",
+    "build:cherry": "tsc -p environments/cherry-blossom-waterways/tsconfig.json && vite build --config environments/cherry-blossom-waterways/vite.config.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

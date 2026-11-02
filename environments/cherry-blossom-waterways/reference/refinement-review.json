@@ -1,0 +1,693 @@
+{
+  "recordedAt": "2026-11-02T09:43:43.846Z",
+  "errors": [],
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "views": [
+    {
+      "id": "user-water-joints",
+      "hash": "0737a41c:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=0.4823,0.1695,0.7143,0.4779,0.67",
+      "stats": {
+        "frameMs": 16.699999999999818,
+        "jsMs": 2,
+        "gpuMs": 2.553856,
+        "drawCalls": 44,
+        "triangles": 3326555.932692308,
+        "trianglesSubmitted": 4057199,
+        "grassInstances": 294599,
+        "flowerInstances": 6403,
+        "textures": 37,
+        "geometries": 44,
+        "programs": 34,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 156,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "7edc9e2d68e54852e8014fc02429ca3cf00078056f0bbe0bf0e97f49271e5832"
+    },
+    {
+      "id": "user-willow",
+      "hash": "f18371be:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=0.6389,0.6256,0.4249,-0.1409,0.59",
+      "stats": {
+        "frameMs": 16.600000000000364,
+        "jsMs": 1.3999999985098839,
+        "gpuMs": 2.745344,
+        "drawCalls": 45,
+        "triangles": 3444098.2857142854,
+        "trianglesSubmitted": 4168321,
+        "grassInstances": 293250,
+        "flowerInstances": 5919,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 139,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 182.70000000298023,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "e331f5b45a356d2a609e3631e223f5fa555745ddb7b92d1e0ca0f993c87c2ee0"
+    },
+    {
+      "id": "willow",
+      "hash": "cacb0aaf:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=0.6475,0.615,0.427,-0.1421,0.7031",
+      "stats": {
+        "frameMs": 16.600000000000364,
+        "jsMs": 1.1000000014901161,
+        "gpuMs": 3.002368,
+        "drawCalls": 46,
+        "triangles": 3297976.4851485146,
+        "trianglesSubmitted": 3967695,
+        "grassInstances": 257762,
+        "flowerInstances": 5840,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 156,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "38f5b4eed361e4462a0d497554a5d50d434462680097741491408b331ce40a77"
+    },
+    {
+      "id": "willow-drift",
+      "hash": "b5a8c3b7:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=18&pose=0.6475,0.615,0.427,-0.1421,0.7031",
+      "stats": {
+        "frameMs": 16.699999999999818,
+        "jsMs": 1.0999999977648258,
+        "gpuMs": 1.666048,
+        "drawCalls": 46,
+        "triangles": 3297976.4851485146,
+        "trianglesSubmitted": 3967695,
+        "grassInstances": 257762,
+        "flowerInstances": 5840,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 156,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 18,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "48eaa0796ff7a647712fc97cd28802405313baf8f667733ee64e04903f452f8d"
+    },
+    {
+      "id": "willow-return",
+      "hash": "cacb0aaf:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=0.6475,0.615,0.427,-0.1421,0.7031",
+      "stats": {
+        "frameMs": 16.700000000000728,
+        "jsMs": 1.300000000745058,
+        "gpuMs": 2.030592,
+        "drawCalls": 46,
+        "triangles": 3297976.4851485146,
+        "trianglesSubmitted": 3967695,
+        "grassInstances": 257762,
+        "flowerInstances": 5840,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 156,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "bb7aa04ea82738c5032aa7df641072ff6a084f812f8cfa20a5f67930399854b5"
+    },
+    {
+      "id": "canal-ducks-0",
+      "hash": "35e3357e:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=-0.2193,0.674,0.7016,0.0738,0.7463",
+      "stats": {
+        "frameMs": 166.60000000000036,
+        "jsMs": 1.199999999254942,
+        "gpuMs": 2.612224,
+        "drawCalls": 45,
+        "triangles": 3195819.1747572813,
+        "trianglesSubmitted": 4014103,
+        "grassInstances": 295303,
+        "flowerInstances": 3131,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 165,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "6fa6db945a639cd64f9cd9ed3f7936c6e5f98a5383d8846ca885dbfdb685a867"
+    },
+    {
+      "id": "canal-ducks-1",
+      "hash": "ede64ffb:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=-0.3145,0.4532,-0.5631,0.6153,0.7463",
+      "stats": {
+        "frameMs": 183.3000000000011,
+        "jsMs": 1.0999999977648258,
+        "gpuMs": 1.92512,
+        "drawCalls": 44,
+        "triangles": 3462923.8846153845,
+        "trianglesSubmitted": 4220111,
+        "grassInstances": 285789,
+        "flowerInstances": 4722,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 159,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "58cfc53591b264b0b340b4fa6d37d6326fc20599feb43166364efac538e650fc"
+    },
+    {
+      "id": "home-water",
+      "hash": "b0cce136:1440x900",
+      "state": "cam=wander&q=high&hud=0&t=12&pose=0.6562,0.5813,0.4728,-0.0889,0.6042",
+      "stats": {
+        "frameMs": 166.6999999999989,
+        "jsMs": 1.300000000745058,
+        "gpuMs": 3.505152,
+        "drawCalls": 45,
+        "triangles": 3378706,
+        "trianglesSubmitted": 4026383,
+        "grassInstances": 243495,
+        "flowerInstances": 7515,
+        "textures": 37,
+        "geometries": 46,
+        "programs": 35,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 140,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "05ee697441d3bc3acb876c47656fa05f4123334a017f8d2c772e2d8c35a1d554"
+    },
+    {
+      "id": "globe",
+      "hash": "13df5b3c:1440x900",
+      "state": "q=high&hud=0&t=12&pose=-0.2064,0.2449,0.8328,-0.4516,0",
+      "stats": {
+        "frameMs": 16.69999999999891,
+        "jsMs": 0.7000000029802322,
+        "gpuMs": 2.499584,
+        "drawCalls": 33,
+        "triangles": 1058671,
+        "trianglesSubmitted": 1058671,
+        "grassInstances": 5978,
+        "flowerInstances": 769,
+        "textures": 38,
+        "geometries": 49,
+        "programs": 36,
+        "gpuBytes": 218214954,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 15,
+        "lodMin": 0,
+        "lodMax": 1,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 6472.099999997765,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "trees": 1040,
+      "remoteDucks": 45,
+      "remoteFlocks": 17,
+      "imageSHA256": "aacecad325386665b0bd9912ca4c3b8c4373b62c82baa145b11ee22093c32bd2"
+    }
+  ],
+  "timeReturn": true,
+  "sourceHashes": [
+    {
+      "path": "cherry.css",
+      "sha256": "d2d688e9948185f9d6b52869aeed52525bf83c2465b1f1141addefc18796da13"
+    },
+    {
+      "path": "core/hashSync.ts",
+      "sha256": "fc0c7c1357991b49a703494dbbaea35586dd7b00bac0a593e13e9e09f227666b"
+    },
+    {
+      "path": "dev/cherry-distribution.test.ts",
+      "sha256": "96438398d338940895bba42019a56828d4356e1e6b9e8041b66de62d47efeeb5"
+    },
+    {
+      "path": "dev/cherry-fields.test.ts",
+      "sha256": "d55a9aa13a66d6e64682e2e42b3a4a19e1da6bdb1645725c2707a1eab881b2b7"
+    },
+    {
+      "path": "dev/cherry-geometry.test.ts",
+      "sha256": "4dc1ef7ed4a264aa83c06c250cadcaf2525e1a0a15ad66ca4584138974032137"
+    },
+    {
+      "path": "dev/cherry-joints.test.ts",
+      "sha256": "ef4bba9b06acd72a108d9b9b721b151b28bdaee0b34202f282c192785244cf7f"
+    },
+    {
+      "path": "dev/cherry-pavilion.test.ts",
+      "sha256": "5e8e3012528be635cdadfba280801c7443291a6c89f4b80fc9eca8d18d27cc52"
+    },
+    {
+      "path": "dev/cherry-waterlife.test.ts",
+      "sha256": "63143d5d24126a8544e598b846898eb2803c4a47079795bababfc1e4d534ee18"
+    },
+    {
+      "path": "dev/ecology.spec.ts",
+      "sha256": "462c263f95a0c862d29025ee315bf3ee2aa7ebc92f3b0e2ddeefdb0bdddfcb35"
+    },
+    {
+      "path": "dev/harness.ts",
+      "sha256": "eef326282b971b11b41d5646eca61fcf5f23a9ae83080602edcffa73708bbafd"
+    },
+    {
+      "path": "dev/hud.ts",
+      "sha256": "954362a933f0e3243adb1b97215fc18d5a279b570d529751d145b10e2791af35"
+    },
+    {
+      "path": "dev/invariants/growth.test.ts",
+      "sha256": "bcf69b8714a3b6c9a8b3abcd3fad8bfd7051aeef8f153ad73d798a207f73228e"
+    },
+    {
+      "path": "dev/invariants/params.test.ts",
+      "sha256": "c52b5f7317d282ea16d92195a08a3a6ecc9b3e7d9dfeefee8143d3a96aff6f3b"
+    },
+    {
+      "path": "dev/invariants/scale.test.ts",
+      "sha256": "f4eb7a2f1ce61a06a009586c57f1bf8cce256eb4fdf3871ef9cfd75318a0b184"
+    },
+    {
+      "path": "dev/invariants.spec.ts",
+      "sha256": "eeae37cb2a102bd76d347f2794ba35a1e4143b99465cf9da14f58650918dc2ce"
+    },
+    {
+      "path": "dev/lock.spec.ts",
+      "sha256": "ab31ec7b818a3b38a292f3028eac5b58e8eb8e00657776b0f891d2ba82be7087"
+    },
+    {
+      "path": "dev/parity.ts",
+      "sha256": "d0b437d88bf2fd687d836e5f11a96679a2a0f65d7ee912a9a3f320ca34c4d2c1"
+    },
+    {
+      "path": "garden/placement.ts",
+      "sha256": "3173e7134df87369eda9429a87c6cb36a6381f0982ef7f6208026d763e3ff29a"
+    },
+    {
+      "path": "index.html",
+      "sha256": "24daf3c432913c729a3db0b4b4e38c4012903f0205dc802a4f157f2b63e919e6"
+    },
+    {
+      "path": "life/birds.ts",
+      "sha256": "de9f19686aa329712a92090e764441f3ed9e3796e8c47919b84b22d0ad134d93"
+    },
+    {
+      "path": "life/blossomPetal.vert.glsl",
+      "sha256": "224149f571639d02a870e8e760db1db3e0b249127a3c0da6af9e16cb1e66e48e"
+    },
+    {
+      "path": "life/blossomPetals.ts",
+      "sha256": "a34b7bded7fb86e5354cf96504b57f761f40003d66b4dba1a84a6cd9d5cae15b"
+    },
+    {
+      "path": "life/butterflies.ts",
+      "sha256": "5625ad2ad3d9cc32918cdc3532e34ac8f33968ec93bc562e95025e4c6ebf3fa5"
+    },
+    {
+      "path": "life/cherry.frag.glsl",
+      "sha256": "ec37b1d73470000412e0e9071be03f4fb6f2e722be1e15dc07d5723c2d227b8a"
+    },
+    {
+      "path": "life/cherry.vert.glsl",
+      "sha256": "265d79e318fc0b40d28acfb70856108c58cba869e8db3883cb79bd39537ca01b"
+    },
+    {
+      "path": "life/cherryDistribution.ts",
+      "sha256": "0e69e7922d6ba22d98f8a6961aa906768fc93902a48ea70d9c7c51cebac47158"
+    },
+    {
+      "path": "life/cherryGeometry.ts",
+      "sha256": "5343406db69643023ff61d349af7b5171623d13bfc36e1c3ced01cdbbf6bc310"
+    },
+    {
+      "path": "life/cherryScenery.ts",
+      "sha256": "3707942b066c39a51a86b7f1326af09f9382604e71ec0f242b58ab753607e65b"
+    },
+    {
+      "path": "life/cherryShadow.frag.glsl",
+      "sha256": "4eeef34fb6ac93b067490d5975301e7ad014dae25eb865201fca30703819f661"
+    },
+    {
+      "path": "life/cherryShadow.vert.glsl",
+      "sha256": "9c106706f4e9215ab7cf4e9e2c8870cfe9c9fd85a2e3c6897b14aaf18f9db6e3"
+    },
+    {
+      "path": "life/cherryWaterlife.ts",
+      "sha256": "d1deb8904dd2e256d3b8e4a3b15b2261b1b16877ad375c13be2cd5709bb4f07c"
+    },
+    {
+      "path": "life/findBeds.ts",
+      "sha256": "8a4a47c2ad8ef82a67eb68e01d49a3b132757004908e4bf21c14ee4f78c66247"
+    },
+    {
+      "path": "life/flower.vert.glsl",
+      "sha256": "c0cafd22b1172cdc80ee399944521b86cde3543d7a3318855acea343dcb2cac4"
+    },
+    {
+      "path": "life/flowerMeshes.ts",
+      "sha256": "6c89f1dee8486e17f70b647d6750f331126c018514b2e51c47ab4ebcba55d264"
+    },
+    {
+      "path": "life/flowers.ts",
+      "sha256": "3b212c4a8d3d0f7782c80eb367e8ad35ef3b388a65acb5d7942ebb94d8bc304f"
+    },
+    {
+      "path": "life/grass.ts",
+      "sha256": "70f75ce68688d4a2a2cdc6eacb27ee0d9ab7825e3f1e4fc5df7952fa13515e27"
+    },
+    {
+      "path": "life/muse.ts",
+      "sha256": "d200eb33c36cfa2efb30dd959f62e145750b11d6bbb9a9619f208f1f5ac5b151"
+    },
+    {
+      "path": "life/museProps.ts",
+      "sha256": "501bd83752dd9cba9d9bfc6806bd7c52b92422e572fb957764553cbb63c4720c"
+    },
+    {
+      "path": "life/museRoam.ts",
+      "sha256": "9c233cb8b25165614258767d7c7985fa4b0b200dbe57252fdbfad8404681b5e0"
+    },
+    {
+      "path": "life/props.frag.glsl",
+      "sha256": "a17cde44b651c199677fb1662e28a504314c81cb8c177fd3fd0ae457fc60fe70"
+    },
+    {
+      "path": "life/props.ts",
+      "sha256": "39b47e3386911e390143b81f1b03cb49055441b42a956174afcc4dd1f4f62b58"
+    },
+    {
+      "path": "life/props.vert.glsl",
+      "sha256": "c098e5f88f42a10e444b6c17aae3ef8e1d7060e837a8bf20291001fe7bead014"
+    },
+    {
+      "path": "main.ts",
+      "sha256": "e28c71e87c381a1d68af9458ab59951032d568fd116c2c44130c4b1ddffbdcf2"
+    },
+    {
+      "path": "muse/ui/body.ts",
+      "sha256": "5b504e757e32eb32a62fd051b726602eab63cb3c8855494e5d30d9ec876e775f"
+    },
+    {
+      "path": "muse/ui/overlay.ts",
+      "sha256": "dd93639efb76569918058298e1da049d0ec170739bbfb5e990e29533ff3a168f"
+    },
+    {
+      "path": "params.ts",
+      "sha256": "5af5db816e25ee71815e69ab0ff340e7e1275c990592571dfb1b56f1541ebab8"
+    },
+    {
+      "path": "planet/bake.frag.glsl",
+      "sha256": "26dc409b5a70b536b3300f7275d36536a5f9520eb0d7cbed4276cbb8bbf9dc62"
+    },
+    {
+      "path": "planet/bake.ts",
+      "sha256": "a05a20b821ff866f6ff7e3ce27e23d1eb3fecc625ee2feca58ffc24154590d0a"
+    },
+    {
+      "path": "planet/fields.glsl",
+      "sha256": "3f1faffe9df31c4c940f440622bd32ad8d7518edc820bd9bf13835f32818a7b2"
+    },
+    {
+      "path": "planet/fields.ts",
+      "sha256": "24ce66e658ed36ea98ad9ddc9abef4baf9173c0e70575a33cc2d2179bbab2cd0"
+    },
+    {
+      "path": "planet/meadow.glsl",
+      "sha256": "9ba3ad092c886e7e071c697e08fc34e7adfe21818fd2c460d0672aea5f3d101c"
+    },
+    {
+      "path": "planet/surface.frag.glsl",
+      "sha256": "1db1a3ac4ea68dd7492ebc9e697278647c756ff4ad43fafac2e59cff6049d92c"
+    },
+    {
+      "path": "planet/surface.ts",
+      "sha256": "f1116773bdb0235773e0c7612601a1da7468949ade88917e0a153d084232e859"
+    },
+    {
+      "path": "planet/surface.vert.glsl",
+      "sha256": "c30c9e29fb028ff21c5587a5773a9b2ca5e1535a280798a20935cbd0a9aec507"
+    },
+    {
+      "path": "planet/terrain.glsl",
+      "sha256": "a5a7cd333863e8b4e48636335c5922130e40178b33ff3abcc71e1b3c1630efd1"
+    },
+    {
+      "path": "planet/terrain.ts",
+      "sha256": "e684f1802e620586ada1cf86a822b4a62d32a462f6d47570131c57de40482276"
+    },
+    {
+      "path": "planet/water.glsl",
+      "sha256": "e5c3be4fe6f705a2a861cc1af3f4691b51418d0c73a956b90a1aee26ffbe35db"
+    },
+    {
+      "path": "render/glsl.ts",
+      "sha256": "adca51852e167a25ac51d865fa58e3bd4c853752f540904d02ef95cc2259db10"
+    },
+    {
+      "path": "render/palette.ts",
+      "sha256": "ee427a5953ccf3bd6db57cb980350b8c78769bb9309e94c65c32eae406cf5912"
+    },
+    {
+      "path": "render/sky.ts",
+      "sha256": "2e87f69b54592156dbf7e44017ee45d993464182f88b6dad7b6ee61de6cc8a52"
+    },
+    {
+      "path": "render/toon.glsl",
+      "sha256": "373e6cc33012ecebeb0f5ec0e19d1820453ceb19e6f03472d59f1edbb3a2b49b"
+    },
+    {
+      "path": "ui/controlBar.ts",
+      "sha256": "da76481ec54357f74a19c89f38aef26d7ca3471f215183f9c47d606bda022b87"
+    },
+    {
+      "path": "ui/format.ts",
+      "sha256": "f1a3ca0cc11f2eada1cdcb937baa23eb8b856d07790c281eb797e354d3786a7a"
+    },
+    {
+      "path": "ui/garden/basketFlight.ts",
+      "sha256": "8e2f55f606a4dd322351220f08ded508c5d04de138b0eb9e99ac131fae6b4d52"
+    },
+    {
+      "path": "ui/garden/gardenUi.ts",
+      "sha256": "5b61f0f229f290b9ae6e54b9bd378df2aab427ac58259b3191b9365d8b35c06b"
+    },
+    {
+      "path": "ui/garden/travel.ts",
+      "sha256": "e7370336b733785740603f27c42858af6596401bf2f44122ff59eb2b6a7def65"
+    },
+    {
+      "path": "ui/panel.ts",
+      "sha256": "8cb5048747ba53290d138db8b67aeb1539baa57b1648263a518efac22422be66"
+    },
+    {
+      "path": "ui/postcard.ts",
+      "sha256": "b65894dc5eecf625e967a2cd7c043d08d19bb2f2fa0a578fa2ad34b8649bfd2d"
+    },
+    {
+      "path": "ui/ui.ts",
+      "sha256": "d9ec392075b93e0a32761b58e3d833bd5c62b7bac005a9e82e457adb9ec87a96"
+    },
+    {
+      "path": "view/picking.ts",
+      "sha256": "a3c9b7bf7e7a6807c22a6bc7d1a6feb4cb486f9ec5b45a7d8d895a467a24572b"
+    },
+    {
+      "path": "view/vista.ts",
+      "sha256": "0ae243dcda2f331ebb9d15c3b6f87c66c60f107cf8e88faef07282f28c73ec5a"
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "9378fffc6196f3e2f1195daf272364c6a60f3f298a699b0c8d758a700434bf91"
+    },
+    {
+      "path": "world.ts",
+      "sha256": "7c0eacd84b1eed22248e1e5a3a232a0002956c3fa6508e1954d78731fe2a5b44"
+    }
+  ]
+}
