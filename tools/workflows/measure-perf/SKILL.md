@@ -19,7 +19,7 @@ description: How to measure Muse's Garden's performance honestly on this Mac (he
 Make builds to compare with drive-app's `build-at.sh`. Use probe builds: production code with `window.__world` exposed.
 
 ```bash
-B=.claude/skills/drive-app/scripts; P=.claude/skills/measure-perf/scripts
+B=tools/workflows/drive-app/scripts; P=tools/workflows/measure-perf/scripts
 $B/build-at.sh before HEAD~1 && $B/build-at.sh after      # the last commit against the working tree
 node $P/ab.mjs before after high                        # per view: best / median of 8 alternating rounds
 node $P/ab.mjs before after medium

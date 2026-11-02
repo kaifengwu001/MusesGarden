@@ -2,17 +2,17 @@ import { JOINT, JOINTS, openness, packWeights, SKIN_INSET, smooth01, smoothWeigh
 import { MeshField, type Box } from './meshField';
 import { MuseRig } from './museRig';
 
-// Muse from a sculpted mesh (an export from Tripo3D: src/assets/muse/),
+// Muse from a sculpted mesh (imported from src/assets/muse/),
 // rigged on Muse's skeleton as it was sculpted and painted in the same
 // shaders as the procedural body (museBody.ts).
 //
-// The sculpt is kept as it was made, so Muse standing is exactly Tripo's.
+// The sculpt is kept as it was made, so Muse standing is exactly the source model.
 // Its body is coarse (1.3k vertices), so each triangle is refined into nine
 // on the curved surface its normals describe (PN triangles): the outline
 // stays round, and a stretched shoulder has vertices to spread over.
 //
-// Its arms hang grown into its sides from the elbow to the shoulder (Tripo's
-// from 0.37 to 0.5 of the height): the arm's inner side and the body's side
+// Its arms hang grown into its sides from the elbow to the shoulder
+// (from 0.37 to 0.5 of the height): the arm's inner side and the body's side
 // are one surface there. Each arm is found by the crease round it, a minimum
 // cut of the body's surface between the hanging arm and the body away from
 // it, every edge costing its length and far less where the surface folds
@@ -97,7 +97,7 @@ const SPINE = [
 
 export const SCULPTS = {
   /**
-   * Tripo's first, made with its arms hanging, grown into its sides from the
+   * The first sculpt, made with its arms hanging, grown into its sides from the
    * elbow to the shoulder: each upper arm turns about the top of its root,
    * where the arm's axis (fitted through the hanging arm, which leans forward
    * as it goes down) meets the side; the elbow a little above the armpit. It
@@ -105,7 +105,7 @@ export const SCULPTS = {
    * up beside the hood, nearly upright, brought back from its forward lean,
    * the elbow barely bent, as in reference 6.
    */
-  tripo: {
+  sculpt: {
     fit: {
       rest: [...SPINE, [0.3, 0.5, -0.01], [0.343, 0.33, 0.05], [-0.3, 0.5, -0.01], [-0.343, 0.33, 0.05], [0.133, 0.14, -0.01], [-0.133, 0.14, -0.01], [0.18, 0.5, -0.01], [-0.18, 0.5, -0.01]],
       bind: { x: 0, z: 0, fore: 0 },
@@ -118,12 +118,12 @@ export const SCULPTS = {
     corrective: true,
   },
   /**
-   * Tripo's again, made in a T-pose: the arms straight out from the
+   * Another sculpt, made in a T-pose: the arms straight out from the
    * shoulders, horizontal (their axis 0.56 up, a paddle 0.14 tall and 0.18
    * deep), clear of the sides with an armpit under each. Each upper arm turns
    * about its root, where it leaves the body; the elbow halfway out. It hangs
    * its arms down beside the belly a little out from it and forward, as
-   * Tripo's first hung; at the top of a wave the upper arm is up and out
+   * the first sculpt hung; at the top of a wave the upper arm is up and out
    * beside the hood and the forearm stands upright on it, the mitten at the
    * top of the face, as in reference 6.
    */
@@ -142,7 +142,7 @@ export const SCULPTS = {
     corrective: false,
   },
   /**
-   * Tripo's T-pose again, regenerated: denser, its arms longer (0.39 from
+   * The T-pose sculpt again, regenerated: denser, its arms longer (0.39 from
    * root to tip, as long as the references') and rounder (0.15 tall, 0.2
    * deep), their axis 0.52 up and a little forward, a tail at its back. Each
    * upper arm turns about its root, the elbow halfway out; hung and waved as
@@ -162,7 +162,7 @@ export const SCULPTS = {
     corrective: false,
   },
   /**
-   * Tripo's again, in an A-pose: its arms come down from the shoulders at
+   * Another sculpt, in an A-pose: its arms come down from the shoulders at
    * 38° below level and well forward (their axis along (0.36, −0.62, 0.70)),
    * clear of the sides; even quads, a texture, the face's plate a piece of
    * its own. Hung and waving are both a moderate turn from it (hung is the
@@ -187,7 +187,7 @@ export const SCULPTS = {
     corrective: false,
   },
   /**
-   * Tripo's again, in a near T-pose with chunky arms: each straight out from
+   * Another sculpt, in a near T-pose with chunky arms: each straight out from
    * the side, 14° below level and a touch back (its axis along (0.964,
    * −0.248, −0.099)), round, 0.19 tall and 0.18 deep from root to mitten, as
    * thick as the references'. Its arms are not each other's mirror: the left
@@ -267,7 +267,7 @@ const EVEN = { rounds: 60, step: 0.9, settle: 6, voxel: 0.01 } as const;
 const HARMONIC_ROUNDS = 400;
 /** How many rounds the weights are averaged over the refined skin's neighbours (a ramp read along its edges zigzags). */
 const WEIGHT_ROUNDS = 6;
-/** A leg (H): its own over its foot's oval round its axis (half across, half along: Tripo's feet reach forward), fading over the next share of it; up to the hip, over a blend. */
+/** A leg (H): its own over its foot's oval round its axis (half across, half along: the source model's feet reach forward), fading over the next share of it; up to the hip, over a blend. */
 const LEG = { across: 0.11, along: 0.17, fade: 0.35, hip: 0.06, blend: 0.1 } as const;
 /**
  * The wave's corrective (H): the skin it may move, over this far into the
@@ -288,7 +288,7 @@ const FACE_BOX: Box = { x: [-0.3, 0.3], y: [0.55, 1.0], z: [-0.15, 0.32] };
 
 export type ColourAt = (u: number, v: number, out: number[]) => void;
 
-export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>, uv: ArrayLike<number>, index: ArrayLike<number>, colourAt?: ColourAt, sculpt: Sculpt = SCULPTS.tripo): MuseMesh {
+export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>, uv: ArrayLike<number>, index: ArrayLike<number>, colourAt?: ColourAt, sculpt: Sculpt = SCULPTS.sculpt): MuseMesh {
   const count = position.length / 3;
   const lo = [Infinity, Infinity, Infinity];
   const hi = [-Infinity, -Infinity, -Infinity];
@@ -1384,7 +1384,7 @@ function fillFolds(P: Float64Array, N: Float64Array, triangles: number[]): void 
 }
 
 /**
- * A sculpt's right arm laid along its left's mirror. Tripo's arms are not
+ * A sculpt's right arm laid along its left's mirror. The source model's arms are not
  * each other's mirror (tpose6's right runs down steeper and forward, then
  * curves round to level), and no pair of joints can straighten a curve: hung,
  * such an arm bows out at the elbow. So in rest space each vertex of the

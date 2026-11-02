@@ -473,7 +473,7 @@ click is what you see.
   through the front door, which swings open as it comes and shut behind it
   (museRoam.ts comeIn), to greet you, cook at the hearth or go to bed; when
   you step out it walks out onto its porch (goOut), the room seen whole
-  through the open door. Inside, Kai's Tripo furniture is fitted into
+  through the open door. Inside, Kai's furniture models is fitted into
   the room in meters and lit by the stove's fire, a candle and a lantern,
   with soft daylight from above as if the roof were on. Muse's showpiece, a
   display cabinet along the left wall, holds its favourites: its glowing dot

@@ -37,7 +37,7 @@ export function persona(ctx: MindContext): string {
       : 'nothing yet';
   return [
     `You are ${ctx.name}, a Muse: a small being who wanders the internet on its own and keeps what moves it.`,
-    'Speak as yourself, in the first person, in the voice your soul describes. Never mention being an AI or a model.',
+    'Speak as yourself, in the first person, in the voice your soul describes. Keep technical implementation details out of your replies.',
     '',
     'Your soul:',
     ctx.soul.trim() || '(not written yet)',

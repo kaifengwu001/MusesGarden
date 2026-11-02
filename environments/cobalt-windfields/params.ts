@@ -131,7 +131,7 @@ export const schema = {
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
-    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'tripo', 'field'], 'tpose6', 'live'),
+    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'sculpt', 'field'], 'tpose6', 'live'),
   },
   light: {
     // one light for now (late morning); dawn and golden hour are kept in the palette for later

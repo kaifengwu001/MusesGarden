@@ -12,7 +12,7 @@ Both demand evidence pixel for pixel, not "looks the same". Every script takes t
 ## Is it the same picture? (`samecheck.mjs`)
 
 ```bash
-S=.claude/skills/check-frames/scripts
+S=tools/workflows/check-frames/scripts
 node $S/samecheck.mjs after after high               # self-check first: must be identical
 node $S/samecheck.mjs before after high medium        # per view and tier: identical, or how many pixels and how far
 DPR=1 node $S/samecheck.mjs before after high         # 1×: MSAA on
@@ -36,7 +36,7 @@ CROPS=/tmp/crops node $S/samecheck.mjs before after high   # zoomed crops round 
    ```bash
    node $S/film.mjs <target> /tmp/film '{"view":"standing 4.3 m","t0":20,"n":90}'
    node $S/flashes.mjs /tmp/film          # a pixel unlike both neighbours, which agree: per frame, by band
-   node .claude/skills/drive-app/scripts/sheet.mjs /tmp/film.jpg --cols 6 --width 240 /tmp/film/f0*.png
+   node tools/workflows/drive-app/scripts/sheet.mjs /tmp/film.jpg --cols 6 --width 240 /tmp/film/f0*.png
    ffmpeg -framerate 30 -i /tmp/film/f%03d.png -pix_fmt yuv420p /tmp/film.mp4
    ```
 

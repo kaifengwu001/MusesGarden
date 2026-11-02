@@ -35,7 +35,7 @@ import dotVertex from './hutDot.vert.glsl?raw';
 // homestead's local meters and fitted to the walls as props.ts built them),
 // the cut through the walls showing their rubble stone, the timber plates
 // along their tops and the lintels over the door and the window; the
-// furniture Kai made in Tripo (src/assets/interior: each model scaled to its
+// Kai's imported furniture (src/assets/interior: each model scaled to its
 // height in meters, set square and stood in its place, against a wall or out
 // on the floor), the rug from Kai's picture, the stove's fire and two small
 // lamps lighting it (hut.frag.glsl). Along the left wall stands Muse's
@@ -71,7 +71,7 @@ export interface Piece {
   depth?: number;
   /** Mirrored across its front. */
   mirror?: boolean;
-  /** A turn about up that sets it square first (rad): Tripo made a few askew. */
+  /** A turn about up that sets it square first (rad): some source models are rotated. */
   square?: number;
   /**
    * Where it stands: its back against a wall, its middle `along` it (m from
@@ -95,7 +95,7 @@ const model = (name: string): string => new URL(`../assets/interior/${name}.glb`
 const deg = (d: number): number => (d * Math.PI) / 180;
 
 /**
- * The furniture (Kai's Tripo models), as Kai laid it out in the layout
+ * The furniture (Kai's imported models), as Kai laid it out in the layout
  * editor (2026-11-01; ui/garden/hutEditor.ts): each piece's foot's middle in
  * the room (m), its turn as it faces and its size. The hearth, big, in the
  * back wall left of the middle, the dish cabinet beyond it; the low shelf to
@@ -121,7 +121,7 @@ export const PIECES: readonly Piece[] = [
 const RUG = { x: -0.76, z: 0.01, length: 3.92, width: 2.11, turn: deg(7.3) } as const;
 /** The pot on the hearth's stove (a fraction of the stove's box as made: across its front, up, back to front): Muse cooks at it. */
 const POT_ON_STOVE = [0.47, 0.45, 0.6] as const;
-/** The middle of the bed's mattress, on top (a fraction of the bed's box as made: Tripo made it askew, so not the box's middle): Muse sleeps there. */
+/** The middle of the bed's mattress, on top (a fraction of the bed's box as made: the source bed is rotated, so not the box's middle): Muse sleeps there. */
 const ON_THE_BED = [0.38, 0.47, 0.624] as const;
 /** The favourites' places on the showpiece, as fractions of its front as made (x across, y up): three shelves of five. */
 const COLUMNS = [0.14, 0.32, 0.5, 0.68, 0.86] as const;
@@ -269,7 +269,7 @@ async function loadModel(url: string): Promise<{ geometry: BufferGeometry; map: 
   return { geometry, map: map ? await smaller(map) : null };
 }
 
-/** A picture drawn at TEXTURE_SIZE (Tripo's are 2048²), mipmapped, kept sharp at a slant. */
+/** A picture drawn at TEXTURE_SIZE (source textures are 2048²), mipmapped, kept sharp at a slant. */
 async function smaller(map: Texture): Promise<Texture> {
   const image = map.image as ImageBitmap | HTMLImageElement;
   if (typeof createImageBitmap === 'function' && image && image.width > TEXTURE_SIZE) {

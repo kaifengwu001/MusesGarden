@@ -267,9 +267,9 @@ export class HutEditor {
     this.out.select();
     try {
       await navigator.clipboard.writeText(text);
-      this.note.textContent = 'Copied: paste it to Claude.';
+      this.note.textContent = 'Layout copied to the clipboard.';
     } catch {
-      this.note.textContent = 'Select the text below and copy it to paste to Claude.';
+      this.note.textContent = 'Select and copy the layout text below.';
     }
   }
 }

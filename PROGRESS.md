@@ -139,19 +139,19 @@ Started from eeda5d5, on the branch `hut-interior` in a worktree of its own
 references kept out of git: a mock-up of the hut with its roof off, seen from
 above at an angle with the room inside (reference/hut-interior/cutaway.jpg),
 and a red and cream rug (reference/hut-interior/rug.webp). With them, a
-library of Tripo models for the furniture, moved from the Desktop into the
+library of imported models for the furniture, moved from the Desktop into the
 project (src/assets/interior; the display cabinet's first try is kept in
 reference/hut-interior).
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | An interior for Muse's hut: cozy and lived in | The room inside the cottage's walls (life/hut.ts): a floor and the walls' inner faces fitted to the walls as props.ts builds them, nine pieces of Kai's furniture stood in their places (each model scaled to its height in meters, set square where Tripo made it askew, its picture drawn at 1024²), the rug cut out of Kai's picture. Muse stands in the room while you are there. |
+| 1 | An interior for Muse's hut: cozy and lived in | The room inside the cottage's walls (life/hut.ts): a floor and the walls' inner faces fitted to the walls as props.ts builds them, nine pieces of Kai's furniture stood in their places (each model scaled to its height in meters, set square where the original export was askew, its picture drawn at 1024²), the rug cut out of Kai's picture. Muse stands in the room while you are there. |
 | 2 | A hearth or stove radiating warm light | The stove's fire lights the room (hut.frag.glsl): warm, flickering, falling off over a few meters and wrapped softly round what it lights, with a candle on the table and the lantern on the desk; daylight soft from above as if the roof were on, a warmer bounce from the floor; the corners, the walls' feet and the floor round what stands on it darker. |
 | 3 | Dark wooden floors and furniture | Dark staggered planks with their grain, seams and a worn path; ochre limewash over stone inside, the stones showing low down. The furniture is Kai's dark wood. |
 | 4 | A large showpiece shelf holding Muse's favourites, opened with the finds' glowing dot, line and card | One big display cabinet along the blind left wall (Kai's later notes). In the room it shows a single glowing dot; tap it and the camera turns to the cabinet (from the front of the room, not straight on) and comes in until it fills half the screen, whatever stands in front of it dissolving (life/occlude.glsl). There a small white dot stands on each favourite (fifteen places, three shelves of five): tap one and its line rises to its card beside the cabinet (the find's card: Muse's favourites, 3 of 15; ← → for the next). The favourites come from the source (`favourites` in the snapshot); without them the garden picks one a topic, newest first. |
 | 5 | You go in by clicking the door while Muse is inside or about the hut | The door is picked on screen (its outline projected, seen from in front); with Muse out, or out in the meadow, a line says so (and offers Find Muse). The cottage button's arrival says to tap the door. |
 | 6 | The camera rises to an almost orthographic cutaway (the roof off, seen from above at an angle) | view/cutaway.ts: from wherever you are, the camera rises and its view narrows to 15°, the roof lifting off and dissolving, until the room is seen as in the mock-up (from 39° round to the right, 69° down); clouds near the line of sight draw back; the tiny-planet warp eases out so the room stands square. Drag turns round the room, the wheel comes closer; Step outside (or Esc) goes back down the same way to exactly where you were, the roof settling on. |
-| 7 | The interior's Tripo models move into the project | src/assets/interior: nine models and the rug. |
+| 7 | The interior's imported models move into the project | src/assets/interior: nine models and the rug. |
 
 Kai's notes on the first pass (2026-11-01), done:
 
@@ -166,7 +166,7 @@ Then (2026-11-01, done):
 - **Scrolling out at the showpiece** goes back to the room's view (Kai's note), as Back to the room and Esc do, and puts an open card away.
 - **The front walls cut lower,** across the window and the door (1.25 m over the floor; the front and the right end alike): the window's frame and panes and the door's planks are cut with the wall (their CUTAWAY builds), the cut stops either side of the openings, and the right end's window lies wholly over it; the lintels are no longer in the cut.
 - **The chimney:** outside it is no longer a solid block (its top is a dark flue with soot round it, the one change to the cottage's look outside besides the steps); in the cutaway it lifts off and dissolves with the roof (it used to slide onto the back wall, which looked strange).
-- **Asleep, Muse lies in the middle of the bed,** its head against the pillow, not over the headboard (55 cm toward the bed's foot from the mattress's middle as Tripo made it), and sunk into the mattress rather than floating over it (12 cm lower).
+- **Asleep, Muse lies in the middle of the bed,** its head against the pillow, not over the headboard (55 cm toward the bed's foot from the mattress's middle in the source model), and sunk into the mattress rather than floating over it (12 cm lower).
 - **The cut through the walls** shows their stones in courses as the cottage does outside where its plaster has fallen away (two courses across the wall's thickness on top, the walls' own courses on the upright ends), pale as the cut catches the light, their joints soft (the first cut's rubble was too dark and unlike the walls); **the door cut through** shows thick (12 cm of planks in section, warm as the door outside), the cottage's own door unchanged outside.
 - **The home flag follows the door:** Muse's portrait says at home and the cottage's "out" sign comes down while Muse is about the hut (within 30 m), as the door opens then.
 - **The door opens while Muse is about:** home, or pottering in the meadow within 30 m of the hut (it was shut whenever Muse stepped off the homestead, two thirds of its day); while laying the room out, always.
@@ -174,9 +174,9 @@ Then (2026-11-01, done):
 
 The meadow outside the cutaway draws pixel for pixel as before in every standard view, at 2× and 1× (check-frames samecheck against eeda5d5), but for the steps in the cottage view (Kai's fix) and orbit, which differs against itself too (the Muse pin's pop-up). `npm run check` and `npm test` (758 tests, 8 of them new: hut.test.ts) pass.
 
-Known: the models are the stand-ins (see the pipeline test below), about 580k triangles and 28 MB together; the display cabinet is drawn out 1.4 times across to fill the wall, its things with it (a wide cabinet from Tripo would drop in). Muse is lit by the sun outside, not by the fire. The water's mirror still shows the roof. The cutaway's materials compile on the first knock (a hitch then).
+Known: the models are the stand-ins (see the pipeline test below), about 580k triangles and 28 MB together; the display cabinet is drawn out 1.4 times across to fill the wall, its things with it (a wider cabinet model would drop in). Muse is lit by the sun outside, not by the fire. The water's mirror still shows the roof. The cutaway's materials compile on the first knock (a hitch then).
 
-**GPU memory (after the merge with Tracy's main, 2026-11-01).** The furniture is fetched when you come near the hut, but it reaches the GPU only when the cutaway first draws it and leaves it when the cutaway shuts, and the ledger now books it so (it had booked the prefetch's 71.8 MB at once, putting the finds test's wander view at 301.5 MB against its 256). Outside, near the hut, it is 229.7 MB as before; inside, 301.5 MB at 1600×1000 (the stand-ins' nine pictures at 1024², 50.6 MB, their meshes about 18 MB, the rug 3.3 MB), over the budget while you are in. Lighter models from Tripo or smaller pictures would bring it in. A second visit uploads the furniture again as the camera starts to rise. `npm run check`, `npm test` (848) and `npm run test:gpu` (14) pass on main.
+**GPU memory (after the merge with Tracy's main, 2026-11-01).** The furniture is fetched when you come near the hut, but it reaches the GPU only when the cutaway first draws it and leaves it when the cutaway shuts, and the ledger now books it so (it had booked the prefetch's 71.8 MB at once, putting the finds test's wander view at 301.5 MB against its 256). Outside, near the hut, it is 229.7 MB as before; inside, 301.5 MB at 1600×1000 (the stand-ins' nine pictures at 1024², 50.6 MB, their meshes about 18 MB, the rug 3.3 MB), over the budget while you are in. Lighter models or smaller pictures would bring it in. A second visit uploads the furniture again as the camera starts to rise. `npm run check`, `npm test` (848) and `npm run test:gpu` (14) pass on main.
 
 **Kai's notes after the merge (2026-11-01):**
 
@@ -208,7 +208,7 @@ as if it had explored that much already; it grows from there as it explores more
 `?garden=/api/muses/hero` now draws the meadow exactly as it is without the engine.
 
 The first planet stays as it is: its seed, size and look are Kai's to change, and the rest of the team builds
-other worlds beside it. The rules are in [CLAUDE.md](CLAUDE.md), and `npm test` holds them
+other worlds beside it. The rules are in [development guidelines](docs/development-guidelines.md), and `npm test` holds them
 (`params.test.ts`, `cast.test.ts`, `garden.test.ts`). A local garden seeded before this change (`.muse/`)
 has to be deleted and seeded again.
 
@@ -427,7 +427,7 @@ The beds over a planted patch, frames back to back (High, 1440×900): 0.4–1.6 
 ## Iteration 16: Muse's interactions (in the lab)
 
 Started from iteration 15 (74926b7). Since then Muse has come to the meadow
-(e2de5cf, 02a9840, 2fb02be, a7f6349): Tripo3D's sculpt rigged on a
+(e2de5cf, 02a9840, 2fb02be, a7f6349): an imported sculpt rigged on a
 thirteen-joint skeleton, walking the cottage's terrace and waving on a 44 s
 day, with a lab (src/dev/museLab.html) that plays it live. Kai's notes for
 its interactions, to be built in the lab first ("make it cute!"); this table

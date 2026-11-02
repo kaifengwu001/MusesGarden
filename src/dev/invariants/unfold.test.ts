@@ -30,7 +30,7 @@ function edgeAlong(hut: Vector3, along: Vector3, noise: number, turn: number): n
 }
 
 describe('the unfolding (planet/unfold.ts)', () => {
-  it('leaves the first planet as tuned by default: unveiled, all in flower, at R 128 m (see CLAUDE.md)', () => {
+  it('leaves the first planet as tuned by default: unveiled, all in flower, at R 128 m (see docs/development-guidelines.md)', () => {
     expect(schema.world.unfold.def).toBe(UNVEILED);
     expect(unveiling(UNVEILED)).toBe(1);
     // (so the bloom is the season's own: Math.min(bloom, 1) is bloom, to the bit)
