@@ -226,8 +226,11 @@ interface Bloom {
   /** Its picture, and the mesh it turns into on its way home. */
   readonly picture: Mesh<BufferGeometry, ShaderMaterial>;
   readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
-  /** Its place (by its index among the flowers, which is its slot in the fan): out of sight in the basket, standing in it ready to go home, or in the fan. */
-  rest: { readonly in: 'basket' | 'ready' | 'fan'; readonly k: number };
+  /**
+   * Its place (by its index among the flowers, which is its slot in the fan): out of sight in the basket, standing in
+   * it ready to go home (among `of` flowers, so it keeps its place as the others leave), or in the fan.
+   */
+  rest: { readonly in: 'basket' | 'fan'; readonly k: number } | { readonly in: 'ready'; readonly k: number; readonly of: number };
   leg: Leg | null;
   /** Going home to its patch. */
   homing: Homing | null;
@@ -660,10 +663,10 @@ export class BasketStage {
   }
 
   /** A flower ready to go home: its foot inside, leaning out, its head above the rim (it leaves from here in view). */
-  private readyPose(b: Bloom, k: number, t: number): Pose {
+  private readyPose(b: Bloom, k: number, of: number, t: number): Pose {
     const at = this.basketAt;
     const angle = k * 2.399 + 0.6;
-    const reach = READY.reach * Math.sqrt((k + 0.5) / Math.max(1, this.blooms.size));
+    const reach = READY.reach * Math.sqrt((k + 0.5) / Math.max(1, of));
     const foot = this.basketPoint(this.tv.set(Math.cos(angle) * reach, READY.foot, Math.sin(angle) * reach * 0.8), at, new Vector3());
     const lean = new Quaternion().setFromEuler(new Euler(Math.sin(angle) * READY.lean, 0, -Math.cos(angle) * READY.lean));
     const sway = Math.sin(t * 1.3 + k * 1.7) * 0.03;
@@ -690,7 +693,7 @@ export class BasketStage {
   /** Where a flower rests, in the basket or on its slot (by default where it is going now). */
   private restPose(b: Bloom, t: number, rest: Bloom['rest'] = b.rest): Pose {
     if (rest.in === 'fan') return this.inFan(b, rest.k, t);
-    return rest.in === 'ready' ? this.readyPose(b, rest.k, t) : this.inBasket(b, rest.k);
+    return rest.in === 'ready' ? this.readyPose(b, rest.k, rest.of, t) : this.inBasket(b, rest.k);
   }
 
   /**
@@ -713,8 +716,9 @@ export class BasketStage {
 
   /** Every flower back into the basket from `start` (out of sight, or ready to go home), the rise played backward (the last out goes in first); returns when the last is in. */
   private dropIn(start: number, into: 'basket' | 'ready' = 'basket'): number {
-    const last = this.blooms.size - 1;
-    for (const [k, b] of this.order()) this.send(b, { in: into, k }, start + (last - k) * T.stagger);
+    const of = this.blooms.size;
+    const last = of - 1;
+    for (const [k, b] of this.order()) this.send(b, into === 'ready' ? { in: 'ready', k, of } : { in: 'basket', k }, start + (last - k) * T.stagger);
     return start + Math.max(0, last) * T.stagger + T.rise;
   }
 
