@@ -725,7 +725,8 @@ houses, the meadow's clouds so far). Its code is in `src/terraces/`.
   found from the last one along its chain, guarded by each segment's
   clearance, so the result is the true nearest whatever the order), the
   bands again with the shifts, small rings levelled, the cuts' lines up
-  their bands.
+  their bands (none that would stop in the middle of a paddy, at a ring
+  levelled into its band: a hilltop's small top).
 - **Pieces**: each triangle cut into the woods, a plain (its fields, or a
   village's ground) and the bands round it, a band's piece parted exactly
   along a cut; the pieces joined into
@@ -745,28 +746,45 @@ houses, the meadow's clouds so far). Its code is in `src/terraces/`.
   side; open banks and ridges carried a little past their ends; trees
   jittered over the woods. A check counts any step between two terraced
   floors with no bank within 12 cm (`bare`).
-- **A plain's fields** (Kai's two aerials of flat rice fields, 2026-11-02):
-  a few major curves across it (a winding track along it, bunds across it
-  branching off the track to one side), each the zero of a field of its own
-  on the plane at the plain's middle, bending gently over 26–40 m, part it
-  into sections; each section's strips (3–5 m, as many as keep its widest
-  stretch's that wide) fan between the two curves it lies between (or to a
-  rail beyond the plain's edge), crossed every 8–14 m square to its first
-  side, every line bending a little of its own. Each piece of a plain is
-  split along the curves, then cut between its section's lines, each field
-  kept back from its lines by their half-width in meters; every field at
-  the plain's level (co-planar), the lines sunk between them as grooves
-  (dark; the major bunds wider and deeper; the track pale, barely sunk),
-  each traced over its plain's squares on its own field. A bund runs round
-  a plain where the terraces meet it.
+- **A plain's fields** (Kai's two aerials of flat rice fields, 2026-11-01;
+  2026-11-02, "dividing an area against a matte that's scaled"): a pattern
+  of one scale laid over the plain and cut by its matte (its raster), from
+  which its middle, its way and its sections' middles come. Its major
+  curves: a track winding along it, and bunds branching off the track every
+  24–36 m, to one side and the other by turns, each the zero of a field of
+  its own on the plane at the plain's middle, a straight way plus a smooth
+  bend along it (so it rises steadily across the curve everywhere, and the
+  curve can neither loop nor turn back). Each section between them is laid
+  in strips 3–5 m wide, each line its rail's curve (the track; in some,
+  the bund) moved over a strip at a time, crossed every 8–14 m by its
+  bund's curve moved over likewise (or by lines square to its strips where
+  no bund bounds it), every line bending a little of its own: no two strips
+  meet, nor two crossings, so nothing fans or pinches. Each piece of a
+  plain is split along the curves, then cut between its section's lines,
+  each field kept back from its lines by their half-width in meters; every
+  field at the plain's level (co-planar), the lines sunk between them as
+  grooves (dark; the bunds wider and deeper; the track pale, barely sunk),
+  each traced over its plain's squares on its own field (a track or a bund
+  a few squares further, so one along a narrow edge is whole). A line that
+  runs into a track or a bund passes under its surface (a bund under the
+  track), and any line off the plain lies under the land there. A bund runs
+  round a plain where the terraces meet it.
 - **The villages**: every other plain by size from the second (two at most,
   over 400 m²): its ground packed earth and grass at its level, its track
   its street; Kai's houses huddled along the street and out over its ground,
   their yards meeting, square to the street; trees in clumps between them.
 - **Built in a worker** (worker.ts) when the planet is first visited (about
-  35 s on this Mac); 96 meshes, a sixteenth of a cube face each
+  35–40 s on this Mac); 96 meshes, a sixteenth of a cube face each
   (builder.ts), and the towers, houses and trees placed. The harness's
-  settle waits for it (`PlanetWorld.whenBuilt`).
+  settle waits for it (`PlanetWorld.whenBuilt`). **Kept** in the browser
+  (Kai: no rebuild unless the geometry changed): the worker keeps each
+  build in IndexedDB under its seed and a hash of the build's own code
+  (every module the worker imports, read from disk by a Vite plugin in
+  vite.config.ts, `virtual:terraces-build-hash`, worked out again when one
+  of them changes), as a record per chunk and a head written in one
+  transaction (no value over about 128 MB; a build is 423 MB), the last
+  build only, on desktops only; a page loads it from there in a quarter of
+  a second. If the store cannot be opened, it builds as before.
 
 ### Drawing (terrace.*.glsl, rice, trees, models, clouds)
 
@@ -786,10 +804,20 @@ houses, the meadow's clouds so far). Its code is in `src/terraces/`.
 - Kai's towers and houses (models.ts, model.*.glsl): instanced per model
   and level of detail where the build placed them, rigid, lit as the
   terraces are, full detail near (140 m a tower, 60 m a house).
-- The clouds: the meadow's (life/clouds.ts), cloudier (the panel's coverage
-  plus 0.3), each cloud's base the panel's altitude over the highest of the
-  hills within 12 m of it as it drifts (a 96² raster a cube face); their
-  shadows read through the meadow's lookup (`cloudShadowAt`); their lake
+- The clouds (Kai, 2026-11-02: "meandering, thinner", the paintings' mist):
+  the meadow's weather (life/clouds.ts: its flow, streamlines and cloudy
+  stretches) in a form of the terraces' own (`CloudForm`): thin bands along
+  the streamlines, swinging across them as they go, each at its own height
+  the panel's altitude over the ground under it (the highest of the hills
+  within 12 m, eased over 8 m and kept over the highest, a 96² raster a
+  cube face), broad as its stretch's girth and tapering to its ends,
+  drifting together about the wind's axis at their altitude's own pace.
+  Each band is drawn as a sheet made again each frame (mist.*.glsl): a flat
+  white body feathered at its frayed edges, brushed with faint streaks
+  along it, light from above, denser seen aslant, thinning round the
+  camera. Its shadow is cast by a run of flat lobes under it (the cloud
+  shadow shaders' CLOUD_FLAT), read through the meadow's lookup
+  (`cloudShadowAt`); the lobes' billboards are not drawn and the lake
   passes skipped (no lakes).
 - No grade but the paper grain: a planet may carry its own final grade
   (`PlanetWorld.grade`, render/post.ts), and the terraces' is the lab's,
@@ -842,7 +870,7 @@ houses, the meadow's clouds so far). Its code is in `src/terraces/`.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve (a planet may do without it and the bloom), paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker), its paint, trees, rice, Kai's models (models.ts) and the meadow's clouds
+      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker, kept in the browser), its paint, trees, rice, Kai's models (models.ts) and the meadow's clouds in a form of its own, drawn as mist (mist.*.glsl)
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

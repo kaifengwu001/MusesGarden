@@ -38,13 +38,34 @@ Started from 228d47e (the flats divided; the towers, the villages and the clouds
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | (on hiding the clouds until the ground has built) "leave as is" | |
-| 2 | "On flats, multiple lines converge to a single point, creating a pinch that's unnatural for farmland division. Flat division should simply be dividing an area against a matte that's scaled; don't try to reconstruct from mesh points" | |
-| 3 | "Divisions invading onto roads" | |
-| 4 | "Dead-end divisions going over a local hilltop's flat" | |
-| 5 | "Cache the geometry build next time so that no rebuild is required unless geometry changed" | |
-| 6 | "There seems to be a bug where groups of clouds rotate against each other" | |
-| 7 | "Let's work on the shapes of the clouds: they are currently full, fat cumulus clouds. See reference for meandering, thinner clouds" | |
+| 1 | (on hiding the clouds until the ground has built) "leave as is" | Left as they were: the clouds show over the planet while its ground builds (now about a second, once the build is kept: row 5). |
+| 2 | "On flats, multiple lines converge to a single point, creating a pinch that's unnatural for farmland division. Flat division should simply be dividing an area against a matte that's scaled; don't try to reconstruct from mesh points" | Each plain is divided by a pattern of one scale laid over it and cut by its matte (its raster); its middle, its way and its sections' middles come from the matte, nothing from mesh points. A track winds along it and bunds branch off the track every 24–36 m, to one side and the other by turns, each a straight way plus a smooth bend along it, so none can loop or turn back (one had looped beside the track, another turned back to it). A section's strips are its rail's curve (the track's; in some, its bund's) moved over 3–5 m at a time, crossed every 8–14 m by its bund's curve moved over likewise (or by lines square to the strips where no bund bounds it), every line bending a little of its own. No two strips meet, nor two crossings, so nothing fans or pinches: the fan in the first screenshot is gone. 148 fields on the four farmed plains (186). |
+| 3 | "Divisions invading onto roads" | A line that runs into the track or a bund passes under its surface (a bund under the track, a strip or a crossing under either), so none shows on a road: the slots across the track are gone. A track or a bund is traced wherever any of its width lies on the plain, a few squares further round, across the cube's faces too (one along a thin neck of a plain's land had left a hole of about a square meter). Any line off the plain lies under the land there, so no line's end shows on a slope below a plain (the dark ticks in the first screenshot). |
+| 4 | "Dead-end divisions going over a local hilltop's flat" | A cut ran up its band to the next level's bank; on a hilltop that bank is often a small ring levelled into the band (too small to be a paddy of its own), so the cut stopped in the middle of the top paddy. Such cuts are left out now: 92 of the 11,899 cuts' lines (the cuts that cross a band from bank to bank stay). The hilltop in the third screenshot has none. |
+| 5 | "Cache the geometry build next time so that no rebuild is required unless geometry changed" | The build is kept in the browser: the worker keeps it in IndexedDB under its seed and a hash of the build's own code (every module the worker imports, read from disk by a Vite plugin; a change to any of them changes the key within 0.1 s, a change anywhere else, the clouds say, does not), and a page loads it from there. In place 0.9 s after a reload (the worker reads it in 0.25–0.3 s) rather than 39 s, in headless Chrome and in the app's own browser. Kept as a record per chunk and a head written in one go (Chrome takes no value over about 128 MB; a build is 423 MB), the last build only, on desktops only. If the store cannot be opened the page builds as before. |
+| 6 | "There seems to be a bug where groups of clouds rotate against each other" | My bug from the last round: a cloud's drift is its altitude's own pace about the wind's axis, and raising it over the hills under it had gone into that pace too, so with the time since the page opened a cloud over a slope moved ahead of the rest or back, ever more. Now it drifts at its altitude's pace and is only raised over the hills. Paces had spread from 0.5 to 2.7 m/s after 100 s on the page, and kept spreading; now 1.4–1.8 m/s, steady (the spread their altitudes' and the hills'). |
+| 7 | "Let's work on the shapes of the clouds: they are currently full, fat cumulus clouds. See reference for meandering, thinner clouds" | The clouds are thin bands of mist, painted as the paintings paint theirs: long white sheets along the wind, swinging across it as they go (up to 24 m over stretches of about 55 m), each at its own height over the ground under it, as broad as their stretch's girth (5–10 m) and tapering to their ends; flat white bodies with feathered, frayed edges and faint streaks along them, light from above, denser seen aslant, thinning round the camera. From orbit they wind round the planet like the scroll clouds; from the ground they lie in thin layers, a streamer now and then curling at its end. Their shadows are cast by runs of flat lobes under them. (Drawn first as those runs of lobes, they read as a lumpy tube: Kai, "that cloud looks like poop".) |
+
+Measured (84c1fc4, Chrome on this Mac):
+
+- The clouds' cost, frozen frames at 2880×1800 on High, the clouds against none (their update skipped, nothing of them drawn), best of six alternating rounds, both builds in one run on a quiet machine (an earlier run under load had read the heaps at 15–32 ms):
+
+  | View | Last round's heaps (228d47e's clouds) | The mist |
+  |---|---|---|
+  | Orbit | +6.5 ms (17.8 against 11.3) | +0.9 ms (12.1 against 11.3) |
+  | 70 m | +14.3 ms (29.6 against 15.4) | +1.2 ms (16.2 against 15.1) |
+  | 30 m, toward the horizon | +16.8 ms (32.5 against 15.7) | +1.1 ms (16.2 against 15.2) |
+  | Vista | +11.7 ms (25.1 against 13.4) | +0.8 ms (14.0 against 13.1) |
+
+- The build kept: in place 0.9 s after a reload (the worker reads it in 0.25–0.3 s), against 39 s built; 423 MB in the browser's store. In headless Chrome a fresh persistent profile could not open its IndexedDB at all (it builds every time there, as with no store); in the app's own browser and in plain contexts the build is kept and loaded.
+- The build itself: 37–38 s here (35.4), 11.6 M triangles; 6 plains (4 farmed, 148 fields; 2 villages, 52 houses); 23 towers; 6,142 trees; 92 dead-end cuts left out; `bare` 0.
+- Against a red sky from 80 views: 1 pixel of gap in 1 view (the skyline notch, as before). No hole anywhere in the ground (one of 6 cells, about a square meter, where a track ran along a thin neck of a plain's land near a cube corner, closed).
+- The meadow, against 7d21e88 (check-frames samecheck): identical in all nine standard views, High and Medium at 2×, High at 1× with MSAA.
+- `npm run check`, `npm test` (119), `npm run test:gpu` (12, one skipped) and `npm run shots` (15) pass.
+
+Trades: none in the look. The clouds' new form is the look Kai asked for, not a saving; that it costs a tenth of the heaps is a side effect.
+
+Still open: the strips' last field by a plain's edge can be a long thin wedge where the edge runs nearly along a strip (two lines meeting, not a fan); the bands' shadows come from round lobes, so they are a little scalloped against the sheet's smooth edge; the mist's colours are the meadow's clouds' (no gold or teal of the scroll-cloud paintings yet); the kept build is the last one only; the build's 37 s and 11.6 M triangles; the river, birds and valley fog. Checkpoints: docs/checkpoints/terraces-8/ (the flats and the track before and after from 60 m, 40 m and 14 m, the hilltops before and after, the mist from orbit, 70 m, 30 m and the vista).
 
 ### Kai's notes on the flats: truly flat, divided as the aerials divide them
 
