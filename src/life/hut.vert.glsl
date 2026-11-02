@@ -8,6 +8,9 @@ uniform float uRadius;
 
 #ifdef SHELL
 attribute vec4 aPaint; // the room's paint data (hut.ts Shell)
+// The front door swung open (rad) about its hinge (props.ts DOORWAY): the door in the cut (the timber's paint flag 3) goes with it.
+uniform float uDoor;
+uniform int uKind;
 #endif
 #ifdef PLACED
 // a piece moved, turned or scaled in the layout editor (ui/garden/hutEditor.ts) from where hut.ts stood it
@@ -42,13 +45,24 @@ void main() {
   vec3 pos = position;
   vec3 nrm = normal;
 #endif
-  vec2 h = pos.xz;
+  // (its paint goes with it: vLocal keeps where it stood shut)
+  vec3 at = pos;
+#ifdef SHELL
+  if (uDoor > 0.0 && uKind == 5 && aPaint.w > 2.5) {
+    float c = cos(uDoor);
+    float s = sin(uDoor);
+    vec2 r = at.xz - DOOR_HINGE;
+    at.xz = DOOR_HINGE + vec2(c * r.x - s * r.y, s * r.x + c * r.y);
+    nrm.xz = vec2(c * nrm.x - s * nrm.z, s * nrm.x + c * nrm.z);
+  }
+#endif
+  vec2 h = at.xz;
   float d = length(h);
   float angle = asin(min(d / uRadius, 1.0));
   vec3 T = d > 1e-5 ? (X * h.x + Z * h.y) / d : X;
   vec3 axis = normalize(cross(U, T));
   vec3 up = U * cos(angle) + T * sin(angle);
-  vec3 world = up * (ground + pos.y);
+  vec3 world = up * (ground + at.y);
   vec3 n = turn(normalize(X * nrm.x + U * nrm.y + Z * nrm.z), axis, angle);
   vec3 w = warpPosition(world);
   vNormal = warpNormal(world, n);

@@ -20,6 +20,7 @@ uniform float uRadius;
 
 uniform int uKind;          // 0 the floor, 1 the walls inside, 2 the cut through the walls, 3 a model (its own picture), 4 the rug, 5 the timber in the cut
 uniform float uShowpiece;   // 1: Muse's showpiece (never dissolved)
+uniform float uCut;         // 1 seen through the cutaway (the walls cut), 0 through the open front door (whole)
 uniform sampler2D uMap;     // a model's or the rug's picture
 uniform vec4 uFire;         // the stove's fire: where (local m), how bright now
 uniform vec4 uLamps[2];     // the candle on the table, the lantern on the desk: where, how bright
@@ -162,7 +163,7 @@ void main() {
   vec3 toCam = cameraPosition - vWorld;
   vec3 dir = normalize(vPlanet);
   // the walls inside go no higher than the cut; what stands in front of Muse's shelf, looked at, dissolves
-  if (uKind == 1 && p.y > cutHeight(p.xz) + 0.002) discard;
+  if (uKind == 1 && uCut > 0.5 && p.y > cutHeight(p.xz) + 0.002) discard;
   if (uKind != 0 && uKind != 4 && uShowpiece < 0.5 && screenDoor(occluded(vWorld))) discard;
   vec3 col;
   if (uKind == 2) {

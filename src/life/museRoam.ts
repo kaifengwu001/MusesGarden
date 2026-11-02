@@ -3,15 +3,16 @@ import { smoothstep } from '../core/math';
 import { angleBetween, tangentToward, travel } from '../planet/geo';
 import { createGroundSample, type Terrain } from '../planet/terrain';
 import { Answers, rampIntegral, withTool } from './museLife';
-import { COOK, FISH, HOP, LIE_BACK, PLOP, POCKET, POT, RISE, STEP, WAKE, WAVE_LENGTH, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
-import { BENCH, CHAIR, FACE, FLOOR, PIER, SIDE, STEPS, TERRACE } from './props';
+import { COOK, FISH, HOP, LIE_BACK, PLOP, POCKET, RISE, STEP, WAKE, WAVE_LENGTH, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind, type MuseAction } from './museRig';
+import { BENCH, CHAIR, COTTAGE, DOORWAY, FACE, FLOOR, OUTER, PIER, SIDE, STEPS, TERRACE } from './props';
 
 // Muse's life on the planet (muse.ts draws it): it roams the meadow at
 // random and does what it likes where it is, more often close to its hut.
 // Some things have their places: the bench against the house's front, the
-// little stove on the porch, the end of the pier to fish from. Others it
-// does wherever it has wandered: watering the plants, napping in the grass,
-// fishing from a shore now and then, sitting down to look about.
+// end of the pier to fish from. Others it does wherever it has wandered:
+// watering the plants, napping in the grass, fishing from a shore now and
+// then, sitting down to look about. It cooks only in its hut, at the
+// hearth's stove (Kai, 2026-11-01: the porch's stove is gone).
 //
 // Its days are drawn from a seed (the planet's), outing after outing, each a
 // walk somewhere (up the porch steps, along the porch, out along the pier,
@@ -19,6 +20,14 @@ import { BENCH, CHAIR, FACE, FLOOR, PIER, SIDE, STEPS, TERRACE } from './props';
 // it does there, so a time always finds it in one place doing one thing:
 // the itinerary is written out lazily as time runs on, and read back by
 // time. Over it go your doings and its answers (museLife.ts Answers).
+//
+// When you knock at its hut (and it is about), its day is cut short where it
+// is (cut): what it was doing is brought to a stop and got up from, and it
+// walks home and in through the door, which swings open as it comes and
+// shut behind it, to greet you, cook at the hearth or go to bed; when you
+// step out, it puts that by and walks out to its porch, and its days go on
+// from there. Inside, its places are the room's (Room, as the garden lays it
+// out), and it keeps clear of the walls and what stands on the floor.
 //
 // Places on the homestead are in its local meters (x across the front, z
 // toward the pond, as props.ts and terrain.ts have them) and stand on its
@@ -45,22 +54,39 @@ const ROUND = 1.6;
 /** How far out it goes (m from the hut): mostly close, now and then across the meadow. */
 const ROAM = { near: 5, far: 60, bias: 3 } as const;
 /** What it might do next, and how likely each is. */
-const LIKES = { wander: 3, water: 2.2, bench: 1.6, cook: 1.4, fish: 1.6, nap: 1.2, rest: 1 } as const;
+const LIKES = { wander: 3, water: 2.2, bench: 1.6, fish: 1.6, nap: 1.2, rest: 1 } as const;
 type Like = keyof typeof LIKES;
 /** In its hut, cooking at the hearth's stove: rounds of stirring and tasting a go, then a look about this long (s); greeting you: its wave this long after you come in (s), again now and then (s), its eyes on you until then. */
 const INDOOR = { rounds: 4, pause: 6, wave: 0.6, again: 24, watch: 6 } as const;
 
 /** What Muse is doing in its hut when you come in: cooking at the hearth's stove, standing in the room greeting you, asleep on its bed. */
 export type Indoors = 'cook' | 'greet' | 'sleep';
+/**
+ * Its hut inside (local m): the room's half sizes to the walls' inner faces; the doorway's middle, how far either
+ * side of it Muse keeps going through (its girth inside the door's width), and where it stands before the door on
+ * the porch; the doorstep it steps over (its half width, its depth out from the wall, its height).
+ */
+const ROOM = { x: COTTAGE.halfX - COTTAGE.thickness / 2, z: COTTAGE.halfZ - COTTAGE.thickness / 2 } as const;
+const DOOR = { x: (DOORWAY.x0 + DOORWAY.x1) / 2, way: 0.2, porch: OUTER.z + 0.85 } as const;
+const DOORSTEP = { half: 0.68, depth: 0.34, height: 0.09 } as const;
+/** The door swinging open as Muse comes to it: open by the time it is this far from it (m), taking this long (s); shutting once it is this far past (m), taking this long (s). */
+const SWING = { ahead: 1.5, open: 0.8, past: 1.4, shut: 0.9 } as const;
+/** Cut short (you knocked, or stepped out of its hut): a walk slows to a halt over this long (s), a pastime's motions ease out over this long (s). */
+const HALT = 0.8;
+const EASE = 0.7;
+/** On its bed: how much higher its edge is than where it lies (m: sat on the edge it sinks in less), how long it takes to swing round onto it or off it (s). */
+const BED = { edge: 0.07, swing: 1.5 } as const;
+/** As long as a visit to its hut could last (s): what it does there is written out this long, cut short when you step out. */
+const STAY = 6 * 3600;
 /** How often it fishes from a shore rather than off the pier. */
 const SHORE = 0.3;
-/** The porch's lane along the front, clear of the bench and the stove (local m: z); the top of the steps and their foot on the meadow; where the terrace meets the pier. */
+/** The porch's lane along the front, clear of the bench (local m: z); the top of the steps and their foot on the meadow; where the terrace meets the pier. */
 const TOP = { x: (STEPS.x0 + STEPS.x1) / 2, z: TERRACE.z1 - 0.5 } as const;
 const FOOT = { x: (STEPS.x0 + STEPS.x1) / 2, z: TERRACE.z1 + STEPS.count * STEPS.tread + 0.8 } as const;
 /**
  * Getting about on the deck (local m): Muse's girth (half its width, a
  * little over), and a few places to go by when the straight way is blocked
- * (by the bench, the stove, the chair, the house's corner): along the porch
+ * (by the bench, the chair, the house's corner): along the porch
  * and out onto the pier. Its ways there are straight where they can be,
  * round by these where not, the corners rounded off.
  */
@@ -71,13 +97,10 @@ const DECK_WAYS: readonly (readonly [number, number])[] = [
   [0.4, 3.85],
   [-1, 3.85],
   [-2.4, 3.6],
-  // (behind the stove, between it and the house)
   [-3.9, 3.5],
   [-5.4, 4.5],
   [-6.6, 4.9],
 ];
-/** The little stove on the porch (local m: its middle; it stands on the floor), kept clear of the lane. */
-export const STOVE = { x: -3.45, z: 4.32, half: 0.24 } as const;
 /** Where it sits to fish off the pier: how far along the pier's front edge (local m: x). */
 const PIER_SPOT = -6.6;
 /** The homestead's footprint with a margin (local m): paths over the meadow keep out of it. */
@@ -95,8 +118,8 @@ export interface RoamCues {
   /** (watering: also how far the can is tipped, and how much water pours from it) */
   water: { time: number; grip: number; tip: number; pour: number } | null;
   fish: { time: number; grip: number; edge: boolean } | null;
-  /** (cooking in the hut, at the hearth's stove: where its pot is, planet space; at the porch's stove, none) */
-  cook: { time: number; grip: number; pot?: Vector3 } | null;
+  /** (cooking in the hut, at the hearth's stove: where its pot is, planet space) */
+  cook: { time: number; grip: number; pot: Vector3 } | null;
   sleep: { time: number; roused: number } | null;
   /** Humming on the bench (0 … 1), being petted (s into it, < 0 for none). */
   hum: number;
@@ -114,6 +137,18 @@ export interface Roaming {
   home: boolean;
 }
 
+/** Its hut's room as the garden lays it out (local m: x across the front, z toward the pond, y over the clearing). */
+export interface Room {
+  /** What stands on its floor, to keep clear of: boxes across (x0 … x1) and deep (z0 … z1). */
+  things: readonly { x0: number; x1: number; z0: number; z1: number }[];
+  /** Where it stands to greet you, facing the way you look in (a unit x, z). */
+  greet: { x: number; z: number; facing: readonly [number, number] };
+  /** Where it stands to cook, facing the hearth's pot, and the pot. */
+  cook: { x: number; z: number; facing: readonly [number, number]; pot: readonly [number, number, number] };
+  /** Its bed: where it lies (y: the height it lies at), facing the foot; the side it gets in from (a unit x, z out of the bed) and how far that edge is from where it lies (m). */
+  bed: { x: number; z: number; y: number; foot: readonly [number, number]; side: readonly [number, number]; edge: number };
+}
+
 interface Context {
   camera: Vector3;
   gait: number;
@@ -125,6 +160,10 @@ interface Segment {
   time: number;
   gait: number;
   play(s: number, out: Roaming, ctx: Context): void;
+  /** Cut short s seconds in (you knocked, or stepped out of its hut): the time it then runs to, coming to a stop (a walk slowing to a halt, a pastime's motions eased out, its tool put away). Unset, it runs to its end. */
+  stop?(s: number): number;
+  /** Written after it once it is cut short: getting up from it (off the bench, up out of the grass, awake, its can put away). */
+  then?(): void;
 }
 
 /** A small seeded random source (mulberry32). */
@@ -248,6 +287,14 @@ export class MuseRoam {
   readonly height: number;
   /** The homestead's corners out on the meadow, to go round it by. */
   private readonly corners: Vector3[] = [];
+  /** Its hut's room while you visit (it goes in and about it then), the places to go round what stands there by, and when its door is open (the itinerary's clock, s: opening from, open, shutting from; when Muse goes through). */
+  private room: Room | null = null;
+  private roomWays: { x: number; z: number }[] = [];
+  private readonly doorways: { from: number; open: number; shut: number; through: number }[] = [];
+  /** When its day was last cut short (the itinerary's clock, s): its door moves no sooner. */
+  private cutAt = 0;
+  /** A life read off to the side: where a part cut short leaves it. */
+  private readonly probe: Roaming;
 
   /** terrain: the planet as it is now (its radius and layout fix the places); height: Muse's height (m). */
   constructor(terrain: Terrain, height: number) {
@@ -273,7 +320,7 @@ export class MuseRoam {
     // it starts the day on the porch, looking out
     this.here = this.deckSpot(0.4, 4.2);
     this.facing = this.toward(this.here, this.deckSpot(0.4, 8).dir);
-    this.living = {
+    const life = (): Roaming => ({
       dir: this.here.dir.clone(),
       height: 0,
       heading: new Vector3(),
@@ -281,7 +328,9 @@ export class MuseRoam {
       lookAt: null,
       cues: { water: null, fish: null, cook: null, sleep: null, hum: 0, petted: -1 },
       home: true,
-    };
+    });
+    this.living = life();
+    this.probe = life();
   }
 
   /** Whether this life was laid out for the planet as it is (its radius and layout): if not, a new one is wanted. */
@@ -303,18 +352,33 @@ export class MuseRoam {
     return { dir: this.local(x, z), deck: { x, z } };
   }
 
-  /** The deck under local meters (its height over the clearing, m): the terrace and the pier at the floor, the steps going down to the meadow; null off it. */
+  /** The deck under local meters (its height over the clearing, m): the terrace, the pier and the hut's floor (in through its door, over the doorstep) at the floor, the steps going down to the meadow; null off it. */
   private deckAt(x: number, z: number): number | null {
     const inside = (r: { x0: number; x1: number; z0: number; z1: number }): boolean => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
-    if (inside(TERRACE) || inside(PIER)) return FLOOR;
+    if (Math.abs(x) < ROOM.x && z > -ROOM.z && z < OUTER.z && (z < ROOM.z || (x > DOORWAY.x0 && x < DOORWAY.x1))) return FLOOR + this.doorstep(x, z);
+    if (inside(TERRACE) || inside(PIER)) return FLOOR + this.doorstep(x, z);
     // (four risers: down the three steps and off the last onto the meadow, a tread beyond it)
     const run = (STEPS.count + 1) * STEPS.tread;
     if (x >= STEPS.x0 && x <= STEPS.x1 && z > TERRACE.z1 && z < TERRACE.z1 + run) return FLOOR * (1 - (z - TERRACE.z1) / run);
     return null;
   }
 
-  /** Can Muse stand here on the deck (local m), clear of its edges, the house, the bench, the stove and the chair? */
+  /** The doorstep under its feet going in or out (m over the floor): up onto it from the doorway and the porch, smoothly. */
+  private doorstep(x: number, z: number): number {
+    if (Math.abs(x - DOOR.x) > DOORSTEP.half) return 0;
+    const z1 = OUTER.z + DOORSTEP.depth;
+    return DOORSTEP.height * smoothstep(OUTER.z - 0.08, OUTER.z + 0.06, z) * (1 - smoothstep(z1 - 0.04, z1 + 0.1, z));
+  }
+
+  /** Can Muse stand here on the deck (local m), clear of its edges, the house, the bench and the chair; and while you visit, through the hut's door and about its room, clear of the walls and what stands there? */
   private deckFree(x: number, z: number): boolean {
+    const room = this.room;
+    if (room && z < FACE + GIRTH && z > -OUTER.z && Math.abs(x) < SIDE) {
+      // (through the doorway along its middle)
+      if (z > ROOM.z - 0.1) return Math.abs(x - DOOR.x) < DOOR.way;
+      if (Math.abs(x) > ROOM.x - GIRTH || z < -ROOM.z + GIRTH) return false;
+      return room.things.every((t) => x < t.x0 - GIRTH || x > t.x1 + GIRTH || z < t.z0 - GIRTH || z > t.z1 + GIRTH);
+    }
     const run = STEPS.count * STEPS.tread;
     const terrace = x > TERRACE.x0 + 0.35 && x < TERRACE.x1 - 0.35 && z > FACE + GIRTH && z < TERRACE.z1 - 0.3;
     const pier = x > PIER.x0 + 0.35 && x < PIER.x1 && z > PIER.z0 + 0.5 && z < PIER.z1 - 0.25;
@@ -322,7 +386,6 @@ export class MuseRoam {
     if (!terrace && !pier && !steps) return false;
     // (the house itself, beside the pier)
     if (x > -SIDE - GIRTH && z < FACE + GIRTH) return false;
-    if (Math.abs(x - STOVE.x) < STOVE.half + GIRTH && Math.abs(z - STOVE.z) < STOVE.half + GIRTH) return false;
     if (Math.abs(x - BENCH.x) < BENCH.half + GIRTH && z < BENCH.z + BENCH.depth + GIRTH) return false;
     return Math.hypot(x - CHAIR.x, z - CHAIR.z) > 0.3 + GIRTH;
   }
@@ -342,7 +405,7 @@ export class MuseRoam {
   /** The shortest way over the deck (the places after the first, the last the place itself): straight if it can, else by the deck's ways. */
   private deckWay(a: { x: number; z: number }, b: { x: number; z: number }): { x: number; z: number }[] {
     if (this.deckClear(a, b)) return [b];
-    const nodes = [a, ...DECK_WAYS.map(([x, z]) => ({ x, z })), b];
+    const nodes = [a, ...DECK_WAYS.map(([x, z]) => ({ x, z })), ...this.roomWays, b];
     const n = nodes.length;
     const best = new Array<number>(n).fill(Infinity);
     const back = new Array<number>(n).fill(-1);
@@ -501,19 +564,20 @@ export class MuseRoam {
 
   // ---- writing the itinerary ----
 
-  private push(segment: Segment): void {
+  private push(segment: Segment): Segment {
     this.day.push(segment);
     this.starts.push(this.length);
     this.gaits.push(this.gait);
     this.length += segment.time;
     this.gait += segment.gait;
+    return segment;
   }
 
   /** Stand where it is for a while, facing as asked, with something more (a look, holding its can). */
-  private stand(name: string, time: number, f: Facing, extra?: (s: number, out: Roaming) => void): void {
+  private stand(name: string, time: number, f: Facing, extra?: (s: number, out: Roaming) => void): Segment {
     const at = this.here;
     const heading = f.clone();
-    this.push({
+    const segment = this.push({
       name,
       time,
       gait: 0,
@@ -525,6 +589,21 @@ export class MuseRoam {
       },
     });
     this.facing = heading;
+    return segment;
+  }
+
+  /** A stand that may be cut short at once (a look about, a rest), and what to write after it then. */
+  private halting(segment: Segment, then?: () => void): Segment {
+    segment.stop = (s) => s;
+    segment.then = then;
+    return segment;
+  }
+
+  /** A pastime sat or lain in that may be cut short: its motions eased out where it is, then getting up from it. */
+  private easing(segment: Segment, then: () => void): Segment {
+    segment.stop = (s) => Math.min(segment.time, s + EASE);
+    segment.then = then;
+    return segment;
   }
 
   /** Step round on the spot to face as asked: quicker for a small turn than a half turn, none at all for a slight one. */
@@ -642,7 +721,9 @@ export class MuseRoam {
    * Walk a path, speeding up and slowing down at its ends, its heading the
    * path's way; setting off from the way it faced (`from`) it brings its
    * heading round to the path over the first stretch, and arriving, round to
-   * the way it means to face (`end`).
+   * the way it means to face (`end`). Cut short, it slows to a halt where it
+   * is. Through the hut's door, the door swings open as it comes and shut
+   * once it is through.
    */
   private walkPath(path: Path, to: Spot, name: string, from?: Vector3, end?: Vector3, carry?: Carry): void {
     const length = path.length;
@@ -652,15 +733,45 @@ export class MuseRoam {
     const startFacing = from?.clone();
     const endFacing = end?.clone();
     const ahead = new Vector3();
-    this.push({
+    /** How far along it is s seconds in (m), and its pace then (its share of a full one). */
+    const along = (s: number): number => ((rampIntegral(s / time, 0, RAMP) - rampIntegral(s / time, 1 - RAMP, 1)) / (1 - RAMP)) * length;
+    const paceAt = (s: number): number => smoothstep(0, RAMP, s / time) - smoothstep(1 - RAMP, 1, s / time);
+    // (cut short: slowing to a halt from here, s seconds in, so far along, at this pace)
+    const halt = { s: Infinity, d: 0, pace: 0 };
+    const full = PACE * this.height;
+    const start = this.length;
+    const through = this.doorCrossing(path);
+    if (through !== null) {
+      // (when it is so far along: the walk's own ramps inverted)
+      const when = (d: number): number => {
+        if (d <= 0) return 0;
+        if (d >= length) return time;
+        let lo = 0;
+        let hi = time;
+        for (let k = 0; k < 40; k++) {
+          const mid = (lo + hi) / 2;
+          if (along(mid) < d) lo = mid;
+          else hi = mid;
+        }
+        return (lo + hi) / 2;
+      };
+      const open = start + when(through - SWING.ahead);
+      const from = Math.max(this.cutAt, open - SWING.open);
+      this.doorways.push({ from, open: Math.max(open, from + 0.3), shut: Math.max(start + when(through + SWING.past), open), through: start + when(through) });
+    }
+    const segment = this.push({
       name,
       time,
       gait: steps,
       play: (s, out, ctx) => {
-        const u = s / time;
-        const covered = (rampIntegral(u, 0, RAMP) - rampIntegral(u, 1 - RAMP, 1)) / (1 - RAMP);
-        const speed = smoothstep(0, RAMP, u) - smoothstep(1 - RAMP, 1, u);
-        const d = covered * length;
+        let d = along(s);
+        let speed = paceAt(s);
+        if (s > halt.s) {
+          const t = Math.min(s - halt.s, HALT);
+          d = Math.min(length, halt.d + halt.pace * full * (t - (t * t) / (2 * HALT)));
+          speed = halt.pace * (1 - t / HALT);
+        }
+        const covered = d / length;
         path.point(d, out.dir);
         out.height = this.groundAt(out.dir);
         path.heading(d, out.heading);
@@ -680,9 +791,35 @@ export class MuseRoam {
         out.lookAt = lookTmp.copy(ahead).multiplyScalar(this.R + this.groundAt(ahead) + 0.6 * this.height);
         carry?.(s, out);
       },
+      stop: (s) => {
+        // (near its end it slows to a stop as it is)
+        if (time - s < HALT * 1.5) return time;
+        halt.s = s;
+        halt.d = along(s);
+        halt.pace = paceAt(s);
+        segment.gait = (steps * Math.min(length, halt.d + (halt.pace * full * HALT) / 2)) / length;
+        return s + HALT;
+      },
     });
     this.facing = endFacing ?? path.heading(length, new Vector3());
     this.here = to;
+  }
+
+  /** Where a path goes through the hut's front door (m along it), if it does. */
+  private doorCrossing(path: Path): number | null {
+    const a = { x: 0, z: 0 };
+    const b = { x: 0, z: 0 };
+    for (let i = 1; i < path.points.length; i++) {
+      this.terrain.cottageLocal(path.points[i - 1], a);
+      this.terrain.cottageLocal(path.points[i], b);
+      const da = a.z - DOORWAY.z;
+      const db = b.z - DOORWAY.z;
+      if (da * db > 0 || da === db) continue;
+      const f = da / (da - db);
+      const x = a.x + (b.x - a.x) * f;
+      if (x > DOORWAY.x0 && x < DOORWAY.x1) return path.at[i - 1] + (path.at[i] - path.at[i - 1]) * f;
+    }
+    return null;
   }
 
   /** The way from where it is to a spot: over the deck (straight, or round what is in the way), down or up its steps, over the meadow (straight, or round the homestead). */
@@ -745,11 +882,11 @@ export class MuseRoam {
     if (!end) this.turn(f, 'turn', carry);
   }
 
-  /** A move played where it is (its posture's own placement given by `place`), with something more. */
-  private play(name: string, kind: MoveKind, time: number, extra?: (s: number, out: Roaming, move: Move) => void, place?: (s: number, out: Roaming) => void): void {
+  /** A move played where it is (its posture's own placement given by `place`), with something more (told how long it now runs: it may be cut short). */
+  private play(name: string, kind: MoveKind, time: number, extra?: (s: number, out: Roaming, move: Move, time: number) => void, place?: (s: number, out: Roaming) => void): Segment {
     const at = this.here;
     const f = this.facing.clone();
-    this.push({
+    const segment: Segment = this.push({
       name,
       time,
       gait: 0,
@@ -758,11 +895,12 @@ export class MuseRoam {
         out.height = this.groundAt(at.dir);
         out.heading.copy(f);
         place?.(s, out);
-        const move: Move = { kind, time: s, amount: 1, ease: smoothstep(0, 0.7, s) * smoothstep(0, 0.7, time - s) };
+        const move: Move = { kind, time: s, amount: 1, ease: smoothstep(0, 0.7, s) * smoothstep(0, 0.7, segment.time - s) };
         out.action.moves.push(move);
-        extra?.(s, out, move);
+        extra?.(s, out, move, segment.time);
       },
     });
+    return segment;
   }
 
   /** Write the next outing: choose what to do (not the same twice running), go there, do it. */
@@ -788,17 +926,20 @@ export class MuseRoam {
         // out on the porch, looking over the meadow
         const spot = this.deckSpot(-0.6 + 2.4 * rand(), TERRACE.z1 - 0.45);
         this.go(spot, this.out(spot), 'home', rand);
-        this.stand('rest', 10 + 12 * rand(), this.facing, (_s, out) => (out.lookAt = null));
+        this.halting(this.stand('rest', 10 + 12 * rand(), this.facing, (_s, out) => (out.lookAt = null)));
         return;
       }
       case 'wander': {
         const spot = this.meadowSpot(rand);
         if (!spot) return this.outingHome(rand);
         this.go(spot, this.toward(spot, travel(spot.dir, tangentToward(spot.dir, this.U, scratch), -1 / this.R, new Vector3())), 'wander', rand);
-        this.stand('look about', 6 + 6 * rand(), this.facing, (_s, out) => (out.lookAt = null));
+        this.halting(this.stand('look about', 6 + 6 * rand(), this.facing, (_s, out) => (out.lookAt = null)));
         if (rand() < 0.5) {
           this.play('plop', 'plop', PLOP);
-          this.play('sit', 'sit', 15 + 25 * rand(), (_s, out) => (out.lookAt = null));
+          this.easing(
+            this.play('sit', 'sit', 15 + 25 * rand(), (_s, out) => (out.lookAt = null)),
+            () => this.play('rise', 'rise', RISE),
+          );
           this.play('rise', 'rise', RISE);
         }
         return;
@@ -811,6 +952,7 @@ export class MuseRoam {
         // the can out of its pocket; poured here and there, as it goes, now long, now short, now sweeping it over
         // the plants, a content look now and then; between, a shuffle aside, a turn, a few steps, a look about
         this.can(false);
+        const holding = this.day.length;
         const pours = 2 + Math.floor(rand() * 3);
         for (let k = 0; k < pours; k++) {
           this.pour(2.4 + 3 * rand(), 0.7 + 0.3 * rand(), rand() < 0.5, rand() < 0.4);
@@ -819,8 +961,10 @@ export class MuseRoam {
           if (r < 0.35) this.shuffle(rand);
           else if (r < 0.65) this.turn(turned(this.facing, this.here.dir, (rand() < 0.5 ? -1 : 1) * (0.35 + 0.75 * rand()), new Vector3()), 'turn', holdingCan);
           else if (r < 0.9) this.stroll(rand);
-          else this.stand('look about', 1.5 + 1.5 * rand(), this.facing, holdingCan);
+          else this.halting(this.stand('look about', 1.5 + 1.5 * rand(), this.facing, holdingCan));
         }
+        // (cut short with the can out: put away)
+        for (let i = holding; i < this.day.length; i++) this.day[i].then = () => this.can(true);
         this.can(true);
         return;
       }
@@ -832,27 +976,12 @@ export class MuseRoam {
         const seat = this.deckSpot(x, seatZ);
         this.go(front, this.out(front), 'to the bench', rand);
         this.hop('hopUp', front, seat, BENCH.seat);
-        this.play('bench', 'perch', 30 + 45 * rand(), (s, out) => {
+        const perch = this.play('bench', 'perch', 30 + 45 * rand(), (s, out) => {
           out.lookAt = null;
           out.cues.hum = perchBeats(s).hum;
         }, (_s, out) => (out.height += BENCH.seat));
+        this.easing(perch, () => this.hop('hopDown', seat, front, BENCH.seat));
         this.hop('hopDown', seat, front, BENCH.seat);
-        return;
-      }
-      case 'cook': {
-        // at the little stove on the porch: the ladle out of its pocket, stirring and tasting, put back
-        const at = this.deckSpot(STOVE.x - POT[0] * H, STOVE.z - POT[2] * H);
-        this.go(at, this.out(at), 'to the stove', rand);
-        const cooking = (3 + Math.floor(2 * rand())) * COOK.period + 2 * POCKET.time;
-        const pot = this.local(STOVE.x, STOVE.z).multiplyScalar(this.R + this.terrain.cottageGround + FLOOR + POT[1] * H);
-        this.play('cook', 'stir', cooking, (s, out, move) => {
-          const tool = withTool(s, cooking);
-          move.time = tool.time;
-          move.ease = tool.ease;
-          if (tool.pocket > 0) out.action.moves.push({ kind: 'pocket', time: s, amount: tool.pocket });
-          out.lookAt = tool.pocket > 0.5 ? null : lookTmp.copy(pot);
-          out.cues.cook = { time: tool.time, grip: tool.grip };
-        });
         return;
       }
       case 'fish': {
@@ -862,7 +991,7 @@ export class MuseRoam {
           // from a bank it has wandered to, sitting in the grass
           this.go(shore.spot, shore.facing, 'to the shore', rand);
           this.play('plop', 'plop', PLOP);
-          this.fishing(fishing, false);
+          this.fishing(fishing, false).then = () => this.play('rise', 'rise', RISE);
           this.play('rise', 'rise', RISE);
           return;
         }
@@ -877,9 +1006,12 @@ export class MuseRoam {
         };
         this.play('plop', 'plop', PLOP, (_s, _out, move) => (move.edge = true), (s, out) => along(s, 0.25, 0.65, stand, sit, out));
         this.here = sit;
-        this.fishing(fishing, true);
-        this.play('rise', 'rise', RISE, (_s, _out, move) => (move.edge = true), (s, out) => along(s, 0.35, 0.85, sit, stand, out));
-        this.here = stand;
+        const rise = (): void => {
+          this.play('rise', 'rise', RISE, (_s, _out, move) => (move.edge = true), (s, out) => along(s, 0.35, 0.85, sit, stand, out));
+          this.here = stand;
+        };
+        this.fishing(fishing, true).then = rise;
+        rise();
         return;
       }
       case 'nap': {
@@ -890,13 +1022,13 @@ export class MuseRoam {
         this.play('yawn', 'yawn', YAWN_LENGTH, (_s, out) => (out.lookAt = null));
         this.play('plop', 'plop', PLOP);
         this.play('lie back', 'lieBack', LIE_BACK);
-        const nap = 45 + 50 * rand();
-        this.play('nap', 'sleep', nap, (s, out) => (out.cues.sleep = { time: s, roused: -1 }));
-        this.play('wake', 'wake', WAKE, (s, out) => {
-          // (the snore bubble pops as it wakes)
-          if (s < 0.4) out.cues.sleep = { time: nap + s, roused: s };
-        });
-        this.play('rise', 'rise', RISE);
+        const nap = this.play('nap', 'sleep', 45 + 50 * rand(), (s, out) => (out.cues.sleep = { time: s, roused: -1 }));
+        const wake = (): void => {
+          this.wake(nap.time);
+          this.play('rise', 'rise', RISE);
+        };
+        this.easing(nap, wake);
+        wake();
         return;
       }
     }
@@ -920,20 +1052,27 @@ export class MuseRoam {
     const f = this.facing.clone();
     const H = this.height;
     const look = glad ? 1.8 : 0;
-    this.push({
+    // (cut short here, s: the can righted and the look gone over the half second after)
+    let cut = Infinity;
+    const segment = this.push({
       name: 'pour',
       time: time + look,
       gait: 0,
       play: (s, out) => {
         out.dir.copy(at.dir);
         out.height = this.groundAt(at.dir);
-        const sway = sweep ? 0.22 * Math.sin((2 * Math.PI * s) / time) * smoothstep(0.3, 1, s) * smoothstep(0.3, 1, time - s) : 0;
+        const left = s > cut ? 1 - smoothstep(cut, cut + 0.5, s) : 1;
+        const sway = sweep ? 0.22 * Math.sin((2 * Math.PI * s) / time) * smoothstep(0.3, 1, s) * smoothstep(0.3, 1, time - s) * left : 0;
         turned(f, at.dir, s < time ? sway : 0, out.heading);
-        const tipped = tip * smoothstep(0, 0.6, s) * smoothstep(0, 0.5, time - s);
-        const content = glad ? smoothstep(time, time + 0.4, s) * smoothstep(0, 0.5, time + look - s) : 0;
+        const tipped = tip * smoothstep(0, 0.6, s) * smoothstep(0, 0.5, time - s) * left;
+        const content = glad ? smoothstep(time, time + 0.4, s) * smoothstep(0, 0.5, time + look - s) * left : 0;
         out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: 1, tip: tipped, glad: content });
         out.cues.water = { time: s, grip: 1, tip: tipped, pour: smoothstep(0.4, 0.7, tipped) };
         out.lookAt = lookTmp.copy(out.dir).multiplyScalar(this.R + out.height).addScaledVector(out.heading, 0.6 * H);
+      },
+      stop: (s) => {
+        cut = s;
+        return Math.min(segment.time, s + 0.5);
       },
     });
   }
@@ -993,14 +1132,21 @@ export class MuseRoam {
   private outingHome(rand: () => number): void {
     const spot = this.deckSpot(-0.6 + 2.4 * rand(), TERRACE.z1 - 0.45);
     this.go(spot, this.out(spot), 'home', rand);
-    this.stand('rest', 6 + 4 * rand(), this.facing, (_s, out) => (out.lookAt = null));
+    this.halting(this.stand('rest', 6 + 4 * rand(), this.facing, (_s, out) => (out.lookAt = null)));
   }
 
-  /** Fishing where it sits (on a bank, or on the pier's edge), the rod out of its pocket and back. */
-  private fishing(time: number, edge: boolean): void {
+  /** Waking from a sleep this long (s): sitting up, rubbing its eyes, the snore bubble popping; `place` sets it where it lies. */
+  private wake(slept: number, place?: (s: number, out: Roaming) => void): void {
+    this.play('wake', 'wake', WAKE, (s, out) => {
+      if (s < 0.4) out.cues.sleep = { time: slept + s, roused: s };
+    }, place);
+  }
+
+  /** Fishing where it sits (on a bank, or on the pier's edge), the rod out of its pocket and back (cut short, back at once). */
+  private fishing(time: number, edge: boolean): Segment {
     const H = this.height;
-    this.play('fish', 'fish', time, (s, out, move) => {
-      const tool = withTool(s, time);
+    const segment = this.play('fish', 'fish', time, (s, out, move, T) => {
+      const tool = withTool(s, T);
       move.time = tool.time;
       move.ease = tool.ease;
       move.edge = edge;
@@ -1009,6 +1155,8 @@ export class MuseRoam {
       out.lookAt = tool.pocket > 0.5 ? null : lookTmp.copy(out.dir).multiplyScalar(this.R).addScaledVector(out.heading, 1.25 * H);
       out.cues.fish = { time: tool.time, grip: tool.grip, edge };
     }, edge ? (_s, out) => (out.height = this.terrain.cottageGround + FLOOR) : undefined);
+    segment.stop = (s) => Math.min(segment.time, s + POCKET.time);
+    return segment;
   }
 
   /** A hop up onto a seat behind it (or down off it to its front): from one spot to the other in an arc, `seat` over the floor. */
@@ -1041,6 +1189,231 @@ export class MuseRoam {
     }
   }
 
+  // ---- visits to its hut ----
+
+  /**
+   * You knocked at its hut's door at `now` (while it was about): it puts by what it was doing and comes home, up the
+   * steps, along the porch and in through the door (open as it comes, shut behind it), to do there what it does this
+   * time (`doing`): greet you on the rug, cook at the hearth, or go to bed. `room`: the hut inside, as laid out.
+   */
+  comeIn(now: number, doing: Indoors, room: Room): void {
+    this.enter(room);
+    this.cut(now);
+    if (doing === 'greet') this.greetYou(room);
+    else if (doing === 'cook') this.cookAt(room);
+    else this.toBed(room);
+  }
+
+  /** You stepped out of its hut at `now`: it puts by what it was doing in there and goes out onto its porch, a look about there, and its days go on from there. */
+  goOut(now: number): void {
+    if (!this.room) return;
+    this.cut(now);
+    if (this.inHut(this.here.dir)) {
+      const porch = this.deckSpot(DOOR.x, DOOR.porch);
+      this.go(porch, this.out(porch), 'out');
+      this.halting(this.stand('look about', 2 + 2 * random(this.seed * 13 + this.outings)(), this.facing, (_s, out) => (out.lookAt = null)));
+    }
+    this.room = null;
+    this.roomWays = [];
+  }
+
+  /** Its room for this visit, and the places to go round what stands there by (a little out from each corner, where it may stand), the way in among them. */
+  private enter(room: Room): void {
+    this.room = room;
+    const m = GIRTH + 0.12;
+    this.roomWays = [
+      { x: DOOR.x, z: DOOR.porch },
+      { x: DOOR.x, z: ROOM.z - 0.6 },
+    ];
+    for (const t of room.things) {
+      for (const [x, z] of [
+        [t.x0 - m, t.z0 - m],
+        [t.x1 + m, t.z0 - m],
+        [t.x0 - m, t.z1 + m],
+        [t.x1 + m, t.z1 + m],
+      ]) {
+        if (this.deckFree(x, z)) this.roomWays.push({ x, z });
+      }
+    }
+  }
+
+  /**
+   * Cut its day short at `now` (you knocked, or stepped out of its hut): what it is doing comes to a stop there (a
+   * walk slowing to a halt, a pastime's motions eased out, its tool put away), what can't be cut short (a hop,
+   * sitting down, a turn) running to its end first, and how it gets up from it written after (off the bench, up out
+   * of the grass, awake); the rest of the outing goes. The next walk starts where it then is, as it faces.
+   */
+  private cut(now: number): void {
+    const u = this.clock(now);
+    this.writeTo(u);
+    let k = this.segmentAt(u);
+    let s = u - this.starts[k];
+    while (!this.day[k].stop && k + 1 < this.day.length) {
+      k++;
+      s = 0;
+    }
+    const segment = this.day[k];
+    if (segment.stop) segment.time = segment.stop(Math.min(s, segment.time));
+    this.day.length = this.starts.length = this.gaits.length = k + 1;
+    this.length = this.starts[k] + segment.time;
+    this.gait = this.gaits[k] + segment.gait;
+    this.cutAt = u;
+    // its door: what was to open it later goes; open for a way it now won't go through, it shuts as it halts
+    for (let i = this.doorways.length - 1; i >= 0; i--) {
+      const d = this.doorways[i];
+      if (d.from >= u) this.doorways.splice(i, 1);
+      else if (d.through > u) d.shut = Math.min(d.shut, this.length);
+    }
+    // where it now is, and which way it faces
+    const p = this.probe;
+    p.action.moves.length = 0;
+    p.cues.water = p.cues.fish = p.cues.cook = p.cues.sleep = null;
+    segment.play(segment.time, p, { camera: p.dir, gait: this.gaits[k] });
+    this.here = this.spotAt(p.dir);
+    this.facing = p.heading.clone();
+    segment.then?.();
+  }
+
+  /** The spot at a direction: on the deck (its local meters), or out on the meadow. */
+  private spotAt(dir: Vector3): Spot {
+    const c = this.terrain.cottageLocal(dir, { x: 0, z: 0 });
+    const deck = Math.abs(c.x) < 14 && Math.abs(c.z) < 14 && this.deckAt(c.x, c.z) !== null;
+    return { dir: dir.clone(), deck: deck ? { x: c.x, z: c.z } : null };
+  }
+
+  /** The heading at a spot toward a way across the homestead (a unit x, z in its frame). */
+  private facingWay(at: Spot, way: readonly [number, number]): Vector3 {
+    const c = at.deck ?? this.terrain.cottageLocal(at.dir, { x: 0, z: 0 });
+    return tangentToward(at.dir, this.local(c.x + 0.5 * way[0], c.z + 0.5 * way[1]), new Vector3());
+  }
+
+  /** In its room to where it greets you, and greeting you there: a wave as it gets there and now and then after, its eyes on you till then. */
+  private greetYou(room: Room): void {
+    const spot = this.deckSpot(room.greet.x, room.greet.z);
+    this.go(spot, this.facingWay(spot, room.greet.facing), 'to greet you');
+    const at = this.here;
+    const f = this.facing.clone();
+    const waving = (s: number): number => (s < INDOOR.wave ? -1 : (s - INDOOR.wave) % INDOOR.again);
+    this.push({
+      name: 'greet',
+      time: STAY,
+      gait: 0,
+      play: (s, out, ctx) => {
+        out.dir.copy(at.dir);
+        out.height = this.groundAt(at.dir);
+        out.heading.copy(f);
+        const w = waving(s);
+        if (w >= 0 && w < WAVE_LENGTH) out.action.wave = w;
+        if (s < INDOOR.watch || (w >= 0 && w < WAVE_LENGTH)) out.lookAt = lookTmp.copy(ctx.camera);
+      },
+      // (a wave seen through)
+      stop: (s) => {
+        const w = waving(s);
+        return w >= 0 && w < WAVE_LENGTH ? s + WAVE_LENGTH - w : s;
+      },
+    });
+  }
+
+  /** In its room to the hearth, and cooking there: the ladle out of its pocket, rounds of stirring and tasting, put back, a look about, again (cut short, the ladle put back at once). */
+  private cookAt(room: Room): void {
+    const c = room.cook;
+    const spot = this.deckSpot(c.x, c.z);
+    this.go(spot, this.facingWay(spot, c.facing), 'to the hearth');
+    const at = this.here;
+    const f = this.facing.clone();
+    const pot = this.local(c.pot[0], c.pot[2]).multiplyScalar(this.R + this.terrain.cottageGround + c.pot[1]);
+    const cooking = INDOOR.rounds * COOK.period + 2 * POCKET.time;
+    const cycle = cooking + INDOOR.pause;
+    // (cut short: the ladle back in its pocket by then, s)
+    let end = Infinity;
+    this.push({
+      name: 'cook',
+      time: STAY,
+      gait: 0,
+      play: (s, out) => {
+        out.dir.copy(at.dir);
+        out.height = this.groundAt(at.dir);
+        out.heading.copy(f);
+        const from = Math.floor(s / cycle) * cycle;
+        const t = s - from;
+        const total = Math.min(cooking, end - from);
+        if (t >= total) return;
+        const tool = withTool(t, total);
+        out.action.moves.push({ kind: 'stir', time: tool.time, amount: 1, ease: tool.ease });
+        if (tool.pocket > 0) out.action.moves.push({ kind: 'pocket', time: t, amount: tool.pocket });
+        out.lookAt = tool.pocket > 0.5 ? null : lookTmp.copy(pot);
+        out.cues.cook = { time: tool.time, grip: tool.grip, pot };
+      },
+      stop: (s) => {
+        const from = Math.floor(s / cycle) * cycle;
+        if (s - from >= cooking) return s;
+        end = Math.min(from + cooking, s + POCKET.time);
+        return end;
+      },
+    });
+  }
+
+  /**
+   * In its room to bed: before it, its back to it, a yawn, up onto its edge, round and back onto it (its legs swung
+   * up), lying back, asleep, its head on the pillow; cut short, awake, round with its legs over the edge, down.
+   */
+  private toBed(room: Room): void {
+    const b = room.bed;
+    const H = this.height;
+    const [sx, sz] = b.side;
+    const ex = b.x + sx * b.edge;
+    const ez = b.z + sz * b.edge;
+    const seat = this.deckSpot(ex, ez);
+    const front = this.deckSpot(ex + sx * 0.45 * H, ez + sz * 0.45 * H);
+    const lie = this.deckSpot(b.x, b.z);
+    const away = this.facingWay(front, b.side);
+    const foot = this.facingWay(lie, b.foot);
+    const edge = b.y + BED.edge;
+    const onBed = (_s: number, out: Roaming): void => {
+      out.height = this.terrain.cottageGround + b.y;
+    };
+    this.go(front, away, 'to bed');
+    this.play('yawn', 'yawn', YAWN_LENGTH, (_s, out) => (out.lookAt = null));
+    this.hop('hopUp', front, seat, edge - FLOOR);
+    this.swivel(seat, lie, away, foot, edge, b.y, true);
+    this.play('lie back', 'lieBack', LIE_BACK, (_s, out) => (out.lookAt = null), onBed);
+    const asleep = this.play('asleep', 'sleep', STAY, (s, out) => (out.cues.sleep = { time: s, roused: -1 }), onBed);
+    this.easing(asleep, () => {
+      this.wake(asleep.time, onBed);
+      this.swivel(lie, seat, foot, away, b.y, edge, false);
+      this.hop('hopDown', seat, front, edge - FLOOR);
+    });
+  }
+
+  /** On its bed: from perched on its edge facing out of it, round and back onto it, sat facing its foot (into), or back out again (heights over the clearing, m). */
+  private swivel(from: Spot, to: Spot, fromHeading: Vector3, toHeading: Vector3, fromHeight: number, toHeight: number, into: boolean): void {
+    const time = BED.swing;
+    const f = fromHeading.clone();
+    const angle = between(fromHeading, toHeading, from.dir);
+    this.push({
+      name: into ? 'into bed' : 'out of bed',
+      time,
+      gait: 0,
+      play: (s, out) => {
+        const u = smoothstep(0, 1, s / time);
+        out.dir.copy(from.dir).lerp(to.dir, u).normalize();
+        out.height = this.terrain.cottageGround + fromHeight + (toHeight - fromHeight) * u;
+        turned(f, out.dir, angle * u, out.heading);
+        const sat = into ? u : 1 - u;
+        out.action.moves.push({ kind: 'perch', time: s, amount: 1 - sat, ease: 0 }, { kind: 'sit', time: s, amount: sat, ease: 0 });
+        out.lookAt = null;
+      },
+    });
+    this.here = to;
+    this.facing = toHeading.clone();
+  }
+
+  /** Is a direction in its hut (inside its walls' outer faces)? */
+  private inHut(dir: Vector3): boolean {
+    const c = this.terrain.cottageLocal(dir, localTmp);
+    return Math.abs(c.x) < OUTER.x && Math.abs(c.z) < OUTER.z;
+  }
+
   // ---- reading it back ----
 
   /** Move the day on so that at time `now` it is `at` seconds into its itinerary (dev). */
@@ -1052,6 +1425,33 @@ export class MuseRoam {
   /** The itinerary's clock at a time: the caller's, less what it has spent answering you. */
   clock(now: number): number {
     return Math.max(0, now + this.shift - this.you.heldBack(now));
+  }
+
+  /** The part of the itinerary under its clock at a time (by halves: it only grows). */
+  private segmentAt(u: number): number {
+    let lo = 0;
+    let hi = this.day.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this.starts[mid] <= u) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+
+  /** How far its hut's front door stands open at a time (0 shut … 1): opening as Muse comes to it, shutting once it is through. */
+  doorAt(now: number): number {
+    const u = this.clock(now);
+    let open = 0;
+    for (const d of this.doorways) open = Math.max(open, smoothstep(d.from, d.open, u) * (1 - smoothstep(d.shut, d.shut + SWING.shut, u)));
+    return open;
+  }
+
+  /** How far into its hut a direction is (0 out of it … 1 in its room past the doorway): how much its walls hide it. */
+  indoors(dir: Vector3): number {
+    const c = this.terrain.cottageLocal(dir, localTmp);
+    if (Math.abs(c.x) > OUTER.x || Math.abs(c.z) > OUTER.z + 0.3) return 0;
+    return 1 - smoothstep(ROOM.z - 0.3, OUTER.z + 0.3, c.z);
   }
 
   /** The itinerary's parts so far and their starts (s) (dev). */
@@ -1088,17 +1488,10 @@ export class MuseRoam {
     c.petted = -1;
     const u = this.clock(now);
     this.writeTo(u);
-    // the segment under the clock (by halves: the itinerary only grows)
-    let lo = 0;
-    let hi = this.day.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (this.starts[mid] <= u) lo = mid;
-      else hi = mid - 1;
-    }
-    const s = Math.min(this.day[lo].time, u - this.starts[lo]);
-    a.gait = this.gaits[lo];
-    this.day[lo].play(s, out, { camera, gait: this.gaits[lo] });
+    const k = this.segmentAt(u);
+    const s = Math.min(this.day[k].time, u - this.starts[k]);
+    a.gait = this.gaits[k];
+    this.day[k].play(s, out, { camera, gait: this.gaits[k] });
     this.answer(now, out, camera);
     const local = this.terrain.cottageLocal(out.dir, localTmp);
     out.home = local.x > HOMESTEAD.x0 && local.x < HOMESTEAD.x1 && local.z > -3 && local.z < HOMESTEAD.z1 + 5;

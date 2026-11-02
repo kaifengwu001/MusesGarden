@@ -1,6 +1,8 @@
 // Into Muse's hut headless (the cutaway, view/cutaway.ts): the cottage view, a knock (window.__garden.hut()), the rise,
 // the room, the showpiece's view (shelf), a favourite's card (fav<i>), back to the room, outside again (leave).
-// node hut.mjs <target> <outdir> [outside in mid open shelf fav2 room leave orbit-az,el,size]; env W, H, DPR, T, WAIT
+// node hut.mjs <target> <outdir> [outside in mid open shelf fav2 room leave orbit-az,el,size]; env W, H, DPR, T, WAIT,
+// DOING (greet, cook, sleep: else at random). Time is frozen (T), so Muse is put in its room rather than walking in
+// (for the walk in and out, film with time running: muse-look).
 import { launch, openPage } from './lib.mjs';
 const [base = 'http://localhost:5194', out = '.', ...steps] = process.argv.slice(2);
 const W = Number(process.env.W ?? 1405), H = Number(process.env.H ?? 860), dpr = Number(process.env.DPR ?? 2);
@@ -15,7 +17,7 @@ for (const step of list) {
   if (step === 'outside') {
     await page.screenshot({ path: `${out}/outside.png` });
   } else if (step === 'in') {
-    await page.evaluate(() => window.__garden.hut());
+    await page.evaluate((doing) => window.__garden.hut(doing || undefined, true), process.env.DOING ?? '');
     await sleep(700);
     await page.screenshot({ path: `${out}/rising-0.7s.png` });
   } else if (step === 'mid') {

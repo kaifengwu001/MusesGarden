@@ -21,7 +21,8 @@ import {
 } from 'three';
 import rugUrl from '../assets/interior/rug.webp';
 import { geometryBytes, gpuMemory } from '../core/gpuMemory';
-import { Builder, COTTAGE, CUT, FLOOR, OUTER, wallAt, type Paint, type WallFace } from './props';
+import { smoothstep } from '../core/math';
+import { Builder, COTTAGE, CUT, DOORWAY, FLOOR, OUTER, wallAt, type Paint, type WallFace } from './props';
 import fragmentShader from './hut.frag.glsl?raw';
 import vertexShader from './hut.vert.glsl?raw';
 import dotFragment from './hutDot.frag.glsl?raw';
@@ -41,9 +42,11 @@ import dotVertex from './hutDot.vert.glsl?raw';
 // showpiece, a big display cabinet holding its favourites: a glowing dot
 // (hutDot.vert.glsl) there opens the shelf's view, where a small white dot
 // on each favourite opens its card as a find's does. Nothing here is drawn
-// before the cutaway opens: the meadow outside draws exactly as before. The
-// furniture is fetched when the hut is near, reaches the GPU when first drawn
-// and leaves it when the cutaway shuts, so the meadow keeps to its budget.
+// before the cutaway opens, or the front door as Muse comes in or goes out
+// (the room whole then, seen through it): the meadow outside draws exactly as
+// before. The furniture is fetched when the hut is near, reaches the GPU when
+// first drawn and leaves it when nothing shows it, so the meadow keeps to its
+// budget.
 
 /** The room inside the walls (local m): half its width and depth (to the walls' inner faces), its floor and the walls' tops. */
 export const ROOM = { x: COTTAGE.halfX - COTTAGE.thickness / 2, z: COTTAGE.halfZ - COTTAGE.thickness / 2, floor: FLOOR, top: COTTAGE.wall } as const;
@@ -385,8 +388,9 @@ export class HutInterior {
   private favourites: readonly Favourite[] = [];
   private hovered = -1;
   private opened = -1;
-  /** How open the cutaway is, 0 (not drawn) … 1. */
+  /** How open the cutaway is, 0 … 1, and the front door (0 shut … 1): drawn while either is. */
   private amount = 0;
+  private door = 0;
   /** The furniture and the rug, and their bytes on the GPU while drawn. */
   private readonly furniture: Array<Mesh<BufferGeometry, ShaderMaterial>> = [];
   private bytes = 0;
@@ -398,6 +402,8 @@ export class HutInterior {
       uLamps: { value: [new Vector4(0, ROOM.floor + 1, 0, 0), new Vector4(0, ROOM.floor + 1, 0, 0)] },
       uRest: { value: Array.from({ length: RESTS }, () => new Vector4()) },
       uRests: { value: 0 },
+      uCut: { value: 1 },
+      uDoor: { value: 0 },
     };
     const parts = shell(faces);
     for (const [geometry, kind] of [
@@ -443,6 +449,7 @@ export class HutInterior {
         ROOM_Z: ROOM.z.toFixed(4),
         CUT_FRONT: CUT.front.toFixed(4),
         CUT_BACK: CUT.back.toFixed(4),
+        DOOR_HINGE: `vec2(${DOORWAY.hinge[0].toFixed(4)}, ${DOORWAY.hinge[1].toFixed(4)})`,
         ...defines,
       },
     });
@@ -504,9 +511,9 @@ export class HutInterior {
     this.book();
   }
 
-  /** The ledger's 'hut': the furniture and the rug are on the GPU only while the cutaway is open (and loaded). */
+  /** The ledger's 'hut': the furniture and the rug are on the GPU only while drawn (and loaded). */
   private book(): void {
-    if (this.loaded && this.amount > 0) gpuMemory.set('hut', this.bytes);
+    if (this.loaded && this.group.visible) gpuMemory.set('hut', this.bytes);
     else gpuMemory.delete('hut');
   }
 
@@ -571,13 +578,13 @@ export class HutInterior {
     return onModel(p.raw, new Matrix4().multiplyMatrices(p.place.value, p.matrix), POT_ON_STOVE, out);
   }
 
-  /** Where Muse lies on its bed (local m: the mattress's middle, on top) and the way to the bed's foot (a unit direction, local), as the bed stands now; null before it is in. */
-  bedAt(out: Vector3): { at: Vector3; foot: Vector3 } | null {
+  /** Where Muse lies on its bed (local m: the mattress's middle, on top), the way to the bed's foot (a unit direction, local) and the bed's box, as the bed stands now; null before it is in. */
+  bedAt(out: Vector3): { at: Vector3; foot: Vector3; box: Box3 } | null {
     const p = this.placed.find((e) => e.name === 'single-bed');
     if (!p?.raw || !p.matrix) return null;
     const at = onModel(p.raw, new Matrix4().multiplyMatrices(p.place.value, p.matrix), ON_THE_BED, out);
     const yaw = p.handle.rotation.y;
-    return { at, foot: new Vector3(Math.sin(yaw), 0, Math.cos(yaw)) };
+    return { at, foot: new Vector3(Math.sin(yaw), 0, Math.cos(yaw)), box: p.box.clone().applyMatrix4(p.place.value) };
   }
 
   /** The pieces and the rug as they stand, for the layout editor (ui/garden/hutEditor.ts). */
@@ -617,13 +624,28 @@ export class HutInterior {
 
   /** How open the cutaway is (0 … 1), and how far it has gone to the shelf (0 … 1): the room drawn from the first moment, the showpiece's dot once it is open, the favourites' dots at the shelf. */
   open(amount: number, shelf = 0): void {
-    const was = this.amount > 0;
     this.amount = amount;
-    this.group.visible = amount > 0;
     (this.beacon.material.uniforms.uShown as IUniform<number>).value = amount * (1 - shelf);
     (this.dots.material.uniforms.uShown as IUniform<number>).value = amount * shelf;
-    if (was === amount > 0) return;
-    // shut: the furniture's buffers and pictures leave the GPU (kept here; three.js uploads them again when next drawn)
+    this.show();
+  }
+
+  /** How far the front door stands open (0 shut … 1 swung right in, as Muse comes to it): the door in the cut with it, and the room seen through it. */
+  setDoor(open: number): void {
+    this.door = open;
+    (this.uniforms.uDoor as IUniform<number>).value = DOORWAY.swing * smoothstep(0, 1, open);
+    this.show();
+  }
+
+  /** Drawn while the cutaway or the door is open: through the cutaway cut, through the door whole (the cut and its timber not drawn). */
+  private show(): void {
+    const was = this.group.visible;
+    const cut = this.amount > 0;
+    this.group.visible = cut || this.door > 0;
+    (this.uniforms.uCut as IUniform<number>).value = cut ? 1 : 0;
+    this.shellMeshes[2].visible = this.shellMeshes[3].visible = cut;
+    if (was === this.group.visible) return;
+    // hidden: the furniture's buffers and pictures leave the GPU (kept here; three.js uploads them again when next drawn)
     if (was) {
       for (const mesh of this.furniture) {
         mesh.geometry.dispose();

@@ -37,7 +37,7 @@ import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from './muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from './museRig';
-import { MuseRoam, PACE, type Indoors, type Roaming } from './museRoam';
+import { MuseRoam, PACE, type Indoors, type Roaming, type Room } from './museRoam';
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from './museShadow.vert.glsl?raw';
 
@@ -50,9 +50,9 @@ import shadowVertex from './museShadow.vert.glsl?raw';
 // (museShadowMap.glsl), fine enough that its edge stays clean as it moves.
 //
 // It roams the planet on a life of its own (museRoam.ts): out over the
-// meadow and home again, perched on the bench, cooking at the porch's stove,
-// fishing off the pier or from a bank, watering the plants, napping in the
-// grass, always findable by time alone, so a frozen time still draws one
+// meadow and home again, perched on the bench, fishing off the pier or from
+// a bank, watering the plants, napping in the grass, cooking at its hearth
+// while you visit, always findable by time alone, so a frozen time still draws one
 // Muse. Tap it and it answers; hold it and it leans into your hand. Lying in
 // the grass it presses it down round it (uMusePress, read by the grass).
 
@@ -162,8 +162,14 @@ export class Muse {
   readonly place = new Matrix4();
   /** Its body's spheres (planet space, m), for the grass and for taps. */
   readonly spheres = Array.from({ length: BODY.length }, () => new Vector4());
-  /** The last life read; its things (the porch's stove, what it holds, what floats about it). */
+  /** The last life read; its things (what it holds, what floats about it). */
   living: Roaming | null = null;
+  /** Whether its hut's walls stand whole round it (the cutaway shut: world.ts): in its room then, they hide it. */
+  walled = true;
+  /** How far its hut's front door stands open now (0 … 1, as its life swings it: museRoam.ts doorAt). */
+  door = 0;
+  /** When its life was last read (world s). */
+  private time = 0;
   /** What the engine says it is doing (directed), and the life it is given for that when it isn't its own. */
   private direction: MuseDirection = { kind: 'home', busy: false };
   /** When it came into its hut (world s; NaN until its first moment there). */
@@ -344,6 +350,10 @@ export class Muse {
     const R = terrain.radius;
     const l = this.lifeAt(time, terrain, camera, this.roam);
     this.living = l;
+    this.time = time;
+    this.door = this.roam.doorAt(time);
+    // (in its room behind the hut's walls: not drawn, no shadow out through them; seen again through the open door)
+    const inside = this.walled ? this.roam.indoors(l.dir) : 0;
     this.where.dir.copy(l.dir);
     this.where.height = l.height;
     this.where.heading.copy(l.heading);
@@ -383,10 +393,10 @@ export class Muse {
     const push = FUR_LENGTH * 0.9 * strength * (0.75 + 0.25 * Math.sin(1.3 * time) * Math.sin(0.41 * time + 1));
     this.uniforms.uMuseWind.value.set(along.x * push, along.y * push, along.z * push, 0.3 * strength);
     const far = camera.distanceTo(pos);
-    const seen = show && this.loaded && !this.away && far < SEEN;
+    const seen = show && this.loaded && !this.away && far < SEEN && !(inside >= 1 && this.door <= 0);
     this.mesh.visible = seen;
     this.shadowMesh.visible = seen;
-    this.placeShadow(R, seen);
+    this.placeShadow(R, seen && inside < 0.5);
     // as many shells as the fur's length on screen in pixels
     const shells = Math.max(2, Math.min(SHELLS, Math.ceil(FUR_LENGTH / Math.max(far, 0.1) / Math.max(pixelAngle, 1e-6))));
     this.uniforms.uMuseSize.value.z = shells;
@@ -536,6 +546,16 @@ export class Muse {
       }
     }
     return best < Infinity ? { side } : null;
+  }
+
+  /** You knocked at its hut while it was about (museRoam.ts comeIn): it puts by what it was doing and comes in, to do `doing` there. */
+  comeIn(doing: Indoors, room: Room): void {
+    this.roam?.comeIn(this.time, doing, room);
+  }
+
+  /** You stepped out of its hut: it goes out onto its porch, and on with its days. */
+  goOut(): void {
+    this.roam?.goOut(this.time);
   }
 
   /** Your doings (world time, s): a tap, a hold on one side, letting go. */

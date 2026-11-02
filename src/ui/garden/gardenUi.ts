@@ -1,4 +1,4 @@
-import { Matrix4, Vector3, type Vector4 } from 'three';
+import { Box3, Matrix4, Vector3, type Vector4 } from 'three';
 import friendFace from '../../assets/garden/friend-face.jpg';
 import museFace from '../../assets/garden/muse-face.jpg';
 import { bedAt, layOut, type Bed, type GardenLayout } from '../../garden/placement';
@@ -9,7 +9,7 @@ import type { Basket, Postcard } from '../../garden/types';
 import { FindBeds, type BedLook } from '../../life/findBeds';
 import { MUSE_HEIGHT, type MuseDirection } from '../../life/muse';
 import { POT } from '../../life/museRig';
-import type { Indoors } from '../../life/museRoam';
+import type { Indoors, Room } from '../../life/museRoam';
 import { Pins, type PinSpec } from '../../life/pins';
 import { FLOOR, FRONT, OUTER } from '../../life/props';
 import type { ParamStore } from '../../params';
@@ -68,10 +68,10 @@ const MUSE_NEAR = 30;
  * Muse in its hut: where it stands greeting you (local m: on the rug, clear of the table), facing the way the
  * cutaway looks in from (its bearing from the front, rad); at the stove, how far it is turned from facing the back
  * wall toward the left (rad), clear of the table; asleep, how far toward the bed's foot from the mattress's middle
- * (m: so its head lies on the pillow, not over the headboard); and how often a visit finds it cooking, greeting you,
- * asleep.
+ * (m: so its head lies on the pillow, not over the headboard), how far it sinks in, and how far in from the bed's
+ * side it sits on the edge getting in; and how often a visit finds it cooking, greeting you, asleep.
  */
-const INSIDE = { x: 0.6, z: 0.75, facing: 0.68, stove: 0.96, toFoot: 0.55, sink: 0.12 } as const;
+const INSIDE = { x: 0.6, z: 0.75, facing: 0.68, stove: 0.96, toFoot: 0.55, sink: 0.12, edge: 0.08 } as const;
 const VISITS: ReadonlyArray<readonly [Indoors, number]> = [
   ['cook', 0.4],
   ['greet', 0.35],
@@ -122,8 +122,9 @@ export class GardenUi {
   private hoveredBeacon = false;
   private readonly outside: HTMLButtonElement;
   private hutFetched = false;
-  /** What Muse is doing in its hut this visit (chosen as you knock). */
+  /** What Muse is doing in its hut this visit (chosen as you knock), and whether it was put there (the room laid out while it was away) rather than walking in. */
   private indoors: Indoors = 'greet';
+  private placed = false;
   /** The hut's layout editor (temporary: ?edit in the address), and its button in the room. */
   private readonly editor: HutEditor | null;
   private readonly editOpen: HTMLButtonElement | null;
@@ -373,15 +374,16 @@ export class GardenUi {
   update(dt: number): void {
     this.flight.update(dt);
     this.cutaway.update(dt);
-    const muse = this.visit.away ? OUT_OF_SIGHT : this.cutaway.entering ? this.inside() : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
+    const muse = this.visit.away ? OUT_OF_SIGHT : this.cutaway.entering && this.placed ? this.inside() : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
     if (muse) this.world.muse.direct(muse);
   }
 
   /**
-   * Muse in its hut, doing what this visit found it doing (until the room is in, greeting you): at the hearth's
-   * stove, cooking (the pot ahead of it and a little to its right, as its cooking pose has it: museRig.ts POT;
-   * standing at the hearth's right front, turned toward the pot); on the rug, greeting you, turned toward the way
-   * you look in; or asleep on its bed, lying back along it, its head on the pillow.
+   * Muse put in its hut (the room laid out while it was away, ?edit), doing what this visit found it doing (until the
+   * room is in, greeting you): at the hearth's stove, cooking (the pot ahead of it and a little to its right, as its
+   * cooking pose has it: museRig.ts POT; standing at the hearth's right front, turned toward the pot); on the rug,
+   * greeting you, turned toward the way you look in; or asleep on its bed, lying back along it, its head on the
+   * pillow. About the hut, it walks in instead (room, museRoam.ts comeIn).
    */
   private inside(): MuseDirection {
     const c = this.cutaway;
@@ -405,6 +407,39 @@ export class GardenUi {
     const heading = ahead.sub(dir);
     heading.addScaledVector(up, -heading.dot(up)).normalize();
     return { kind: 'inside', doing, dir: up, height: this.world.terrain.cottageGround + y, heading, pot: pot ? c.local(pot.x, pot.y, pot.z, new Vector3()) : null };
+  }
+
+  /**
+   * The hut inside as Muse goes about it (museRoam.ts Room), as it is laid out now: what stands on the floor (not the
+   * rug, nor what hangs over its head), where it greets you, where it cooks (at the hearth's right front, turned to
+   * the pot) and where it lies on its bed (its head on the pillow), getting in from the side toward the room's
+   * middle; null before the room is in.
+   */
+  private room(): Room | null {
+    const hut = this.world.hut;
+    const pot = hut.potAt(new Vector3());
+    const bed = hut.bedAt(new Vector3());
+    if (!pot || !bed) return null;
+    const box = new Box3();
+    const things = hut.pieces.flatMap((p) => {
+      if (!p.piece) return [];
+      box.copy(p.box).applyMatrix4(p.place.value);
+      return box.min.y > FLOOR + MUSE_HEIGHT ? [] : [{ x0: box.min.x, x1: box.max.x, z0: box.min.z, z1: box.max.z }];
+    });
+    const [fx, fz] = [-Math.sin(INSIDE.stove), -Math.cos(INSIDE.stove)];
+    const [lx, lz] = [fz, -fx];
+    const cook = { x: pot.x - (lx * POT[0] + fx * POT[2]) * MUSE_HEIGHT, z: pot.z - (lz * POT[0] + fz * POT[2]) * MUSE_HEIGHT, facing: [fx, fz] as const, pot: [pot.x, pot.y, pot.z] as const };
+    const lie = { x: bed.at.x + bed.foot.x * INSIDE.toFoot, z: bed.at.z + bed.foot.z * INSIDE.toFoot };
+    let side: [number, number] = [bed.foot.z, -bed.foot.x];
+    if (side[0] * -lie.x + side[1] * -lie.z < 0) side = [-side[0], -side[1]];
+    const b = bed.box;
+    const edge = (Math.abs(side[0]) > Math.abs(side[1]) ? (side[0] > 0 ? b.max.x - lie.x : lie.x - b.min.x) : side[1] > 0 ? b.max.z - lie.z : lie.z - b.min.z) - INSIDE.edge;
+    return {
+      things,
+      greet: { x: INSIDE.x, z: INSIDE.z, facing: [Math.sin(INSIDE.facing), Math.cos(INSIDE.facing)] },
+      cook,
+      bed: { ...lie, y: bed.at.y - INSIDE.sink, foot: [bed.foot.x, bed.foot.z], side, edge },
+    };
   }
 
   /** What a visit finds Muse doing in its hut, at random by how often each is (VISITS). */
@@ -770,15 +805,35 @@ export class GardenUi {
     this.closeCard();
     this.flight.cancel();
     this.basketFlight.finish();
-    this.indoors = this.pickIndoors();
-    w.hut.load().catch((error: unknown) => console.error('hut: could not load', error));
+    this.enterHut(this.pickIndoors(), this.museAbout());
+  }
+
+  /**
+   * Into the hut, the camera rising to the cutaway: Muse, about the hut, puts by what it was doing and walks in to do
+   * `doing` there once the room is in (walk); else (the room being laid out while it is away) it is put there.
+   */
+  private enterHut(doing: Indoors, walk: boolean): void {
+    const w = this.world;
+    this.indoors = doing;
+    this.placed = !walk;
+    const loading = w.hut.load();
+    loading.catch((error: unknown) => console.error('hut: could not load', error));
+    if (walk) {
+      void loading.then(() => {
+        const room = this.room();
+        if (!room || !this.cutaway.entering || this.placed) return;
+        w.muse.comeIn(doing, room);
+      });
+    }
     this.cutaway.enter();
   }
 
-  /** Step outside: the card put away, the camera back down to where it was before; `then` once it is there. */
+  /** Step outside: the card put away, Muse out onto its porch after you (unless it was put in), the camera back down to where it was before; `then` once it is there. */
   leaveHut(then?: () => void): void {
     this.closeCard();
     this.editor?.close();
+    if (!this.placed) this.world.muse.goOut();
+    this.placed = false;
     this.cutaway.leave(then);
   }
 
@@ -1017,12 +1072,8 @@ export class GardenUi {
       travel: () => this.travelSheet.open(),
       home: (h: boolean) => this.setHome(h),
       flying: () => this.flight.flying,
-      /** Into the hut (as a knock on the door, whatever Muse is doing; `doing`: what it is doing there, else at random), out again, its state, a favourite's card. */
-      hut: (doing?: Indoors) => {
-        this.indoors = doing ?? this.pickIndoors();
-        void this.world.hut.load();
-        this.cutaway.enter();
-      },
+      /** Into the hut (as a knock on the door, Muse walking in if it is about, else put there; put: put there at once; `doing`: what it does there, else at random), out again, its state, a favourite's card. */
+      hut: (doing?: Indoors, put = false) => this.enterHut(doing ?? this.pickIndoors(), !put && this.museAbout()),
       outside: () => this.leaveHut(),
       inHut: () => ({ active: this.cutaway.active, open: this.cutaway.open, shelf: this.cutaway.shelfAmount, loaded: this.world.hut.loaded, favourites: this.favourites.length }),
       favourite: (i: number) => this.openFavourite(i),

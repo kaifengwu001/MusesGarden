@@ -411,11 +411,16 @@ click is what you see.
   (`CameraRig.held`) while the focus moves to the room, so the near field,
   the light and the fog are the room's; the tiny-planet warp eases out so
   the room stands square, and clouds near the line of sight draw back. The
-  roof lifts off and dissolves, the chimney settles onto the back wall over
-  the hearth, and the walls are cut straight: the front and the right end
-  low, over the front's lintels, the back and the left end whole. The
-  cottage draws with its own materials whenever the cutaway is shut, so the
-  meadow outside is untouched. Inside, Kai's Tripo furniture is fitted into
+  roof and the chimney lift off and dissolve, and the walls are cut
+  straight: the front and the right end low, across the front's window and
+  door, the back and the left end whole. The cottage draws with its own
+  materials whenever the cutaway is shut (its door's planks turned on their
+  hinge only while it stands open), so the meadow outside is untouched.
+  Muse, about the hut when you knock, puts by what it was doing and walks in
+  through the front door, which swings open as it comes and shut behind it
+  (museRoam.ts comeIn), to greet you, cook at the hearth or go to bed; when
+  you step out it walks out onto its porch (goOut), the room seen whole
+  through the open door. Inside, Kai's Tripo furniture is fitted into
   the room in meters and lit by the stove's fire, a candle and a lantern,
   with soft daylight from above as if the roof were on. Muse's showpiece, a
   display cabinet along the left wall, holds its favourites: its glowing dot

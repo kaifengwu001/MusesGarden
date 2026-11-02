@@ -436,8 +436,12 @@ export class World {
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
+    this.muse.walled = !this.hut.shown;
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.muse.renderShadow(this.renderer);
+    // (the hut's front door swings open as Muse comes to it, the room seen through it)
+    this.homestead.setDoor(this.muse.door);
+    this.hut.setDoor(this.muse.door);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;

@@ -1,5 +1,6 @@
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, FrontSide, Matrix4, Mesh, Object3D, ShaderMaterial, Vector3, type IUniform } from 'three';
 import { hash32, unit } from '../core/hash';
+import { smoothstep } from '../core/math';
 import { gnoise } from '../planet/noise';
 import { BANK, HOME_LEVEL } from '../planet/terrain';
 import fragmentShader from './props.frag.glsl?raw';
@@ -86,6 +87,17 @@ const BASE = -(HOME_LEVEL + BANK.height + 1.8);
 type Kind = 'wall' | 'roof' | 'wood' | 'iron' | 'glass' | 'landing';
 /** Where the front's openings are, along it from its left end (m), the end window along the right end from its front corner. */
 export const FRONT = { window: [1.32, 2.52], door: [4.6, 5.7] } as const;
+/**
+ * The front door (local m): its opening across the front (x0 … x1), the plane its planks stand in (z: 0.6 of the wall
+ * in from its face, as fittings builds them), the hinge it swings in on (its right side, seen from the porch), and how
+ * far it swings open (rad, into the room), as Muse comes to it (museRoam.ts).
+ */
+export const DOORWAY = (() => {
+  const x0 = -OUTER.x + FRONT.door[0];
+  const x1 = -OUTER.x + FRONT.door[1];
+  const z = OUTER.z - COTTAGE.thickness * 0.6;
+  return { x0, x1, z, hinge: [x1, z] as const, swing: 0.47 * Math.PI };
+})();
 /** The bench against the front, between the window and the door (local m): its middle, its seat's half length and half depth, the seat's top over the floor. */
 export const BENCH = { x: -OUTER.x + (FRONT.window[1] + FRONT.door[0]) / 2 - 0.12, z: OUTER.z + 0.22, half: 0.74, depth: 0.19, seat: 0.485 } as const;
 /** The house's front face and its side walls (local m: z, ±x): what stands on the terrace stands clear of them. */
@@ -681,6 +693,8 @@ export class Homestead {
    */
   private readonly cut: Array<{ mesh: Mesh; own: ShaderMaterial; cutaway: ShaderMaterial }> = [];
   private readonly cutaway: IUniform<number> = { value: 0 };
+  /** How far the front door has swung open (rad): its planks turned about its hinge in the wood's vertex shader. */
+  private readonly door: IUniform<number> = { value: 0 };
   private roof: Mesh | null = null;
 
   constructor(shared: Record<string, IUniform>, seed: number) {
@@ -720,15 +734,22 @@ export class Homestead {
   }
 
   private material(shared: Record<string, IUniform>, kind: Kind, cutaway = false): ShaderMaterial {
+    const door = kind === 'wood';
     const mat = new ShaderMaterial({
       name: cutaway ? `${kind} (cutaway)` : kind,
       vertexShader,
       fragmentShader,
-      uniforms: cutaway ? { ...shared, uKind: { value: KIND_ID[kind] }, uCutaway: this.cutaway } : { ...shared, uKind: { value: KIND_ID[kind] } },
-      // (the chimney's top, where its flue opens: its middle x, z and its half width, m)
+      uniforms: {
+        ...shared,
+        uKind: { value: KIND_ID[kind] },
+        ...(cutaway ? { uCutaway: this.cutaway } : {}),
+        ...(door ? { uDoor: this.door } : {}),
+      },
+      // (the chimney's top, where its flue opens: its middle x, z and its half width, m; the front door's hinge, x and z)
       defines: {
         CHIMNEY_TOP: `vec3(${CHIMNEY.x.toFixed(3)}, ${CHIMNEY.z.toFixed(3)}, ${CHIMNEY.half.toFixed(3)})`,
         ...(cutaway ? { CUTAWAY: '', CUT_FRONT: CUT.front.toFixed(4), CUT_BACK: CUT.back.toFixed(4), CUT_X: CUT_X.toFixed(4), CUT_Z: CUT_Z.toFixed(4) } : {}),
+        ...(door ? { DOOR_HINGE: `vec2(${DOORWAY.hinge[0].toFixed(4)}, ${DOORWAY.hinge[1].toFixed(4)})` } : {}),
       },
       side: kind === 'roof' ? DoubleSide : FrontSide,
     });
@@ -747,6 +768,11 @@ export class Homestead {
     for (const c of this.cut) c.mesh.material = open ? c.cutaway : c.own;
     this.cutaway.value = amount;
     if (this.roof) this.roof.visible = amount < 1;
+  }
+
+  /** How far the front door stands open (0 shut … 1 swung right in): eased, as a door swings. */
+  setDoor(open: number): void {
+    this.door.value = DOORWAY.swing * smoothstep(0, 1, open);
   }
 
   /** Seat the homestead: origin on the cottage clearing, up = local vertical, +z toward the pond. */
