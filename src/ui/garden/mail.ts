@@ -1,31 +1,59 @@
-import { worldArt } from '../../garden/art';
+import { hashOf, worldArt } from '../../garden/art';
 import type { GardenState } from '../../garden/state';
 import type { Postcard } from '../../garden/types';
-import { button, dayName, el, nextFrame, shortDate, wait } from './dom';
+import { button, dayName, el, reducedMotion, shortDate, wait } from './dom';
 import { ICONS } from './icons';
-import { PILE_SHOWN, stackSlot, underSlot, type Slot } from './pile';
 import type { PostBox } from './postbox';
+import { paperOf, scrapOf, trimmings } from './scrapbook';
 
-// The post: what comes out of the post box. Its door drops and the cards
-// fly out of its mouth into a loose stack on the table, the newest on top;
-// an invitation comes as a sealed envelope. Tap a card and it flies
-// forward; tap it again and it turns over (a postcard's back: the place and
-// the day, a stamp and a postmark, a mitten print for a signature). Like it,
-// or put it away in the album, where every card Muse has sent is kept, each
-// held at its corners. An envelope opens to its invitation: travel now
-// (good for one visit) or keep it for later. Opening the box collects the
-// post, so its flag comes down.
+// The post: what comes out of the post box. Its door drops and today's cards
+// fly out of its mouth into a deck, the newest on top. Swipe the top card
+// away, any way, and the next comes up; the deck goes round. Tap a card and it
+// turns over (a postcard's back: the place and the day, a stamp and a
+// postmark, a mitten print for a signature). Beside it, a heart to like it and
+// a star to keep it among your favorites. Up top, a switch: From today,
+// Favorite (the starred cards) and Album (every card Muse has sent), the last
+// two laid out on a scrapbook page, each card taped or clipped there, some
+// with a scribbled frame or a sticker. Every card is a polaroid: the whole
+// photo, and its place and day written in the strip under it. Under the switch,
+// every invitation not yet used waits as a ticket in its host's colours, with
+// its host's name and planet on it; tap one to travel. An invitation in
+// today's post comes sealed in an envelope: tap it and its ticket slides out
+// and joins the others. Opening the box collects the post, so its flag comes
+// down.
 
 export interface MailActions {
   travel(invitation: string): void;
 }
 
-type View = 'stack' | 'focus' | 'album';
+type View = 'today' | 'favorite' | 'album';
 
-/** The card up close. */
-const HELD: Slot = { x: 0, y: -10, r: 0, s: 1, shown: true };
+const VIEWS: ReadonlyArray<{ view: View; label: string }> = [
+  { view: 'today', label: 'From today' },
+  { view: 'favorite', label: 'Favorite' },
+  { view: 'album', label: 'Album' },
+];
 
-/** A drag on the card up close; far or fast enough and it is thrown away. */
+/** A card's place: offset from the stage's centre in px, tilt in degrees, scale, and whether it shows. */
+interface Slot {
+  x: number;
+  y: number;
+  r: number;
+  s: number;
+  shown: boolean;
+}
+
+/** The deck, by how far under the top a card lies: the top card up close, two more peeking out under it. */
+const DECK: readonly Slot[] = [
+  { x: 0, y: -10, r: 0, s: 1, shown: true },
+  { x: 16, y: -3, r: 2.6, s: 0.965, shown: true },
+  { x: -14, y: 4, r: -2.2, s: 0.94, shown: true },
+];
+
+/** Deeper cards lie hidden under the last that shows. */
+const slot = (depth: number): Slot => DECK[depth] ?? { ...DECK[DECK.length - 1], shown: false };
+
+/** A drag on the top card; far or fast enough and it is thrown away. */
 interface Drag {
   pointer: number;
   node: HTMLElement;
@@ -40,12 +68,49 @@ const THROW_DISTANCE = 110;
 const THROW_SPEED = 0.5;
 const THROW_MS = 400;
 
-function place(node: HTMLElement, slot: Slot): void {
-  node.style.setProperty('--x', `${slot.x}px`);
-  node.style.setProperty('--y', `${slot.y}px`);
-  node.style.setProperty('--r', `${slot.r}deg`);
-  node.style.setProperty('--s', String(slot.s));
-  node.classList.toggle('is-buried', !slot.shown);
+/**
+ * A card leaving the mailbox: how long its whole way takes (ms), the gap between cards (ms), its size and tilt in the
+ * mouth (as small as the cards drawn inside the box), and how far its way bends up out of the mouth (px).
+ */
+const FLY_OUT = { ms: 1150, stagger: 260, s: 0.075, r: -14, pull: 70 } as const;
+
+const transformAt = (at: { x: number; y: number; r: number; s: number }): string =>
+  `translate(${at.x}px, ${at.y}px) rotate(${at.r}deg) scale(${at.s})`;
+
+/**
+ * Out of the mailbox's mouth (`from`, px from the stage's middle) into its place in the deck, growing to full size on
+ * the way: one movement that starts slow out of the mouth and never stops until it lands. Its way bends through a
+ * point just out of the mouth, placed by distance so its speed carries through the bend. Its place is already set, so
+ * it rests there after.
+ */
+function flyOut(node: HTMLElement, from: { x: number; y: number }, to: Slot, delay: number): void {
+  const away = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  const bend = {
+    x: from.x + ((to.x - from.x) / away) * FLY_OUT.pull,
+    y: from.y + ((to.y - from.y) / away) * FLY_OUT.pull - FLY_OUT.pull * 0.4,
+    r: FLY_OUT.r * 1.3,
+    s: FLY_OUT.s * 1.8,
+  };
+  const start = { ...from, r: FLY_OUT.r, s: FLY_OUT.s };
+  const out = Math.hypot(bend.x - start.x, bend.y - start.y);
+  const at = out / (out + Math.hypot(to.x - bend.x, to.y - bend.y));
+  node.animate(
+    [
+      { transform: transformAt(start), opacity: 0, offset: 0 },
+      { transform: transformAt(start), opacity: 1, offset: 0.01 },
+      { transform: transformAt(bend), opacity: 1, offset: Math.min(0.3, Math.max(0.05, at)) },
+      { transform: transformAt(to), opacity: 1, offset: 1 },
+    ],
+    { duration: FLY_OUT.ms, delay, fill: 'backwards', easing: 'cubic-bezier(0.45, 0, 0.25, 1)' },
+  );
+}
+
+function place(node: HTMLElement, at: Slot): void {
+  node.style.setProperty('--x', `${at.x}px`);
+  node.style.setProperty('--y', `${at.y}px`);
+  node.style.setProperty('--r', `${at.r}deg`);
+  node.style.setProperty('--s', String(at.s));
+  node.classList.toggle('is-buried', !at.shown);
 }
 
 /** A stamp: a little painted planet with its cottage, on perforated card. */
@@ -59,18 +124,23 @@ function postmark(day: string): string {
   return `<svg viewBox="0 0 120 64" aria-hidden="true"><defs><path id="pm" d="M32 32 m-22 0 a22 22 0 1 1 44 0 a22 22 0 1 1 -44 0"/></defs><circle cx="32" cy="32" r="26" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="32" cy="32" r="16" fill="none" stroke="currentColor" stroke-width="1"/><text font-family="ui-sans-serif, system-ui" font-size="6.4" letter-spacing="1.1" fill="currentColor"><textPath href="#pm">${text}</textPath></text><text x="32" y="35" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-size="9" font-style="italic" fill="currentColor">${shortDate(day)}</text>${[0, 1, 2, 3].map((k) => `<path d="M62 ${18 + k * 9} q7 -5 14 0 t14 0 t14 0 t14 0" fill="none" stroke="currentColor" stroke-width="1.4"/>`).join('')}</svg>`;
 }
 
-/** A postcard as a thing you hold: its photo on the front; on the back the place and day, a stamp, a postmark. */
+/** Where and when, as written in a polaroid's strip: 'On Wren’s planet · 2 Nov'. */
+const written = (card: Postcard): string => `${card.place}\u00a0·\u00a0${shortDate(card.day)}`;
+
+/** A postcard as a thing you hold: on the front a polaroid, its photo whole and its place and day written under it;
+ *  on the back the place and day again, a stamp, a postmark. */
 function postcard(card: Postcard, withName: string | null): HTMLElement {
   const root = el('div', 'g-pc');
   root.dataset.id = card.id;
   const inner = el('div', 'g-pc-inner');
   const front = el('div', 'g-pc-front');
+  front.style.cssText = paperOf(scrapOf(card.id).tint);
   const photo = el('img', 'g-pc-photo');
   photo.src = card.image;
   photo.alt = card.place;
   photo.draggable = false;
   photo.decoding = 'async';
-  front.append(photo);
+  front.append(photo, el('p', 'g-pc-caption', written(card)));
   const back = el('div', 'g-pc-back');
   const left = el('div', 'g-pc-left');
   left.append(el('p', 'g-pc-place', card.place), el('p', 'g-pc-day', dayName(card.day)));
@@ -92,31 +162,38 @@ function postcard(card: Postcard, withName: string | null): HTMLElement {
   return root;
 }
 
-/** An invitation as a sealed envelope, its card inside. */
-function envelope(card: Postcard, from: string, actions: { travel: () => void; later: () => void }): HTMLElement {
+/** Each host's ticket lies at its own slight angle (deg). */
+const tilt = (host: string): number => ((hashOf(host) % 1000) / 1000 - 0.5) * 3.2;
+
+/** A ticket to a friend's planet: in its host's colours, the planet and the host's name on it, good for one visit. */
+function ticket<K extends 'button' | 'div'>(tag: K, card: Postcard): HTMLElementTagNameMap[K] {
   const inv = card.invitation!;
+  const root = el(tag, 'g-ticket');
+  root.dataset.id = card.id;
+  root.style.setProperty('--coat', inv.coat);
+  root.style.setProperty('--tilt', `${tilt(inv.from).toFixed(2)}deg`);
+  const stub = el('span', 'g-ticket-stub');
+  const planet = el('span', 'g-ticket-planet');
+  planet.style.backgroundImage = `url("${worldArt(inv.world)}")`;
+  stub.append(planet, el('span', 'g-ticket-admit', 'Admit one'));
+  const main = el('span', 'g-ticket-main');
+  const go = el('span', 'g-ticket-go');
+  go.innerHTML = `${ICONS.globe}<span>Travel</span>`;
+  main.append(el('span', 'g-ticket-world', inv.worldName), el('span', 'g-ticket-host', `from ${inv.fromName}`), el('span', 'g-ticket-once', 'Good for one visit'), go);
+  root.append(stub, main);
+  return root;
+}
+
+/** An invitation as a sealed envelope, its ticket inside. */
+function envelope(card: Postcard): HTMLElement {
   const root = el('div', 'g-pc g-env');
   root.dataset.id = card.id;
   const body = el('div', 'g-env-body');
-  const letter = el('div', 'g-invite');
-  const pic = el('div', 'g-invite-pic');
-  pic.style.backgroundImage = `url("${worldArt(inv.world)}")`;
-  letter.append(
-    el('p', 'g-invite-kicker', 'You’re invited'),
-    el('h3', 'g-invite-world', inv.worldName),
-    el('p', 'g-invite-from', `${from} would love you to visit`),
-    pic,
-    el('p', 'g-invite-blurb', inv.blurb),
-  );
-  const row = el('div', 'g-invite-actions');
-  row.append(button('g-invite-go', 'Travel now', `${ICONS.globe}<span>Travel now</span>`, (e) => (e.stopPropagation(), actions.travel())), button('g-invite-later', 'Keep for later', '', (e) => (e.stopPropagation(), actions.later())));
-  (row.lastChild as HTMLElement).textContent = 'Keep for later';
-  letter.append(row, el('p', 'g-invite-once', 'Good for one visit'));
+  const inside = el('div', 'g-env-ticket');
+  inside.append(ticket('div', card));
   const pocket = el('div', 'g-env-pocket');
-  pocket.append(el('span', 'g-env-to', 'For you'), el('span', 'g-env-from', `from ${from}`));
-  const flap = el('div', 'g-env-flap');
-  const seal = el('span', 'g-env-seal');
-  body.append(letter, pocket, flap, seal);
+  pocket.append(el('span', 'g-env-to', 'For you'), el('span', 'g-env-from', `from ${card.invitation!.fromName}`));
+  body.append(inside, pocket, el('div', 'g-env-flap'), el('span', 'g-env-seal'));
   root.append(body);
   return root;
 }
@@ -124,17 +201,27 @@ function envelope(card: Postcard, from: string, actions: { travel: () => void; l
 export class Mail {
   private readonly el: HTMLElement;
   private readonly stage: HTMLElement;
+  private readonly empty: HTMLElement;
+  private readonly side: HTMLElement;
+  private readonly likeButton: HTMLButtonElement;
+  private readonly starButton: HTMLButtonElement;
   private readonly album: HTMLElement;
+  private readonly tickets: HTMLElement;
   private readonly title: HTMLElement;
   private readonly sub: HTMLElement;
-  private readonly bar: HTMLElement;
-  private readonly likeButton: HTMLButtonElement;
-  private readonly albumButton: HTMLButtonElement;
-  private view: View = 'stack';
+  private readonly switches: Map<View, HTMLButtonElement>;
+  private view: View = 'today';
+  /** Favorite and Album open on a page of cards; a card picked there brings the page's cards up close as a deck. */
+  private board = false;
   private cards: Postcard[] = [];
-  private focused = -1;
-  private from: View = 'stack';
+  private top = 0;
   private opening = false;
+  private closing = false;
+  private operation = 0;
+  private readonly pending = new Set<number>();
+  /** The invitation whose ticket is on its way out of its envelope to the others. */
+  private pocketing: string | null = null;
+  private ticketIds = '';
   private drag: Drag | null = null;
   private swallowClick = false;
 
@@ -148,180 +235,323 @@ export class Mail {
     this.el.setAttribute('role', 'dialog');
     this.el.setAttribute('aria-label', 'Post');
     const scrim = el('div', 'g-mail-scrim');
-    scrim.addEventListener('click', () => (this.view === 'focus' ? this.unfocus() : this.close()));
+    scrim.addEventListener('click', () => this.back());
     const head = el('header', 'g-mail-head');
     this.title = el('h2', 'g-mail-title', 'Post');
     this.sub = el('p', 'g-mail-sub');
     const tools = el('div', 'g-mail-tools');
-    this.albumButton = button('g-mail-tool', 'Album', `${ICONS.album}<span>Album</span>`, () => this.toggleAlbum());
-    tools.append(this.albumButton, button('g-mail-tool g-mail-close', 'Close', ICONS.close, () => this.close()));
+    const segments = el('div', 'g-segments');
+    segments.setAttribute('role', 'group');
+    segments.setAttribute('aria-label', 'Show');
+    this.switches = new Map(
+      VIEWS.map(({ view, label }) => {
+        const b = button('g-segment', label, '', () => this.show(view));
+        b.textContent = label;
+        b.removeAttribute('title');
+        segments.append(b);
+        return [view, b];
+      }),
+    );
+    tools.append(segments, button('g-mail-close', 'Close', ICONS.close, () => this.close()));
     head.append(this.title, this.sub, tools);
+
+    const desk = el('div', 'g-mail-desk');
     this.stage = el('div', 'g-mail-stage');
     this.stage.addEventListener('click', (e) => this.stageClick(e));
     this.stage.addEventListener('pointerdown', (e) => this.grab(e));
     this.stage.addEventListener('pointermove', (e) => this.pull(e));
     this.stage.addEventListener('pointerup', (e) => this.release(e, false));
     this.stage.addEventListener('pointercancel', (e) => this.release(e, true));
+    this.empty = el('div', 'g-mail-empty');
+    this.empty.append(el('p', 'g-mail-quiet', 'Nothing from Muse today'), el('p', 'g-mail-hint', 'Muse sends a card now and then. Every card it has sent is in the Album.'));
+    this.side = el('div', 'g-mail-side');
+    this.likeButton = this.mark('g-mark-like', 'Like', () => this.like());
+    this.starButton = this.mark('g-mark-star', 'Favorite', () => this.favorite());
+    this.side.append(this.likeButton, this.starButton);
     this.album = el('div', 'g-album');
-    this.bar = el('div', 'g-mail-bar');
-    this.likeButton = button('g-mail-act', 'Like', `${ICONS.heart}<span>Like</span>`, () => this.like());
-    this.bar.append(
-      button('g-mail-act g-mail-step', 'Previous', ICONS.left, () => this.step(-1)),
-      this.likeButton,
-      button('g-mail-act', 'Turn over', `${ICONS.flip}<span>Turn over</span>`, () => this.flip()),
-      button('g-mail-act', 'Put away', `${ICONS.album}<span>Put away</span>`, () => void this.putAway()),
-      button('g-mail-act g-mail-step', 'Next', ICONS.right, () => this.step(1)),
-    );
-    this.el.append(scrim, head, this.stage, this.album, this.bar);
+    desk.append(this.stage, this.empty, this.side, this.album);
+
+    this.tickets = el('div', 'g-tickets');
+    this.tickets.setAttribute('aria-label', 'Travel tickets');
+    this.el.append(scrim, head, desk, this.tickets);
     parent.append(this.el);
-    window.addEventListener('keydown', (e) => {
-      if (!this.isOpen) return;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        e.stopImmediatePropagation();
-        if (this.view === 'focus') this.step(e.key === 'ArrowRight' ? 1 : -1);
-      } else if (e.key === ' ' && this.view === 'focus') {
-        e.preventDefault();
-        this.flip();
-      }
-    });
+    window.addEventListener('keydown', (e) => this.key(e));
   }
 
   get isOpen(): boolean {
-    return this.el.classList.contains('is-open');
+    return this.opening || this.el.classList.contains('is-open');
   }
 
-  /** Called when the post changes (a card arrived while the garden is open). */
+  private invalidate(): number {
+    for (const timer of this.pending) clearTimeout(timer);
+    this.pending.clear();
+    return ++this.operation;
+  }
+
+  private later(action: () => void, ms: number): void {
+    const operation = this.operation;
+    const timer = window.setTimeout(() => {
+      this.pending.delete(timer);
+      if (operation === this.operation) action();
+    }, reducedMotion() ? 0 : ms);
+    this.pending.add(timer);
+  }
+
+  /** A heart or a star beside the card; its word shows to its right on hover. */
+  private mark(className: string, label: string, onClick: () => void): HTMLButtonElement {
+    const b = button(`g-mark ${className}`, label, '', onClick);
+    b.removeAttribute('title');
+    b.setAttribute('aria-pressed', 'false');
+    return b;
+  }
+
+  /** Called when the post changes: a card arrived, a like or a star came back, an envelope was opened. */
   refresh(): void {
-    if (this.isOpen && this.view === 'stack' && !this.opening) this.layStack(false);
+    if (!this.isOpen || this.opening || this.closing) return;
+    this.paintTickets();
+    if (this.pocketing) return;
+    if (this.board) this.paintBoard(false);
+    else if (this.view === 'today' && ids(this.state.today) !== ids(this.cards)) {
+      const keep = this.cards[this.top]?.id;
+      const fresh = this.state.today;
+      this.layDeck(fresh, Math.max(0, fresh.findIndex((c) => c.id === keep)));
+    } else this.paint();
   }
 
   private friendName(card: Postcard): string | null {
-    const id = card.with ?? card.invitation?.from;
-    return id ? (this.state.snapshot?.friends.find((f) => f.id === id)?.name ?? null) : null;
+    return card.with ? (this.state.snapshot?.friends.find((f) => f.id === card.with)?.name ?? null) : null;
   }
 
   private build(card: Postcard): HTMLElement {
-    if (card.invitation) {
-      return envelope(card, this.friendName(card) ?? 'A friend', {
-        travel: () => this.actions.travel(card.id),
-        later: () => this.unfocus(),
-      });
-    }
-    return postcard(card, this.friendName(card));
+    return card.invitation ? envelope(card) : postcard(card, this.friendName(card));
   }
 
-  /** Open the box: its door drops, the cards fly from its mouth to the stack. */
+  /** Open the box: its door drops, and today's cards fly from its mouth into the deck. */
   async open(): Promise<void> {
-    if (this.isOpen || this.opening) return;
+    if (this.opening || (this.isOpen && !this.closing)) return;
+    const operation = this.invalidate();
+    this.closing = false;
     this.opening = true;
+    this.pocketing = null;
+    this.el.classList.remove('is-open', 'is-closing', 'is-board');
+    document.body.classList.remove('g-mail-open');
+    this.stage.replaceChildren();
     const mouth = await this.postbox.open();
-    this.view = 'stack';
+    if (operation !== this.operation) return;
     this.el.classList.add('is-open');
     document.body.classList.add('g-mail-open');
-    this.el.dataset.view = 'stack';
-    this.layStack(true, mouth);
-    // collected: the flag comes down
-    for (const card of this.cards) this.state.markRead(card.id);
+    this.ticketIds = '';
+    this.show('today', reducedMotion() ? undefined : mouth);
+    this.postbox.releaseMail();
+    this.state.collect();
     this.opening = false;
   }
 
   close(): void {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.closing) return;
+    this.invalidate();
+    this.opening = false;
+    this.pocketing = null;
+    if (this.drag?.node.hasPointerCapture(this.drag.pointer)) this.drag.node.releasePointerCapture(this.drag.pointer);
+    this.drag = null;
+    this.swallowClick = false;
+    const finish = (): void => {
+      this.closing = false;
+      this.el.classList.remove('is-open', 'is-board', 'is-closing');
+      document.body.classList.remove('g-mail-open');
+      this.stage.replaceChildren();
+      this.postbox.close();
+    };
+    if (!this.el.classList.contains('is-open') || reducedMotion()) {
+      finish();
+      return;
+    }
+    this.closing = true;
+    this.el.classList.add('is-closing');
+    if (this.board) {
+      this.later(finish, 180);
+      return;
+    }
     const mouth = this.postbox.mouth();
     const stage = this.stage.getBoundingClientRect();
     for (const node of this.stage.children) {
       const e = node as HTMLElement;
-      e.classList.remove('is-focus', 'is-flipped', 'is-open');
+      for (const flight of e.getAnimations()) flight.cancel();
+      e.classList.remove('is-flipped', 'is-open', 'is-dragging', 'is-thrown');
+      e.style.transition = '';
       e.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
       e.style.setProperty('--y', `${mouth.y - stage.top - stage.height / 2}px`);
-      e.style.setProperty('--s', '0.12');
+      e.style.setProperty('--s', '0.075');
+      e.style.setProperty('--r', '-12deg');
       e.style.opacity = '0';
     }
-    this.el.classList.remove('is-open', 'is-album');
-    document.body.classList.remove('g-mail-open');
-    setTimeout(() => this.postbox.close(), 220);
+    this.later(finish, 520);
   }
 
-  private layStack(fly: boolean, mouth?: { x: number; y: number }): void {
-    this.cards = this.state.mail;
-    this.focused = -1;
-    const unread = this.state.unread.length;
-    this.title.textContent = 'Post';
-    this.sub.textContent = this.cards.length === 0 ? 'Nothing in the box. Muse sends a card now and then.' : unread > 0 ? `${unread} new from Muse` : `${this.cards.length} ${this.cards.length === 1 ? 'card' : 'cards'} from Muse`;
-    const stage = this.stage.getBoundingClientRect();
-    const nodes = this.cards.map((card) => this.build(card));
-    this.stage.replaceChildren(...nodes);
-    const shown = Math.min(nodes.length, PILE_SHOWN);
-    nodes.forEach((node, k) => {
-      node.style.zIndex = String(100 - k);
-      node.dataset.index = String(k);
-      if (fly && mouth) {
-        node.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
-        node.style.setProperty('--y', `${mouth.y - stage.top - stage.height / 2}px`);
-        node.style.setProperty('--s', '0.12');
-        node.style.setProperty('--r', '-20deg');
-        node.style.opacity = '0';
-      }
-      const land = (): void => {
-        node.style.opacity = '';
-        place(node, stackSlot(k));
-      };
-      // the hidden cards land with the last one that shows
-      if (fly) void nextFrame().then(() => setTimeout(land, (shown - 1 - Math.min(k, shown - 1)) * 70));
-      else land();
+  /** Esc, or a click beside the card: from a card picked on a page back to the page, else the post closes. */
+  back(): void {
+    if (this.opening || this.closing) this.close();
+    else if (this.view !== 'today' && !this.board) this.showBoard();
+    else this.close();
+  }
+
+  /** The switch: From today shows today's deck; Favorite and Album open on their page. */
+  private show(view: View, mouth?: { x: number; y: number }): void {
+    this.view = view;
+    this.el.dataset.view = view;
+    for (const [v, b] of this.switches) b.setAttribute('aria-pressed', String(v === view));
+    if (view === 'today') {
+      this.board = false;
+      this.el.classList.remove('is-board');
+      this.layDeck(this.state.today, 0, mouth);
+    } else this.showBoard();
+    this.paintTickets();
+  }
+
+  // ---- the deck ---------------------------------------------------------------------
+
+  private layDeck(cards: Postcard[], top: number, mouth?: { x: number; y: number }): void {
+    this.cards = cards;
+    this.top = cards.length > 0 ? Math.min(top, cards.length - 1) : 0;
+    const nodes = cards.map((card, i) => {
+      const node = this.build(card);
+      node.dataset.index = String(i);
+      return node;
     });
+    // each in its place in the deck before it is on the page, so nothing transitions there from the middle
+    nodes.forEach((node, i) => this.arrange(node, i));
+    const from = mouth ? this.fromMouth(mouth) : null;
+    this.stage.replaceChildren(...nodes);
+    this.el.classList.toggle('is-empty', cards.length === 0);
+    if (from) {
+      // the deepest that shows comes out first, the top card last
+      const shown = Math.min(cards.length, DECK.length);
+      nodes.forEach((node, i) => {
+        const depth = this.depth(i);
+        if (depth < shown) flyOut(node, from, slot(depth), (shown - 1 - depth) * FLY_OUT.stagger);
+      });
+    }
+    this.paint();
+  }
+
+  /** The mailbox's mouth, from the middle of the stage the deck sits in. */
+  private fromMouth(mouth: { x: number; y: number }): { x: number; y: number } {
+    const stage = this.stage.getBoundingClientRect();
+    return { x: mouth.x - stage.left - stage.width / 2, y: mouth.y - stage.top - stage.height / 2 };
+  }
+
+  private depth(i: number): number {
+    return (i - this.top + this.cards.length) % this.cards.length;
+  }
+
+  private arrange(node: HTMLElement, i: number): void {
+    const depth = this.depth(i);
+    node.classList.toggle('is-top', depth === 0);
+    if (depth !== 0) node.classList.remove('is-flipped');
+    node.style.zIndex = String(100 - depth);
+    place(node, slot(depth));
+  }
+
+  private rearrange(): void {
+    [...this.stage.children].forEach((node, i) => {
+      if (!node.classList.contains('is-thrown')) this.arrange(node as HTMLElement, i);
+    });
+    this.paint();
+  }
+
+  private topNode(): HTMLElement | undefined {
+    return this.stage.children[this.top] as HTMLElement | undefined;
+  }
+
+  private step(d: 1 | -1): void {
+    if (this.board || this.pocketing || this.cards.length < 2) return;
+    this.top = (this.top + d + this.cards.length) % this.cards.length;
+    this.rearrange();
+  }
+
+  /** The head over the deck or the page, and the heart and star beside the top card. */
+  private paint(): void {
+    const card = this.board ? undefined : this.cards[this.top];
+    if (this.board) {
+      const cards = this.boardCards();
+      this.title.textContent = this.view === 'favorite' ? 'Favorites' : 'Album';
+      this.sub.textContent = `${cards.length} ${cards.length === 1 ? 'postcard' : 'postcards'}${this.view === 'favorite' ? ' you starred' : ' from Muse'}`;
+    } else if (!card) {
+      this.title.textContent = 'Post';
+      this.sub.textContent = '';
+    } else if (card.invitation) {
+      this.title.textContent = 'An invitation';
+      this.sub.textContent = `From ${card.invitation.fromName} · tap to open it`;
+    } else {
+      const withName = this.friendName(card);
+      const count = this.cards.length > 1 ? ` · ${this.top + 1} of ${this.cards.length}` : '';
+      this.title.textContent = card.place;
+      this.sub.textContent = `${dayName(card.day)}${withName ? ` · with ${withName}` : ''}${count}`;
+    }
+    const photo = card && !card.invitation ? card : null;
+    this.side.classList.toggle('is-on', photo !== null);
+    if (!photo) return;
+    const liked = this.state.cardLiked(photo.id);
+    const starred = this.state.cardFavorite(photo.id);
+    this.paintMark(this.likeButton, liked, liked ? ICONS.heartFilled : ICONS.heart, 'Like');
+    this.paintMark(this.starButton, starred, starred ? ICONS.starFilled : ICONS.star, 'Favorite');
+  }
+
+  private paintMark(b: HTMLButtonElement, on: boolean, icon: string, word: string): void {
+    // (unchanged, it is left alone: its pop plays once, when it turns on)
+    if (b.firstChild && b.getAttribute('aria-pressed') === String(on)) return;
+    b.setAttribute('aria-pressed', String(on));
+    b.classList.toggle('is-on', on);
+    b.innerHTML = `${icon}<span class="g-mark-word">${word}</span>`;
   }
 
   private stageClick(e: MouseEvent): void {
+    if (this.opening || this.closing) return;
     if (this.swallowClick) {
       this.swallowClick = false;
       return;
     }
     const node = (e.target as HTMLElement).closest<HTMLElement>('.g-pc');
     if (!node) {
-      if (this.view === 'focus') this.unfocus();
+      this.back();
       return;
     }
-    const k = Number(node.dataset.index);
-    if (this.view === 'focus' && k === this.focused) this.flip();
-    else this.focus(k);
+    const i = Number(node.dataset.index);
+    if (i === this.top) this.act();
+    else {
+      this.top = i;
+      this.rearrange();
+    }
   }
 
-  private focus(k: number): void {
-    if (k < 0 || k >= this.cards.length) return;
-    if (this.view !== 'focus') this.from = this.view;
-    this.view = 'focus';
-    this.el.dataset.view = 'focus';
-    this.focused = k;
-    const card = this.cards[k];
-    this.state.markRead(card.id);
-    const nodes = [...this.stage.children] as HTMLElement[];
-    nodes.forEach((node, i) => {
-      if (!node.classList.contains('is-thrown')) this.arrange(node, i);
-    });
-    if (card.invitation) setTimeout(() => nodes[k].classList.add('is-open'), 380);
-    this.likeButton.classList.toggle('is-liked', this.state.cardLiked(card.id));
-    this.likeButton.innerHTML = `${this.state.cardLiked(card.id) ? ICONS.heartFilled : ICONS.heart}<span>${this.state.cardLiked(card.id) ? 'Liked' : 'Like'}</span>`;
-    this.bar.classList.toggle('is-invitation', !!card.invitation);
-    this.title.textContent = card.invitation ? 'An invitation' : card.place;
-    this.sub.textContent = card.invitation ? `From ${this.friendName(card) ?? 'a friend'}` : `${dayName(card.day)}${this.friendName(card) ? ` · with ${this.friendName(card)}` : ''}`;
+  /** A tap on the top card: a postcard turns over, an envelope gives up its ticket. */
+  private act(): void {
+    const card = this.cards[this.top];
+    const node = this.topNode();
+    if (!card || !node || this.pocketing) return;
+    if (card.invitation) void this.pocket(card, node);
+    else node.classList.toggle('is-flipped');
   }
 
-  /** Card i up close, or in the pile under the one that is. */
-  private arrange(node: HTMLElement, i: number): void {
-    const on = i === this.focused;
-    node.classList.toggle('is-focus', on);
-    node.classList.remove('is-flipped');
-    if (!on) node.classList.remove('is-open');
-    node.style.zIndex = on ? '200' : String(100 - i);
-    place(node, on ? HELD : underSlot(i, this.focused));
+  private key(e: KeyboardEvent): void {
+    if (!this.isOpen || this.opening || this.closing || this.board || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.stopImmediatePropagation();
+      this.step(e.key === 'ArrowRight' ? 1 : -1);
+    } else if (e.key === ' ' && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      this.act();
+    }
   }
+
+  // ---- swiping: the top card thrown away, any way, and the next comes up ---------------
 
   private grab(e: PointerEvent): void {
+    if (this.opening || this.closing) return;
     this.swallowClick = false;
     const target = e.target as HTMLElement;
-    const node = target.closest<HTMLElement>('.g-pc.is-focus');
-    if (this.view !== 'focus' || this.drag || !e.isPrimary || e.button !== 0 || !node || target.closest('button')) return;
+    const node = target.closest<HTMLElement>('.g-pc.is-top');
+    if (this.board || this.pocketing || this.drag || !e.isPrimary || e.button !== 0 || !node || target.closest('button')) return;
     node.setPointerCapture(e.pointerId);
     this.drag = { pointer: e.pointerId, node, x: e.clientX, y: e.clientY, moved: false, trail: [{ x: e.clientX, y: e.clientY, t: e.timeStamp }] };
   }
@@ -336,10 +566,10 @@ export class Mail {
     d.node.classList.add('is-dragging');
     d.trail.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
     while (d.trail.length > 2 && e.timeStamp - d.trail[0].t > 90) d.trail.shift();
-    place(d.node, { ...HELD, x: dx, y: HELD.y + dy, r: dx * 0.04 });
+    place(d.node, { ...DECK[0], x: dx, y: DECK[0].y + dy, r: dx * 0.04 });
   }
 
-  /** Let go: thrown far or fast enough, the card flies off and the next comes up; else it springs back. */
+  /** Let go: thrown far or fast enough, the card flies off and goes to the bottom of the deck; else it springs back. */
   private release(e: PointerEvent, cancelled: boolean): void {
     const d = this.drag;
     if (!d || e.pointerId !== d.pointer) return;
@@ -355,17 +585,19 @@ export class Mail {
     const vy = (e.clientY - from.y) / dt;
     const flung = Math.hypot(vx, vy) > THROW_SPEED;
     if (cancelled || (!flung && Math.hypot(dx, dy) < THROW_DISTANCE)) {
-      place(d.node, HELD);
+      place(d.node, DECK[0]);
       return;
     }
     const [ux, uy] = flung ? [vx, vy] : [dx, dy];
     const far = Math.hypot(window.innerWidth, window.innerHeight) / Math.hypot(ux, uy);
     const node = d.node;
     node.classList.add('is-thrown');
-    place(node, { ...HELD, x: dx + ux * far, y: HELD.y + dy + uy * far, r: dx * 0.04 + Math.sign(ux) * 24 });
-    this.step(1);
-    // back into the pile out of sight, then it shows there
-    setTimeout(() => {
+    place(node, { ...DECK[0], x: dx + ux * far, y: DECK[0].y + dy + uy * far, r: dx * 0.04 + Math.sign(ux) * 24 });
+    this.top = (this.top + 1) % this.cards.length;
+    this.rearrange();
+    // under the deck out of sight, then it shows there
+    this.later(() => {
+      if (!node.isConnected) return;
       node.style.transition = 'none';
       this.arrange(node, Number(node.dataset.index));
       void node.offsetWidth;
@@ -374,107 +606,135 @@ export class Mail {
     }, THROW_MS);
   }
 
-  private unfocus(): void {
-    if (this.view !== 'focus') return;
-    if (this.from === 'album') {
-      this.showAlbum();
-      return;
-    }
-    this.view = 'stack';
-    this.el.dataset.view = 'stack';
-    this.layStack(false);
-  }
-
-  private step(d: 1 | -1): void {
-    if (this.view !== 'focus' || this.cards.length === 0) return;
-    this.focus((this.focused + d + this.cards.length) % this.cards.length);
-  }
-
-  private flip(): void {
-    const node = this.stage.children[this.focused] as HTMLElement | undefined;
-    if (!node || this.cards[this.focused]?.invitation) return;
-    node.classList.toggle('is-flipped');
-  }
+  // ---- like and favorite ----------------------------------------------------------------
 
   private like(): void {
-    const card = this.cards[this.focused];
-    if (!card) return;
-    const liked = this.state.toggleCardLike(card.id);
-    this.likeButton.classList.toggle('is-liked', liked);
-    this.likeButton.innerHTML = `${liked ? ICONS.heartFilled : ICONS.heart}<span>${liked ? 'Liked' : 'Like'}</span>`;
-    const node = this.stage.children[this.focused] as HTMLElement | undefined;
-    node?.classList.toggle('is-liked', liked);
+    const card = this.cards[this.top];
+    if (!card || card.invitation) return;
+    this.state.toggleCardLike(card.id);
+    this.paint();
   }
 
-  /** The focused card shrinks into the album; the next comes forward. */
-  private async putAway(): Promise<void> {
-    const card = this.cards[this.focused];
-    const node = this.stage.children[this.focused] as HTMLElement | undefined;
-    if (!card || !node) return;
-    const target = this.albumButton.getBoundingClientRect();
-    const stage = this.stage.getBoundingClientRect();
-    node.style.setProperty('--x', `${target.left + target.width / 2 - stage.left - stage.width / 2}px`);
-    node.style.setProperty('--y', `${target.top + target.height / 2 - stage.top - stage.height / 2}px`);
-    node.style.setProperty('--s', '0.08');
-    node.style.setProperty('--r', '-12deg');
-    node.classList.add('is-away');
-    this.albumButton.classList.add('is-catching');
-    await wait(420);
-    this.albumButton.classList.remove('is-catching');
-    this.state.putAway(card.id);
-    const index = this.focused;
-    this.view = 'stack';
-    this.layStack(false);
-    if (this.cards.length > 0) this.focus(Math.min(index, this.cards.length - 1));
+  private favorite(): void {
+    const card = this.cards[this.top];
+    if (!card || card.invitation) return;
+    this.state.toggleCardFavorite(card.id);
+    this.paint();
   }
 
-  private toggleAlbum(): void {
-    if (this.view === 'album') {
-      this.view = 'stack';
-      this.el.classList.remove('is-album');
-      this.el.dataset.view = 'stack';
-      this.layStack(false);
-    } else this.showAlbum();
+  // ---- the pages: favorites and the album ------------------------------------------------
+
+  private boardCards(): Postcard[] {
+    const photos = this.state.postcards.filter((p) => !p.invitation);
+    return this.view === 'favorite' ? photos.filter((p) => this.state.cardFavorite(p.id)) : photos;
   }
 
-  /** Every card Muse has sent, held at its corners on the album's page. */
-  private showAlbum(): void {
-    this.view = 'album';
-    this.el.dataset.view = 'album';
-    this.el.classList.add('is-album');
-    this.title.textContent = 'Album';
-    const all = this.state.postcards.filter((p) => !p.invitation);
-    this.sub.textContent = `${all.length} postcards from Muse`;
-    const grid = el('div', 'g-album-page');
-    all.forEach((card, k) => {
-      const slot = el('button', 'g-album-slot');
-      slot.type = 'button';
-      slot.style.setProperty('--r', `${Math.sin((k + 2) * 51.3) * 2.2}deg`);
+  private showBoard(): void {
+    this.board = true;
+    this.el.classList.add('is-board');
+    this.paintBoard(true);
+  }
+
+  /** The page, a scrapbook's: each card a polaroid taped or clipped there, its place and day written under its
+   *  photo, a heart after a liked one's; some with a scribbled frame or a sticker. */
+  private paintBoard(fromTop: boolean): void {
+    const cards = this.boardCards();
+    const page = el('div', 'g-album-page');
+    cards.forEach((card, k) => {
+      const scrap = scrapOf(card.id);
+      const slotEl = el('button', 'g-album-slot');
+      slotEl.type = 'button';
+      slotEl.dataset.id = card.id;
+      slotEl.setAttribute('aria-label', `${card.place}, ${shortDate(card.day)}`);
+      slotEl.style.setProperty('--r', `${scrap.tilt.toFixed(2)}deg`);
+      const snap = el('span', 'g-snap');
+      snap.style.cssText = paperOf(scrap.tint);
       const img = el('img');
       img.src = card.image;
       img.alt = card.place;
       img.draggable = false;
-      slot.append(img, el('span', 'g-corner g-corner-tl'), el('span', 'g-corner g-corner-tr'), el('span', 'g-corner g-corner-bl'), el('span', 'g-corner g-corner-br'));
-      const label = el('span', 'g-album-label', `${card.place} · ${shortDate(card.day)}`);
-      slot.append(label);
-      if (this.state.cardLiked(card.id)) {
-        const heart = el('span', 'g-album-heart');
-        heart.innerHTML = ICONS.heartFilled;
-        slot.append(heart);
-      }
-      slot.addEventListener('click', () => {
-        // look at it up close, among all the album's cards
-        this.from = 'album';
-        this.el.classList.remove('is-album');
-        this.cards = all;
-        this.stage.replaceChildren(...all.map((c) => this.build(c)));
-        [...this.stage.children].forEach((n, i) => ((n as HTMLElement).dataset.index = String(i)));
-        this.view = 'stack';
-        this.focus(k);
+      const label = el('span', 'g-album-label');
+      // (a flex row trims its text's edge spaces: these hold)
+      label.append(el('span', 'g-album-place', card.place), `\u00a0·\u00a0${shortDate(card.day)}`);
+      if (this.state.cardLiked(card.id)) label.append(el('span', 'g-album-heart', '♥'));
+      snap.append(img, label);
+      slotEl.append(snap, ...trimmings(scrap, String(k)));
+      slotEl.addEventListener('click', () => {
+        this.board = false;
+        this.el.classList.remove('is-board');
+        this.layDeck(cards, k);
       });
-      grid.append(slot);
+      page.append(slotEl);
     });
-    this.album.replaceChildren(grid);
-    this.album.scrollTop = 0;
+    const blank = this.view === 'favorite' ? 'No favorites yet. Tap the star beside a card to keep it here.' : 'No postcards yet. Muse sends one now and then.';
+    const scroll = this.album.scrollTop;
+    this.album.replaceChildren(cards.length > 0 ? page : el('p', 'g-album-empty', blank));
+    this.album.scrollTop = fromTop ? 0 : scroll;
+    this.paint();
+  }
+
+  // ---- tickets ------------------------------------------------------------------------------
+
+  private paintTickets(): void {
+    const tickets = this.state.tickets;
+    const key = ids(tickets);
+    this.el.classList.toggle('has-tickets', tickets.length > 0);
+    if (key === this.ticketIds) return;
+    this.ticketIds = key;
+    this.tickets.replaceChildren(
+      ...tickets.map((card) => {
+        const t = ticket('button', card);
+        t.type = 'button';
+        t.setAttribute('aria-label', `Travel to ${card.invitation!.worldName}`);
+        t.classList.toggle('is-incoming', card.id === this.pocketing);
+        t.addEventListener('click', () => this.actions.travel(card.id));
+        return t;
+      }),
+    );
+  }
+
+  /** An envelope opened: its flap lifts, its ticket slides out, flies to its place among the tickets and lands there. */
+  private async pocket(card: Postcard, node: HTMLElement): Promise<void> {
+    const operation = this.operation;
+    const motion = !reducedMotion();
+    this.pocketing = card.id;
+    this.side.classList.remove('is-on');
+    node.classList.add('is-open');
+    await wait(motion ? 950 : 0);
+    if (operation !== this.operation) return;
+    if (!node.isConnected) {
+      this.pocketing = null;
+      this.refresh();
+      return;
+    }
+    // opened: it is a ticket now, and the column makes room for it
+    this.state.markRead(card.id);
+    this.paintTickets();
+    const target = this.tickets.querySelector<HTMLElement>(`.g-ticket[data-id="${CSS.escape(card.id)}"]`);
+    const inner = node.querySelector<HTMLElement>('.g-ticket');
+    if (target && inner) {
+      const to = target.getBoundingClientRect();
+      const from = inner.getBoundingClientRect();
+      const box = node.getBoundingClientRect();
+      const stage = this.stage.getBoundingClientRect();
+      const s = to.width / from.width;
+      // the node turns about its centre: place it so its ticket's centre lands on the slot's
+      const nx = box.left + box.width / 2;
+      const ny = box.top + box.height / 2;
+      const x = to.left + to.width / 2 - (stage.left + stage.width / 2) - s * (from.left + from.width / 2 - nx);
+      const y = to.top + to.height / 2 - (stage.top + stage.height / 2) - s * (from.top + from.height / 2 - ny);
+      node.classList.add('is-pocketed');
+      place(node, { x, y, r: Number.parseFloat(getComputedStyle(target).getPropertyValue('--tilt')) || 0, s, shown: true });
+      await wait(motion ? 620 : 0);
+      if (operation !== this.operation) return;
+      target.classList.remove('is-incoming');
+      target.classList.add('is-landed');
+    }
+    this.pocketing = null;
+    const index = this.top;
+    const fresh = this.state.today;
+    this.layDeck(fresh, Math.min(index, Math.max(0, fresh.length - 1)));
   }
 }
+
+const ids = (cards: readonly Postcard[]): string => cards.map((c) => c.id).join('|');

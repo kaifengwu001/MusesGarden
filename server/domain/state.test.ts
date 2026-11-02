@@ -254,6 +254,19 @@ describe('the owner likes things in the garden', () => {
     expect(life.state.likes.get(selfie.id)).toEqual({ liked: true, firstAt: later });
   });
 
+  it('keeps a starred photo until it is unstarred, and a star nudges nothing, where a like of the same photo does', () => {
+    const { life, photo } = lived();
+    const before = life.state;
+    life.push(later, { kind: 'owner.favorited', photo: photo.id, favorite: true });
+    expect([...life.state.favoritePhotos]).toEqual([photo.id]);
+    expect(life.state.interests).toEqual(before.interests);
+    expect(life.state.likes).toEqual(before.likes);
+    life.push(later + HOUR_MS, { kind: 'owner.favorited', photo: photo.id, favorite: false });
+    expect(life.state.favoritePhotos.size).toBe(0);
+    life.push(later + HOUR_MS, { kind: 'owner.liked', target: { photo: photo.id }, liked: true });
+    expect(salience(life.state, 'Pigment')).toBeGreaterThan(salience(before, 'Pigment'));
+  });
+
   it('does nothing with a like whose target is not in the fold, or an unlike of something never liked', () => {
     const { life, pigment } = lived();
     const before = life.state;
@@ -262,5 +275,17 @@ describe('the owner likes things in the garden', () => {
     life.push(later, { kind: 'owner.liked', target: { find: pigment.id }, liked: false });
     expect(life.state.interests).toEqual(before.interests);
     expect(life.state.likes.size).toBe(0);
+  });
+});
+
+describe('the friend group', () => {
+  it('starts at the Muses of people the owner shares with, and the owner’s settings move it', () => {
+    const life = new Life();
+    expect(life.state.reach).toBe('shared');
+    life.push(t('2026-11-03T09:00:00-08:00'), { kind: 'owner.settings', reach: 'everyone' });
+    life.push(t('2026-11-03T10:00:00-08:00'), { kind: 'owner.settings', basketTime: '18:30' });
+    expect(life.state.reach).toBe('everyone');
+    life.push(t('2026-11-03T11:00:00-08:00'), { kind: 'owner.settings', reach: 'known' });
+    expect(life.state.reach).toBe('known');
   });
 });

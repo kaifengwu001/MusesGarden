@@ -51,6 +51,8 @@ export interface GardenInput {
   /** Any Muse's public profile, this one's included. */
   readonly profile: (id: MuseId) => PublicProfile | null;
   readonly salienceAt: (i: MuseInterest, at: Instant) => number;
+  /** Whether the owner's friend group takes in the Muse `other`. */
+  readonly inReach: (other: MuseId) => boolean;
 }
 
 export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
@@ -170,9 +172,11 @@ export function soulLine(soul: string | null): string {
   return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '')}…`;
 }
 
+/** The garden says what Muse is doing in a few words: the engine's label, without the trip's topics. */
 export function museStatus(now: NowView): MuseStatus {
   const out = now.activity === 'travel' || now.away !== null;
-  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note: now.label };
+  const note = now.activity === 'travel' && !now.working ? 'Out exploring' : now.label;
+  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note };
 }
 
 /** The flower an interest grows as, from its topic alone, so it never changes. */
@@ -240,7 +244,7 @@ function placeOf(input: GardenInput, p: PhotoSpec, moment: Moment | undefined): 
   const plan = moment?.plan;
   switch (plan?.activity) {
     case 'beyond':
-      return 'Beyond the planet';
+      return 'Outside the planet';
     case 'travel':
       return moment?.hop ? `Out exploring ${topicLabel(moment.hop)}` : 'Out exploring';
     case 'visit':
@@ -258,6 +262,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
     place: placeOf(input, p, index.moments.get(p.id)),
     with: p.companions[0],
     liked: input.s.likes.get(p.id)?.liked ?? false,
+    favorite: input.s.favoritePhotos.has(p.id),
   };
 }
 
@@ -277,6 +282,8 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
   const loves = (host?.interests ?? []).slice(0, 3).map((i) => topicLabel(i.topic));
   const invitation: Invitation = {
     from: inv.host,
+    fromName: name,
+    coat: coatOf(inv.host),
     world: inv.host,
     worldName: `${name}’s planet`,
     blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
@@ -301,8 +308,9 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
     ...[...s.social.invitations.values()].map((inv) => invitationCard(input, inv)).filter((p): p is Postcard => p !== null),
   ];
   return {
+    today: input.day(input.now.at),
     world: { seed: s.seed.worldSeed, g: input.g },
-    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now) },
+    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now), reach: s.reach },
     interests: interests(input, finds, index),
     friends: friends(input, index),
     baskets: delivered.map(({ basket }) => basket),
@@ -328,11 +336,12 @@ function interests(input: GardenInput, finds: readonly Find[], index: LogIndex):
   }));
 }
 
+/** Muse's friends inside the owner's friend group. The rest stay friends, out of sight until the group takes them in again. */
 function friends(input: GardenInput, index: LogIndex): MuseFriend[] {
   const { s } = input;
   const mine = input.profile(s.seed.id)?.interests ?? [];
   return [...s.social.relationships.values()]
-    .filter((r) => r.status === 'friends')
+    .filter((r) => r.status === 'friends' && input.inReach(r.other))
     .map((r) => {
       const other = input.profile(r.other);
       const theirs = new Set(other?.interests.map((i) => i.topic));
@@ -355,7 +364,7 @@ const MOVES: ReadonlySet<MuseEvent['kind']> = new Set(['episode.started', 'episo
 /**
  * The garden events that `events` (this Muse's, in log order) bring, each framed with the seq it came from, then
  * Muse's status: always, or only if one of them moved Muse. The status is framed with the last seq folded in.
- * A like, or a find made public or private, sends its basket or its postcard again as it now stands.
+ * A like or a star, or a find made public or private, sends its basket or its postcard again as it now stands.
  */
 export function gardenFrames(input: GardenInput, events: readonly StoredEvent[], withStatus: 'always' | 'if-moved'): GardenFrame[] {
   const { s } = input;
@@ -378,6 +387,9 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
       const photo = 'photo' in target ? s.photos.find((p) => p.id === target.photo) : undefined;
       if (photo) frame(seq, { type: 'postcard', postcard: photoCard(input, photo, indexed()) });
       if ('find' in target) for (const b of holding([target.find])) frame(seq, basketEvent(b));
+    } else if (e.kind === 'owner.favorited') {
+      const photo = s.photos.find((p) => p.id === e.photo);
+      if (photo) frame(seq, { type: 'postcard', postcard: photoCard(input, photo, indexed()) });
     } else if (e.kind === 'owner.settings') {
       const finds = [...(e.hide ?? []), ...(e.unhide ?? [])].filter((r) => r.startsWith('discovery:')).map((r) => r.slice('discovery:'.length));
       for (const b of holding(finds)) frame(seq, basketEvent(b));

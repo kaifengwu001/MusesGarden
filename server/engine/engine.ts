@@ -21,6 +21,7 @@ import type {
   MuseId,
   MuseSeed,
   MuseState,
+  PhotoId,
   PhotoSpec,
   QuestionId,
   ReduceCore,
@@ -261,6 +262,19 @@ export class Engine {
       const friend = photo && (photo.subject === 'friend' || photo.subject === 'new-friend') ? photo.companions.at(0) : undefined;
       const tx = this.tx(this.clockAt);
       tx.emit(museId, { kind: 'owner.liked', target, liked, ...(friend ? { friend } : {}) });
+      this.commit(tx);
+      return true;
+    });
+  }
+
+  /** A postcard starred or unstarred in the garden. False when Muse took no such photo. Starring what is starred records nothing. */
+  favorite(museId: MuseId, photo: PhotoId, favorite: boolean): Promise<boolean> {
+    return this.exclusive(() => {
+      const s = this.must(museId);
+      if (!s.photos.some((p) => p.id === photo)) return false;
+      if (s.favoritePhotos.has(photo) === favorite) return true;
+      const tx = this.tx(this.clockAt);
+      tx.emit(museId, { kind: 'owner.favorited', photo, favorite });
       this.commit(tx);
       return true;
     });
@@ -509,6 +523,8 @@ export class Engine {
     const bs = tx.state(p.other);
     const still = (s: MuseState, n: number) => s.episode?.n === n && CAN_MEET[p.where](s);
     if (!still(as, p.n) || !still(bs, p.otherN)) return;
+    // Drawn while both friend groups allowed it; either owner may have narrowed theirs since.
+    if (!this.deps.social.inReach(as, p.other) || !this.deps.social.inReach(bs, a)) return;
     const k = as.social.relationships.get(p.other)?.encounters ?? 0;
     const out = this.deps.social.encounter(as, bs, p.where, tx.now, this.deps.drawFor(a, p.n * 64 + 1 + k));
     tx.emitAll(a, out.self);

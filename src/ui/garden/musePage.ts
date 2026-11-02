@@ -1,33 +1,33 @@
 import type { GardenState } from '../../garden/state';
+import type { Reach } from '../../garden/types';
 import { agoPhrase, el, shortDate, toggle } from './dom';
 import { topicColour } from './findCard';
 import { ICONS } from './icons';
 import { Sheet } from './sheet';
 
-// Muse's page: who it is (the line its soul.md gives, all it carries into
-// the garden), where it is, and three tabs. Its interests, each shared with
-// other Muses or kept private (private ones never leave the planet). Its
-// friends, other Muses it has met by what they share, named by their own
-// names only, tagged when their human is your friend on Instagram or
-// Facebook. And what the garden keeps private, in plain words.
+// Muse's page: who it is (the line its soul.md gives), what it is doing,
+// and three tabs. Its interests, each shared with other Muses or kept
+// private. Its friends inside the friend group, named by their own names
+// only, tagged when their human is your friend on Instagram or Facebook.
+// And privacy: what the garden gets from Muse, what other Muses see, and
+// how far out Muse makes friends.
 
 type Tab = 'interests' | 'friends' | 'privacy';
 
-/** Local preferences on the privacy tab (not sent anywhere yet: the backend decides what they mean). */
-const PREFS_KEY = 'muses-garden.garden.privacy.v1';
-const PREFS = [
-  { id: 'visits', label: 'Friends’ Muses can visit Muse’s garden', on: true },
-  { id: 'strangers', label: 'Invitations from Muses you haven’t met', on: false },
-  { id: 'known', label: 'Say when a Muse’s human is your friend on Instagram or Facebook', on: true },
-] as const;
+/** The friend group's steps, narrowest first, and the line that says what each takes in. */
+const REACH: Readonly<Record<Reach, { readonly step: string; readonly line: string }>> = {
+  shared: { step: 'People I share with', line: 'Muses of people you’ve shared Muse with.' },
+  known: { step: '+ Instagram & Facebook', line: 'Also the Muses of your Instagram and Facebook friends.' },
+  everyone: { step: 'Everyone', line: 'Also Muses it meets traveling outside the planet.' },
+};
 
-function readPrefs(): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Record<string, boolean>;
-  } catch {
-    return {};
-  }
-}
+const GETS: readonly (readonly [string, string])[] = [
+  ['Its soul.md. ', 'A few lines on who Muse is becoming.'],
+  ['Topics from its memory.md. ', 'A filter keeps only interests, like “botanical illustration”. The file itself stays in the Muse app.'],
+  ['When Muse is busy, and your timezone. ', 'Times only, never what a task is.'],
+  ['Never your chats. ', 'Nothing you say to Muse comes here.'],
+];
+const SEEN: readonly (readonly [string, string])[] = [['Muse’s name, its Shared interests, and the finds in them. ', 'Never your name, and nothing marked Private.']];
 
 export class MuseSheet extends Sheet {
   private tab: Tab = 'interests';
@@ -36,7 +36,6 @@ export class MuseSheet extends Sheet {
     parent: HTMLElement,
     private readonly state: GardenState,
     private readonly faces: { muse: string; friend: string },
-    private readonly setHome: (home: boolean) => void,
   ) {
     super(parent, 'Muse', '', 'g-muse');
   }
@@ -46,7 +45,7 @@ export class MuseSheet extends Sheet {
     if (!s) return;
     const status = this.state.status;
     const sub = this.el.querySelector('.g-sheet-sub');
-    if (sub) sub.textContent = status.home ? `At home · ${status.note ?? 'in its cottage'}` : `Out exploring · ${status.note ?? 'back later'}`;
+    if (sub) sub.textContent = this.state.statusNote;
     const hero = el('div', 'g-muse-hero');
     const face = el('span', `g-muse-face${status.home ? '' : ' is-out'}`);
     face.style.backgroundImage = `url(${this.faces.muse})`;
@@ -72,11 +71,14 @@ export class MuseSheet extends Sheet {
     if (this.tab === 'interests') this.interests(panel);
     else if (this.tab === 'friends') this.friends(panel);
     else this.privacy(panel);
+    const stepping = document.activeElement?.closest('.g-reach-steps') != null;
     this.body.replaceChildren(hero, tabs, panel);
+    // (picking a step renders the page again: keep the keyboard on the group)
+    if (stepping) panel.querySelector<HTMLInputElement>('.g-reach-steps input:checked')?.focus();
   }
 
   private interests(panel: HTMLElement): void {
-    panel.append(el('p', 'g-intro', 'What Muse is into grows as it explores, and goes into its soul.md. Shared interests are all other Muses can see of it, and how it finds friends; private ones never leave its planet.'));
+    panel.append(el('p', 'g-intro', 'Muse picks up interests as it explores and writes them into its soul.md. Other Muses see the Shared ones, and Muse makes friends through them. Private ones stay between you and Muse.'));
     const list = el('ul', 'g-interests');
     for (const interest of this.state.interests) {
       const li = el('li', 'g-interest');
@@ -92,7 +94,7 @@ export class MuseSheet extends Sheet {
 
   private friends(panel: HTMLElement): void {
     const friends = this.state.snapshot?.friends ?? [];
-    panel.append(el('p', 'g-intro', 'Muses that Muse has met. It chooses whom to meet by the interests they share; you only ever see Muses’ own names.'));
+    if (friends.length === 0) panel.append(el('p', 'g-intro', 'No friends in Muse’s friend group yet.'));
     const list = el('ul', 'g-friends');
     for (const f of friends) {
       const li = el('li', 'g-friend');
@@ -127,39 +129,38 @@ export class MuseSheet extends Sheet {
 
   private privacy(panel: HTMLElement): void {
     const card = el('div', 'g-privacy-card');
-    card.append(el('h3', '', 'What Muse brings into the garden'));
-    const items = el('ul', 'g-privacy-list');
-    for (const [strong, rest] of [
-      ['Its soul.md, ', 'a few lines on who it is becoming. That is all.'],
-      ['Never its memory, ', 'your messages, or anything about you.'],
-      ['Only Muses’ names. ', 'No human’s name appears in any garden, yours or a friend’s.'],
-      ['Shared interests only. ', 'Private ones stay on Muse’s planet.'],
-    ]) {
-      const li = el('li');
-      li.append(el('strong', '', strong), rest);
-      items.append(li);
+    for (const [title, items] of [
+      ['What the garden gets from Muse', GETS],
+      ['What other Muses see', SEEN],
+    ] as const) {
+      const list = el('ul', 'g-privacy-list');
+      for (const [strong, rest] of items) {
+        const li = el('li');
+        li.append(el('strong', '', strong), rest);
+        list.append(li);
+      }
+      card.append(el('h3', '', title), list);
     }
-    card.append(items);
-    panel.append(card);
-    const prefs = readPrefs();
-    const list = el('div', 'g-prefs');
-    for (const p of PREFS) {
-      list.append(
-        toggle(p.label, prefs[p.id] ?? p.on, (on) => {
-          const next = { ...readPrefs(), [p.id]: on };
-          try {
-            localStorage.setItem(PREFS_KEY, JSON.stringify(next));
-          } catch {
-            // forgotten in a private window
-          }
-        }),
-      );
+    panel.append(card, this.friendGroup());
+  }
+
+  private friendGroup(): HTMLElement {
+    const reach = this.state.reach;
+    const group = el('fieldset', 'g-reach');
+    group.append(el('legend', '', 'Muse’s friend group'));
+    const steps = el('div', 'g-reach-steps');
+    for (const [id, { step }] of Object.entries(REACH) as [Reach, (typeof REACH)[Reach]][]) {
+      const label = el('label', `g-reach-step${id === reach ? ' is-on' : ''}`);
+      const input = el('input');
+      input.type = 'radio';
+      input.name = 'g-reach';
+      input.value = id;
+      input.checked = id === reach;
+      input.addEventListener('change', () => this.state.setReach(id));
+      label.append(input, el('span', '', step));
+      steps.append(label);
     }
-    panel.append(list);
-    // a preview of the garden while Muse is out (until the backend says where Muse is)
-    const demo = el('div', 'g-demo');
-    demo.append(el('p', 'g-demo-label', 'Preview'));
-    demo.append(toggle('Muse is out exploring', !this.state.status.home, (on) => this.setHome(!on)));
-    panel.append(demo);
+    group.append(steps, el('p', 'g-reach-line', REACH[reach].line));
+    return group;
   }
 }

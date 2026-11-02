@@ -1,26 +1,36 @@
 import type { Find, Interest } from '../../garden/types';
-import { button, duration, el, toggle } from './dom';
+import { basketCalled, basketWhen, button, duration, el, toggle } from './dom';
 import { ICONS } from './icons';
 
-// A find's card, standing over its bed on a thin line: tap a bed and the
-// line rises from it, then the card pops up at its top. The card is drawn
+// A find's card, standing over its bed: tap a bed and the card rises there,
+// its basket's day at its head. The card is drawn
 // from the find's fields (never an embed): a reel or a video with its
 // picture and length, a post with its picture and caption, an article with
 // its headline, the site and the time it takes to read. Under it a heart
 // (a like goes back to Muse and pins the find on your map), the link out,
 // the find's topic, and a Public/Private switch (a private find never
 // leaves the planet: other Muses don't see it). Swipe it, or press the
-// arrows (← → on a keyboard), for the next find; the camera flies there and
-// the next card rises.
+// arrows (← → on a keyboard), for the find before or after it in time, as
+// on the basket's timeline; the camera flies there and the next card rises.
+// An arrow whose step goes into another day's basket turns blue and says so.
 
 export interface CardContext {
-  /** 'Today’s basket', 'Tuesday’s basket'. */
-  basket: string;
+  /** Its basket's day (ISO). */
+  day: string;
+  /** What its head calls where it is shown from, in place of its basket's day (Muse's favourites, on the shelf in its hut). */
+  from?: string;
   index: number;
   total: number;
   liked: boolean;
   /** Whether other Muses may see it. */
   shared: boolean;
+  /** The basket a step back (older) or forward (newer) goes into, by its day (ISO), and whether that step goes round the end; null within this basket. */
+  crossing: { back: Crossing | null; forward: Crossing | null };
+}
+
+export interface Crossing {
+  readonly day: string;
+  readonly wraps: boolean;
 }
 
 export interface CardActions {
@@ -123,10 +133,30 @@ export function cardBody(find: Find, interest: Interest | undefined): HTMLElemen
   return body;
 }
 
+/** How long a card put away takes to leave (s): its layer stays up till then. */
+const LEAVE = 0.45;
+
+/** `v` (px) to the pixel, or `last` while `v` is still within a little over half a pixel of it. */
+const steady = (v: number, last: number): number => (Math.abs(v - last) < 0.6 ? last : Math.round(v));
+
+/** What the line over an arrow says as its step goes into another basket: the next or the previous, or round the end. */
+const CROSSING = {
+  forward: { step: 'Going to the next basket', round: 'Going back to the first basket' },
+  back: { step: 'Going to the previous basket', round: 'Going to the latest basket' },
+} as const;
+
+/** An arrow whose step goes into another day's basket (null: it stays in this one): blue, its line over it. */
+function crossing(arrow: HTMLButtonElement, hint: HTMLElement, way: keyof typeof CROSSING, into: Crossing | null, label: string): void {
+  const text = into ? `${into.wraps ? CROSSING[way].round : CROSSING[way].step} (${basketWhen(into.day)})` : '';
+  arrow.classList.toggle('is-crossing', into !== null);
+  arrow.setAttribute('aria-label', text || label);
+  arrow.title = text || label;
+  hint.textContent = text;
+  hint.classList.toggle('is-on', into !== null);
+}
+
 export class FindCard {
   readonly el: HTMLElement;
-  private readonly stem: SVGLineElement;
-  private readonly dot: SVGCircleElement;
   private readonly card: HTMLElement;
   private readonly kicker: HTMLElement;
   private readonly content: HTMLElement;
@@ -136,21 +166,18 @@ export class FindCard {
   private readonly share: HTMLElement;
   private readonly prev: HTMLButtonElement;
   private readonly next: HTMLButtonElement;
-  /** The line's rise: 0 at the bed, 1 at the card; animated toward `riseTo`. */
-  private rise = 0;
-  private riseTo = 0;
+  private readonly prevHint: HTMLElement;
+  private readonly nextHint: HTMLElement;
+  /** Seconds the layer stays up after the card is put away, while it leaves. */
+  private leaving = 0;
+  /** Where the card was last put (px). */
+  private readonly placed = { left: Number.NaN, top: Number.NaN };
   private open = false;
   private swipe: { id: number; x: number; y: number; dx: number } | null = null;
   private findId: string | null = null;
 
   constructor(parent: HTMLElement, private readonly actions: CardActions) {
     this.el = el('div', 'g-findlayer');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.classList.add('g-stem');
-    this.stem = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    this.dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    this.dot.setAttribute('r', '5');
-    svg.append(this.stem, this.dot);
     this.card = el('article', 'g-card');
     this.card.setAttribute('aria-live', 'polite');
     this.kicker = el('p', 'g-card-kicker');
@@ -167,9 +194,11 @@ export class FindCard {
     this.share.title = 'Public: other Muses can see it. Private: it never leaves your planet.';
     const close = button('g-card-close', 'Close', ICONS.close, () => actions.close());
     this.card.append(this.kicker, close, this.content, foot, this.share);
-    this.prev = button('g-step g-step-prev', 'Previous find', ICONS.left, () => actions.step(-1));
-    this.next = button('g-step g-step-next', 'Next find', ICONS.right, () => actions.step(1));
-    this.el.append(svg, this.card, this.prev, this.next);
+    this.prev = button('g-step g-step-prev', 'Earlier find', ICONS.left, () => actions.step(-1));
+    this.next = button('g-step g-step-next', 'Later find', ICONS.right, () => actions.step(1));
+    this.prevHint = el('span', 'g-step-hint g-step-hint-prev');
+    this.nextHint = el('span', 'g-step-hint g-step-hint-next');
+    this.el.append(this.card, this.prev, this.next, this.prevHint, this.nextHint);
     parent.append(this.el);
     this.card.addEventListener('pointerdown', (e) => this.swipeStart(e));
     this.card.addEventListener('pointermove', (e) => this.swipeMove(e));
@@ -181,12 +210,15 @@ export class FindCard {
     return this.open ? this.findId : null;
   }
 
-  /** Fill the card for a find and let it rise (the line first, then the card). */
+  /** Fill the card for a find and let it rise. */
   show(find: Find, interest: Interest | undefined, context: CardContext): void {
     this.findId = find.id;
     this.content.replaceChildren(cardBody(find, interest));
     this.card.className = `g-card g-card--${find.media.kind}`;
-    this.kicker.textContent = `${context.basket} · ${context.index + 1} of ${context.total}`;
+    const called = context.from ?? basketCalled(context.day);
+    this.kicker.textContent = `${called[0].toUpperCase()}${called.slice(1)} · ${context.index + 1} of ${context.total}`;
+    crossing(this.prev, this.prevHint, 'back', context.crossing.back, 'Earlier find');
+    crossing(this.next, this.nextHint, 'forward', context.crossing.forward, 'Later find');
     this.openLink.href = find.media.url;
     this.openLink.querySelector('span')!.textContent = find.media.kind === 'article' ? 'Read' : 'Open';
     this.openLink.title = `Open on ${find.media.source}`;
@@ -197,18 +229,21 @@ export class FindCard {
     this.setLiked(context.liked, false);
     this.share.replaceChildren(toggle('Let other Muses see this find', context.shared, (on) => this.actions.share(find.id, on), ['Public', 'Private']));
     this.open = true;
-    this.rise = 0;
-    this.riseTo = 1;
+    this.leaving = 0;
     this.el.classList.add('is-on');
     this.card.classList.remove('is-up', 'is-leaving-left', 'is-leaving-right');
     this.card.style.removeProperty('--swipe');
+    // straight to its hidden pose, from wherever the last card left: place() lets it rise from there
+    this.card.style.transition = 'none';
+    void this.card.offsetWidth;
+    this.card.style.removeProperty('transition');
   }
 
-  /** Send the card off (to the side it was swiped, or down) and let the line sink back. */
+  /** Send the card off (to the side it was swiped, or down). */
   hide(direction: 1 | -1 | 0 = 0): void {
     if (!this.open) return;
     this.open = false;
-    this.riseTo = 0;
+    this.leaving = LEAVE;
     this.card.classList.remove('is-up');
     if (direction !== 0) this.card.classList.add(direction > 0 ? 'is-leaving-left' : 'is-leaving-right');
   }
@@ -226,16 +261,14 @@ export class FindCard {
   }
 
   /**
-   * Each frame: where the bed's foot and the line's top are on screen (px), or null when the bed is out of
-   * view. The card stands on the line's top, kept inside the screen; the arrows sit at its sides.
+   * Each frame: where the card stands over its bed on screen (px), or null when the bed is out of view. The card
+   * stands there, kept inside the screen; the arrows sit at its sides, a crossing's line over its arrow.
    */
-  place(foot: { x: number; y: number } | null, top: { x: number; y: number } | null, dt: number, width: number, height: number): void {
-    const step = Math.min(1, dt / 0.32);
-    this.rise += (this.riseTo - this.rise) * (this.riseTo > this.rise ? 1 - Math.pow(1 - step, 2) : step * 1.4);
-    if (Math.abs(this.riseTo - this.rise) < 0.002) this.rise = this.riseTo;
-    const visible = foot !== null && top !== null && (this.open || this.rise > 0.01);
+  place(at: { x: number; y: number } | null, dt: number, width: number, height: number): void {
+    this.leaving = Math.max(0, this.leaving - dt);
+    const visible = at !== null && (this.open || this.leaving > 0);
     this.el.classList.toggle('is-on', visible);
-    if (!visible || !foot || !top) return;
+    if (!visible || !at) return;
     const w = this.card.offsetWidth;
     const h = this.card.offsetHeight;
     const margin = 14;
@@ -243,24 +276,28 @@ export class FindCard {
     const right = phone ? margin : 88; // clear of the rail
     const bottom = phone ? 150 : 96; // clear of the controls
     const above = phone ? 64 : margin; // clear of the panel's corner on a phone
-    const cx = Math.min(Math.max(top.x, margin + w / 2), width - right - w / 2);
-    const cardBottom = Math.min(Math.max(top.y, above + h), height - bottom);
-    this.card.style.left = `${Math.round(cx - w / 2)}px`;
-    this.card.style.top = `${Math.round(cardBottom - h)}px`;
-    // the line from the bed to the card's foot, risen this far
-    const ty = foot.y + (cardBottom - foot.y) * this.rise;
-    const tx = foot.x + (cx - foot.x) * this.rise;
-    this.stem.setAttribute('x1', String(foot.x));
-    this.stem.setAttribute('y1', String(foot.y));
-    this.stem.setAttribute('x2', String(tx));
-    this.stem.setAttribute('y2', String(ty));
-    this.dot.setAttribute('cx', String(foot.x));
-    this.dot.setAttribute('cy', String(foot.y));
-    if (this.open && this.rise > 0.9 && !this.card.classList.contains('is-up')) this.card.classList.add('is-up');
-    const top0 = cardBottom - h;
-    this.prev.style.left = `${Math.round(cx - w / 2 - 54)}px`;
-    this.next.style.left = `${Math.round(cx + w / 2 + 10)}px`;
-    this.prev.style.top = this.next.style.top = `${Math.round(top0 + h / 2 - 22)}px`;
+    const cx = Math.min(Math.max(at.x, margin + w / 2), width - right - w / 2);
+    const cardBottom = Math.min(Math.max(at.y, above + h), height - bottom);
+    // to the pixel, kept unless it truly moved: a framed bed stands at the screen's middle, where half an odd card's
+    // width falls on half a pixel, and the camera's float noise at rest flipped the rounding to and fro
+    const left = (this.placed.left = steady(cx - w / 2, this.placed.left));
+    const top = (this.placed.top = steady(cardBottom - h, this.placed.top));
+    this.card.style.left = `${left}px`;
+    this.card.style.top = `${top}px`;
+    // (placed before it rises, so it rises where it stands)
+    if (this.open && !this.card.classList.contains('is-up')) this.card.classList.add('is-up');
+    const arrowTop = top + Math.round(h / 2 - 22);
+    const prevLeft = left - 54;
+    const nextLeft = left + w + 10;
+    this.prev.style.left = `${prevLeft}px`;
+    this.next.style.left = `${nextLeft}px`;
+    this.prev.style.top = this.next.style.top = `${arrowTop}px`;
+    // each line runs outward from over its arrow, kept on the screen
+    const hintTop = `${arrowTop - 30}px`;
+    const pw = this.prevHint.offsetWidth;
+    this.prevHint.style.left = `${Math.round(Math.max(margin, prevLeft + 44 - pw))}px`;
+    this.nextHint.style.left = `${Math.round(Math.min(nextLeft, width - right - this.nextHint.offsetWidth))}px`;
+    this.prevHint.style.top = this.nextHint.style.top = hintTop;
   }
 
   private swipeStart(e: PointerEvent): void {

@@ -51,6 +51,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     soulVersion: 0,
     basketTime: null,
     hidden: new Set(),
+    reach: 'shared',
     working: false,
     episode: null,
     episodes: 0,
@@ -68,6 +69,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     reflections: [],
     experiencesSinceReflection: 0,
     likes: new Map(),
+    favoritePhotos: new Set(),
     day: freshDay(''),
     social: { relationships: new Map(), invitations: new Map(), likedPhotos: new Set(), knownOn: new Map() },
     workSince: null,
@@ -105,7 +107,7 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       const hidden = new Set(s.hidden);
       for (const r of e.hide ?? []) hidden.add(r);
       for (const r of e.unhide ?? []) hidden.delete(r);
-      return { ...s, hidden, basketTime: e.basketTime === undefined ? s.basketTime : e.basketTime };
+      return { ...s, hidden, basketTime: e.basketTime === undefined ? s.basketTime : e.basketTime, reach: e.reach ?? s.reach };
     }
     case 'episode.started':
       return startEpisode(s, e, at);
@@ -155,6 +157,12 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       return gift(s, stored, e);
     case 'owner.liked':
       return like(s, e.target, e.liked, at);
+    case 'owner.favorited': {
+      const favoritePhotos = new Set(s.favoritePhotos);
+      if (e.favorite) favoritePhotos.add(e.photo);
+      else favoritePhotos.delete(e.photo);
+      return { ...s, favoritePhotos };
+    }
     case 'owner.introduced':
     case 'owner.unshared':
     case 'owners.connected':

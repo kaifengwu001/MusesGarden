@@ -1,10 +1,11 @@
 // npm run sim -- --hours 504 --work server/fixtures/work-3weeks.json [--db garden.db] [--mind meta] [--seed 7]
-//   [--like "Green tea" --like-from 24 --like-days 3]
+//   [--like "Green tea" --like-from 24 --like-days 3] [--reach shared|known|everyone]
 // Simulates the cast on the real engine, prints what each Muse did, and checks the plan's promises against the logs.
 // --like scripts the hero's owner to like every delivered find about one topic for a few days (--like-days 0 is
-// the control), and prints that topic's share of the hero's trips.
+// the control), and prints that topic's share of the hero's trips. --reach sets every owner's friend group at the
+// start; without it each keeps the default (shared).
 import { parseArgs } from 'node:util';
-import type { Instant, MuseId, MuseState, TopicKey } from '../../src/muse/contract';
+import type { Instant, MuseId, MuseState, Reach, TopicKey } from '../../src/muse/contract';
 import { lifePolicy } from '../domain/policy/index';
 import { renderSoulSection } from '../domain/soul';
 import { localDay } from '../domain/time';
@@ -25,8 +26,11 @@ const { values } = parseArgs({
     like: { type: 'string' },
     'like-from': { type: 'string', default: '24' },
     'like-days': { type: 'string', default: '3' },
+    reach: { type: 'string' },
   },
 });
+const REACHES: readonly string[] = ['shared', 'known', 'everyone'] satisfies Reach[];
+if (values.reach !== undefined && !REACHES.includes(values.reach)) throw new Error(`--reach must be one of: ${REACHES.join(', ')}`);
 
 const hours = Number(values.hours);
 const start = Date.parse(values.start) as Instant;
@@ -47,6 +51,7 @@ const opts = { cast: values.cast, work: values.work === 'none' ? null : values.w
 
 const t0 = performance.now();
 if (garden.engine.museIds().length === 0) await seedCast(garden.engine, lifePolicy, opts);
+if (values.reach) for (const id of garden.engine.museIds()) await garden.engine.ownerSettings(id, { kind: 'owner.settings', reach: values.reach as Reach });
 await run(garden.engine, opts);
 const seconds = ((performance.now() - t0) / 1000).toFixed(1);
 
@@ -68,7 +73,7 @@ const line = (s: MuseState) => {
   ].join('  ');
 };
 
-console.info(`Simulated ${hours} h for ${garden.engine.museIds().length} Muses in ${seconds} s (mind: ${values.mind}).\n`);
+console.info(`Simulated ${hours} h for ${garden.engine.museIds().length} Muses in ${seconds} s (mind: ${values.mind}, friend group: ${values.reach ?? 'shared'}).\n`);
 for (const id of garden.engine.museIds()) {
   const s = garden.engine.state(id);
   if (s) console.info(line(s));
