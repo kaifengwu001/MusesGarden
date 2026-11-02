@@ -62,11 +62,10 @@ const SEEN_BELOW = 88;
 const SWAP = [72, 88] as const;
 /** A pulse lasts this long (s). */
 const PULSE = 1.4;
-/** The picked basket's patches and spheres stand this much larger; a hero in focus stands this much higher (m) and larger, and nods this far (rad). */
+/** The picked basket's patches and spheres stand this much larger; a hero in focus stands this much higher (m) and larger. */
 const MARK_SIZE = 1.3;
 const FOCUS_LIFT = 0.12;
 const FOCUS_SIZE = 1.55;
-const FOCUS_NOD = 0.14;
 /** A hero landing or in focus is drawn this much nearer (m) than it stands, over the rest of its patch. */
 const HERO_NEAR = 1.2;
 /** A landing's sway runs out through its patch for this long (s); its hero is lit, and holds still, till then. */
@@ -281,8 +280,9 @@ export class FindBeds {
       BED_SPAN: (2 * BED_RADIUS).toFixed(2),
       FOCUS_LIFT: FOCUS_LIFT.toFixed(2),
       FOCUS_SIZE: FOCUS_SIZE.toFixed(2),
-      FOCUS_NOD: FOCUS_NOD.toFixed(2),
       HERO_NEAR: HERO_NEAR.toFixed(2),
+      LAND_RING: LAND_RING.toFixed(2),
+      HOVER_LIFT: HOVER_LIFT.toFixed(2),
     };
     SPECIES_MESH.forEach((make, species) => {
       const geometry = make();

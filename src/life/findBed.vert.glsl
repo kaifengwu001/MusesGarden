@@ -12,6 +12,7 @@
 // Each patch's hero (findBeds.ts) is hidden while its twin flies in from the
 // basket; in focus it stands lifted, larger and lit; as its flower lands a
 // sway runs out through the patch and the hero settles with a small bounce.
+// While lit it holds still: the wind moves the rest of its patch, not it.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -36,10 +37,9 @@ uniform int uSpecies;
 uniform vec4 uBedLook; // stem top (m), nod, -, -
 centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
 
-// A flower landing: how long its sway runs (s), how fast it spreads (aDelay's units a second), how far it bows a
-// plant; how long the hero settles (s). How a hero in focus stands (FOCUS_LIFT m up, FOCUS_SIZE times larger,
-// nodding FOCUS_NOD rad) comes from findBeds.ts, which places the basket's flower where its hero stands.
-const float LAND_RING = 1.1;
+// A flower landing: how fast its sway spreads (aDelay's units a second), how far it bows a plant; how long the
+// hero settles (s). How long the sway runs (LAND_RING s) and how a hero in focus stands (FOCUS_LIFT m up,
+// FOCUS_SIZE times larger) come from findBeds.ts, which places the basket's flower where its hero stands.
 const float LAND_SPEED = 1.6;
 const float LAND_BOW = 0.45;
 const float LAND_SETTLE = 0.25;
@@ -110,6 +110,9 @@ void main() {
   float strength = uWindVec.w;
   vec3 shared = inside > 0.5 ? wind.xyz : windDir(dir) * strength * (0.18 + 0.42 * strength);
   vec3 bend = windPlant(dir, shared, rnd(seed, 5.0), 1.15 + 0.4 * rnd(seed, 6.0));
+  // a lit hero holds still, as the basket's flower stood; the wind takes it back as its landing runs out
+  float still = shown ? max(focus, landing) : 0.0;
+  bend *= 1.0 - still;
   if (landing > 0.0 && !hero) {
     // a ring running out from the middle, bowing each plant it passes downwind, fading as it goes; it builds
     // from nothing as the flower touches down (the hero only settles: it stands where its flower came down)
@@ -117,7 +120,7 @@ void main() {
     bend += windDir(dir) * (LAND_BOW * exp(-off * off / 0.018) * landing * smoothstep(0.0, 0.12, since) * (1.0 - 0.5 * clamp(delay / 0.85, 0.0, 1.0)));
   }
   float stemTop = uBedLook.x;
-  vec3 base = dir * (uRadius + aPlace.w - 0.02 + 0.22 * find.lift);
+  vec3 base = dir * (uRadius + aPlace.w - 0.02 + HOVER_LIFT * find.lift);
   if (shown) base += dir * (FOCUS_LIFT * focus);
   vec3 local = position;
   vec3 world;
@@ -129,10 +132,8 @@ void main() {
     vec3 w = vec3(dot(bend, side), 0.0, dot(bend, fwd));
     float wl = length(w);
     vec3 axis = wl > 1e-4 ? normalize(vec3(w.z, 0.0, -w.x)) : vec3(1.0, 0.0, 0.0);
-    float flutter = sin(uGust.x * (7.0 + 3.0 * rnd(seed, 7.0)) + seed * 31.0) * 0.08 * (0.3 + uWindVec.w);
+    float flutter = sin(uGust.x * (7.0 + 3.0 * rnd(seed, 7.0)) + seed * 31.0) * 0.08 * (0.3 + uWindVec.w) * (1.0 - still);
     float nod = uBedLook.y * mix(0.4, 1.0, open) + 0.6 * wl + flutter;
-    // a hero in focus nods slowly on its own, so the eye finds it among its patch
-    if (shown) nod += focus * FOCUS_NOD * sin(uPlantClock * 2.3);
     head = rotateAxis(head, axis, nod);
     vec3 top = base + up * (stemTop * stemScale * (1.0 - 0.25 * min(dot(bend, bend), 1.0))) + bend * (stemTop * stemScale);
     world = top + side * (head.x * scale) + up * (head.y * scale) + fwd * (head.z * scale);
