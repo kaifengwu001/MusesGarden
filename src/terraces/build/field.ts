@@ -10,8 +10,10 @@ import { gnoise, latticeHash } from '../../planet/noise';
 // height less a slow noise, so the levels' outlines wander off the height's
 // own contours), each level's own wander, and the slope, smoothed (the
 // broader octaves' gradient, wandering a little at the edges), which sorts
-// the ground: too steep is left to the woods, too flat is farmed in plain
-// plots, terraces between. Nothing is read off a mesh or a texture.
+// the ground: too steep is left to the woods, too flat is a plain, terraces
+// between. Where the build lays a plain (Plains), the terrace field is held
+// level there and eased back to the land round it. Nothing is read off a
+// mesh or a texture.
 
 export interface Octave {
   /** Its wavelength (m) and its share of the relief. */
@@ -40,10 +42,14 @@ export interface FieldParams {
   readonly flat: number;
 }
 
-/** The lab's ground as Kai left it (its second round: a hillside, Perlin noise at four scales) on a planet of R 128. */
+/**
+ * The lab's ground as Kai left it (its second round: a hillside, Perlin noise at four scales) on a planet of R 128,
+ * its relief 50 m (Kai, 2026-11-01: the lab's 36 on this planet came out gentler than the lab's canvas; at 50 the
+ * planet's ground falls into flats, gentle and steep terraces and woods as the canvas's does).
+ */
 export const FIELD: Omit<FieldParams, 'seed'> = {
   radius: 128,
-  relief: 36,
+  relief: 50,
   octaves: [
     { scale: 260, weight: 1 },
     { scale: 80, weight: 0.35 },
@@ -62,6 +68,20 @@ export const FIELD: Omit<FieldParams, 'seed'> = {
 
 /** The octaves the smoothed slope reads: those 12 m and broader (the lab's). */
 const BROAD = 12;
+/**
+ * The plains the build lays on the field (build/construct.ts): each a flat stretch of the land held level at its
+ * own level, the land round it eased back to itself (each plain's weight: 1 on it, falling to 0 a collar's width
+ * out). Where two plains' collars overlap, the land eases to their levels by their weights.
+ */
+export interface Plains {
+  readonly count: number;
+  /** Whether a plain can reach a direction at all (its cap: cheap). */
+  near(p: number, x: number, y: number, z: number): boolean;
+  /** How fully a plain holds the land at a direction (0 … 1); with g, its gradient there (on the planet, per m). */
+  weight(p: number, x: number, y: number, z: number, g?: Float64Array): number;
+  /** Per plain: its level (m: a band's floor). */
+  readonly level: Float64Array;
+}
 const SEED = { hills: 0x68, offset: 0x6f, bank: 0x62, cls: 0x63 } as const;
 
 const gc = new Float64Array(24);
@@ -119,6 +139,8 @@ export class PlanetField {
   private readonly freq: number[];
   private readonly shift: number[];
   private readonly g = new Float64Array(3);
+  /** The plains laid on the field, if any (the build's). */
+  plains: Plains | null = null;
 
   constructor(readonly p: FieldParams) {
     this.R = p.radius;
@@ -165,15 +187,76 @@ export class PlanetField {
 
   private readonly og = new Float64Array(3);
 
-  /** The field the terraces are cut from (m): the height less its slow wander; with `out`, its gradient. */
+  /** The field the terraces are cut from (m): the height less its slow wander, held level on the plains; with `out`, its gradient. */
   terrace(x: number, y: number, z: number, out?: Float64Array): number {
     const h = this.height(x, y, z, out);
-    if (!out) return h - this.offsetAt(x, y, z);
+    if (!out) return this.flatten(x, y, z, h - this.offsetAt(x, y, z));
     const o = this.offsetAt(x, y, z, this.og);
     out[0] -= this.og[0];
     out[1] -= this.og[1];
     out[2] -= this.og[2];
-    return h - o;
+    return this.flatten(x, y, z, h - o, out);
+  }
+
+  private readonly hg = new Float64Array(3);
+  private readonly tg = new Float64Array(3);
+
+  /**
+   * The ground the woods stand on (m): the hills' height, eased on the plains' collars by as much as the terrace field
+   * is there (so the woods meet the terraces round a plain where the field put them); with `out`, its gradient.
+   */
+  ground(x: number, y: number, z: number, out?: Float64Array): number {
+    if (!this.plains) return this.height(x, y, z, out);
+    const h = this.height(x, y, z, out ? this.hg : undefined);
+    const t = h - this.offsetAt(x, y, z, out ? this.og : undefined);
+    if (!out) return h + this.flatten(x, y, z, t) - t;
+    for (let i = 0; i < 3; i++) this.tg[i] = this.hg[i] - this.og[i];
+    const held = this.flatten(x, y, z, t, this.tg);
+    for (let i = 0; i < 3; i++) out[i] = this.hg[i] + this.tg[i] - (this.hg[i] - this.og[i]);
+    return h + held - t;
+  }
+
+  private readonly wg = new Float64Array(3);
+  private readonly sw = new Float64Array(3);
+  private readonly sl = new Float64Array(3);
+
+  /**
+   * The field t at a direction as the plains hold it: eased to each plain's level by its weight there (summing to at
+   * most all of it); with `out` (t's gradient), the gradient carried through.
+   */
+  private flatten(x: number, y: number, z: number, t: number, out?: Float64Array): number {
+    const P = this.plains;
+    if (!P) return t;
+    let W = 0;
+    let Lw = 0;
+    const sw = this.sw;
+    const sl = this.sl;
+    if (out) {
+      sw.fill(0);
+      sl.fill(0);
+    }
+    for (let p = 0; p < P.count; p++) {
+      if (!P.near(p, x, y, z)) continue;
+      const w = P.weight(p, x, y, z, out ? this.wg : undefined);
+      if (w <= 0) continue;
+      W += w;
+      Lw += w * P.level[p];
+      if (out) {
+        for (let i = 0; i < 3; i++) {
+          sw[i] += this.wg[i];
+          sl[i] += P.level[p] * this.wg[i];
+        }
+      }
+    }
+    if (W <= 0) return t;
+    if (W <= 1) {
+      // (t eased toward the plains' levels by their weights: t (1 − W) + Σ w level)
+      if (out) for (let i = 0; i < 3; i++) out[i] = (1 - W) * out[i] - t * sw[i] + sl[i];
+      return t * (1 - W) + Lw;
+    }
+    // (more than wholly held, where collars overlap: their levels by their weights)
+    if (out) for (let i = 0; i < 3; i++) out[i] = (sl[i] * W - Lw * sw[i]) / (W * W);
+    return Lw / W;
   }
 
   /** Level k's own wander at a direction (m): a stretch of noise of its own. */
@@ -218,7 +301,7 @@ export class PlanetField {
     tangent(gx, gy, gz, x, y, z, this.sg);
     const c = this.R / 13;
     out[0] = h;
-    out[1] = h - this.offsetAt(x, y, z);
+    out[1] = this.flatten(x, y, z, h - this.offsetAt(x, y, z));
     out[2] = Math.hypot(this.sg[0], this.sg[1], this.sg[2]) * (1 + 0.3 * gnoise(x * c, y * c, z * c, (this.p.seed + SEED.cls) >>> 0));
     return out;
   }

@@ -2,7 +2,7 @@ import { hash32, unit } from '../../core/hash';
 import { smoothstep } from '../../core/math';
 import { gnoise } from '../../planet/noise';
 import { Bands, Cuts, inRing, insideRing, type CutParams } from './bands';
-import { PlanetField, type FieldParams } from './field';
+import { gnoiseGrad, PlanetField, type FieldParams } from './field';
 import { clip, faceDirection, Side, SphereGrid, tangentFrame, vertexCorner, type Chain, type Corner, type Field } from './sphere';
 
 // The terraces' build (build/): the paddy lab's construction (src/dev/
@@ -40,14 +40,18 @@ export interface DamParams {
 }
 
 export interface PlotParams {
-  /** A field's width across the strips and its length along them (m). */
-  readonly width: number;
-  readonly length: number;
-  /** How far the strips' lines bend to and fro (× a field's width) and the crossings' (× its length), over 60 m or so. */
+  /** About how much of a plain each of its major curves parts off (m²). */
+  readonly section: number;
+  /** A section's strips' width (m, from … to: each section its own). */
+  readonly strip: readonly [number, number];
+  /** How far apart a section's strips are crossed where they are (m, from … to), and the share of sections that are. */
+  readonly cross: readonly [number, number];
+  readonly crossed: number;
+  /** How far each line between strips bends of its own (× a strip's width, over 18 m or so). */
   readonly bend: number;
-  readonly warp: number;
-  /** Every how many crossings a track runs (pale, a cart's width: m) in place of a bund. */
-  readonly trackEvery: number;
+  /** The lines' widths (m): between strips and crossings, between sections, the track along the first major curve. */
+  readonly minor: number;
+  readonly major: number;
   readonly trackWidth: number;
 }
 
@@ -76,7 +80,7 @@ export const BUILD: BuildParams = {
   minArea: 12,
   dam: { width: 0.3, widthVar: 0.08, widthScale: 7, height: 0.13, heightVar: 0.04, batter: 0.3 },
   cut: { spacing: [7, 20], cascade: 0.75, drift: 0.5, shift: 0.45, blend: 1.2 },
-  plot: { width: 9, length: 32, bend: 0.35, warp: 0.15, trackEvery: 4, trackWidth: 1.6 },
+  plot: { section: 450, strip: [3, 5], cross: [8, 14], crossed: 0.85, bend: 0.45, minor: 0.3, major: 0.6, trackWidth: 1.6 },
   treeSpacing: 2.2,
   leastWoods: 60,
   leastFlats: 400,
@@ -142,7 +146,7 @@ const OVERLAP = 0.1;
 const LOOK_SHARE = [0, 0.44, 0.54, 0.9, 1];
 const LOOK_DELAY = [1, 0.55, 0.424, 0.13, 0];
 
-const SLOT = { woods: 2, flat: 3, base: 100000, bands: 200000, cut: 600000, fields: 1000000 } as const;
+const SLOT = { woods: 2, flat: 3, zone: 4, base: 100000, bands: 200000, cut: 600000, fields: 1000000 } as const;
 
 /** A growable array of numbers, typed. */
 class Grow<T extends Float32Array | Float64Array | Int32Array | Uint8Array> {
@@ -321,30 +325,398 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   stats.flatsTidied = tidy(flatIdx, SLOT.flat, flatF, flatV, P.leastFlats, false);
   turned.sort((a, b) => b.area - a.area);
   for (let v = 0; v < V; v++) if (woodsIdx[v]) flatIdx[v] = 0;
-  /** A direction's class: 0 the woods, 1 the flats, 2 the terraces (the largest turned ring round it has the last word). */
+  /**
+   * A direction's class: 0 the woods, 1 a plain, 2 the terraces (the largest turned ring round it has the last word;
+   * a plain is the whole of its stretch of the flats, as the lab's flats were, and the land round it its collar keeps
+   * at its level, up to the banks where the next terraces step: fields only, the bands only round it).
+   */
   const classAt = (x: number, y: number, z: number): number => {
     const s = field.slope(x, y, z);
     let woods = s - fp.steep >= 0;
-    let flat = fp.flat - s >= 0;
     let w = false;
-    let f = false;
     for (const r of turned) {
-      if ((r.woods ? w : f) || x * r.c[0] + y * r.c[1] + z * r.c[2] < 0.9) continue;
+      if (!r.woods || w || x * r.c[0] + y * r.c[1] + z * r.c[2] < 0.9) continue;
       const px = x * r.F[0] + y * r.F[1] + z * r.F[2];
       const py = x * r.F[3] + y * r.F[4] + z * r.F[5];
       if (px < r.box[0] || px > r.box[1] || py < r.box[2] || py > r.box[3] || !inRing(r.xy, px, py)) continue;
-      if (r.woods) {
-        woods = r.value === 1;
-        w = true;
-      } else {
-        flat = r.value === 1;
-        f = true;
-      }
+      woods = r.value === 1;
+      w = true;
     }
-    return woods ? 0 : flat ? 1 : 2;
+    if (woods) return 0;
+    const p = plainAt(x, y, z);
+    if (p < 0) return 2;
+    const d = plainDist(p, x, y, z);
+    return d < 0 || (d < rasters[p].collar && bandsNow !== null && bandsNow.bandAt(x, y, z) === plainBand[p]) ? 1 : 2;
   };
   const terraced = (x: number, y: number, z: number): boolean => classAt(x, y, z) === 2;
   time('Classes');
+
+  // the plains: each stretch of the flats (tidied, joined across the grid's triangles, its narrow bays and its
+  // islands filled) cut out of the land before the bands, as the lab's flats were, and held level (field.ts Plains),
+  // the whole of it, at one level: the floor of the band in the middle of the most of its ground that lies within
+  // 4 m (a hilltop's flat, a hollow's, a valley floor's). So a plain is truly flat, all of it fields, and no band's
+  // outline crosses it. Round it a collar where the land eases back to its own height, the wider the farther the
+  // plain's ground lay from its level (8 m for every meter, 14 to 32 m), by the distance from the plain's edge
+  // (softened where the edge bends, so the ease bends smoothly too), so the terraces step up and down from its
+  // edges. The distance kept on a fine raster on the plane at the plain's middle; the field's samples taken again.
+  /** How far a plain's edge's distance is softened (m). */
+  const PLAIN_SOFT = 1.5;
+  /** How narrow a bay in a plain's edge it fills (half its width, m), and how large a mound in its fields (m²). */
+  const PLAIN_CLOSE = 7;
+  const PLAIN_MOUND = 800;
+  const RASTER = 0.5;
+  const core = new Int32Array(V).fill(-1);
+  const plainLevel: number[] = [];
+  const plainBand: number[] = [];
+  interface PlainRaster {
+    readonly c: number[];
+    readonly e1: number[];
+    readonly e2: number[];
+    readonly x0: number;
+    readonly y0: number;
+    readonly nx: number;
+    readonly ny: number;
+    /** The distance from the plain's edge (m, signed: < 0 on it), per raster point; its collar's width (m). */
+    readonly sd: Float32Array;
+    readonly collar: number;
+    readonly capCos: number;
+  }
+  const rasters: PlainRaster[] = [];
+  {
+    const up = new Int32Array(V);
+    for (let v = 0; v < V; v++) up[v] = v;
+    const root = (v: number): number => {
+      while (up[v] !== v) {
+        up[v] = up[up[v]];
+        v = up[v];
+      }
+      return v;
+    };
+    for (let f = 0; f < 6; f++) {
+      for (let cj = 0; cj < m; cj++) {
+        for (let ci = 0; ci < m; ci++) {
+          const t = grid.triangles(f, ci, cj);
+          for (let q = 0; q < 12; q += 3) {
+            for (let e = 0; e < 3; e++) {
+              const a = t[q + e];
+              const b = t[q + ((e + 1) % 3)];
+              if (!flatIdx[a] || !flatIdx[b]) continue;
+              const ra = root(a);
+              const rb = root(b);
+              if (ra !== rb) up[Math.max(ra, rb)] = Math.min(ra, rb);
+            }
+          }
+        }
+      }
+    }
+    const members = new Map<number, number[]>();
+    for (let v = 0; v < V; v++) {
+      if (!flatIdx[v]) continue;
+      const r = root(v);
+      const list = members.get(r);
+      if (list) list.push(v);
+      else members.set(r, [v]);
+    }
+    for (const list of members.values()) {
+      const p = plainLevel.length;
+      for (const v of list) core[v] = p;
+      // its level
+      const ts = list.map((v) => T[v]).sort((a, b) => a - b);
+      let first = 0;
+      let most = 0;
+      for (let i = 0, j = 0; i < ts.length; i++) {
+        while (ts[i] - ts[j] > 4) j++;
+        if (i - j + 1 > most) {
+          most = i - j + 1;
+          first = j;
+        }
+      }
+      let a = 0;
+      let b = L;
+      while (a < b) {
+        const c = (a + b) >> 1;
+        if (levels[c] > (ts[first] + ts[first + most - 1]) / 2) b = c;
+        else a = c + 1;
+      }
+      plainBand.push(a - 1);
+      plainLevel.push(floorOf(a - 1));
+    }
+    // its plane, and on it what it holds (its flats, and whatever of the rest they close round) and the distance from
+    // that edge, raster point by raster point (an exact distance transform, blurred a little so the ease bends
+    // smoothly where the edge does); its collar
+    for (let p = 0; p < plainLevel.length; p++) {
+      let sx = 0;
+      let sy = 0;
+      let sz = 0;
+      let off = 0;
+      for (let v = 0; v < V; v++) {
+        if (core[v] !== p) continue;
+        off = Math.max(off, Math.abs(T[v] - plainLevel[p]));
+        sx += D[3 * v];
+        sy += D[3 * v + 1];
+        sz += D[3 * v + 2];
+      }
+      const collar = Math.min(Math.max(8 * off, 14), 32);
+      const l = Math.hypot(sx, sy, sz) || 1;
+      const c = [sx / l, sy / l, sz / l];
+      const F = tangentFrame(c[0], c[1], c[2], new Float64Array(6));
+      const e1 = [F[0], F[1], F[2]];
+      const e2 = [F[3], F[4], F[5]];
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (let v = 0; v < V; v++) {
+        if (core[v] !== p) continue;
+        const s = Math.max(D[3 * v] * c[0] + D[3 * v + 1] * c[1] + D[3 * v + 2] * c[2], 0.2);
+        const X = (R * (D[3 * v] * e1[0] + D[3 * v + 1] * e1[1] + D[3 * v + 2] * e1[2])) / s;
+        const Y = (R * (D[3 * v] * e2[0] + D[3 * v + 1] * e2[1] + D[3 * v + 2] * e2[2])) / s;
+        x0 = Math.min(x0, X);
+        x1 = Math.max(x1, X);
+        y0 = Math.min(y0, Y);
+        y1 = Math.max(y1, Y);
+      }
+      const pad = collar + 3;
+      x0 -= pad;
+      y0 -= pad;
+      x1 += pad;
+      y1 += pad;
+      const nx = Math.ceil((x1 - x0) / RASTER) + 1;
+      const ny = Math.ceil((y1 - y0) / RASTER) + 1;
+      const inside = new Uint8Array(nx * ny);
+      const at = { face: 0, ci: 0, cj: 0 };
+      for (let j = 0; j < ny; j++) {
+        for (let i = 0; i < nx; i++) {
+          const X = x0 + i * RASTER;
+          const Y = y0 + j * RASTER;
+          const dx = c[0] + (X / R) * e1[0] + (Y / R) * e2[0];
+          const dy = c[1] + (X / R) * e1[1] + (Y / R) * e2[1];
+          const dz = c[2] + (X / R) * e1[2] + (Y / R) * e2[2];
+          const dl = Math.hypot(dx, dy, dz);
+          grid.square(dx / dl, dy / dl, dz / dl, at);
+          const t = grid.triangles(at.face, at.ci, at.cj);
+          let n = 0;
+          for (const v of [t[0], t[3], t[6], t[9], t[2]]) if (core[v] === p) n++;
+          inside[j * nx + i] = n >= 3 ? 1 : 0;
+        }
+      }
+      // (its bays and notches narrower than twice PLAIN_CLOSE filled: closed, a dilation then an erosion)
+      {
+        const r2 = (PLAIN_CLOSE / RASTER) ** 2;
+        const toIn0 = edt(inside, nx, ny, 1);
+        const grown = new Uint8Array(nx * ny);
+        for (let q = 0; q < nx * ny; q++) grown[q] = toIn0[q] <= r2 ? 1 : 0;
+        const toOut0 = edt(grown, nx, ny, 0);
+        for (let q = 0; q < nx * ny; q++) inside[q] = toOut0[q] > r2 ? 1 : inside[q];
+      }
+      // (islands: what of the outside the raster's border does not reach)
+      const seen = new Uint8Array(nx * ny);
+      const stack: number[] = [];
+      for (let i = 0; i < nx; i++) stack.push(i, (ny - 1) * nx + i);
+      for (let j = 0; j < ny; j++) stack.push(j * nx, j * nx + nx - 1);
+      while (stack.length) {
+        const q = stack.pop() as number;
+        if (seen[q] || inside[q]) continue;
+        seen[q] = 1;
+        const i = q % nx;
+        const j = (q - i) / nx;
+        if (i > 0) stack.push(q - 1);
+        if (i + 1 < nx) stack.push(q + 1);
+        if (j > 0) stack.push(q - nx);
+        if (j + 1 < ny) stack.push(q + nx);
+      }
+      for (let q = 0; q < nx * ny; q++) if (!seen[q]) inside[q] = 1;
+      // (signed distance: to the nearest point of the other side, less half a raster step either way; then blurred)
+      const distance = (): Float32Array => {
+        const toIn = edt(inside, nx, ny, 1);
+        const toOut = edt(inside, nx, ny, 0);
+        const raw = new Float32Array(nx * ny);
+        for (let q = 0; q < nx * ny; q++) raw[q] = inside[q] ? -(Math.sqrt(toOut[q]) - 0.5) * RASTER : (Math.sqrt(toIn[q]) - 0.5) * RASTER;
+        return blur(raw, nx, ny, PLAIN_SOFT / RASTER);
+      };
+      let sd = distance();
+      // (and a mound its level's land round it closes in on every side, under PLAIN_MOUND: held level too, as the lab
+      // filled a small hole in its flats)
+      {
+        const level = plainLevel[p];
+        const ring = new Uint8Array(nx * ny);
+        for (let q = 0; q < nx * ny; q++) {
+          const d = sd[q];
+          if (d <= 0) {
+            ring[q] = 1;
+            continue;
+          }
+          if (d >= collar) continue;
+          const X = x0 + (q % nx) * RASTER;
+          const Y = y0 + Math.floor(q / nx) * RASTER;
+          const dx = c[0] + (X / R) * e1[0] + (Y / R) * e2[0];
+          const dy = c[1] + (X / R) * e1[1] + (Y / R) * e2[1];
+          const dz = c[2] + (X / R) * e1[2] + (Y / R) * e2[2];
+          const dl = Math.hypot(dx, dy, dz);
+          const t = field.terrace(dx / dl, dy / dl, dz / dl);
+          const w = (1 - d / collar) ** 2;
+          ring[q] = Math.abs(t + w * (level - t) - level) < 0.5 * step ? 1 : 0;
+        }
+        const out = new Uint8Array(nx * ny);
+        const todo: number[] = [];
+        for (let i = 0; i < nx; i++) todo.push(i, (ny - 1) * nx + i);
+        for (let j = 0; j < ny; j++) todo.push(j * nx, j * nx + nx - 1);
+        while (todo.length) {
+          const q = todo.pop() as number;
+          if (out[q] || ring[q]) continue;
+          out[q] = 1;
+          const i = q % nx;
+          const j = (q - i) / nx;
+          if (i > 0) todo.push(q - 1);
+          if (i + 1 < nx) todo.push(q + 1);
+          if (j > 0) todo.push(q - nx);
+          if (j + 1 < ny) todo.push(q + nx);
+        }
+        // (each mound on its own: its size, and filled if small enough)
+        const seenM = new Uint8Array(nx * ny);
+        let filled = false;
+        for (let q0 = 0; q0 < nx * ny; q0++) {
+          if (ring[q0] || out[q0] || seenM[q0]) continue;
+          const cells: number[] = [];
+          const st = [q0];
+          seenM[q0] = 1;
+          while (st.length) {
+            const q = st.pop() as number;
+            cells.push(q);
+            const i = q % nx;
+            const j = (q - i) / nx;
+            for (const r of [i > 0 ? q - 1 : -1, i + 1 < nx ? q + 1 : -1, j > 0 ? q - nx : -1, j + 1 < ny ? q + nx : -1]) {
+              if (r < 0 || ring[r] || out[r] || seenM[r]) continue;
+              seenM[r] = 1;
+              st.push(r);
+            }
+          }
+          if (cells.length * RASTER * RASTER > PLAIN_MOUND) continue;
+          for (const q of cells) inside[q] = 1;
+          filled = true;
+        }
+        if (filled) sd = distance();
+      }
+      const capR = Math.hypot(Math.max(-x0, x1), Math.max(-y0, y1)) / R;
+      rasters.push({ c, e1, e2, x0, y0, nx, ny, sd, collar, capCos: Math.cos(Math.min(capR, 1.2)) });
+    }
+  }
+  const pg = [0, 0];
+  /** A plain's distance from its edge at a direction (m, signed: < 0 on it); with g, its gradient on its plane. */
+  const plainDist = (p: number, x: number, y: number, z: number, g?: number[]): number => {
+    const r = rasters[p];
+    const s = Math.max(x * r.c[0] + y * r.c[1] + z * r.c[2], 0.2);
+    const X = (R * (x * r.e1[0] + y * r.e1[1] + z * r.e1[2])) / s;
+    const Y = (R * (x * r.e2[0] + y * r.e2[1] + z * r.e2[2])) / s;
+    const fx = (X - r.x0) / RASTER;
+    const fy = (Y - r.y0) / RASTER;
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    if (i < 0 || j < 0 || i + 1 >= r.nx || j + 1 >= r.ny) {
+      if (g) g[0] = g[1] = 0;
+      return r.collar + 10;
+    }
+    const u = fx - i;
+    const v = fy - j;
+    const a = r.sd[j * r.nx + i];
+    const b = r.sd[j * r.nx + i + 1];
+    const c = r.sd[(j + 1) * r.nx + i];
+    const d = r.sd[(j + 1) * r.nx + i + 1];
+    if (g) {
+      g[0] = ((b - a) * (1 - v) + (d - c) * v) / RASTER;
+      g[1] = ((c - a) * (1 - u) + (d - b) * u) / RASTER;
+    }
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+  field.plains = {
+    count: plainLevel.length,
+    near: (p, x, y, z) => x * rasters[p].c[0] + y * rasters[p].c[1] + z * rasters[p].c[2] > rasters[p].capCos,
+    weight: (p, x, y, z, g) => {
+      const d = plainDist(p, x, y, z, g ? pg : undefined);
+      const collar = rasters[p].collar;
+      if (d >= collar) {
+        if (g) g[0] = g[1] = g[2] = 0;
+        return 0;
+      }
+      if (d <= 0) {
+        if (g) g[0] = g[1] = g[2] = 0;
+        return 1;
+      }
+      // (falling off at once from the plain's edge, so the land leaves its level there, and gently into its own)
+      const u = d / collar;
+      if (g) {
+        // (dw/dd times d's gradient on the plane, carried onto the planet through the plane's own ways there: X =
+        // R (p·e1) / (p·c), so a meter along the planet moves X by (e1 (p·c) − (p·e1) c) / (p·c)² along it)
+        const dw = (-2 * (1 - u)) / collar;
+        const r = rasters[p];
+        const sc = Math.max(x * r.c[0] + y * r.c[1] + z * r.c[2], 0.2);
+        const p1 = x * r.e1[0] + y * r.e1[1] + z * r.e1[2];
+        const p2 = x * r.e2[0] + y * r.e2[1] + z * r.e2[2];
+        for (let k = 0; k < 3; k++) g[k] = (dw * (pg[0] * (r.e1[k] * sc - p1 * r.c[k]) + pg[1] * (r.e2[k] * sc - p2 * r.c[k]))) / (sc * sc);
+        const n = g[0] * x + g[1] * y + g[2] * z;
+        g[0] -= n * x;
+        g[1] -= n * y;
+        g[2] -= n * z;
+      }
+      return (1 - u) * (1 - u);
+    },
+    level: Float64Array.from(plainLevel),
+  };
+  // (each square's plain: the one holding its middle most, if any)
+  const squarePlain = new Int32Array(6 * m * m).fill(-1);
+  {
+    const best = new Float32Array(6 * m * m);
+    const mid = [0, 0, 0];
+    for (let f = 0; f < 6; f++) {
+      for (let cj = 0; cj < m; cj++) {
+        for (let ci = 0; ci < m; ci++) {
+          const t = grid.triangles(f, ci, cj);
+          grid.point(t[2], mid);
+          for (let p = 0; p < plainLevel.length; p++) {
+            if (!field.plains.near(p, mid[0], mid[1], mid[2])) continue;
+            // (a square's middle and corners all count: a collar's edge can pass between)
+            let w = 0;
+            for (const v of [t[2], t[0], t[3], t[6], t[9]]) w = Math.max(w, field.plains.weight(p, D[3 * v], D[3 * v + 1], D[3 * v + 2]) + (plainDist(p, D[3 * v], D[3 * v + 1], D[3 * v + 2]) < rasters[p].collar + 1 ? 1e-3 : 0));
+            const si = (f * m + cj) * m + ci;
+            if (w > best[si]) {
+              best[si] = w;
+              squarePlain[si] = p;
+            }
+          }
+        }
+      }
+    }
+  }
+  const psq = { face: 0, ci: 0, cj: 0 };
+  /** The plain whose zone a direction lies in (its square's), or −1. */
+  const plainAt = (x: number, y: number, z: number): number => {
+    grid.square(x, y, z, psq);
+    return squarePlain[(psq.face * m + psq.cj) * m + psq.ci];
+  };
+  /** How far within a plain a direction lies (m: ≥ 0 on it), or −1 with none near. */
+  const plainIn = (x: number, y: number, z: number): number => {
+    const p = plainAt(x, y, z);
+    return p < 0 ? -1 : -plainDist(p, x, y, z);
+  };
+  {
+    const again = new Uint8Array(V);
+    for (let f = 0; f < 6; f++) {
+      for (let cj = 0; cj < m; cj++) {
+        for (let ci = 0; ci < m; ci++) {
+          if (squarePlain[(f * m + cj) * m + ci] < 0) continue;
+          const t = grid.triangles(f, ci, cj);
+          for (const v of [t[0], t[3], t[6], t[9], t[2]]) {
+            if (again[v]) continue;
+            again[v] = 1;
+            T[v] = field.terrace(D[3 * v], D[3 * v + 1], D[3 * v + 2]);
+          }
+        }
+      }
+    }
+  }
+  stats.plains = plainLevel.length;
+  let bandsNow: Bands | null = null;
+  time('Plains');
 
   // the bands, unshifted; the cuts along their banks; the bands as the cuts shift them. (A vertex's levels' wander
   // and shift are kept for the four levels round its own, all the bands' outlines through it can need.)
@@ -374,6 +746,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   const G0v = (k: number, v: number): number => T[v] - levels[k] - kept(wanders, k, v, () => field.wander(k, D[3 * v], D[3 * v + 1], D[3 * v + 2]));
   const base = new Bands(grid, levels, G0, G0v, T, terraceF, SLOT.base);
   base.trace();
+  bandsNow = base;
   time('Base');
   const cuts = new Cuts(grid, field, base.chains, base, P.cut, seed, terraced, P.minArea);
   time('Cuts');
@@ -390,6 +763,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   const bands = new Bands(grid, levels, G, Gv, T, terraceF, SLOT.bands);
   bands.trace();
   bands.levelSmall(P.minArea);
+  bandsNow = bands;
   const cutLines = cuts.lines(bands, terraced);
   time('Bands');
   stats.levels = L;
@@ -397,136 +771,359 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   stats.cutLines = cutLines.length;
   stats.levelled = bands.dropped;
 
-  // the flats' fields: each flat patch (its vertices joined across the grid's triangles) a lattice of its own, on the
-  // plane at its middle: strips a field's width apart across the lie of its land (the way the hills' broader slope
-  // falls over it on the whole), crossed a field's length apart along it, both bending a little; a field is a cell
+  // each plain divided as Kai's aerials of flat fields divide them (2026-11-01): a few gentle curves across it (the
+  // major lines: a track along it, bunds) part it into sections; each section is laid in strips, gentle curves too,
+  // running along its sides and fanning from one to the one across from it (or keeping a side's way where none lies
+  // across), now and then crossed; a field is a strip's cell, every field of a plain at its level, the lines between
+  // them sunk (grooves, below). Each line is the zero of a field of its own on the plane at the plain's middle,
+  // found where it crosses the grid on that field itself, as every outline is.
   const pl = P.plot;
-  const patch = new Int32Array(V).fill(-1);
-  /** Per patch: its middle, the way its land falls (across the strips), the way the strips run (unit, xyz each). */
-  const patchFrame: number[] = [];
-  {
-    const up = new Int32Array(V);
-    for (let v = 0; v < V; v++) up[v] = v;
-    const root = (v: number): number => {
-      while (up[v] !== v) {
-        up[v] = up[up[v]];
-        v = up[v];
-      }
-      return v;
-    };
-    for (let f = 0; f < 6; f++) {
-      for (let cj = 0; cj < m; cj++) {
-        for (let ci = 0; ci < m; ci++) {
-          const t = grid.triangles(f, ci, cj);
-          for (let q = 0; q < 12; q += 3) {
-            for (let e = 0; e < 3; e++) {
-              const a = t[q + e];
-              const b = t[q + ((e + 1) % 3)];
-              if (!flatIdx[a] || !flatIdx[b]) continue;
-              const ra = root(a);
-              const rb = root(b);
-              if (ra !== rb) up[Math.max(ra, rb)] = Math.min(ra, rb);
-            }
-          }
-        }
-      }
-    }
-    const ids = new Map<number, number>();
-    const sum: number[] = [];
-    for (let v = 0; v < V; v++) {
-      if (!flatIdx[v]) continue;
-      const r = root(v);
-      let id = ids.get(r);
-      if (id === undefined) {
-        id = ids.size;
-        ids.set(r, id);
-        sum.push(0, 0, 0);
-      }
-      patch[v] = id;
-      sum[3 * id] += D[3 * v];
-      sum[3 * id + 1] += D[3 * v + 1];
-      sum[3 * id + 2] += D[3 * v + 2];
-    }
-    // (the lie of each patch's land: the hills' broader gradient over it, its orientation's mean — the fall's way either
-    // way along it, so a valley's two sides agree)
-    const J = new Float64Array(3 * ids.size);
-    const frames: Float64Array[] = [];
-    for (let id = 0; id < ids.size; id++) {
-      const l = Math.hypot(sum[3 * id], sum[3 * id + 1], sum[3 * id + 2]) || 1;
-      frames.push(tangentFrame(sum[3 * id] / l, sum[3 * id + 1] / l, sum[3 * id + 2] / l, new Float64Array(6)));
-      sum[3 * id] /= l;
-      sum[3 * id + 1] /= l;
-      sum[3 * id + 2] /= l;
-    }
-    for (let v = 0; v < V; v += 3) {
-      const id = patch[v];
-      if (id < 0) continue;
-      field.height(D[3 * v], D[3 * v + 1], D[3 * v + 2], g3, true);
-      const F = frames[id];
-      const gx = g3[0] * F[0] + g3[1] * F[1] + g3[2] * F[2];
-      const gy = g3[0] * F[3] + g3[1] * F[4] + g3[2] * F[5];
-      J[3 * id] += gx * gx;
-      J[3 * id + 1] += gx * gy;
-      J[3 * id + 2] += gy * gy;
-    }
-    for (let id = 0; id < ids.size; id++) {
-      const F = frames[id];
-      const th = 0.5 * Math.atan2(2 * J[3 * id + 1], J[3 * id] - J[3 * id + 2]);
-      const [ca, sa] = [Math.cos(th), Math.sin(th)];
-      patchFrame.push(sum[3 * id], sum[3 * id + 1], sum[3 * id + 2]);
-      patchFrame.push(ca * F[0] + sa * F[3], ca * F[1] + sa * F[4], ca * F[2] + sa * F[5]);
-      patchFrame.push(-sa * F[0] + ca * F[3], -sa * F[1] + ca * F[4], -sa * F[2] + ca * F[5]);
-    }
-    stats.patches = ids.size;
+  interface Curve {
+    /** Where it runs: everywhere (parent −1), or on one side (pside) of an earlier curve (parent), branching off it. */
+    readonly parent: number;
+    readonly pside: number;
+    /** A point it passes, its normal, how far it bends (× its scale) over its scale (m), its noise's offsets, its half-width (m). */
+    readonly x0: number;
+    readonly y0: number;
+    readonly nx: number;
+    readonly ny: number;
+    readonly bend: number;
+    readonly scale: number;
+    readonly o: readonly [number, number, number];
+    readonly half: number;
+    readonly track: boolean;
   }
-  const bendK = R / 60;
-  /** A patch's lattice at a direction: fam 0 across the strips (a field's width a unit), 1 along them (a field's length). */
-  const fieldAt = (fam: number, x: number, y: number, z: number, p: number): number => {
-    const o = 9 * p;
-    const F = patchFrame;
-    // (on the plane at the patch's middle: straight lines there are straight on the planet)
-    const s = Math.max(x * F[o] + y * F[o + 1] + z * F[o + 2], 0.2);
-    if (fam === 0) return (R * (x * F[o + 3] + y * F[o + 4] + z * F[o + 5])) / s / pl.width + pl.bend * gnoise(x * bendK + 31.7, y * bendK - 12.9, z * bendK + 7.3, (seed + 0x9109) >>> 0);
-    return (R * (x * F[o + 6] + y * F[o + 7] + z * F[o + 8])) / s / pl.length + pl.warp * gnoise(x * bendK - 5.3, y * bendK + 22.1, z * bendK - 17.9, (seed + 0x910a) >>> 0);
+  interface Section {
+    /** Its rails (the curves its strips run along: a, and b across from it, or none) and its side of each (±1). */
+    readonly a: Curve;
+    readonly sa: number;
+    readonly b: Curve | null;
+    readonly sb: number;
+    /** Its strips: how many between two rails (0: from one rail on, each W m wide), and a line's half-width (in strips). */
+    readonly n: number;
+    readonly W: number;
+    readonly off: number;
+    /** Its crossings, L m apart: along a major curve (c, its side sc), or straight across (way tx, ty), or none. */
+    readonly c: Curve | null;
+    readonly sc: number;
+    readonly straight: boolean;
+    readonly tx: number;
+    readonly ty: number;
+    readonly t0: number;
+    readonly L: number;
+    readonly coff: number;
+    /** Its lines' own bend: the noise's offsets. */
+    readonly wo: readonly [number, number, number];
+  }
+  interface Division {
+    /** The plane at the plain's middle: its middle and two ways along it (unit). */
+    readonly c: number[];
+    readonly e1: number[];
+    readonly e2: number[];
+    readonly curves: Curve[];
+    /** Rails only, beyond the plain's edges (none of its lines): the far sides strips by an edge fan toward. */
+    readonly phantoms: Curve[];
+    readonly sections: Map<number, Section>;
+    /** Per section (its sides of the curves, a bit each): its held ground's middle on the plane and how much of it. */
+    readonly middles: Map<number, number[]>;
+  }
+  const divisions: Division[] = [];
+  const cg = new Float64Array(3);
+  const loc = [0, 0];
+  /** A direction on a plain's plane (m), into out. */
+  const onPlane = (d: Division, x: number, y: number, z: number, out: number[]): number[] => {
+    const s = Math.max(x * d.c[0] + y * d.c[1] + z * d.c[2], 0.2);
+    out[0] = (R * (x * d.e1[0] + y * d.e1[1] + z * d.e1[2])) / s;
+    out[1] = (R * (x * d.e2[0] + y * d.e2[1] + z * d.e2[2])) / s;
+    return out;
   };
-  const latOwner = new Int32Array(V).fill(-1);
-  const latValue = new Float64Array(2 * V);
-  const lat = (fam: number, v: number, p: number): number => {
-    if (latOwner[v] !== p) {
-      // (a vertex between two patches: worked out again each time)
-      if (latOwner[v] >= 0) return fieldAt(fam, D[3 * v], D[3 * v + 1], D[3 * v + 2], p);
-      latOwner[v] = p;
-      latValue[2 * v] = fieldAt(0, D[3 * v], D[3 * v + 1], D[3 * v + 2], p);
-      latValue[2 * v + 1] = fieldAt(1, D[3 * v], D[3 * v + 1], D[3 * v + 2], p);
+  /** A major curve's field at (X, Y) (about meters from it, signed: its zero the curve); with g, its gradient. */
+  const curveAt = (cv: Curve, X: number, Y: number, g?: number[]): number => {
+    const n = gnoiseGrad((X - cv.x0) / cv.scale + cv.o[0], (Y - cv.y0) / cv.scale + cv.o[1], cv.o[2], (seed + 0x5ec7) >>> 0, cg);
+    if (g) {
+      g[0] = cv.nx + cv.bend * cg[0];
+      g[1] = cv.ny + cv.bend * cg[1];
     }
-    return latValue[2 * v + fam];
+    return cv.nx * (X - cv.x0) + cv.ny * (Y - cv.y0) + cv.bend * cv.scale * n;
   };
-  /** A field: its patch and its cell of the patch's lattice. */
-  const fieldKey = (p: number, i: number, j: number): number => (p * 4096 + (i + 2048)) * 4096 + (j + 2048);
-  const fieldOf = (v: number, p: number): number => fieldKey(p, Math.floor(lat(0, v, p)), Math.floor(lat(1, v, p)));
-  const psq = { face: 0, ci: 0, cj: 0 };
-  /** The patch a direction on the flats lies in (from the grid's vertices round it), or −1. */
-  const patchAt = (x: number, y: number, z: number): number => {
-    grid.square(x, y, z, psq);
-    for (let r = 0; r <= 2; r++) {
-      for (let dj = -r; dj <= r; dj++) {
-        for (let di = -r; di <= r; di++) {
-          const ci = psq.ci + di;
-          const cj = psq.cj + dj;
-          if (Math.max(Math.abs(di), Math.abs(dj)) !== r || ci < 0 || cj < 0 || ci >= m || cj >= m) continue;
-          const t = grid.triangles(psq.face, ci, cj);
-          for (const v of [t[2], t[0], t[3], t[6], t[9]]) if (patch[v] >= 0) return patch[v];
+  const gq = [0, 0];
+  /** How far (X, Y) lies from a major curve (m, signed): its field over its gradient's length. */
+  const curveDist = (cv: Curve, X: number, Y: number): number => {
+    const f = curveAt(cv, X, Y, gq);
+    return f / Math.max(Math.hypot(gq[0], gq[1]), 0.3);
+  };
+  /** Whether a curve runs at (X, Y): everywhere, or on its side of the curve it branches off. */
+  const curveRuns = (d: Division, cv: Curve, X: number, Y: number): boolean => cv.parent < 0 || (curveAt(d.curves[cv.parent], X, Y) >= 0 ? 1 : -1) === cv.pside;
+  /** A section's sides of the curves at (X, Y), a bit each (0 for a curve that does not run there). */
+  const sigmaAt = (d: Division, X: number, Y: number): number => {
+    let sigma = 0;
+    for (let i = 0; i < d.curves.length; i++) if (curveRuns(d, d.curves[i], X, Y) && curveAt(d.curves[i], X, Y) >= 0) sigma |= 1 << i;
+    return sigma;
+  };
+  for (let p = 0; p < plainLevel.length; p++) {
+    // (its held ground: the flats' vertices the plain holds level)
+    let sx = 0;
+    let sy = 0;
+    let sz = 0;
+    const held: number[] = [];
+    for (let v = 0; v < V; v++) {
+      if (core[v] !== p) continue;
+      held.push(v);
+      sx += D[3 * v];
+      sy += D[3 * v + 1];
+      sz += D[3 * v + 2];
+    }
+    const l = Math.hypot(sx, sy, sz) || 1;
+    const c = [sx / l, sy / l, sz / l];
+    const F = tangentFrame(c[0], c[1], c[2], new Float64Array(6));
+    const d: Division = { c, e1: [F[0], F[1], F[2]], e2: [F[3], F[4], F[5]], curves: [], phantoms: [], sections: new Map(), middles: new Map() };
+    divisions.push(d);
+    // its spread on the plane: the way it runs longest and how far either way
+    let mx = 0;
+    let my = 0;
+    for (const v of held) {
+      onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
+      mx += loc[0];
+      my += loc[1];
+    }
+    mx /= Math.max(held.length, 1);
+    my /= Math.max(held.length, 1);
+    let cxx = 0;
+    let cxy = 0;
+    let cyy = 0;
+    for (const v of held) {
+      onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
+      cxx += (loc[0] - mx) ** 2;
+      cxy += (loc[0] - mx) * (loc[1] - my);
+      cyy += (loc[1] - my) ** 2;
+    }
+    const th = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
+    const [ux, uy] = [Math.cos(th), Math.sin(th)];
+    const n = Math.max(held.length, 1);
+    const along = Math.sqrt(Math.max((cxx * ux * ux + 2 * cxy * ux * uy + cyy * uy * uy) / n, 1));
+    const across = Math.sqrt(Math.max((cxx * uy * uy - 2 * cxy * ux * uy + cyy * ux * ux) / n, 1));
+    const area = (held.length * 4 * Math.PI * R * R) / V;
+    // its major curves: the first along it near its middle (a track); the rest across it, branching off the track to
+    // one side or the other, and along it, by turns, spread over it, each its own way give or take, bending gently
+    let h = hash32((Math.imul(p + 1, 0x9e3779b1) ^ (seed + 0x91a1)) >>> 0);
+    const rnd = (): number => unit((h = hash32((h + 0x6d2b79f5) >>> 0)));
+    const count = Math.max(2, Math.min(8, Math.round(area / pl.section)));
+    const acrossCount = Math.ceil((count - 1) / 2);
+    const alongCount = count - 1 - acrossCount;
+    for (let i = 0; i < count; i++) {
+      const isAcross = i > 0 && i % 2 === 1;
+      const rank = i === 0 ? 0 : Math.floor((i - 1) / 2);
+      const of = isAcross ? acrossCount : alongCount;
+      const turn = isAcross ? Math.PI / 2 + (rnd() - 0.5) * 0.9 : (rnd() - 0.5) * 0.5;
+      // (its place: along the plain for those across, across it for those along; the track near the middle)
+      const at = i === 0 ? (rnd() - 0.5) * 0.4 : ((rank + 0.3 + 0.4 * rnd()) / Math.max(of, 1) - 0.5) * 2.4;
+      const [px, py] = isAcross ? [mx + ux * at * along, my + uy * at * along] : [mx - uy * at * across, my + ux * at * across];
+      const dirX = Math.cos(th + turn);
+      const dirY = Math.sin(th + turn);
+      d.curves.push({
+        parent: isAcross ? 0 : -1,
+        pside: rnd() < 0.5 ? 1 : -1,
+        x0: px,
+        y0: py,
+        nx: -dirY,
+        ny: dirX,
+        bend: 0.24 + 0.12 * rnd(),
+        scale: 26 + 14 * rnd(),
+        o: [rnd() * 97, rnd() * 97, rnd() * 97],
+        half: (i === 0 ? pl.trackWidth : pl.major) / 2,
+        track: i === 0,
+      });
+    }
+    // beyond each of its edges a rail of its own, turned a little and bending, for the strips by that edge to fan to
+    for (const [isAcross, sgn] of [
+      [false, 1],
+      [false, -1],
+      [true, 1],
+      [true, -1],
+    ] as const) {
+      const turn = (isAcross ? Math.PI / 2 : 0) + (rnd() - 0.5) * 0.6;
+      const out = isAcross ? 2.2 * along + 6 : 2.2 * across + 6;
+      const [px, py] = isAcross ? [mx + ux * sgn * out, my + uy * sgn * out] : [mx - uy * sgn * out, my + ux * sgn * out];
+      d.phantoms.push({ parent: -1, pside: 1, x0: px, y0: py, nx: -Math.sin(th + turn), ny: Math.cos(th + turn), bend: 0.24 + 0.12 * rnd(), scale: 26 + 14 * rnd(), o: [rnd() * 97, rnd() * 97, rnd() * 97], half: 0, track: false });
+    }
+    // each section's held ground: its middle on the plane, how much of it
+    for (const v of held) {
+      onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
+      const sigma = sigmaAt(d, loc[0], loc[1]);
+      const mid = d.middles.get(sigma);
+      if (mid) {
+        mid[0] += loc[0];
+        mid[1] += loc[1];
+        mid[2]++;
+      } else d.middles.set(sigma, [loc[0], loc[1], 1]);
+    }
+    for (const mid of d.middles.values()) {
+      mid[0] /= mid[2];
+      mid[1] /= mid[2];
+    }
+  }
+  /** A section of a plain (its sides of the major curves, a bit each), worked out the first time it is asked for. */
+  const sectionOf = (p: number, sigma: number, X: number, Y: number): Section => {
+    const d = divisions[p];
+    const known = d.sections.get(sigma);
+    if (known) return known;
+    const mid = d.middles.get(sigma) ?? [X, Y, 0];
+    const [cx, cy] = mid;
+    // the curves it lies along: where the nearest point of each to its middle has it on the same side of every other
+    // (and the curve runs there)
+    type Rail = { cv: Curve; d: number; nx: number; ny: number; side: number };
+    const railOf = (cv: Curve): Rail => {
+      const g = [0, 0];
+      const f = curveAt(cv, cx, cy, g);
+      const gl = Math.hypot(g[0], g[1]) || 1;
+      const side = f >= 0 ? 1 : -1;
+      return { cv, d: Math.abs(f) / Math.max(gl, 0.3), nx: (side * g[0]) / gl, ny: (side * g[1]) / gl, side };
+    };
+    const border: Rail[] = [];
+    d.curves.forEach((cv, i) => {
+      let qx = cx;
+      let qy = cy;
+      const g = [0, 0];
+      for (let it = 0; it < 4; it++) {
+        const f = curveAt(cv, qx, qy, g);
+        const gg = Math.max(g[0] * g[0] + g[1] * g[1], 0.09);
+        qx -= (f * g[0]) / gg;
+        qy -= (f * g[1]) / gg;
+      }
+      if (curveRuns(d, cv, qx, qy) && ((sigmaAt(d, qx, qy) ^ sigma) & ~(1 << i)) === 0) border.push(railOf(cv));
+    });
+    border.sort((u, w) => u.d - w.d);
+    // its rails: the two it lies between, most nearly facing each other, if any do; else the nearest, and across from
+    // it the rail beyond the plain's edge most nearly facing it; else the nearest alone
+    let a = border.length ? border[0] : railOf(d.curves[0]);
+    let b: Rail | null = null;
+    let best = -0.3;
+    for (let i = 0; i < border.length; i++) {
+      for (let j = i + 1; j < border.length; j++) {
+        const dot = border[i].nx * border[j].nx + border[i].ny * border[j].ny;
+        if (dot < best) {
+          best = dot;
+          a = border[i];
+          b = border[j];
         }
       }
     }
-    return -1;
+    if (!b) {
+      for (const ph of d.phantoms) {
+        const r = railOf(ph);
+        const dot = r.nx * a.nx + r.ny * a.ny;
+        if (dot < best) {
+          best = dot;
+          b = r;
+        }
+      }
+    }
+    const hs = hash32((Math.imul(p + 1, 0x85ebca6b) ^ Math.imul(sigma + 1, 0xc2b2ae35) ^ (seed + 0x5ec1)) >>> 0);
+    const W = pl.strip[0] + (pl.strip[1] - pl.strip[0]) * unit(hs);
+    const gap = b ? a.d + b.d : 0;
+    const n = b ? Math.max(1, Math.round(gap / W)) : 0;
+    const width = b ? gap / n : W;
+    // its crossings, in some sections: along a third curve that lies across its strips, or else straight across them
+    let c: Curve | null = null;
+    let sc = 1;
+    let straight = false;
+    let tx = 0;
+    let ty = 0;
+    let t0 = 0;
+    const L = pl.cross[0] + (pl.cross[1] - pl.cross[0]) * unit(hash32(hs ^ 0x51));
+    if (unit(hash32(hs ^ 0x52)) < pl.crossed) {
+      const third = border.find((e) => e !== a && e !== b && Math.abs(e.nx * a.nx + e.ny * a.ny) < 0.5);
+      if (third) {
+        c = third.cv;
+        sc = third.side;
+      } else {
+        straight = true;
+        tx = -a.ny;
+        ty = a.nx;
+        t0 = cx * tx + cy * ty + L * unit(hash32(hs ^ 0x53));
+      }
+    }
+    const wo = [unit(hash32(hs ^ 0x54)) * 97, unit(hash32(hs ^ 0x55)) * 97, unit(hash32(hs ^ 0x56)) * 97] as const;
+    const sec: Section = { a: a.cv, sa: a.side, b: b ? b.cv : null, sb: b ? b.side : 1, n, W, off: pl.minor / 2 / width, c, sc, straight, tx, ty, t0, L, coff: pl.minor / 2 / L, wo };
+    d.sections.set(sigma, sec);
+    return sec;
+  };
+  /** A section's lines' own bend at (X, Y) (in strips: k a second noise, for its crossings). */
+  const bendAt = (sec: Section, X: number, Y: number, k: number): number =>
+    gnoise(X / 18 + sec.wo[0] + 31 * k, Y / 18 + sec.wo[1], sec.wo[2], (seed + 0x5ec3) >>> 0);
+  /** A section's strip coordinate at (X, Y): 0 along rail a, n along rail b (or a strip's width a unit from a alone), each line bending a little of its own. */
+  const stripAt = (sec: Section, X: number, Y: number): number => {
+    const da = sec.sa * curveDist(sec.a, X, Y);
+    const bend = pl.bend * bendAt(sec, X, Y, 0);
+    if (!sec.b) return da / sec.W + bend;
+    const db = sec.sb * curveDist(sec.b, X, Y);
+    const pa = Math.max(da, 0);
+    const pb = Math.max(db, 0);
+    return (sec.n * pa) / Math.max(pa + pb, 1e-9) + bend;
+  };
+  /** Whether a section's strips are crossed. */
+  const crossed = (sec: Section): boolean => sec.c !== null || sec.straight;
+  /** A section's crossing coordinate at (X, Y) (0 where it is not crossed). */
+  const crossAt = (sec: Section, X: number, Y: number): number => {
+    if (sec.c) return (sec.sc * curveDist(sec.c, X, Y)) / sec.L + 0.6 * pl.bend * bendAt(sec, X, Y, 1);
+    if (!sec.straight) return 0;
+    return (X * sec.tx + Y * sec.ty - sec.t0) / sec.L + 0.6 * pl.bend * bendAt(sec, X, Y, 1);
+  };
+  /** A field: its plain, section, strip and crossing. */
+  const fieldKey = (p: number, sigma: number, t: number, u: number): number => ((p * 64 + sigma) * 512 + (t + 128)) * 256 + (u + 128);
+  /** A vertex's field, or −1 within a groove's reach (so a square whose five agree holds no line). */
+  const fieldOfVertex = (v: number, p: number): number => {
+    const d = divisions[p];
+    onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
+    const [X, Y] = loc;
+    for (const cv of d.curves) if (Math.abs(curveDist(cv, X, Y)) < cv.half + pl.minor && curveRuns(d, cv, X, Y)) return -1;
+    const sigma = sigmaAt(d, X, Y);
+    const sec = sectionOf(p, sigma, X, Y);
+    // (its strip as the cut pieces take it: before the first, the first; past the last, the last; near a line between
+    // two strips — not a rail — none)
+    const f = stripAt(sec, X, Y);
+    const t = Math.min(Math.max(Math.floor(f), 0), sec.b ? sec.n - 1 : Infinity);
+    const width = sec.b ? pl.minor / 2 / sec.off : sec.W;
+    if (t >= 1 && (f - t) * width < pl.minor / 2 + 0.3) return -1;
+    if ((!sec.b || t + 1 < sec.n) && (t + 1 - f) * width < pl.minor / 2 + 0.3) return -1;
+    const g = crossAt(sec, X, Y);
+    const u = Math.floor(g);
+    if (crossed(sec) && Math.min(g - u, u + 1 - g) * sec.L < pl.minor / 2 + 0.3) return -1;
+    return fieldKey(p, sigma, t, u);
   };
 
   // the sides pieces are cut by (one per field and level, sharing their crossings with the outlines)
   const inWoods = new Side(grid, SLOT.woods, steepF, (v) => woodsIdx[v] === 1, true, steepV);
   const outWoods = new Side(grid, SLOT.woods, steepF, (v) => woodsIdx[v] === 1, false, steepV);
-  const inFlats = new Side(grid, SLOT.flat, flatF, (v) => flatIdx[v] === 1, true, flatV);
-  const outFlats = new Side(grid, SLOT.flat, flatF, (v) => flatIdx[v] === 1, false, flatV);
+  // (a plain: its edge where its distance from it passes 0)
+  const plainF: Field = (x, y, z) => plainIn(x, y, z);
+  const plainMemo = new Map<number, number>();
+  const plainV = (v: number): number => {
+    let q = plainMemo.get(v);
+    if (q === undefined) {
+      q = plainIn(D[3 * v], D[3 * v + 1], D[3 * v + 2]);
+      plainMemo.set(v, q);
+    }
+    return q;
+  };
+  const inPlain = new Side(grid, SLOT.zone, plainF, (v) => plainV(v) >= 0, true, plainV);
+  const outPlain = new Side(grid, SLOT.zone, plainF, (v) => plainV(v) >= 0, false, plainV);
+  // (a plain's collar: its outer edge, where the land is its own again)
+  const collarIn = (x: number, y: number, z: number): number => {
+    const p = plainAt(x, y, z);
+    return p < 0 ? -1 : rasters[p].collar - plainDist(p, x, y, z);
+  };
+  const collarMemo = new Map<number, number>();
+  const collarV = (v: number): number => {
+    let q = collarMemo.get(v);
+    if (q === undefined) {
+      q = collarIn(D[3 * v], D[3 * v + 1], D[3 * v + 2]);
+      collarMemo.set(v, q);
+    }
+    return q;
+  };
+  const inCollar = new Side(grid, SLOT.zone + 1, collarIn, (v) => collarV(v) >= 0, true, collarV);
+  const outCollar = new Side(grid, SLOT.zone + 1, collarIn, (v) => collarV(v) >= 0, false, collarV);
   const sides = new Map<number, Side>();
   const memoSide = (key: number, make: () => Side): Side => {
     let s = sides.get(key);
@@ -546,17 +1143,48 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const [f, fv] = bands.H(k);
       return new Side(grid, SLOT.bands + k, f, (v) => bands.band[v] >= k, false, fv);
     });
-  /** A patch's lattice line (fam 0: between strips, 1: a crossing) at i: its slot, and the side above it or below. */
-  const fieldLine = (p: number, fam: number, i: number): number => SLOT.fields + (p * 2 + fam) * 100000 + i + 50000;
-  const fieldSides = new Map<number, Side>();
-  const fieldSide = (p: number, fam: number, i: number, above: boolean): Side => {
-    const line = fieldLine(p, fam, i);
-    let sd = fieldSides.get(2 * line + (above ? 0 : 1));
+  // the plains' lines' sides: each field kept back from its lines by their half-widths (the grooves between), a slot
+  // each, the side each vertex is on kept
+  let nextSlot = SLOT.fields;
+  const lineSides = new Map<string, Side>();
+  const lineSide = (key: string, f: (X: number, Y: number) => number, p: number): Side => {
+    let sd = lineSides.get(key);
     if (!sd) {
-      sd = new Side(grid, line, (x, y, z) => fieldAt(fam, x, y, z, p) - i, (v) => Math.floor(lat(fam, v, p)) >= i, above, (v) => lat(fam, v, p) - i);
-      fieldSides.set(2 * line + (above ? 0 : 1), sd);
+      const d = divisions[p];
+      const at = [0, 0];
+      const f3: Field = (x, y, z) => {
+        onPlane(d, x, y, z, at);
+        return f(at[0], at[1]);
+      };
+      const known = new Map<number, number>();
+      const fv = (v: number): number => {
+        let q = known.get(v);
+        if (q === undefined) {
+          q = f3(D[3 * v], D[3 * v + 1], D[3 * v + 2]);
+          known.set(v, q);
+        }
+        return q;
+      };
+      sd = new Side(grid, nextSlot++, f3, (v) => fv(v) >= 0, true, fv);
+      lineSides.set(key, sd);
     }
     return sd;
+  };
+  /** A field's side of a major curve (s: which), kept back from it by its half-width. */
+  const majorSide = (p: number, i: number, s: number): Side => {
+    const cv = divisions[p].curves[i];
+    return lineSide(`${p} m${i} ${s}`, (X, Y) => s * curveDist(cv, X, Y) - cv.half, p);
+  };
+  /** A field's side of the line t between a section's strips (or crossings): above it or below, kept back. */
+  const stripSide = (p: number, sigma: number, t: number, above: boolean): Side => {
+    const d = divisions[p];
+    const sec = d.sections.get(sigma) as Section;
+    return lineSide(`${p} s${sigma} ${t} ${above}`, (X, Y) => (above ? stripAt(sec, X, Y) - t - sec.off : t - sec.off - stripAt(sec, X, Y)), p);
+  };
+  const crossSide = (p: number, sigma: number, u: number, above: boolean): Side => {
+    const d = divisions[p];
+    const sec = d.sections.get(sigma) as Section;
+    return lineSide(`${p} c${sigma} ${u} ${above}`, (X, Y) => (above ? crossAt(sec, X, Y) - u - sec.coff : u - sec.coff - crossAt(sec, X, Y)), p);
   };
 
   // the cuts' lines part the paddies: the triangles' edges each crosses, per band
@@ -686,23 +1314,11 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   };
   // the woods' triangles: points, chunk
   const woodsTri = new Grow(new Int32Array(1 << 16));
-  // the fields' triangles: points, field, chunk; per field its area and its ground's terrace field over it (m³), and
-  // per patch the squares it lies in
+  // the fields' triangles: points, field, chunk; per field its plain; per plain the squares its fields lie in
   const plotTri = new Grow(new Int32Array(1 << 16));
   const plotIds = new Map<number, number>();
-  const plotArea: number[] = [];
-  const plotSum: number[] = [];
-  // (checks: the terrace field's least and most under each field)
-  const plotLo: number[] = [];
-  const plotHi: number[] = [];
-  const weigh = (plot: number, a: Corner, b: Corner, c: Corner, t: number, lo: number, hi: number): void => {
-    const area = R * R * triArea([a.x, a.y, a.z], [b.x, b.y, b.z], [c.x, c.y, c.z]);
-    plotArea[plot] += area;
-    plotSum[plot] += area * t;
-    plotLo[plot] = Math.min(plotLo[plot], lo);
-    plotHi[plot] = Math.max(plotHi[plot], hi);
-  };
-  const patchSquares = new Map<number, number[]>();
+  const plotPlain: number[] = [];
+  const plainSquares = new Map<number, number[]>();
   // the paddies' pieces: per triangle slot (4 a square) its first piece, first band and count; per piece whether it
   // holds any of the floor, whether a cut parts it, its band; the pieces' triangles (points, piece, chunk)
   const slots = 4 * 6 * m * m;
@@ -757,27 +1373,28 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           }
           continue;
         }
-        const pp = patch[five.find((v) => patch[v] >= 0) ?? five[0]];
-        if (five.every((v) => flatIdx[v]) && five.every((v) => fieldOf(v, pp) === fieldOf(five[0], pp))) {
-          const plot = plotIndex(fieldOf(five[0], pp));
-          const t4 = [T[five[0]], T[five[1]], T[five[2]], T[five[3]]];
-          const t0 = (t4[0] + t4[1] + t4[2] + t4[3]) / 4;
-          for (const [a, b, c] of [
-            [0, 1, 2],
-            [0, 2, 3],
-          ]) {
-            for (const k of [a, b, c]) plotTri.push(corners[k]);
-            plotTri.push(plot);
-            plotTri.push(chunk);
-            weigh(plot, vertexCorner(grid, corners[a]), vertexCorner(grid, corners[b]), vertexCorner(grid, corners[c]), t0, Math.min(...t4), Math.max(...t4));
+        // (a plain's, if one reaches here)
+        const pp = squarePlain[si];
+        if (pp >= 0 && five.every((v) => plainV(v) >= 0)) {
+          const key = fieldOfVertex(five[0], pp);
+          if (key >= 0 && five.every((v) => fieldOfVertex(v, pp) === key)) {
+            const plot = plotIndex(key, pp);
+            for (const [a, b, c] of [
+              [0, 1, 2],
+              [0, 2, 3],
+            ]) {
+              for (const k of [a, b, c]) plotTri.push(corners[k]);
+              plotTri.push(plot);
+              plotTri.push(chunk);
+            }
+            const list = plainSquares.get(pp);
+            if (list) list.push(si);
+            else plainSquares.set(pp, [si]);
+            continue;
           }
-          const list = patchSquares.get(pp);
-          if (list) list.push(si);
-          else patchSquares.set(pp, [si]);
-          continue;
         }
         const k0 = bands.band[five[0]];
-        if (five.every((v) => !woodsIdx[v] && !flatIdx[v] && bands.band[v] === k0) && !cutSquare.has(si * L + k0)) {
+        if (five.every((v) => !woodsIdx[v] && bands.band[v] === k0 && !(pp >= 0 && (plainV(v) >= 0 || (k0 === plainBand[pp] && collarV(v) >= 0)))) && !cutSquare.has(si * L + k0)) {
           const piece = newPiece(k0);
           pieceValid.a[piece] = 1;
           for (let q = 0; q < 4; q++) {
@@ -805,38 +1422,19 @@ export function buildTerraces(input: BuildInput): BuildOutput {
             woodsTri.push(c.id);
             woodsTri.push(chunk);
           });
-          const rest = clip(tri, outWoods);
-          if (rest.length < 3) continue;
-          const fl = clip(rest, inFlats);
-          if (fl.length >= 3 && pp >= 0) {
-            // (the triangle cut into its patch's fields: between two lines of the strips and two of the crossings)
-            onFlats = true;
-            const vs = [t[3 * q], t[3 * q + 1], t[3 * q + 2]];
-            const tm = (T[vs[0]] + T[vs[1]] + T[vs[2]]) / 3;
-            const lo2 = [0, 1].map((c) => Math.min(...vs.map((v) => Math.floor(lat(c, v, pp)))));
-            const hi2 = [0, 1].map((c) => Math.max(...vs.map((v) => Math.floor(lat(c, v, pp)))));
-            for (let i = lo2[0]; i <= hi2[0]; i++) {
-              for (let j = lo2[1]; j <= hi2[1]; j++) {
-                let pc = clip(fl, fieldSide(pp, 0, i, true));
-                pc = clip(pc, fieldSide(pp, 0, i + 1, false));
-                pc = clip(pc, fieldSide(pp, 1, j, true));
-                pc = clip(pc, fieldSide(pp, 1, j + 1, false));
-                if (pc.length < 3) continue;
-                const plot = plotIndex(fieldKey(pp, i, j));
-                fan(pc, (a, b, c) => {
-                  plotTri.push(a.id);
-                  plotTri.push(b.id);
-                  plotTri.push(c.id);
-                  plotTri.push(plot);
-                  plotTri.push(chunk);
-                  weigh(plot, a, b, c, tm, Math.min(T[vs[0]], T[vs[1]], T[vs[2]]), Math.max(T[vs[0]], T[vs[1]], T[vs[2]]));
-                });
-              }
-            }
-          }
-          const r = clip(rest, outFlats);
+          let r = clip(tri, outWoods);
           if (r.length < 3) continue;
           const vs = [t[3 * q], t[3 * q + 1], t[3 * q + 2]];
+          if (pp >= 0) {
+            // (a plain first, as the lab's flats: on it its fields, the bands only round it)
+            const fl = clip(r, inPlain);
+            if (fl.length >= 3) {
+              onFlats = true;
+              fieldsOf(fl, pp, chunk);
+            }
+            r = clip(r, outPlain);
+            if (r.length < 3) continue;
+          }
           const b0 = Math.min(...vs.map((v) => bands.band[v]));
           const b1 = Math.max(...vs.map((v) => bands.band[v]));
           const slot = 4 * si + q;
@@ -845,8 +1443,18 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           slotFirst[slot] = pieceValid.n;
           for (let k = b0; k <= b1; k++) newPiece(k);
           for (let k = b0; k <= b1; k++) {
-            const pc = clip(clip(r, bandFrom(k)), bandTo(k + 1));
+            let pc = clip(clip(r, bandFrom(k)), bandTo(k + 1));
             if (pc.length < 3) continue;
+            if (pp >= 0 && k === plainBand[pp]) {
+              // (the plain's own level round it, in its collar: its fields too, up to the banks)
+              const fl = clip(pc, inCollar);
+              if (fl.length >= 3) {
+                onFlats = true;
+                fieldsOf(fl, pp, chunk);
+              }
+              pc = clip(pc, outCollar);
+              if (pc.length < 3) continue;
+            }
             const id = slotFirst[slot] + (k - b0);
             pieceValid.a[id] = 1;
             fan(pc, (a, b, c) => {
@@ -880,9 +1488,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           }
         }
         if (onFlats) {
-          const list = patchSquares.get(pp);
+          const list = plainSquares.get(pp);
           if (list) list.push(si);
-          else patchSquares.set(pp, [si]);
+          else plainSquares.set(pp, [si]);
         }
       }
     }
@@ -890,17 +1498,87 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   stats.pieces = pieceValid.n;
   time('Pieces');
 
-  function plotIndex(key: number): number {
+  function plotIndex(key: number, plain: number): number {
     let i = plotIds.get(key);
     if (i === undefined) {
       i = plotIds.size;
       plotIds.set(key, i);
-      plotArea.push(0);
-      plotSum.push(0);
-      plotLo.push(Infinity);
-      plotHi.push(-Infinity);
+      plotPlain.push(plain);
     }
     return i;
+  }
+  /** A piece of a plain cut into its fields: split along each major curve its corners lie either side of, each section's part into its strips and crossings, every field kept back from its lines. */
+  function fieldsOf(piece: Corner[], p: number, chunk: number): void {
+    const d = divisions[p];
+    const at = [0, 0];
+    const plane = (c: Corner): number[] => onPlane(d, c.x, c.y, c.z, at);
+    let parts: Array<[Corner[], number]> = [[piece, 0]];
+    d.curves.forEach((cv, i) => {
+      const next: Array<[Corner[], number]> = [];
+      for (const [pc, sigma] of parts) {
+        // (a curve that branches off another runs on one side of it only)
+        if (cv.parent >= 0 && (((sigma >> cv.parent) & 1) === 1 ? 1 : -1) !== cv.pside) {
+          next.push([pc, sigma]);
+          continue;
+        }
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (const c of pc) {
+          plane(c);
+          const v = curveDist(cv, at[0], at[1]);
+          lo = Math.min(lo, v);
+          hi = Math.max(hi, v);
+        }
+        if (lo >= cv.half + 0.05) next.push([pc, sigma | (1 << i)]);
+        else if (hi <= -cv.half - 0.05) next.push([pc, sigma]);
+        else {
+          const a = clip(pc, majorSide(p, i, 1));
+          if (a.length >= 3) next.push([a, sigma | (1 << i)]);
+          const b = clip(pc, majorSide(p, i, -1));
+          if (b.length >= 3) next.push([b, sigma]);
+        }
+      }
+      parts = next;
+    });
+    for (const [pc, sigma] of parts) {
+      plane(pc[0]);
+      const sec = sectionOf(p, sigma, at[0], at[1]);
+      const fs: number[] = [];
+      const gs: number[] = [];
+      for (const c of pc) {
+        plane(c);
+        fs.push(stripAt(sec, at[0], at[1]));
+        gs.push(crossAt(sec, at[0], at[1]));
+      }
+      // (before rail a's first line still the first strip's, past rail b's last still the last's: as fieldOfVertex)
+      const tHi = Math.max(sec.b ? Math.min(Math.floor(Math.max(...fs)), sec.n - 1) : Math.floor(Math.max(...fs)), 0);
+      const tLo = Math.min(Math.max(Math.floor(Math.min(...fs)), 0), tHi);
+      const uLo = Math.floor(Math.min(...gs));
+      const uHi = Math.floor(Math.max(...gs));
+      for (let t = tLo; t <= tHi; t++) {
+        // (no line along a rail: the major curve's side keeps the field back there)
+        let st = pc;
+        if (t > 0 && Math.min(...fs) < t + sec.off + 0.01) st = clip(st, stripSide(p, sigma, t, true));
+        if ((!sec.b || t + 1 < sec.n) && Math.max(...fs) > t + 1 - sec.off - 0.01) st = clip(st, stripSide(p, sigma, t + 1, false));
+        if (st.length < 3) continue;
+        for (let u = uLo; u <= uHi; u++) {
+          let cu = st;
+          if (crossed(sec)) {
+            if (Math.min(...gs) < u + sec.coff + 0.01) cu = clip(cu, crossSide(p, sigma, u, true));
+            if (Math.max(...gs) > u + 1 - sec.coff - 0.01) cu = clip(cu, crossSide(p, sigma, u + 1, false));
+          }
+          if (cu.length < 3) continue;
+          const plot = plotIndex(fieldKey(p, sigma, t, u), p);
+          fan(cu, (a, b, c) => {
+            plotTri.push(a.id);
+            plotTri.push(b.id);
+            plotTri.push(c.id);
+            plotTri.push(plot);
+            plotTri.push(chunk);
+          });
+        }
+      }
+    }
   }
   // the paddies: a band's pieces joined across every edge no cut parts
   const parent = new Int32Array(pieceValid.n);
@@ -1019,32 +1697,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   });
   time('Paddies');
 
-  // the fields' floors: level, each at the band its ground lies in on the whole (the lab's: a field a step at most from
-  // the fields and paddies round it, its bunds and the flats' edge covering the step)
-  const plotFloor = new Float64Array(plotIds.size);
-  for (let i = 0; i < plotIds.size; i++) {
-    const t = plotSum[i] / Math.max(plotArea[i], 1e-9);
-    let a = 0;
-    let b = L;
-    while (a < b) {
-      const c = (a + b) >> 1;
-      if (levels[c] > t) b = c;
-      else a = c + 1;
-    }
-    plotFloor[i] = floorOf(a - 1);
-  }
-  // (checks: how far the fields' floors stand off their ground, in steps: the worst, and how many stand over a step
-  // above some of it or under it)
-  stats.fieldsOver = 0;
-  stats.fieldsUnder = 0;
-  stats.fieldsWorst = 0;
-  for (let i = 0; i < plotIds.size; i++) {
-    const over = (plotFloor[i] - plotLo[i]) / step;
-    const under = (plotHi[i] - plotFloor[i]) / step;
-    if (over > 1.5) stats.fieldsOver++;
-    if (under > 1.5) stats.fieldsUnder++;
-    stats.fieldsWorst = Math.max(stats.fieldsWorst, Math.round(10 * Math.max(over, under)) / 10);
-  }
+  // the fields' floors: every field of a plain at its level, co-planar (the plain is held level there)
+  const plotFloor = Float64Array.from(plotPlain, (p) => plainLevel[p]);
+  stats.fields = plotIds.size;
   const plotCrop: number[][] = [];
   // (the fields planted and grown, each its own green, lime to deep, as in Kai's aerial)
   for (const [key, i] of plotIds) plotCrop[i] = cropOf(0.46 + 0.54 * unit(hash32((key ^ (seed + 78)) >>> 0)), hash32((key + seed) >>> 0));
@@ -1097,7 +1752,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       let v = c.shared.get(key);
       if (v === undefined) {
         grid.point(id, tmp);
-        const h = field.height(tmp[0], tmp[1], tmp[2], g3);
+        const h = field.ground(tmp[0], tmp[1], tmp[2], g3);
         nrm[0] = tmp[0] - g3[0];
         nrm[1] = tmp[1] - g3[1];
         nrm[2] = tmp[2] - g3[2];
@@ -1115,12 +1770,8 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   // the floor a direction stands on: the woods' ground, a field's floor, a band's
   const surfaceAt = (x: number, y: number, z: number): number => {
     const cls = classAt(x, y, z);
-    if (cls === 0) return field.height(x, y, z);
-    if (cls === 1) {
-      const p = patchAt(x, y, z);
-      const id = p < 0 ? undefined : plotIds.get(fieldKey(p, Math.floor(fieldAt(0, x, y, z, p)), Math.floor(fieldAt(1, x, y, z, p))));
-      if (id !== undefined) return plotFloor[id];
-    }
+    if (cls === 0) return field.ground(x, y, z);
+    if (cls === 1) return plainLevel[plainAt(x, y, z)];
     return floorOf(bands.bandAt(x, y, z));
   };
   /** How steep the terrace field is at a direction (m per m: its own gradient, as the lab reads it). */
@@ -1147,20 +1798,20 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     if (count < 3) continue;
     const at = (i: number): number => (chain.closed ? (i + count) % count : Math.min(Math.max(i, 0), count - 1));
     const N = normals(pts, chain.closed);
-    // where it is a bank: its band still there (not pinched out), and terraced (on the flats each field is level on its
-    // own, the bands' outlines no step there)
+    // where it is a bank: its band still there (not pinched out), and farmed (a paddy's or a plain's edge, not the
+    // woods')
     const present = new Uint8Array(count);
     const cls = new Int8Array(count);
     for (let i = 0; i < count; i++) {
       const [x, y, z] = [pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]];
       const [qx, qy, qz] = moveTo(x, y, z, N[3 * i], N[3 * i + 1], N[3 * i + 2], 0.04);
       present[i] = bands.bandAt(qx, qy, qz) === k ? 1 : 0;
-      cls[i] = classAt(x, y, z);
+      cls[i] = classAt(qx, qy, qz);
     }
     const built = new Uint8Array(count);
     {
       const ok = new Uint8Array(count);
-      for (let i = 0; i < count; i++) ok[i] = present[i] && cls[i] === 2 ? 1 : 0;
+      for (let i = 0; i < count; i++) ok[i] = present[i] && cls[i] !== 0 ? 1 : 0;
       // (where it ends at the woods or the other farmed land, a little on into it, within its edge's half-width:
       // its end buried in it)
       {
@@ -1204,7 +1855,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const [x, y, z] = [pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]];
       const [ix, iy, iz] = moveTo(x, y, z, N[3 * i], N[3 * i + 1], N[3 * i + 2], 0.04);
       const [ox, oy, oz] = moveTo(x, y, z, N[3 * i], N[3 * i + 1], N[3 * i + 2], -0.05);
-      if (classAt(ix, iy, iz) !== 2 || classAt(ox, oy, oz) !== 2) continue;
+      if (classAt(ix, iy, iz) === 0 || classAt(ox, oy, oz) === 0) continue;
       const inner = bands.bandAt(ix, iy, iz);
       const outer = bands.bandAt(ox, oy, oz);
       if (inner > outer) candidates.push(x, y, z, k + 0.001 * Math.min(inner - k + 1, 9) + 0.0001 * (present[i] ? 1 : 0));
@@ -1460,60 +2111,162 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       PART.ridge,
     );
   }
-  // the fields' bunds (thin, dark) along their patch's lattice, and every so many crossings a track (pale, a cart's
-  // width) in its place: each line traced over its patch's squares, kept where the flats are
-  const flatRuns = (chains: Chain[], width: number, rise: number, wall: number, top: number): void => {
-    for (const chain of chains) {
-      const pts = resample(grid, chain, P.edgeSpacing);
-      const c = pts.length / 3;
-      const ok = new Uint8Array(c);
-      for (let i = 0; i < c; i++) ok[i] = classAt(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]) === 1 ? 1 : 0;
-      for (const run of runs(ok, chain.closed)) {
-        const r: number[] = [];
-        for (const i of run.idx) r.push(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]);
-        const N = normals(r, run.closed);
-        const probe = (i: number, s: number): number => {
-          const [x, y, z] = moveTo(r[3 * i], r[3 * i + 1], r[3 * i + 2], N[3 * i], N[3 * i + 1], N[3 * i + 2], s);
-          return surfaceAt(x, y, z);
-        };
-        ridge(r, run.closed, () => width, (i) => probe(i, width / 2 + 0.05), (i) => probe(i, -width / 2 - 0.05), () => rise, wall, top);
+  // the lines between the plains' fields, sunk: the fields' surfaces stand over them (the crop over its bunds), dark,
+  // the major curves' wider and deeper; along each plain's first major curve a track, pale and barely sunk. Each line
+  // traced over its plain's squares on its own field, kept where the plain is (a section's strips and crossings
+  // within their section), carried on a little past its ends under whatever it runs into; its lips a hair under
+  // the fields and on under their edges, so nothing between shows a gap.
+  const groove = (src: number[], closed: boolean, half: number, depth: number, track: boolean, level: number): void => {
+    if (src.length < 6) return;
+    let pts = src;
+    if (!closed) {
+      const n = src.length / 3;
+      const head = past([src[0], src[1], src[2]], [src[3], src[4], src[5]], OVERLAP);
+      const tail = past([src[3 * n - 3], src[3 * n - 2], src[3 * n - 1]], [src[3 * n - 6], src[3 * n - 5], src[3 * n - 4]], OVERLAP);
+      pts = [...head, ...src, ...tail];
+    }
+    const lip = 0.012;
+    const prof: Array<[number, number]> = track
+      ? [
+          [-(half + 0.06), lip],
+          [-half, lip],
+          [-0.8 * half, depth],
+          [0.8 * half, depth],
+          [half, lip],
+          [half + 0.06, lip],
+        ]
+      : [
+          [-(half + 0.06), lip],
+          [-half, lip],
+          [-0.55 * half, 0.7 * depth],
+          [0, depth],
+          [0.55 * half, 0.7 * depth],
+          [half, lip],
+          [half + 0.06, lip],
+        ];
+    const c = pts.length / 3;
+    const N = normals(pts, closed);
+    const ch = chunks[chunkAt(pts[0], pts[1], pts[2])];
+    const r0 = ch.count;
+    const part = track ? PART.track : PART.earth;
+    for (let i = 0; i < c; i++) {
+      for (const [s, dz] of prof) {
+        const [x, y, z] = moveTo(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2], N[3 * i], N[3 * i + 1], N[3 * i + 2], -s);
+        const h = level - dz;
+        ch.vertex(x * (R + h), y * (R + h), z * (R + h), part, NONE, level, 0, 0, 0);
+      }
+    }
+    const M = prof.length;
+    for (let i = 0; i < (closed ? c : c - 1); i++) {
+      const a = r0 + i * M;
+      const b = r0 + ((i + 1) % c) * M;
+      for (let j = 0; j + 1 < M; j++) quad(ch, a + j, b + j, b + j + 1, a + j + 1);
+    }
+    // (its ends closed: the profile fanned from its first point)
+    if (!closed) {
+      for (const i of [0, c - 1]) {
+        for (let j = 1; j + 1 < M; j++) {
+          if (i === 0) tri(ch, r0 + i * M, r0 + i * M + j + 1, r0 + i * M + j);
+          else tri(ch, r0 + i * M, r0 + i * M + j, r0 + i * M + j + 1);
+        }
       }
     }
   };
   const lineIdx = new Int32Array(V);
-  for (const [p, squares] of patchSquares) {
-    for (let fam = 0; fam < 2; fam++) {
-      for (const si of squares) {
-        const f = Math.floor(si / (m * m));
-        const cj = Math.floor((si - f * m * m) / m);
-        const t = grid.triangles(f, si - f * m * m - cj * m, cj);
-        for (const v of [t[0], t[3], t[6], t[9], t[2]]) lineIdx[v] = Math.floor(lat(fam, v, p));
+  const lineSlots = new Map<string, number>();
+  let grooves = 0;
+  for (const [p, squares] of plainSquares) {
+    const d = divisions[p];
+    const level = plainLevel[p];
+    const verts = new Set<number>();
+    for (const si of squares) {
+      const f = Math.floor(si / (m * m));
+      const cj = Math.floor((si - f * m * m) / m);
+      const t = grid.triangles(f, si - f * m * m - cj * m, cj);
+      for (const v of [t[0], t[3], t[6], t[9], t[2]]) verts.add(v);
+    }
+    const at = [0, 0];
+    /** The lines k of a field over the plain (value), each kept where `keep` holds and the plain is, sunk as a groove. */
+    const lines = (name: string, value: (X: number, Y: number) => number, take: (k: number) => boolean, keep: (X: number, Y: number) => boolean, half: number, depth: number, track: boolean): void => {
+      const known = new Map<number, number>();
+      const fv = (v: number): number => {
+        let q = known.get(v);
+        if (q === undefined) {
+          onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], at);
+          q = value(at[0], at[1]);
+          known.set(v, q);
+        }
+        return q;
+      };
+      for (const v of verts) lineIdx[v] = Math.floor(fv(v));
+      const chains = grid.trace(
+        lineIdx,
+        (u, w, k) => {
+          const key = `${p} ${name} ${k}`;
+          let slot = lineSlots.get(key);
+          if (slot === undefined) {
+            slot = nextSlot++;
+            lineSlots.set(key, slot);
+          }
+          const f3: Field = (x, y, z) => {
+            onPlane(d, x, y, z, at);
+            return value(at[0], at[1]) - k;
+          };
+          return grid.crossing(slot, u, w, f3, (v) => fv(v) - k);
+        },
+        squares,
+      );
+      for (const chain of chains) {
+        if (!take(chain.level)) continue;
+        const pts = resample(grid, chain, P.edgeSpacing);
+        const c = pts.length / 3;
+        const ok = new Uint8Array(c);
+        for (let i = 0; i < c; i++) {
+          onPlane(d, pts[3 * i], pts[3 * i + 1], pts[3 * i + 2], at);
+          ok[i] = keep(at[0], at[1]) && classAt(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]) === 1 ? 1 : 0;
+        }
+        for (const run of runs(ok, chain.closed)) {
+          const r: number[] = [];
+          for (const i of run.idx) r.push(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]);
+          groove(r, run.closed, half, depth, track, level);
+          grooves++;
+        }
       }
-      const chains = grid.trace(lineIdx, (u, w, k) => grid.crossing(fieldLine(p, fam, k), u, w, (x, y, z) => fieldAt(fam, x, y, z, p) - k, (v) => lat(fam, v, p) - k), squares);
-      const track = (k: number): boolean => fam === 1 && ((k % pl.trackEvery) + pl.trackEvery) % pl.trackEvery === 0;
-      flatRuns(
-        chains.filter((c) => !track(c.level)),
-        0.6 * D_.width,
-        0.06,
-        PART.earth,
-        PART.earth,
-      );
-      flatRuns(
-        chains.filter((c) => track(c.level)),
-        pl.trackWidth,
-        0.04,
-        PART.track,
-        PART.track,
-      );
+    };
+    d.curves.forEach((cv, i) => {
+      lines(`m${i}`, (X, Y) => (curveAt(cv, X, Y) >= 0 ? 0.5 : -0.5), (k) => k === 0, (X, Y) => curveRuns(d, cv, X, Y), cv.half, cv.track ? 0.035 : 0.18, cv.track);
+    });
+    for (const [sigma, sec] of d.sections) {
+      const inside = (X: number, Y: number): boolean => sigmaAt(d, X, Y) === sigma;
+      lines(`s${sigma}`, (X, Y) => stripAt(sec, X, Y), (k) => k >= 1 && (!sec.b || k < sec.n), inside, pl.minor / 2, 0.12, false);
+      if (crossed(sec)) lines(`c${sigma}`, (X, Y) => crossAt(sec, X, Y), () => true, inside, pl.minor / 2, 0.12, false);
     }
   }
-  // where the flats meet the terraces: a bund between the field and the paddy
-  const edgeRidge = (chains: Chain[], width: number, rise: (hl: number, hr: number) => number, wall: number, top: number): void => {
+  stats.grooves = grooves;
+  // where a plain meets the terraces, and where the woods meet the farmed land: a ridge between them (where `keep`
+  // holds, if given)
+  const edgeRidge = (chains: Chain[], width: number, rise: (hl: number, hr: number) => number, wall: number, top: number, keep?: (x: number, y: number, z: number, nx: number, ny: number, nz: number) => boolean): void => {
+    const pieces: Array<[number[], boolean]> = [];
     for (const chain of chains) {
-      const pts = resample(grid, chain, P.edgeSpacing);
+      const all = resample(grid, chain, P.edgeSpacing);
+      if (!keep) {
+        pieces.push([all, chain.closed]);
+        continue;
+      }
+      const n = all.length / 3;
+      const An = normals(all, chain.closed);
+      const ok = new Uint8Array(n);
+      for (let i = 0; i < n; i++) ok[i] = keep(all[3 * i], all[3 * i + 1], all[3 * i + 2], An[3 * i], An[3 * i + 1], An[3 * i + 2]) ? 1 : 0;
+      for (const run of runs(ok, chain.closed)) {
+        const r: number[] = [];
+        for (const i of run.idx) r.push(all[3 * i], all[3 * i + 1], all[3 * i + 2]);
+        pieces.push([r, run.closed]);
+      }
+    }
+    for (const [pts, closed] of pieces) {
       const c = pts.length / 3;
       if (c < 2) continue;
-      const N = normals(pts, chain.closed);
+      const N = normals(pts, closed);
       const side = (i: number, s: number): number => {
         const [x, y, z] = moveTo(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2], N[3 * i], N[3 * i + 1], N[3 * i + 2], s);
         return surfaceAt(x, y, z);
@@ -1523,7 +2276,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const far = width / 2 + 0.02;
       const L = Array.from({ length: c }, (_, i) => [side(i, 0.03), side(i, far)]);
       const Rt = Array.from({ length: c }, (_, i) => [side(i, -0.03), side(i, -far)]);
-      const ring = (i: number): number => (chain.closed ? (i + c) % c : Math.min(Math.max(i, 0), c - 1));
+      const ring = (i: number): number => (closed ? (i + c) % c : Math.min(Math.max(i, 0), c - 1));
       const over = (i: number): number => {
         let h = -Infinity;
         for (let d = -2; d <= 2; d++) {
@@ -1532,16 +2285,34 @@ export function buildTerraces(input: BuildInput): BuildOutput {
         }
         return h;
       };
-      ridge(pts, chain.closed, () => width, (i) => Math.min(L[i][0], L[i][1]), (i) => Math.min(Rt[i][0], Rt[i][1]), (i) => rise(L[i][1], Rt[i][1]), wall, top, over);
+      ridge(pts, closed, () => width, (i) => Math.min(L[i][0], L[i][1]), (i) => Math.min(Rt[i][0], Rt[i][1]), (i) => rise(L[i][1], Rt[i][1]), wall, top, over);
     }
   };
-  edgeRidge(
-    grid.trace(flatIdx, (u, w) => grid.crossing(SLOT.flat, u, w, flatF, flatV)),
-    0.7 * D_.width,
-    () => 0.75 * D_.height,
-    PART.riser,
-    PART.ridge,
-  );
+  // (a plain's edge, as the lab's flats': a bund between its fields and the paddies, its wall down to the lower where
+  // they step: along its flats where another level meets them, and where its own level goes on past its collar)
+  {
+    const near = new Int32Array(V);
+    const far = new Int32Array(V);
+    for (let f = 0; f < 6; f++) {
+      for (let cj = 0; cj < m; cj++) {
+        for (let ci = 0; ci < m; ci++) {
+          if (squarePlain[(f * m + cj) * m + ci] < 0) continue;
+          const t = grid.triangles(f, ci, cj);
+          for (const v of [t[0], t[3], t[6], t[9], t[2]]) {
+            near[v] = plainV(v) >= 0 ? 1 : 0;
+            far[v] = collarV(v) >= 0 ? 1 : 0;
+          }
+        }
+      }
+    }
+    const level = (x: number, y: number, z: number, nx: number, ny: number, nz: number, s: number): boolean => {
+      const p = plainAt(x, y, z);
+      const [qx, qy, qz] = moveTo(x, y, z, nx, ny, nz, s);
+      return p >= 0 && bands.bandAt(qx, qy, qz) === plainBand[p];
+    };
+    edgeRidge(grid.trace(near, (u, w) => grid.crossing(SLOT.zone, u, w, plainF, plainV)), 0.7 * D_.width, () => 0.75 * D_.height, PART.riser, PART.ridge, (x, y, z, nx, ny, nz) => !level(x, y, z, nx, ny, nz, -0.05));
+    edgeRidge(grid.trace(far, (u, w) => grid.crossing(SLOT.zone + 1, u, w, collarIn, collarV)), 0.7 * D_.width, () => 0.75 * D_.height, PART.riser, PART.ridge, (x, y, z, nx, ny, nz) => level(x, y, z, nx, ny, nz, 0.05) && level(x, y, z, nx, ny, nz, -0.05));
+  }
   // (the woods on the left: a bank of earth up to the woods, or a bund where the paddy stands above them)
   edgeRidge(
     grid.trace(woodsIdx, (u, w) => grid.crossing(SLOT.woods, u, w, steepF, steepV)),
@@ -1577,7 +2348,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           const keep = rand();
           const look = rand();
           if (keep > 0.85 || field.slope(tx, ty, tz) - fp.steep < 0.03 || classAt(tx, ty, tz) !== 0) continue;
-          trees.push(tx, ty, tz, field.height(tx, ty, tz), look);
+          trees.push(tx, ty, tz, field.ground(tx, ty, tz), look);
         }
       }
     }
@@ -1733,3 +2504,76 @@ function soften(w: Float64Array, closed: boolean): void {
   }
 }
 
+/** Squared distance (in raster steps) from each raster point to the nearest point whose flag is `to` (Felzenszwalb and Huttenlocher's transform, rows then columns). */
+function edt(flag: Uint8Array, nx: number, ny: number, to: number): Float64Array {
+  const INF = 1e20;
+  const f = new Float64Array(nx * ny);
+  for (let q = 0; q < nx * ny; q++) f[q] = flag[q] === to ? 0 : INF;
+  const n = Math.max(nx, ny);
+  const line = new Float64Array(n);
+  const out = new Float64Array(n);
+  const v = new Int32Array(n);
+  const z = new Float64Array(n + 1);
+  const pass = (len: number): void => {
+    let k = 0;
+    v[0] = 0;
+    z[0] = -INF;
+    z[1] = INF;
+    for (let q = 1; q < len; q++) {
+      let s = (line[q] + q * q - (line[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (s <= z[k]) {
+        k--;
+        s = (line[q] + q * q - (line[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      }
+      k++;
+      v[k] = q;
+      z[k] = s;
+      z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 0; q < len; q++) {
+      while (z[k + 1] < q) k++;
+      out[q] = (q - v[k]) * (q - v[k]) + line[v[k]];
+    }
+  };
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) line[i] = f[j * nx + i];
+    pass(nx);
+    for (let i = 0; i < nx; i++) f[j * nx + i] = out[i];
+  }
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) line[j] = f[j * nx + i];
+    pass(ny);
+    for (let j = 0; j < ny; j++) f[j * nx + i] = out[j];
+  }
+  return f;
+}
+
+/** A raster blurred (a Gaussian of `sigma` raster steps, rows then columns, its edges held). */
+function blur(a: Float32Array, nx: number, ny: number, sigma: number): Float32Array {
+  const r = Math.ceil(3 * sigma);
+  const k: number[] = [];
+  let sum = 0;
+  for (let i = -r; i <= r; i++) {
+    k.push(Math.exp(-(i * i) / (2 * sigma * sigma)));
+    sum += k[k.length - 1];
+  }
+  for (let i = 0; i < k.length; i++) k[i] /= sum;
+  const b = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      let s = 0;
+      for (let t = -r; t <= r; t++) s += k[t + r] * a[j * nx + Math.min(Math.max(i + t, 0), nx - 1)];
+      b[j * nx + i] = s;
+    }
+  }
+  const c = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      let s = 0;
+      for (let t = -r; t <= r; t++) s += k[t + r] * b[Math.min(Math.max(j + t, 0), ny - 1) * nx + i];
+      c[j * nx + i] = s;
+    }
+  }
+  return c;
+}
