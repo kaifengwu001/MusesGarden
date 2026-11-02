@@ -84,8 +84,13 @@ type Where = (t: number) => Pose;
 /** The basket model's size (model units): its rim's radius, and the box it fills (rim to rim, foot to handle). */
 const RIM = 0.52;
 const MODEL = { width: 2 * (RIM + 0.05), height: 0.98, middle: 0.07 } as const;
-/** A flower in the basket: its stem this long (model units), its foot this deep and this far out, leaning out. */
-const IN_BASKET = { stem: 0.7, foot: -0.3, reach: 0.22, lean: 0.24 } as const;
+/**
+ * A flower in the basket, out of sight: lying on its bottom (model units: its stem this long, its foot this deep and
+ * this far to one side, raised this much, rad), a little toward the front, where the front wall hides it.
+ */
+const IN_BASKET = { stem: 0.6, foot: -0.3, reach: 0.3, raised: 0.12, front: 0.08, spread: 0.12 } as const;
+/** A flower ready to go home, standing in the basket: its stem this long (model units), its foot this deep and this far out, leaning out. */
+const READY = { stem: 0.7, foot: -0.3, reach: 0.22, lean: 0.24 } as const;
 /** A fanned flower's stem against the fan's spacing, and how it is turned toward you. */
 const FAN_STEM = 2.3;
 const FAN_TIP = 0.55;
@@ -93,11 +98,14 @@ const FAN_TIP = 0.55;
 const BASKET_TILT = new Euler(0.42, -0.32, 0);
 const SMALL = 0.72;
 /**
- * Seconds: the basket's flights, a flower's rise and drop, the stagger between flowers, a vanish, an appearance, a
- * flower's leave before the camera stops, the gap between leaves, and the beat after the last touch-down before an
- * act is done (the card rises after its flower has settled, not on the frame it lands).
+ * Seconds: the basket's flights, a flower's rise out of the basket to its slot (and its drop back in, the same way
+ * backward), the stagger between flowers, a vanish, a flower's leave before the camera stops, the gap between leaves,
+ * and the beat after the last touch-down before an act is done (the card rises after its flower has settled, not on
+ * the frame it lands).
  */
-const T = { out: 0.62, home: 0.5, rise: 0.5, drop: 0.3, stagger: 0.045, vanish: 0.3, appear: 0.22, lead: 0.45, gap: 0.11, landed: 0.35 } as const;
+const T = { out: 0.62, home: 0.5, rise: 0.5, stagger: 0.04, vanish: 0.3, lead: 0.45, gap: 0.11, landed: 0.35 } as const;
+/** A rise's bow up, against its length. */
+const RISE_ARC = 0.3;
 /** A flower going home: the least time it takes over its whole way (s), its touch-down after the camera stops (s), and where it starts following the live view. */
 const HOMING = { least: 0.6, after: 0.08, follow: 0.7 } as const;
 /** Sparkles: how many at once, how long each lives (s). */
@@ -107,7 +115,9 @@ const SPARK_LIFE = 0.75;
 const Z = { fan: 0, home: 320 } as const;
 
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
-const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
+const linear = (t: number): number => t;
+const early = (t: number): number => 1 - (1 - t) * (1 - t);
+const late = (t: number): number => t * t;
 const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const easeBack = (t: number): number => {
   const u = t - 1;
@@ -249,8 +259,8 @@ const pose = (x: number, y: number, z: number, q: Quaternion, s: number, a = 1):
 interface Bloom {
   readonly look: StageFlower;
   readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
-  /** Its place in the basket (its index among the flowers) or in the fan (its slot). */
-  rest: { readonly in: 'basket' | 'fan'; readonly k: number };
+  /** Its place (by its index among the flowers, which is its slot in the fan): out of sight in the basket, standing in it ready to go home, or in the fan. */
+  rest: { readonly in: 'basket' | 'ready' | 'fan'; readonly k: number };
   leg: Leg | null;
   /** Going home to its patch. */
   homing: Homing | null;
@@ -260,7 +270,7 @@ interface Bloom {
   hover: number;
 }
 
-/** A way between two places, eased over [start, start + span] s, bowing up by `arc` of its length. */
+/** A way between two places, each followed as it moves (a place in the basket flies with it), eased over [start, start + span] s, bowing up by `arc` of its length. */
 interface Leg {
   readonly from: Where;
   readonly to: Where;
@@ -268,9 +278,9 @@ interface Leg {
   readonly span: number;
   readonly arc: number;
   readonly ease: (t: number) => number;
-  /** Where it set off from (taken as it starts: until then it rides along with `from`). */
-  setOff: Pose | null;
-  readonly then?: () => void;
+  /** How far its turn and its size have come when its place is `e` of the way. */
+  readonly turn: (e: number) => number;
+  readonly grow: (e: number) => number;
 }
 
 interface Homing {
@@ -446,29 +456,21 @@ export class BasketStage {
       return;
     }
     this.moveBasket('centre', T.out, 0.22, easeBack);
-    [...this.order()].forEach(([k, b], i) => this.send(b, { in: 'fan', k }, t + (wasHome ? 0.3 : 0.08) + i * T.stagger, T.rise, 0.3, easeOut));
+    this.rise(t + (wasHome ? 0.3 : 0.08));
   }
 
-  /** Another day: the flowers out vanish in a sparkle and these appear in the basket and rise into `fan`. */
+  /** Another day: the flowers out vanish in a sparkle and these rise out of the basket into `fan`. */
   swap(flowers: readonly StageFlower[], fan: Fan, animate: boolean, done: () => void): void {
     this.begin(done);
     this.fan = fan;
-    const t = this.time;
     for (const b of [...this.blooms.values()]) this.vanish(b, animate);
     this.blooms.clear();
     this.setFlowers(flowers);
-    for (const [k, b] of this.order()) {
-      if (!animate) {
-        this.settleIn(b, { in: 'fan', k });
-        continue;
-      }
-      // appear in the basket with a little sparkle, then rise
-      b.rest = { in: 'basket', k };
-      b.leg = this.leg(this.grown(b, 0.2, 0), (now) => this.inBasket(b, k, now), t + 0.12 + k * 0.03, T.appear, 0, easeOut, () => {
-        this.sparkle(this.headOf(b), 5, 0.6);
-        this.send(b, { in: 'fan', k }, this.time + 0.06, T.rise, 0.3, easeOut);
-      });
+    if (!animate) {
+      for (const [k, b] of this.order()) this.settleIn(b, { in: 'fan', k });
+      return;
     }
+    this.rise(this.time + 0.15);
   }
 
   /** Put the flowers back in the basket and the basket back into the rail's icon (`to`). */
@@ -481,8 +483,7 @@ export class BasketStage {
       return;
     }
     const t = this.time;
-    [...this.order()].forEach(([k, b], i) => this.send(b, { in: 'basket', k }, t + i * 0.025, T.drop, 0.12, easeInOut));
-    this.moveBasket(null, T.home, -0.12, easeInOut, t + T.drop * 0.8);
+    this.moveBasket(null, T.home, -0.12, easeInOut, this.dropIn(t) - 0.1);
   }
 
   /** One flower goes home to its patch as the camera flies there; the others drop in and the basket goes back to `to`. */
@@ -492,10 +493,10 @@ export class BasketStage {
     this.departures = null;
     const picked = this.take(landing.id);
     const t = this.time;
-    for (const [k, b] of this.order()) this.send(b, { in: 'basket', k }, t, T.drop, 0.12, easeInOut);
+    const inside = this.dropIn(t);
     if (picked) this.home(picked, landing, t, land, animate);
     else land(landing.id);
-    if (animate) this.moveBasket(null, T.home, -0.12, easeInOut, t + T.drop);
+    if (animate) this.moveBasket(null, T.home, -0.12, easeInOut, inside - 0.1);
     else this.putAway();
   }
 
@@ -514,7 +515,7 @@ export class BasketStage {
       return;
     }
     const t = this.time;
-    [...this.order()].forEach(([k, b], i) => this.send(b, { in: 'basket', k }, t + i * 0.02, T.drop, 0.12, easeInOut));
+    this.dropIn(t, 'ready');
     this.moveBasket('small', 0.42, 0, easeInOut, t + 0.12);
     this.departures = { landings: [...landings], land, next: null };
   }
@@ -647,24 +648,36 @@ export class BasketStage {
     return out.set(at.x + out.x, at.y - out.y, out.z);
   }
 
-  /** A flower in the basket: its foot inside, leaning out, its head above the rim. */
-  private inBasket(b: Bloom, k: number, t: number): Pose {
+  /** A flower in the basket, lying on its bottom out of sight, its head toward its side of the fan. */
+  private inBasket(b: Bloom, k: number): Pose {
+    const at = this.basketAt;
+    const fan = this.fan;
+    const slot = fan?.slots[k];
+    const off = slot && fan ? slot.x - fan.basket.x : 0;
+    const side = Math.abs(off) > 1 ? Math.sign(off) : k % 2 ? 1 : -1;
+    const front = IN_BASKET.front + IN_BASKET.spread * (((k * 0.618) % 1) - 0.5);
+    const foot = this.basketPoint(this.tv.set(-side * IN_BASKET.reach, IN_BASKET.foot, front), at, new Vector3());
+    const q = this.basketTurn.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -side * (Math.PI / 2 - IN_BASKET.raised)));
+    return pose(foot.x, foot.y, foot.z, q, (at.s * IN_BASKET.stem) / HEADS[b.look.species][0]);
+  }
+
+  /** A flower ready to go home: its foot inside, leaning out, its head above the rim (it leaves from here in view). */
+  private readyPose(b: Bloom, k: number, t: number): Pose {
     const at = this.basketAt;
     const angle = k * 2.399 + 0.6;
-    const reach = IN_BASKET.reach * Math.sqrt((k + 0.5) / Math.max(1, this.blooms.size));
-    const foot = this.basketPoint(this.tv.set(Math.cos(angle) * reach, IN_BASKET.foot, Math.sin(angle) * reach * 0.8), at, new Vector3());
-    const lean = new Quaternion().setFromEuler(new Euler(Math.sin(angle) * IN_BASKET.lean, 0, -Math.cos(angle) * IN_BASKET.lean));
+    const reach = READY.reach * Math.sqrt((k + 0.5) / Math.max(1, this.blooms.size));
+    const foot = this.basketPoint(this.tv.set(Math.cos(angle) * reach, READY.foot, Math.sin(angle) * reach * 0.8), at, new Vector3());
+    const lean = new Quaternion().setFromEuler(new Euler(Math.sin(angle) * READY.lean, 0, -Math.cos(angle) * READY.lean));
     const sway = Math.sin(t * 1.3 + k * 1.7) * 0.03;
     const q = this.basketTurn.clone().multiply(lean).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), sway)).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), k * 1.1));
-    const stem = HEADS[b.look.species][0];
-    return pose(foot.x, foot.y, foot.z, q, (at.s * IN_BASKET.stem) / stem);
+    return pose(foot.x, foot.y, foot.z, q, (at.s * READY.stem) / HEADS[b.look.species][0]);
   }
 
   /** A flower in the fan: its head on its slot, its stem toward the basket, turned to show its face, bobbing. */
   private inFan(b: Bloom, k: number, t: number): Pose {
     const fan = this.fan;
     const slot = fan?.slots[k];
-    if (!fan || !slot) return this.inBasket(b, k, t);
+    if (!fan || !slot) return this.inBasket(b, k);
     const bob = Math.sin(t * 1.7 + k * 1.3);
     const lift = b.hover;
     const s = ((FAN_STEM * fan.size) / HEADS[b.look.species][0]) * (1 + 0.12 * lift) * (b.look.size / 1.6) ** 0.35;
@@ -676,28 +689,35 @@ export class BasketStage {
     return pose(slot.x - stem.x, slot.y + stem.y - 2.5 * bob - 6 * lift, Z.fan + k, q, s);
   }
 
-  private restPose(b: Bloom, t: number): Pose {
-    return b.rest.in === 'fan' ? this.inFan(b, b.rest.k, t) : this.inBasket(b, b.rest.k, t);
+  /** Where a flower rests, in the basket or on its slot (by default where it is going now). */
+  private restPose(b: Bloom, t: number, rest: Bloom['rest'] = b.rest): Pose {
+    if (rest.in === 'fan') return this.inFan(b, rest.k, t);
+    return rest.in === 'ready' ? this.readyPose(b, rest.k, t) : this.inBasket(b, rest.k);
   }
 
-  /** `b` grown to `s` of its size and `a` opaque, where it rests. */
-  private grown(b: Bloom, s: number, a: number): Where {
-    return (t) => {
-      const p = this.restPose(b, t);
-      return { ...p, s: p.s * s, a };
-    };
-  }
-
-  private leg(from: Where, to: Where, start: number, span: number, arc: number, ease: (t: number) => number, then?: () => void): Leg {
-    return { from, to, start, span, arc, ease, setOff: null, then };
-  }
-
-  /** Send a flower to a place, setting off from wherever it is then. */
-  private send(b: Bloom, rest: Bloom['rest'], start: number, span: number, arc: number, ease: (t: number) => number): void {
+  /**
+   * Send a flower to a place on the rise's way, setting off from wherever it is then. Out of the basket it turns up
+   * early and grows late, so it clears the rim before it reaches out to its slot; back in, the same played backward.
+   */
+  private send(b: Bloom, rest: Bloom['rest'], start: number): void {
     const was = b.leg;
-    const from: Where = was ? (t) => this.legPose(was, t) : (t) => this.restPose(b, t);
+    const at = b.rest;
+    const from: Where = was ? (t) => this.legPose(was, t) : (t) => this.restPose(b, t, at);
+    const out = rest.in === 'fan';
     b.rest = rest;
-    b.leg = this.leg(from, (t) => this.restPose(b, t), start, span, arc, ease);
+    b.leg = { from, to: (t) => this.restPose(b, t, rest), start, span: T.rise, arc: RISE_ARC, ease: easeInOut, turn: out ? early : late, grow: out ? late : early };
+  }
+
+  /** Every flower out of the basket to its slot, one after another from `start`. */
+  private rise(start: number): void {
+    for (const [k, b] of this.order()) this.send(b, { in: 'fan', k }, start + k * T.stagger);
+  }
+
+  /** Every flower back into the basket from `start` (out of sight, or ready to go home), the rise played backward (the last out goes in first); returns when the last is in. */
+  private dropIn(start: number, into: 'basket' | 'ready' = 'basket'): number {
+    const last = this.blooms.size - 1;
+    for (const [k, b] of this.order()) this.send(b, { in: into, k }, start + (last - k) * T.stagger);
+    return start + Math.max(0, last) * T.stagger + T.rise;
   }
 
   private settleIn(b: Bloom, rest: Bloom['rest']): void {
@@ -711,14 +731,7 @@ export class BasketStage {
       return;
     }
     const now = this.pose(b, this.time);
-    b.leg = this.leg(
-      () => now,
-      () => now,
-      this.time,
-      1,
-      0,
-      (x) => x,
-    );
+    b.leg = { from: () => now, to: () => now, start: this.time, span: 1, arc: 0, ease: linear, turn: linear, grow: linear };
     b.vanish = this.time;
     this.sparkle(this.headOf(b), 9, 1);
     this.leaving.push(b);
@@ -753,9 +766,9 @@ export class BasketStage {
 
   private legPose(leg: Leg, t: number): Pose {
     if (t < leg.start) return leg.from(t);
-    leg.setOff ??= leg.from(leg.start);
     const u = clamp01((t - leg.start) / leg.span);
-    return blend(leg.setOff, leg.to(t), leg.ease(u), leg.arc);
+    const e = leg.ease(u);
+    return blend(leg.from(t), leg.to(t), e, leg.arc, leg.turn(e), leg.grow(e));
   }
 
   private homePose(h: Homing): Pose {
@@ -817,11 +830,7 @@ export class BasketStage {
     this.stepDepartures(t);
     for (const b of this.blooms.values()) {
       b.hover = approach(b.hover, this.hovered === b.look.id ? 1 : 0, dt / 0.12);
-      if (b.leg && t >= b.leg.start + b.leg.span) {
-        const then = b.leg.then;
-        b.leg = null;
-        then?.();
-      }
+      if (b.leg && t >= b.leg.start + b.leg.span) b.leg = null;
     }
     this.basketHover = approach(this.basketHover, this.hovered === '' ? 1 : 0, dt / 0.15);
     for (const b of [...this.leaving]) {
@@ -972,16 +981,16 @@ const cubic = (a: number, b: number, c: number, d: number, u: number): number =>
   return v * v * v * a + 3 * v * v * u * b + 3 * v * u * u * c + u * u * u * d;
 };
 
-/** Between two poses, `e` of the way, bowing up (toward the screen's top) by `arc` of the distance. */
-function blend(a: Pose, b: Pose, e: number, arc: number): Pose {
+/** Between two poses, `e` of the way (its turn `turn` and its size `grow` of theirs), bowing up (toward the screen's top) by `arc` of the distance. */
+function blend(a: Pose, b: Pose, e: number, arc: number, turn = e, grow = e): Pose {
   const lift = arc * Math.hypot(b.x - a.x, b.y - a.y);
   const u = clamp01(e);
   return {
     x: quad(a.x, (a.x + b.x) / 2, b.x, e),
     y: quad(a.y, (a.y + b.y) / 2 - lift, b.y, e),
     z: a.z + (b.z - a.z) * u,
-    q: a.q.clone().slerp(b.q, u),
-    s: a.s * Math.pow(b.s / Math.max(a.s, 1e-6), e),
+    q: a.q.clone().slerp(b.q, clamp01(turn)),
+    s: a.s * Math.pow(b.s / Math.max(a.s, 1e-6), grow),
     a: a.a + (b.a - a.a) * u,
   };
 }
