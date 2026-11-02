@@ -42,6 +42,8 @@ Started from fbbf35e (the paddies painted as the lab paints them). Kai (2026-11-
 | 2 | "Neither flat is truly flat": on the planet the paddies' outlines invade the flats; in the lab the divided cells still rise up and down | |
 | 3 | "Neither gets how the cells within a flat are divided, and both feel very mechanical, not organic at all": the major and minor lines are all gentle bezier curves | |
 | 4 | "The surfaces of the cells rise above the divides, but the surfaces should be co-planar with each other" | |
+| 5 | (Kai, 2026-11-02, on the work in progress) "Still getting paddies invading into flat areas: how did we avoid that in the lab?" | |
+| 6 | "Flat cells are still too large, and their divides not curved enough" | |
 
 ### Kai's notes on the planet's paddies against the lab
 
