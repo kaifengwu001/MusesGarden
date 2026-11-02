@@ -1,6 +1,7 @@
 import { Matrix4, PerspectiveCamera, Quaternion, Vector3, Vector4 } from 'three';
 import friendFace from '../../assets/garden/friend-face.jpg';
 import museFace from '../../assets/garden/muse-face.jpg';
+import basketImage from '../../assets/garden/orchard-basket-warm-brown.png';
 import { smoothstep } from '../../core/math';
 import { bedAt, layOut, type Bed, type GardenLayout } from '../../garden/placement';
 import { placeholderSource, type PlaceholderSource } from '../../garden/placeholder';
@@ -191,10 +192,14 @@ export class GardenUi {
     this.homeButton.dataset.label = 'Muse’s cottage';
     this.sign = el('span', 'g-sign', 'out');
     this.homeButton.append(this.sign);
-    this.basketsButton = button('g-railbtn g-basketbtn', 'Baskets', ICONS.basket, () => this.railBasket());
+    this.basketsButton = button('g-railbtn g-basketbtn', 'Baskets', '', () => this.railBasket());
     this.basketsButton.dataset.label = 'Baskets';
+    const basketIcon = el('img', 'g-basket-icon');
+    basketIcon.src = basketImage;
+    basketIcon.alt = '';
+    basketIcon.draggable = false;
     this.basketDot = el('span', 'g-dot');
-    this.basketsButton.append(this.basketDot);
+    this.basketsButton.append(basketIcon, this.basketDot);
     this.rail.append(this.portrait, find, this.homeButton, this.basketsButton);
     this.root.append(this.rail);
 
@@ -243,7 +248,7 @@ export class GardenUi {
     if (change === 'snapshot' || change === 'baskets') this.relayout(true);
     if (change === 'snapshot' || change === 'likes' || change === 'status') this.refreshPins();
     const unread = s.unread.length;
-    this.postbox.setMail(unread, s.invitations.filter((p) => !s.isRead(p.id)).length);
+    this.postbox.setMail(unread, s.invitations.filter((p) => !s.isRead(p.id)).length, s.today.length);
     this.basketDot.classList.toggle('is-on', s.freshBasket !== undefined);
     const home = s.status.home;
     this.portrait.classList.toggle('is-out', !home);

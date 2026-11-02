@@ -172,6 +172,9 @@ export class Mail {
   private cards: Postcard[] = [];
   private top = 0;
   private opening = false;
+  private closing = false;
+  private operation = 0;
+  private readonly pending = new Set<number>();
   /** The invitation whose ticket is on its way out of its envelope to the others. */
   private pocketing: string | null = null;
   private ticketIds = '';
@@ -232,7 +235,22 @@ export class Mail {
   }
 
   get isOpen(): boolean {
-    return this.el.classList.contains('is-open');
+    return this.opening || this.el.classList.contains('is-open');
+  }
+
+  private invalidate(): number {
+    for (const timer of this.pending) clearTimeout(timer);
+    this.pending.clear();
+    return ++this.operation;
+  }
+
+  private later(action: () => void, ms: number): void {
+    const operation = this.operation;
+    const timer = window.setTimeout(() => {
+      this.pending.delete(timer);
+      if (operation === this.operation) action();
+    }, reducedMotion() ? 0 : ms);
+    this.pending.add(timer);
   }
 
   /** A heart or a star beside the card; its word shows to its right on hover. */
@@ -245,7 +263,7 @@ export class Mail {
 
   /** Called when the post changes: a card arrived, a like or a star came back, an envelope was opened. */
   refresh(): void {
-    if (!this.isOpen || this.opening) return;
+    if (!this.isOpen || this.opening || this.closing) return;
     this.paintTickets();
     if (this.pocketing) return;
     if (this.board) this.paintBoard(false);
@@ -266,37 +284,69 @@ export class Mail {
 
   /** Open the box: its door drops, and today's cards fly from its mouth into the deck. */
   async open(): Promise<void> {
-    if (this.isOpen || this.opening) return;
+    if (this.opening || (this.isOpen && !this.closing)) return;
+    const operation = this.invalidate();
+    this.closing = false;
     this.opening = true;
+    this.pocketing = null;
+    this.el.classList.remove('is-open', 'is-closing', 'is-board');
+    document.body.classList.remove('g-mail-open');
+    this.stage.replaceChildren();
     const mouth = await this.postbox.open();
+    if (operation !== this.operation) return;
     this.el.classList.add('is-open');
     document.body.classList.add('g-mail-open');
     this.ticketIds = '';
-    this.show('today', mouth);
+    this.show('today', reducedMotion() ? undefined : mouth);
+    this.postbox.releaseMail();
     this.state.collect();
     this.opening = false;
   }
 
   close(): void {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.closing) return;
+    this.invalidate();
+    this.opening = false;
+    this.pocketing = null;
+    if (this.drag?.node.hasPointerCapture(this.drag.pointer)) this.drag.node.releasePointerCapture(this.drag.pointer);
+    this.drag = null;
+    this.swallowClick = false;
+    const finish = (): void => {
+      this.closing = false;
+      this.el.classList.remove('is-open', 'is-board', 'is-closing');
+      document.body.classList.remove('g-mail-open');
+      this.stage.replaceChildren();
+      this.postbox.close();
+    };
+    if (!this.el.classList.contains('is-open') || reducedMotion()) {
+      finish();
+      return;
+    }
+    this.closing = true;
+    this.el.classList.add('is-closing');
+    if (this.board) {
+      this.later(finish, 180);
+      return;
+    }
     const mouth = this.postbox.mouth();
     const stage = this.stage.getBoundingClientRect();
     for (const node of this.stage.children) {
       const e = node as HTMLElement;
-      e.classList.remove('is-flipped', 'is-open');
+      e.classList.remove('is-flipped', 'is-open', 'is-dragging', 'is-thrown');
+      e.style.transition = '';
       e.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
       e.style.setProperty('--y', `${mouth.y - stage.top - stage.height / 2}px`);
-      e.style.setProperty('--s', '0.12');
+      e.style.setProperty('--s', '0.075');
+      e.style.setProperty('--r', '-12deg');
       e.style.opacity = '0';
     }
-    this.el.classList.remove('is-open', 'is-board');
-    document.body.classList.remove('g-mail-open');
-    setTimeout(() => this.postbox.close(), 220);
+    this.later(finish, 520);
   }
 
   /** Esc, or a click beside the card: from a card picked on a page back to the page, else the post closes. */
   back(): void {
-    if (this.view !== 'today' && !this.board) this.showBoard();
+    if (this.opening || this.closing) this.close();
+    else if (this.view !== 'today' && !this.board) this.showBoard();
     else this.close();
   }
 
@@ -316,6 +366,7 @@ export class Mail {
   // ---- the deck ---------------------------------------------------------------------
 
   private layDeck(cards: Postcard[], top: number, mouth?: { x: number; y: number }): void {
+    const operation = this.operation;
     this.cards = cards;
     this.top = cards.length > 0 ? Math.min(top, cards.length - 1) : 0;
     const nodes = cards.map((card, i) => {
@@ -330,23 +381,25 @@ export class Mail {
       for (const node of nodes) {
         node.style.setProperty('--x', `${mouth.x - stage.left - stage.width / 2}px`);
         node.style.setProperty('--y', `${mouth.y - stage.top - stage.height / 2}px`);
-        node.style.setProperty('--s', '0.12');
+        node.style.setProperty('--s', '0.075');
         node.style.setProperty('--r', '-20deg');
         node.style.opacity = '0';
       }
       // the deepest that shows lands first, the top card last
-      void nextFrame().then(() =>
+      void nextFrame().then(() => {
+        if (operation !== this.operation) return;
         nodes.forEach((node, i) => {
           const depth = Math.min(this.depth(i), DECK.length - 1);
-          setTimeout(
+          this.later(
             () => {
+              if (this.closing || !node.isConnected) return;
               node.style.opacity = '';
               this.arrange(node, i);
             },
             (DECK.length - 1 - depth) * 90,
           );
-        }),
-      );
+        });
+      });
     } else nodes.forEach((node, i) => this.arrange(node, i));
     this.paint();
   }
@@ -418,6 +471,7 @@ export class Mail {
   }
 
   private stageClick(e: MouseEvent): void {
+    if (this.opening || this.closing) return;
     if (this.swallowClick) {
       this.swallowClick = false;
       return;
@@ -445,7 +499,7 @@ export class Mail {
   }
 
   private key(e: KeyboardEvent): void {
-    if (!this.isOpen || this.board || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!this.isOpen || this.opening || this.closing || this.board || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       e.stopImmediatePropagation();
       this.step(e.key === 'ArrowRight' ? 1 : -1);
@@ -458,6 +512,7 @@ export class Mail {
   // ---- swiping: the top card thrown away, any way, and the next comes up ---------------
 
   private grab(e: PointerEvent): void {
+    if (this.opening || this.closing) return;
     this.swallowClick = false;
     const target = e.target as HTMLElement;
     const node = target.closest<HTMLElement>('.g-pc.is-top');
@@ -506,7 +561,8 @@ export class Mail {
     this.top = (this.top + 1) % this.cards.length;
     this.rearrange();
     // under the deck out of sight, then it shows there
-    setTimeout(() => {
+    this.later(() => {
+      if (!node.isConnected) return;
       node.style.transition = 'none';
       this.arrange(node, Number(node.dataset.index));
       void node.offsetWidth;
@@ -600,11 +656,18 @@ export class Mail {
 
   /** An envelope opened: its flap lifts, its ticket slides out, flies to its place among the tickets and lands there. */
   private async pocket(card: Postcard, node: HTMLElement): Promise<void> {
+    const operation = this.operation;
     const motion = !reducedMotion();
     this.pocketing = card.id;
     this.side.classList.remove('is-on');
     node.classList.add('is-open');
     await wait(motion ? 950 : 0);
+    if (operation !== this.operation) return;
+    if (!node.isConnected) {
+      this.pocketing = null;
+      this.refresh();
+      return;
+    }
     // opened: it is a ticket now, and the column makes room for it
     this.state.markRead(card.id);
     this.paintTickets();
@@ -624,6 +687,7 @@ export class Mail {
       node.classList.add('is-pocketed');
       place(node, { x, y, r: Number.parseFloat(getComputedStyle(target).getPropertyValue('--tilt')) || 0, s, shown: true });
       await wait(motion ? 620 : 0);
+      if (operation !== this.operation) return;
       target.classList.remove('is-incoming');
       target.classList.add('is-landed');
     }
