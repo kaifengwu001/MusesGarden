@@ -11,7 +11,8 @@ import vertexShader from '../../../src/life/muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from '../../../src/life/museRig';
 import { MuseRoam, PACE, type Roaming } from './museRoam';
-import shadowFragment from '../../../src/life/museShadow.frag.glsl?raw';
+// Scarlet still adds optical depth into its cloud map, so retain that shader contract locally.
+import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from '../../../src/life/museShadow.vert.glsl?raw';
 
 // Muse, who lives here: a cream plush about as tall as you, built from its

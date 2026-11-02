@@ -6,7 +6,7 @@ import { travel, tangentToward } from '../../../src/planet/geo';
 import vertexShader from './findBed.vert.glsl?raw';
 import { SPECIES_MESH } from './flowerMeshes';
 import { HEADS } from './flowers';
-import fragmentShader from '../../../src/life/grass.frag.glsl?raw';
+import fragmentShader from './nativePlant.frag.glsl?raw';
 
 // Each kept find grows a native canyon patch: coral, ivory fern or sage.
 // Topic channel IDs, planting timelines, highlights and hover lifts are unchanged.

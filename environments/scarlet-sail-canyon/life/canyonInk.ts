@@ -123,6 +123,7 @@ export function makeCanyonInk(source: BufferGeometry, shared: Record<string, IUn
   if (!shared.uSceneryTime) throw new Error('Canyon ink must share the scenery clock.');
   const geometry = canyonInkGeometry(source);
   for (const [name, attribute] of Object.entries(attributes)) geometry.setAttribute(name, attribute);
+  geometry.setAttribute('aGroundSlope', source.getAttribute('aGroundSlope') ?? new InstancedBufferAttribute(new Float32Array(attributes.aAnchor.count*2),2));
   const count = source instanceof InstancedBufferGeometry ? source.instanceCount : attributes.aAnchor.count;
   geometry.instanceCount = Number.isFinite(count) ? count : attributes.aAnchor.count;
   const material = new ShaderMaterial({
