@@ -762,14 +762,12 @@ export class Clouds {
       at.fade = fade;
       at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32(h + 1))) * Math.pow(scale, 0.35);
       at.size = SIZE * sizeScale * girth * (0.9 + 0.2 * unit(hash32(h + 2))) * (0.35 + 0.65 * fade);
-      let angle = (time * speed) / at.base;
+      const angle = (time * speed) / at.base;
       at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
-      if (ground) {
-        // (over hills: its base the altitude over the ground under it, as it drifts)
-        at.base += ground(at.up);
-        angle = (time * speed) / at.base;
-        at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
-      }
+      // (over hills: its base the altitude over the ground under it, as it drifts; it drifts at its altitude's own
+      // pace still, as every cloud does: the ground's height in its pace, with the time since the page opened, moved
+      // clouds over a slope ahead or back of the rest, ever more)
+      if (ground) at.base += ground(at.up);
       at.along.copy(slot.along).applyAxisAngle(windAxis, angle);
       at.along.addScaledVector(at.up, -at.along.dot(at.up)).normalize();
       at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
