@@ -1,5 +1,13 @@
 # References
 
+## Mainline compatibility review
+
+- [Cottage and mill](mainline-review/mainline-home.png), [dense flower fields](mainline-review/mainline-fields.png), [globe](mainline-review/mainline-globe.png).
+- [Postcard album](mainline-review/mainline-album.png), [find card](mainline-review/mainline-find.png).
+- [Source/mainline comparison](mainline-review/comparison.json), [final merged scene and control checks](mainline-review/final-smoke.json).
+
+The three scene canvases are pixel-identical to the original preview at matched camera presets, frozen time12 and disabled pins. Native Windows Chromium / ANGLE D3D11 / RTX 4070 SUPER, 1440x960, DPR1/high/MSAA4. Final control smoke records zero runtime errors and the shared butterfly shader's Direct3D compiler warning. These images preserve the existing design during mainline integration.
+
 ## Current density review
 
 The latest planting is shown in `density-review/`; previous cottage images below retain the earlier sparse planting.

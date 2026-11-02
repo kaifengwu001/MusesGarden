@@ -1,5 +1,17 @@
 # Validation — Tulipwind Meadows
 
+## Mainline integration — 2 November 2026
+
+The complete environment and density/cottage revisions are committed from source 7ea2f22. Integration starts from remote main 37c8206 and incorporates the newer shared asset naming in 335104a. The original find-state table, card/postbox/pins, garden styling and Muse/grass shader contracts are retained locally in this environment to preserve the reviewed appearance against changed mainline interfaces. The model loader uses the current shared sculpt names. Shared source, server and lockfile have no Tulipwind changes. Root additions are the environment index and three scoped npm commands.
+
+- 35 focused CPU tests pass across four files, including the six local find-table tests and the existing 29 geometry/planting/parameter/growth checks.
+- Seven native D3D11 browser checks pass: frozen redraw, windmill/Bloom/time return, dense-field walking and buffer reuse, growth return, CPU/GPU terrain parity, picking and the unchanged continuous-growth budget.
+- Final scoped TypeScript/ESLint and standalone production build pass after integrating the renamed model loader. The existing large-chunk build warning remains.
+- Cottage, remote flower-field and globe canvases match the original preview exactly, including after the shared asset rename. Evidence: [comparison](reference/mainline-review/comparison.json) and [final smoke result](reference/mainline-review/final-smoke.json). Windows Chromium / RTX 4070 SUPER / ANGLE D3D11, 1440x960, DPR1, high/MSAA4, frozen time12; pins disabled for canvas comparisons to exclude wall-clock pop animation.
+- Interaction smoke passes: six basket rows open/close, Post box and Album open/close, and a find card opens, updates Like state and closes. No runtime/console errors. Direct3D emits a warning about potentially uninitialized `f_wing_int` in the unchanged shared butterfly shader; this is recorded in the result, not counted as an error-free compiler log.
+
+The comparison harness needed the same authored home preset rather than a zero-pitch reconstructed pose, and its closed-mail lookup needed to include hidden elements. These were harness corrections, with no rendering tolerances relaxed. Screenshots of the three scene views, album and find card were inspected. Earlier checkpoint notes below describe their original state; their “no commit/push” wording is historical. Existing startup, platform, interior/collision and Muse-pose limitations remain.
+
 ## Ground-filling tulip density — 2 November 2026
 
 The user's remote walking view exposed the old difference between dense home planting and very sparse global flowers. The home-only rectangle is replaced by a224×224 close-detail window of globally addressed planting cells, spaced34cm apart. Cells retain their roots, colour and wind phase as the window moves; camera/growth changes update uniforms rather than rebuilding placement buffers. The same farm/path/pasture exclusions apply in the shader. Detailed foliage is12% broader horizontally. Close detail fades between18m and50m camera altitude; the globe uses the distant representation.

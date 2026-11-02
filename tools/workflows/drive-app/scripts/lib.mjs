@@ -8,7 +8,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const HERE = dirname(fileURLToPath(import.meta.url));
-/** The checkout these scripts sit in (.claude/skills/drive-app/scripts → its root). */
+/** The checkout these scripts sit in (tools/workflows/drive-app/scripts → its root). */
 export const REPO = resolve(HERE, '../../../..');
 /** Where build-at.sh puts builds, a folder per name. */
 export const BUILDS = process.env.BUILDS ?? join(tmpdir(), 'muses-garden-builds');

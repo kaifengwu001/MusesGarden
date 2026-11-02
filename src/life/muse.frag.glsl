@@ -31,7 +31,7 @@ uniform mat3 uMuseFrame;
 uniform vec3 uStudioSun;
 #endif
 #ifdef MUSE_COLOURED
-// a sculpt's own colour (museMesh.ts) for the coat, graded to the reference's cream (museTripo.ts); its face is painted here as the field's is
+// a sculpt's own colour (museMesh.ts) for the coat, graded to the reference's cream (museSculptLoader.ts); its face is painted here as the field's is
 uniform vec3 uMuseGrade;
 centroid varying vec3 vColour;
 #endif

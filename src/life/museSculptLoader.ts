@@ -3,19 +3,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { MuseMesh, SculptKind } from './museMesh';
 import SculptWorker from './museSculpt.worker?worker&inline';
 
-// The Tripo3D sculpts of Muse (src/assets/muse/: each one GLB, unrigged, its
+// The imported sculpts of Muse (src/assets/muse/: each one GLB, unrigged, its
 // 2K base colour inside it), loaded and rigged on Muse's skeleton
 // (museMesh.ts, in a worker), their colours read off their paint. Imported
 // only when asked for, so the loader stays out of the app until then; the
 // build carries the files as assets, fetched only when asked for.
 
-/** The sculpts: Tripo's first (arms hanging, grown into the sides), and its T-poses (arms straight out). */
-export const TRIPO_URLS: Record<SculptKind, string> = {
-  tripo: new URL('../assets/muse/tripo.glb', import.meta.url).href,
-  tpose: new URL('../assets/muse/tripo-tpose.glb', import.meta.url).href,
-  tpose2: new URL('../assets/muse/tripo-tpose2.glb', import.meta.url).href,
-  tpose5: new URL('../assets/muse/tripo-tpose5.glb', import.meta.url).href,
-  tpose6: new URL('../assets/muse/tripo-tpose6.glb', import.meta.url).href,
+/** The sculpts: the first sculpt (arms hanging, grown into the sides), and its T-poses (arms straight out). */
+export const SCULPT_URLS: Record<SculptKind, string> = {
+  sculpt: new URL('../assets/muse/sculpt.glb', import.meta.url).href,
+  tpose: new URL('../assets/muse/sculpt-tpose.glb', import.meta.url).href,
+  tpose2: new URL('../assets/muse/sculpt-tpose2.glb', import.meta.url).href,
+  tpose5: new URL('../assets/muse/sculpt-tpose5.glb', import.meta.url).href,
+  tpose6: new URL('../assets/muse/sculpt-tpose6.glb', import.meta.url).href,
 };
 
 /**
@@ -33,8 +33,8 @@ export interface Loaded {
   raw: Mesh<BufferGeometry, MeshStandardMaterial>;
 }
 
-export async function loadTripo(kind: SculptKind = 'tripo'): Promise<Loaded> {
-  const url = TRIPO_URLS[kind];
+export async function loadSculpt(kind: SculptKind = 'sculpt'): Promise<Loaded> {
+  const url = SCULPT_URLS[kind];
   const gltf = await new GLTFLoader().loadAsync(url);
   let found: Mesh<BufferGeometry, MeshStandardMaterial> | null = null;
   gltf.scene.traverse((o) => {
@@ -88,7 +88,7 @@ function pixels(map: Texture, size: number): ImageData {
  * The grade for a sculpt's paint: the median of its fur's texels (neither
  * the dark seams nor the brightest highlights), linear, against CREAM. A
  * gain per channel keeps the paint's strands and shading, only its colour
- * moves (Tripo's runs warmer and yellower than the reference).
+ * moves (the source paint runs warmer and yellower than the reference).
  */
 function gradeFor(map: Texture): Vector3 {
   const px = pixels(map, 512).data;

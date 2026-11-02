@@ -6,8 +6,8 @@ import { GardenState } from '../../garden/state';
 import { fit, PIECES, ROOM, type Piece } from '../../life/hut';
 import { COTTAGE, CUT, cutAt, FLOOR, OUTER, STEPS } from '../../life/props';
 
-// Muse's hut inside (hut.ts, view/cutaway.ts): the furniture Kai made in
-// Tripo fitted into the room as Kai laid it out, the walls cut straight, the
+// Muse's hut inside (hut.ts, view/cutaway.ts): Kai's imported furniture
+// fitted into the room as Kai laid it out, the walls cut straight, the
 // steps clear of the meadow, and Muse's favourites for its showpiece.
 
 const found = import.meta.glob<string>('/src/assets/interior/*.glb', { query: '?inline', import: 'default', eager: true });

@@ -176,7 +176,7 @@ describe('the garden snapshot on a seeded engine', () => {
 });
 
 describe('Fern on the first planet', () => {
-  it('starts on the meadow as tuned, seed 412 at R 128 m, as if it had explored that much already (see CLAUDE.md)', async () => {
+  it('starts on the meadow as tuned, seed 412 at R 128 m, as if it had explored that much already (see docs/development-guidelines.md)', async () => {
     const fresh = await seeded(0);
     expect(fresh.views.garden(HERO, fresh.engine.now())?.world).toEqual({ seed: FIRST_PLANET.seed, g: FIRST_PLANET.growth });
   });

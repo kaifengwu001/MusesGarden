@@ -678,7 +678,7 @@ frozen time draws one exact frame.
 - **Petals** (`src/life/petals.ts`). Lift where flowers grow as gust crests
   pass, and at the bloom front.
 - **Muse** (`src/life/muse.ts:111`). A cream plush about 1.1 m tall. Its
-  body is either a Tripo3D sculpt (`src/assets/muse/*.glb`, rigged in
+  body is either an imported sculpt (`src/assets/muse/*.glb`, rigged in
   `museMesh.ts` / `museRig.ts`) or a procedural distance-field body
   (`museBody.ts`). It is drawn as skin plus up to 20 fur shells in one
   instanced draw. It lives on the cottage's terrace in cottage-local
