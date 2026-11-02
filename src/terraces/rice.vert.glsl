@@ -88,7 +88,7 @@ void main() {
 
   vec3 wp = warpPosition(p);
   col = applyAerial(col, length(cameraPosition - wp), dir);
-  col = applyHeightFog(col, length(cameraPosition - wp), floorH + h * y);
+  col = applyHeightFog(col, length(cameraPosition - wp), floorH + h * y, dir);
   vColour = col;
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }

@@ -41,6 +41,6 @@ void main() {
   float sunUp = clamp(dot(up, uSunDir), 0.0, 1.0);
   vec3 col = mistColour(s.x, fray) * mix(0.86, 1.0, above) * mix(0.93, 1.03, sunUp);
   col = mix(col, aerialColor(), 0.32 * min(1.0 - exp(-max(0.0, dist - uFog.z) * uFog.x), uFog.w));
-  col = applyHeightFog(col, dist, vHeight);
+  col = applyHeightFog(col, dist, vHeight, dir);
   gl_FragColor = vec4(col * alpha, alpha);
 }

@@ -4,16 +4,18 @@ import { gnoise } from '../planet/noise';
 
 // The terraces' mist as strokes (Kai, 2026-11-02, against the blue-green landscape: the bands' meanders "too
 // simplistic and mechanical", their widths not growing and shrinking "as dynamically as the painting"). Each band is
-// a stroke of its own, as the painting's ribbons are brushed: it runs along the wind, meandering as a river does (a
+// a stroke of its own, as the painting's ribbons are brushed. It runs along the wind, the wind's way twisted across
+// the globe by a broad pattern of its own (Kai: off the latitude lines), and meanders as a river does (a
 // sine-generated curve, Kinoshita's, its sinuosity and wavelength wandering along it: mostly long calm runs, as the
-// painting's are, now and then a coiling stretch that folds back on itself; its bends lean), steered round the hills its layer meets (toward the side where it clears the
-// ground more, ahead), so it winds along the valleys between them, now and then ending in a curl; its breadth swells into broad bodies and pinches to
-// thin necks along it, scalloped along one edge, tapering to a point at its tail. Some fork, a branch peeling off; some
-// run with a sibling stacked beside them, as the painting's ribbons lie in parallel runs; the rest merge where they
-// cross. Each is kept where its layer clears the ground along most of it, and where it does not pile on another.
-// Out come its segments, for the bake (mist.ts) to draw into its layer's cube map as distances.
+// painting's are, now and then a coiling stretch that folds back on itself; its bends lean). It is steered round the
+// hills its layer meets (toward the side where it clears the ground more, ahead), so it winds along the valleys
+// between them, and now and then ends in a curl. Its breadth swells into broad bodies and pinches to thin necks along
+// it, scalloped along one edge, tapering to a point at its tail. Some fork, a branch peeling off; some run with a
+// sibling stacked beside them, as the painting's ribbons lie in parallel runs; the rest merge where they cross. Each
+// is kept where its layer clears the ground along most of it, and where it does not pile on another. Out come its
+// segments, for the bake (mist.ts) to draw into the layer's cube map as distances.
 
-/** A layer's strokes (mist.ts MIST_LAYERS). */
+/** A layer's strokes (mist.ts MIST). */
 export interface StrokeParams {
   /** How many, at the panel's default coverage (each with its branch or sibling, if any). */
   readonly strokes: number;
@@ -32,6 +34,8 @@ export interface StrokeParams {
   readonly lobe: number;
   /** How hard a stroke steers round the hills (rad per m, for each m more its layer clears the ground on one side than the other). */
   readonly steer: number;
+  /** How far the strokes' way turns off the wind's across the globe (0 … 1: up to about 110° either way; 0.6, about 70°), by a broad pattern (TWIST). */
+  readonly twist: number;
 }
 
 /** A layer's strokes as segments: per segment its ends (unit directions) and its half-breadth at each (m): A.xyz, B.xyz, hA, hB. */
@@ -48,6 +52,8 @@ type V3 = [number, number, number];
 
 /** How far apart a stroke's points are (m). */
 const STEP = 0.5;
+/** The pattern twisting the strokes' way off the wind's: its two scales (m), the finer's share. */
+const TWIST = { broad: 220, fine: 85, fineShare: 0.3 } as const;
 /** Kinoshita's skew and flatness of a meander's bends. */
 const SKEW = 1 / 32;
 const FLAT = 1 / 192;
@@ -77,12 +83,20 @@ export function makeStrokes(P: StrokeParams, seed: number, radius: number, axis:
   const between = (r: readonly [number, number]): number => r[0] + (r[1] - r[0]) * rnd();
   const noise = (s: number, o: number): number => gnoise(s, o, 0.5, (seed + 0x2b1) >>> 0);
   const R = radius;
-  /** The wind's way at a direction (unit, square to it): round its axis. */
+  /** The strokes' way at a direction (unit, square to it): round the wind's axis, turned by the twist's pattern there (off the latitude lines). */
   const windAt = (p: V3): V3 => {
-    const w = cross(axis, p);
+    let w = cross(axis, p);
     const l = Math.hypot(w[0], w[1], w[2]);
-    if (l < 0.05) return norm(cross(p, Math.abs(p[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
-    return [w[0] / l, w[1] / l, w[2] / l];
+    w = l < 0.05 ? norm(cross(p, Math.abs(p[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])) : [w[0] / l, w[1] / l, w[2] / l];
+    if (P.twist <= 0) return w;
+    const b = R / TWIST.broad;
+    const f = R / TWIST.fine;
+    const n = (1 - TWIST.fineShare) * gnoise(p[0] * b + 5.1, p[1] * b, p[2] * b, (seed + 0x7a1) >>> 0) + TWIST.fineShare * gnoise(p[0] * f, p[1] * f + 2.3, p[2] * f, (seed + 0x7a2) >>> 0);
+    const turn = P.twist * 1.25 * Math.PI * n;
+    const side = cross(p, w);
+    const c = Math.cos(turn);
+    const sn = Math.sin(turn);
+    return [w[0] * c + side[0] * sn, w[1] * c + side[1] * sn, w[2] * c + side[2] * sn];
   };
   /** A heading a (rad) off the wind at a direction, as a unit tangent there. */
   const headingAt = (p: V3, a: number): V3 => {

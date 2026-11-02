@@ -86,7 +86,7 @@ void main() {
     col = mix(col, mix(shallow, mirror, mix(0.7, 1.0, fres)), water);
   }
   col = applyAerial(col, viewDist, dir);
-  col = applyHeightFog(col, viewDist, vHeight);
+  col = applyHeightFog(col, viewDist, vHeight, dir);
   if (uDebug == 4) {
     // (dbg=land: each part flat: floors by their paddy, risers dark blue, dams yellow, earth brown, ridges white,
     // the woods green, tracks orange, villages lilac)

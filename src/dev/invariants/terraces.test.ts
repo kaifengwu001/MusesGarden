@@ -170,7 +170,7 @@ describe("the terraces' mathematics", () => {
 // coverage the first of those at a larger, none where the layer never clears the ground, and every segment on the
 // sphere with a breadth of its own, broad bodies and thin necks both.
 describe("the terraces' mist strokes", () => {
-  const P = { strokes: 24, half: 2.4, length: [30, 80] as const, wavelength: [24, 40] as const, sinuosity: [0.35, 1.4] as const, curl: 0.4, branch: 0.35, stack: 0.3, lobe: 2.8, steer: 0.04 };
+  const P = { strokes: 24, half: 2.4, length: [30, 80] as const, wavelength: [24, 40] as const, sinuosity: [0.35, 1.4] as const, curl: 0.4, branch: 0.35, stack: 0.3, lobe: 2.8, steer: 0.04, twist: 0.6 };
   const axis: [number, number, number] = [0.9, 0, -0.44];
   const open = (): number => 5;
   it('makes the same strokes for a seed, the fewer shown the first of the more', () => {

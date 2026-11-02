@@ -113,7 +113,9 @@ export class TerraceWorld implements PlanetWorld {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
-    uHeightFog: { value: new Vector4(0, -3, 6, 0) },
+    uHeightFog: { value: new Vector4(0, 3, 2.5, 0) },
+    uHeightFogPatches: { value: new Vector4(0.7, 70, 0, 0) },
+    uHeightFogEye: { value: new Vector3(0, 1, 0) },
   };
   private posed = false;
   private noiseSeed = -1;
@@ -348,11 +350,14 @@ export class TerraceWorld implements PlanetWorld {
     this.rice.update(this.renderer, { seed: p.world.seed, radius: R, radiusHi: this.band.radiusHi, focus: rig.up, frustum: this.frustum, warp: this.warp, queue: this.queue, near: riceNear }, riceNear, p.wind.sheen * 1.2);
     this.own.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
     // the mist: its layers drifting with the wind, by the panel's coverage, speed and shadow
-    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, this.windAxis, p.terraces.cloudHeight, p.terraces.cloudDensity);
+    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, this.windAxis, p.terraces.cloudHeight, p.terraces.cloudDensity, p.terraces.cloudTwist);
     // the height fog (fog.glsl), by the panel's sliders: its density (the slider's square, so the low end is fine:
-    // 0.018 a m at its default, 0.05 at its fullest), the height it fills the valleys to, how far over that it thins
+    // 0.05 a m at Kai's 1, 0.2 at its fullest), the height it fills the valleys to, how far over that it thins; how
+    // patchy it is across the globe and how large its patches
     const t = p.terraces;
     this.own.uHeightFog.value.set(0.05 * t.fogDensity * t.fogDensity, t.fogRange, Math.max(t.fogFalloff, 0.5), rig.altitude);
+    this.own.uHeightFogPatches.value.set(t.fogPatchiness, t.fogPatchSize, 0, 0);
+    this.own.uHeightFogEye.value.copy(rig.up);
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }

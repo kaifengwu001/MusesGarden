@@ -57,12 +57,12 @@ export interface MistLayer extends StrokeParams {
 }
 
 /**
- * One layer (Kai: the layers' overlapping did not look good; one, with a little more in it): 2 m over a form 60 % of
- * the way from the land's broadest to the hills', so it lies in the valleys and up the hills' sides, the hilltops
- * rising through it; 137 strokes (52 of them branches or siblings) covering 16.5 % of the planet seen from above (the
- * largest of the three layers before, 122 and 14.5 %).
+ * One layer (Kai: the layers' overlapping did not look good; one, with a little more in it), its height Kai's (the
+ * panel's Cloud height, 8 m by default) over a form 60 % of the way from the land's broadest to the hills', so it
+ * lies over the valleys and the hills' sides, the highest hilltops rising through it; its strokes' way twisted off
+ * the wind's across the globe (the panel's Cloud twist).
  */
-export const MIST: MistLayer = { height: 2, follow: 0.6, strokes: 170, half: 2.9, length: [50, 140], wavelength: [30, 55], sinuosity: [0.2, 1.75], curl: 0.4, branch: 0.35, stack: 0.3, lobe: 3, steer: 0.04, drift: 0.4 };
+export const MIST: MistLayer = { height: 8, follow: 0.6, strokes: 170, half: 2.9, length: [50, 140], wavelength: [30, 55], sinuosity: [0.2, 1.75], curl: 0.4, branch: 0.35, stack: 0.3, lobe: 3, steer: 0.04, twist: 0.6, drift: 0.4 };
 
 
 /** The forms the layers lie over: the hills' octaves this broad and broader (m), the land's broadest form and the hills'. */
@@ -103,9 +103,11 @@ export class TerraceMist {
   private readonly bakedAxis = new Vector3();
   private bakedCoverage = Number.NaN;
   private bakedHeight = Number.NaN;
-  /** The height and coverage last asked for, and when either last changed (ms). */
+  private bakedTwist = Number.NaN;
+  /** The height, coverage and twist last asked for, and when any last changed (ms). */
   private height = MIST.height;
   private wantCoverage = Number.NaN;
+  private twist = MIST.twist;
   private changedAt = 0;
   private readonly bake: ShaderMaterial;
   private readonly bakeMesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
@@ -170,7 +172,7 @@ export class TerraceMist {
    * last change, so a slider's drag does not make them at every step) and the ground's height (once a seed), then set
    * the layer for now: its height (at once) and density (the panel's sliders), its drift.
    */
-  update(renderer: WebGLRenderer, seed: number, field: PlanetField, R: number, time: number, coverage: number, speed: number, windAxis: Vector3, height: number, density: number): void {
+  update(renderer: WebGLRenderer, seed: number, field: PlanetField, R: number, time: number, coverage: number, speed: number, windAxis: Vector3, height: number, density: number, twist: number): void {
     // (the share of the strokes shown: all of them at 0.72, 0.625 at the panel's default 0.45)
     const shown = Math.round(Math.min(Math.max(coverage / 0.72, 0), 1) * 100) / 100;
     if (seed !== this.groundFor) {
@@ -178,18 +180,20 @@ export class TerraceMist {
       this.groundFor = seed;
     }
     const now = performance.now();
-    if (height !== this.height || shown !== this.wantCoverage) {
+    if (height !== this.height || shown !== this.wantCoverage || twist !== this.twist) {
       this.height = height;
       this.wantCoverage = shown;
+      this.twist = twist;
       this.changedAt = now;
     }
     const settled = now - this.changedAt > 300;
-    if (seed !== this.bakedFor || this.bakedAxis.dot(windAxis) < 0.9999 || (settled && (shown !== this.bakedCoverage || height !== this.bakedHeight))) {
-      this.bakeStrokes(renderer, seed, R, windAxis, shown, height);
+    if (seed !== this.bakedFor || this.bakedAxis.dot(windAxis) < 0.9999 || (settled && (shown !== this.bakedCoverage || height !== this.bakedHeight || twist !== this.bakedTwist))) {
+      this.bakeStrokes(renderer, seed, R, windAxis, shown, height, twist);
       this.bakedFor = seed;
       this.bakedAxis.copy(windAxis);
       this.bakedCoverage = shown;
       this.bakedHeight = height;
+      this.bakedTwist = twist;
     }
     (this.uniforms.uMistLayer.value as Vector4).set(height, MIST.follow, OFFSET, density);
     // (its lookup turned back about the wind's axis as far as the wind has carried it: the strokes go with the wind)
@@ -198,7 +202,7 @@ export class TerraceMist {
   }
 
   /** The strokes, made (mistStrokes.ts) and drawn into the cube map, a face at a time. */
-  private bakeStrokes(renderer: WebGLRenderer, seed: number, R: number, windAxis: Vector3, shown: number, height: number): void {
+  private bakeStrokes(renderer: WebGLRenderer, seed: number, R: number, windAxis: Vector3, shown: number, height: number, twist: number): void {
     const previous = renderer.getRenderTarget();
     const shell = R + height;
     // (how far the layer clears the ground, read from the ground's raster as the mist's paint reads it)
@@ -207,7 +211,7 @@ export class TerraceMist {
       this.groundAt(d, g);
       return height + g[1] + (g[2] - g[1]) * MIST.follow - g[0];
     };
-    const made = makeStrokes(MIST, hash32((seed + 0x3157) >>> 0), shell, [windAxis.x, windAxis.y, windAxis.z], clearance, shown);
+    const made = makeStrokes({ ...MIST, twist }, hash32((seed + 0x3157) >>> 0), shell, [windAxis.x, windAxis.y, windAxis.z], clearance, shown);
     this.strokes = { strokes: made.strokes, children: made.children, segments: made.count, area: Math.round(made.area) };
     const segments = new InstancedInterleavedBuffer(made.data, 8, 1);
     const quads = new InstancedBufferGeometry();

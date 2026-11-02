@@ -101,7 +101,7 @@ void main() {
   }
   vec3 planet = unwarpPosition(hit);
   col = applyAerial(col, length(hit - ro), normalize(planet));
-  col = applyHeightFog(col, length(hit - ro), length(planet) - uRadius);
+  col = applyHeightFog(col, length(hit - ro), length(planet) - uRadius, normalize(planet));
   gl_FragColor = vec4(col, 1.0);
   vec4 clip = uProjection * viewMatrix * vec4(hit, 1.0);
   gl_FragDepth = clamp(clip.z / clip.w * 0.5 + 0.5, 0.0, 1.0);

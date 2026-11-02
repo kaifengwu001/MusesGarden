@@ -33,6 +33,6 @@ void main() {
   vec3 col = mix(albedo, labLight(albedo, n, up), 0.75);
   float above = length(vPlanet) - uRadius;
   col = mix(col, applyAerial(col, dist, dir), mix(1.0, 0.4, smoothstep(5.0, 55.0, above)));
-  col = applyHeightFog(col, dist, above);
+  col = applyHeightFog(col, dist, above, dir);
   gl_FragColor = vec4(col, 1.0);
 }
