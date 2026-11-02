@@ -22,7 +22,9 @@ uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four t
 uniform float uPageSize;
 uniform vec4 uFlowers;    // near radius (m), ln mean density (per m²), species id, size scale
 uniform vec4 uFlowerFade; // full-density radius (m), kept fraction at the edge, stem top (m), nod
-centroid varying vec3 vColour; // centroid, as in grass.frag.glsl
+centroid varying vec3 vColour;
+centroid varying vec2 vNativeUv;
+varying float vNativeSpecies;
 
 float rnd(float s, float k) {
   return fract(sin(s * 78.233 + k * 12.9898) * 43758.5453);
@@ -96,7 +98,7 @@ void main() {
   float b = max(0.4, toonLight(abs(dot(facing, uSunDir)))) * mix(0.8, 1.0, aT) * (1.0 - 0.55 * shadow);
   float v = look.y;
   vec3 pigment = species == 1 ? vec3(0.98, 0.97, 0.86)
-    : (species == 2 ? mix(vec3(0.29, 0.40, 0.26), vec3(0.52, 0.59, 0.37), 0.35 + 0.4 * v)
+    : (species == 2 ? mix(vec3(0.35, 0.43, 0.25), vec3(0.61, 0.64, 0.36), 0.35 + 0.4 * v)
     : mix(vec3(0.76, 0.27, 0.23), vec3(0.84, 0.34, 0.28), v));
   pigment = pow(pigment, vec3(2.2));
   vec3 col = tone3(pigment * 1.04, pigment * 0.92, pigment * vec3(0.59, 0.67, 0.8), b);
@@ -109,5 +111,7 @@ void main() {
 
   vec3 wp = warpPosition(world);
   vColour = applyAerial(col, length(cameraPosition - wp), dir);
+  vNativeUv=uv;
+  vNativeSpecies=float(species);
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }

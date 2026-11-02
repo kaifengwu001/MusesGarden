@@ -9,6 +9,7 @@ attribute vec4 aAnchor;
 attribute vec3 aAcross;
 attribute vec4 aPlacement;
 attribute float aHeightScale;
+attribute vec2 aGroundSlope;
 attribute float aPlantBase;
 attribute vec3 aInkNormalA;
 attribute vec3 aInkNormalB;
@@ -33,6 +34,7 @@ void main() {
   bool plant=(aKind>2.5&&aKind<3.5)||aKind>7.5;
   float verticalScale=plant?1.0:aHeightScale;
   p.y=(aPlantBase*aHeightScale+(position.y-aPlantBase)*verticalScale)*aPlacement.x;
+  p.y+=dot(p.xz,aGroundSlope);
   vec3 breeze=cross(uWindVec.xyz,U);
   vec2 breezeLocal=vec2(dot(breeze,X),dot(breeze,Z));
   if(aKind>0.5&&aKind<1.5) p.xz+=breezeLocal*sin(uSceneryTime*0.65+aPlacement.y+position.y*0.4)*0.24*uWindVec.w*uv.y*uv.y*aPlacement.x;
@@ -48,6 +50,8 @@ void main() {
   vec3 view=normalize(cameraPosition-world);
   vec3 localA=normalize(vec3(aInkNormalA.x,aInkNormalA.y/verticalScale,aInkNormalA.z));
   vec3 localB=normalize(vec3(aInkNormalB.x,aInkNormalB.y/verticalScale,aInkNormalB.z));
+  localA.xz-=localA.y*aGroundSlope;localA=normalize(localA);
+  localB.xz-=localB.y*aGroundSlope;localB=normalize(localB);
   vec3 normalA=rotateAround(X*localA.x+U*localA.y+Z*localA.z,axis,angle);
   vec3 normalB=rotateAround(X*localB.x+U*localB.y+Z*localB.z,axis,angle);
   vFacing=vec2(dot(warpNormal(planet,normalA),view),dot(warpNormal(planet,normalB),view));

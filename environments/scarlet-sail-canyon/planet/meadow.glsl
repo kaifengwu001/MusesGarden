@@ -196,64 +196,75 @@ float chalkSegment(vec2 p, vec2 a, vec2 b) {
   return length(p - a - ab * clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0));
 }
 
-// Chalk is matte and broken into bedding faces; the lower corridors collect
-// fine mineral scree. All marks are anchored to planet-space metres. Detail
-// fades below its pixel footprint so orbit views do not shimmer.
+// A loose, angular flake per selected cell. Marks have actual metre sizes and
+// disappear below the pixel footprint; no moving high-frequency sand noise.
+vec3 mineralChips(vec2 meters, float pixelMeters) {
+  const float cellSize=0.72;
+  vec2 cell=floor(meters/cellSize);
+  uint id=meadowHash(ivec3(ivec2(cell),0),uTerrainSeed+727u);
+  vec3 r=vec3(float(id&255u),float((id>>8)&255u),float((id>>16)&255u))/255.0;
+  vec2 q=(fract(meters/cellSize)-0.5-(r.xy-0.5)*0.74)*cellSize;
+  float turn=r.z*6.2831853;
+  q=mat2(cos(turn),-sin(turn),sin(turn),cos(turn))*q;
+  vec2 radii=vec2(0.015+0.066*r.x*r.x,0.011+0.040*r.y*r.y);
+  float bevel=0.68+0.28*r.z;
+  float d=max(max(abs(q.x)-radii.x,abs(q.y)-radii.y),(abs(q.x+q.y*0.21)+abs(q.y)-bevel*(radii.x+radii.y))*0.7071);
+  float aa=max(pixelMeters*0.7,0.0015);
+  float face=1.0-smoothstep(-aa,aa,d);
+  float edge=1.0-smoothstep(0.003,0.003+aa,abs(d));
+  float cluster=gnoise(vec3(meters*0.37,0.0),uTerrainSeed+728u);
+  float selected=float((id>>24)&255u)/255.0;
+  float keep=step(mix(0.98,0.49,smoothstep(-0.16,0.25,cluster)),selected)*(1.0-smoothstep(0.025,0.13,pixelMeters));
+  return vec3(face,edge,clamp(q.y/max(radii.y,0.001)*0.5+0.5,0.0,1.0))*vec3(keep,keep,1.0);
+}
+
+// Warm weathered chalk, loose mineral dust and sparse lichen. The material
+// contains no grass-like wind strokes and does not add a second ground plane.
 vec3 meadowPaint(Meadow m) {
-  vec3 p = m.dir * uRadius;
-  float mineral = gnoise(p / 7.0, uTerrainSeed + 710u);
-  float close = 1.0 - smoothstep(0.08, 0.7, m.pixelMeters);
-  float grain = close * gnoise(p * 7.0, uTerrainSeed + 711u);
-  float layer = gnoise(vec3(p.x * 0.19, p.y * 0.75, p.z * 0.19), uTerrainSeed + 712u);
-  float h = terrainFields(m.dir).r;
-  float face = smoothstep(0.22, 0.85, m.slope);
-  float scree = (1.0 - face) * (0.45 + 0.3 * smoothstep(-0.2, 0.4, mineral));
+  vec3 p=m.dir*uRadius;
+  float mineral=gnoise(p/7.0,uTerrainSeed+710u);
+  float close=1.0-smoothstep(0.035,0.23,m.pixelMeters);
+  float grain=close*gnoise(p*22.0,uTerrainSeed+711u);
+  float wash=gnoise(p/2.3,uTerrainSeed+713u);
+  float h=terrainFields(m.dir).r;
+  float face=smoothstep(0.22,0.85,m.slope);
+  float dust=(1.0-face)*smoothstep(-0.3,0.27,mineral+wash*0.35);
+  vec3 lit=mix(vec3(0.85,0.83,0.75),vec3(0.80,0.75,0.62),dust*0.65);
+  vec3 mid=mix(vec3(0.55,0.60,0.61),vec3(0.55,0.54,0.45),dust*0.7);
+  vec3 shade=vec3(0.30,0.39,0.46);
+  lit=mix(lit,vec3(0.63,0.72,0.81),face*0.8);
+  mid=mix(mid,vec3(0.40,0.51,0.64),face*0.8);
+  shade=mix(shade,vec3(0.24,0.33,0.46),face*0.6);
+  vec3 col=tone3(lit,mid,shade,m.light);
+  // Keep paths mineral. Olive carpets belong to the placed ledge vegetation;
+  // broad procedural colour islands on the path read as sprayed paint.
+  float sediment=gnoise(p*1.8,uTerrainSeed+714u)+0.22*grain;
+  col*=1.0+smoothstep(0.22,0.43,sediment)*0.025;
+  col*=1.0+mineral*0.055+wash*0.035+grain*0.035;
 
-  // Blue-white chalk in full light; a cool, dry, opaque face in the shade.
-  vec3 lit = mix(vec3(0.79, 0.86, 0.87), vec3(0.72, 0.69, 0.57), scree * 0.6);
-  vec3 mid = mix(vec3(0.48, 0.60, 0.66), vec3(0.47, 0.49, 0.44), scree * 0.6);
-  vec3 shade = vec3(0.23, 0.35, 0.43);
-  // Broad chalk tops and exposed blue-grey cliff faces remain distinct even
-  // under the same sunlight. This colour follows real slope, not painted hills.
-  lit = mix(lit, vec3(0.59, 0.70, 0.79), face * 0.75);
-  mid = mix(mid, vec3(0.32, 0.46, 0.59), face * 0.8);
-  shade = mix(shade, vec3(0.17, 0.27, 0.38), face * 0.6);
-  vec3 col = tone3(lit, mid, shade, m.light);
-  // Low, matte lichen crusts occupy broken patches on shelf tops. The dense
-  // upright plants are separate meshes; these marks keep exposed rock alive.
-  float crust = (1.0 - face) * smoothstep(0.16, 0.43, mineral + 0.25 * layer);
-  col = mix(col, tone3(vec3(0.42, 0.48, 0.26), vec3(0.27, 0.36, 0.21), vec3(0.16, 0.24, 0.17), m.light), crust * 0.65);
-  float bedding = 1.0 - smoothstep(0.02, 0.11, abs(fract((h + 0.12) / uChalk.z) - 0.09));
-  col *= 1.0 - bedding * face * 0.1;
-  col *= 1.0 + mineral * 0.09 + layer * 0.045 + grain * 0.075;
+  vec3 axis=abs(m.dir);
+  vec2 uv=axis.x>axis.y&&axis.x>axis.z?p.yz:axis.y>axis.z?p.xz:p.xy;
+  vec3 chips=mineralChips(uv,m.pixelMeters);
+  vec3 chipColour=tone3(vec3(0.72,0.76,0.75),vec3(0.42,0.50,0.54),vec3(0.26,0.34,0.40),m.light);
+  chipColour*=0.88+0.17*chips.z;
+  col=mix(col,chipColour,chips.x*(1.0-face)*0.57);
+  col=mix(col,tone3(vec3(0.38,0.43,0.44),vec3(0.23,0.30,0.34),vec3(0.16,0.23,0.28),m.light),chips.y*(1.0-face)*0.20);
 
-  // Hairline chips on occasional exposed chalk plates. Gravel routes stay
-  // quiet. These are two short straight segments, never noise isolines.
-  vec3 axis = abs(m.dir);
-  vec2 uv = axis.x > axis.y && axis.x > axis.z ? p.yz : axis.y > axis.z ? p.xz : p.xy;
-  vec2 cell = floor(uv / 1.7);
-  vec2 q = fract(uv / 1.7);
-  uint id = meadowHash(ivec3(ivec2(cell), 0), uTerrainSeed + 720u);
-  vec3 rnd = vec3(float(id & 255u), float((id >> 8) & 255u), float((id >> 16) & 255u)) / 255.0;
-  vec2 a = vec2(0.16 + 0.12 * rnd.x, 0.2 + 0.5 * rnd.y);
-  vec2 b = vec2(0.44 + 0.08 * rnd.z, 0.4 + 0.16 * rnd.x);
-  vec2 c = vec2(0.69 + 0.12 * rnd.y, 0.25 + 0.46 * rnd.z);
-  float distanceToCrack = min(chalkSegment(q, a, b), chalkSegment(q, b, c)) * 1.7;
-  float crack = 1.0 - smoothstep(0.003, 0.003 + max(m.pixelMeters * 0.65, 0.003), distanceToCrack);
-  float selected = (id >> 24) > 195u ? 1.0 : 0.0;
-  float fracture = crack * selected * (1.0 - smoothstep(0.035, 0.2, m.pixelMeters));
-  col = mix(col, vec3(0.23, 0.35, 0.41) * mix(uShadeTint, uSunTint, m.light), fracture * (0.14 - 0.1 * scree));
-
-  // Sparse, dry-brush crosshatching in the shaded faces. No animated gloss
-  // or wind sheen: a rock's surface remains still while plants move.
-  float hatchPhase = dot(p, vec3(0.85, 0.43, -0.28)) * 19.0 + mineral * 6.0;
-  float hatchWidth = max(m.pixelMeters * 19.0, 0.05);
-  float hatch = 1.0 - smoothstep(0.09, 0.09 + hatchWidth, abs(sin(hatchPhase)));
-  float hatchMask = smoothstep(0.05, 0.35, layer) * (1.0 - m.light) * close;
-  col *= 1.0 - hatch * hatchMask * 0.17;
-
-  // Tiny pale flecks describe loose grains without looking like foam.
-  float fleck = smoothstep(0.35, 0.62, grain) * scree;
-  col = mix(col, lit * uSunTint, fleck * 0.35);
+  // Long, sparse hairlines separate exposed mineral plates. Unequal segments
+  // and missing cells keep these from becoming a tiled pavement pattern.
+  const float plateSize=3.1;
+  vec2 cell=floor(uv/plateSize),q=fract(uv/plateSize);
+  uint id=meadowHash(ivec3(ivec2(cell),0),uTerrainSeed+720u);
+  vec3 rnd=vec3(float(id&255u),float((id>>8)&255u),float((id>>16)&255u))/255.0;
+  vec2 a=vec2(0.09+0.12*rnd.x,0.12+0.65*rnd.y);
+  vec2 b=vec2(0.39+0.17*rnd.z,0.38+0.14*rnd.x);
+  vec2 c=vec2(0.73+0.12*rnd.y,0.14+0.65*rnd.z);
+  float distanceToCrack=min(chalkSegment(q,a,b),chalkSegment(q,b,c))*plateSize;
+  float crack=1.0-smoothstep(0.006,0.006+max(m.pixelMeters*0.65,0.002),distanceToCrack);
+  float selected=(id>>24)>155u?1.0:0.0;
+  float fracture=crack*selected*(1.0-smoothstep(0.055,0.32,m.pixelMeters));
+  col=mix(col,vec3(0.27,0.34,0.38)*mix(uShadeTint,uSunTint,m.light),fracture*(0.22-0.07*dust));
+  float bedding=1.0-smoothstep(0.018,0.10,abs(fract((h+0.12)/uChalk.z)-0.09));
+  col*=1.0-bedding*face*0.12;
   return col;
 }

@@ -8,7 +8,7 @@ import vertexShader from './props.vert.glsl?raw';
 export const FLOOR=0.72;
 export const COTTAGE={halfX:4.12,halfZ:2.45,wall:3.45,thickness:0.36,overhang:0.45,pitch:0.16} as const;
 const OUTER={x:COTTAGE.halfX+COTTAGE.thickness/2,z:COTTAGE.halfZ+COTTAGE.thickness/2} as const;
-export const ROOF={ex:4.85,ez:3.4,eave:3.6,rise:1,ridge:0,slope:6.8,top:4.6} as const;
+export const ROOF={ex:4.85,ez:3.4,eave:3.3,rise:1.95,ridge:0,slope:6.8,top:5.25} as const;
 export const TERRACE={x0:-OUTER.x-0.1,x1:OUTER.x-0.2,z0:OUTER.z-0.3,z1:OUTER.z+2.1} as const;
 /** The former pier is now a dry chalk lookout; its deck still supports resident routines. */
 export const PIER={x0:-OUTER.x-3.9,x1:-OUTER.x+0.9,z0:OUTER.z-0.8,z1:OUTER.z+3.0} as const;
@@ -57,14 +57,25 @@ export function shelterGeometry(seed:number):ReturnType<CanyonGeometry['build']>
       b.quad(a,c,c.clone().setY(below),a.clone().setY(below),2,a.distanceTo(c),a.y-below);
       return;
     }
-    const lower=(p:Vector3,foot:boolean):Vector3=>{
+    // Small, non-coplanar facets replace metre-wide flat plinth faces.
+    // Their upper edge is still the exact support boundary; only the buried
+    // perimeter below it expands into a broken talus foot.
+    const lower=(p:Vector3,ring:0|1|2):Vector3=>{
       const variation=Math.sin(p.x*2.41+p.z*1.73);
+      const small=Math.sin(p.x*7.33-p.z*5.21);
       const out=outwardAt(p.x,p.z,p.y);
-      return p.clone().addScaledVector(out,foot?0.13+0.045*variation:0.055+0.025*variation).setY(foot?-0.28+0.035*variation:p.y*(0.38+0.09*variation));
+      const offset=ring===0?0.055+0.04*variation:ring===1?0.24+0.09*variation+0.045*small:0.50+0.17*variation+0.065*small;
+      const y=ring===0?p.y*(0.71+0.08*small):ring===1?p.y*(0.23+0.07*variation):-0.25+0.055*variation;
+      return p.clone().addScaledVector(out,offset).setY(y);
     };
-    const ma=lower(a,false),mc=lower(c,false),fa=lower(a,true),fc=lower(c,true);
-    b.quad(a,c,mc,ma,2,a.distanceTo(c),a.y*0.6);
-    b.quad(ma,mc,fc,fa,2,a.distanceTo(c),a.y*0.4+0.28);
+    const pieces=Math.max(1,Math.ceil(a.distanceTo(c)/0.55));
+    for(let i=0;i<pieces;i++){
+      const p=a.clone().lerp(c,i/pieces),q=a.clone().lerp(c,(i+1)/pieces);
+      const p0=lower(p,0),q0=lower(q,0),p1=lower(p,1),q1=lower(q,1),p2=lower(p,2),q2=lower(q,2);
+      b.quad(p,q,q0,p0,2,p.distanceTo(q),p.y*0.3);
+      b.quad(p0,q0,q1,p1,2,p.distanceTo(q),p.y*0.45);
+      b.quad(p1,q1,q2,p2,2,p.distanceTo(q),p.y*0.25+0.25);
+    }
   };
   for(let ix=0;ix+1<xs.length;ix++)for(let iz=0;iz+1<zs.length;iz++){
     const x0=xs[ix],x1=xs[ix+1],z0=zs[iz],z1=zs[iz+1];
@@ -86,29 +97,13 @@ export function shelterGeometry(seed:number):ReturnType<CanyonGeometry['build']>
     const p=new Vector3(c.x,-0.03,a.z),q=new Vector3(a.x,-0.03,c.z);
     b.triangle(a,p,ridge,2);b.triangle(p,c,ridge,2);b.triangle(c,q,ridge,2);b.triangle(q,a,ridge,2);
   }
-  // Salvaged offcuts hold the upper face of the ledge: uneven dark wood
-  // breaks the long bright plinth, while fractured chalk remains at its foot.
-  const fascia=(from:Vector3,to:Vector3):void=>{
-    const length=from.distanceTo(to),count=Math.max(1,Math.ceil(length/1.3));
-    for(let k=0;k<count;k++){
-      const a=from.clone().lerp(to,k/count+0.008/count),c=from.clone().lerp(to,(k+1)/count-0.008/count);
-      const low=0.23+0.07*Math.sin(k*2.3+length);
-      const high=FLOOR-0.045-0.017*(k%2);
-      b.quad(a.clone().setY(low),a.clone().setY(high),c.clone().setY(high-0.012),c.clone().setY(low+0.035*Math.sin(k+1)),0,high-low,length/count);
-    }
-  };
-  fascia(new Vector3(TERRACE.x0,0,TERRACE.z1+0.12),new Vector3(STEPS.x0-0.04,0,TERRACE.z1+0.12));
-  fascia(new Vector3(STEPS.x1+0.04,0,TERRACE.z1+0.12),new Vector3(TERRACE.x1,0,TERRACE.z1+0.12));
-  fascia(new Vector3(PIER.x0,0,PIER.z1+0.12),new Vector3(PIER.x1,0,PIER.z1+0.12));
-  fascia(new Vector3(OUTER.x+0.13,0,-OUTER.z+0.3),new Vector3(OUTER.x+0.13,0,OUTER.z));
-  fascia(new Vector3(TERRACE.x1+0.12,0,OUTER.z),new Vector3(TERRACE.x1+0.12,0,TERRACE.z1-0.15));
-  // The floor's weathered plank material is on the union surface itself.
-  // No boxes or material decals sit on top of its exact support plane.
+  // The support is exposed fractured chalk rather than a board-wrapped
+  // stage. Its single union surface still carries all existing walking routes.
 
   // High rear corners fasten directly against the rock's face near z=-3.1.
   // Four slim, slightly crooked uprights replace the six-post box frame.
-  const rearL=new Vector3(-4.3,4.65,-3.2),rearR=new Vector3(4.2,4.45,-3.2);
-  const frontL=new Vector3(-4.48,3.4,3.18),frontR=new Vector3(4.35,2.95,3.35);
+  const rearL=new Vector3(-4.3,5.25,-3.2),rearR=new Vector3(4.2,4.65,-3.2);
+  const frontL=new Vector3(-4.48,3.3,3.18),frontR=new Vector3(4.35,3.05,3.35);
   for(const [foot,head] of [
     [new Vector3(-4.25,-0.05,-3.05),rearL],
     [new Vector3(4.14,-0.05,-3.06),rearR],
@@ -124,24 +119,36 @@ export function shelterGeometry(seed:number):ReturnType<CanyonGeometry['build']>
     }
   }
   beam(rearL.clone().add(new Vector3(-0.23,0,0)),rearR.clone().add(new Vector3(0.25,0,0)),0.07);
-  beam(frontL.clone().add(new Vector3(-0.22,-0.015,0)),frontR.clone().add(new Vector3(0.3,0.03,0)),0.052);
+  for(const corner of [rearL,rearR]){
+    const wall=corner.clone().add(new Vector3(0,0.18,-0.85));
+    beam(corner,wall,0.022,13);
+    beam(wall.clone().add(new Vector3(-0.13,0,0)),wall.clone().add(new Vector3(0.13,0,0)),0.045);
+  }
+  // The front hem hangs between the posts; no straight rafter forces it flat.
   // Short back braces reinforce the attachment; the front/right bay stays open.
   beam(new Vector3(-4.23,FLOOR+0.1,-3.04),new Vector3(-2.9,2.55,-2.99),0.052);
   beam(new Vector3(4.15,FLOOR+0.12,-3.04),new Vector3(3.2,2.35,-3.01),0.048);
 
-  // A rough suspended canvas windscreen covers only part of the stone wall.
-  // Separate drooping panels leave uneven hems and a useful open right bay.
-  for(let k=0;k<7;k++){
-    const x0=-3.95+k*0.86,x1=x0+0.88;
-    const top=3.42-0.055*k+0.035*Math.sin(k*1.7);
-    const low=FLOOR+0.12+0.10*Math.sin(k*2.1+0.4);
-    const z=-2.91+0.045*Math.sin(k*1.6);
-    const a=new Vector3(x0,top,z),c=new Vector3(x1,low,z+0.07);
-    b.triangle(a,new Vector3(x1,top-0.035,z),c,5,[[0,0],[0.88,0],[0.88,top-low]]);
-    b.triangle(a,c,new Vector3(x0,low+0.055,z+0.04),5,[[0,0],[0.88,top-low],[0,top-low-0.055]]);
-    beam(new Vector3(x0+0.05,top,z),new Vector3(x0+0.05,top+0.32,z-0.03),0.009,5);
+  // A continuous sewn windscreen has folds and a staggered hem. Adjacent
+  // strips share their boundary exactly: the old 0.88 m panels at 0.86 m
+  // spacing overlapped along their edges and could shimmer through each other.
+  const curtainPoint=(u:number,v:number):Vector3=>{
+    const x=-3.97+6.18*u;
+    const top=4.04-0.61*u-0.12*Math.sin(Math.PI*u);
+    const bottom=FLOOR+0.16+0.11*Math.sin(u*13.0)+0.07*Math.cos(u*26.0);
+    return new Vector3(x,top+(bottom-top)*v,-2.87+0.055*Math.sin(u*Math.PI*14)+0.035*Math.sin(u*23.0+v*2.0)*v);
+  };
+  for(let x=0;x<42;x++)for(let y=0;y<5;y++){
+    const u0=x/42,u1=(x+1)/42,v0=y/5,v1=(y+1)/5;
+    b.triangle(curtainPoint(u0,v0),curtainPoint(u1,v0),curtainPoint(u1,v1),5,[[u0*6.18,v0*3],[u1*6.18,v0*3],[u1*6.18,v1*3]]);
+    b.triangle(curtainPoint(u0,v0),curtainPoint(u1,v1),curtainPoint(u0,v1),5,[[u0*6.18,v0*3],[u1*6.18,v1*3],[u0*6.18,v1*3]]);
   }
-  beam(new Vector3(-4.05,3.5,-2.96),new Vector3(2.25,3.1,-2.96),0.045);
+  const curtainCord=Array.from({length:29},(_,i)=>curtainPoint(i/28,0).add(new Vector3(0,0.045,-0.025)));
+  b.tube(curtainCord,curtainCord.map(()=>0.016),13,5);
+  for(let k=0;k<8;k++){
+    const top=curtainPoint((k+0.2)/8,0);
+    beam(top.clone().add(new Vector3(0,0.01,0)),top.clone().add(new Vector3(0,0.22,-0.10)),0.012,13);
+  }
   // Low salvaged boards reinforce the windscreen without making a box wall.
   for(let i=0;i<12;i++){
     const x=-3.72+i*0.47,h=0.56+0.13*Math.sin(i*1.8);
@@ -150,26 +157,42 @@ export function shelterGeometry(seed:number):ReturnType<CanyonGeometry['build']>
   // A narrow left windbreak has a ragged top and no closed side frame.
   b.quad(new Vector3(-4.12,FLOOR+0.12,-2.7),new Vector3(-4.12,FLOOR+0.18,-0.9),new Vector3(-4.1,2.45,-0.9),new Vector3(-4.1,3.12,-2.7),5,1.8,2.1);
 
-  // One broad woven red sheet slopes down from the rock. Front sag and a
-  // lower right corner give the hand-tensioned canopy its asymmetric silhouette.
+  // One tensioned red sheet: uneven wall anchors and a deep catenary-like
+  // front hem replace the old rectangular pavilion silhouette.
   const point=(u:number,v:number):Vector3=>{
-    const rear=4.65-0.2*u,front=3.4-0.45*u;
-    return new Vector3(-4.48+u*8.83,rear+(front-rear)*v-0.43*Math.sin(Math.PI*u)*Math.sin(Math.PI*v*0.65)-0.10*Math.sin(Math.PI*v)+0.028*Math.sin(u*Math.PI*8)*v*v,-3.2+v*(6.38+u*0.17));
+    const rear=rearL.clone().lerp(rearR,u),front=frontL.clone().lerp(frontR,u);
+    const p=rear.lerp(front,v);
+    p.y-=0.57*Math.sin(Math.PI*u)*Math.sin(Math.PI*v*0.68)+0.12*Math.sin(Math.PI*v);
+    p.y+=0.028*Math.sin(u*Math.PI*10)*v*v;
+    p.z+=0.07*Math.sin(Math.PI*u)*v*v;
+    return p;
   };
-  const columns=28,rows=16;
+  const columns=32,rows=18;
+  // Match the vertex shader's pinned-edge wind periods. Only the interior
+  // moves; the stitched hem and four attachment points stay on their ropes.
+  const clothU=Math.PI/0.324,clothV=Math.PI/0.462;
   for(let y=0;y<rows;y++)for(let x=0;x<columns;x++){
     const u0=x/columns,u1=(x+1)/columns,v0=y/rows,v1=(y+1)/rows;
     const a=point(u0,v0),c=point(u1,v1);
-    b.triangle(a,point(u1,v0),c,4,[[u0*8.83,v0*6.5],[u1*8.83,v0*6.5],[u1*8.83,v1*6.5]]);
-    b.triangle(a,c,point(u0,v1),4,[[u0*8.83,v0*6.5],[u1*8.83,v1*6.5],[u0*8.83,v1*6.5]]);
+    b.triangle(a,point(u1,v0),c,4,[[u0*clothU,v0*clothV],[u1*clothU,v0*clothV],[u1*clothU,v1*clothV]]);
+    b.triangle(a,c,point(u0,v1),4,[[u0*clothU,v0*clothV],[u1*clothU,v1*clothV],[u0*clothU,v1*clothV]]);
   }
   for(const v of [0,1]){
-    const points=Array.from({length:29},(_,i)=>point(i/28,v));
-    b.tube(points,points.map(()=>0.012),5,4);
+    const points=Array.from({length:33},(_,i)=>point(i/32,v));
+    b.tube(points,points.map(()=>0.018),13,5);
   }
   for(const u of [0,1]){
-    const points=Array.from({length:17},(_,i)=>point(u,i/16));
-    b.tube(points,points.map(()=>0.012),5,4);
+    const points=Array.from({length:19},(_,i)=>point(u,i/18));
+    b.tube(points,points.map(()=>0.016),13,5);
+  }
+  // Two taut side guys visibly connect fabric, post and stone fixing. They
+  // remain outside the front approach and have small wooden tension toggles.
+  for(const [corner,peg] of [[frontL,new Vector3(-5.10,FLOOR+0.1,2.7)],[frontR,new Vector3(4.95,FLOOR+0.08,2.85)]] as const){
+    const start=corner.clone().add(new Vector3(0,-0.05,0));
+    beam(start,peg,0.015,13);
+    const toggle=start.clone().lerp(peg,0.62);
+    beam(toggle.clone().add(new Vector3(-0.10,-0.03,0)),toggle.clone().add(new Vector3(0.10,0.03,0)),0.029);
+    beam(peg.clone().add(new Vector3(0,-0.12,0)),peg.clone().add(new Vector3(0,0.20,0)),0.045);
   }
 
   // A rear work shelf, seed trays and a low chest occupy the non-walking bay.
@@ -201,6 +224,58 @@ export function shelterGeometry(seed:number):ReturnType<CanyonGeometry['build']>
   basket(2.65,1.22,0.28,0.39);
   basket(3.21,0.99,0.22,0.31);
   basket(-2.16,-0.8,0.19,0.25);
+  // Open-necked clay vessels have a real rim and dark interior, rather
+  // than a sphere with a painted opening. All walls meet along shared edges.
+  const pot=(x:number,y:number,z:number,r:number,h:number,kind:number):void=>{
+    const profile=[[0,0.60],[0.12,0.85],[0.58,1.0],[0.86,0.70],[1,0.69]] as const;
+    const levels=profile.map(([height])=>new Vector3(x,y+h*height,z));
+    b.tube(levels,profile.map(([,radius])=>r*radius),kind,14,true);
+    const top=y+h,outer=r*0.69,inner=Math.max(0.025,outer-0.035);
+    const centre=new Vector3(x,top-0.15,z);
+    for(let i=0;i<14;i++){
+      const a=i/14*Math.PI*2,c=(i+1)/14*Math.PI*2;
+      const oa=new Vector3(x+Math.cos(a)*outer,top,z+Math.sin(a)*outer),oc=new Vector3(x+Math.cos(c)*outer,top,z+Math.sin(c)*outer);
+      const ia=new Vector3(x+Math.cos(a)*inner,top,z+Math.sin(a)*inner),ic=new Vector3(x+Math.cos(c)*inner,top,z+Math.sin(c)*inner);
+      b.quad(oa,oc,ic,ia,kind,0.10,0.035);
+      b.quad(ia,ic,ic.clone().setY(top-0.15),ia.clone().setY(top-0.15),kind,0.10,0.15);
+      b.triangle(centre,ia.clone().setY(top-0.15),ic.clone().setY(top-0.15),6);
+    }
+  };
+  pot(-3.39,FLOOR+0.02,1.09,0.33,0.64,10);
+  pot(-2.75,FLOOR+0.02,1.25,0.25,0.40,11);
+  pot(1.19,FLOOR+0.875,-2.15,0.20,0.36,10);
+  pot(1.77,FLOOR+0.875,-2.31,0.13,0.24,11);
+  // A little field notebook, drying rack, labels and rolled charts make the
+  // bench read as an inhabited workshop even from the normal shelter view.
+  for(let i=0;i<3;i++){
+    const width=0.60-i*0.055,depth=0.37-i*0.015;
+    b.box(0.58,FLOOR+0.90+i*0.075,-2.10,width,0.066,depth,i===1?11:12);
+    b.box(0.58,FLOOR+0.937+i*0.075,-2.10,width+0.045,0.012,depth+0.025,0);
+  }
+  for(let k=0;k<3;k++){
+    const x=-1.84+k*0.9;
+    beam(new Vector3(x,FLOOR+1.02,-2.25),new Vector3(x,FLOOR+1.37,-2.29),0.010);
+    b.quad(new Vector3(x-0.07,FLOOR+1.26,-2.25),new Vector3(x+0.07,FLOOR+1.26,-2.25),new Vector3(x+0.07,FLOOR+1.36,-2.26),new Vector3(x-0.07,FLOOR+1.36,-2.26),12,0.14,0.1);
+  }
+  for(const [x,z,h] of [[2.86,-1.40,1.10],[3.10,-1.45,0.92]] as const){
+    const points=[new Vector3(x,FLOOR+0.025,z),new Vector3(x-0.13,FLOOR+h,z-0.26)];
+    b.tube(points,[0.095,0.095],12,10,true);
+    const tie=points[0].clone().lerp(points[1],0.5);
+    const ring=Array.from({length:13},(_,i)=>tie.clone().add(new Vector3(Math.cos(i/12*Math.PI*2)*0.103,0,Math.sin(i/12*Math.PI*2)*0.103)));
+    b.tube(ring,ring.map(()=>0.012),13,4);
+  }
+  // Off-centre open storage below the bench; no duplicate coplanar faces
+  // are laid on top of its timber surfaces for slats or straps.
+  b.box(-1.45,FLOOR+0.23,-2.07,0.82,0.46,0.63,0);
+  b.box(-0.30,FLOOR+0.18,-2.02,0.62,0.36,0.56,5);
+  // Wall pegs and hanging hand tools occupy the gaps above the work surface.
+  for(const [x,y] of [[-3.2,3.22],[-2.3,3.07],[0.2,2.93],[1.30,2.85]] as const){
+    beam(new Vector3(x,y,-2.84),new Vector3(x,y,-2.62),0.025);
+    const strap=[new Vector3(x,y,-2.65),new Vector3(x-0.03,y-0.21,-2.59),new Vector3(x+0.02,y-0.44,-2.60)];
+    b.tube(strap,[0.012,0.012,0.012],13,4);
+    beam(strap[2],strap[2].clone().add(new Vector3(0.02,-0.32,0.015)),0.025);
+    b.quad(new Vector3(x-0.065,y-0.72,-2.56),new Vector3(x+0.09,y-0.72,-2.56),new Vector3(x+0.11,y-0.89,-2.56),new Vector3(x-0.02,y-0.97,-2.56),6,0.16,0.25);
+  }
   // A broom and short spade lean against the left rear pole, away from routes.
   beam(new Vector3(-3.62,FLOOR,-1.7),new Vector3(-3.88,FLOOR+1.65,-2.14),0.021);
   for(let i=0;i<8;i++)beam(new Vector3(-3.62+(i-3.5)*0.035,FLOOR+0.02,-1.69),new Vector3(-3.66,FLOOR+0.34,-1.77),0.012,5);

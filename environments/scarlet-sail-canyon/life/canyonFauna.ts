@@ -5,7 +5,8 @@ import { FAUNA_ANCHORS, FaunaMotion } from './canyonFaunaMotion';
 import vertexShader from './canyonFauna.vert.glsl?raw';
 import fragmentShader from './canyonFauna.frag.glsl?raw';
 import shadowVertex from './canyonFaunaShadow.vert.glsl?raw';
-import shadowFragment from '../../../src/life/museShadow.frag.glsl?raw';
+// Fauna share Scarlet's additive cloud-map optical depth with its Muse residents.
+import shadowFragment from './museShadow.frag.glsl?raw';
 
 export interface FaunaSpecies { readonly id: FaunaKind; readonly name: string; readonly count: number; readonly description: string }
 interface Animal { rig: FaunaRig; motion: FaunaMotion }

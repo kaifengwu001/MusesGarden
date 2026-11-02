@@ -86,11 +86,17 @@ float homestead(vec3 dir, float h) {
   float uphill = max(smoothstep(14.0, 45.0, -local.x), smoothstep(7.0, 40.0, -local.y) * (1.0 - opening));
   float rise = uChalk.z * smoothstep(0.2, 0.7, uphill * fade);
   float down = max(2.0 * smoothstep(18.0, 54.0, local.x), 3.0 * opening) * fade;
-  float fall = uChalk.z * (floor(down) + smoothstep(0.32, 0.68, fract(down)));
+  // Wider regional risers preserve full beds without sub-grid cliff teeth.
+  float fall = uChalk.z * (floor(down) + smoothstep(0.18, 0.82, fract(down)));
   h = max(0.35, h + rise - fall);
   float band = edge / 8.0;
-  float steps = uChalk.z * (floor(band) + smoothstep(0.25, 0.55, fract(band)));
-  return clamp(h, uCottage.w - steps, uCottage.w + steps);
+  // Preserve the complete riser width even when the final step is shallow.
+  // Clamping after interpolation compresses those drops below the mesh grid.
+  float low = uChalk.z * floor(band);
+  float high = low + uChalk.z;
+  float from = clamp(h, uCottage.w - low, uCottage.w + low);
+  float to = clamp(h, uCottage.w - high, uCottage.w + high);
+  return mix(from, to, smoothstep(0.25, 0.55, fract(band)));
 }
 
 // The homestead applied to a natural height h, or not at all where it reaches
