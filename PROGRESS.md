@@ -42,6 +42,8 @@ Started from 27961a4 (the mist in three layers). Kai (2026-11-02), with the blue
 | 2 | "Too sparse" | |
 | 3 | "Shape of cloud needs refinement: not curving / detailed enough. See reference and match as close as possible" | |
 | 4 | (Kai, on the work in progress) "Reduce count by 30%" | |
+| 5 | (the same) "The way they meander is still a bit too simplistic and mechanical compared to the example" | |
+| 6 | (the same) "Their widths also don't grow and shrink as dynamically as the painting" | |
 
 ### Kai's notes on the mist bands
 
