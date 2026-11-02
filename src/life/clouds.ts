@@ -467,8 +467,8 @@ export class Clouds {
   private readonly mirrorScene: Scene;
   private readonly mirrorCamera = new PerspectiveCamera();
   private readonly mirror = new Matrix4();
-  /** Where the lakes can read the mirror: the mirror pass shades only there. */
-  private readonly waterMask: WaterMask;
+  /** Where the lakes can read the mirror: the mirror pass shades only there (none on a planet without lakes). */
+  private readonly waterMask: WaterMask | null;
   private readonly wind: IUniform<Vector4>;
   /** The pixels drawn this frame (globals: the render scale's part of the screen-sized targets). */
   private readonly view: IUniform<Vector2>;
@@ -501,9 +501,11 @@ export class Clouds {
   /**
    * `uniforms` must already be in `shared` (materials copy it when they are
    * made). Sizes: a face of the shadow cube and of the cover-from-below
-   * cube, and the sharper window of the shadows.
+   * cube, and the sharper window of the shadows. `lakes`: whether lakes read
+   * the clouds (their mirror and the cover from below; a planet without lakes,
+   * the terraces, does without both).
    */
-  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number, localSize: number) {
+  constructor(shared: Record<string, IUniform>, readonly uniforms: CloudUniforms, shadowSize: number, layerSize: number, localSize: number, private readonly lakes = true) {
     const cube = (size: number): WebGLCubeRenderTarget =>
       new WebGLCubeRenderTarget(size, { type: HalfFloatType, format: RedFormat, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
     this.shadowCube = cube(shadowSize);
@@ -519,7 +521,7 @@ export class Clouds {
     uniforms.uCloudLayerCube.value = this.layerCube.texture;
     uniforms.uCloudLumps.value = this.lumps.texture;
 
-    this.waterMask = new WaterMask(shared);
+    this.waterMask = lakes ? new WaterMask(shared) : null;
     this.wind = shared.uWindVec as IUniform<Vector4>;
     this.view = shared.uResolution as IUniform<Vector2>;
     const cloudMaterial = (mirror: boolean): ShaderMaterial =>
@@ -527,7 +529,7 @@ export class Clouds {
         name: mirror ? 'clouds (mirror)' : 'clouds',
         vertexShader,
         fragmentShader,
-        uniforms: mirror ? { ...shared, uProjection: this.projection, uWaterMask: { value: this.waterMask.texture } } : { ...shared, uProjection: this.projection },
+        uniforms: mirror ? { ...shared, uProjection: this.projection, uWaterMask: { value: this.waterMask?.texture ?? null } } : { ...shared, uProjection: this.projection },
         defines: mirror ? { MIRROR_PASS: 1, MASK_CELL } : {},
         // a mirrored camera turns the billboards' winding
         side: mirror ? DoubleSide : FrontSide,
@@ -717,7 +719,7 @@ export class Clouds {
    * the faces of the cube maps that hold some of it are drawn (the others are
    * never read this frame).
    */
-  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, focus: Vector3, seen: number): void {
+  update(renderer: WebGLRenderer, seed: number, radius: number, time: number, p: CloudParams, windAxis: Vector3, sunDir: Vector3, camera: PerspectiveCamera, warp: WarpFrame, focus: Vector3, seen: number, ground?: (dir: Vector3) => number): void {
     if (!this.lumpsBaked) this.bakeLumps(renderer);
     if (seed !== this.seed) this.build(seed);
     if (radius !== this.slotsR) this.layoutSlots(radius);
@@ -760,8 +762,14 @@ export class Clouds {
       at.fade = fade;
       at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32(h + 1))) * Math.pow(scale, 0.35);
       at.size = SIZE * sizeScale * girth * (0.9 + 0.2 * unit(hash32(h + 2))) * (0.35 + 0.65 * fade);
-      const angle = (time * speed) / at.base;
+      let angle = (time * speed) / at.base;
       at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
+      if (ground) {
+        // (over hills: its base the altitude over the ground under it, as it drifts)
+        at.base += ground(at.up);
+        angle = (time * speed) / at.base;
+        at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
+      }
       at.along.copy(slot.along).applyAxisAngle(windAxis, angle);
       at.along.addScaledVector(at.up, -at.along.dot(at.up)).normalize();
       at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
@@ -872,8 +880,8 @@ export class Clouds {
       this.renderCube(renderer, this.shadowCube, this.shadowScene, faces);
       this.renderWindow(renderer, focus, radius, camera.position.length() - radius);
     } else this.uniforms.uShadowWindow.value.w = 0;
-    if (orbit > 0) this.renderCube(renderer, this.layerCube, this.layerScene, faces);
-    if (orbit < 1) this.renderMirror(renderer, camera, radius, warp, n);
+    if (orbit > 0 && this.lakes) this.renderCube(renderer, this.layerCube, this.layerScene, faces);
+    if (orbit < 1 && this.lakes) this.renderMirror(renderer, camera, radius, warp, n);
     renderer.setClearColor(this.clearColour, clearAlpha);
     renderer.setRenderTarget(previous);
   }
@@ -971,7 +979,7 @@ export class Clouds {
       const tanY = Math.tan((camera.fov * Math.PI) / 360);
       const tanX = tanY * camera.aspect;
       const spread = ((RUFFLE * this.wind.value.w * vh) / (2 * tanY)) * (1 + tanX * tanX + tanY * tanY);
-      this.waterMask.render(renderer, camera, this.bufferSize, view, spread);
+      this.waterMask?.render(renderer, camera, this.bufferSize, view, spread);
     }
     // cleared to transparent black: the water reads it as premultiplied colour
     renderer.setRenderTarget(this.mirrorTarget);

@@ -22,8 +22,13 @@ const vec3 LAB_SKY = vec3(0.7484, 0.8276, 0.9551) * 1.6;
 const vec3 LAB_GROUND = vec3(0.1473, 0.1706, 0.0835) * 1.6;
 const vec3 LAB_SUN = vec3(1.0, 0.9114, 0.7874) * 2.2;
 
-vec3 labLight(vec3 albedo, vec3 n, vec3 up) {
+// shade: a passing cloud's shadow there (0 … 1): the sun's share dimmed under it, the light a little cooler.
+vec3 labLight(vec3 albedo, vec3 n, vec3 up, float shade) {
   vec3 sky = mix(LAB_GROUND, LAB_SKY, 0.5 + 0.5 * dot(n, up)) * uShadeTint;
-  vec3 sun = LAB_SUN * max(dot(n, uSunDir), 0.0) * uSunTint;
-  return albedo * (sky + sun) * 0.31830989;
+  vec3 sun = LAB_SUN * max(dot(n, uSunDir), 0.0) * uSunTint * (1.0 - 0.85 * shade);
+  return albedo * (sky * mix(vec3(1.0), vec3(0.9, 0.96, 1.04), shade) + sun) * 0.31830989;
+}
+
+vec3 labLight(vec3 albedo, vec3 n, vec3 up) {
+  return labLight(albedo, n, up, 0.0);
 }

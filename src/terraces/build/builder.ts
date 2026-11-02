@@ -21,6 +21,9 @@ export class TerraceBuild {
   stats: Record<string, number> = {};
   /** The trees the last build placed (per tree: direction, ground, seed). */
   trees: Float32Array | null = null;
+  /** The mountains and the houses it placed (per model: direction, base, height, which, turn, stretch). */
+  peaks: Float32Array | null = null;
+  houses: Float32Array | null = null;
   /** Builds put in place so far (a key for what reads the meshes). */
   version = 0;
   private waiting: Array<() => void> = [];
@@ -74,6 +77,8 @@ export class TerraceBuild {
     }
     this.stats = out.stats;
     this.trees = out.trees;
+    this.peaks = out.peaks;
+    this.houses = out.houses;
     this.building = false;
     this.version++;
     for (const done of this.waiting.splice(0)) done();

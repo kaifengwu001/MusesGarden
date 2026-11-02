@@ -8,7 +8,7 @@ const scope = self as unknown as { onmessage: ((e: MessageEvent<BuildInput>) => 
 
 scope.onmessage = (e) => {
   const out = buildTerraces(e.data);
-  const transfer: Transferable[] = [out.trees.buffer];
+  const transfer: Transferable[] = [out.trees.buffer, out.peaks.buffer, out.houses.buffer];
   for (const c of out.chunks) if (c) transfer.push(c.position.buffer, c.normal.buffer, c.part.buffer, c.paddy.buffer, c.floor.buffer, c.index.buffer);
   scope.postMessage(out, transfer);
 };

@@ -20,11 +20,41 @@ import { warpForZoom } from '../render/warp';
 import { CameraRig } from '../view/camera';
 import { pickSurface, type Pick } from '../view/picking';
 import { TerraceBuild } from './build/builder';
+import { Clouds, createCloudUniforms, type CloudParams } from '../life/clouds';
 import { FIELD, PlanetField } from './build/field';
+import { tangentFrame } from './build/sphere';
+import { ModelSet, type Placement } from './models';
 import { PaddyMap } from './paddyMap';
 import { TERRACE_ROWS } from './palette';
 import { Rice, RICE } from './rice';
 import { Trees } from './trees';
+
+/**
+ * The cloud layer (Kai, 2026-11-02: hanging just above the ground, as the meadow's, much cloudier): the meadow's
+ * clouds (life/clouds.ts) and its clouds' settings (the panel's coverage, altitude, speed and shadow), the coverage
+ * `more` than the meadow's (0.45 there by default, 0.75 here); their base over the ground under them, the ground
+ * taken as the highest of the hills within `reach` m (a raster of `cells` a cube face's side), so a cloud clears the
+ * slopes round it as it drifts over the hills.
+ */
+const CLOUDS = { more: 0.3, reach: 12, cells: 96 } as const;
+
+/** Kai's models, made light by scripts/terraces-models.mjs (a unit tall, two levels of detail each). */
+const MODEL_URLS = (kind: 'mountain' | 'house'): string[] => [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/${kind}${k}.glb`, import.meta.url).href);
+
+/** The build's models (per model: direction, base, height, which, turn, stretch) as placements, turned in the planet's tangent frame at each. */
+function placements(a: Float32Array): Placement[] {
+  const out: Placement[] = [];
+  const F = new Float64Array(6);
+  for (let i = 0; i < a.length; i += 8) {
+    const up = new Vector3(a[i], a[i + 1], a[i + 2]);
+    tangentFrame(up.x, up.y, up.z, F);
+    const c = Math.cos(a[i + 6]);
+    const s = Math.sin(a[i + 6]);
+    const e1 = new Vector3(c * F[0] + s * F[3], c * F[1] + s * F[4], c * F[2] + s * F[5]).normalize();
+    out.push({ model: a[i + 5], up, e1, base: a[i + 3], height: a[i + 4], stretch: a[i + 7] });
+  }
+  return out;
+}
 
 const NOON = new Palette(TERRACE_ROWS);
 const NOON_SUN = NOON.get(ROW.LIGHT, 0);
@@ -78,6 +108,16 @@ export class TerraceWorld implements PlanetWorld {
   }
   field: PlanetField;
   readonly trees: Trees;
+  /** Kai's karst towers on the hilltops and houses in the villages, where the build placed them. */
+  readonly towers: ModelSet;
+  readonly houses: ModelSet;
+  private placedModels: Float32Array | null = null;
+  readonly cloudUniforms = createCloudUniforms();
+  readonly clouds: Clouds;
+  /** The ground under the clouds (m): per cube face cell, the highest of the hills within CLOUDS.reach. */
+  private cloudFloor = new Float32Array(0);
+  private cloudFloorFor = -1;
+  private readonly cloudParams: CloudParams = { coverage: 0.75, altitude: 5, speed: 0.4, shadow: 0.88 };
   readonly rice: Rice;
   readonly objects: TerraceBuild;
   readonly paddyMap: PaddyMap;
@@ -93,6 +133,7 @@ export class TerraceWorld implements PlanetWorld {
   private readonly frustum = new Frustum();
   private readonly projView = new Matrix4();
   private readonly windAxis = new Vector3();
+  private readonly eye = new Vector3();
   private readonly tmp = new Vector3();
   private readonly g3 = new Float64Array(3);
 
@@ -108,6 +149,7 @@ export class TerraceWorld implements PlanetWorld {
       ...globals,
       ...this.look,
       ...this.own,
+      ...this.cloudUniforms,
       uGustRot: { value: new Vector4(1, 0, 1, 0) },
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
@@ -118,7 +160,10 @@ export class TerraceWorld implements PlanetWorld {
     Object.assign(this.shared, this.paddyMap.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceBuild(this.shared);
-    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh);
+    this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 32, 140);
+    this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
+    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, 16, tier.maps.cloudWindow, false);
+    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.clouds.mesh);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
     if (only !== null) {
@@ -130,6 +175,75 @@ export class TerraceWorld implements PlanetWorld {
   }
 
   /** The planet's mathematics for the world's seed. */
+  /** The ground under the clouds: on each cube face cell, the highest of the hills over CLOUDS.reach round it. */
+  private makeCloudFloor(): void {
+    const N = CLOUDS.cells;
+    const f = this.field;
+    const raw = new Float32Array(6 * N * N);
+    const d = new Vector3();
+    for (let face = 0; face < 6; face++) {
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          cubeDir(face, (2 * (i + 0.5)) / N - 1, (2 * (j + 0.5)) / N - 1, d);
+          raw[(face * N + j) * N + i] = f.height(d.x, d.y, d.z);
+        }
+      }
+    }
+    // (the highest within reach: a cell is about πR/2N m across)
+    const r = Math.max(1, Math.ceil(CLOUDS.reach / ((Math.PI * f.R) / (2 * N))));
+    const out = new Float32Array(6 * N * N);
+    for (let face = 0; face < 6; face++) {
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          let m = -Infinity;
+          for (let b = Math.max(0, j - r); b <= Math.min(N - 1, j + r); b++) for (let a = Math.max(0, i - r); a <= Math.min(N - 1, i + r); a++) m = Math.max(m, raw[(face * N + b) * N + a]);
+          out[(face * N + j) * N + i] = m;
+        }
+      }
+    }
+    this.cloudFloor = out;
+    this.cloudFloorFor = this.noiseSeed;
+  }
+
+  /** The ground under a cloud (m), bilinear on its face's raster. */
+  private readonly floorAt = (dir: Vector3): number => {
+    const N = CLOUDS.cells;
+    const ax = Math.abs(dir.x);
+    const ay = Math.abs(dir.y);
+    const az = Math.abs(dir.z);
+    let face: number;
+    let u: number;
+    let v: number;
+    if (ax >= ay && ax >= az) [face, u, v] = [dir.x > 0 ? 0 : 1, dir.y / ax, dir.z / ax];
+    else if (ay >= az) [face, u, v] = [dir.y > 0 ? 2 : 3, dir.x / ay, dir.z / ay];
+    else [face, u, v] = [dir.z > 0 ? 4 : 5, dir.x / az, dir.y / az];
+    const fx = Math.min(Math.max(((u + 1) / 2) * N - 0.5, 0), N - 1.001);
+    const fy = Math.min(Math.max(((v + 1) / 2) * N - 0.5, 0), N - 1.001);
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    const a = this.cloudFloor[(face * N + j) * N + i];
+    const b = this.cloudFloor[(face * N + j) * N + i + 1];
+    const c = this.cloudFloor[(face * N + j + 1) * N + i];
+    const e = this.cloudFloor[(face * N + j + 1) * N + i + 1];
+    const tx = fx - i;
+    const ty = fy - j;
+    return (a + (b - a) * tx) * (1 - ty) + (c + (e - c) * tx) * ty;
+  };
+
+  /** How far round the focus (rad) the ground the camera sees reaches (the clouds draw only the cube faces that hold some). */
+  private groundInSight(): number {
+    const R = this.growth.radius;
+    const k = this.warp.k;
+    const margin = 0.08;
+    const top = FIELD.relief;
+    if (Math.abs(k) * R < 0.01) return Math.acos(Math.min(1, R / this.rig.camera.position.length())) + margin;
+    const bend = 1 / R + 2 * k;
+    if (bend <= 1e-6) return Math.PI;
+    const radiusEff = 1 / bend;
+    const reach = Math.sqrt(2 * radiusEff * (this.rig.altitude + 0.5)) + Math.sqrt(2 * radiusEff * top);
+    return Math.min(Math.PI, reach / R + margin);
+  }
+
   private makeField(): PlanetField {
     this.noiseSeed = hash32(hashMix(this.store.values.world.seed, 0x51ce7a));
     this.own.uTerrainSeed.value = this.noiseSeed;
@@ -299,6 +413,14 @@ export class TerraceWorld implements PlanetWorld {
     // the terraces, the whole planet's, built once for this seed (in a worker: until they are, the sky alone)
     this.objects.update(this.noiseSeed);
     if (this.objects.trees && this.objects.trees !== this.trees.placed) this.trees.place(this.objects.trees);
+    if (this.objects.peaks && this.objects.peaks !== this.placedModels) {
+      this.placedModels = this.objects.peaks;
+      this.towers.set(placements(this.objects.peaks), R);
+      this.houses.set(placements(this.objects.houses ?? new Float32Array(0)), R);
+    }
+    // (near ones in full detail: the camera's place on the planet, unwarped)
+    this.towers.update(this.eye.copy(rig.up).multiplyScalar(R + rig.altitude));
+    this.houses.update(this.eye);
     // the rice reads the built paddies round the focus from their map
     this.paddyMap.render(this.renderer, this.objects.group, rig.up, rig.forward, R, `${this.objects.version}/${this.own.uPaddy.value.y.toFixed(3)}`);
     // the rice near the focus, fewer as the camera rises, none from a bird's height
@@ -306,6 +428,13 @@ export class TerraceWorld implements PlanetWorld {
     this.nearFieldDrawn = riceNear > 0.5;
     this.rice.update(this.renderer, { seed: p.world.seed, radius: R, radiusHi: this.band.radiusHi, focus: rig.up, frustum: this.frustum, warp: this.warp, queue: this.queue, near: riceNear }, riceNear, p.wind.sheen * 1.2);
     this.own.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
+    // the clouds: the meadow's, cloudier, each over the ground under it
+    if (this.cloudFloorFor !== this.noiseSeed) this.makeCloudFloor();
+    this.cloudParams.coverage = Math.min(1, p.clouds.coverage + CLOUDS.more);
+    this.cloudParams.altitude = p.clouds.altitude;
+    this.cloudParams.speed = p.clouds.speed;
+    this.cloudParams.shadow = p.clouds.shadow;
+    this.clouds.update(this.renderer, this.noiseSeed, R, clock.time, this.cloudParams, this.windAxis, this.sunDir, cam, this.warp, rig.up, this.groundInSight(), this.floorAt);
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }
@@ -385,4 +514,15 @@ export class TerraceWorld implements PlanetWorld {
     this.rig.settle();
     this.pinGrowth(this.store.values.world.growth, this.store.values.world.areaMin, this.store.values.world.areaMax);
   }
+}
+
+/** The direction at (u, v) on a cube face (each in −1 … 1: the face's own two axes, as makeCloudFloor and floorAt read them). */
+function cubeDir(face: number, u: number, v: number, out: Vector3): Vector3 {
+  if (face === 0) out.set(1, u, v);
+  else if (face === 1) out.set(-1, u, v);
+  else if (face === 2) out.set(u, 1, v);
+  else if (face === 3) out.set(u, -1, v);
+  else if (face === 4) out.set(u, v, 1);
+  else out.set(u, v, -1);
+  return out.normalize();
 }
