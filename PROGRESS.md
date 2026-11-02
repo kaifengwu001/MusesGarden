@@ -44,6 +44,7 @@ Started from fbb25fd (the mist as brushed strokes in three layers). Kai (2026-11
 | 4 | "Add some translucency to them, and vary based on width" | |
 | 5 | "Add a general height-based fog" | |
 | 6 | "Start adding water and rice to paddies, based on base color: white is full water, dark green is very dense grass, and everything in between" | |
+| 7 | (Kai, on the work in progress) "Clouds reflect in paddies with water" | |
 
 ### Kai's notes on the mist layers
 
