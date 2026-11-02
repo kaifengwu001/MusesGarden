@@ -42,7 +42,6 @@ import lumpsFragment from './cloudLumpsBake.frag.glsl?raw';
 import vertexShader from './cloud.vert.glsl?raw';
 import shadowFragment from './cloudShadow.frag.glsl?raw';
 import shadowVertex from './cloudShadow.vert.glsl?raw';
-import { Veil, VEIL, type VeilHeap } from './veil';
 import { MASK_CELL, WaterMask } from './waterMask';
 
 // Low cumulus drifting with the wind a few meters above the meadow. Each
@@ -70,18 +69,8 @@ import { MASK_CELL, WaterMask } from './waterMask';
 // the streamlines stay put in direction space, and the clouds along them
 // slide closer (more of them) so a streak stays whole. A cloud fades in and
 // out with its cloudiness, so nothing pops.
-//
-// Under them, while the planet has yet to unfold (planet/unfold.ts), lies the
-// veil (veil.ts): still, low heaps of the same puffs over all of it but a
-// little ground round the hut, clearing heap by heap as it unfolds. They go
-// into the same rows, so they are drawn, shadowed and mirrored with the rest.
 
 export const MAX_CLOUDS = 512;
-/** Rows for the veil's heaps, after the drifting clouds' own. */
-const MAX_VEIL = 640;
-/** A lobe of the veil the camera comes this near (m from its surface) shrinks away from it, all of it by the nearer. */
-const VEIL_EYE = [9, 2] as const;
-const ROWS = MAX_CLOUDS + MAX_VEIL;
 const PUFFS = 8;
 const HEADER = 3;
 /** Texels per cloud: the header, the puffs, then the puffs' self-shadows (four a texel). */
@@ -171,7 +160,7 @@ export interface CloudUniforms {
   uCloudMirrorExtent: IUniform<Vector4>;
 }
 
-export interface Puff {
+interface Puff {
   /** Offset × cloud size: x along the cloud, y up from its base, z across. */
   x: number;
   y: number;
@@ -416,7 +405,7 @@ function traceStreamlines(flow: Flow, rand: () => number, noiseSeed: number): Ve
 }
 
 export function createCloudUniforms(): CloudUniforms {
-  const data = new DataTexture(new Float32Array(COLUMNS * ROWS * 4), COLUMNS, ROWS, RGBAFormat, FloatType);
+  const data = new DataTexture(new Float32Array(COLUMNS * MAX_CLOUDS * 4), COLUMNS, MAX_CLOUDS, RGBAFormat, FloatType);
   data.magFilter = NearestFilter;
   data.minFilter = NearestFilter;
   data.generateMipmaps = false;
@@ -450,8 +439,6 @@ function quad(): InstancedBufferGeometry {
 /** A cloud being shown this frame. */
 interface Placed {
   slot: Slot;
-  /** A heap of the veil (its own lobes and still), or null: a drifting cloud. */
-  heap: VeilHeap | null;
   fade: number;
   /** Distance of its base from the planet centre, and its size (m). */
   base: number;
@@ -479,8 +466,6 @@ export class Clouds {
    * none stands in the way while it is open. Null the rest of the time.
    */
   clearing: { readonly from: Vector3; readonly to: Vector3; radius: number; amount: number } | null = null;
-  /** The veil over the planet yet to unfold (veil.ts): World lays it out and sets how far it has cleared. */
-  readonly veil = new Veil();
   private readonly shadowCube: WebGLCubeRenderTarget;
   private readonly layerCube: WebGLCubeRenderTarget;
   /** The sharper window of the shadows (WINDOW), its face (-1: none yet) and size. */
@@ -515,17 +500,15 @@ export class Clouds {
   private slotsR = Number.NaN;
   private threshold = 0;
   private thresholdKey = '';
-  private readonly placed: Placed[] = Array.from({ length: ROWS }, () => ({ slot: null as unknown as Slot, heap: null, fade: 1, base: 0, size: 0, up: new Vector3(), along: new Vector3(), distance: 0 }));
+  private readonly placed: Placed[] = Array.from({ length: MAX_CLOUDS }, () => ({ slot: null as unknown as Slot, fade: 1, base: 0, size: 0, up: new Vector3(), along: new Vector3(), distance: 0 }));
   private readonly order: Placed[] = [];
   /** Per row: 1 when the ground does not hide the cloud from the camera. */
-  private readonly inSight = new Uint8Array(ROWS);
+  private readonly inSight = new Uint8Array(MAX_CLOUDS);
   private readonly all: Array<{ centre: Vector3; radius: number }> = [];
   private readonly p = new Vector3();
   private readonly q = new Vector3();
   private readonly across = new Vector3();
   private readonly centre = new Vector3();
-  /** The camera in planet space (the veil's lobes give way to it). */
-  private readonly eye = new Vector3();
   private readonly projection = { value: new Matrix4() };
   /** Clouds shown (perf stat). */
   count = 0;
@@ -789,7 +772,6 @@ export class Clouds {
       }
       const at = this.placed[this.order.length];
       at.slot = slot;
-      at.heap = null;
       at.fade = fade;
       at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32(h + 1))) * Math.pow(scale, 0.35);
       at.size = SIZE * sizeScale * girth * (0.9 + 0.2 * unit(hash32(h + 2))) * (0.35 + 0.65 * fade);
@@ -807,30 +789,6 @@ export class Clouds {
       at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
       this.order.push(at);
     }
-    // the veil's heaps where it still stands: still, sunk in the meadow, under the drifting clouds
-    const veil = this.veil;
-    if (veil.progress < 1) {
-      const end = this.order.length + MAX_VEIL;
-      for (const heap of veil.heaps) {
-        if (this.order.length >= end) break;
-        if (!Veil.stands(heap, veil.progress)) continue;
-        const at = this.placed[this.order.length];
-        at.heap = heap;
-        at.fade = 1;
-        at.base = radius + VEIL.base * scale;
-        at.size = VEIL.height * scale;
-        at.up.copy(heap.dir);
-        at.along.copy(heap.along);
-        if (this.clearing) {
-          const c = this.clearing;
-          const middle = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size);
-          const reach = segmentDistance(middle, c.from, c.to) - 1.45 * at.size;
-          at.fade *= 1 - c.amount * (1 - smoothstep(c.radius, c.radius + 8, reach));
-        }
-        at.distance = this.p.copy(at.up).multiplyScalar(at.base + 0.45 * at.size).distanceTo(camera.position);
-        this.order.push(at);
-      }
-    }
     this.order.sort((a, b) => a.distance - b.distance);
     this.order.forEach((at, i) => {
       const b = (this.all[i] ??= { centre: new Vector3(), radius: 0 });
@@ -845,16 +803,10 @@ export class Clouds {
     const data = this.uniforms.uCloudData.value.image.data as Float32Array;
     const { x: sx, y: sy, z: sz } = sunDir;
     let heights = 0;
-    let drifting = 0;
-    const spread = VEIL.spacing * scale;
-    const eye = unwarpPoint(warp, this.eye.copy(camera.position), this.eye);
     this.order.forEach((at, row) => {
-      const heap = at.heap;
-      const h = heap ? heap.seed : at.slot.seed;
+      const h = at.slot.seed;
       const { size, base } = at;
-      const puffs = heap ? veil.templates[h % veil.templates.length] : this.templates[h % TEMPLATES];
-      // (a heap of the veil is laid out by its spacing; a cloud by its size)
-      const span = heap ? spread : size;
+      const puffs = this.templates[h % TEMPLATES];
       const across = this.across.crossVectors(at.up, at.along);
       const o = row * COLUMNS * 4;
       // bounding sphere about the heap's middle
@@ -866,10 +818,10 @@ export class Clouds {
       const { x: mx, y: my, z: mz } = this.centre;
       for (let k = 0; k < PUFFS; k++) {
         const puff = puffs[k];
-        const r = heap ? puff.r * span * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * Veil.lobe(heap, k, veil.progress) * at.fade : puff.r * size * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * at.fade;
-        const up = base + puff.y * span;
-        const al = puff.x * span;
-        const ac = puff.z * span;
+        const r = puff.r * size * (1 + 0.05 * Math.sin(time * 0.25 + puff.phase)) * at.fade;
+        const up = base + puff.y * size;
+        const al = puff.x * size;
+        const ac = puff.z * size;
         const x = ux * up + ax * al + cx * ac;
         const y = uy * up + ay * al + cy * ac;
         const z = uz * up + az * al + cz * ac;
@@ -877,8 +829,7 @@ export class Clouds {
         data[q] = x;
         data[q + 1] = y;
         data[q + 2] = z;
-        // (a lobe of the veil the camera comes near shrinks away from it, rather than fogging the view)
-        data[q + 3] = heap ? r * smoothstep(VEIL_EYE[1], VEIL_EYE[0], Math.hypot(x - eye.x, y - eye.y, z - eye.z) - r) : r;
+        data[q + 3] = r;
         reach = Math.max(reach, Math.hypot(x - mx, y - my, z - mz) + r);
       }
       // how much of the heap stands between each puff and the sun (from the
@@ -888,8 +839,7 @@ export class Clouds {
       for (let k = 0; k < PUFFS; k++) {
         const qk = o + (HEADER + k) * 4;
         const rk = data[qk + 3];
-        // (the veil's heaps are too low and broad for it: their hollows are shaded as they are drawn, clouds.glsl)
-        if (!this.inSight[row] || rk <= 0 || heap) {
+        if (!this.inSight[row] || rk <= 0) {
           data[lit + k] = 0;
           continue;
         }
@@ -921,12 +871,7 @@ export class Clouds {
       data[o + 8] = (h % 9973) + 7;
       data[o + 9] = size;
       data[o + 10] = this.inSight[row];
-      data[o + 11] = heap ? 1 : 0;
-      // (the lakes seen from orbit mirror the drifting clouds at their height; the veil lies on the ground)
-      if (!heap) {
-        heights += base + 0.45 * size - radius;
-        drifting++;
-      }
+      heights += base + 0.45 * size - radius;
     });
     this.uniforms.uCloudData.value.needsUpdate = true;
     this.projection.value.copy(camera.projectionMatrix);
@@ -936,7 +881,7 @@ export class Clouds {
     // the lakes mirror the clouds through the mirror pass near the ground and read the cover from below from orbit
     const orbit = smoothstep(ORBIT_REFLECTION[0] * radius, ORBIT_REFLECTION[1] * radius, camera.position.length() - radius);
     this.uniforms.uCloudLook.value.set(p.shadow, 0.22, n, 0);
-    this.uniforms.uCloudOrbit.value.set(orbit, drifting > 0 ? heights / drifting : 12, 0, 0);
+    this.uniforms.uCloudOrbit.value.set(orbit, n > 0 ? heights / n : 12, 0, 0);
     this.mesh.geometry.instanceCount = n;
     this.mesh.visible = this.count > 0;
     this.shadowGeometry.instanceCount = n * PUFFS;

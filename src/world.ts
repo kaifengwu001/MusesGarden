@@ -11,6 +11,7 @@ import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
+import { VeilFog } from './life/veilFog';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
 import { HutInterior } from './life/hut';
 import { Homestead } from './life/props';
@@ -91,6 +92,8 @@ export class World {
   /** Muse's hut inside, drawn only while the cutaway is open (view/cutaway.ts); it stands in the homestead's frame. */
   readonly hut: HutInterior;
   readonly clouds: Clouds;
+  /** The veil over the planet yet to unfold: ground fog, clearing out from the hut (planet/unfold.ts, life/veil.ts). */
+  readonly veilFog: VeilFog;
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
@@ -190,6 +193,7 @@ export class World {
     this.hut = new HutInterior(this.shared, this.homestead.faces);
     this.homestead.group.add(this.hut.group);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
+    this.veilFog = new VeilFog(this.shared);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.butterflies = new Butterflies(this.shared);
@@ -198,7 +202,7 @@ export class World {
     this.clouds.addShadowCaster(this.birds.shadowMesh);
     // (the float's rings on the water are the meadow's own ripples)
     this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.veilFog.mesh, this.clouds.mesh);
     this.applyTier(tier);
   }
 
@@ -449,9 +453,8 @@ export class World {
     // (the hut's front door swings open as Muse comes to it, the room seen through it)
     this.homestead.setDoor(this.muse.door);
     this.hut.setDoor(this.muse.door);
-    // the veil over the planet yet to unfold, clearing out from the hut (life/veil.ts)
-    this.clouds.veil.build(L.seed, L.cottage);
-    this.clouds.veil.progress = unveiling(p.world.unfold);
+    // the veil over the planet yet to unfold: ground fog, clearing out from the hut
+    this.veilFog.update(this.renderer, L.seed, L.cottage, unveiling(p.world.unfold), this.terrain.maxHeight, this.windAxis, rig.camera);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
 
     const cam = rig.camera;

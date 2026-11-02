@@ -47,13 +47,12 @@ ARCHITECTURE.md ("The unfolding"):
 
 - **Unfold** in the control bar (plays over 16 s: 8 to unveil, 8 to grow);
   URL key `u`; the default ½ is the meadow as it was.
-- **The veil:** about 490 still heaps of the clouds' own puffs, clearing heap
-  by heap out from the hut, in the clouds' rows (drawn, sorted and mirrored
-  with them). It takes the drifting clouds' shadows and casts none.
-- **Up close it's fog** (Kai: "something fog like"): nearer than 70 m the
-  veil's lobes thin away to their edges, it is as opaque as the depth of fog
-  the view goes through above the ground, so it frays at its foot, and it
-  is lit paler and flatter. Past 220 m it is cloud again: orbit is unchanged.
+- **The veil is ground fog** (third round, below): a layer on the meadow,
+  dense at the ground, thinning upward to a top that lies in banks 2–5.5 m
+  high, with wisps streaked along the wind. A sea of it from orbit, a bank
+  of it from the clearing, under the drifting clouds. Its edge recedes
+  raggedly out from the hut (a field of turns baked once per planet). It is
+  marched per pixel in a fullscreen pass. The clouds' code is main's again.
 - **The flowers:** the existing bloom front, moved by the unfolding (the
   Bloom slider still sets the season; the lower of the two wins).
 - **Growth:** g from 0.1886 to 1 over the second half, the camera held
@@ -62,8 +61,7 @@ ARCHITECTURE.md ("The unfolding"):
 - **Pixel-identical at the default:** main and the branch draw the same
   frames in all nine standard views, high and medium, at 1× and 2×. The one
   exception is Muse's pin on the orbit, whose face differs between two loads
-  of main as well. The veil is lit in a block of its own after the clouds'
-  light: lit inside it, it moved one pixel of a drifting cloud by one step.
+  of main as well.
 - **Also fixed:** the area bounds' URL round trip. A constrained bound was
   kept finer than the URL writes it and came back a square meter off. The new
   field shifted params.test.ts's random draws onto that case.
@@ -75,15 +73,24 @@ camera back, or starting the growth farther out, was offered and turned down.
 
 Also decided (Kai, 2026-11-01): the page opens on the meadow as it was (the
 slider's middle; `#u=0` opens the start), and ahead of the flowers the grass
-stays the Bloom slider's early-spring grass, a little shorter and paler. Up
-close the veil should look like fog, not a smooth dome. Its cost is measured
-once its look is settled.
+stays the Bloom slider's early-spring grass, a little shorter and paler. Its
+cost is measured once its look is settled.
+
+The veil's look took three rounds. First it was still heaps of the clouds'
+puffs, which up close were smooth domes. Then those heaps turned to fog up
+close and stayed sculpted cloud far off. Kai: "Fog needs work" — they were
+blurry blobs, not fog, and too see-through; the veil should be fog from
+every distance. So it became a ground-fog layer, dense at the ground,
+lying in banks with wisps. The lakes don't mirror it (Kai: no need, it
+covers the lake already).
 
 Open (questions for Kai, and what wasn't done):
 
-- Inside the veil (walking into it) the lobes round you give way: the fog
-  stands round you rather than closing in, and by a lake at eye level the
-  water's horizon shows hard against it.
+- At eye level in the clearing (1.6 m), the tiny planet's near horizon hides
+  most of the fog: it shows as a pale strip beyond it. From the standing
+  stop (4.3 m) up, it is a bank round the clearing.
+- The drifting clouds' bases (4–6 m over the water table) dip into the
+  fog's highest banks in places, and are drawn over the fog there.
 - Muse still roams under the veil, and the finds' beds and pins show
   wherever they are; the engine's growth (Fern's exploration) still sets the
   size directly, so the slider stands in for Muse's exploring.

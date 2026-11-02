@@ -9,8 +9,6 @@
 //   RADIAL             straight down: the cloud cover seen from below, which
 //                      the lakes read from orbit (cloudsFromOrbit)
 // Nothing here depends on the camera, so the maps are fixed to the planet.
-// The veil's heaps (veil.ts) are left out of both: it lies on the ground
-// under the drifting clouds, and takes their shadows (clouds.glsl).
 // The shadows are drawn twice: the cube map, and a sharper window of one
 // face about where you stand (clouds.ts), its texels fixed to the planet.
 #include <meadow_noise>
@@ -34,9 +32,8 @@ void main() {
   vec4 puff = texelFetch(uCloudData, ivec2(3 + k, row), 0);
   vOff = position.xy * (1.0 + 1.5 * CLOUD_LUMPS);
   vRadius = puff.w;
-  vec4 info = texelFetch(uCloudData, ivec2(2, row), 0);
-  vSeed = lumpSeed(uint(info.x), k);
-  if (row >= int(uCloudLook.z) || puff.w <= 0.0 || info.w > 0.5) {
+  vSeed = lumpSeed(uint(texelFetch(uCloudData, ivec2(2, row), 0).x), k);
+  if (row >= int(uCloudLook.z) || puff.w <= 0.0) {
     gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     return;
   }

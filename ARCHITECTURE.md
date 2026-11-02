@@ -174,12 +174,12 @@ u ∈ [0, 1], the control bar's **Unfold** in place of the radius slider
 (`planet/unfold.ts`). It writes the growth; the panel's Growth and the
 URL's `g` still work on their own.
 
-- **u = 0:** the meadow at its tuned size (R 128 m), under a low **veil** of
-  cloud everywhere but a ragged clearing about 45 m round the hut (its pond
-  and pier in it): grass, no flowers (the bloom front at b = 0).
-- **0 → ½:** the veil clears heap by heap and the bloom front moves out from
-  the hut behind it, both at an even pace in distance from the hut (so the
-  side you face from orbit unveils steadily).
+- **u = 0:** the meadow at its tuned size (R 128 m), under a **veil** of
+  ground fog everywhere but a ragged clearing about 45 m round the hut (its
+  pond and pier in it): grass, no flowers (the bloom front at b = 0).
+- **0 → ½:** the fog's edge recedes raggedly and the bloom front moves out
+  from the hut behind it, both at an even pace in distance from the hut (so
+  the side you face from orbit unveils steadily).
 - **u = ½ (the default):** the meadow as tuned, unveiled and all in flower.
   It draws pixel-identical to main.
 - **½ → 1:** the planet grows from R 128 m to R 400 m (g linear in u). The
@@ -188,28 +188,32 @@ URL's `g` still work on their own.
   by about R 200 m); over the meadow it keeps its height, as the zoom stops do.
   Only growth the unfolding writes is held, not a URL, a preset or the engine.
 
-**The veil** (`life/veil.ts`): about 490 still heaps of the clouds' own puffs
-on a Fibonacci lattice 22 m apart (at R 128; they scale with R), each six
-broad lobes round two, sunk to their middles in the ground: low domes, up to
-about 9 m, closing over the ground between them. Each heap's turn to clear is
-its distance from the hut pushed about by a broad noise (bays and fingers)
-and a little of its own (islands that linger, holes that open early); then
-its lobes shrink away one by one. The heaps go into the clouds' rows
-(`clouds.ts`), so they are drawn, sorted and mirrored with the drifting ones.
-They stay out of the shadow and cover maps, and take the drifting clouds'
-shadows instead (the drifting clouds pass over them). Their hollows are
-shaded by height rather than by the heap's own sun shadow, which drew the
-lobes' flat intersections as straight edges. The camera erodes only the lobes
-it comes within a few meters of.
+**The veil** (`life/veil.ts`, `life/veilFog.ts`): ground fog, a sea of it
+from orbit and a bank of it from the clearing, unlike the drifting clouds
+from any distance (Kai: "fog from every distance"), beneath them. Where it
+lies is a field over the sphere, each place's turn: how far the unfolding has
+to go before it clears. The turn is the place's angle from the hut, pushed
+about by a broad noise (bays and fingers) and a finer one (islands that
+linger, holes that open early). The field is baked once per planet into a
+cube map (`veilField.frag.glsl`, 256² a face, with the fog's bank heights and
+its wisps, drawn out along the wind). Its CPU mirror (`veilTurn`) finds the
+turn below which a given share of the planet lies, so the edge moves out at
+an even pace; the fog softens over 1.5 m at it.
 
-**Up close the veil is fog** (`veilFog`, cloud.frag.glsl): all fog nearer than
-70 m, all cloud past 220 m. Each lobe thins to nothing toward its edge,
-inside its lumpy outline. The fog's opacity is the depth of fog the view
-goes through above the ground (7 m hides two thirds of what lies behind), so
-it frays where it meets the ground. It is lit paler and flatter than cloud,
-grey-blue low down and white above. Each of these varies smoothly across the
-lobes, so no lobe's edge shows through, and the lakes mirror it the same. It
-is drawn after the clouds' own light, which it leaves to the bit.
+The fog is a fullscreen pass (`veilFog.frag.glsl`) after the ground and what
+stands on it, before the clouds. Each view ray is marched in view space,
+each sample unwarped onto the planet, from where it enters the layer until
+it meets the ground (cut at it exactly, so the fog's foot has no steps),
+leaves the layer, or the fog hides what lies behind. Its steps stride over
+the clearing by the turn's distance to the edge. The fog is dense at the
+ground (1.2 /m) and thins over the upper half of its top. The top lies in
+banks 2–5.5 m over the ground, ±1.2 m of wisps, coming down to the ground
+at its edge. It is lit pale on top and grey-blue in its depths, its banks'
+slopes shaded to the sun, the drifting clouds' shadows softened on it where
+the light comes in at its top. It writes the depth of its front, so what
+stands in front of it hides it. The lakes don't mirror it: it covers the
+lakes it lies on. The clouds' code is main's. Nothing of the fog is drawn
+once all is clear.
 
 ## Chunks and the GPU data path (as built)
 
@@ -761,7 +765,8 @@ so any view can be shared.
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
         clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow and cover cube maps, mirror pass
-        veil.ts            the veil over the planet yet to unfold (branch unfold): still heaps in the clouds' rows, clearing out from the hut
+        veil.ts            the veil over the planet yet to unfold (branch unfold): the field of turns out from the hut, and the pace
+        veilFog.ts/.glsl   the veil drawn as ground fog: the field's bake (veilField), a fullscreen march through the layer
         cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings

@@ -3,7 +3,7 @@
 // uCloudData per cloud, nearest the camera first:
 //   texel 0      bounding sphere: centre (planet space, m), radius (m)
 //   texel 1      base: cloud up (unit), distance of the base from the planet centre (m)
-//   texel 2      noise seed, size (m: the heap is about this tall), in sight (0 or 1), veil (0 or 1: veil.ts)
+//   texel 2      noise seed, size (m: the heap is about this tall), in sight (0 or 1), -
 //   texels 3..10 puffs: centre (planet space, m), radius (m; 0 = unused)
 //   texels 11–12 the puffs' self-shadow toward the sun, 0..1, four a texel
 // Everything that shows a cloud reads these same puffs, so a cloud, its
@@ -47,16 +47,13 @@ struct Cloud {
   vec3 baseNormal;
   uint seed;
   float size;
-  bool veil; // a heap of the veil (veil.ts): it lies on the ground, under the drifting clouds
 };
 
 // A cloud the camera is in (or nearly) dissolves rather than fogging the
 // view: 1 well clear of it … 0 inside. Its puffs shrink with it, so it
-// erodes from its edges (traceCloud) and only the last of it fades. (The
-// veil's heaps are too broad to judge by their bounds: clouds.ts erodes the
-// lobes the camera comes near instead.)
+// erodes from its edges (traceCloud) and only the last of it fades.
 float cloudFade(Cloud cl) {
-  return cl.veil ? 1.0 : smoothstep(4.0, 18.0, distance(uCloudEye, cl.centre) - 0.6 * cl.radius);
+  return smoothstep(4.0, 18.0, distance(uCloudEye, cl.centre) - 0.6 * cl.radius);
 }
 
 // A bounding radius that still holds after the warp: puffs farther out from
@@ -78,7 +75,6 @@ Cloud loadCloud(int row) {
   vec4 info = texelFetch(uCloudData, ivec2(2, row), 0);
   c.seed = uint(info.x);
   c.size = info.y;
-  c.veil = info.w > 0.5;
   return c;
 }
 
@@ -213,8 +209,6 @@ CloudHit traceCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec
   return h;
 }
 
-float cloudShadowAt(vec3 p, float edge); // (below)
-
 // A cloud seen along a ray: premultiplied colour and coverage. Lit white
 // where the sun reaches a lobe, blue-grey where it turns away or the puffs
 // above shade it, deeper in the creases and toward the flat base, which
@@ -229,9 +223,8 @@ vec4 shadeCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec3 ro
   float size = cl.size;
   float height = clamp(dot(p - cl.basePoint, cl.baseNormal) / (1.1 * size), 0.0, 1.0);
 
-  // the base thins away where the ray only grazes it (seen from below it stays solid); the veil, lying on the
-  // ground, has no base to see
-  float alpha = cl.veil ? h.cover : h.cover * mix(smoothstep(0.0, 0.35 * size, h.thick), 1.0, smoothstep(0.05, 0.3, height));
+  // the base thins away where the ray only grazes it (seen from below it stays solid)
+  float alpha = h.cover * mix(smoothstep(0.0, 0.35 * size, h.thick), 1.0, smoothstep(0.05, 0.3, height));
   alpha *= smoothstep(0.0, 0.35, cloudFade(cl));
   if (alpha <= 0.0) return vec4(0.0);
 
@@ -248,14 +241,6 @@ vec4 shadeCloud(Cloud cl, vec4 puffs[PUFFS], vec4 shadowA, vec4 shadowB, vec3 ro
   float behind = pow(max(dot(rd, uSunDir), 0.0), 3.0);
   float edge = pow(1.0 - abs(dot(n, rd)), 3.0);
   col += pal(ROW_CLOUD, 3) * edge * behind * 0.5;
-  // the veil, lit again: the hollows between its domes are in their shade, and the drifting clouds' shadows fall
-  // on it (it casts none of its own: clouds.ts). (Lit apart, after the clouds' own light, which it leaves to the bit.)
-  if (cl.veil && !mirror) {
-    float lit = sun * (1.0 - 0.5 * (1.0 - smoothstep(0.2, 0.75, height))) * (1.0 - cloudShadowAt(unwarpPosition(p), 0.0));
-    col = mix(shade * mix(0.86, 1.03, sky), mix(pal(ROW_CLOUD, 2), pal(ROW_CLOUD, 0), smoothstep(0.0, 0.45, ndl)), lit);
-    col = mix(col, pal(ROW_CLOUD, 3), lit * smoothstep(0.45, 0.95, ndl) * 0.6);
-    col += pal(ROW_CLOUD, 3) * edge * behind * 0.5;
-  }
   return vec4(col * alpha, alpha);
 }
 

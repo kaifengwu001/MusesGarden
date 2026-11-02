@@ -1,22 +1,33 @@
-import type { Vector3 } from 'three';
+import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { Veil, VEIL } from '../../life/veil';
+import { Veil, VEIL, veilSeed, veilTurn } from '../../life/veil';
 import { DEFAULT_GROWTH, schema } from '../../params';
 import { FIRST_PLANET } from '../../planet/firstPlanet';
+import { travel } from '../../planet/geo';
 import { generateLayout } from '../../planet/terrain';
 import { unfoldBloom, unfoldGrowth, UNVEILED, unveiling } from '../../planet/unfold';
 import { CameraRig } from '../../view/camera';
 
-const angle = (a: Vector3, b: Vector3): number => Math.acos(Math.min(1, Math.max(-1, a.dot(b))));
-
-function veilOf(seed: number): { veil: Veil; hut: Vector3 } {
+function veilOf(seed: number): { veil: Veil; hut: Vector3; noise: number } {
   const hut = generateLayout(seed).cottage;
   const veil = new Veil();
   veil.build(seed, hut);
-  return { veil, hut };
+  return { veil, hut, noise: veilSeed(seed) };
 }
 
-const standing = (veil: Veil, progress: number): number => veil.heaps.filter((h) => Veil.stands(h, progress) && h.lobes.some((_, k) => Veil.lobe(h, k, progress) > 0)).length;
+/** Bearings round the hut: unit tangents there, evenly spread. */
+function bearings(hut: Vector3, n: number): Vector3[] {
+  const a = new Vector3().crossVectors(hut, Math.abs(hut.y) < 0.9 ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0)).normalize();
+  const b = new Vector3().crossVectors(hut, a);
+  return Array.from({ length: n }, (_, i) => a.clone().multiplyScalar(Math.cos((i / n) * 2 * Math.PI)).addScaledVector(b, Math.sin((i / n) * 2 * Math.PI)));
+}
+
+/** How far out from the hut (m at R 128) the clearing first meets the fog along a bearing, at an unveiling. */
+function edgeAlong(hut: Vector3, along: Vector3, noise: number, turn: number): number {
+  const p = new Vector3();
+  for (let m = 1; m < Math.PI * 128; m += 1) if (veilTurn(travel(hut, along, m / 128, p), hut, noise) > turn) return m;
+  return Math.PI * 128;
+}
 
 describe('the unfolding (planet/unfold.ts)', () => {
   it('leaves the first planet as tuned by default: unveiled, all in flower, at R 128 m (see CLAUDE.md)', () => {
@@ -57,51 +68,68 @@ describe('the unfolding (planet/unfold.ts)', () => {
 
 describe('the veil (life/veil.ts)', () => {
   it('lays out the same veil for the same planet', () => {
-    const a = veilOf(412).veil;
-    const b = veilOf(412).veil;
-    expect(a.heaps.length).toBe(b.heaps.length);
-    a.heaps.forEach((h, i) => {
-      expect(h.dir.toArray()).toEqual(b.heaps[i].dir.toArray());
-      expect(h.turn).toBe(b.heaps[i].turn);
-    });
+    const a = veilOf(412);
+    const b = veilOf(412);
+    for (const s of [0, 0.1, 0.37, 0.8, 0.999]) expect(a.veil.threshold(s)).toBe(b.veil.threshold(s));
+    const d = new Vector3(0.3, -0.5, 0.81).normalize();
+    expect(veilTurn(d, a.hut, a.noise)).toBe(veilTurn(d, b.hut, b.noise));
   });
 
   it('covers all of the planet but a little ground round the hut, before anything unfolds', () => {
     for (const seed of [412, 7, 2024]) {
-      const { veil, hut } = veilOf(seed);
-      const open = veil.heaps.filter((h) => !Veil.stands(h, 0));
-      // the ground round the hut is clear, and only a little more
-      for (const h of veil.heaps) if (angle(h.dir, hut) * 128 < VEIL.core) expect(Veil.stands(h, 0)).toBe(false);
-      expect(open.length / veil.heaps.length).toBeLessThan(VEIL.clear + 0.01);
-      // the rest stands whole
-      for (const h of veil.heaps) if (Veil.stands(h, 0)) for (let k = 0; k < 8; k++) expect(Veil.lobe(h, k, 0)).toBe(1);
+      const { veil, hut, noise } = veilOf(seed);
+      const turn = veil.threshold(0);
+      // the ground round the hut is clear, and the planet's share of clear ground is what VEIL.clear asks
+      for (const along of bearings(hut, 16)) expect(veilTurn(travel(hut, along, (0.9 * VEIL.core) / 128, new Vector3()), hut, noise)).toBeLessThan(turn);
+      expect(veil.share(turn)).toBeCloseTo(VEIL.clear, 2);
     }
   });
 
   it('clears for good by the time the planet is unveiled, and only ever clears', () => {
     const { veil } = veilOf(412);
-    expect(standing(veil, 1)).toBe(0);
-    let last = Infinity;
-    for (let i = 0; i <= 200; i++) {
-      const s = i / 200;
-      const n = standing(veil, s);
-      expect(n).toBeLessThanOrEqual(last);
-      last = n;
-      for (const h of veil.heaps.slice(0, 40)) for (let k = 0; k < 8; k++) expect(Veil.lobe(h, k, s)).toBeLessThanOrEqual(Veil.lobe(h, k, Math.max(0, s - 0.005)));
+    expect(veil.threshold(1)).toBe(Number.POSITIVE_INFINITY);
+    let last = -Infinity;
+    for (let i = 0; i < 200; i++) {
+      const turn = veil.threshold(i / 200);
+      expect(turn).toBeGreaterThanOrEqual(last);
+      last = turn;
+    }
+    expect(veil.share(veil.threshold(0.999))).toBeGreaterThan(0.995);
+  });
+
+  it('moves its edge out from the hut at an even pace', () => {
+    const { veil } = veilOf(412);
+    const first = Math.acos(1 - 2 * VEIL.clear);
+    for (let i = 0; i <= 20; i++) {
+      const s = (i / 20) * 0.98;
+      // the clear share, as the angle of a cap round the hut holding as much
+      const angle = Math.acos(1 - 2 * veil.share(veil.threshold(s)));
+      expect(angle).toBeCloseTo(first + (Math.PI - first) * s, 1);
     }
   });
 
-  it('clears out from the hut, raggedly: by and large nearer first, but not in rings', () => {
-    const { veil, hut } = veilOf(412);
-    const going = veil.heaps.filter((h) => h.turn >= 0);
-    // the mean distance from the hut of each tenth of the veil to clear grows tenth by tenth
-    const tenths = Array.from({ length: 10 }, (_, t) => going.filter((h) => h.turn >= (t / 10) * 0.84 && h.turn < ((t + 1) / 10) * 0.84 + (t === 9 ? 1 : 0)));
-    const means = tenths.map((hs) => hs.reduce((a, h) => a + angle(h.dir, hut), 0) / hs.length);
-    for (let t = 1; t < 10; t++) expect(means[t]).toBeGreaterThan(means[t - 1]);
-    // and some heaps clear before others nearer the hut (islands behind the edge, holes ahead of it)
-    let out = 0;
-    for (let i = 1; i < going.length; i++) if (angle(going[i].dir, hut) < angle(going[i - 1].dir, hut)) out++;
-    expect(out / going.length).toBeGreaterThan(0.2);
+  it('clears out from the hut raggedly: in bays and fingers, islands lingering and holes opening, not in rings', () => {
+    const { veil, hut, noise } = veilOf(412);
+    for (const s of [0.15, 0.3, 0.5]) {
+      const turn = veil.threshold(s);
+      const edges = bearings(hut, 64).map((along) => edgeAlong(hut, along, noise, turn));
+      // along some bearings the edge lies tens of meters nearer the hut than along others (a ring: a meter or so)
+      expect(Math.max(...edges) - Math.min(...edges)).toBeGreaterThan(25);
+    }
+    // nearer the hut is clearer by and large, but not always: some places clear before others nearer to it
+    const p = new Vector3();
+    let behind = 0;
+    let pairs = 0;
+    for (const along of bearings(hut, 32)) {
+      for (let m = 40; m < 300; m += 6) {
+        const near = veilTurn(travel(hut, along, m / 128, p), hut, noise);
+        const out = veilTurn(travel(hut, along, (m + 6) / 128, p), hut, noise);
+        pairs++;
+        if (out < near) behind++;
+      }
+    }
+    expect(behind / pairs).toBeGreaterThan(0.05);
+    expect(behind / pairs).toBeLessThan(0.45);
   });
 });
 
