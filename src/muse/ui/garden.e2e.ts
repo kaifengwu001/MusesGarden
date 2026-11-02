@@ -15,7 +15,9 @@ import { FIRST_PLANET } from '../../planet/firstPlanet';
 // Every test shares one engine (playwright.live.config.ts), so each takes what it needs from where the engine
 // stands, advancing it when that isn't there yet.
 
-const API = 'http://localhost:8787/api';
+/** The engine (playwright.live.config.ts starts it; MUSE_PORT moves it). */
+const ENGINE = `http://localhost:${process.env.MUSE_PORT ?? 8787}`;
+const API = `${ENGINE}/api`;
 const HERO = 'hero';
 const PAGE = `/?dev&garden=/api/muses/${HERO}#hud=0`;
 const SHOTS = 'shots/garden-live';
@@ -178,7 +180,7 @@ async function streamRelay() {
     if (!up) return req.socket.destroy();
     const last = req.headers['last-event-id'];
     lastEventIds.push(typeof last === 'string' ? last : null);
-    const upstream = forward(`http://localhost:8787${req.url ?? ''}`, { headers: req.headers }, (r) => {
+    const upstream = forward(`${ENGINE}${req.url ?? ''}`, { headers: req.headers }, (r) => {
       res.writeHead(r.statusCode ?? 502, r.headers);
       r.pipe(res);
     });
