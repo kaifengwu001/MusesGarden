@@ -30,6 +30,22 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The garden's controls, the second look (in progress)
+
+Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with screenshots; this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Post: no heart on the photo's corner (the filled heart beside the card says it already); the heart and the star level with the photo's top edge | |
+| 2 | Basket: the preview above the flower under the pointer, clear of the basket and the other flowers; a flower under the pointer doesn't turn | |
+| 3 | Dates read "Oct 23 Fri". Basket titles: Muse names each day (tracked as "Muse names each day's basket", Agent backend) | |
+| 4 | A landed flower lights under the pointer, and a click on it always opens its card before any other click | |
+| 5 | Card arrows: left goes back in time, right forward, as on the timeline; each card shows its day; at a day's end a line over the arrow says "Going to Oct 22 Thu basket" and the arrow turns light blue | |
+| 6 | The lit flower holds still while the meadow sways | |
+| 7 | No line and dot under the card: the card alone | |
+| 8 | (asked) Why some glowing spheres look cut off: each glow is a flat sprite 0.6 m over its find at one depth, so ground rising toward the camera inside its glow hid part of it. Round again, still hidden by what truly stands in front | |
+| 9 | The flowers' flight out of the basket looks inconsistent | |
+
 ## The garden's controls (2026-11-01)
 
 Started from f51a9e2 (Fern lives on the first planet). The review notes (2026-11-01), with screenshots of the rail and
