@@ -65,8 +65,15 @@ void main() {
 
   if (part < 0.5) {
     float face = vPart.w;
+    // Distinct pieces expose blue slate, pale weathered faces or warm mineral
+    // seams. Each palette belongs to the entire stone, including distant LOD.
+    float weathered = smoothstep(0.44, 0.86, vSeed);
+    float iron = smoothstep(0.70, 0.97, fract(vSeed * 3.73));
     vec3 lit = mix(pal(ROW_ROCK, 2), pal(ROW_ROCK, 4), smoothstep(0.78, 1.0, face) * 0.32);
     vec3 mid = mix(pal(ROW_ROCK, 0), pal(ROW_ROCK, 3), 0.28 + face * 0.15);
+    lit = mix(lit, pal(ROW_CANVAS, 2), weathered * 0.22);
+    mid = mix(mid, pal(ROW_ROCK, 2), weathered * 0.24);
+    mid = mix(mid, pal(ROW_LEAF, 4), iron * 0.13);
     col = tone3(lit, mid, pal(ROW_ROCK, 1), b);
     float hatch = pencil(vLocal, normalize(vec3(0.15, 1.0, 0.25)), 0.045, pixelMeters, seed);
     col = mix(col, pal(ROW_ROCK, 5), hatch * (0.1 + 0.17 * (1.0 - b)));
@@ -89,7 +96,12 @@ void main() {
     float fold = smoothstep(0.06, 0.88, distanceAcross);
     float dryTip = smoothstep(0.76, 1.0, along) * (0.35 + 0.65 * fold);
     vec3 leafMid = mix(pal(ROW_LEAF, 0), pal(ROW_LEAF, 1), fold * 0.16);
-    col = tone3(pal(ROW_LEAF, 2), leafMid, pal(ROW_LEAF, 1), gl_FrontFacing ? b : b * 0.87);
+    // Wheat-coloured young crowns and deeper ochre mature crowns remain
+    // recognisable when their veins are smaller than a pixel.
+    float mature = smoothstep(0.2, 0.85, vSeed);
+    leafMid = mix(leafMid, pal(ROW_LEAF, 3), mature * 0.22);
+    vec3 leafLit = mix(pal(ROW_LEAF, 2), pal(ROW_CANVAS, 1), (1.0 - mature) * 0.16);
+    col = tone3(leafLit, leafMid, pal(ROW_LEAF, 1), gl_FrontFacing ? b : b * 0.87);
     col = mix(col, pal(ROW_LEAF, 3), dryTip * 0.12);
 
     float midrib = singleStroke(across, 0.013, acrossPixel);
@@ -125,6 +137,7 @@ void main() {
     vec3 paperLit = mix(pal(ROW_CANVAS, 1), pal(ROW_LEAF, 2), 0.3);
     vec3 paperMid = mix(pal(ROW_CANVAS, 2), pal(ROW_LEAF, 0), 0.15);
     vec3 paperShade = mix(pal(ROW_CANVAS, 4), pal(ROW_LEAF, 3), 0.1);
+    paperMid = mix(paperMid, pal(ROW_CANVAS, 3), smoothstep(0.25, 0.9, vSeed) * 0.18);
     float neckAndTip = 1.0 - smoothstep(0.0, 0.18, along) + smoothstep(0.8, 1.0, along);
     col = tone3(paperLit, paperMid, paperShade, b);
     col = mix(col, paperMid, (1.0 - panelCentre) * 0.11 + neckAndTip * 0.055);
@@ -150,10 +163,12 @@ void main() {
   } else if (part < 4.5) {
     col = tone3(pal(ROW_LEAF, 2), pal(ROW_LEAF, 0), pal(ROW_LEAF, 3), b);
   } else if (part < 5.5) {
-    col = tone3(pal(ROW_STAR, 0), pal(ROW_STAR, 4), pal(ROW_STAR, 1), b);
+    vec3 ivoryMid = mix(pal(ROW_STAR, 4), pal(ROW_ROCK, 2), smoothstep(0.25, 0.85, vSeed) * 0.16);
+    col = tone3(pal(ROW_STAR, 0), ivoryMid, pal(ROW_STAR, 1), b);
     col = mix(col, pal(ROW_CANVAS, 4), smoothstep(0.88, 1.0, abs(vPart.w)) * 0.12);
   } else {
-    col = tone3(pal(ROW_ROCK, 2) * 1.26, pal(ROW_ROCK, 3), pal(ROW_ROCK, 5), b);
+    vec3 lowMid = mix(pal(ROW_ROCK, 3), pal(ROW_ROCK, 0), smoothstep(0.15, 0.8, vSeed) * 0.28);
+    col = tone3(pal(ROW_ROCK, 2) * 1.26, lowMid, pal(ROW_ROCK, 5), b);
     // A blade's central highlight has compact support across [-1, 1].
     // Outside that support it is zero, never a negative odd-power mix weight.
     float centre = max(0.0, 1.0 - abs(vPart.w));

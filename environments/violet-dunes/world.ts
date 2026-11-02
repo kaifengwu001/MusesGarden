@@ -7,6 +7,7 @@ import { smoothstep } from '../../src/core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
 import { Clouds, createCloudUniforms } from './life/clouds';
+import { CloudRibbons } from './life/cloudRibbons';
 import { Flowers } from './life/flowers';
 import { landmarkReach, Landmarks, MAX_STAR_GROUPS, starGroups } from './life/landmarks';
 import { Muse, MUSE_FLOOR, MUSE_HEIGHT } from './life/muse';
@@ -97,6 +98,7 @@ export class World {
   readonly fauna: OrchardFauna;
   homestead: Homestead;
   readonly clouds: Clouds;
+  readonly cirrus: CloudRibbons;
   readonly birds: Birds;
   readonly muse: Muse;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
@@ -182,6 +184,7 @@ export class World {
     this.fauna = new OrchardFauna(this.shared, this.terrain);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
+    this.cirrus = new CloudRibbons(this.shared);
     this.birds = new Birds(this.shared);
     this.birds.mesh.visible = false;
     this.birds.shadowMesh.visible = false;
@@ -190,7 +193,7 @@ export class World {
     this.clouds.addShadowCaster(this.birds.shadowMesh);
     this.clouds.addShadowCaster(this.muse.shadowMesh);
     for (const mesh of this.fauna.shadowMeshes) this.clouds.addShadowCaster(mesh);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, ...this.flowers.meshes, ...this.landmarks.meshes, this.birds.mesh, this.fauna.group, this.clouds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, ...this.flowers.meshes, ...this.landmarks.meshes, this.birds.mesh, this.fauna.group, this.clouds.mesh, this.cirrus.mesh);
     this.applyTier(tier);
   }
 
@@ -476,6 +479,7 @@ export class World {
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.fauna.update(clock.time, this.terrain, rig.camera.position);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
+    this.cirrus.update(L.seed, R, this.terrain.maxHeight, clock.time, this.windAxis, rig.camera.position, p.clouds.speed);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
@@ -513,7 +517,7 @@ export class World {
       const away = Math.acos(Math.min(1, this.aimUp.dot(rig.up))) * R;
       if (away > 4 || Math.abs(Math.log(altitude / rig.altitude)) > 0.15) {
         aimFlowers = flowersAt(altitude);
-        aimLandmarks = landmarkReach(altitude, this.look.uPixelAngle.value);
+        aimLandmarks = landmarkReach(altitude, this.look.uPixelAngle.value, R);
         const aim = this.aimCamera;
         this.aimFrustum.setFromProjectionMatrix(this.projView.multiplyMatrices(aim.projectionMatrix, aim.matrixWorldInverse));
         this.aimWarp.up.copy(this.aimUp);
@@ -550,7 +554,9 @@ export class World {
         radius: R,
         radiusHi: this.band.radiusHi,
         focus: rig.up,
-        near: landmarkReach(rig.altitude, this.look.uPixelAngle.value),
+        near: landmarkReach(rig.altitude, this.look.uPixelAngle.value, R),
+        cameraPosition: cam.position,
+        pixelAngle: this.look.uPixelAngle.value,
         heightAbove: this.terrain.maxHeight,
         frustum: this.frustum,
         warp: this.warp,
@@ -643,15 +649,16 @@ export class World {
     // per streamed layer: the slots of its drawn pages its instances don't fill (only meshes actually drawn)
     let wasted = 0;
     const layers = [
-      { layer: this.flowers.layer, meshes: this.flowers.meshes },
-      { layer: this.landmarks.layer, meshes: this.landmarks.seededMeshes },
+      { layer: this.flowers.layer, meshes: this.flowers.meshes, counts: this.flowers.layer.instanceCounts },
+      { layer: this.landmarks.layer, meshes: this.landmarks.seededMeshes, counts: this.landmarks.layer.instanceCounts },
+      { layer: this.landmarks.layer, meshes: this.landmarks.farMeshes, counts: this.landmarks.layer.farInstanceCounts },
     ];
-    for (const { layer, meshes } of layers) {
+    for (const { layer, meshes, counts } of layers) {
       const all = Math.max(layer.instanceCount, 1);
       meshes.forEach((mesh, c) => {
         if (!mesh.visible) return;
         const tris = (mesh.geometry.index?.count ?? 0) / 3;
-        const drawn = layer.instanceCounts[c];
+        const drawn = counts[c];
         wasted += (drawn - (layer.visibleInstances * drawn) / all) * tris;
       });
     }

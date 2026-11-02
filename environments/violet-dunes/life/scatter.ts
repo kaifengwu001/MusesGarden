@@ -11,7 +11,7 @@ import { warpPoint, type WarpFrame } from '../../../src/render/warp';
 // rest-space point set. The area within `radius` is covered by quadtree tiles
 // of about `tileMeters`; each tile's points are enumerated by a time-sliced
 // job and copied into pages of a fixed instance pool, drawn in a single call.
-// The pool is a float texture, a page a row, and the draw covers only the
+// The pool is a flat float array packed into a compact texture; the draw covers only the
 // pages of tiles in view: a short list of them (in pool order) tells each
 // instance which page and slot to read (through iteration 13 the pool was a
 // vertex buffer drawn up to its highest page, the pages out of view culled
@@ -60,6 +60,8 @@ export interface ScatterSpec {
   readonly mapBuilt?: boolean;
   /** Conservative world-space excursion above the base sphere, including ground and asset motion. */
   readonly boundPadding?: () => number;
+  /** Group each tile's progressive births for bounded distant page submission. */
+  readonly sortByBirth?: boolean;
 }
 
 /** Sorts a tile's points into channels, thins them by local density and writes their extras. */
@@ -97,6 +99,8 @@ export interface ScatterView extends ScatterLook {
   readonly density: number;
   readonly queue: BuildQueue;
   readonly classifier?: ScatterClassifier;
+  /** Optional near/far mesh split; both lists reference the same stable pool. */
+  readonly lod?: { readonly camera: Vector3; readonly detailDistance: number; readonly densityRadius?: number };
   /** Where the camera is headed (a glide, a zoom, a named view): the tiles it will see are built on the way. */
   readonly ahead?: ScatterLook;
 }
@@ -143,8 +147,46 @@ export function scatterTileBounds(centre: Vector3, alpha: number, radius: number
   return out;
 }
 
+/** Lower camera distance to a warped tile; the warp preserves tangent offsets. */
+export function scatterTileDistance(centre: Vector3, alpha: number, radius: number, padding: number, warp: WarpFrame, camera: Vector3): number {
+  const r = 2 * radius * Math.sin(alpha / 2) + Math.max(0, padding);
+  const x = centre.x * radius - warp.focus.x;
+  const y = centre.y * radius - warp.focus.y;
+  const z = centre.z * radius - warp.focus.z;
+  const cx = camera.x - warp.focus.x;
+  const cy = camera.y - warp.focus.y;
+  const cz = camera.z - warp.focus.z;
+  if (Math.abs(warp.k) < 1e-9) return Math.max(0, Math.hypot(x - cx, y - cy, z - cz) - r);
+  const up = warp.up;
+  const along = x * up.x + y * up.y + z * up.z;
+  const cameraAlong = cx * up.x + cy * up.y + cz * up.z;
+  const tx = x - along * up.x;
+  const ty = y - along * up.y;
+  const tz = z - along * up.z;
+  const tangent = Math.hypot(tx, ty, tz);
+  const horizontal = Math.max(0, Math.hypot(tx - cx + cameraAlong * up.x, ty - cy + cameraAlong * up.y, tz - cz + cameraAlong * up.z) - r);
+  const offsetA = warp.k * Math.max(0, tangent - r) ** 2;
+  const offsetB = warp.k * (tangent + r) ** 2;
+  const bottom = along - r - Math.max(offsetA, offsetB);
+  const top = along + r - Math.min(offsetA, offsetB);
+  const vertical = Math.max(bottom - cameraAlong, cameraAlong - top, 0);
+  // The bounding cylinder contains the whole warped sphere. It avoids the
+  // much looser frustum sphere's quadratic padding swallowing the camera.
+  return Math.hypot(horizontal, vertical);
+}
+
+/** Conservative visibility of raised spherical caps against the opaque ground. */
+export function behindHorizon(centre: Vector3, alpha: number, radius: number, padding: number, camera: Vector3): boolean {
+  const distance = camera.length();
+  if (distance <= radius) return false;
+  const angle = Math.acos(clamp(centre.dot(camera) / distance, -1, 1));
+  const groundLimb = Math.acos(clamp(radius / distance, -1, 1));
+  const raisedLimb = Math.acos(clamp(radius / (radius + Math.max(0, padding)), -1, 1));
+  return angle - alpha > groundLimb + raisedLimb;
+}
+
 /**
- * One channel's instances, in two RGBA float textures a page a row: `main`
+ * One channel's instances, in two flat RGBA float textures: `main`
  * holds each instance's direction and ln birth threshold; `rest` its seed
  * (four to a texel) or, with extras, its seed and up to three extras (a
  * texel each). `list` holds the pages to draw, four to a texel.
@@ -157,10 +199,35 @@ interface Pool {
   readonly list: Float32Array;
   readonly listTexture: DataTexture;
   readonly free: number[];
+  readonly firstBirth: Float64Array;
+  readonly counts: Uint32Array;
 }
 
-/** An RGBA float texture over `data`, read with texelFetch; its first upload sends one row (the rest is allocated, and written as pages fill). */
-function poolTexture(data: Float32Array, width: number, height: number): DataTexture {
+/** WebGL2 guarantees this texture dimension, including on smaller GPUs. */
+export const SCATTER_TEXTURE_LIMIT = 2048;
+
+/** Compact, bounded rectangle for a flat RGBA texel array. */
+export function scatterTextureShape(texels: number): { width: number; height: number } {
+  if (!Number.isSafeInteger(texels) || texels < 1 || texels > SCATTER_TEXTURE_LIMIT ** 2) throw new Error('Scatter texture exceeds its portable texel capacity');
+  const width = Math.min(SCATTER_TEXTURE_LIMIT, 2 ** Math.ceil(Math.log2(Math.sqrt(texels))));
+  return { width, height: Math.ceil(texels / width) };
+}
+
+/** Split component ranges at physical rows: Three uploads each range as one row. */
+export function scatterTextureUpdate(texture: DataTexture, start: number, count: number): void {
+  const row = texture.image.width * 4;
+  const end = start + count;
+  for (let at = start; at < end;) {
+    const length = Math.min(end - at, row - at % row);
+    texture.addUpdateRange(at, length);
+    at += length;
+  }
+}
+
+/** First upload sends one row; later page writes retain their logical flat offsets. */
+function poolTexture(texels: number): DataTexture {
+  const { width, height } = scatterTextureShape(texels);
+  const data = new Float32Array(width * height * 4);
   const texture = new DataTexture(data, width, height, RGBAFormat, FloatType);
   texture.minFilter = NearestFilter;
   texture.magFilter = NearestFilter;
@@ -188,6 +255,10 @@ export class ScatterLayer {
   readonly mainTextures: DataTexture[] = [];
   readonly restTextures: DataTexture[] = [];
   readonly listTextures: DataTexture[] = [];
+  readonly farListTextures: DataTexture[] = [];
+  readonly farInstanceCounts: number[];
+  private readonly farLists: Float32Array[] = [];
+  private readonly farDrawn: number[][];
   /** Instances to draw per channel (the pages in the list). */
   readonly instanceCounts: number[];
   /** Instances held in visible pages, all channels (perf stat). */
@@ -215,33 +286,45 @@ export class ScatterLayer {
     this.stride = spec.stride ?? SCATTER_STRIDE;
     this.channels = spec.channels ?? 1;
     this.instanceCounts = new Array<number>(this.channels).fill(0);
+    this.farInstanceCounts = new Array<number>(this.channels).fill(0);
+    this.farDrawn = Array.from({ length: this.channels }, () => []);
     this.drawn = Array.from({ length: this.channels }, () => []);
     const size = spec.pageSize; // a multiple of 4
     const packed = this.stride === SCATTER_STRIDE;
     for (let c = 0; c < this.channels; c++) {
-      const main = new Float32Array(spec.pages * size * 4);
+      const mainTexture = poolTexture(spec.pages * size);
+      const main = mainTexture.image.data as Float32Array;
       for (let k = 3; k < main.length; k += 4) main[k] = NEVER;
-      const rest = new Float32Array(spec.pages * size * (packed ? 1 : 4));
-      const listWidth = Math.ceil(spec.pages / 4);
-      const list = new Float32Array(listWidth * 4);
+      const restTexture = poolTexture(spec.pages * size / (packed ? 4 : 1));
+      const rest = restTexture.image.data as Float32Array;
+      const listTexels = Math.ceil(spec.pages / 4);
+      const listTexture = poolTexture(listTexels);
+      const list = listTexture.image.data as Float32Array;
       const free: number[] = [];
       for (let k = spec.pages - 1; k >= 0; k--) free.push(k);
       const pool: Pool = {
         main,
-        mainTexture: poolTexture(main, size, spec.pages),
+        mainTexture,
         rest,
-        restTexture: poolTexture(rest, packed ? size / 4 : size, spec.pages),
+        restTexture,
         list,
-        listTexture: poolTexture(list, listWidth, 1),
+        listTexture,
         free,
+        firstBirth: new Float64Array(spec.pages).fill(Number.POSITIVE_INFINITY),
+        counts: new Uint32Array(spec.pages),
       };
       this.pools.push(pool);
       this.mainTextures.push(pool.mainTexture);
       this.restTextures.push(pool.restTexture);
       this.listTextures.push(pool.listTexture);
+      const farListTexture = poolTexture(listTexels);
+      const farList = farListTexture.image.data as Float32Array;
+      this.farLists.push(farList);
+      this.farListTextures.push(farListTexture);
     }
     let bytes = 0;
     for (const p of this.pools) bytes += p.main.byteLength + p.rest.byteLength + p.list.byteLength;
+    for (const list of this.farLists) bytes += list.byteLength;
     gpuMemory.set(`${spec.name} instances`, bytes);
   }
 
@@ -249,6 +332,7 @@ export class ScatterLayer {
   get instanceCount(): number {
     let n = 0;
     for (const c of this.instanceCounts) n += c;
+    for (const c of this.farInstanceCounts) n += c;
     return n;
   }
 
@@ -281,8 +365,9 @@ export class ScatterLayer {
       if (!(t.need > 0)) continue; // an empty near field (or a degenerate falloff) needs nothing built
       const grow = t.need > t.sigma && t.building < t.need;
       const stale = t.version !== version && t.buildingVersion !== version;
+      const compact = t.need * this.spec.headroom < t.sigma * 0.72 && t.building === 0;
       if (grow) this.schedule(t, t.need * this.spec.headroom, t.priority, view);
-      else if (stale) this.schedule(t, Math.max(t.need * this.spec.headroom, t.sigma), t.priority, view);
+      else if (stale || compact) this.schedule(t, t.need * this.spec.headroom, t.priority, view);
     }
 
     // 2. Re-tiling swaps region by region: an old-level tile stays (and keeps
@@ -319,18 +404,39 @@ export class ScatterLayer {
     //    the same order).
     const drawn = this.drawn;
     for (const d of drawn) d.length = 0;
+    for (const d of this.farDrawn) d.length = 0;
     let visible = 0;
     for (const t of this.tiles.values()) {
       if (t.count === 0 || (t.wanted && !t.current) || hidden.has(t) || !this.inFrustum(t.centre, t.alpha, R, view)) continue;
-      for (let c = 0; c < this.channels; c++) for (const p of t.pages[c]) drawn[c].push(p);
-      visible += t.count;
+      // Conservative nearest distance: a tile stays detailed until all of it is remote.
+      const distant = view.lod && scatterTileDistance(t.centre, t.alpha, R, this.spec.boundPadding?.() ?? 3, view.warp, view.lod.camera) > view.lod.detailDistance;
+      // Only the unwarped globe can use ordinary spherical horizon rejection.
+      // The raised tile bound keeps ridges/crowns visible beyond the ground limb.
+      if (view.lod && Math.abs(view.warp.k) < 1e-9 && behindHorizon(t.centre, t.alpha, R, this.spec.boundPadding?.() ?? 3, view.lod.camera)) continue;
+      const list = distant ? this.farDrawn : drawn;
+      const birthLimit = distant && this.spec.sortByBirth && view.lod?.densityRadius
+        ? Math.log(view.density * Math.min(view.radiusHi, view.lod.densityRadius) ** 2)
+        : Number.POSITIVE_INFINITY;
+      for (let c = 0; c < this.channels; c++) for (const p of t.pages[c]) {
+        if (this.pools[c].firstBirth[p] > birthLimit) break;
+        list[c].push(p);
+        visible += this.pools[c].counts[p];
+      }
     }
     for (let c = 0; c < this.channels; c++) {
       const pool = this.pools[c];
       const d = drawn[c].sort((a, b) => a - b);
       for (let k = 0; k < d.length; k++) pool.list[k] = d[k];
+      // Lists change as a whole, including before their first GPU upload.
+      // Discard the constructor's single-row initialization range.
+      pool.listTexture.clearUpdateRanges();
       pool.listTexture.needsUpdate = true;
       this.instanceCounts[c] = d.length * this.spec.pageSize;
+      const far = this.farDrawn[c].sort((a, b) => a - b);
+      this.farLists[c].set(far);
+      this.farListTextures[c].clearUpdateRanges();
+      this.farListTextures[c].needsUpdate = true;
+      this.farInstanceCounts[c] = far.length * this.spec.pageSize;
     }
     this.visibleInstances = visible;
   }
@@ -482,6 +588,16 @@ export class ScatterLayer {
     for (let c = 0; c < this.channels; c++) {
       const pool = this.pools[c];
       const count = used[c] / stride;
+      let records = data[c];
+      if (this.spec.sortByBirth) {
+        const source = data[c];
+        const order = Array.from({ length: count }, (_, i) => i).sort((a, b) => source[a * stride + 3] - source[b * stride + 3]);
+        const sorted = new Float32Array(used[c]);
+        order.forEach((index, i) => sorted.set(source.subarray(index * stride, (index + 1) * stride), i * stride));
+        // Keep the original nonzero-capacity staging buffer in the reuse pool.
+        // Empty channels legitimately produce a zero-length sorted view.
+        records = sorted;
+      }
       // release the old pages first, then take enough for the new data
       for (const p of tile.pages[c]) pool.free.push(p);
       pool.free.sort((a, b) => b - a); // pop() returns the lowest index: the pages in use stay together
@@ -494,7 +610,7 @@ export class ScatterLayer {
       for (let k = 0; k < needed; k++) {
         const page = pool.free.pop()!;
         tile.pages[c].push(page);
-        this.writePage(pool, page, data[c], k * size, Math.min(count - k * size, size));
+        this.writePage(pool, page, records, k * size, Math.min(count - k * size, size));
       }
       total += Math.min(count, needed * size);
     }
@@ -510,7 +626,7 @@ export class ScatterLayer {
 
   /**
    * Copy `n` instances from `stride`-float records, starting at instance
-   * `first`, into a page (a row of each texture); the page's other slots are
+   * `first`, into a logical page; the page's other slots are
    * never born. Only ranges are added: several tiles can commit in one frame,
    * and three.js clears the ranges itself once they are uploaded.
    */
@@ -522,6 +638,8 @@ export class ScatterLayer {
     let m = page * size * 4;
     let r = page * size * (packed ? 1 : 4);
     let o = first * stride;
+    pool.firstBirth[page] = records[o + 3];
+    pool.counts[page] = n;
     for (let i = 0; i < size; i++, m += 4, o += stride) {
       if (i >= n) {
         main[m + 3] = NEVER;
@@ -537,8 +655,8 @@ export class ScatterLayer {
         r += 4;
       }
     }
-    pool.mainTexture.addUpdateRange(page * size * 4, size * 4);
-    pool.restTexture.addUpdateRange(page * size * (packed ? 1 : 4), size * (packed ? 1 : 4));
+    scatterTextureUpdate(pool.mainTexture, page * size * 4, size * 4);
+    scatterTextureUpdate(pool.restTexture, page * size * (packed ? 1 : 4), size * (packed ? 1 : 4));
     pool.mainTexture.needsUpdate = true;
     pool.restTexture.needsUpdate = true;
   }

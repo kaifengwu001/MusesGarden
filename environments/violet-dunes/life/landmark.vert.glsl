@@ -21,11 +21,14 @@ uniform vec4 uKit;       // 0 slate / 1 sail-reed, footprint half sizes x, z (m)
 attribute vec4 aPart;    // part (0 slate, 1 stem, 2 leaf), height fraction, lance slot, shade / across the leaf
 attribute vec2 aLeaf;    // along the leaf 0..1, its length (m)
 #ifdef SEEDED
-uniform sampler2D uPool;     // per instance, a page a row: direction xyz, ln birth threshold (at the local density)
+uniform sampler2D uPool;     // flat instance texels: direction xyz, ln birth threshold (at the local density)
 uniform sampler2D uPoolRest; // per instance: seed in [0, 1), size factor, lance leaves shown, -
 uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four to a texel (scatter.ts)
 uniform float uPageSize;
 uniform float uLnDensity;    // ln of the layer's mean density (per m²)
+#ifdef DISTANT
+uniform float uFarDensityRadius;
+#endif
 const float HOME_CLEAR = 19.0; // landmarks.ts SEEDED.homeClear
 #else
 attribute vec4 aHome;    // shelter-local x, z (m), turn (rad), size factor
@@ -58,15 +61,30 @@ void collapse() {
   gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
 }
 
+#ifdef SEEDED
+vec4 scatterTexel(sampler2D data, int index) {
+  int width = textureSize(data, 0).x;
+  return texelFetch(data, ivec2(index % width, index / width), 0);
+}
+#endif
+
 void main() {
   bool reed = uKit.x > 0.5;
 #ifdef SEEDED
   int perPage = int(uPageSize);
   int drawn = gl_InstanceID / perPage;
   int slot = gl_InstanceID - drawn * perPage;
-  int page = int(texelFetch(uPageList, ivec2(drawn >> 2, 0), 0)[drawn & 3]);
-  vec4 pool = texelFetch(uPool, ivec2(slot, page), 0);
-  vec4 rest = texelFetch(uPoolRest, ivec2(slot, page), 0);
+  int page = int(scatterTexel(uPageList, drawn >> 2)[drawn & 3]);
+  int instance = page * perPage + slot;
+  vec4 pool = scatterTexel(uPool, instance);
+  vec4 rest = scatterTexel(uPoolRest, instance);
+#ifdef DISTANT
+  // The page prefix may include a few later births in its last partial page.
+  if (pool.w > uLnDensity + 2.0 * log(uFarDensityRadius)) {
+    collapse();
+    return;
+  }
+#endif
   vec3 anchor = pool.xyz;
   float seed = rest.x;
   float grow = presence(0.5 * (pool.w - uLnDensity));
@@ -105,13 +123,31 @@ void main() {
   float s = sin(yaw);
   vec3 side = x0 * c - z0 * s;
   vec3 fwd = x0 * s + z0 * c;
+  vec3 shape = vec3(1.0);
+#ifdef SEEDED
+  // Stable individual proportions: broad squat slabs and slender/tall plant crowns.
+  shape = vec3(0.78 + 0.48 * fract(seed * 19.31),
+               0.78 + 0.48 * fract(seed * 31.73),
+               0.78 + 0.48 * fract(seed * 47.17));
+#endif
+#ifdef DISTANT
+  // Broader coarse canopy cover represents the sub-pixel neighbours on large
+  // planets; crown height remains physical, never inflated into giant trees.
+  shape.xz *= sqrt(clamp(uRadius / uFarDensityRadius, 1.0, 3.2));
+#endif
 
   // shrink away under a couple of pixels (judged at the anchor, before any ground fetch but one)
   float h0 = height0(anchor);
   vec3 foot = anchor * (uRadius + h0);
   float dist = distance(cameraPosition, warpPosition(foot));
-  float px = uKit.w * scale / max(dist * uPixelAngle, 1e-6);
+  float px = uKit.w * scale * shape.y / max(dist * uPixelAngle, 1e-6);
+#ifdef DISTANT
+  // Coarse silhouettes retain sub-pixel cover in orbital groves; detailed
+  // foliage still resolves out before its fine edges become unstable.
+  float shown = smoothstep(0.25, 0.9, px);
+#else
   float shown = smoothstep(1.2, 2.6, px);
+#endif
   if (shown <= 0.0) {
     collapse();
     return;
@@ -120,7 +156,7 @@ void main() {
   float base = h0;
   if (!reed) {
     // the footprint's corners on the ground: the lowest carries it, the slope tilts it
-    vec2 half_ = uKit.yz * scale;
+    vec2 half_ = uKit.yz * scale * shape.xz;
     float hxp = height0(normalize(anchor + (side * half_.x) / uRadius));
     float hxm = height0(normalize(anchor - (side * half_.x) / uRadius));
     float hzp = height0(normalize(anchor + (fwd * half_.y) / uRadius));
@@ -133,14 +169,15 @@ void main() {
     fwd = cross(side, n);
     up = n;
     float lowest = min(min(hxp, hxm), min(hzp, hzm));
-    base = mix(h0, lowest, 0.5) - 0.06 * uKit.w * scale - min(0.0015 * dist, 0.25);
+    base = mix(h0, lowest, 0.5) - 0.06 * uKit.w * scale * shape.y - min(0.0015 * dist, 0.25);
   } else {
     base = h0 - 0.04;
   }
 
-  vec3 local = position * scale * mix(0.35, 1.0, shown);
+  vec3 local = position * shape * scale * mix(0.35, 1.0, shown);
   vec3 world = anchor * (uRadius + base) + side * local.x + up * local.y + fwd * local.z;
-  vec3 normalW = side * normal.x + up * normal.y + fwd * normal.z;
+  vec3 localNormal = normalize(normal / shape);
+  vec3 normalW = side * localNormal.x + up * localNormal.y + fwd * localNormal.z;
 
   if (reed) {
     // the clump sways with the wind, the tops most, each clump on its own beat; leaves flutter a little more

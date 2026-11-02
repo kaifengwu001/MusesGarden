@@ -12,6 +12,7 @@ const gl = process.env.MEADOW_GL ?? (process.platform === 'darwin' ? 'metal' : '
 const glArgs: Record<string, string[]> = {
   metal: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'],
   swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  d3d11: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
 };
 
 export default defineConfig({
@@ -33,6 +34,7 @@ export default defineConfig({
     { name: 'violet-dunes:ecology', testMatch: /ecology\.spec\.ts/ },
     { name: 'violet-dunes:invariants', testMatch: /invariants\.spec\.ts/ },
     { name: 'violet-dunes:lock', testMatch: /lock\.spec\.ts/ },
+    { name: 'violet-dunes:globe', testMatch: /globe\.spec\.ts/ },
   ],
   webServer: {
     command: `npx vite --host 127.0.0.1 --port ${port} --strictPort`,

@@ -1,7 +1,114 @@
 # Paper Orchard validation
 
-Review date: 1 November 2026. Delivery branch: `environment_violet_dune`,
-based on `main` at `ad37acf`. Preview port 5231.
+Latest review: 2 November 2026, native Windows. Delivery branch:
+`environment_violet_dune`, based on `main` at `ad37acf`; this local pass starts
+from `e5ac0a4`. Active Windows preview port: **5232**. The older external
+checkout on 5231 is not this review target.
+
+## Mainline readiness fixes · 2 November 2026
+
+The final source was also checked in an isolated export of GitHub `main` at
+`4259aea`, with the current Violet folder applied. This preserves the working
+branch while exercising the 31 newer mainline commits and their shared APIs.
+
+- Scatter pools retain all 16,384 pages per species but use compact textures;
+  the actual largest dimension is now 512 rather than 16,384. Layout helpers
+  enforce a 2,048-pixel dimension limit. Dirty uploads split at physical rows,
+  and both page lists upload every row on their first draw.
+- Distant-detail selection uses a conservative tangent/height bound for warped
+  terrain, separate from the deliberately generous visibility bound. Full
+  detail covers the home patch and nearby plants; distant plants retain their
+  stable positions and coarse geometry. No habitat population was removed.
+- Disabled bloom no longer allocates or warms its targets. Re-enabling it
+  recreates correctly sized targets, and disabling it releases the chain.
+  Terrain MSAA, cloud FP16 precision and the 2.25× ribbon width are preserved.
+- Distant materials share live uniforms directly, avoiding unsupported
+  render-target texture cloning.
+
+| Final check | Result |
+| --- | --- |
+| Branch TypeScript / ESLint | `npm.cmd run check` passes; final scoped lint also passes |
+| CPU contracts against current main | 69 tests in 12 files pass |
+| Mainline client and browser-test types / standalone production build | Pass |
+| Targeted mainline browser regressions | Nine distinct checks pass: determinism, ground/picking agreement, walking/resize, colour and draw budgets, plus globe coverage and resource limits |
+| Expanded globe check | Seven views, 16 identical frozen redraws each, exact R128 → R400 → R128 return, no pool saturation, no captured runtime/shader errors |
+| Final material construction | Expanded globe test rerun passes after removing redundant uniform cloning |
+| Shared-code compatibility | Seven captured views match the working branch pixel-for-pixel on the same renderer |
+
+High-quality resource checks at 1600×1000, DPR1, render scale 1 and four MSAA
+samples now meet the existing HUD budgets. Orchard effective triangles fell
+from 7.44 million to **3.65 million**, below 4 million. Submitted triangles
+are 4.43 million, including unused birth slots and passes excluded from the
+existing effective-count metric. The largest captured allocation is
+**253.35 MiB at R400**, below 256 MiB; R128 uses 217.35 MiB. These are tracked
+allocation estimates and geometry counts, not a cross-device FPS guarantee.
+Renderer: Chromium / ANGLE D3D11, NVIDIA GeForce RTX 4070 SUPER. The complete
+startup/performance suite and Metal backend were not rerun for this pass.
+
+Current [capture evidence](reference/mainline-globe-evidence.json),
+[whole globe](reference/mainline-globe.png),
+[Orchard](reference/mainline-orchard.png), and
+[large-world Orchard](reference/mainline-large-orchard.png) preserve the final
+review. The earlier Windows and Mac records below remain historical. User
+visual acceptance is separate from these checks.
+
+## Windows globe refinement · 2 November 2026
+
+Cloud-width follow-up: ribbons are now 2.25 times their original width at the
+user's request. Both existing cloud geometry tests pass, and the live in-app
+globe was visually reviewed. The [updated app screenshot](reference/windows-wider-clouds-225.jpg)
+shows this width; the frozen captures in this earlier section precede the
+width adjustment. The mainline-readiness evidence above includes it.
+
+The user requested vegetation and rocks throughout the globe, thin swirling
+cloud strips, and more varied assets with broad planted and barren regions.
+Orbital views now stream seeded rocks and plants on both hemispheres. Coarse
+meshes share the detailed meshes' anchors and birth thresholds; horizon
+culling and a capped distant population bound the large-world cost. Broad
+habitat fields vary grove density and species mixture. Per-instance scale,
+proportions and material colour vary within the existing botanical palette.
+
+Twenty-eight translucent cirrus ribbons drift around the sphere above the
+highest terrain. They use 4,032 triangles. A separate depth-aware cloud pass
+composites over the four-sample opaque scene before colour grading. This
+avoids a one-channel, one-pixel frozen-frame instability found when blending
+the thin ribbons directly into the multisampled FP16 target on D3D11.
+Forty repeated diagnostic renders then matched exactly; the normal exact
+hash assertions remain unchanged.
+
+Shrinking after growth now compacts obsolete scatter pages. The harness
+settles bounded reconciliation passes so retile and page compaction finish
+before a frozen capture. The expanded pool reserves both transition layouts;
+the final globe captures show no pool saturation.
+
+| Windows check | Result |
+| --- | --- |
+| TypeScript and ESLint | `npm.cmd run check` passes |
+| Scoped CPU contracts | 60 tests in ten files pass, including cloud geometry, coarse meshes, habitat variation, horizon culling and grow/shrink scatter reuse |
+| Targeted browser regressions | Eight pass: three exact determinism checks, CPU/GPU ground and picking checks, MSAA colour bounds, draw budget, and the new globe test |
+| Walking and resize | One additional browser regression passes, including quality change and viewport resizes with no blank frame or scatter tile drop |
+| Globe review | Six raw views: home-facing R128, opposite hemisphere, middle distance, R400, returned R128 and Orchard; three identical frozen hashes per view; exact R128 growth return; zero captured runtime/shader errors |
+| Production | Standalone Vite build passes |
+
+Browser evidence uses Chromium / ANGLE D3D11 on NVIDIA GeForce RTX 4070 SUPER,
+1600×1000, DPR1, high quality, render scale 1, time 12, and four opaque-scene
+MSAA samples. This is a correctness and visual review, not a fresh performance
+benchmark. The historical Mac Metal timings below do not describe Windows.
+The default Windows test backend remains SwiftShader; select D3D11 explicitly.
+
+The R128 home-facing and opposite views stream 15,106 and 14,108 landmark
+instances respectively; R400 streams 27,297. Submitted triangles are about
+1.26 million at R128 and 2.04 million at R400. Returning to R128 restores both
+the exact image and the original triangle count. The nearby Orchard submits
+about 8.73 million triangles with detailed assets. Captured frame intervals
+include synchronous settling/readback and must not be treated as FPS data.
+
+Open the updated [review page](reference/review.html),
+[whole planet](reference/windows-globe.png),
+[far hemisphere](reference/windows-remote.png), and
+[raw capture evidence](reference/windows-globe-evidence.json).
+These are actual renderer exports, not retouched images. They were inspected
+against the existing concept; user visual sign-off is still pending.
 
 ## Visual contract
 
@@ -24,7 +131,8 @@ slate has physical fractured edges; thin plants retain independent scale.
 
 ## Review workflow and evidence
 
-1. Start the isolated checkout on port 5231. Finish source edits before tests.
+1. Start the isolated checkout on its assigned port (currently 5232 on Windows).
+   Finish source edits before tests.
 2. Open the primary image itself, then open the app without an old `pose`.
 3. Run the local ecology project. It freezes time at 12, renders at scale 1,
    captures Orchard, Dunes, Muse and both animal views, and checks whole-planet
@@ -101,7 +209,7 @@ They do not infer geometric overlap merely from matching vertex indices.
   this change. The source checkout remains untouched; delivery uses its own
   branch based on current `main`.
 
-## Current validation
+## Historical Mac validation · 1 November 2026
 
 | Check | Result |
 | --- | --- |
@@ -137,12 +245,14 @@ surrounding controls. Images have not been retouched.
 The scene is an interactive stylised 3D interpretation. It still has broader,
 simpler shapes and less delicate drawn detail than the concept. The shelter
 retains the inherited navigation footprint, so its rectangular structure is
-more regular than the illustrated home. The local orchard is richer than the
-remote planet surface; remote planting is more widely spaced and gives way to
-paint at a distance. Native animals follow deterministic ambient loops rather
+more regular than the illustrated home. The local orchard has more detailed
+geometry than the remote planet surface; distant plants and rocks now use
+coarse meshes and fade below pixel scale. Native animals follow deterministic
+ambient loops rather
 than a complete ecosystem. Observation cameras frame once, so an animal may turn afterwards.
 
-High cirrus is a distant sky wash with negligible ground shadow. Optional low
+High cirrus includes the distant sky wash and thin orbiting ribbons, with no
+ground shadow from the ribbons. Optional low
 clouds use flattened puffs; their inherited ground-shadow projection remains
 spherical and is deliberately restrained. Do not describe those shadows as an
 exact ellipsoid projection.

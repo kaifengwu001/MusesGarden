@@ -3,6 +3,8 @@
 // brightness), then paper grain.
 uniform sampler2D tScene;
 uniform sampler2D tBloom;
+uniform sampler2D tCirrus;
+uniform float uCirrusEnabled;
 uniform float uBloom;
 uniform float uGrain;
 uniform vec2 uGrade; // contrast, brightness
@@ -25,14 +27,22 @@ vec3 toneCurve(vec3 c) {
   return max(mix(vec3(l), c, 1.07), 0.0);
 }
 
+// Cirrus is premultiplied and rendered against resolved scene depth. Compose
+// in linear space before the grade and use the same result for edge strokes.
+vec3 sceneWithCirrus(vec2 uv) {
+  vec3 ground = texture2D(tScene, uv).rgb;
+  vec4 cloud = texture2D(tCirrus, uv) * uCirrusEnabled;
+  return cloud.rgb + ground * (1.0 - cloud.a);
+}
+
 void main() {
-  vec3 color = texture2D(tScene, min(vUv * uSceneExtent.xy, uSceneExtent.zw)).rgb;
+  vec3 color = sceneWithCirrus(min(vUv * uSceneExtent.xy, uSceneExtent.zw));
   color += texture2D(tBloom, min(vUv * uBloomExtent.xy, uBloomExtent.zw)).rgb * uBloom;
   // A tiny dry colored edge from neighboring pigment values; never a black cartoon outline.
   vec2 texel = 1.0 / vec2(textureSize(tScene, 0));
   vec2 uv = min(vUv * uSceneExtent.xy, uSceneExtent.zw);
-  vec3 cx = texture2D(tScene, min(uv + vec2(texel.x, 0.0), uSceneExtent.zw)).rgb;
-  vec3 cy = texture2D(tScene, min(uv + vec2(0.0, texel.y), uSceneExtent.zw)).rgb;
+  vec3 cx = sceneWithCirrus(min(uv + vec2(texel.x, 0.0), uSceneExtent.zw));
+  vec3 cy = sceneWithCirrus(min(uv + vec2(0.0, texel.y), uSceneExtent.zw));
   float edge = clamp(length(color - cx) + length(color - cy) - 0.025, 0.0, 0.3);
   color *= 1.0 - edge * 0.32;
   color = toneCurve(color);

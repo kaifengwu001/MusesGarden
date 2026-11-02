@@ -202,8 +202,7 @@ export function wedge(): InstancedBufferGeometry {
 const UP = new Vector3(0, 1, 0);
 
 /** A woody stem: two crossed tapering ribbons along a gently curving line from the base to `tip`. */
-function stem(m: Mesh, root: Vector3, tip: Vector3, bow: Vector3, width: number, height: number): void {
-  const segments = 6;
+function stem(m: Mesh, root: Vector3, tip: Vector3, bow: Vector3, width: number, height: number, segments = 6): void {
   const point = (t: number, out: Vector3): Vector3 => out.copy(root).lerp(tip, t).addScaledVector(bow, Math.sin(Math.PI * t));
   const along = new Vector3();
   const sideA = new Vector3();
@@ -231,8 +230,8 @@ function stem(m: Mesh, root: Vector3, tip: Vector3, bow: Vector3, width: number,
 }
 
 /** A thin, folded leaf. Wide bases give orchard leaves their heart/kite silhouette. */
-function leaf(m: Mesh, at: Vector3, dir: Vector3, length: number, width: number, droop: number, slot: number, height: number, part = 2, broad = false): void {
-  const segments = part === 5 ? 2 : part === 6 ? 4 : height <= 1 ? 4 : 7;
+function leaf(m: Mesh, at: Vector3, dir: Vector3, length: number, width: number, droop: number, slot: number, height: number, part = 2, broad = false, detail?: number): void {
+  const segments = detail ?? (part === 5 ? 2 : part === 6 ? 4 : height <= 1 ? 4 : 7);
   const across = new Vector3().crossVectors(dir, UP);
   if (across.lengthSq() < 1e-6) across.set(1, 0, 0);
   across.normalize();
@@ -392,3 +391,82 @@ export function tussock(): InstancedBufferGeometry {
 }
 
 export const KIT_MESH: Record<KitKind, () => InstancedBufferGeometry> = { slab, block, wedge, reed, comb, tussock };
+
+/** Tiny distant fruit keeps the pointed neck and rounded lower body. */
+function farCalyx(m: Mesh, top: Vector3, size: number, height: number): void {
+  const rings: number[][] = [];
+  for (let j = 0; j < 3; j++) {
+    const t = j / 2;
+    const radius = [0.02, 0.39, 0.025][j] * size;
+    const row: number[] = [];
+    for (let k = 0; k <= 5; k++) {
+      const angle = k / 5 * Math.PI * 2;
+      const normal = new Vector3(Math.cos(angle), (0.5 - t) * 0.6, Math.sin(angle)).normalize();
+      const p = top.clone().add(new Vector3(Math.cos(angle) * radius, -size * t, Math.sin(angle) * radius));
+      row.push(vertex(m, p, normal, [3, Math.max(0, p.y) / height, 0, k / 5 * 2 - 1], [t, size]));
+    }
+    rings.push(row);
+  }
+  for (let j = 0; j < 2; j++) for (let k = 0; k < 5; k++) {
+    m.idx.push(rings[j][k], rings[j + 1][k], rings[j + 1][k + 1], rings[j][k], rings[j + 1][k + 1], rings[j][k + 1]);
+  }
+}
+
+/** Same airy crown and palette as the close shrub, with subpixel veins omitted. */
+function farReed(): InstancedBufferGeometry {
+  const m = mesh();
+  const H = KIT.reed[2];
+  const root = new Vector3(0, -0.05, 0);
+  const fork = new Vector3(0.08, 1.35, 0.02);
+  stem(m, root, fork, new Vector3(-0.1, 0.03, 0.035), 0.068, H, 2);
+  const tips = [new Vector3(0.58, 2.65, 0.04), new Vector3(-0.68, 2.25, 0.27), new Vector3(0.28, 1.75, -0.6)];
+  tips.forEach((tip, i) => {
+    const base = root.clone().lerp(fork, 0.9 - i * 0.22);
+    const bow = new Vector3(-0.08, 0.16, 0.02);
+    stem(m, base, tip, bow, 0.04, H, 2);
+    for (let k = 0; k < 2; k++) {
+      const yaw = [0.1, 2.6, 4.3][i] + k * 2.3;
+      const at = base.clone().lerp(tip, k === 0 ? 0.94 : 0.52).addScaledVector(bow, k === 0 ? 0.19 : 1);
+      const dir = new Vector3(Math.cos(yaw) * 0.88, 0.8, Math.sin(yaw) * 0.88).normalize();
+      leaf(m, at, dir, (k === 0 ? 1.3 : 0.9) - i * 0.12, 0.58 - i * 0.04, 0.22, 0, H, 2, true, 2);
+    }
+    if (i < 2) farCalyx(m, base.clone().lerp(tip, 0.8).add(new Vector3(i ? -0.18 : 0.18, -0.1, 0)), 0.39, H);
+  });
+  return finish(m);
+}
+
+function farComb(): InstancedBufferGeometry {
+  const m = mesh();
+  const H = KIT.comb[2];
+  for (let frond = 0; frond < 3; frond++) {
+    const side = new Vector3(Math.cos(frond * 2.3), 0, Math.sin(frond * 2.3));
+    const root = new Vector3(0, -0.03, 0);
+    const tip = side.clone().multiplyScalar(0.32).add(new Vector3(0, H * (0.74 + frond * 0.085), 0));
+    stem(m, root, tip, side.clone().multiplyScalar(0.05), 0.014, H, 2);
+    for (let k = 0; k < 3; k++) for (const sign of [-1, 1]) {
+      const t = 0.22 + k * 0.22;
+      leaf(m, root.clone().lerp(tip, t), side.clone().multiplyScalar(sign).add(new Vector3(0, 1, 0)).normalize(), 0.3 * Math.sin(t * Math.PI), 0.085, 0.06, 0, H, 5, false, 2);
+    }
+  }
+  return finish(m);
+}
+
+function farTussock(): InstancedBufferGeometry {
+  const m = mesh();
+  for (let k = 0; k < 8; k++) {
+    const a = k * 2.39996;
+    const dir = new Vector3(Math.cos(a) * 0.65, 0.75 + (k % 3) * 0.22, Math.sin(a) * 0.65).normalize();
+    leaf(m, new Vector3(Math.cos(a) * 0.035, -0.025, Math.sin(a) * 0.035), dir, 0.44 + (k % 3) * 0.08, 0.14, 0.2, 0, KIT.tussock[2], k % 5 === 0 ? 2 : 6, false, 2);
+  }
+  return finish(m);
+}
+
+/** Whole-globe geometry stays physical, opaque and rooted at the detailed anchor. */
+export const KIT_FAR_MESH: Record<KitKind, () => InstancedBufferGeometry> = {
+  slab: () => slate({ size: KIT.slab, sides: 6, shoulder: 0.76, bevel: 0.14, tilt: [0.025, -0.045], chips: 0.5, dish: 0.055, seed: 101 }),
+  block: () => slate({ size: KIT.block, sides: 5, shoulder: 0.7, bevel: 0.12, tilt: [0.09, 0.04], chips: 0.45, dish: 0.04, seed: 202 }),
+  wedge,
+  reed: farReed,
+  comb: farComb,
+  tussock: farTussock,
+};

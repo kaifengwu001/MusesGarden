@@ -1,12 +1,16 @@
 import {
   AdditiveBlending,
+  Color,
+  DepthTexture,
   HalfFloatType,
   LinearFilter,
   NoBlending,
+  Mesh,
   OrthographicCamera,
   Scene,
   ShaderMaterial,
   UnsignedByteType,
+  UnsignedIntType,
   Vector2,
   Vector4,
   WebGLRenderTarget,
@@ -19,6 +23,7 @@ import { gpuMemory } from '../../../src/core/gpuMemory';
 import bloomFragment from '../../../src/render/bloom.frag.glsl?raw';
 import { fullscreenMesh, fullscreenVertex } from '../../../src/render/fullscreen';
 import fragmentShader from './post.frag.glsl?raw';
+import type { CloudRibbons } from '../life/cloudRibbons';
 
 const LEVELS = 4; // 1/2, 1/4, 1/8, 1/16
 
@@ -43,12 +48,19 @@ function target(type: typeof HalfFloatType | typeof UnsignedByteType, samples = 
  */
 export class Post {
   readonly target: WebGLRenderTarget;
+  private readonly cirrusTarget: WebGLRenderTarget;
+  private readonly cirrusScene = new Scene();
+  private cirrus: CloudRibbons | null = null;
+  private cirrusDraw: Mesh | null = null;
+  private readonly clearColour = new Color();
   private readonly bytesPerPixel: number;
   private readonly scene: Scene;
   private readonly camera = new OrthographicCamera();
   private readonly uniforms: {
     tScene: { value: Texture };
-    tBloom: { value: Texture };
+    tBloom: { value: Texture | null };
+    tCirrus: { value: Texture };
+    uCirrusEnabled: { value: number };
     uBloom: { value: number };
     uGrain: { value: number };
     uGrade: { value: Vector2 };
@@ -63,7 +75,7 @@ export class Post {
   /** The part of each target drawn (px): the scene target's, then each bloom level's. */
   private readonly view = new Vector2(1, 1);
   private readonly levelViews: Vector2[] = [];
-  bloomEnabled = true;
+  private bloomOn = true;
   bloomStrength = 0.22;
 
   constructor(private readonly renderer: WebGLRenderer) {
@@ -71,13 +83,14 @@ export class Post {
     const type = halfFloat ? HalfFloatType : UnsignedByteType;
     this.bytesPerPixel = halfFloat ? 8 : 4;
     this.target = target(type, 0, true);
-    for (let k = 0; k < LEVELS; k++) {
-      this.levels.push(target(type));
-      this.levelViews.push(new Vector2(1, 1));
-    }
+    this.target.depthTexture = new DepthTexture(1, 1, UnsignedIntType);
+    this.target.resolveDepthBuffer = true;
+    this.cirrusTarget = target(type);
     this.uniforms = {
       tScene: { value: this.target.texture },
-      tBloom: { value: this.levels[0].texture },
+      tBloom: { value: null },
+      tCirrus: { value: this.cirrusTarget.texture },
+      uCirrusEnabled: { value: 0 },
       uBloom: { value: 0 },
       uGrain: { value: 0.02 },
       uGrade: { value: new Vector2(1, 1) },
@@ -94,6 +107,62 @@ export class Post {
     return this.target.samples;
   }
 
+  get bloomEnabled(): boolean {
+    return this.bloomOn;
+  }
+
+  set bloomEnabled(enabled: boolean) {
+    if (enabled === this.bloomOn) return;
+    this.bloomOn = enabled;
+    if (!enabled) {
+      // Releasing the targets also prevents warm-up or the final grade's
+      // sampler from retaining a full-resolution-derived chain while off.
+      for (const level of this.levels) level.dispose();
+      this.levels.length = 0;
+      this.levelViews.length = 0;
+      this.uniforms.tBloom.value = null;
+      this.uniforms.uBloom.value = 0;
+      this.bloomUniforms.tSource.value = null;
+      gpuMemory.delete('bloom chain');
+    }
+  }
+
+  /** Allocate bloom only when a frame or warm-up actually needs it. */
+  private ensureBloom(): void {
+    if (this.levels.length > 0) return;
+    const type = this.bytesPerPixel === 8 ? HalfFloatType : UnsignedByteType;
+    for (let k = 0; k < LEVELS; k++) {
+      this.levels.push(target(type));
+      this.levelViews.push(new Vector2(1, 1));
+    }
+    this.resizeBloom();
+    this.setView(this.view.x, this.view.y);
+    this.uniforms.tBloom.value = this.levels[0].texture;
+  }
+
+  private resizeBloom(): void {
+    let bytes = 0;
+    this.levels.forEach((level, k) => {
+      const width = Math.max(1, this.target.width >> (k + 1));
+      const height = Math.max(1, this.target.height >> (k + 1));
+      level.setSize(width, height);
+      bytes += width * height * this.bytesPerPixel;
+    });
+    if (this.levels.length > 0) gpuMemory.set('bloom chain', bytes);
+  }
+
+  /** Soft high clouds composite after the opaque scene's multisample resolve. */
+  setCirrus(cirrus: CloudRibbons): void {
+    this.cirrus = cirrus;
+    if (this.cirrusDraw) this.cirrusScene.remove(this.cirrusDraw);
+    // A second draw object shares geometry/material without reparenting the
+    // world's mesh. Seed changes update its geometry before every render.
+    this.cirrusDraw = new Mesh(cirrus.mesh.geometry, cirrus.mesh.material);
+    this.cirrusDraw.frustumCulled = false;
+    this.cirrusScene.add(this.cirrusDraw);
+    cirrus.setDepth(this.target.depthTexture!, this.target.width, this.target.height);
+  }
+
   /** Size in drawing-buffer pixels. */
   setSize(width: number, height: number, samples: number): void {
     if (this.target.samples !== samples) {
@@ -101,17 +170,13 @@ export class Post {
       this.target.dispose(); // re-created with the new sample count on next use
     }
     this.target.setSize(width, height);
-    let bloomBytes = 0;
-    for (let k = 0; k < LEVELS; k++) {
-      const w = Math.max(1, width >> (k + 1));
-      const h = Math.max(1, height >> (k + 1));
-      this.levels[k].setSize(w, h);
-      bloomBytes += w * h * this.bytesPerPixel;
-    }
+    this.cirrusTarget.setSize(width, height);
+    this.cirrus?.setDepth(this.target.depthTexture!, width, height);
+    this.resizeBloom();
     const colour = this.bytesPerPixel * (samples > 0 ? samples + 1 : 1); // MSAA buffer + resolve
-    const depth = 4 * Math.max(samples, 1);
+    const depth = 4 * (samples > 0 ? samples + 1 : 1); // MSAA depth + sampled resolve
     gpuMemory.set('scene target', width * height * (colour + depth));
-    gpuMemory.set('bloom chain', bloomBytes);
+    gpuMemory.set('cirrus compositing', width * height * this.bytesPerPixel);
     this.setView(width, height);
   }
 
@@ -120,21 +185,29 @@ export class Post {
     const t = this.target;
     this.view.set(Math.max(1, Math.min(width, t.width)), Math.max(1, Math.min(height, t.height)));
     t.viewport.set(0, 0, this.view.x, this.view.y);
+    this.cirrusTarget.viewport.copy(t.viewport);
     extent(this.uniforms.uSceneExtent.value, this.view, t);
-    for (let k = 0; k < LEVELS; k++) {
+    for (let k = 0; k < this.levels.length; k++) {
       const level = this.levels[k];
       const v = this.levelViews[k];
       v.set(Math.max(1, Math.min(level.width, Math.round(this.view.x / 2 ** (k + 1)))), Math.max(1, Math.min(level.height, Math.round(this.view.y / 2 ** (k + 1)))));
       level.viewport.set(0, 0, v.x, v.y);
     }
-    extent(this.uniforms.uBloomExtent.value, this.levelViews[0], this.levels[0]);
+    if (this.levels.length > 0) extent(this.uniforms.uBloomExtent.value, this.levelViews[0], this.levels[0]);
   }
 
   /** Render the scene and grade it to the canvas: paper grain, and contrast and brightness in display space. */
   render(scene: Object3D, camera: Camera, grain: number, contrast = 1, brightness = 1): void {
     const r = this.renderer;
     r.setRenderTarget(this.target);
-    r.render(scene, camera);
+    const cloudVisible = this.cirrus?.mesh.visible ?? false;
+    if (this.cirrus) this.cirrus.mesh.visible = false;
+    try {
+      r.render(scene, camera);
+    } finally {
+      if (this.cirrus) this.cirrus.mesh.visible = cloudVisible;
+    }
+    this.renderCirrus(camera, cloudVisible);
     if (this.bloomEnabled) this.renderBloom();
     r.setRenderTarget(null);
     this.uniforms.uGrain.value = grain;
@@ -143,7 +216,35 @@ export class Post {
     r.render(this.scene, this.camera);
   }
 
+  private renderCirrus(camera: Camera, visible: boolean): void {
+    const r = this.renderer;
+    const cirrus = this.cirrus;
+    const draw = this.cirrusDraw;
+    this.uniforms.uCirrusEnabled.value = cirrus && visible ? 1 : 0;
+    if (!cirrus || !draw) return;
+    draw.geometry = cirrus.mesh.geometry;
+    draw.visible = visible;
+    draw.matrix.copy(cirrus.mesh.matrixWorld);
+    draw.matrixAutoUpdate = false;
+    r.getClearColor(this.clearColour);
+    const alpha = r.getClearAlpha();
+    const autoClear = r.autoClear;
+    const previous = r.getRenderTarget();
+    try {
+      r.setRenderTarget(this.cirrusTarget);
+      r.setClearColor(0x000000, 0);
+      r.clear(true, false, false);
+      r.autoClear = false;
+      if (visible) r.render(this.cirrusScene, camera);
+    } finally {
+      r.autoClear = autoClear;
+      r.setClearColor(this.clearColour, alpha);
+      r.setRenderTarget(previous);
+    }
+  }
+
   private renderBloom(): void {
+    this.ensureBloom();
     const r = this.renderer;
     const u = this.bloomUniforms;
     const pass = (source: WebGLRenderTarget, view: Vector2, dest: WebGLRenderTarget, mode: number, additive: boolean): void => {
@@ -173,8 +274,16 @@ export class Post {
     const r = this.renderer;
     r.setRenderTarget(this.target);
     await r.compileAsync(scene, camera);
-    r.setRenderTarget(this.levels[0]);
-    await r.compileAsync(this.bloomScene, this.camera);
+    if (this.cirrusDraw && this.cirrus) {
+      this.cirrusDraw.geometry = this.cirrus.mesh.geometry;
+      r.setRenderTarget(this.cirrusTarget);
+      await r.compileAsync(this.cirrusScene, camera);
+    }
+    if (this.bloomEnabled) {
+      this.ensureBloom();
+      r.setRenderTarget(this.levels[0]);
+      await r.compileAsync(this.bloomScene, this.camera);
+    }
     r.setRenderTarget(null);
     await r.compileAsync(this.scene, this.camera);
   }

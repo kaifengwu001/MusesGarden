@@ -22,6 +22,9 @@ npx vite build --config environments/violet-dunes/vite.config.ts
 ```
 
 Open [the orchard](http://127.0.0.1:5231/environments/violet-dunes/#q=high&hud=0).
+The current Windows checkout uses [port 5232](http://127.0.0.1:5232/environments/violet-dunes/#q=high&hud=0),
+because an older external checkout owns 5231. In PowerShell, set
+`$env:MEADOW_PORT='5232'` for browser checks and use `npm.cmd` / `npx.cmd`.
 Add `&t=12` for a frozen comparison. Remove an old `pose` parameter to see the
 authored opening composition. The five place buttons show the orchard, dune
 survey, whole planet and both native animals. `MEADOW_PORT` overrides the
@@ -42,9 +45,22 @@ The main construction files are:
 | Stone, timber, canvas and supported home footprint | `life/props.ts`, `props.frag.glsl` |
 | Native geometry, ground contacts, animation and shadows | `life/orchardFauna*` |
 | Preserved resident rig, sculpt loader and matching colour/shadow shaders | `life/museRig.ts`, `museMesh.ts`, `museSculpt.worker.ts`, `museTripo.ts`, `muse*glsl` |
-| High cirrus, optional low cloud banks | `render/sky*`, `life/clouds*`, `cloudLumps.glsl` |
+| High cirrus, optional low cloud banks | `render/sky*`, `life/cloudRibbons*`, `life/clouds*`, `cloudLumps.glsl` |
 | Framing, integration and place controls | `world.ts`, `main.ts`, `ui/orchard.css` |
 
 Keep `meadow_*` shader names and `window.__meadow`: the shared engine and
 copied checks use those interfaces. The dry-world shore distance remains a
 positive sentinel, not zero. Edit CPU and GPU terrain formulas together.
+
+The November 2 Windows globe pass extends seeded rocks and vegetation through
+orbital distance. Broad habitat groves and regional species mixtures alternate
+with open dunes. Distant meshes use the same anchors and growth thresholds as
+their detailed counterparts. Thin, drifting high cirrus strips wrap the sphere
+through `life/cloudRibbons*`; the optional low-cloud cover remains separate.
+`dev/globe.spec.ts` checks remote hemispheres, zoom and growth return.
+The final pass packs scatter textures into portable rectangles and separates
+near-detail distance from visibility bounds. Its globe check also enforces the
+existing high-quality geometry/memory budgets and checks 16 exact redraws per
+view. See the validation record for the isolated check against main `4259aea`.
+For native Windows GPU checks, set `$env:MEADOW_GL='d3d11'`; the default remains
+SwiftShader. Report renderer and resolution alongside any results.

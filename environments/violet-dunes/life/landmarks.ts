@@ -4,8 +4,10 @@ import { hash32, mix, salt, unit } from '../../../src/core/hash';
 import { uvToSphere } from '../../../src/planet/cubesphere';
 import type { RestPoint } from '../../../src/planet/rest';
 import { SCATTER_STRIDE, ScatterLayer, type ScatterClassifier, type ScatterLook, type ScatterView } from './scatter';
-import { CLUSTERS, type FieldParams } from '../planet/fields';
-import { KIT, KIT_KINDS, KIT_MESH, REED_HEIGHT, type KitKind } from './landmarkMeshes';
+import { type FieldParams } from '../planet/fields';
+import { KIT, KIT_KINDS, KIT_MESH, KIT_FAR_MESH, REED_HEIGHT, type KitKind } from './landmarkMeshes';
+import { smoothstep } from '../../../src/core/math';
+import { gnoise } from '../../../src/planet/noise';
 import fragmentShader from './landmark.frag.glsl?raw';
 import vertexShader from './landmark.vert.glsl?raw';
 
@@ -16,8 +18,8 @@ import vertexShader from './landmark.vert.glsl?raw';
 //           rest-space point set (so each stone keeps its direction and its
 //           size in meters as the planet grows, and new ones fade in by
 //           their birth radius), streamed in tiles around the camera by the
-//           shared ScatterLayer, one pool per kit kind, as far out as a
-//           sail-reed stays a few pixels tall
+//           local ScatterLayer, one pool per kit kind. Near and distant
+//           meshes share those anchors; orbital views retain global coverage.
 // Each instance is grounded in the shader on the ground it stands on
 // (landmark.vert.glsl).
 
@@ -77,8 +79,8 @@ export function orchardClear(x: number, z: number): boolean {
   return FAUNA_POCKETS.some(([px, pz]) => Math.hypot(x - px, z - pz) < 1.0);
 }
 
-/** Stones retain a consistent geological scale instead of unrelated swollen boulders. */
-const ROCK_SCALE = [0.8, 1.1] as const;
+/** A range of broken stones and broad outcrops within the same geological kit. */
+const ROCK_SCALE = [0.55, 1.65] as const;
 
 function random(seed: number): () => number {
   let s = hash32(seed >>> 0);
@@ -225,22 +227,31 @@ function kitUniform(kind: KitKind): Vector4 {
 /** Maximum scaled kit extent plus the largest displacement used by landmark.vert.glsl at wind=1. */
 export const LANDMARK_REACH = Math.max(...KIT_KINDS.map((kind) => {
   const [w, d, h] = KIT[kind];
-  const scale = kind === 'reed' ? REED_HEIGHT[1] / h : isPlant(kind) ? 1.25 : 1.4;
-  const geometry = Math.hypot(w / 2, d / 2, h) * scale;
+  const scale = kind === 'reed' ? REED_HEIGHT[1] / h : isPlant(kind) ? 1.35 : 1.65;
+  const geometry = Math.hypot(w / 2 * 1.8, d / 2 * 1.8, h) * scale;
   const motion = isPlant(kind) ? (0.05 + 0.18 + 0.02) * h * scale : 0;
-  return geometry + motion;
+  return (geometry + motion) * 1.3;
 }));
 
 /** Seeded landmarks: their density (per m²) at the heart of a cluster, how far round the shelter the home patch keeps them out (m), the steepest ground they stand on, and each kind's share. */
-export const SEEDED = { peak: 0.20, homeClear: 19, slope: 0.42 } as const;
-const KIND_SHARE: ReadonlyArray<readonly [KitKind, number]> = [
-  ['reed', 0.27],
-  ['comb', 0.20],
-  ['tussock', 0.23],
-  ['slab', 0.12],
-  ['block', 0.08],
-  ['wedge', 0.10],
-];
+export const SEEDED = { peak: 0.26, homeClear: 19, slope: 0.42 } as const;
+/** Broad, seed-stable groves break the habitat into lush banks and stony margins. */
+export function orchardGrove(dir: Vector3, seed: number): number {
+  return smoothstep(-0.16, 0.24, gnoise(dir.x * 4.3, dir.y * 4.3, dir.z * 4.3, (seed + 917) >>> 0));
+}
+
+/** Local species balance follows the same broad regions as the density. */
+export function orchardKind(dir: Vector3, seed: number, pick: number): KitKind {
+  const grove = orchardGrove(dir, seed);
+  const rockShare = 0.52 - 0.34 * grove;
+  if (pick < rockShare) {
+    const stone = pick / rockShare;
+    return stone < 0.52 ? 'slab' : stone < 0.88 ? 'block' : 'wedge';
+  }
+  const plant = (pick - rockShare) / (1 - rockShare);
+  const crownShare = 0.22 + 0.22 * smoothstep(-0.25, 0.25, gnoise(dir.x * 6, dir.y * 6, dir.z * 6, (seed + 921) >>> 0));
+  return plant < crownShare ? 'reed' : plant < crownShare + 0.28 ? 'comb' : 'tussock';
+}
 /** Per instance: the standard five floats, then size factor, lance leaves shown, -. */
 const STRIDE = SCATTER_STRIDE + 3;
 /** Field samples per tile side (bilinear in between), and R's quantisation for classifying (4 % steps). */
@@ -248,7 +259,9 @@ const GRID = 4;
 const LN_R_STEP = 0.04;
 /** A sail-reed stays drawn while at least this many pixels tall (the layer reaches as far), but never beyond REACH_MAX (m). */
 const REACH_PIXELS = 1.2;
-const REACH_MAX = 260;
+const REACH_MAX = 400;
+/** Distant clumps sample a bounded progressive population on large worlds. */
+export const FAR_DENSITY_RADIUS = 128;
 
 interface LandmarkTile {
   level: number;
@@ -270,7 +283,7 @@ export class LandmarkClassifier implements ScatterClassifier<LandmarkTile> {
 
   /** The mean density over the planet the layer is told (per m²): the peak over the clusters' share of the habitat's share. */
   get mean(): number {
-    return SEEDED.peak * CLUSTERS.cover * 0.3;
+    return SEEDED.peak * 0.5 * 0.3;
   }
 
   set(layout: Layout, radius: number, params: FieldParams, paramsKey: string): void {
@@ -295,7 +308,11 @@ export class LandmarkClassifier implements ScatterClassifier<LandmarkTile> {
   /** The clusters' density at dir (per m²). */
   density(dir: Vector3): number {
     const f = this.terrain!.fields;
-    return SEEDED.peak * f.clusters(dir, f.habitat(dir));
+    const habitat = f.habitat(dir);
+    if (habitat <= 0) return 0;
+    const small = f.clusters(dir, habitat) / habitat;
+    const grove = orchardGrove(dir, this.layout!.seed);
+    return SEEDED.peak * habitat * (0.12 + 0.88 * Math.max(small, grove * 0.82));
   }
 
   prepare(face: number, level: number, i: number, j: number): { state: LandmarkTile; boost: number } {
@@ -324,15 +341,9 @@ export class LandmarkClassifier implements ScatterClassifier<LandmarkTile> {
     if (this.nearHome(dir) || this.steep(dir)) return -1;
     record[o + 3] = Math.log(local);
     const h = hash32(p.seed ^ 0x4c1d2e3f);
-    let pick = unit(h);
-    let channel = 0;
-    for (; channel < KIND_SHARE.length - 1; channel++) {
-      pick -= KIND_SHARE[channel][1];
-      if (pick < 0) break;
-    }
-    const kind = KIND_SHARE[channel][0];
+    const kind = orchardKind(dir, this.layout!.seed, unit(h));
     const r = unit(hash32(h ^ 0x9e3779b9));
-    record[o + 5] = kind === 'reed' ? (REED_HEIGHT[0] + (REED_HEIGHT[1] - REED_HEIGHT[0]) * r) / KIT.reed[2] : isPlant(kind) ? 0.75 + 0.5 * r : ROCK_SCALE[0] + (ROCK_SCALE[1] - ROCK_SCALE[0]) * r;
+    record[o + 5] = kind === 'reed' ? (REED_HEIGHT[0] + (REED_HEIGHT[1] - REED_HEIGHT[0]) * r) / KIT.reed[2] : isPlant(kind) ? 0.55 + 0.8 * r : ROCK_SCALE[0] + (ROCK_SCALE[1] - ROCK_SCALE[0]) * r;
     record[o + 6] = kind === 'reed' ? 3 + Math.floor(unit(hash32(h ^ 0x51ed27)) * 3) : 0;
     record[o + 7] = 0;
     return KIT_KINDS.indexOf(kind);
@@ -368,10 +379,20 @@ export class LandmarkClassifier implements ScatterClassifier<LandmarkTile> {
 const UP = new Vector3(0, 1, 0);
 const X_AXIS = new Vector3(1, 0, 0);
 
-/** How far (m) the seeded layer reaches from the focus: as far as a tall sail-reed stays a pixel or two tall, out of the camera's height. */
-export function landmarkReach(altitude: number, pixelAngle: number): number {
+/** Ground coverage from the focus; distant silhouettes keep the whole globe populated in orbit. */
+export function landmarkReach(altitude: number, pixelAngle: number, radius = 128): number {
+  // Orbit must not disable the entire layer when the eye passes a fixed meter cap.
+  if (altitude > radius * 0.65) return Math.PI * radius;
   const far = Math.min(REACH_MAX, REED_HEIGHT[1] / (REACH_PIXELS * Math.max(pixelAngle, 1e-5)));
-  return far > altitude ? Math.sqrt(far * far - altitude * altitude) : 0;
+  return Math.min(Math.PI * radius, Math.max(160, far > altitude ? Math.sqrt(far * far - altitude * altitude) : 160));
+}
+
+/** Detail is useful while the small leaf/fruit features span about a pixel. */
+export function landmarkDetailDistance(pixelAngle: number): number {
+  // This is measured to the nearest point of each conservative tile bound,
+  // not its centre, so a tile touching the close view retains its full kit.
+  // Home's authored meshes are independent and always keep their full detail.
+  return Math.max(40, Math.min(60, 0.04 / Math.max(pixelAngle, 1e-5)));
 }
 
 export class Landmarks {
@@ -382,6 +403,7 @@ export class Landmarks {
   readonly classifier = new LandmarkClassifier();
   /** The seeded layer's meshes, one per kit kind (KIT_KINDS order). */
   readonly seededMeshes: Array<Mesh<InstancedBufferGeometry, ShaderMaterial>> = [];
+  readonly farMeshes: Array<Mesh<InstancedBufferGeometry, ShaderMaterial>> = [];
   private readonly lnDensity = { value: 0 };
   private groundBound = 0;
 
@@ -392,8 +414,12 @@ export class Landmarks {
       boundPadding: () => this.groundBound + LANDMARK_REACH,
       cls: { salt: salt('landmarks'), jitter: 0.9 },
       tileMeters: 40,
-      pageSize: 32,
-      pages: 640,
+      pageSize: 8,
+      // During a retile both complete layouts coexist until replacement
+      // coverage is ready. The lagged growth band can still be at the larger
+      // radius while shrinking, so reserve two full 8192-page populations.
+      pages: 16384,
+      sortByBirth: true,
       headroom: 1.25,
       stride: STRIDE,
       channels: KIT_KINDS.length,
@@ -408,7 +434,7 @@ export class Landmarks {
         uniforms: {
           ...shared,
           uKit: { value: kitUniform(kind) },
-          uPageSize: { value: 32 },
+          uPageSize: { value: 8 },
           uPool: { value: this.layer.mainTextures[channel] },
           uPoolRest: { value: this.layer.restTextures[channel] },
           uPageList: { value: this.layer.listTextures[channel] },
@@ -421,6 +447,21 @@ export class Landmarks {
       mesh.frustumCulled = false;
       this.seededMeshes.push(mesh);
       this.meshes.push(mesh);
+      const farGeometry = KIT_FAR_MESH[kind]();
+      farGeometry.instanceCount = 0;
+      // Share the live terrain/time textures directly. Cloning a material
+      // would first try to clone render-target textures, which is unsupported.
+      const farMaterial = new ShaderMaterial({
+        name: `landmarks ${kind} (distant)`,
+        vertexShader, fragmentShader,
+        uniforms: { ...material.uniforms, uPageList: { value: this.layer.farListTextures[channel] }, uFarDensityRadius: { value: FAR_DENSITY_RADIUS } },
+        defines: { SEEDED: 1, DISTANT: 1 },
+        side: material.side,
+      });
+      const farMesh = new Mesh(farGeometry, farMaterial);
+      farMesh.frustumCulled = false;
+      this.farMeshes.push(farMesh);
+      this.meshes.push(farMesh);
     });
     for (const kind of KIT_KINDS) {
       const geometry = KIT_MESH[kind]();
@@ -448,16 +489,19 @@ export class Landmarks {
   }
 
   /** Stream the seeded stones and clumps for this view. */
-  update(view: Omit<ScatterView, 'falloff' | 'classifier' | 'density' | 'ahead'> & { ahead?: Omit<ScatterLook, 'falloff'>; heightAbove?: number }, layout: Layout, params: FieldParams, paramsKey: string): void {
+  update(view: Omit<ScatterView, 'falloff' | 'classifier' | 'density' | 'ahead'> & { ahead?: Omit<ScatterLook, 'falloff'>; heightAbove?: number; cameraPosition?: Vector3; pixelAngle?: number }, layout: Layout, params: FieldParams, paramsKey: string): void {
     this.classifier.set(layout, view.radius, params, paramsKey);
     this.groundBound = Math.max(0, view.heightAbove ?? this.classifier.maxGroundHeight);
     const all = (): number => 1;
     const { ahead } = view;
-    this.layer.update({ ...view, density: this.classifier.mean, falloff: all, classifier: this.classifier, ahead: ahead && { ...ahead, falloff: all } });
+    this.layer.update({ ...view, density: this.classifier.mean, lod: view.cameraPosition ? { camera: view.cameraPosition, detailDistance: landmarkDetailDistance(view.pixelAngle ?? 0.001), densityRadius: FAR_DENSITY_RADIUS } : undefined, falloff: all, classifier: this.classifier, ahead: ahead && { ...ahead, falloff: all } });
     this.lnDensity.value = Math.log(this.classifier.mean);
     this.seededMeshes.forEach((mesh, c) => {
       mesh.geometry.instanceCount = this.layer.instanceCounts[c];
       mesh.visible = view.near > 0.5 && mesh.geometry.instanceCount > 0;
+      const far = this.farMeshes[c];
+      far.geometry.instanceCount = this.layer.farInstanceCounts[c];
+      far.visible = view.near > 0.5 && far.geometry.instanceCount > 0;
     });
   }
 

@@ -94,6 +94,7 @@ async function boot(): Promise<void> {
   const camera = world.rig.camera;
   camera.aspect = window.innerWidth / Math.max(window.innerHeight, 1);
   const post = new Post(renderer);
+    post.setCirrus(world.cirrus);
   post.bloomEnabled = false;
   const gpuTimer = new GpuTimer(gl);
   const stats = createFrameStats();
@@ -390,9 +391,13 @@ async function boot(): Promise<void> {
       settle: async () => {
         store.flush();
         await world.muse.ready;
-        world.settle();
-        update();
-        world.settle();
+        // A growth change can close the birth band, retile, then compact
+        // future births. Reconcile those dependent stages before a capture.
+        for (let pass = 0; pass < 6; pass++) {
+          world.settle();
+          update();
+          if (pass >= 2 && world.queue.size === 0) break;
+        }
         await post.warm(world.scene, camera);
       },
       set: (path, value) => {

@@ -16,7 +16,7 @@ uniform float uRadius;
 
 attribute float aPart; // 0 stem, 1 petal, 2 centre, 3 leaf at the foot (placed and bent like the stem)
 attribute float aT;    // along the stem 0..1; 1 on the head
-uniform sampler2D uPool;     // per flower, a page a row: direction xyz, ln birth threshold (at the local density)
+uniform sampler2D uPool;     // flat flower texels: direction xyz, ln birth threshold (at the local density)
 uniform sampler2D uPoolRest; // per flower: seed in [0, 1), size factor, colour variant
 uniform sampler2D uPageList; // the pages drawn (those of tiles in view), four to a texel (scatter.ts)
 uniform float uPageSize;
@@ -34,13 +34,19 @@ vec3 rotateAxis(vec3 v, vec3 axis, float angle) {
   return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
 }
 
+vec4 scatterTexel(sampler2D data, int index) {
+  int width = textureSize(data, 0).x;
+  return texelFetch(data, ivec2(index % width, index / width), 0);
+}
+
 void main() {
   int perPage = int(uPageSize);
   int drawn = gl_InstanceID / perPage;
   int slot = gl_InstanceID - drawn * perPage;
-  int page = int(texelFetch(uPageList, ivec2(drawn >> 2, 0), 0)[drawn & 3]);
-  vec4 flower = texelFetch(uPool, ivec2(slot, page), 0);
-  vec4 rest = texelFetch(uPoolRest, ivec2(slot, page), 0);
+  int page = int(scatterTexel(uPageList, drawn >> 2)[drawn & 3]);
+  int instance = page * perPage + slot;
+  vec4 flower = scatterTexel(uPool, instance);
+  vec4 rest = scatterTexel(uPoolRest, instance);
   vec3 dir = flower.xyz;
   float seed = rest.x;
   vec2 look = rest.yz; // size factor, colour variant
