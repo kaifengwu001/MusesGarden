@@ -1,0 +1,145 @@
+{
+  "at": "2026-11-02T09:28:34.357Z",
+  "stage": "before",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "viewport": [
+    1440,
+    960
+  ],
+  "dpr": 1,
+  "errors": [],
+  "views": [
+    {
+      "name": "user-fields",
+      "hash": "q=high&hud=0&t=12&pose=0.7621,0.0711,-0.6433,-0.0197,0.83",
+      "stats": {
+        "frameMs": 16.700000000000728,
+        "jsMs": 1.699999999254942,
+        "gpuMs": 1.667072,
+        "drawCalls": 48,
+        "triangles": 3420079,
+        "trianglesSubmitted": 3420079,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 27,
+        "programs": 31,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 139,
+        "lodMin": 3,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 8202.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 50439,
+          "triangles": 64
+        }
+      ]
+    },
+    {
+      "name": "home",
+      "hash": "q=high&hud=0&t=12&pose=0.1082,-0.2712,0.6564,0.6956,0.7877",
+      "stats": {
+        "frameMs": 16.599999999998545,
+        "jsMs": 1.3999999985098839,
+        "gpuMs": 2.487296,
+        "drawCalls": 50,
+        "triangles": 3473833,
+        "trianglesSubmitted": 3473833,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 29,
+        "programs": 32,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 147,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 8202.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 50439,
+          "triangles": 64
+        }
+      ]
+    },
+    {
+      "name": "planet",
+      "hash": "cam=overview&q=high&hud=0&t=12&pose=0.1082,-0.2712,0.6564,0.6956,0",
+      "stats": {
+        "frameMs": 16.69999999999891,
+        "jsMs": 1.7999999970197678,
+        "gpuMs": 2.168832,
+        "drawCalls": 46,
+        "triangles": 3316203,
+        "trianglesSubmitted": 3316203,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 23,
+        "geometries": 32,
+        "programs": 33,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 14,
+        "lodMin": 0,
+        "lodMax": 1,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 8202.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 50439,
+          "triangles": 64
+        }
+      ]
+    }
+  ]
+}
