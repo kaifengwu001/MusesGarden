@@ -38,12 +38,14 @@ Started from c14319c. Kai (2026-11-01), stopping the sixth round's build (a band
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | A clean-plate paddy lab page with a flat canvas | |
-| 2 | A mathematical height map: Perlin noise at several scales | |
-| 3 | Terrace it: intersect at height intervals (regular ± a noise offset) and find the outlines | |
-| 4 | Offset the outlines by the dam thickness (a base value + variable noise) | |
-| 5 | Extrude and build the dams from them | |
-| 6 | Fill in the top surfaces | |
+| 1 | A clean-plate paddy lab page with a flat canvas | `src/dev/paddyLab.html` (on the terraces' server: http://localhost:5197/src/dev/paddyLab.html): a 90 m square block of land, its code all its own in `src/dev/paddyLab/` (nothing from the planet), every parameter on its panel, rebuilt in about 0.4 s |
+| 2 | A mathematical height map: Perlin noise at several scales | Four octaves of 2D Perlin noise (70, 32, 15 and 7 m; weights 1, 0.45, 0.18, 0.06), 20 m of relief, with its exact gradient (`noise.ts`, `field.ts`) |
+| 3 | Terrace it: intersect at height intervals (regular ± a noise offset) and find the outlines | Levels every 0.5 m, each moved by up to ±15 % of a step, the cut wandering off the height by a slow noise (±0.35 of a step over 14 m). The outlines traced on a 0.3 m grid, each square split into four triangles round its sampled middle (so no square is ambiguous), every crossing found on the field itself and shared by the triangles either side (`contours.ts`). A ring under 12 m² is levelled into the band round it (no little round paddies) |
+| 4 | Offset the outlines by the dam thickness (a base value + variable noise) | Each outline evened out to points 0.12 m apart and laid back on its level, then offset uphill by 0.34 ± 0.1 m (a noise over 7 m), kept within 45 % of its band, inside its bends, below the next level's outline and short of a crest (`build.ts`) |
+| 5 | Extrude and build the dams from them | A rounded dam (0.2 ± 0.05 m over its floor) swept between each outline and its offset; a riser leaning back 0.3 from the floor below up to the dam's outer edge; where the block's edge cuts a dam, its section closed |
+| 6 | Fill in the top surfaces | Each band's top filled level, halfway between its two levels, from the same crossings as the outlines; the dams' inner faces and the risers' feet reach 5 cm under the water, so nothing between them can open. Against a red sky from above and from low angles, on three seeds and settings (1600 px square): not one pixel of gap |
+
+Still open in the lab: with levels at regular heights, the steepest slopes get bands narrower than a dam, and the dams there crowd into a bundle (the dams are kept within their band, so they never cross); the paddies are coloured a band at a time, and the bands are not yet cut across into paddies.
 
 ### Kai's notes on the sixth round: a clean-slate rewrite of the terraces' construction
 

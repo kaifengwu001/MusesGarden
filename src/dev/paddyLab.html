@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paddy lab</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #dde6ea;
+        font: 12px/1.4 system-ui, sans-serif;
+      }
+      canvas {
+        display: block;
+      }
+      #info {
+        position: fixed;
+        left: 8px;
+        bottom: 8px;
+        right: 260px;
+        color: #33413f;
+        opacity: 0.8;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="lab"></canvas>
+    <div id="info"></div>
+    <script type="module" src="./paddyLab/lab.ts"></script>
+  </body>
+</html>
