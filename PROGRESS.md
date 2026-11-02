@@ -32,6 +32,15 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the planet's paddies against the lab
+
+Started from aeeb0c7 (gaps and flats). Kai (2026-11-01), sending the aerial, the lab from above and the lab's block side by side; this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | "Why has there been such a degradation to the paddies since the lab?" | |
+| 2 | "Where is the field? It's so mangled with the paddies I can't even tell which one is which. Why are they colliding and criss-crossing?" | |
+
 ### Gaps and flats
 
 Started from 4e936ca (the mathematical planet). Kai (2026-11-01), asked what the next round should take on: "Gaps and flats first". This table fills in as they are done.
