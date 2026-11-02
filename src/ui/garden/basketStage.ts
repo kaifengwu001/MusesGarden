@@ -673,7 +673,7 @@ export class BasketStage {
     return pose(foot.x, foot.y, foot.z, q, (at.s * READY.stem) / HEADS[b.look.species][0]);
   }
 
-  /** A flower in the fan: its head on its slot, its stem toward the basket, turned to show its face, bobbing. */
+  /** A flower in the fan: its head on its slot, its stem toward the basket, turned to show its face, bobbing; under the pointer it lifts and grows a little. */
   private inFan(b: Bloom, k: number, t: number): Pose {
     const fan = this.fan;
     const slot = fan?.slots[k];
@@ -684,7 +684,7 @@ export class BasketStage {
     const q = new Quaternion()
       .setFromAxisAngle(new Vector3(0, 0, 1), -slot.tilt + Math.sin(t * 1.1 + k) * 0.05)
       .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), FAN_TIP))
-      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (k % 2 ? 1 : -1) * 0.9 + t * 0.15 * (lift > 0.01 ? 1 : 0)));
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (k % 2 ? 1 : -1) * 0.9));
     const stem = this.tv.set(0, HEADS[b.look.species][0] * s, 0).applyQuaternion(q);
     return pose(slot.x - stem.x, slot.y + stem.y - 2.5 * bob - 6 * lift, Z.fan + k, q, s);
   }
