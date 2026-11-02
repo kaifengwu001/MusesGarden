@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-11-02T09:46:10.697Z",
+  "kind": "CPU default R128 population, home focus; not a frame-time measurement",
+  "seed": 412,
+  "fields": {
+    "roll": 4.5,
+    "hummocks": 0.16,
+    "wetlands": 0,
+    "waterLevel": 0,
+    "grain": 0.74,
+    "density": 0,
+    "patchiness": 0.95,
+    "patchSize": 13,
+    "weights": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "farTufts": 98272,
+  "nearStalks": 9640,
+  "cropTriangles": 2328016,
+  "landmarks": [
+    {
+      "name": "Unequal dark cypress groves",
+      "count": 388,
+      "triangles": 265392
+    },
+    {
+      "name": "Distant ochre farms and terracotta roofs",
+      "count": 4,
+      "triangles": 264
+    },
+    {
+      "name": "Bound rye sheaves",
+      "count": 18,
+      "triangles": 10728
+    }
+  ]
+}

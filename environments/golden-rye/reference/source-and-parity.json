@@ -1,0 +1,61 @@
+{
+  "source": "791263247a656a90c8950f4ef866eac564f2ea1f",
+  "parity": {
+    "heightError": 0.017900954655097223,
+    "waterError": 0,
+    "warpError": 0.00001091983708809808,
+    "samples": 64,
+    "worst": {
+      "cpu": 20.205400954655097,
+      "gpu": 20.1875,
+      "direction": [
+        -0.8404950094179401,
+        -0.35700272610481687,
+        -0.4075747694561897
+      ]
+    }
+  },
+  "memory": 236619050,
+  "inventory": [
+    {
+      "path": "world.ts",
+      "sha256": "436aea2cacac2df6fe4cb4a9034bd6ef720498e63c6f02ab9d1779c522c1dc14"
+    },
+    {
+      "path": "params.ts",
+      "sha256": "631fc9a48d189177801fefeab7a66a3be65b184b9d5c801f5605d269bf0bc341"
+    },
+    {
+      "path": "planet/terrain.glsl",
+      "sha256": "c07e96a67b0657259e28801263a0f3aaecd8f40ccadf7cff39a7e1f5ae9fbbf4"
+    },
+    {
+      "path": "planet/bake.ts",
+      "sha256": "06e4bbf03159375d28221997a7a6ef38997baceaa9dd9166142abe3c61b23264"
+    },
+    {
+      "path": "life/rye.vert.glsl",
+      "sha256": "573f95b6038c6cc63107ddbef1786f6dd50ccf57a8ca97ceb366fda4dc53fb4f"
+    },
+    {
+      "path": "life/rye.ts",
+      "sha256": "e430b9d9265e5016c9d41c583392c3669d46cba1de96a63a2cb598112b763ea7"
+    },
+    {
+      "path": "life/ryeGeometry.ts",
+      "sha256": "9bc1ac12ada86b69ab041db60e7bb1cadb890a9c9d88d5e32f744a6b67c7e34a"
+    },
+    {
+      "path": "life/ryeDistribution.ts",
+      "sha256": "47ce294a015a713f43e18107720bbbf8d74f1c7e6e1557b9813f46df4530b7b6"
+    },
+    {
+      "path": "render/sky.ts",
+      "sha256": "779c46e3da6c4a105cfec28d69e5c9934e7890eb7f133d8304d809d9a4fcc4de"
+    },
+    {
+      "path": "render/palette.ts",
+      "sha256": "015e565c04fcd97ad38d789e808bec2eecc815e6c4b9b11c11151118e0b8e315"
+    }
+  ]
+}
