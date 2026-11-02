@@ -1,0 +1,40 @@
+{
+  "recordedUtc": "2026-11-02T08:30:16.7989287Z",
+  "environment": "rice-terraces",
+  "sourceRendererAvailable": false,
+  "sourceRendererNote": "User confirmed that they do not have the source file or project for the flat renderer.",
+  "files": [
+    {
+      "file": "terrace-render.png",
+      "originalFile": "IMG_9203.png",
+      "role": "Primary supplied flat farmland rendering: broad irregular terrace plots, mixed flooded and planted fields, narrow banks and scattered ridge-top tree groves.",
+      "bytes": 545740,
+      "sha256": "6085f5df4c0e2594e9e6a56e5a9efbb4eb6a7174c7a270df05c84a13c8124a3a",
+      "provenance": "User supplied reference attachment; copied byte-for-byte for this new environment."
+    },
+    {
+      "file": "terrace-comparison.png",
+      "originalFile": "IMG_4027.png",
+      "role": "Supplied comparison board: aerial terrace contours and stylized render close/top perspectives for plot shapes, divisions and relief.",
+      "bytes": 2023812,
+      "sha256": "b3f2e7cab80d46855e5526854f5c35ac82f2137e53874bdab963716545433605",
+      "provenance": "User supplied reference attachment; copied byte-for-byte for this new environment."
+    },
+    {
+      "role": "Hui hillside village cottage reference: stepped white gables, dark tile roofs, timber openings and terraced setting.",
+      "file": "hui-hillside.jpg",
+      "sha256": "04fec60ba5ead459573648588b097808a1c725d59859133b0cbecd8be57f8df9",
+      "originalFile": "6c477298c1b2f48f08a1a665778e401b.jpg",
+      "provenance": "User supplied reference attachment; copied byte-for-byte.",
+      "bytes": 238050
+    },
+    {
+      "role": "Hui rural dwelling reference: white plaster, layered charcoal roofs, intimate courtyard and planted edges.",
+      "file": "hui-water-village.jpg",
+      "sha256": "206d2efa78591e25359e316f33f9224593cf8fdbd9a3d1039abfe64d3855993f",
+      "originalFile": "faaf0358668372d376e18c9ee4da1e7c.jpg",
+      "provenance": "User supplied reference attachment; copied byte-for-byte.",
+      "bytes": 143928
+    }
+  ]
+}

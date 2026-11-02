@@ -29,7 +29,10 @@
     "check:cobalt": "tsc -p environments/cobalt-windfields/tsconfig.json && eslint environments/cobalt-windfields",
     "dev:tulip": "vite --host 127.0.0.1 --port 5241 --strictPort",
     "build:tulip": "tsc -p environments/tulip-windmill-meadows/tsconfig.json && vite build --config environments/tulip-windmill-meadows/vite.config.ts",
-    "check:tulip": "tsc -p environments/tulip-windmill-meadows/tsconfig.json && eslint environments/tulip-windmill-meadows"
+    "check:tulip": "tsc -p environments/tulip-windmill-meadows/tsconfig.json && eslint environments/tulip-windmill-meadows",
+    "dev:rice": "vite --host 127.0.0.1 --port 5247 --strictPort",
+    "check:rice": "tsc -p environments/rice-terraces/tsconfig.json && eslint environments/rice-terraces",
+    "build:rice": "tsc -p environments/rice-terraces/tsconfig.json && vite build --config environments/rice-terraces/vite.config.ts"
   },
   "dependencies": {
     "lil-gui": "0.21.0",

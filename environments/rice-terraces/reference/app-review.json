@@ -1,0 +1,168 @@
+{
+  "recordedAt": "2026-11-02T08:50:32.299Z",
+  "sourceHead": "791263247a656a90c8950f4ef866eac564f2ea1f",
+  "sourceBranch": "environment/rice-terraces",
+  "sourceFiles": {
+    "main.ts": "b0a2a7f78f08a7f9874b0187f599b7d04909db6413cd026fc5009c5815e731db",
+    "planet/riceFields.ts": "ef40003681cf115324df1bf1a42a93611d6adbce98fcda95def8657c3ef34e51",
+    "planet/riceLandscape.ts": "56021a86e039a7a9ac8b927bc469aeb8506672da52d54f0bb307b74eb7b6265c",
+    "life/farmLife.ts": "0c0bcd63ec1460b0687e63deb401a2114a66a73a624fbc17129d2437bdc8dcee",
+    "ui/rice.css": "8517d640133bc184e2952662f523f57e74772525f8f057b795e0a9d4f1a41c61"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "errors": [],
+  "views": [
+    {
+      "cameraPosition": [
+        345.2739460561026,
+        271.28667190122354,
+        499.4141005454342
+      ],
+      "cameraTarget": [
+        0,
+        0,
+        0
+      ],
+      "state": "seed=412&radius=128&view=planet",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 6,
+        "triangles": 1127503,
+        "terrain": {
+          "triangles": 911903,
+          "plots": 506,
+          "terraceLevels": 21,
+          "waterTriangles": 79973,
+          "landTriangles": 154584,
+          "bankTriangles": 677346,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "3ac1b768:1440x900"
+    },
+    {
+      "cameraPosition": [
+        150.12512207426525,
+        147.4862451502823,
+        178.77431362938495
+      ],
+      "cameraTarget": [
+        4.246976887631087,
+        77.58333333333334,
+        116.45939024486096
+      ],
+      "state": "seed=412&radius=128&view=paddies",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 6,
+        "triangles": 1127503,
+        "terrain": {
+          "triangles": 911903,
+          "plots": 506,
+          "terraceLevels": 21,
+          "waterTriangles": 79973,
+          "landTriangles": 154584,
+          "bankTriangles": 677346,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "b4bfb970:1440x900"
+    },
+    {
+      "cameraPosition": [
+        0,
+        664.9999999999949,
+        0.010000000000104592
+      ],
+      "cameraTarget": [
+        0,
+        0,
+        0
+      ],
+      "state": "seed=412&radius=128&view=above",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 6,
+        "triangles": 1127503,
+        "terrain": {
+          "triangles": 911903,
+          "plots": 506,
+          "terraceLevels": 21,
+          "waterTriangles": 79973,
+          "landTriangles": 154584,
+          "bankTriangles": 677346,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "b06e96c6:1440x900"
+    },
+    {
+      "cameraPosition": [
+        -345.2739460561026,
+        -271.28667190122354,
+        -499.4141005454343
+      ],
+      "cameraTarget": [
+        0,
+        0,
+        0
+      ],
+      "state": "seed=412&radius=128&view=planet",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 6,
+        "triangles": 1127503,
+        "terrain": {
+          "triangles": 911903,
+          "plots": 506,
+          "terraceLevels": 21,
+          "waterTriangles": 79973,
+          "landTriangles": 154584,
+          "bankTriangles": 677346,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "f35b2a41:1440x900"
+    }
+  ]
+}

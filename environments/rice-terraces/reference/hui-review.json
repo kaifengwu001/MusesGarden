@@ -1,0 +1,347 @@
+{
+  "recordedAt": "2026-11-02T09:30:42.113Z",
+  "sourceHead": "791263247a656a90c8950f4ef866eac564f2ea1f",
+  "sourceBranch": "environment/rice-terraces",
+  "sourceFiles": {
+    "main.ts": "d738db36ee0361f2b39600b638a4232213878be32691c95f9c1259bd429f6e1e",
+    "planet/riceFields.ts": "31ccfc8344b717b38c1cb64419b16c60c6fd2ead79be2c5d5f2112e43b577f85",
+    "planet/riceLandscape.ts": "57e68b5f44c3b3d9cd6124ebe54bfa8604bad1b4466d8b796c45af5498b51d23",
+    "planet/cottageSite.ts": "265170e4e46ec464743e467e5c279f2e6b8a24f26aef7e7a8b5e3a401b4a545c",
+    "life/farmLife.ts": "4380bd13059518ff2e875bbb1c42373e6f351e8dfc1021b5584dcd14f41c2d3b",
+    "life/huiCottage.ts": "0e2cb89a299c93c3ac13ac3e2f28a31413cb72e8712af71ddebc42945eb251f2",
+    "life/huiCottageGeometry.ts": "afd68de6f83445f9f8fdcc402f3e08dab75a279a667f7417003d33b9977c3f45",
+    "ui/rice.css": "b0e15b16165cdec126d222f636fb233892e13a65b121dfdd522c321525340186"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "errors": [],
+  "views": [
+    {
+      "view": "cottage",
+      "cameraPosition": [
+        20.43646790137991,
+        102.91801422348185,
+        128.1061715820107
+      ],
+      "cameraTarget": [
+        -9.01374644189509,
+        71.54881675545161,
+        123.04076682553782
+      ],
+      "state": "seed=412&radius=128&view=cottage",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 14,
+        "triangles": 1324027,
+        "terrain": {
+          "triangles": 1084961,
+          "plots": 141,
+          "terraceLevels": 21,
+          "waterTriangles": 66550,
+          "landTriangles": 195182,
+          "bankTriangles": 823229,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        },
+        "cottage": {
+          "triangles": 18920,
+          "drawCalls": 7,
+          "roofTiles": 1300,
+          "windows": 6,
+          "gableWalls": 3,
+          "foundationTriangles": 4546,
+          "direction": [
+            -0.07088858724247557,
+            0.5010916808223189,
+            0.8624859045859412
+          ],
+          "floorRadius": 140.212415676337,
+          "groundRelief": 1.5789886312019519,
+          "wetFraction": 0
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "1591f7d7:1440x900"
+    },
+    {
+      "view": "cottage-rear",
+      "cameraPosition": [
+        -37.72334225850735,
+        56.1028691727027,
+        143.1044606857853
+      ],
+      "cameraTarget": [
+        -8.586901469311877,
+        71.37998796605528,
+        122.71016100397472
+      ],
+      "state": "seed=412&radius=128&view=cottage",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 14,
+        "triangles": 1324027,
+        "terrain": {
+          "triangles": 1084961,
+          "plots": 141,
+          "terraceLevels": 21,
+          "waterTriangles": 66550,
+          "landTriangles": 195182,
+          "bankTriangles": 823229,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        },
+        "cottage": {
+          "triangles": 18920,
+          "drawCalls": 7,
+          "roofTiles": 1300,
+          "windows": 6,
+          "gableWalls": 3,
+          "foundationTriangles": 4546,
+          "direction": [
+            -0.07088858724247557,
+            0.5010916808223189,
+            0.8624859045859412
+          ],
+          "floorRadius": 140.212415676337,
+          "groundRelief": 1.5789886312019519,
+          "wetFraction": 0
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "61671eb4:1440x900"
+    },
+    {
+      "view": "cottage-top",
+      "cameraPosition": [
+        11.966534812759617,
+        101.5570735390591,
+        140.49076176206023
+      ],
+      "cameraTarget": [
+        -8.586901469311877,
+        71.37998796605528,
+        122.71016100397472
+      ],
+      "state": "seed=412&radius=128&view=cottage",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 14,
+        "triangles": 1324027,
+        "terrain": {
+          "triangles": 1084961,
+          "plots": 141,
+          "terraceLevels": 21,
+          "waterTriangles": 66550,
+          "landTriangles": 195182,
+          "bankTriangles": 823229,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        },
+        "cottage": {
+          "triangles": 18920,
+          "drawCalls": 7,
+          "roofTiles": 1300,
+          "windows": 6,
+          "gableWalls": 3,
+          "foundationTriangles": 4546,
+          "direction": [
+            -0.07088858724247557,
+            0.5010916808223189,
+            0.8624859045859412
+          ],
+          "floorRadius": 140.212415676337,
+          "groundRelief": 1.5789886312019519,
+          "wetFraction": 0
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "643ac4f3:1440x900"
+    },
+    {
+      "view": "approach",
+      "cameraPosition": [
+        17.782381452939347,
+        86.90092778275537,
+        122.81667566325757
+      ],
+      "cameraTarget": [
+        -8.586901469311877,
+        71.37998796605528,
+        122.71016100397472
+      ],
+      "state": "seed=412&radius=128&view=cottage",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 14,
+        "triangles": 1324027,
+        "terrain": {
+          "triangles": 1084961,
+          "plots": 141,
+          "terraceLevels": 21,
+          "waterTriangles": 66550,
+          "landTriangles": 195182,
+          "bankTriangles": 823229,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        },
+        "cottage": {
+          "triangles": 18920,
+          "drawCalls": 7,
+          "roofTiles": 1300,
+          "windows": 6,
+          "gableWalls": 3,
+          "foundationTriangles": 4546,
+          "direction": [
+            -0.07088858724247557,
+            0.5010916808223189,
+            0.8624859045859412
+          ],
+          "floorRadius": 140.212415676337,
+          "groundRelief": 1.5789886312019519,
+          "wetFraction": 0
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "fba91bac:1440x900"
+    },
+    {
+      "view": "planet",
+      "cameraPosition": [
+        345.2739460561026,
+        271.28667190122354,
+        499.4141005454342
+      ],
+      "cameraTarget": [
+        0,
+        0,
+        0
+      ],
+      "state": "seed=412&radius=128&view=planet",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 1440,
+        "height": 900,
+        "pixelRatio": 1,
+        "drawCalls": 14,
+        "triangles": 1324027,
+        "terrain": {
+          "triangles": 1084961,
+          "plots": 141,
+          "terraceLevels": 21,
+          "waterTriangles": 66550,
+          "landTriangles": 195182,
+          "bankTriangles": 823229,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        },
+        "cottage": {
+          "triangles": 18920,
+          "drawCalls": 7,
+          "roofTiles": 1300,
+          "windows": 6,
+          "gableWalls": 3,
+          "foundationTriangles": 4546,
+          "direction": [
+            -0.07088858724247557,
+            0.5010916808223189,
+            0.8624859045859412
+          ],
+          "floorRadius": 140.212415676337,
+          "groundRelief": 1.5789886312019519,
+          "wetFraction": 0
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "f0517a88:1440x900"
+    },
+    {
+      "view": "mobile-cottage",
+      "cameraPosition": [
+        54.71953793175646,
+        139.43497742985528,
+        134.0028222472381
+      ],
+      "cameraTarget": [
+        -9.01374644189509,
+        71.54881675545161,
+        123.04076682553782
+      ],
+      "state": "seed=412&radius=128&view=cottage",
+      "stats": {
+        "radius": 128,
+        "seed": 412,
+        "width": 390,
+        "height": 844,
+        "pixelRatio": 1,
+        "drawCalls": 14,
+        "triangles": 1324027,
+        "terrain": {
+          "triangles": 1084961,
+          "plots": 141,
+          "terraceLevels": 21,
+          "waterTriangles": 66550,
+          "landTriangles": 195182,
+          "bankTriangles": 823229,
+          "resolution": 96
+        },
+        "life": {
+          "trees": 420,
+          "riceTufts": 2600
+        },
+        "cottage": {
+          "triangles": 18920,
+          "drawCalls": 7,
+          "roofTiles": 1300,
+          "windows": 6,
+          "gableWalls": 3,
+          "foundationTriangles": 4546,
+          "direction": [
+            -0.07088858724247557,
+            0.5010916808223189,
+            0.8624859045859412
+          ],
+          "floorRadius": 140.212415676337,
+          "groundRelief": 1.5789886312019519,
+          "wetFraction": 0
+        }
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "hash": "95d52844:390x844"
+    }
+  ]
+}
