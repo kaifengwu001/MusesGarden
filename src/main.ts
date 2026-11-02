@@ -4,7 +4,7 @@ import { BuildBudget } from './core/buildBudget';
 import { FrameClock } from './core/clock';
 import { createGlobals } from './core/globals';
 import { gpuMemory } from './core/gpuMemory';
-import { HashSync } from './core/hashSync';
+import { HashSync, parseHash } from './core/hashSync';
 import { QualityController, detectDevice, runBenchmark, type TierChoice } from './core/quality';
 import { GpuTimer } from './dev/gpuTimer';
 import { installHarness } from './dev/harness';
@@ -14,6 +14,7 @@ import type { ParamPath } from './params';
 import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
 import { registerShaderChunks } from './render/glsl';
+import { unfoldGrowth } from './planet/unfold';
 import { Post } from './render/post';
 import { ControlBar } from './ui/controlBar';
 import { GardenUi } from './ui/garden/gardenUi';
@@ -157,16 +158,21 @@ async function boot(): Promise<void> {
   let heldOnGarden: { x: number; y: number } | null = null;
   attachInput(canvas, {
     drag: (dx, dy) => {
+      // (the hut's layout editor's gizmo, when it has the pointer; in Muse's hut a drag turns round the room)
+      if (garden.gizmo) return;
+      if (garden.drag(dx, dy, canvas.clientWidth, canvas.clientHeight)) return;
       garden.interrupt();
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
       userPosed = true;
     },
     zoom: (delta) => {
+      if (garden.zoom(delta)) return;
       garden.interrupt();
       world.rig.zoomBy(delta);
       userPosed = true;
     },
     tap: (x, y) => {
+      if (garden.gizmo) return;
       gardenTapped = false;
       if (onMuse(x, y)) {
         world.muse.tap(clock.time);
@@ -197,6 +203,7 @@ async function boot(): Promise<void> {
       }
     },
     holdStart: (x, y) => {
+      if (garden.gizmo) return;
       const touch = onMuse(x, y);
       if (touch) {
         pettingMuse = true;
@@ -270,9 +277,13 @@ async function boot(): Promise<void> {
       resizePending = true;
     }
     if (changed.has('view.mode') && !syncingMode) world.rig.setZoom(store.values.view.mode === 'wander' ? 1 : 0);
+    // the unfolding sets the planet's size (planet/unfold.ts), unless the size was set with it (a URL, a preset)
+    if (changed.has('world.unfold') && !changed.has('world.growth')) store.set('world.growth', unfoldGrowth(store.values.world.unfold));
     world.onParams(changed);
     applyUi();
   });
+  // (and so does a URL that names the unfolding but not the size; the hash was applied before this listened)
+  if (!parseHash(location.hash).has('g')) store.set('world.growth', unfoldGrowth(store.values.world.unfold));
 
   const keys = new Keys();
   const update = (): void => {

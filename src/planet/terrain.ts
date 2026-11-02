@@ -32,7 +32,7 @@ export const HOME_LEVEL = 1;
 /** The house's footprint (half sizes, m), and its terrace with the steps and its pier (props.ts COTTAGE, TERRACE, STEPS, PIER: x0, x1, z0, z1): cleared of plants. */
 export const HOUSE_FOOTPRINT = { halfX: 4.45, halfZ: 2.75 } as const;
 export const TERRACE_AREA = [-4.5, 4.2, -0.2, 4.8] as const;
-export const STEPS_AREA = [1.9, 3.9, 4.6, 5.85] as const;
+export const STEPS_AREA = [1.9, 3.9, 4.6, 6.0] as const;
 export const PIER_AREA = [-8.3, -3.3, 1.75, 5.7] as const;
 /** The channel cut under the pier's arch (props.ts ARCH), so the water runs in under its vault: centre x, z and half sizes (m). */
 export const CULVERT = { x: -7.2, z: 4.6, halfX: 0.5, halfZ: 1.3 } as const;

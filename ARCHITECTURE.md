@@ -167,6 +167,56 @@ The press-and-hold layer is a list of (direction, angular radius, start time)
 discs stored in rest space. It survives growth and always covers the same
 flowers.
 
+### The unfolding (branch `unfold`, an experiment)
+
+How the planet opens up to a new player as Muse explores it: one value
+u ∈ [0, 1], the control bar's **Unfold** in place of the radius slider
+(`planet/unfold.ts`). It writes the growth; the panel's Growth and the
+URL's `g` still work on their own.
+
+- **u = 0:** the meadow at its tuned size (R 128 m), under a **veil** of
+  ground fog everywhere but a ragged clearing about 45 m round the hut (its
+  pond and pier in it): grass, no flowers (the bloom front at b = 0).
+- **0 → ½:** the fog's edge recedes raggedly and the bloom front moves out
+  from the hut behind it, both at an even pace in distance from the hut (so
+  the side you face from orbit unveils steadily). The drifting clouds start
+  thicker (coverage 0.75: not overcast) and ease back to the setting's
+  (`unfoldCoverage`, the same to the bit from ½ on).
+- **u = ½ (the default):** the meadow as tuned, unveiled and all in flower.
+  It draws pixel-identical to main.
+- **½ → 1:** the planet grows from R 128 m to R 400 m (g linear in u). The
+  camera holds where it is (`CameraRig.holdThrough`): in orbit it keeps its
+  distance from the centre, so the planet grows in the window (and fills it
+  by about R 200 m); over the meadow it keeps its height, as the zoom stops do.
+  Only growth the unfolding writes is held, not a URL, a preset or the engine.
+
+**The veil** (`life/veil.ts`, `life/veilFog.ts`): ground fog, a sea of it
+from orbit and a bank of it from the clearing, unlike the drifting clouds
+from any distance (Kai: "fog from every distance"), beneath them. Where it
+lies is a field over the sphere, each place's turn: how far the unfolding has
+to go before it clears. The turn is the place's angle from the hut, pushed
+about by a broad noise (bays and fingers) and a finer one (islands that
+linger, holes that open early). The field is baked once per planet into a
+cube map (`veilField.frag.glsl`, 256² a face, with the fog's bank heights and
+its wisps, drawn out along the wind). Its CPU mirror (`veilTurn`) finds the
+turn below which a given share of the planet lies, so the edge moves out at
+an even pace; the fog softens over 1.5 m at it.
+
+The fog is a fullscreen pass (`veilFog.frag.glsl`) after the ground and what
+stands on it, before the clouds. Each view ray is marched in view space,
+each sample unwarped onto the planet, from where it enters the layer until
+it meets the ground (cut at it exactly, so the fog's foot has no steps),
+leaves the layer, or the fog hides what lies behind. Its steps stride over
+the clearing by the turn's distance to the edge. The fog is dense at the
+ground (1.2 /m) and thins over the upper half of its top. The top lies in
+banks 2–5.5 m over the ground, ±1.2 m of wisps, coming down to the ground
+at its edge. It is lit pale on top and grey-blue in its depths, its banks'
+slopes shaded to the sun, the drifting clouds' shadows softened on it where
+the light comes in at its top. It writes the depth of its front, so what
+stands in front of it hides it. The lakes don't mirror it: it covers the
+lakes it lies on. The clouds' code is main's. Nothing of the fog is drawn
+once all is clear.
+
 ## Chunks and the GPU data path (as built)
 
 Changed during the build: terrain is evaluated on the GPU from rest-space
@@ -328,6 +378,9 @@ click is what you see.
 - One zoom parameter dollies smoothly down to **Wander**, a third-person glide
   about 1.6 m above the grass at FOV 55°.
 - Double-click glides the focus along a great circle.
+- **As the unfolding grows the planet** (branch `unfold`), the camera holds:
+  its distance from the centre in orbit, its height over the meadow from the
+  bird's-eye stop down, easing between them (`CameraRig.holdThrough`).
 - **Vista** (`view/vista.ts`, the Vista button): a stand and heading framed
   like the reference still: meadow to the top of the frame, a band of lake
   across the middle, meadow in front, a cloud over the far meadow. The planet
@@ -355,7 +408,12 @@ click is what you see.
   projected), climbing to the zenith near the poles so the field stays smooth.
   It is fixed to the planet, so shadows stay put however the globe is turned.
   The view is lit by the sun at the focus; cloud and bird shadows, the
-  cottage and its ground shadow each use their own place's sun.
+  cottage and its ground shadow each use their own place's sun. Muse's
+  shadow has a map of its own (`muse.ts`, `museShadowMap.glsl`): its skin
+  carried down the sun at Muse to the water table, in about 5 mm texels over
+  the few meters round it, carried along with it, its edge a little soft;
+  the ground, the props, the grass, the flowers and the finds' patches read
+  it (the plants where they stand), Muse never does.
 - **No outlines:** everything keeps soft, painted edges, the cottage too.
 - **The cottage** is bent round the planet: each vertex is placed by the
   terrain's cottage-local meters (the sine map round the cottage) and
@@ -400,6 +458,27 @@ click is what you see.
   view frames it as the painting does (from above the meadow in front and to
   the right, 26 m out): a named view may look up from the zoom's own tilt
   (`CameraRig.lookUp`), which eases away as soon as you drag, zoom or walk.
+- **Muse's hut inside** (hut.ts, view/cutaway.ts): tap the door while Muse
+  is in or about the hut and the camera rises off the meadow, its view
+  narrowing to 15° (almost orthographic), held off the room by the rig
+  (`CameraRig.held`) while the focus moves to the room, so the near field,
+  the light and the fog are the room's; the tiny-planet warp eases out so
+  the room stands square, and clouds near the line of sight draw back. The
+  roof and the chimney lift off and dissolve, and the walls are cut
+  straight: the front and the right end low, across the front's window and
+  door, the back and the left end whole. The cottage draws with its own
+  materials whenever the cutaway is shut (its door's planks turned on their
+  hinge only while it stands open), so the meadow outside is untouched.
+  Muse, about the hut when you knock, puts by what it was doing and walks in
+  through the front door, which swings open as it comes and shut behind it
+  (museRoam.ts comeIn), to greet you, cook at the hearth or go to bed; when
+  you step out it walks out onto its porch (goOut), the room seen whole
+  through the open door. Inside, Kai's Tripo furniture is fitted into
+  the room in meters and lit by the stove's fire, a candle and a lantern,
+  with soft daylight from above as if the roof were on. Muse's showpiece, a
+  display cabinet along the left wall, holds its favourites: its glowing dot
+  turns the camera to it, what stands in front dissolving, and a white dot on
+  each favourite opens its card as a find's does.
 - **Aerial perspective:** distance pales the meadow toward a grey-green haze,
   thicker as the camera comes down into the meadow (the far meadow reads like
   a painted distance); the planet's limb from orbit dissolves into the sky's
@@ -668,6 +747,7 @@ so any view can be shared.
       core/                clock, hash sync, quality tiers, build queue and its budget, hashing, GPU memory ledger, shared uniforms
       planet/
         growth.ts          g → A → R, inverse
+        unfold.ts          the unfolding (branch unfold): the veil and the bloom out from the hut, then the growth
         cubesphere.ts/.glsl spherified cube, closed-form inverse, analytic area element
         rest.ts/.glsl      progressive point sets, birth radii, growth fade band
         chunks.ts          face quadtrees, CDLOD selection, symmetric morph (CPU mirror), culling
@@ -687,16 +767,23 @@ so any view can be shared.
         petals.ts/.glsl    petals lifting at the bloom front and in gusts
         wind.glsl          one wind field: flow, travelling gusts and ripples, sheen, click rings
         clouds.ts/.glsl    low cumulus: flow and streamlines, puffs in a data texture, billboards, shadow and cover cube maps, mirror pass
+        veil.ts            the veil over the planet yet to unfold (branch unfold): the field of turns out from the hut, and the pace
+        veilFog.ts/.glsl   the veil drawn as ground fog: the field's bake (veilField), a fullscreen march through the layer
         cloudLumps.glsl    the puffs' cauliflower lumps (baked cube map) shared by cloud, shadow and mirror
         birds.ts/.glsl     flocks of white birds on routes round the planet, wing hinges, shadow discs
         butterflies.ts/.glsl six kinds of butterflies from a lattice fixed to the planet, painted wings
-        props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench
+        props.ts/.glsl     cottage (tile courses, capping, painted plaster and shadows), landing, stair, rail, bench;
+                           its CUTAWAY builds (the roof lifting off, the walls cut, the chimney onto the back wall)
+        hut.ts/.glsl       Muse's hut inside, drawn only in the cutaway: the room fitted to the cottage's walls, the
+                           cut through them (rubble, timber), Kai's furniture (src/assets/interior), the fire's light,
+                           the showpiece and its favourites' dots (hutDot); occlude.glsl dissolves what hides the shelf
         findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, always grown) and their
                            glowing spheres from high up; a hero plant per patch, the one a basket's flower lands
                            into (heroStance: where and how large it stands); findTable.ts each find's state (card,
                            hover, pulse, picked basket, its hero's focus, landing and away) in a float texture,
                            any number of finds
-        pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo)
+        pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo),
+                           Muse's moving with it as it roams
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
                            react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes and
                            stars, post read, today's post and the tickets, baskets visited), where the finds grow
@@ -710,7 +797,8 @@ so any view can be shared.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve, paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking,
+      view/                camera rig (Overview ↔ Wander, a view held off the focus), the cutaway into Muse's hut (cutaway.ts),
+                           the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking,
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
@@ -724,5 +812,7 @@ so any view can be shared.
                            paints each flower as its patch paints its hero, through the frame's grade, so it
                            matches where it lands), and what you touch over it (basketOverlay.ts: the scrim, a
                            button over each flower, the preview, the day timeline; basketFan.ts and timeline.ts
-                           lay them out)
+                           lay them out). A press on the planet goes to a pin first, then to the hut's door or a
+                           find's patch, the nearer along the pointer's ray; in the hut, to the showpiece and its
+                           favourites (their cards are the finds' cards); hutEditor.ts lays the room out (?edit)
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

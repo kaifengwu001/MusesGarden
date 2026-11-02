@@ -1,5 +1,6 @@
 import type { Params } from '../params';
 import type { GrowthState } from '../planet/growth';
+import { unfoldBloom } from '../planet/unfold';
 
 /** Three significant figures with thousands separators: 205,808 → "206,000". */
 export function formatArea(area: number): string {
@@ -17,7 +18,12 @@ export function seasonFor(bloom: number): string {
   return 'Late spring';
 }
 
+/** The season the meadow shows: its bloom, as far as the unfolding has brought the flowers out (planet/unfold.ts). */
+export function seasonOf(p: Params): string {
+  return seasonFor(Math.min(p.world.bloom, unfoldBloom(p.world.unfold)));
+}
+
 /** The place-style metadata line under the title. */
 export function worldLine(p: Params, growth: GrowthState): string {
-  return `${seasonFor(p.world.bloom)} · R ${Math.round(growth.radius)} m · ${formatArea(growth.area)} m² · seed ${seedLabel(p.world.seed)}`;
+  return `${seasonOf(p)} · R ${Math.round(growth.radius)} m · ${formatArea(growth.area)} m² · seed ${seedLabel(p.world.seed)}`;
 }

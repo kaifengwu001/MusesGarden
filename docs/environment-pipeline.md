@@ -424,7 +424,7 @@ this.clouds    = new Clouds(this.shared, ...);
 this.petals, this.birds, this.butterflies
 this.muse      = new Muse(this.shared);
 this.clouds.addShadowCaster(this.birds.shadowMesh);
-this.clouds.addShadowCaster(this.muse.shadowMesh);
+// (Muse's shadow is a map of its own, drawn each frame by muse.renderShadow)
 ```
 
 ### `update()`, in order (`:376`)

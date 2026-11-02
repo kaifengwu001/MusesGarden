@@ -4,6 +4,8 @@ import clouds from '../life/clouds.glsl?raw';
 import field from '../life/field.glsl?raw';
 import find from '../life/findState.glsl?raw';
 import musePress from '../life/musePress.glsl?raw';
+import museShadow from '../life/museShadowMap.glsl?raw';
+import occlude from '../life/occlude.glsl?raw';
 import wind from '../life/wind.glsl?raw';
 import cubesphere from '../planet/cubesphere.glsl?raw';
 import fields from '../planet/fields.glsl?raw';
@@ -39,6 +41,8 @@ const chunks: Record<string, string> = {
   meadow_wind: wind,
   meadow_find: find,
   meadow_muse_press: musePress,
+  meadow_muse_shadow: museShadow,
+  meadow_occlude: occlude,
 };
 
 export function registerShaderChunks(): void {

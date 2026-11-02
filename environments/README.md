@@ -16,7 +16,7 @@ or refactoring it.
   keep their paths from `src/`, so imports between copies stay as written.
 - **Imports of everything else from `src/`, unchanged.** That covers the engine:
   the cube-sphere, point sets, growth, CDLOD, the warp, scatter, clouds, post,
-  the camera, Muse's body and rig, and every shader file not copied. The
+  the camera, Muse's body and rig, the finds' `FindTable` state, and every shader file not copied. The
   scaffolder rewrites those imports to point into `src/`.
 - **Its own page** (`index.html`), a build config (`vite.config.ts`), copies of
   the meadow's tests that cover copied modules, and a `README.md`.
@@ -51,7 +51,8 @@ the meadow's byte for byte. From then on, it changes only inside its folder.
 The meadow keeps its own commands (`npm run dev` at `/`, `npm run build`) and its own build output (`dist/`). Each world's `README.md`
 records the meadow commit it was copied from.
 
+## Worlds in this checkout
 
-## World in this checkout
+[Lantern Reed Gardens](lantern-reed-gardens/README.md) is available at http://localhost:5225/environments/lantern-reed-gardens/ using `npm run dev:lantern`. Its storage and build output are independent of other worlds. The original meadow remains at `/`.
 
 [Scarlet Sail Canyon](scarlet-sail-canyon/README.md) is served on port 5227. Its code, build output and resident storage are independent of the original meadow.

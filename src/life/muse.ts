@@ -1,6 +1,34 @@
 import type { Ray} from 'three';
-import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  CustomBlending,
+  DoubleSide,
+  FrontSide,
+  InstancedBufferGeometry,
+  LinearFilter,
+  Matrix3,
+  Matrix4,
+  MaxEquation,
+  Mesh,
+  OrthographicCamera,
+  RedFormat,
+  Scene,
+  ShaderMaterial,
+  Sphere,
+  UnsignedByteType,
+  Vector3,
+  Vector4,
+  WebGLRenderTarget,
+  type Frustum,
+  type IUniform,
+  type Texture,
+  type WebGLRenderer,
+} from 'three';
+import { gpuMemory } from '../core/gpuMemory';
 import type { Terrain } from '../planet/terrain';
+import { localSun } from '../render/sun';
 import { warpPoint, type WarpFrame } from '../render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from './museBody';
 import { SCULPTS, type SculptKind } from './museMesh';
@@ -9,7 +37,7 @@ import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from './muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from './museRig';
-import { MuseRoam, PACE, type Roaming } from './museRoam';
+import { MuseRoam, PACE, type Indoors, type Roaming, type Room } from './museRoam';
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from './museShadow.vert.glsl?raw';
 
@@ -18,13 +46,13 @@ import shadowVertex from './museShadow.vert.glsl?raw';
 // Tripo's sculpt rigged on the same skeleton, museMesh.ts), skinned on
 // thirteen joints and posed in closed form (museRig.ts), drawn as its skin
 // and SHELLS shells of fur in one instanced draw (muse.vert.glsl,
-// muse.frag.glsl), and casting its shadow into the clouds' map as the birds
-// do.
+// muse.frag.glsl), and casting its shadow into a map of its own about it
+// (museShadowMap.glsl), fine enough that its edge stays clean as it moves.
 //
 // It roams the planet on a life of its own (museRoam.ts): out over the
-// meadow and home again, perched on the bench, cooking at the porch's stove,
-// fishing off the pier or from a bank, watering the plants, napping in the
-// grass, always findable by time alone, so a frozen time still draws one
+// meadow and home again, perched on the bench, fishing off the pier or from
+// a bank, watering the plants, napping in the grass, cooking at its hearth
+// while you visit, always findable by time alone, so a frozen time still draws one
 // Muse. Tap it and it answers; hold it and it leans into your hand. Lying in
 // the grass it presses it down round it (uMusePress, read by the grass).
 
@@ -38,16 +66,26 @@ export const FUR_LENGTH = 0.06;
 export const SHELLS = 20;
 /** Farther than this from the camera (m) Muse is a pixel or two and is not drawn. */
 const SEEN = 160;
+/**
+ * Its shadow's map: `size` texels square about where its shadow reaches the water table, its half-width enough for
+ * its body's spheres' shadows (at least `min` m, in steps of `step` m, so the texels keep their size while it moves),
+ * and the soft edge's reach (m).
+ */
+const SHADOW = { size: 512, min: 0.9, step: 0.25, soft: 0.02 } as const;
 
 /**
  * What the garden's engine says Muse is doing, over its own life. `home` leaves it to its life by the hut, or, while
  * `busy` (working at home), sat on the bench with its head bowed; `out` stands it at a spot out on the planet (a unit
- * direction), stepping toward `toward` while `walk` is above 0, still with its head bowed while `busy`; `hidden` is
- * beyond the planet or away at a friend's (away: not drawn, its life keeps time). With no engine Muse lives its life.
+ * direction), stepping toward `toward` while `walk` is above 0, still with its head bowed while `busy`; `inside` stands
+ * it in its hut (the cutaway: view/cutaway.ts) on the floor there (its feet's height over R, m), facing along
+ * `heading`, `doing` one of three things (cooking at the hearth's stove's `pot`, planet space; greeting you; asleep
+ * on its bed), your taps and holds answered as anywhere (museRoam.ts inside); `hidden` is beyond the planet or away at a friend's (away: not drawn, its life keeps
+ * time). With no engine Muse lives its life.
  */
 export type MuseDirection =
   | { readonly kind: 'home'; readonly busy: boolean }
   | { readonly kind: 'out'; readonly dir: Vector3; readonly toward: Vector3 | null; readonly walk: number; readonly busy: boolean }
+  | { readonly kind: 'inside'; readonly doing: Indoors; readonly dir: Vector3; readonly height: number; readonly heading: Vector3; readonly pot: Vector3 | null }
   | { readonly kind: 'hidden' };
 
 /** The gait out on the planet (cycles of two steps a second), at its life's pace. */
@@ -69,8 +107,19 @@ export type MuseModel = 'field' | SculptKind;
 
 const tmp = new Vector3();
 const tmp2 = new Vector3();
+const sun = new Vector3();
+const centre = new Vector3();
+const across = new Vector3();
+const upMap = new Vector3();
+const clearColour = new Color();
 const bounds = new Sphere();
 const frameTmp = new Matrix4();
+
+/** A point (planet space, m) carried on down the sun at Muse to the water table (R), in place: as museShadow.vert.glsl. */
+function down(p: Vector3, R: number): Vector3 {
+  const cl = p.dot(sun);
+  return p.addScaledVector(sun, -(cl - Math.sqrt(Math.max(cl * cl - p.lengthSq() + R * R, 0))));
+}
 
 /** Where Muse is: a unit direction on the planet, its feet's height over R (m), and the way it faces there (a unit tangent). */
 export interface MuseWhere {
@@ -113,10 +162,18 @@ export class Muse {
   readonly place = new Matrix4();
   /** Its body's spheres (planet space, m), for the grass and for taps. */
   readonly spheres = Array.from({ length: BODY.length }, () => new Vector4());
-  /** The last life read; its things (the porch's stove, what it holds, what floats about it). */
+  /** The last life read; its things (what it holds, what floats about it). */
   living: Roaming | null = null;
+  /** Whether its hut's walls stand whole round it (the cutaway shut: world.ts): in its room then, they hide it. */
+  walled = true;
+  /** How far its hut's front door stands open now (0 … 1, as its life swings it: museRoam.ts doorAt). */
+  door = 0;
+  /** When its life was last read (world s). */
+  private time = 0;
   /** What the engine says it is doing (directed), and the life it is given for that when it isn't its own. */
   private direction: MuseDirection = { kind: 'home', busy: false };
+  /** When it came into its hut (world s; NaN until its first moment there). */
+  private insideSince = Number.NaN;
   private readonly directed: Roaming = {
     dir: new Vector3(0, 1, 0),
     height: 0,
@@ -130,6 +187,17 @@ export class Muse {
   private loaded = false;
   private readonly press: { value: Vector4[] } | null;
   private readonly pressK: { value: number } | null;
+  /** Its shadow's map, the pass that draws it, and what the ground and the plants read it by (world.ts's shared uniforms). */
+  private readonly shadowTarget: WebGLRenderTarget;
+  private readonly shadowScene: Scene;
+  private readonly shadowCamera = new OrthographicCamera();
+  private readonly shadowFrame: Matrix3;
+  private readonly shadowScale = new Vector3(0, 0, 1);
+  private readonly shadowSun: Vector4;
+  private readonly shadowWindow: Vector4;
+  private readonly shadowFeet: Vector3;
+  private readonly sunAngles: Vector4;
+  private readonly cloudLook: Vector4 | null;
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -139,21 +207,34 @@ export class Muse {
     );
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
+    // its shadow: a map of its own about it, the frame and scale the pass draws it in shared with those who read it
+    this.shadowFrame = (shared.uMuseShadowFrame as IUniform<Matrix3> | undefined)?.value ?? new Matrix3();
+    this.shadowSun = (shared.uMuseShadowSun as IUniform<Vector4> | undefined)?.value ?? new Vector4();
+    this.shadowWindow = (shared.uMuseShadowWindow as IUniform<Vector4> | undefined)?.value ?? new Vector4();
+    this.shadowFeet = (shared.uMuseShadowFeet as IUniform<Vector3> | undefined)?.value ?? new Vector3();
+    this.sunAngles = (shared.uSunAngles as IUniform<Vector4>).value;
+    this.cloudLook = (shared.uCloudLook as IUniform<Vector4> | undefined)?.value ?? null;
     this.shadowMesh = new Mesh(
       new BufferGeometry(),
       new ShaderMaterial({
         name: 'muse shadow',
         vertexShader: shadowVertex,
         fragmentShader: shadowFragment,
-        uniforms: { uCubeFace: shared.uCubeFace, uFaceWindow: shared.uFaceWindow, uRadius: shared.uRadius, uSunAngles: shared.uSunAngles, ...this.uniforms },
+        uniforms: { uCubeFace: { value: this.shadowFrame }, uFaceWindow: { value: this.shadowScale }, uRadius: shared.uRadius, uSunAngles: shared.uSunAngles, ...this.uniforms },
         side: DoubleSide,
-        blending: AdditiveBlending,
+        blending: CustomBlending,
+        blendEquation: MaxEquation,
         depthTest: false,
         depthWrite: false,
         transparent: true,
       }),
     );
     this.shadowMesh.frustumCulled = false;
+    this.shadowScene = new Scene().add(this.shadowMesh);
+    this.shadowTarget = new WebGLRenderTarget(SHADOW.size, SHADOW.size, { format: RedFormat, type: UnsignedByteType, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
+    gpuMemory.set('muse shadow', SHADOW.size * SHADOW.size);
+    const shadowMap = shared.uMuseShadow as IUniform<Texture | null> | undefined;
+    if (shadowMap) shadowMap.value = this.shadowTarget.texture;
     this.props = new MuseProps(shared);
     // (the grass's press, shared: world.ts makes it before the grass)
     this.press = (shared.uMusePress as { value: Vector4[] } | undefined) ?? null;
@@ -269,6 +350,10 @@ export class Muse {
     const R = terrain.radius;
     const l = this.lifeAt(time, terrain, camera, this.roam);
     this.living = l;
+    this.time = time;
+    this.door = this.roam.doorAt(time);
+    // (in its room behind the hut's walls: not drawn, no shadow out through them; seen again through the open door)
+    const inside = this.walled ? this.roam.indoors(l.dir) : 0;
     this.where.dir.copy(l.dir);
     this.where.height = l.height;
     this.where.heading.copy(l.heading);
@@ -308,9 +393,10 @@ export class Muse {
     const push = FUR_LENGTH * 0.9 * strength * (0.75 + 0.25 * Math.sin(1.3 * time) * Math.sin(0.41 * time + 1));
     this.uniforms.uMuseWind.value.set(along.x * push, along.y * push, along.z * push, 0.3 * strength);
     const far = camera.distanceTo(pos);
-    const seen = show && this.loaded && !this.away && far < SEEN;
+    const seen = show && this.loaded && !this.away && far < SEEN && !(inside >= 1 && this.door <= 0);
     this.mesh.visible = seen;
     this.shadowMesh.visible = seen;
+    this.placeShadow(R, seen && inside < 0.5);
     // as many shells as the fur's length on screen in pixels
     const shells = Math.max(2, Math.min(SHELLS, Math.ceil(FUR_LENGTH / Math.max(far, 0.1) / Math.max(pixelAngle, 1e-6))));
     this.uniforms.uMuseSize.value.z = shells;
@@ -318,8 +404,57 @@ export class Muse {
     this.props.update(time, l, rig, this.place, terrain, MUSE_HEIGHT, seen);
   }
 
+  /**
+   * Where its shadow falls, for its map: its body's spheres carried down the sun at Muse to the water table, the map
+   * centred among them (its frame turned toward the sun's bearing) and wide enough for each sphere's shadow, stretched
+   * along the sun as it gets low. Off (strength 0) while Muse isn't drawn.
+   */
+  private placeShadow(R: number, seen: boolean): void {
+    const a = this.sunAngles;
+    localSun(this.up, Math.atan2(a.x, a.y), Math.atan2(a.w, a.z), sun);
+    this.shadowWindow.y = 0;
+    if (!seen) return;
+    centre.set(0, 0, 0);
+    for (const s of this.spheres) centre.add(down(tmp.set(s.x, s.y, s.z), R));
+    centre.normalize();
+    across.copy(sun).addScaledVector(centre, -sun.dot(centre));
+    if (across.lengthSq() < 1e-8) across.copy(this.forward);
+    across.normalize();
+    upMap.crossVectors(centre, across);
+    const sinE = Math.max(sun.dot(this.up), 0.2);
+    let half: number = SHADOW.min;
+    for (const s of this.spheres) {
+      const g = down(tmp.set(s.x, s.y, s.z), R);
+      const out = g.dot(centre);
+      half = Math.max(half, (R * Math.abs(g.dot(across))) / out + s.w / sinE + SHADOW.soft, (R * Math.abs(g.dot(upMap))) / out + s.w + SHADOW.soft);
+    }
+    half = Math.ceil(half / SHADOW.step) * SHADOW.step;
+    this.shadowFrame.set(across.x, upMap.x, centre.x, across.y, upMap.y, centre.y, across.z, upMap.z, centre.z);
+    this.shadowScale.set(0, 0, R / half);
+    // (a point farther from its feet than the whole map's reach, past its height, can't be in its shadow)
+    const reach = 2 * Math.SQRT2 * half + MUSE_HEIGHT;
+    this.shadowSun.set(sun.x, sun.y, sun.z, reach * reach);
+    this.shadowFeet.copy(this.uniforms.uMusePos.value);
+    this.shadowWindow.set(R / half, this.cloudLook?.x ?? 0.7, SHADOW.soft / (2 * half * Math.SQRT2), 0);
+  }
+
+  /** Draw its shadow's map (after update, before the scene that reads it). */
+  renderShadow(renderer: WebGLRenderer): void {
+    if (this.shadowWindow.y <= 0) return;
+    const previous = renderer.getRenderTarget();
+    const clearAlpha = renderer.getClearAlpha();
+    renderer.getClearColor(clearColour);
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(this.shadowTarget);
+    renderer.clear(true, false, false);
+    renderer.render(this.shadowScene, this.shadowCamera);
+    renderer.setClearColor(clearColour, clearAlpha);
+    renderer.setRenderTarget(previous);
+  }
+
   /** The engine's say over Muse's life (null-free: with no engine it stays home, living its life). */
   direct(direction: MuseDirection): void {
+    if (direction.kind === 'inside' && (this.direction.kind !== 'inside' || this.direction.doing !== direction.doing)) this.insideSince = Number.NaN;
     this.direction = direction;
     this.away = direction.kind === 'hidden';
   }
@@ -327,6 +462,11 @@ export class Muse {
   /** Its life at a time, unless the engine has it out on the planet or working at home. */
   private lifeAt(time: number, terrain: Terrain, camera: Vector3, roam: MuseRoam): Roaming {
     const d = this.direction;
+    if (d.kind === 'inside') {
+      // in its hut: its life puts it there, cooking if there is a pot, answering you as anywhere
+      if (Number.isNaN(this.insideSince)) this.insideSince = time;
+      return roam.inside(time, camera, { doing: d.doing, dir: d.dir, height: d.height, heading: d.heading, pot: d.pot, since: this.insideSince });
+    }
     const life = roam.at(time, camera);
     if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;
     const r = this.directed;
@@ -406,6 +546,16 @@ export class Muse {
       }
     }
     return best < Infinity ? { side } : null;
+  }
+
+  /** You knocked at its hut while it was about (museRoam.ts comeIn): it puts by what it was doing and comes in, to do `doing` there. */
+  comeIn(doing: Indoors, room: Room): void {
+    this.roam?.comeIn(this.time, doing, room);
+  }
+
+  /** You stepped out of its hut: it goes out onto its porch, and on with its days. */
+  goOut(): void {
+    this.roam?.goOut(this.time);
   }
 
   /** Your doings (world time, s): a tap, a hold on one side, letting go. */
