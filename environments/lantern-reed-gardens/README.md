@@ -97,6 +97,34 @@ The [reference pack](reference/README.md) keeps the world concept and the final 
 
 ## Task list handoff
 
+### Windows whole-planet vegetation and geology — 2 November 2026
+
+Remote scenery now forms unequal seeded groves and archipelagos around the globe,
+with three additional geological families: broad planted limestone bluffs, narrow
+fractured pillars and low broken rock gardens. `life/lanternDistribution.ts`
+defines the regions; `life/remoteRockGeometry.ts` supplies distinct mineral
+profiles and cap-rooted leaf/lantern plants. Reeds, garnet ferns and loose gravel
+populate dry banks, while planted stone islands can stand in the pools. Open
+water separates the regions. The authored home placements keep their original
+random stream; remote scenery respects a physical home exclusion through growth
+and scales down on the smallest globe. There are now twelve scenery batches.
+
+At the default seed and radius, the scene contains 1,550 reed colonies (previously
+466) and 550 new planted rock formations, in addition to the local mineral
+shelves and mesas. These are complete populations, not counts visible from one
+camera. High remains full resolution.
+
+Windows verification: 95 environment CPU tests pass, TypeScript/ESLint pass,
+and the standalone build passes with the existing large-chunk warning. Two
+focused browser checks pass on NVIDIA RTX 4070 SUPER / ANGLE D3D11 at 1600×1000
+DPR 1: scenery/habitat rendering and nine-view culling equivalence across radii
+40/128/400. Fresh 1440×1000 DPR 1 captures cover the original orbit, three rotated
+globe views and the home. No captured runtime/console errors. Evidence is saved
+outside the checkout in `handoffs/windows/lantern-globe-20261102/` under the full
+Windows workspace. These are visual/correctness checks, not a new performance
+budget measurement or visual acceptance. The earlier SwiftShader settling
+timeout remains separate; browser settings and assertions were not weakened.
+
 These updates have not been synced to the shared task list:
 
 - **Renderer backlog — Build Lantern Reed Gardens: done.** Standalone environment and build; three local residents; daylight/dusk, navigation, saved names and camera links; 90 CPU and 22 browser correctness tests pass.

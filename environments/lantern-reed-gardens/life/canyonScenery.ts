@@ -6,6 +6,8 @@ import { createGroundSample, type Terrain } from '../planet/terrain';
 import type { WarpFrame } from '../../../src/render/warp';
 import { placeScenerySphere, sceneryBounds, warpScenerySphere, type SceneryBounds } from './sceneryCulling';
 import { chalkGeometry, reedColonyGeometry, fernGeometry, lampPetalGeometry, mesaGeometry, pebblePatchGeometry } from './canyonGeometry';
+import { lanternRegions, regionDirection } from './lanternDistribution';
+import { remoteRockGeometry } from './remoteRockGeometry';
 import vertexShader from './canyonScenery.vert.glsl?raw';
 import fragmentShader from './canyonScenery.frag.glsl?raw';
 
@@ -23,7 +25,7 @@ interface Anchor {
   variant?: number;
   light?: number;
 }
-type Habitat = 'reeds' | 'stone' | 'herbs' | 'pebbles' | 'mesas' | 'pollinators';
+type Habitat = 'reeds' | 'stone' | 'herbs' | 'pebbles' | 'mesas' | 'pollinators' | 'islands';
 interface Batch {
   mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
   anchors: Anchor[];
@@ -266,26 +268,38 @@ export class CanyonScenery {
     }
 
     const home = terrain.layout.cottage, forward = terrain.layout.homeBearing;
-    const across = new Vector3().crossVectors(home, forward).normalize();
-    // Distant ecosystems retain stable identities as the globe grows. Each seed
-    // chooses a clump centre and several nearby colonies, leaving broad quiet gaps.
-    for(let i=0;i<150;i++) {
-      const y=1-2*(i+0.5)/150,a=i*2.399963229728653+this.seed*0.001,r=Math.sqrt(1-y*y);
-      const dir=home.clone().multiplyScalar(y).addScaledVector(across,Math.cos(a)*r).addScaledVector(forward,Math.sin(a)*r).normalize();
-      if(dir.dot(home)>Math.cos(0.57))continue;
-      const gate=rand(), tangent=new Vector3().crossVectors(dir,Math.abs(dir.y)<0.9?UP:EAST).normalize();
-      const bitangent=new Vector3().crossVectors(tangent,dir).normalize();
-      for(let j=0;j<3;j++) {
-        const angle=rand()*TAU,offset=rand()*0.026;
-        const nearby=dir.clone().addScaledVector(tangent,Math.cos(angle)*offset).addScaledVector(bitangent,Math.sin(angle)*offset).normalize();
-        const variant=(i+j)%4;
-        reeds[variant].push({direction:nearby,scale:0.47+rand()*0.45,turn:rand()*TAU,phase:rand()*TAU,tint:rand(),threshold:gate,variant});
-        herbs.push({direction:nearby,scale:1+rand(),turn:rand()*TAU,phase:0,tint:rand(),threshold:gate});
-        if(j===0) {
-          rocks.push({direction:nearby,scale:1.2+rand()*1.8,turn:rand()*TAU,phase:0,tint:rand(),threshold:gate});
-          pebbles.push({direction:nearby,scale:1+rand(),turn:rand()*TAU,phase:0,tint:rand(),threshold:gate});
-          if(i%9===0)mesas.push({direction:nearby,scale:.4+rand()*.4,turn:rand()*TAU,phase:0,tint:rand(),threshold:gate});
-        }
+    const islands: Anchor[][] = [[], [], []];
+    // Keep this stream separate: increasing remote detail cannot reshuffle the
+    // home, its light selection, wildlife support shelves or resident clearing.
+    let remoteState = hash32(this.seed ^ 0x91ab72);
+    const remoteRand = (): number => unit(remoteState = hash32((remoteState + 0x9e3779b9) >>> 0));
+    const remote = (direction: Vector3, scale: number): Anchor => ({ direction, scale,
+      turn: remoteRand() * TAU, phase: remoteRand() * TAU, tint: remoteRand(), threshold: remoteRand() * 0.22 });
+    for (const region of lanternRegions(this.seed, home, forward)) {
+      const point = (spread = 1): Vector3 => {
+        const a = remoteRand() * TAU, distance = Math.sqrt(remoteRand()) * region.extent * spread;
+        // Bent elongated groves, with sparse satellites rather than round stamps.
+        return regionDirection(region, Math.cos(a) * distance, Math.sin(a) * distance * 0.58 + Math.sin(a * 2) * distance * 0.19);
+      };
+      const population = Math.floor(22 * region.richness);
+      for (let j = 0; j < population; j++) {
+        const direction = point(j % 7 === 0 ? 1.35 : 1);
+        if (direction.dot(home) > Math.cos(0.43)) continue;
+        const variant = j % 6 === 0 ? 2 : j % 3 === 0 ? 3 : j % 2;
+        const reed = remote(direction, (0.8 + remoteRand() * 0.7) * (variant === 2 ? 1.15 : 1));
+        reed.variant = variant;
+        reeds[variant].push(reed);
+        if (j % 2 === 0) herbs.push(remote(point(), 1.2 + remoteRand() * 1.4));
+        if (j % 3 === 0) pebbles.push(remote(point(), 1.2 + remoteRand() * 1.8));
+      }
+      const rockCount = 3 + Math.floor(region.richness * 3);
+      for (let j = 0; j < rockCount; j++) {
+        const direction = point(1.1);
+        // Include the widest formation's footprint in the protected home cap.
+        if (direction.dot(home) > Math.cos(0.51)) continue;
+        // Related geology dominates a region; occasional rubble breaks its edge.
+        const kind = j === rockCount - 1 ? 2 : region.rockKind;
+        islands[kind].push(remote(direction, (0.65 + remoteRand() * 0.85) * (j === 0 ? 1.3 : 1)));
       }
     }
     for(let i=0;i<4;i++)this.batch(reedColonyGeometry(i),reeds[i],`Lantern reed colony ${i+1}`,'reeds');
@@ -294,6 +308,8 @@ export class CanyonScenery {
     this.batch(pebblePatchGeometry(),pebbles,'Individual lilac shore gravel','pebbles');
     this.batch(mesaGeometry(),mesas,'Blue-lilac mesas and ledge canopies','mesas');
     this.batch(lampPetalGeometry(),flyers,'Seven four-winged Lamp Petals','pollinators');
+    for (let i = 0; i < 3; i++) this.batch(remoteRockGeometry(i), islands[i],
+      ['Remote planted limestone bluffs', 'Remote fractured mineral pillars', 'Remote broken rock gardens'][i], 'islands');
     gpuMemory.set('lantern scenery', this.batches.reduce((bytes, batch) => bytes+geometryBytes(batch.mesh.geometry), 0));
     this.dirty = true;
   }
@@ -340,13 +356,16 @@ export class CanyonScenery {
           if(d<1e-6)dir.copy(home);
           else dir.copy(home).multiplyScalar(Math.cos(angle)).addScaledVector(right, lx / d * Math.sin(angle)).addScaledVector(forward, lz / d * Math.sin(angle)).normalize();
         } else dir.copy(a.direction);
+        // The home has a metre-sized footprint even on a small planet. Keep
+        // remote scenery outside it throughout growth, not only at radius 128.
+        if (!a.local && dir.dot(home) > Math.cos(Math.min(1.5, (batch.habitat === 'islands' ? 65 : 55) / R))) continue;
         if (refreshLocal || refreshAll || refreshGlobal || a.groundHeight === undefined) {
           terrain.sample(dir, this.ground);
           a.groundHeight = this.ground.height;
           a.water = this.ground.water;
         }
         // Global colonies favour shallow banks; leave the broad mirror pools open.
-        if (!a.local && a.water! < -0.45 && batch.habitat !== 'stone') continue;
+        if (!a.local && a.water! < -0.45 && batch.habitat !== 'stone' && batch.habitat !== 'islands') continue;
         if (!a.local && batch.habitat === 'stone' && a.water! < -0.5) continue;
         if (a.local) x.copy(right).addScaledVector(dir, -right.dot(dir)).normalize();
         else x.crossVectors(dir, Math.abs(dir.y) < 0.9 ? UP : EAST).normalize();
@@ -358,7 +377,9 @@ export class CanyonScenery {
         if (flying) height += 2.4 + 0.55 * Math.sin(time * 0.32 + a.phase);
         batch.sourceAnchor.setXYZW(count, dir.x, dir.y, dir.z, height);
         batch.sourceAcross.setXYZ(count, turned.x, turned.y, turned.z);
-        batch.sourcePlacement.setXYZW(count, a.scale * emergence, a.phase, a.tint, 0);
+        // Remote island/grove silhouettes stay proportionate on the smallest globe.
+        const scale = a.scale * emergence * (a.local ? 1 : Math.min(1, Math.max(0.4, R / 128)));
+        batch.sourcePlacement.setXYZW(count, scale, a.phase, a.tint, 0);
         // Read the rounded GPU inputs so the culling sphere encloses precisely
         // the same curved placement that the vertex shader will receive.
         placeScenerySphere(batch.bounds, R, batch.sourceAnchor.getX(count), batch.sourceAnchor.getY(count), batch.sourceAnchor.getZ(count), batch.sourceAnchor.getW(count), batch.sourcePlacement.getX(count), this.planetSphere);
