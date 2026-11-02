@@ -6,7 +6,7 @@ declare global {interface Window {__rice?:Probe;}}
 async function prepare(page:Page){
   await page.goto(route);
   await page.waitForFunction(()=>Reflect.get(window,'__meadow')?.isReady);
-  await page.evaluate(()=>{window.__rice=Reflect.get(window,'__meadow') as Probe;});
+  await page.evaluate(()=>{window.__rice=Reflect.get(window,'__meadow') as unknown as Probe;});
   await page.evaluate(async()=>window.__rice!.settle());
 }
 test('renders terraced water, planted fields and groves without browser errors',async({page})=>{
@@ -30,7 +30,7 @@ test('frozen frames repeat and radius/seed returns restore the same world',async
   await page.evaluate(async()=>{const h=window.__rice!;h.setHash('seed=412&radius=128&view=planet');await h.settle();});
   expect(await page.evaluate(()=>window.__rice!.frameHash())).toBe(first);
   await page.reload();await page.waitForFunction(()=>Reflect.get(window,'__meadow')?.isReady);
-  expect(await page.evaluate(()=>Reflect.get(window,'__meadow').frameHash())).toBe(first);
+  expect(await page.evaluate(()=>window.__meadow!.frameHash())).toBe(first);
 });
 test('mobile viewport keeps camera controls and seeded landscape usable',async({page})=>{
   await page.setViewportSize({width:390,height:844});await prepare(page);
