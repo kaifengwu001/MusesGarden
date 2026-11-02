@@ -2,7 +2,7 @@ import { Matrix4, PerspectiveCamera, Quaternion, Vector3, Vector4 } from 'three'
 import friendFace from '../../assets/garden/friend-face.jpg';
 import museFace from '../../assets/garden/muse-face.jpg';
 import { smoothstep } from '../../core/math';
-import { bedAt, layOut, type Bed, type GardenLayout } from '../../garden/placement';
+import { layOut, type Bed, type GardenLayout } from '../../garden/placement';
 import { placeholderSource, type PlaceholderSource } from '../../garden/placeholder';
 import { gardenSource, type GardenSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
@@ -59,6 +59,8 @@ const OUT_OF_SIGHT: MuseDirection = { kind: 'hidden' };
 
 /** A tap or the pointer this near a find's sphere (px) picks it; the sphere stands this high over its bed (m). */
 const SPHERE = { slop: 16, height: 0.6 } as const;
+/** The ground must stand this much nearer (m) than a patch to hide it from the pointer (the terrain under a patch's rim). */
+const GROUND_SLACK = 0.1;
 
 const sample = createGroundSample();
 const tmp = new Vector3();
@@ -362,7 +364,15 @@ export class GardenUi {
     return true;
   }
 
-  /** The find under a point on the canvas (px): its sphere when the spheres show, else the bed the surface pick lands in. */
+  /** Whether a press here is the garden's (a pin, or a find): then the meadow's own click, double-click and hold leave it be. */
+  claims(x: number, y: number, width: number, height: number): boolean {
+    return this.pins.pick(x, y, width, height, this.world.rig.camera) !== null || this.findAt(x, y, width, height) !== null;
+  }
+
+  /**
+   * The find under a point on the canvas (px): its sphere when the spheres show, else the patch as drawn (its flowers
+   * standing up off the ground, a lit hero over them) nearest along the pointer's ray, unless the ground stands in front.
+   */
   private findAt(x: number, y: number, width: number, height: number): Bed | null {
     const w = this.world;
     if (this.visit.away) return null;
@@ -382,8 +392,15 @@ export class GardenUi {
       }
       return best;
     }
-    const hit = w.pick((x / width) * 2 - 1, 1 - (y / height) * 2);
-    return hit ? bedAt(this.layout, hit.dir, w.growth.radius) : null;
+    const ndcX = (x / width) * 2 - 1;
+    const ndcY = 1 - (y / height) * 2;
+    const camera = w.rig.camera;
+    const ray = new Vector3(ndcX, ndcY, 0.5).unproject(camera).sub(camera.position).normalize();
+    const patch = this.beds.pick(camera.position, ray, w.warp, w.growth.radius);
+    if (!patch) return null;
+    const ground = w.pick(ndcX, ndcY);
+    if (ground && warpPoint(w.warp, ground.point, tmp).distanceTo(camera.position) < patch.depth - GROUND_SLACK) return null;
+    return this.layout.beds.get(patch.find) ?? null;
   }
 
   /** The pointer moved (null: it left the window). Picked at the next frame, so at most once a frame. */
@@ -455,11 +472,12 @@ export class GardenUi {
 
   private ground = (dir: Vector3): number => this.world.terrain.sample(dir, sample).height;
 
-  /** Fly to a find's bed and raise its card. */
+  /** Fly to a find's bed and raise its card (its card up, or on its way: left as it is). */
   openFind(id: string, direction: 1 | -1 | 0 = 0): void {
     const bed = this.layout.beds.get(id);
     const find = this.state.find(id);
     if (!bed || !find) return;
+    if (this.current === id && (this.card.shown === id || this.flight.flying)) return;
     if (this.card.shown) this.card.hide(direction);
     this.marks?.open(null);
     this.current = id;

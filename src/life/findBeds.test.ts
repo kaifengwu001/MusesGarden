@@ -127,6 +127,29 @@ describe('FindBeds', () => {
     expect(beds.focused).toBeNull();
   });
 
+  it('is picked as drawn: through its flowers’ heads standing over its ground, the nearest along the ray', () => {
+    const beds = new FindBeds({});
+    const up = new Vector3(0, 1, 0);
+    const beside = new Vector3(1, 0, 0);
+    // two patches in a row on a flat warp, the camera 8 m short of the first
+    const near = up.clone().applyAxisAngle(new Vector3(0, 0, 1), -2 / R);
+    const far = up.clone().applyAxisAngle(new Vector3(0, 0, 1), -5 / R);
+    beds.set(
+      [near, far].map((dir, i) => ({ bed: { find: `find-${i}`, basket: 'b', dir, ground: 0 }, species: 0 as const, variant: 0.4 })),
+      R,
+    );
+    const warp = { focus: up.clone().multiplyScalar(R), up, k: 0 };
+    const at = (dir: Vector3, height: number, side = 0, eyeHeight = 2): string | null => {
+      const eye = up.clone().multiplyScalar(R + eyeHeight).addScaledVector(beside, -6);
+      const target = dir.clone().multiplyScalar(R + height).addScaledVector(new Vector3(0, 0, 1), side);
+      return beds.pick(eye, target.sub(eye).normalize(), warp, R)?.find ?? null;
+    };
+    expect(at(near, 0.55), 'a head half a metre up, whose ray meets the ground 3 m behind the patch').toBe('find-0');
+    expect(at(far, 0.6, 0, 5), 'the far patch, seen over the near one').toBe('find-1');
+    expect(at(near, 0.1, 3), 'the ground beside it').toBeNull();
+    expect(at(near, 2.5), 'the air over it').toBeNull();
+  });
+
   it('hands the patches over to the spheres as the camera rises', () => {
     const beds = new FindBeds({});
     beds.set(looks(5), R);

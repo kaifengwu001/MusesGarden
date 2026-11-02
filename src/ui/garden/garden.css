@@ -376,7 +376,8 @@
   border-radius: 16px;
   background: var(--grain), var(--paper);
   box-shadow: var(--shadow-card);
-  pointer-events: auto;
+  /* (only while it is up: a card put away stands where it was, unseen, and must not take the clicks meant for the meadow) */
+  pointer-events: none;
   touch-action: pan-y;
   user-select: none;
   transform-origin: 50% 100%;
@@ -389,6 +390,7 @@
 
 .g-card.is-up {
   opacity: 1;
+  pointer-events: auto;
   transform: translateX(var(--swipe, 0px)) rotate(calc(var(--swipe, 0px) * 0.035deg));
 }
 
