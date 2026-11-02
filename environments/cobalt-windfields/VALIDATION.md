@@ -1,6 +1,6 @@
 # Cobalt Windfields — active validation record
 
-Updated 1 November 2026. **Visual acceptance remains open.** The latest correction addresses coincident surfaces, flat rock and sand materials, red habitat spikes, and repetitive edge-on foliage. All **66 CPU tests**, scoped and repository-wide TypeScript/ESLint checks, the production build and **14 targeted browser checks** pass for this revision. The built-page smoke check also passes. The scene remains more angular and simplified than the references, particularly the shelter and distant terrain.
+Updated 1 November 2026. **Visual acceptance remains open.** The latest revision varies rock fractures and formation footprints, expands coral into large irregular colonies, and retains coral coverage in distant views. The standalone environment passes **79 CPU tests**, scoped and repository-wide checks, **14 targeted browser checks**, the production build and built-page smoke check. Geology, shelter and distant terrain remain more angular and simplified than the references.
 
 ## References and starting evidence
 
@@ -13,7 +13,34 @@ Work is isolated to `environments/cobalt-windfields/`. The shared meadow `src/`,
 
 Use the references themselves when continuing. The Scarlet [reference handoff](../../docs/planet-reference-handoff.md) supplies the comparison and evidence workflow; its species, palette and acceptance history do not apply to Cobalt.
 
-## Current material, foliage and surface correction
+## Current fracture and distribution revision
+
+The previous layout repeated short, similarly aligned rock rows. The new placement mixes dense provinces, broad multi-lobed outcrops, wandering deposits, small pockets and isolated remnants. Individual rocks vary in scale and bearing; nearby beds can still share a geological direction. The authored home landmarks and protected walking/animal routes remain.
+
+- Across seeds 412 / 5 / 413, measured global groups contain **1–32 rocks**. Each seed has both compact and elongated groups, all eight tested heading bins, and a 12–16× ratio between the 90th- and 10th-percentile group spans. These measurements verify diversity of placed points, not visual acceptance.
+- Fracture shading mixes long splits, tilted bedding seams, short hairlines, branching faults and sparse weathering. Each stone varies spacing, heading, length, width and strength, including quiet areas. Complete finite paths can cross cell boundaries. Small details fade with pixel footprint; no extra fracture planes or decals are added.
+- Coral occupies broad irregular, lobed fields, smaller pockets and sparse ribbons. The three tested seeds each have **350–680 local coral plants**, at least three large local fields, and smaller colonies. Sail cohorts retain adult/juvenile variation. Roots respect route clearance and host growth thresholds. A radius-aware clearance pass checks roots against every active rock’s actual curved triangles, including neighboring formations. Independent ray tests verify no accepted coral or sail roots beneath rocks at radii 40 / 128 / 400; moving plant tips may still touch rock. Real gaps inside a rock’s bounding footprint remain available.
+- Distant coral uses a **108-triangle branching volume per root**, replacing the detailed 3,128–3,300-triangle fans. A complementary dither transition preserves coverage between the two versions. Tests verify identical accepted root sets and total per-root coverage through five camera heights at planet radii 40 / 128 / 400. No whole-field altitude cutoff remains.
+
+Actual application comparisons, captured at 1,672 × 940, high quality, DPR/render scale 1 and frozen time 12 s:
+
+| View | Before | Current |
+| --- | --- | --- |
+| User's whole-planet pose | [Repeated rows](reference/distribution-before-planet.png) | [Unequal formations](reference/distribution-planet.png) |
+| Ground-level opening | [Sparse planting](reference/distribution-before-ground.png) | [Large coral fields](reference/distribution-ground.png) |
+| Close rock and reverse views | — | [Fractures and colony](reference/distribution-fractures.png), [reverse side](reference/distribution-reverse.png) |
+
+The overview submits 316,964 triangles / 35 draws; the opening submits 1,728,330 / 57, versus 212,914 / 34 and 1,448,834 / 56 previously. Shortening the detailed coral range reduced an intermediate opening from 3,084,030 triangles. These are fixed-view geometry counts; timing samples were collected on a contended machine and do **not** establish a sustained frame-rate budget. [Capture data](reference/distribution-review.json).
+
+The root check uses a spatial index, conservative projected bounds and lazy exact triangle tests. Eleven alternating warm Node trials measured about **4.2 / 3.9 ms** added rebuild cost at radii 128 / 400, compared with a no-op clearance pass. Ordinary camera updates reuse the accepted-root cache. These isolated timings do not establish browser growth or frame-rate budgets.
+
+All 79 CPU tests and 14 targeted browser checks pass. The latter cover residents, saved native finds, navigation, review angles, growth/seed changes, terrain parity, picking and frozen determinism. Scoped and full repository checks, production build and built-page smoke pass. The existing large-chunk warning remains.
+
+Three final frozen views repeat exactly. Reversing triangle order in 18 scenery/shelter meshes changes **11 / 37 / 14 isolated pixels** out of 1,296,000; only **1 / 0 / 1** exceed 12 channel levels, and the largest connected component is one pixel. No collected WebGL or page errors. This is a bounded surface-order probe, not a guarantee for every camera or animation. [Exact results](reference/distribution-surface-order.json).
+
+Visible limits of this pass: recognizable slab prototypes still repeat within the more varied groups, and some coral margins remain more abrupt and evenly populated than the concept’s broken ribbons. The earlier material/surface record below is historical. Reference matching, the shelter silhouette, distant layering, the 400-find specimen memory limit and account-backed travel remain open.
+
+## Earlier material, foliage and surface correction
 
 This pass responds to the user's close-up screenshots and saved camera pose `-0.5712,0.5324,0.3232,0.5347,0.891`. All changes remain inside `environments/cobalt-windfields/`.
 
@@ -54,7 +81,7 @@ Fresh actual-application evidence:
 
 One medium-quality production smoke frame reported 58 draw calls, 1,443,434 submitted triangles, 206,989,702 GPU bytes and 3.32 ms GPU time. This is a single observation, not a benchmark or a sustained frame-rate claim.
 
-The standard reference captures listed later in this record were also refreshed for the final correction. The earlier verification and production tables remain historical results; the table above governs this revision.
+The standard reference captures listed later in this record were also refreshed for the final correction. The earlier verification and production tables remain historical results; the current distribution section above governs the latest revision.
 
 Known limits remain open: angular geological silhouettes, the rectangular shelter, insufficient distant layering, the 400-find memory budget, local-only residents and unimplemented account-backed travel. No visual acceptance or performance-budget claim follows from the passing CPU checks.
 

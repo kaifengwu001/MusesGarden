@@ -14,6 +14,7 @@ varying vec3 vLocalNormal;
 varying vec2 vUv;
 varying float vKind;
 varying float vVariation;
+varying float vCoralLod;
 vec3 linearColor(vec3 c){return pow(c,vec3(2.2));}
 float inkLine(float value,float width,float footprint){
  float aa=max(footprint*0.7,0.00015);
@@ -24,7 +25,9 @@ void main(){
  float localFoot=max(length(localDx),length(localDy));
  vec2 uvFoot=abs(dFdx(vUv))+abs(dFdy(vUv));
  vec3 n=normalize(vPlanetNormal);if(!gl_FrontFacing)n=-n;
- float relief=cobaltRelief(vLocal,localFoot);
+ // Material kind is constant over each primitive. Keep derivatives outside
+ // the branch, while avoiding unused mineral noise on dense coral and sails.
+ float relief=vKind>1.5&&vKind<2.5?cobaltRelief(vLocal,localFoot):0.0;
  vec3 stoneNormal=cobaltBumpNormal(n,dFdx(vPlanet),dFdy(vPlanet),vec2(dFdx(relief),dFdy(relief)));
  vec3 dir=normalize(vPlanet),sun=localSun(dir);
  float light=toonLight(dot(n,sun))*(1.0-cloudShadowAt(vPlanet,0.0)*0.2);
@@ -74,5 +77,12 @@ void main(){
  // enters gradually, as in the environment's painted perspective.
  vec3 aerial=applyAerial(col,viewDistance,dir);
  col=mix(col,aerial,1.0);
+ // Matching screen-space coverage makes the near/far meshes complementary:
+ // they never compete for the same depth sample during the transition.
+ if(abs(vCoralLod)>0.5) {
+  float detail=abs(vCoralLod)-1.0;
+  float sampleId=hash12(floor(gl_FragCoord.xy));
+  if(vCoralLod>0.0?sampleId>detail:sampleId<=detail)discard;
+ }
  gl_FragColor=vec4(col,1.0);
 }

@@ -67,12 +67,17 @@ describe('Cobalt fractured geology', () => {
     const local=first.rocks.flatMap((anchors,type)=>anchors.filter(anchor=>anchor.local).map(anchor=>({anchor,type})));
     expect(local.filter(item=>item.type<5).length).toBeGreaterThan(25);
     for(const {anchor,type} of local) expect(clearsWindfieldRoutes(anchor.local![0],anchor.local![1],prototypes[type].footprint*anchor.scale),anchor.id).toBe(true);
+    const coralRoots=new Set(first.coral.flat());
     for(const plant of [...first.sails.flat(),...first.coral.flat()]) {
       const host=hosts.get(plant.rockId!);
       expect(host,plant.rockId).toBeDefined();
       const from=host!.anchor.local??host!.anchor.offset!;
       const to=plant.local??plant.offset!;
-      expect(Math.hypot(to[0]-from[0],to[1]-from[1])).toBeLessThan((prototypes[host!.type].footprint+3.2)*host!.anchor.scale);
+      // Fields now extend beyond the old narrow lee-edge strip. Keep
+      // their accepted roots local to a real host, while sails retain the
+      // tighter crown placement envelope.
+      const reach=coralRoots.has(plant)?45:(prototypes[host!.type].footprint+3.2)*host!.anchor.scale;
+      expect(Math.hypot(to[0]-from[0],to[1]-from[1])).toBeLessThan(reach);
       expect(plant.threshold).toBe(host!.anchor.threshold);
     }
     expect(first.sails.every(variant=>variant.length>0)).toBe(true);
@@ -108,7 +113,7 @@ describe('Cobalt fractured geology', () => {
     expect(closestAnimal).toBeGreaterThan(0.7);
   },20_000);
 
-  it('keeps world transforms finite through growth and omits tiny plants in orbit', () => {
+  it('keeps transforms finite through growth and replaces distant coral with cheap branching volumes', () => {
     const terrain=new Terrain(generateLayout(412));
     terrain.update(128,PARAMS,0.5);
     const scenery=new WindfieldScenery({uWindVec:{value:new Vector4(1,0,0,0.6)}},terrain);
@@ -154,6 +159,9 @@ describe('Cobalt fractured geology', () => {
     for(const object of scenery.group.children.filter(child=>child.name.startsWith('Sheltered coral'))) {
       expect((object as Mesh<InstancedBufferGeometry>).geometry.instanceCount).toBe(0);
     }
+    const farCoral=scenery.group.children.find(child=>child.name==='Distant coral fields') as Mesh<InstancedBufferGeometry>;
+    expect(farCoral.geometry.instanceCount).toBeGreaterThan(100);
+    expect(farCoral.geometry.getAttribute('position').count/3).toBeLessThan(150);
     const outlines=scenery.group.children.filter(child=>child.name.endsWith(' ink edges'));
     expect(outlines).toHaveLength(prototypes.length);
     for(const object of outlines) {

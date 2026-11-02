@@ -1,6 +1,6 @@
 # Cobalt Windfields
 
-A standalone playable world: peach sand, varied fractured cobalt outcrops, curved ivory seed sails, coral lee gardens, a rough slate shelter and the two-slab Wind Window. Pip, Juniper and Marlo live near the shelter. Sailbacks walk and open their sails, Kitelets flutter and perch, Sand Stitchers carry dry stems, and light seeds drift through the stone gap.
+A standalone playable world: peach sand, varied fractured cobalt outcrops, curved ivory seed sails, large coral fields and sheltered pockets, a rough slate shelter and the two-slab Wind Window. Pip, Juniper and Marlo live near the shelter. Sailbacks walk and open their sails, Kitelets flutter and perch, Sand Stitchers carry dry stems, and light seeds drift through the stone gap.
 
 The environment began from the Muse body and animation engine at commit `fb21a13`, with locally copied dry-world infrastructure, and is integrated on main commit `ad37acf`. Its saved-find and grass shaders retain local compatible copies so newer meadow shader changes do not change their data contracts. All world-specific code is inside this folder. Shared `src/`, the meadow, Scarlet Sail Canyon and Violet Dunes are not edited by this world.
 

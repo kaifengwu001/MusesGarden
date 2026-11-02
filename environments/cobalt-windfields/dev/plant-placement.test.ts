@@ -6,6 +6,21 @@ import { generateLayout } from '../planet/terrain';
 const prototypes=makeGeologyPrototypes();
 afterAll(()=>prototypes.forEach(prototype=>{prototype.geometry.dispose();prototype.outline.dispose();}));
 
+const plans=new Map<number,ReturnType<typeof createWindfieldAnchors>>();
+const planFor=(seed:number)=>{
+  let plan=plans.get(seed);
+  if(!plan){plan=createWindfieldAnchors(generateLayout(seed),prototypes);plans.set(seed,plan);}
+  return plan;
+};
+const domains=(anchors:WindfieldAnchor[]):WindfieldAnchor[][]=>{
+  const groups=new Map<string,WindfieldAnchor[]>();
+  for(const anchor of anchors){
+    const key=anchor.local?'local':anchor.direction.toArray().join(',');
+    const group=groups.get(key)??[];group.push(anchor);groups.set(key,group);
+  }
+  return [...groups.values()];
+};
+
 const separation=(a:WindfieldAnchor,b:WindfieldAnchor):number=>{
   if(a.local&&b.local) return Math.hypot(a.local[0]-b.local[0],a.local[1]-b.local[1]);
   if(!a.local&&!b.local&&a.direction.distanceToSquared(b.direction)<1e-12) {
@@ -16,7 +31,7 @@ const separation=(a:WindfieldAnchor,b:WindfieldAnchor):number=>{
 
 describe('windfield living colonies',()=>{
   test.each([412,413,5])('seed %i keeps several ages and blade bearings in the local scene',seed=>{
-    const plan=createWindfieldAnchors(generateLayout(seed),prototypes);
+    const plan=planFor(seed);
     const local=plan.sails.flat().filter(anchor=>anchor.local);
     const sizes=local.map(anchor=>anchor.scale),bearings=local.map(anchor=>anchor.turn);
     expect(local.length).toBeGreaterThan(10);
@@ -31,19 +46,20 @@ describe('windfield living colonies',()=>{
   });
 
   test('roots stay separate where neighbouring rock habitats overlap',()=>{
-    const plan=createWindfieldAnchors(generateLayout(412),prototypes);
+    const plan=planFor(412);
     for(const [groups,spacing] of [[plan.sails,0.34],[plan.coral,0.16]] as const) {
-      const anchors=groups.flat();
       let nearestRatio=Infinity;
-      for(let i=0;i<anchors.length;i++)for(let j=0;j<i;j++) {
+      for(const anchors of domains(groups.flat())) for(let i=0;i<anchors.length;i++)for(let j=0;j<i;j++) {
         nearestRatio=Math.min(nearestRatio,separation(anchors[i],anchors[j])/(anchors[i].scale+anchors[j].scale));
       }
       expect(nearestRatio).toBeGreaterThanOrEqual(spacing);
     }
-    for(const group of plan.rocks) for(let i=0;i<group.length;i++) for(let j=0;j<i;j++) {
+    let duplicateSurfaces=0;
+    for(const category of plan.rocks) for(const group of domains(category)) for(let i=0;i<group.length;i++) for(let j=0;j<i;j++) {
       const a=group[i],b=group[j];
       const sameSurface=separation(a,b)<0.06&&Math.abs(a.scale-b.scale)<0.015&&Math.abs(Math.sin((a.turn-b.turn)/2))<0.006;
-      expect(sameSurface).toBe(false);
+      if(sameSurface)duplicateSurfaces++;
     }
+    expect(duplicateSurfaces).toBe(0);
   });
 });

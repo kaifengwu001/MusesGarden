@@ -3,6 +3,9 @@ import { hash32, unit } from '../../../src/core/hash';
 import { createGroundSample, type Layout, type Terrain } from '../planet/terrain';
 import { coralGeometry, driftingSeedGeometry, seedSailGeometry } from './windGeometry';
 import { makeGeologyPrototypes, type GeologyPrototype } from './windGeology';
+import { createWindfieldEcology, type CoralColony } from './windfieldEcology';
+import { distantCoralGeometry } from './windfieldCoralLod';
+import { WindfieldRootClearance } from './windfieldRootClearance';
 import vertexShader from './windfieldScenery.vert.glsl?raw';
 import fragmentShader from './windfieldScenery.frag.glsl?raw';
 import outlineVertex from './windRockOutline.vert.glsl?raw';
@@ -14,13 +17,14 @@ export interface WindfieldAnchor {
   /** Physical offsets in the tangent frame of a persistent global formation. */
   offset?: readonly [number, number];
   scale: number; turn: number; phase: number; tint: number; threshold: number;
-  id?: string; rockId?: string; seed?: boolean; burial?: number;
+  id?: string; rockId?: string; formationId?: string; seed?: boolean; burial?: number;
 }
 export interface WindfieldAnchors {
   rocks: WindfieldAnchor[][];
   sails: WindfieldAnchor[][];
   coral: WindfieldAnchor[][];
   seeds: WindfieldAnchor[];
+  colonies: CoralColony[];
 }
 interface Resolved { dir: Vector3; across: Vector3; height: number; footDepth: number; present: boolean; }
 interface Batch {
@@ -30,8 +34,9 @@ interface Batch {
   anchorData: InstancedBufferAttribute; acrossData: InstancedBufferAttribute;
   placementData: InstancedBufferAttribute;
   footData: InstancedBufferAttribute;
+  coralLodData: InstancedBufferAttribute;
   supportSites: readonly Vector3[];
-  role: 'rock' | 'sail' | 'coral' | 'seed';
+  role: 'rock' | 'sail' | 'coral' | 'coral-far' | 'seed';
 }
 const TAU = Math.PI * 2;
 const UP = new Vector3(0, 1, 0);
@@ -77,8 +82,6 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
   let state = hash32(layout.seed ^ 0xc0ba147);
   const rand = (): number => unit(state = hash32((state + 0x9e3779b9) >>> 0));
   const rocks: WindfieldAnchor[][] = prototypes.map(() => []);
-  const sails: WindfieldAnchor[][] = Array.from({ length: 3 }, () => []);
-  const coral: WindfieldAnchor[][] = Array.from({ length: 3 }, () => []);
   const seeds: WindfieldAnchor[] = [];
   const local = (x: number, z: number, scale: number, turn = 0): WindfieldAnchor => ({ direction: new Vector3(), local:[x,z], scale, turn, phase:rand()*TAU, tint:rand(), threshold:0 });
   const anchorDistance = (a: WindfieldAnchor,b: WindfieldAnchor): number => {
@@ -98,63 +101,6 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
     rocks[type].push(anchor);
     return anchor;
   };
-  const offsetFrom = (host: WindfieldAnchor, dx: number, dz: number, scale: number): WindfieldAnchor => {
-    const x = (dx * Math.cos(host.turn) - dz * Math.sin(host.turn)) * host.scale;
-    const z = (dx * Math.sin(host.turn) + dz * Math.cos(host.turn)) * host.scale;
-    const anchor: WindfieldAnchor = { direction:host.direction.clone(), scale, turn:0.12+(rand()-0.5)*0.25, phase:rand()*TAU, tint:rand(), threshold:host.threshold, rockId:host.id };
-    if (host.local) anchor.local = [host.local[0]+x,host.local[1]+z];
-    else anchor.offset = [(host.offset?.[0] ?? 0)+x,(host.offset?.[1] ?? 0)+z];
-    return anchor;
-  };
-  const plant = (groups: WindfieldAnchor[][],variant: number,anchor: WindfieldAnchor,clearance: number): boolean => {
-    if(anchor.local&&!clearsWindfieldRoutes(anchor.local[0],anchor.local[1],clearance)) return false;
-    // Keep roots distinct even where two accepted rocks share a lee edge.
-    // Leaves may overlap in projection; stems never start at the same point.
-    const spacing=groups===sails?0.34:0.16;
-    if(groups.some(group=>group.some(other=>anchorDistance(anchor,other)<spacing*(anchor.scale+other.scale)))) return false;
-    groups[variant].push(anchor);
-    return true;
-  };
-  const ecology = (host: WindfieldAnchor, type: number, lushness: number, hero = false): void => {
-    const proto = prototypes[type];
-    const first=Math.floor(rand()*proto.leeSites.length);
-    // Colonies follow two unequal stretches of a real front edge, leaving gaps.
-    for(let seam=0;seam<(hero?2:1);seam++) {
-      const site=proto.leeSites[(first+seam)%proto.leeSites.length];
-      const count=2+Math.floor(rand()*lushness);
-      const span=hero?3.3:2.1;
-      for(let i=0;i<count;i++) {
-        const dx=site[0]+(i/(count-1)-0.5)*span+(rand()-0.5)*0.28;
-        const dz=site[1]+0.38+rand()*0.7;
-        const age=rand();
-        const anchor=offsetFrom(host,dx,dz,(0.46+Math.pow(age,0.65)*0.91)*(hero?1.1:1));
-        anchor.turn=host.turn+(rand()-0.5)*1.35;
-        plant(coral,Math.floor(rand()*3),anchor,Math.max(0.32,0.43*anchor.scale));
-      }
-    }
-    if(hero||rand()<0.42) {
-      const site=proto.leeSites[(first+1)%proto.leeSites.length];
-      // One wind-shaped adult and occasional young plants share a pocket.
-      // Age, heading and offset vary independently instead of stamping a row
-      // of equally tall, front-facing two-leaf trees along every rock.
-      const amount=hero?(rand()<0.6?3:2):(rand()<0.35?2:1);
-      const adultScale=hero?1.12+rand()*0.68:0.80+rand()*0.65;
-      const bearing=host.turn+(rand()-0.5)*2.6;
-      const adultVariant=Math.floor(rand()*3);
-      for(let i=0;i<amount;i++) {
-        const young=i>0;
-        const scale=young?adultScale*(0.28+rand()*0.26):adultScale;
-        const side=i===2?-1:1;
-        const dx=site[0]+(young?side*(1.1+rand()*1.7):(rand()-0.5)*0.7);
-        const dz=site[1]+0.68+rand()*(young?1.25:0.55);
-        const anchor=offsetFrom(host,dx,dz,scale);
-        anchor.turn=bearing+(young?(side*0.9+(rand()-0.5)*1.1):0);
-        const variant=young?(adultVariant+i)%3:adultVariant;
-        plant(sails,variant,anchor,0.42+0.32*scale);
-      }
-    }
-  };
-
   // The opening composition is a valley between unequal bedrock masses, not a
   // ring of fins. Foreground animals keep open sand pockets between these beds.
   const landmarks: readonly (readonly [number,number,number,number,number])[] = [
@@ -174,74 +120,108 @@ export function createWindfieldAnchors(layout: Layout, prototypes: readonly Geol
     [6,22,-73,1.3,0.1], [1,43,-58,2.0,0.24],
   ];
   for(const [type,x,z,scale,turn] of landmarks) {
-    const host=rock(type,local(x,z,scale,turn));
-    if(host&&z> -26) ecology(host,type,5,z>25||x< -20&&z>5);
+    const anchor=local(x,z,scale,turn);
+    anchor.formationId=`home-landmark-${Math.floor(x/16)}-${Math.floor(z/18)}`;
+    rock(type,anchor);
   }
 
-  // Uneven connected ledge runs share a bedding direction but vary their
-  // lengths, interruptions, height families and rubble skirts.
-  const belts: readonly (readonly [number,number,number,number])[] = [
-    [-29,-2,5,0.22],[-29,20,4,0.18],[-24,40,4,0.3],
-    [31,29,4,0.21],[31,3,4,0.29],[-3,-31,5,0.23],[-35,-29,4,0.18],
-  ];
-  for(const [cx,cz,count,turn] of belts) {
-    let along=-count*2.7;
+  // A formation is a wandering deposit, an uneven two-dimensional scatter,
+  // or a few isolated remnants. Shared geology does not imply repeated rows.
+  const formation=(place:(x:number,z:number,scale:number,turn:number)=>WindfieldAnchor,
+    count:number,extent:number,aspect:number,heading:number,habit:number,id:string):void=>{
+    let walkX=-extent*.5,walkZ=(rand()-.5)*extent*.15;
+    const lobes=Array.from({length:2+Math.floor(rand()*3)},()=>({x:(rand()-.5)*extent,z:(rand()-.5)*extent/aspect}));
     for(let i=0;i<count;i++) {
-      along+=4.1+rand()*3.7;
-      const x=cx+along*Math.cos(turn),z=cz+along*Math.sin(turn)+(rand()-0.5)*3;
-      const type=[0,2,4,1][Math.floor(rand()*4)];
-      const host=rock(type,local(x,z,0.7+rand()*0.4,turn+(rand()-0.5)*0.3));
-      if(!host) continue;
-      if(rand()<0.58) ecology(host,type,4,z>27);
-      const site=prototypes[type].leeSites[Math.floor(rand()*3)];
-      const rubbleCount=2+Math.floor(rand()*4);
-      for(let k=0;k<rubbleCount;k++) {
-        const child=offsetFrom(host,site[0]+(rand()-0.5)*6,site[1]+1.1+rand()*1.4,0.6+rand()*0.55);
-        child.turn=turn+(rand()-0.5)*1.3;
-        rock(k===0?4:7,child);
+      let x:number,z:number;
+      if(habit===0) {
+        walkX+=extent/count*(.65+rand()*.85);
+        walkZ+=(rand()-.42)*extent/count*.8;
+        x=walkX;z=walkZ+Math.sin(i*.58+heading)*extent*.09;
+      } else {
+        const lobe=lobes[Math.floor(rand()*lobes.length)];
+        const angle=rand()*TAU,r=Math.sqrt(rand());
+        x=lobe.x+Math.cos(angle)*r*extent*.30;
+        z=lobe.z+Math.sin(angle)*r*extent*.30/aspect;
       }
+      const rotatedX=x*Math.cos(heading)-z*Math.sin(heading);
+      const rotatedZ=x*Math.sin(heading)+z*Math.cos(heading);
+      const selection=rand();
+      let type=selection<.28?7:selection<.48?4:selection<.64?2:selection<.77?0:selection<.90?3:1;
+      // Few tall signatures, many low fragments; a large cluster is not a
+      // scaled copy of a small one with the same number of peaks.
+      if(i===0&&count>14&&rand()<.60)type=[5,6,8][Math.floor(rand()*3)];
+      const scale=type===7?.38+Math.pow(rand(),1.5)*1.25:.48+Math.pow(rand(),1.6)*1.50;
+      const turn=heading+(rand()-.5)*(habit===0?.72:2.8);
+      const a=place(rotatedX,rotatedZ,scale,turn);a.formationId=id;rock(type,a);
     }
-  }
-  // Fallen stones have finite visible tops and sides. Their spacing follows
-  // the foot of the bed; there is no near-total burial into triangular tips.
-  for(const [cx,cz,spread] of [[-14,30,6],[-18,40,5],[-8,23,3],[22,29,5],[22,41,5],[-27,11,6],[18,11,3]]) {
-    for(let i=0;i<5;i++) rock(7,local(cx+(rand()-0.5)*spread,cz+(rand()-0.5)*2.5,0.65+rand()*0.65,rand()*1.1));
+  };
+  // Keep the valley and its authored landmarks, but break the flanking skirts
+  // into unequal banks, loose fragments and broad, connected rocky pockets.
+  const localPockets:readonly(readonly[number,number,number,number,number,number])[]=[
+    [-28,30,18,25,1.2,.2],[-25,7,8,17,3.7,1.25],[-33,-18,24,32,1.3,-.6],
+    [28,27,21,29,1.0,2.2],[31,4,6,14,2.8,.6],[24,-28,27,36,1.4,-.8],
+    [-11,-38,14,25,4.0,.3],[12,-55,10,20,1.1,1.9],
+  ];
+  localPockets.forEach(([cx,cz,count,extent,aspect,heading],i)=>
+    formation((x,z,scale,turn)=>local(cx+x,cz+z,scale,turn),count,extent,aspect,heading,aspect>2?0:1,`home-pocket-${i}`));
+  for(const [cx,cz,spread] of [[-14,30,6],[-18,40,5],[-8,23,3],[22,29,5],[22,41,5],[18,11,3]]) {
+    const count=2+Math.floor(rand()*7);
+    for(let i=0;i<count;i++) {
+      const a=local(cx+(rand()-.5)*spread,cz+(rand()-.5)*spread*.6,.4+rand()*.9,rand()*TAU);
+      a.formationId=`loose-${cx}-${cz}`;rock(7,a);
+    }
   }
 
   const home=layout.cottage,forward=layout.homeBearing;
   const right=new Vector3().crossVectors(home,forward).normalize();
-  const centres: Vector3[]=[];
-  for(let attempt=0;centres.length<132&&attempt<2000;attempt++) {
+  const sphere=():Vector3=>{
     const y=1-2*rand(),angle=rand()*TAU,r=Math.sqrt(1-y*y);
-    const centre=home.clone().multiplyScalar(y).addScaledVector(right,Math.cos(angle)*r).addScaledVector(forward,Math.sin(angle)*r).normalize();
-    if(centre.dot(home)>Math.cos(0.42)) continue;
-    // Broad sparse provinces, with some nearly empty sandy longitudes.
-    const province=Math.sin(angle*2.3+y*4)+0.65*Math.cos(angle*5-y*3);
-    if(province< -0.65&&rand()<0.8) continue;
-    if(centres.some(other=>other.dot(centre)>Math.cos(0.1))) continue;
-    centres.push(centre);
-    const gate=rand(),heading=0.18+(rand()-0.5)*0.32;
-    const global=(x:number,z:number,scale:number):WindfieldAnchor=>({ direction:centre,offset:[x,z],scale,turn:heading+(rand()-0.5)*0.11,phase:rand()*TAU,tint:rand(),threshold:gate });
-    const rows=3+Math.floor(rand()*4);
-    const lush=rand()>0.45;
-    for(let i=0;i<rows;i++) {
-      const type=[0,1,2,0,4][Math.floor(rand()*5)];
-      const x=(i-(rows-1)/2)*(5.2+rand()*2.5),z=(rand()-0.5)*4;
-      const host=rock(type,global(x,z,0.8+rand()*0.7));
-      if(!host) continue;
-      if(lush&&i%3===1) ecology(host,type,3);
-      if(i%2===0) rock(3,global(x+(rand()-0.5)*4,z+5+rand()*3,0.55+rand()*0.55));
-    }
-    if(rand()<0.35) rock(5,global(-3,-3,0.8+rand()*0.45));
-    if(rand()<0.12) rock(6,global(3,-4,0.65+rand()*0.4));
-    for(let i=0;i<5;i++) rock(7,global((rand()-0.5)*25,4+rand()*6,0.65+rand()*0.65));
+    return home.clone().multiplyScalar(y).addScaledVector(right,Math.cos(angle)*r).addScaledVector(forward,Math.sin(angle)*r).normalize();
+  };
+  const provinces:Vector3[]=[];
+  for(let attempt=0;provinces.length<13&&attempt<1000;attempt++) {
+    const centre=sphere();
+    if(centre.dot(home)>.91||provinces.some(other=>other.dot(centre)>.91))continue;
+    provinces.push(centre);
   }
+  const centres:Vector3[]=[];
+  let serialFormation=0;
+  const populate=(centre:Vector3,heading:number,count:number,extent:number,aspect:number,habit:number):void=>{
+    if(centre.dot(home)>Math.cos(.45))return;
+    // Loose outer formations may nearly touch a dense province, but identical
+    // anchor domains would create competing copies of the same surfaces.
+    if(centres.some(other=>other.dot(centre)>Math.cos(.035)))return;
+    centres.push(centre);
+    const gate=rand(),id=`formation-${serialFormation++}`;
+    const place=(x:number,z:number,scale:number,turn:number):WindfieldAnchor=>({direction:centre,offset:[x,z],scale,turn,phase:rand()*TAU,tint:rand(),threshold:gate,formationId:id});
+    formation(place,count,extent,aspect,heading,habit,id);
+  };
+  for(const province of provinces) {
+    const axis=new Vector3().crossVectors(province,Math.abs(province.y)<.9?UP:SIDE).normalize();
+    const second=new Vector3().crossVectors(axis,province).normalize();
+    const reach=.17+rand()*.38,heading=rand()*TAU;
+    const families=3+Math.floor(rand()*7);
+    for(let i=0;i<families;i++) {
+      const radius=Math.pow(rand(),.7)*reach,angle=rand()*TAU;
+      const centre=province.clone().multiplyScalar(Math.cos(radius)).addScaledVector(axis,Math.sin(radius)*Math.cos(angle)).addScaledVector(second,Math.sin(radius)*Math.sin(angle)).normalize();
+      const occupancy=rand(),count=occupancy<.22?2+Math.floor(rand()*3):occupancy>.72?18+Math.floor(rand()*15):6+Math.floor(rand()*9);
+      const habit=rand()<.33?0:1;
+      const extent=count<5?4+rand()*7:count>17?24+rand()*22:12+rand()*19;
+      const aspect=habit===0?2.5+rand()*3.0:.8+rand()*1.1;
+      populate(centre,heading+(rand()-.5)*1.25,count,extent,aspect,habit);
+    }
+  }
+  // Remnants outside the main provinces make the transition to empty sand
+  // uneven instead of repeating the same gap around every large group.
+  for(let i=0;i<24;i++)populate(sphere(),rand()*TAU,1+Math.floor(rand()*4),3+rand()*7,1+rand()*2,rand()<.4?0:1);
+
   for(let i=0;i<14;i++) {
     const anchor=local(-8,-12+(i%4)*1.3,0.55+rand()*0.55);
     anchor.seed=true;
     seeds.push(anchor);
   }
-  return {rocks,sails,coral,seeds};
+  const ecology=createWindfieldEcology(layout,rocks,prototypes);
+  return {rocks,seeds,...ecology};
 }
 
 /** Rock-dominated terrain dressing; animated animals live in WindWildlife. */
@@ -266,6 +246,8 @@ export class WindfieldScenery {
   private readonly supportForward = new Vector3();
   private readonly previousView = new Vector3();
   private previousAltitude = Number.NaN;
+  private rootClearance?: WindfieldRootClearance;
+  private plantClearance=new WeakMap<WindfieldAnchor,boolean>();
 
   constructor(shared: Record<string, IUniform>, terrain: Terrain) {
     this.wind = shared.uWindVec as IUniform<Vector4>;
@@ -287,10 +269,12 @@ export class WindfieldScenery {
     const acrossData = new InstancedBufferAttribute(new Float32Array(anchors.length * 3), 3);
     const placementData = new InstancedBufferAttribute(new Float32Array(anchors.length * 4), 4);
     const footData = new InstancedBufferAttribute(new Float32Array(anchors.length),1);
+    const coralLodData = new InstancedBufferAttribute(new Float32Array(anchors.length),1);
     geometry.setAttribute('aAnchor', anchorData);
     geometry.setAttribute('aAcross', acrossData);
     geometry.setAttribute('aPlacement', placementData);
     geometry.setAttribute('aFootDepth',footData);
+    geometry.setAttribute('aCoralLod',coralLodData);
     geometry.instanceCount = 0;
     const mesh = new Mesh(geometry, this.material);
     mesh.name = name;
@@ -314,7 +298,7 @@ export class WindfieldScenery {
       this.group.add(outline);
     }
     const resolved=anchors.map(()=>({dir:new Vector3(),across:new Vector3(),height:0,footDepth:0,present:false}));
-    this.batches.push({ mesh, outline, anchors, resolved, anchorData, acrossData, placementData, footData, supportSites, role });
+    this.batches.push({ mesh, outline, anchors, resolved, anchorData, acrossData, placementData, footData, coralLodData, supportSites, role });
   }
 
   private buildAnchors(terrain: Terrain): void {
@@ -331,6 +315,7 @@ export class WindfieldScenery {
       this.batch(seedSailGeometry(variant),plan.sails[variant],`Ivory seed sails ${variant+1}`,'sail');
       this.batch(coralGeometry(variant),plan.coral[variant],`Sheltered coral ${variant+1}`,'coral');
     }
+    this.batch(distantCoralGeometry(),plan.coral.flat(),'Distant coral fields','coral-far');
     this.batch(driftingSeedGeometry(),plan.seeds,'Windborne seeds','seed');
     this.dirty=true;
   }
@@ -346,6 +331,10 @@ export class WindfieldScenery {
     const R=terrain.radius,home=terrain.layout.cottage,forward=terrain.layout.homeBearing;
     const right=this.right.crossVectors(home,forward).normalize();
     const {dir,x,z,turned}=this;
+    if(rebuild) {
+      this.rootClearance=new WindfieldRootClearance(R);
+      this.plantClearance=new WeakMap();
+    }
     const active=Math.min(1,0.38+R/128*0.5);
     for(const batch of this.batches) {
       if(!rebuild&&!viewChanged&&batch.role!=='seed') continue;
@@ -403,28 +392,54 @@ export class WindfieldScenery {
           }
         }
         if(!resolved.present) continue;
+        // Rock batches precede plants. Register every active rock before
+        // view culling, so overlapping neighbouring formations cannot grow
+        // vegetation through one another as the sphere changes size.
+        if(rebuild&&batch.role==='rock')this.rootClearance!.add(batch.mesh.geometry,resolved.dir,resolved.across,resolved.height,a.scale*presence,resolved.footDepth);
+        if(rebuild&&(batch.role==='sail'||batch.role==='coral'||batch.role==='coral-far')) {
+          let clear=this.plantClearance.get(a);
+          if(clear===undefined) {
+            const groundHeight=resolved.height+(a.burial??.09*a.scale);
+            clear=!this.rootClearance!.blocked(resolved.dir,groundHeight);
+            this.plantClearance.set(a,clear);
+          }
+          resolved.present=clear;
+          if(!clear)continue;
+        }
+        let coralLod=0;
         if(cameraDirection) {
           const dot=cameraDirection.dot(resolved.dir);
           if(dot< -0.12) continue;
-          if(batch.role==='coral'&&(altitude>50||dot<Math.cos(Math.min(Math.PI,95/R)))) continue;
+          if(batch.role==='coral'||batch.role==='coral-far') {
+            const distance=Math.sqrt(Math.max(0,R*R+(R+altitude)*(R+altitude)-2*R*(R+altitude)*dot));
+            // The distant representation preserves every accepted root. It
+            // replaces detailed branches rather than dropping whole fields.
+            const t=Math.min(1,Math.max(0,(distance-18-8*a.scale)/20));
+            const detail=1-t*t*(3-2*t);
+            if(batch.role==='coral'?detail<=0:detail>=1)continue;
+            coralLod=(batch.role==='coral'?1:-1)*(1+detail);
+          }
           if(batch.role==='sail'&&dot<Math.cos(Math.min(Math.PI,220/R))) continue;
           if(batch.role==='seed'&&altitude>65) continue;
         }
+        if(!cameraDirection&&batch.role==='coral-far')continue;
         const p=resolved.dir;
         batch.anchorData.setXYZW(count,p.x,p.y,p.z,resolved.height);
         batch.acrossData.setXYZ(count,resolved.across.x,resolved.across.y,resolved.across.z);
         batch.placementData.setXYZW(count,a.scale*presence,a.phase,a.tint,a.seed?1:0);
         batch.footData.setX(count,resolved.footDepth);
+        batch.coralLodData.setX(count,coralLod);
         count++;
       }
       batch.mesh.geometry.instanceCount=count;
       if(batch.outline) batch.outline.geometry.instanceCount=count;
-      batch.anchorData.needsUpdate=true;batch.acrossData.needsUpdate=true;batch.placementData.needsUpdate=true;batch.footData.needsUpdate=true;
+      batch.anchorData.needsUpdate=true;batch.acrossData.needsUpdate=true;batch.placementData.needsUpdate=true;batch.footData.needsUpdate=true;batch.coralLodData.needsUpdate=true;
     }
   }
 
   dispose(): void {
     for(const b of this.batches) { b.mesh.geometry.dispose();b.outline?.geometry.dispose(); }
     this.material.dispose();this.outlineMaterial.dispose();this.group.clear();
+    this.rootClearance=undefined;this.plantClearance=new WeakMap();
   }
 }

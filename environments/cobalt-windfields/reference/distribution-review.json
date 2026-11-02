@@ -1,0 +1,501 @@
+{
+  "viewport": [
+    1672,
+    940
+  ],
+  "quality": "high",
+  "dpr": 1,
+  "renderScale": 1,
+  "frozenTime": 12,
+  "before": {
+    "results": [
+      {
+        "view": "overview",
+        "stats": {
+          "frameMs": 16.600000000002183,
+          "jsMs": 2.600000023841858,
+          "gpuMs": 13.494374,
+          "drawCalls": 34,
+          "triangles": 212914,
+          "trianglesSubmitted": 212914,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 12,
+          "geometries": 46,
+          "programs": 23,
+          "gpuBytes": 224323294,
+          "width": 1672,
+          "height": 940,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 15,
+          "lodMin": 0,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 18927.899999976158,
+          "time": 12,
+          "frozen": true
+        },
+        "batches": []
+      },
+      {
+        "view": "vista",
+        "stats": {
+          "frameMs": 33.29999999999927,
+          "jsMs": 2.5,
+          "gpuMs": 52.377958,
+          "drawCalls": 56,
+          "triangles": 1448834,
+          "trianglesSubmitted": 1448834,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 12,
+          "geometries": 59,
+          "programs": 24,
+          "gpuBytes": 224323294,
+          "width": 1672,
+          "height": 940,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 253,
+          "lodMin": 2,
+          "lodMax": 5,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 18927.899999976158,
+          "time": 12,
+          "frozen": true
+        },
+        "batches": []
+      },
+      {
+        "view": "homestead",
+        "stats": {
+          "frameMs": 33.29999999999927,
+          "jsMs": 2,
+          "gpuMs": 62.152916,
+          "drawCalls": 56,
+          "triangles": 1466670,
+          "trianglesSubmitted": 1466670,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 12,
+          "geometries": 59,
+          "programs": 24,
+          "gpuBytes": 224323294,
+          "width": 1672,
+          "height": 940,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 238,
+          "lodMin": 2,
+          "lodMax": 5,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 18927.899999976158,
+          "time": 12,
+          "frozen": true
+        },
+        "batches": []
+      }
+    ],
+    "errors": []
+  },
+  "after": {
+    "results": [
+      {
+        "view": "overview",
+        "stats": {
+          "frameMs": 16.600000000000364,
+          "jsMs": 1,
+          "gpuMs": 3.77675,
+          "drawCalls": 35,
+          "triangles": 316964,
+          "trianglesSubmitted": 316964,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 12,
+          "geometries": 47,
+          "programs": 25,
+          "gpuBytes": 224323294,
+          "width": 1672,
+          "height": 940,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 15,
+          "lodMin": 0,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 2006.9000000357628,
+          "time": 12,
+          "frozen": true
+        },
+        "batches": [
+          {
+            "name": "Notched exposed bed",
+            "count": 83,
+            "triangles": 336
+          },
+          {
+            "name": "Broken terraced reef",
+            "count": 65,
+            "triangles": 358
+          },
+          {
+            "name": "Interrupted long ledge",
+            "count": 97,
+            "triangles": 144
+          },
+          {
+            "name": "Blunt jointed outcrop",
+            "count": 72,
+            "triangles": 64
+          },
+          {
+            "name": "Detached split blocks",
+            "count": 129,
+            "triangles": 68
+          },
+          {
+            "name": "Inclined fractured wall",
+            "count": 7,
+            "triangles": 366
+          },
+          {
+            "name": "Broken cliff buttress",
+            "count": 7,
+            "triangles": 264
+          },
+          {
+            "name": "Blunt fallen stone",
+            "count": 234,
+            "triangles": 32
+          },
+          {
+            "name": "Broad windward fin",
+            "count": 4,
+            "triangles": 364
+          },
+          {
+            "name": "Ivory seed sails 1",
+            "count": 15,
+            "triangles": 648
+          },
+          {
+            "name": "Sheltered coral 1",
+            "count": 0,
+            "triangles": 3300
+          },
+          {
+            "name": "Ivory seed sails 2",
+            "count": 18,
+            "triangles": 972
+          },
+          {
+            "name": "Sheltered coral 2",
+            "count": 0,
+            "triangles": 3164
+          },
+          {
+            "name": "Ivory seed sails 3",
+            "count": 15,
+            "triangles": 648
+          },
+          {
+            "name": "Sheltered coral 3",
+            "count": 0,
+            "triangles": 3128
+          },
+          {
+            "name": "Distant coral fields",
+            "count": 1564,
+            "triangles": 108
+          },
+          {
+            "name": "Windborne seeds",
+            "count": 0,
+            "triangles": 4
+          }
+        ]
+      },
+      {
+        "view": "vista",
+        "stats": {
+          "frameMs": 16.699999999999818,
+          "jsMs": 1.699999988079071,
+          "gpuMs": 14.22175,
+          "drawCalls": 57,
+          "triangles": 1728330,
+          "trianglesSubmitted": 1728330,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 12,
+          "geometries": 60,
+          "programs": 25,
+          "gpuBytes": 224323294,
+          "width": 1672,
+          "height": 940,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 253,
+          "lodMin": 2,
+          "lodMax": 5,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 2006.9000000357628,
+          "time": 12,
+          "frozen": true
+        },
+        "batches": [
+          {
+            "name": "Notched exposed bed",
+            "count": 86,
+            "triangles": 336
+          },
+          {
+            "name": "Broken terraced reef",
+            "count": 68,
+            "triangles": 358
+          },
+          {
+            "name": "Interrupted long ledge",
+            "count": 102,
+            "triangles": 144
+          },
+          {
+            "name": "Blunt jointed outcrop",
+            "count": 77,
+            "triangles": 64
+          },
+          {
+            "name": "Detached split blocks",
+            "count": 139,
+            "triangles": 68
+          },
+          {
+            "name": "Inclined fractured wall",
+            "count": 7,
+            "triangles": 366
+          },
+          {
+            "name": "Broken cliff buttress",
+            "count": 9,
+            "triangles": 264
+          },
+          {
+            "name": "Blunt fallen stone",
+            "count": 251,
+            "triangles": 32
+          },
+          {
+            "name": "Broad windward fin",
+            "count": 4,
+            "triangles": 364
+          },
+          {
+            "name": "Ivory seed sails 1",
+            "count": 17,
+            "triangles": 648
+          },
+          {
+            "name": "Sheltered coral 1",
+            "count": 107,
+            "triangles": 3300
+          },
+          {
+            "name": "Ivory seed sails 2",
+            "count": 20,
+            "triangles": 972
+          },
+          {
+            "name": "Sheltered coral 2",
+            "count": 110,
+            "triangles": 3164
+          },
+          {
+            "name": "Ivory seed sails 3",
+            "count": 18,
+            "triangles": 648
+          },
+          {
+            "name": "Sheltered coral 3",
+            "count": 109,
+            "triangles": 3128
+          },
+          {
+            "name": "Distant coral fields",
+            "count": 1436,
+            "triangles": 108
+          },
+          {
+            "name": "Windborne seeds",
+            "count": 14,
+            "triangles": 4
+          }
+        ]
+      },
+      {
+        "view": "homestead",
+        "stats": {
+          "frameMs": 16.600000000000364,
+          "jsMs": 1.4000000357627869,
+          "gpuMs": 13.268791,
+          "drawCalls": 57,
+          "triangles": 2135298,
+          "trianglesSubmitted": 2135298,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 12,
+          "geometries": 60,
+          "programs": 25,
+          "gpuBytes": 224323294,
+          "width": 1672,
+          "height": 940,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 238,
+          "lodMin": 2,
+          "lodMax": 5,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 2006.9000000357628,
+          "time": 12,
+          "frozen": true
+        },
+        "batches": [
+          {
+            "name": "Notched exposed bed",
+            "count": 84,
+            "triangles": 336
+          },
+          {
+            "name": "Broken terraced reef",
+            "count": 66,
+            "triangles": 358
+          },
+          {
+            "name": "Interrupted long ledge",
+            "count": 101,
+            "triangles": 144
+          },
+          {
+            "name": "Blunt jointed outcrop",
+            "count": 77,
+            "triangles": 64
+          },
+          {
+            "name": "Detached split blocks",
+            "count": 135,
+            "triangles": 68
+          },
+          {
+            "name": "Inclined fractured wall",
+            "count": 7,
+            "triangles": 366
+          },
+          {
+            "name": "Broken cliff buttress",
+            "count": 8,
+            "triangles": 264
+          },
+          {
+            "name": "Blunt fallen stone",
+            "count": 243,
+            "triangles": 32
+          },
+          {
+            "name": "Broad windward fin",
+            "count": 4,
+            "triangles": 364
+          },
+          {
+            "name": "Ivory seed sails 1",
+            "count": 17,
+            "triangles": 648
+          },
+          {
+            "name": "Sheltered coral 1",
+            "count": 142,
+            "triangles": 3300
+          },
+          {
+            "name": "Ivory seed sails 2",
+            "count": 20,
+            "triangles": 972
+          },
+          {
+            "name": "Sheltered coral 2",
+            "count": 150,
+            "triangles": 3164
+          },
+          {
+            "name": "Ivory seed sails 3",
+            "count": 18,
+            "triangles": 648
+          },
+          {
+            "name": "Sheltered coral 3",
+            "count": 147,
+            "triangles": 3128
+          },
+          {
+            "name": "Distant coral fields",
+            "count": 1496,
+            "triangles": 108
+          },
+          {
+            "name": "Windborne seeds",
+            "count": 14,
+            "triangles": 4
+          }
+        ]
+      }
+    ],
+    "errors": []
+  },
+  "timingLimit": "Single observations on a contended machine; not an FPS benchmark. Triangle and draw counts are the useful comparison."
+}
