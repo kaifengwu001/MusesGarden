@@ -120,3 +120,7 @@ Current appearance: [before](denser-clouds-before.png), [globe after](denser-clo
 ## Current-main merge verification — 2 November 2026
 
 [Shelter](mainline-close.png), [globe](mainline-globe.png) and [merge-comparison metadata](mainline-review.json) verify integration with upstream main4259aea. Both frozen canvas hashes match the pre-merge source exactly; all four retained local shader files match their original source hashes. RTX4070SUPER / ANGLE D3D11, 1280×800, DPR1, high/MSAA4, time12, no captured errors. [Validation](../VALIDATION.md) records 140 CPU and five focused browser passes, scoped check/build and the initial shader-include failure that was corrected.
+
+## Remote-main interface review — 2 November 2026
+
+[Baskets](mainline-ui-baskets.png), [find card](mainline-ui-find-card.png), [mail](mainline-ui-mail.png), [globe](mainline-ui-globe.png) and [metadata](mainline-ui-review.json) show the matching Scarlet-local stylesheet on combined main335104a. The same hardware, resolution and frozen time apply; no page/console errors were captured. The orbit pin picking/toggle smoke and five focused browser checks pass alongside 140 CPU tests, scoped check and build. See [validation](../VALIDATION.md) for the review-script correction and remaining historical diagnostics.
