@@ -118,6 +118,12 @@
   height: 22px;
 }
 
+.g-railbtn .g-basket-icon {
+  width: 36px;
+  height: 27px;
+  object-fit: contain;
+}
+
 .g-railbtn:hover {
   transform: translateY(-1px) scale(1.05);
   background: rgba(251, 248, 238, 0.94);
@@ -244,6 +250,26 @@
   pointer-events: none;
 }
 
+/* The illustrated mailbox stays sharp above the open mail viewer. */
+.g-postbox-visual {
+  position: absolute;
+  inset: 0;
+}
+
+.g-postbox-illustration {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.g-postbox.is-illustrated.is-open {
+  z-index: 11;
+}
+
+.g-postbox.is-illustrated.is-open .g-postbox-hit {
+  pointer-events: none;
+}
+
 .g-postbox-hit {
   appearance: none;
   position: absolute;
@@ -290,6 +316,27 @@
 
 .g-postbox-count.is-on {
   transform: scale(1);
+}
+
+/* A little paper count tag, readable against the painted red mailbox. */
+.g-postbox.is-illustrated .g-postbox-count {
+  margin: -14px 0 0 -13px;
+  min-width: 26px;
+  height: 25px;
+  padding: 0 7px;
+  border: 1.5px solid #795a40;
+  border-radius: 5px 7px 5px 4px;
+  background: #f5e9c9;
+  box-shadow: 0 2px 3px rgba(65, 40, 26, 0.22);
+  color: #51382c;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  transform: rotate(-7deg) scale(0);
+}
+
+.g-postbox.is-illustrated .g-postbox-count.is-on {
+  transform: rotate(-7deg) scale(1);
 }
 
 /* an invitation's wax seal, pressed on the box */
@@ -2781,11 +2828,12 @@ body.postcard .garden {
   opacity: 1;
 }
 
-/* a flower's preview: its find's card, light, beside it */
+/* a flower's preview: its find's card, light, above it (the basket's beside it) */
 .g-peek {
   position: absolute;
   left: 0;
   top: 0;
+  transform-origin: 0 0;
   width: 236px;
   box-sizing: border-box;
   padding: 9px 10px 8px;
@@ -2957,12 +3005,38 @@ body.postcard .garden {
   color: #2e6e9e;
 }
 
+/* Let the postcards return to the open mailbox before hiding the viewer. */
+.g-mail.is-closing {
+  pointer-events: none;
+}
+
+.g-mail.is-closing .g-mail-head,
+.g-mail.is-closing .g-mail-side,
+.g-mail.is-closing .g-tickets,
+.g-mail.is-closing .g-album {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.g-mail.is-closing .g-mail-scrim {
+  opacity: 0;
+}
+
+.g-mail.is-closing .g-pc {
+  pointer-events: none;
+  transition:
+    transform 0.5s cubic-bezier(0.4, 0, 0.7, 1),
+    opacity 0.14s ease 0.36s;
+}
+
 /* the rail's icon steps aside while the basket is out of it */
-.g-basketbtn svg {
+.g-basketbtn svg,
+.g-basketbtn .g-basket-icon {
   transition: opacity 0.16s ease;
 }
 
-.g-basketbtn.is-away svg {
+.g-basketbtn.is-away svg,
+.g-basketbtn.is-away .g-basket-icon {
   opacity: 0;
 }
 
