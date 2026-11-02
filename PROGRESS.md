@@ -32,6 +32,19 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the mist strokes, a height fog, and water and rice in the paddies
+
+Started from fbb25fd (the mist as brushed strokes in three layers). Kai (2026-11-02), on the local server; this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | "Shapes still need more work" | |
+| 2 | "Overlapping actually doesn't look great: reduce to one layer, but have a bit more in the layer" | |
+| 3 | "No shadow from clouds" | |
+| 4 | "Add some translucency to them, and vary based on width" | |
+| 5 | "Add a general height-based fog" | |
+| 6 | "Start adding water and rice to paddies, based on base color: white is full water, dark green is very dense grass, and everything in between" | |
+
 ### Kai's notes on the mist layers
 
 Started from 27961a4 (the mist in three layers). Kai (2026-11-02), with the blue-green landscape again (reference/terraces/clouds-ribbons-blue-green.webp) "to match as close as possible"; this table fills in as they are done.
