@@ -132,9 +132,18 @@ export const schema = {
     shadow: num('csh', 'Shadow', 0.88, 0, 1, 0.01, 'live'),
   },
   terraces: {
-    hills: num('th', 'Hills', 13, 4, 36, 0.5, 'terrain', { unit: 'm' }),
-    forest: num('tf', 'Woods', 0.1, 0, 0.9, 0.01, 'terrain'),
-    fog: num('tfg', 'Valley fog', 0.55, 0, 1, 0.01, 'live'),
+    // (the old world's, read by nothing since the planet became mathematics: kept in the URL, out of the panel)
+    hills: num('th', 'Hills', 13, 4, 36, 0.5, 'terrain', { unit: 'm', hidden: true }),
+    forest: num('tf', 'Woods', 0.1, 0, 0.9, 0.01, 'terrain', { hidden: true }),
+    fog: num('tfg', 'Valley fog', 0.55, 0, 1, 0.01, 'live', { hidden: true }),
+    // the height fog (terraces/fog.glsl): how thick it is, the height it fills the valleys to, and how far over that
+    // it thins away
+    fogDensity: num('tfd', 'Fog density', 0.6, 0, 1, 0.01, 'live'),
+    fogRange: num('tfr', 'Fog range', -3, -24, 12, 0.5, 'live', { unit: 'm' }),
+    fogFalloff: num('tff', 'Fog falloff', 6, 0.5, 30, 0.5, 'live', { unit: 'm' }),
+    // the mist (terraces/mist.ts): its height over the land's form, how dense it is
+    cloudHeight: num('tch', 'Cloud height', 2, -8, 14, 0.5, 'live', { unit: 'm' }),
+    cloudDensity: num('tcd', 'Cloud density', 1, 0, 2, 0.05, 'live'),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),

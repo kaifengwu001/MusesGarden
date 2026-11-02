@@ -102,6 +102,11 @@ export class TerraceMist {
   /** The wind's axis and the coverage the strokes were made for (made again if either changes). */
   private readonly bakedAxis = new Vector3();
   private bakedCoverage = Number.NaN;
+  private bakedHeight = Number.NaN;
+  /** The height and coverage last asked for, and when either last changed (ms). */
+  private height = MIST.height;
+  private wantCoverage = Number.NaN;
+  private changedAt = 0;
   private readonly bake: ShaderMaterial;
   private readonly bakeMesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
   private readonly bakeScene: Scene;
@@ -118,7 +123,7 @@ export class TerraceMist {
     this.uniforms = {
       uMistBands: { value: this.bands.texture },
       uMistDrift: { value: new Matrix3() },
-      uMistLayer: { value: new Vector4(MIST.height, MIST.follow, OFFSET, 0) },
+      uMistLayer: { value: new Vector4(MIST.height, MIST.follow, OFFSET, 1) },
       uMistGround: { value: this.ground },
     };
     Object.assign(shared, this.uniforms);
@@ -160,34 +165,47 @@ export class TerraceMist {
     this.mesh.renderOrder = 3;
   }
 
-  /** Make and draw a seed's strokes (again if the wind turns or the coverage changes) and the ground's height (once a seed), then set the layer's drift for now. */
-  update(renderer: WebGLRenderer, seed: number, field: PlanetField, R: number, time: number, coverage: number, speed: number, windAxis: Vector3): void {
+  /**
+   * Make and draw a seed's strokes (again if the wind turns, or the coverage or the height changes: a moment after the
+   * last change, so a slider's drag does not make them at every step) and the ground's height (once a seed), then set
+   * the layer for now: its height (at once) and density (the panel's sliders), its drift.
+   */
+  update(renderer: WebGLRenderer, seed: number, field: PlanetField, R: number, time: number, coverage: number, speed: number, windAxis: Vector3, height: number, density: number): void {
     // (the share of the strokes shown: all of them at 0.72, 0.625 at the panel's default 0.45)
     const shown = Math.round(Math.min(Math.max(coverage / 0.72, 0), 1) * 100) / 100;
     if (seed !== this.groundFor) {
       this.bakeGround(field);
       this.groundFor = seed;
     }
-    if (seed !== this.bakedFor || this.bakedAxis.dot(windAxis) < 0.9999 || shown !== this.bakedCoverage) {
-      this.bakeStrokes(renderer, seed, R, windAxis, shown);
+    const now = performance.now();
+    if (height !== this.height || shown !== this.wantCoverage) {
+      this.height = height;
+      this.wantCoverage = shown;
+      this.changedAt = now;
+    }
+    const settled = now - this.changedAt > 300;
+    if (seed !== this.bakedFor || this.bakedAxis.dot(windAxis) < 0.9999 || (settled && (shown !== this.bakedCoverage || height !== this.bakedHeight))) {
+      this.bakeStrokes(renderer, seed, R, windAxis, shown, height);
       this.bakedFor = seed;
       this.bakedAxis.copy(windAxis);
       this.bakedCoverage = shown;
+      this.bakedHeight = height;
     }
+    (this.uniforms.uMistLayer.value as Vector4).set(height, MIST.follow, OFFSET, density);
     // (its lookup turned back about the wind's axis as far as the wind has carried it: the strokes go with the wind)
-    const angle = (time * (0.4 + 3.2 * speed) * MIST.drift) / (R + MIST.height);
+    const angle = (time * (0.4 + 3.2 * speed) * MIST.drift) / (R + height);
     (this.uniforms.uMistDrift.value as Matrix3).setFromMatrix4(this.turn.makeRotationAxis(windAxis, -angle));
   }
 
   /** The strokes, made (mistStrokes.ts) and drawn into the cube map, a face at a time. */
-  private bakeStrokes(renderer: WebGLRenderer, seed: number, R: number, windAxis: Vector3, shown: number): void {
+  private bakeStrokes(renderer: WebGLRenderer, seed: number, R: number, windAxis: Vector3, shown: number, height: number): void {
     const previous = renderer.getRenderTarget();
-    const shell = R + MIST.height;
+    const shell = R + height;
     // (how far the layer clears the ground, read from the ground's raster as the mist's paint reads it)
     const g = [0, 0, 0];
     const clearance = (d: readonly number[]): number => {
       this.groundAt(d, g);
-      return MIST.height + g[1] + (g[2] - g[1]) * MIST.follow - g[0];
+      return height + g[1] + (g[2] - g[1]) * MIST.follow - g[0];
     };
     const made = makeStrokes(MIST, hash32((seed + 0x3157) >>> 0), shell, [windAxis.x, windAxis.y, windAxis.z], clearance, shown);
     this.strokes = { strokes: made.strokes, children: made.children, segments: made.count, area: Math.round(made.area) };

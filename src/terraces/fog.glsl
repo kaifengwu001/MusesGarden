@@ -1,22 +1,26 @@
-// The terraces' height fog (Kai, 2026-11-02: "a general height based fog"): a haze denser the lower it lies, settled
-// in the valleys and thinning up the hills, its density falling off exponentially with height over the radius. Its
-// amount along a view ray is worked out exactly, from the camera's height to the point's (so a valley seen from a
-// hill is hazed through all the fog it holds, a hilltop seen from orbit hardly at all). Its colour the sky's haze, a
-// little paler, so the far land fades toward the sky behind it.
+// The terraces' height fog (Kai, 2026-11-02: "a general height based fog", with sliders for its density, range and
+// falloff): a haze filling the valleys at its full density up to its range (a height over the radius), thinning away
+// above it by e every falloff meters. Its amount along a view ray is worked out exactly, from the camera's height to
+// the point's (so a valley seen from a hill is hazed by all the fog it holds, a hilltop seen from orbit hardly at all).
+// Its colour the sky's haze, a little paler, so the far land fades toward the sky behind it.
 // Requires: the palette (toon).
-uniform vec4 uHeightFog; // its density at its base (1/m), its base's height and its scale height (m over the radius), the camera's height (m over the radius)
+uniform vec4 uHeightFog; // its density (1/m), its range and its falloff (m: the height it fills to, over the radius; how far above that it thins by e), the camera's height (m over the radius)
+
+// The fog's density summed up to height h from far below, over its full density (m): all of it up to its range,
+// thinning above.
+float heightFogColumn(float h) {
+  float top = uHeightFog.y;
+  float H = uHeightFog.z;
+  return h <= top ? h : top + H * (1.0 - exp(-(h - top) / H));
+}
 
 // How much of the fog lies between the camera and a point dist m away at height h (m over the radius): 0 … 1.
 float heightFogAmount(float dist, float h) {
-  float h0 = uHeightFog.y;
-  float H = uHeightFog.z;
-  float hc = max(uHeightFog.w, h0 - 2.0 * H);
-  float hp = max(h, h0 - 2.0 * H);
-  float ec = exp(-(hc - h0) / H);
-  float ep = exp(-(hp - h0) / H);
-  float dh = hp - hc;
-  // (the density's mean along the ray, its exact integral over the heights it passes)
-  float mean = abs(dh) > 0.05 ? H * (ec - ep) / dh : 0.5 * (ec + ep);
+  float hc = uHeightFog.w;
+  float dh = h - hc;
+  // (the density's mean along the ray: the column between its two heights over their difference)
+  float hm = 0.5 * (h + hc);
+  float mean = abs(dh) > 0.05 ? (heightFogColumn(h) - heightFogColumn(hc)) / dh : (hm <= uHeightFog.y ? 1.0 : exp(-(hm - uHeightFog.y) / uHeightFog.z));
   return 1.0 - exp(-uHeightFog.x * dist * mean);
 }
 

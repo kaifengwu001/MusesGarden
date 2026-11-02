@@ -828,11 +828,13 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   at its necks to 86 % in its bodies), a little denser seen aslant,
   thinning round the camera. It casts no shadow. The paddies' water
   mirrors it (`mistReflected`: where the reflected ray meets the layer).
-- The height fog (fog.glsl, `uHeightFog`): a density falling off by e every
-  6 m up from 16 m under the radius, its amount along each view ray its
-  exact integral from the camera's height to the point's, the sky's haze in
-  colour; over the terraces, trees, towers, houses, rice and mist (not the
-  sky, which is shared).
+- The height fog (fog.glsl, `uHeightFog`, the panel's Fog density, range
+  and falloff): its full density up to its range (a height over the
+  radius), thinning above by e every falloff meters; its amount along each
+  view ray its exact integral from the camera's height to the point's, the
+  sky's haze in colour; over the terraces, trees, towers, houses, rice and
+  mist (not the sky, which is shared). The mist's height and density are
+  the panel's Cloud height and Cloud density.
 - The paddies' water (terrace.frag.glsl, rice.glsl `paddyWater`): each
   floor shows as much water as its look says (all flooded, 45 % just
   planted, 20 % growing, 6 % grown, none deep), mirroring the sky a little

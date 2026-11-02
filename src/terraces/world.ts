@@ -29,13 +29,6 @@ import { Rice, RICE } from './rice';
 import { Trees } from './trees';
 import { TerraceMist } from './mist';
 
-/**
- * The height fog (Kai, 2026-11-02: "a general height based fog", fog.glsl): its density at its base (1/m), its base's
- * height and its scale height (m over the radius): settled in the valleys (the ground is under −9 m over a quarter of
- * the planet), thinning up the hills by e every 6 m: across a valley 60 m wide at −10 m, a third of the land hazed.
- */
-const HEIGHT_FOG = { density: 0.0085, base: -16, scale: 6 } as const;
-
 /** Kai's models, made light by scripts/terraces-models.mjs (a unit tall, two levels of detail each). */
 const MODEL_URLS = (kind: 'mountain' | 'house'): string[] => [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/${kind}${k}.glb`, import.meta.url).href);
 
@@ -120,7 +113,7 @@ export class TerraceWorld implements PlanetWorld {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
-    uHeightFog: { value: new Vector4(HEIGHT_FOG.density, HEIGHT_FOG.base, HEIGHT_FOG.scale, 0) },
+    uHeightFog: { value: new Vector4(0, -3, 6, 0) },
   };
   private posed = false;
   private noiseSeed = -1;
@@ -355,8 +348,11 @@ export class TerraceWorld implements PlanetWorld {
     this.rice.update(this.renderer, { seed: p.world.seed, radius: R, radiusHi: this.band.radiusHi, focus: rig.up, frustum: this.frustum, warp: this.warp, queue: this.queue, near: riceNear }, riceNear, p.wind.sheen * 1.2);
     this.own.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
     // the mist: its layers drifting with the wind, by the panel's coverage, speed and shadow
-    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, this.windAxis);
-    this.own.uHeightFog.value.w = rig.altitude;
+    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, this.windAxis, p.terraces.cloudHeight, p.terraces.cloudDensity);
+    // the height fog (fog.glsl), by the panel's sliders: its density (the slider's square, so the low end is fine:
+    // 0.018 a m at its default, 0.05 at its fullest), the height it fills the valleys to, how far over that it thins
+    const t = p.terraces;
+    this.own.uHeightFog.value.set(0.05 * t.fogDensity * t.fogDensity, t.fogRange, Math.max(t.fogFalloff, 0.5), rig.altitude);
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }

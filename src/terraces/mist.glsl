@@ -4,7 +4,7 @@
 // Requires: uRadius; the terraces' palette (terraces_common).
 uniform samplerCube uMistBands; // the distance from the nearest stroke's edge (m, at an offset), its half-breadth there (m)
 uniform mat3 uMistDrift;        // planet direction → the strokes, as far as the wind has carried them
-uniform vec4 uMistLayer;        // its height (m over its form), how far its form follows the hills, the distances' offset, -
+uniform vec4 uMistLayer;        // its height (m over its form), how far its form follows the hills, the distances' offset, its density (× its own: the panel's slider)
 uniform sampler2D uMistGround;  // the ground's height, the land's broadest form, the hills' form (m over the radius): a raster a cube face, the six stacked
 
 // The ground's height, the land's broadest form and the hills' form under it (m over the radius) at a direction.
@@ -46,9 +46,9 @@ float mistBody(float edge, float fray) {
 }
 
 // How opaque a stroke is by its breadth there (Kai: "add some translucency to them, and vary based on width"): its
-// thin necks and tails see-through, its broad bodies nearly whole.
+// thin necks and tails see-through, its broad bodies nearly whole; all of it the denser by the layer's density.
 float mistOpacity(float half_) {
-  return mix(0.3, 0.86, smoothstep(0.5, 3.8, half_));
+  return min(mix(0.3, 0.86, smoothstep(0.5, 3.8, half_)) * uMistLayer.w, 0.97);
 }
 
 // The mist's colour where a stroke is (edge: how far inside its edge, m; fray as for mistBody): as the painting's
