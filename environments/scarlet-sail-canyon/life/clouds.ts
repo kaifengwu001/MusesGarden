@@ -42,6 +42,7 @@ import lumpsFragment from '../../../src/life/cloudLumpsBake.frag.glsl?raw';
 import vertexShader from '../../../src/life/cloud.vert.glsl?raw';
 import shadowFragment from '../../../src/life/cloudShadow.frag.glsl?raw';
 import shadowVertex from '../../../src/life/cloudShadow.vert.glsl?raw';
+import { makeCloudPuffs, type CloudPuff } from './cloudShapes';
 import { MASK_CELL, WaterMask } from '../../../src/life/waterMask';
 
 // Low cumulus drifting with the wind a few meters above the meadow. Each
@@ -160,14 +161,7 @@ export interface CloudUniforms {
   uCloudMirrorExtent: IUniform<Vector4>;
 }
 
-interface Puff {
-  /** Offset × cloud size: x along the cloud, y up from its base, z across. */
-  x: number;
-  y: number;
-  z: number;
-  r: number;
-  phase: number;
-}
+type Puff = CloudPuff;
 
 /** A swirl in the weather: the flow circles its centre, spiralling in (inflow > 0) or out. */
 interface Vortex {
@@ -203,6 +197,8 @@ interface Slot {
   dir: Vector3;
   along: Vector3;
   cloudiness: number;
+  template: number;
+  altitude: number;
   /** Size factor: each streak has its own girth, and swells and thins along its length. */
   girth: number;
   seed: number;
@@ -211,19 +207,6 @@ interface Slot {
 function rng(seed: number): () => number {
   let s = hash32(seed >>> 0);
   return () => unit((s = hash32((s + 0x9e3779b9) >>> 0)));
-}
-
-/** Wind-combed mist banks: low, elongated sheets with a quiet scalloped edge. */
-function makePuffs(rand: () => number): Puff[] {
-  const e = 1.05 + 0.2 * rand();
-  const puffs: Puff[] = [];
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const r = 0.24 + 0.08 * Math.sin(t * Math.PI) + rand() * 0.025;
-    puffs.push({ x: (t - 0.5) * 1.5 * e, y: r * 0.6, z: (rand() - 0.5) * 0.12, r, phase: rand() * Math.PI * 2 });
-  }
-  for (let i = 0; i < 2; i++) puffs.push({ x: (i - 0.5) * 0.45 * e, y: 0.32, z: 0.08, r: 0.3, phase: rand() * Math.PI * 2 });
-  return puffs;
 }
 
 /** `count` directions, each placed farthest from those before it: any prefix is evenly spread. */
@@ -652,7 +635,7 @@ export class Clouds {
       });
       return { points, cloudy, girth, seed: hash32(seed + li * 7919) };
     });
-    this.templates = Array.from({ length: TEMPLATES }, () => makePuffs(rand));
+    this.templates = Array.from({ length: TEMPLATES }, (_, i) => makeCloudPuffs(rand, Math.floor(i / 12)));
     this.seed = seed;
     this.slotsR = Number.NaN;
   }
@@ -666,21 +649,30 @@ export class Clouds {
     for (const line of this.lines) {
       const pts = line.points;
       const length = (pts.length - 1) * step;
+      const phase = unit(hash32(line.seed + 31)) * Math.PI * 2;
+      const altitude = 0.82 + unit(hash32(line.seed + 47)) * 0.34;
       for (let j = 0; (j + 0.5) * spacing < length; j++) {
-        const at = ((j + 0.5) * spacing) / step;
+        // Bounded jitter keeps slot order while breaking the bead-like cadence.
+        // Correlated side bends join neighbouring clouds into uneven banks.
+        const interval = j + 0.5 + Math.sin(j * 0.91 + phase) * 0.24;
+        const at = Math.min(length / step, interval * spacing / step);
         const i = Math.min(Math.floor(at), pts.length - 2);
         const f = at - i;
         // slots are reused frame to frame (R changes every frame while the planet grows)
-        const slot = (this.slots[count++] ??= { dir: new Vector3(), along: new Vector3(), cloudiness: 0, girth: 1, seed: 0 });
+        const slot = (this.slots[count++] ??= { dir: new Vector3(), along: new Vector3(), cloudiness: 0, girth: 1, seed: 0, template: 0, altitude: 1 });
         const dir = slot.dir.lerpVectors(pts[i], pts[i + 1], f).normalize();
         const along = slot.along.subVectors(pts[i + 1], pts[i]);
         along.addScaledVector(dir, -along.dot(dir)).normalize();
         // a little off the line, to either side, so neighbouring streaks do not run in step
         slot.seed = hash32(line.seed + j * 131);
         const side = this.across.crossVectors(dir, along);
-        dir.addScaledVector(side, (unit(hash32(slot.seed + 5)) - 0.5) * 0.4 * STREAM.sep).normalize();
+        dir.addScaledVector(side, (Math.sin(j * 0.67 + phase) * 0.32 + (unit(hash32(slot.seed + 5)) - 0.5) * 0.24) * STREAM.sep).normalize();
+        // A short run shares its cloud family, then breaks into another shape.
+        const family = hash32(line.seed + Math.floor(j / 3) * 997) % 5;
+        slot.template = family * 12 + hash32(slot.seed + 71) % 12;
+        slot.altitude = altitude + Math.sin(j * 0.58 + phase) * 0.07;
         along.addScaledVector(dir, -along.dot(dir)).normalize();
-        slot.girth = line.girth[i] + (line.girth[i + 1] - line.girth[i]) * f;
+        slot.girth = (line.girth[i] + (line.girth[i + 1] - line.girth[i]) * f) * (0.76 + 0.48 * (0.5 + 0.5 * Math.sin(j * 0.78 + phase)));
         slot.cloudiness = line.cloudy[i] + (line.cloudy[i + 1] - line.cloudy[i]) * f;
       }
     }
@@ -758,7 +750,7 @@ export class Clouds {
       const at = this.placed[this.order.length];
       at.slot = slot;
       at.fade = fade;
-      at.base = radius + p.altitude * (0.75 + 0.5 * unit(hash32(h + 1))) * Math.pow(scale, 0.35);
+      at.base = radius + p.altitude * slot.altitude * Math.pow(scale, 0.35);
       at.size = SIZE * sizeScale * girth * (0.9 + 0.2 * unit(hash32(h + 2))) * (0.35 + 0.65 * fade);
       const angle = (time * speed) / at.base;
       at.up.copy(slot.dir).applyAxisAngle(windAxis, angle);
@@ -784,7 +776,7 @@ export class Clouds {
     this.order.forEach((at, row) => {
       const h = at.slot.seed;
       const { size, base } = at;
-      const puffs = this.templates[h % TEMPLATES];
+      const puffs = this.templates[at.slot.template];
       const across = this.across.crossVectors(at.up, at.along);
       const o = row * COLUMNS * 4;
       // bounding sphere about the heap's middle
