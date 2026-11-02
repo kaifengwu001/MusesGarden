@@ -667,13 +667,15 @@ radius fixed at 128 m, built once. Its ground is mathematics (Kai,
 generated the lab's way, nothing on it measured off a mesh or a baked
 texture. The world it replaced (its baked fields, cells, plots, ground mesh
 and paint, its river, villages, towers, birds and fog) was abandoned; what
-of it comes back will come back as mathematics on these hills. Its code is
-in `src/terraces/`.
+of it comes back comes back as mathematics on these hills (Kai's towers and
+houses, the meadow's clouds so far). Its code is in `src/terraces/`.
 
 ### The planet's mathematics (build/field.ts)
 
 - **The hills**: gradient noise at four scales in meters (260, 80, 28 and
-  10 m, weights 1, 0.35, 0.1, 0.035; 36 m of relief: the lab's hillside),
+  10 m, weights 1, 0.35, 0.1, 0.035; 50 m of relief: on this planet the
+  lab's 36 m came out gentler than the lab's canvas, at 50 its ground falls
+  into flats, terraces and woods as the canvas's does),
   read at the point on the sphere at R, so the hills are the same shape
   every way and wrap round the planet without a seam; their gradient worked
   out exactly from each octave's own (`gnoiseGrad`).
@@ -683,6 +685,10 @@ in `src/terraces/`.
 - **The smoothed slope**: the gradient of the octaves 12 m and broader,
   wandering ±30 % over 13 m. Over 0.3 is the woods, under 0.06 the flats,
   the terraces between.
+- **The plains** (`Plains`, laid by the build): the terrace field eased to
+  each plain's level by its weight there (1 on the plain, falling to 0
+  across its collar), its exact gradient carried through; `ground` eases
+  the woods' ground with it.
 
 ### The construction (build/sphere.ts, bands.ts, construct.ts)
 
@@ -694,6 +700,22 @@ in `src/terraces/`.
   by the triangles either side and by the outline through it. A piece's
   corner on a grid edge takes its side from where that edge's own crossing
   lies; only a corner inside a triangle has the field worked out there.
+- **The towers** first (Kai's karst towers, 2026-11-02): groups of 2–4 on
+  the highest tops of the hills' broader height (7 groups at least 70 m
+  apart), the tallest (30–44 m) on the top and the rest round it, each its
+  own model, turn and stretch; the woods round each foot (their own class
+  within half its height); each tower's base under the lowest ground round
+  it, set once the land is.
+- **The plains**: each stretch of the flats (joined across the grid's
+  triangles) cut out of the land before the bands, as the lab's flats were:
+  held level at one level (the floor of the band in the middle of the most
+  of its ground); its narrow bays (under 14 m), its islands and the mounds
+  its level closes round (under 800 m²) filled; its edge's distance kept on
+  a 0.5 m raster on the plane at its middle (an exact distance transform,
+  blurred 1.5 m); a collar 14–32 m wide (the farther its ground lay off its
+  level, the wider) easing the land back. No band's outline crosses a
+  plain; the land its collar keeps at its level is its too, up to the next
+  banks.
 - **The lab's steps**, each on the exact fields: the classes (small patches
   of woods or flats terraced like the land round them), the bands (a
   point's band the highest level whose field is ≥ 0 there), the cuts
@@ -704,8 +726,9 @@ in `src/terraces/`.
   clearance, so the result is the true nearest whatever the order), the
   bands again with the shifts, small rings levelled, the cuts' lines up
   their bands.
-- **Pieces**: each triangle cut into the woods, the flats' fields and the
-  bands, a band's piece parted exactly along a cut; the pieces joined into
+- **Pieces**: each triangle cut into the woods, a plain (its fields, or a
+  village's ground) and the bands round it, a band's piece parted exactly
+  along a cut; the pieces joined into
   paddies (union-find, the cuts' edges barriers); each paddy's place in
   the season from a slow noise at its middle (one in seven its own),
   mapped so that at the season's default front the paddies share the lab's
@@ -722,26 +745,30 @@ in `src/terraces/`.
   side; open banks and ridges carried a little past their ends; trees
   jittered over the woods. A check counts any step between two terraced
   floors with no bank within 12 cm (`bare`).
-- **The flats** (the lab's plots, after Kai's aerial of flat rice fields):
-  each flat patch (its vertices joined across the grid's triangles; 16 on
-  the planet) is a lattice of its own on the plane at its middle: strips
-  9 m apart across the way its land falls on the whole (the dominant way
-  of the hills' broader gradient over it, so a valley's two sides agree),
-  crossed every 32 m along it, both bending a little over about 60 m. A
-  field is a cell, cut exactly along the lattice's lines (root-found like
-  every outline, shared with the bunds along them), level at the band its
-  ground's mean lies in, grown, its own green. Thin dark bunds along the
-  lines (on the higher field, down to the lower), every fourth crossing a
-  pale track in their place, each line traced over its own patch's squares
-  only; the bands' outlines are no steps on the flats (no banks there), and
-  where the flats meet the terraces a bund runs along the edge. A check
-  counts the fields standing more than 1.5 steps over or under some of
-  their ground (`fieldsOver`, `fieldsUnder`, `fieldsWorst`).
+- **A plain's fields** (Kai's two aerials of flat rice fields, 2026-11-02):
+  a few major curves across it (a winding track along it, bunds across it
+  branching off the track to one side), each the zero of a field of its own
+  on the plane at the plain's middle, bending gently over 26–40 m, part it
+  into sections; each section's strips (3–5 m, as many as keep its widest
+  stretch's that wide) fan between the two curves it lies between (or to a
+  rail beyond the plain's edge), crossed every 8–14 m square to its first
+  side, every line bending a little of its own. Each piece of a plain is
+  split along the curves, then cut between its section's lines, each field
+  kept back from its lines by their half-width in meters; every field at
+  the plain's level (co-planar), the lines sunk between them as grooves
+  (dark; the major bunds wider and deeper; the track pale, barely sunk),
+  each traced over its plain's squares on its own field. A bund runs round
+  a plain where the terraces meet it.
+- **The villages**: every other plain by size from the second (two at most,
+  over 400 m²): its ground packed earth and grass at its level, its track
+  its street; Kai's houses huddled along the street and out over its ground,
+  their yards meeting, square to the street; trees in clumps between them.
 - **Built in a worker** (worker.ts) when the planet is first visited (about
-  30 s on this Mac); 96 meshes, a sixteenth of a cube face each
-  (builder.ts). The harness's settle waits for it (`PlanetWorld.whenBuilt`).
+  35 s on this Mac); 96 meshes, a sixteenth of a cube face each
+  (builder.ts), and the towers, houses and trees placed. The harness's
+  settle waits for it (`PlanetWorld.whenBuilt`).
 
-### Drawing (terrace.*.glsl, rice, trees)
+### Drawing (terrace.*.glsl, rice, trees, models, clouds)
 
 - Painted as the paddy lab paints (Kai, 2026-11-01: the planet had lost
   the lab's look): each part one colour from the lab's palette (`aPart`):
@@ -750,10 +777,20 @@ in `src/terraces/`.
   grey, just planted lime, growing, grown, grown deep), the dams and the
   cross-banks cream, the risers olive, the earth (the woods' edge, the
   flats' bunds) dark, the woods' ground two greens a noise mixes (rock where
-  steeper than 1.3), the tracks pale. All lit as the lab lights them
-  (`labLight`: three.js's hemisphere light and sun on a matt surface,
-  Lambert over π, the lab's colours and strengths, tinted by the time of
-  day), then the haze of distance. `dbg=land` colours the parts flat.
+  steeper than 1.3), the tracks pale, a village's ground earth and grass.
+  All lit as the lab lights them (`labLight`: three.js's hemisphere light
+  and sun on a matt surface, Lambert over π, the lab's colours and
+  strengths, tinted by the time of day; under a cloud's shadow the sun's
+  share dimmed, the light a little cooler), then the haze of distance.
+  `dbg=land` colours the parts flat.
+- Kai's towers and houses (models.ts, model.*.glsl): instanced per model
+  and level of detail where the build placed them, rigid, lit as the
+  terraces are, full detail near (140 m a tower, 60 m a house).
+- The clouds: the meadow's (life/clouds.ts), cloudier (the panel's coverage
+  plus 0.3), each cloud's base the panel's altitude over the highest of the
+  hills within 12 m of it as it drifts (a 96² raster a cube face); their
+  shadows read through the meadow's lookup (`cloudShadowAt`); their lake
+  passes skipped (no lakes).
 - No grade but the paper grain: a planet may carry its own final grade
   (`PlanetWorld.grade`, render/post.ts), and the terraces' is the lab's,
   which draws straight to the canvas: no tone curve, bloom, contrast or
@@ -805,7 +842,7 @@ in `src/terraces/`.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve (a planet may do without it and the bloom), paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      terraces/            the second planet: its mathematics (build/field.ts), the paddy lab's construction on it (build/: the grid, bands and cuts, the build in a worker), its paint, trees and rice
+      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker), its paint, trees, rice, Kai's models (models.ts) and the meadow's clouds
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
