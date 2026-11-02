@@ -113,6 +113,9 @@ interleaved rounds, the machine busy with other sessions, so ±1–2 ms):
   saved from above and at the vista, almost nothing at the bank. From above
   the fog went see-through in streaks (142,000 pixels off by more than 16
   levels at 170 m): its steps passed over the thin layer.
+- **Decided (Kai):** the fog's cost is fine as it is. The unfolding is a
+  once-and-done cinematic, so the fog shows once. Not worth optimizing (a
+  half-resolution fog would have been the next step).
 
 Open (questions for Kai, and what wasn't done):
 
