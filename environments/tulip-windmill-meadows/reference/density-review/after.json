@@ -1,0 +1,559 @@
+{
+  "at": "2026-11-02T09:36:39.965Z",
+  "stage": "after",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "viewport": [
+    1440,
+    960
+  ],
+  "dpr": 1,
+  "errors": [],
+  "views": [
+    {
+      "name": "user-fields",
+      "hash": "q=high&hud=0&t=12&pose=0.7621,0.0711,-0.6433,-0.0197,0.83",
+      "stats": {
+        "frameMs": 16.80000000000109,
+        "jsMs": 1.699999999254942,
+        "gpuMs": 3.887104,
+        "drawCalls": 49,
+        "triangles": 4883187,
+        "trianglesSubmitted": 4883187,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 28,
+        "programs": 32,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 139,
+        "lodMin": 3,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7837.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Dense tulips wherever you wander",
+          "instances": 50176,
+          "triangles": 64
+        },
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 67270,
+          "triangles": 22
+        }
+      ]
+    },
+    {
+      "name": "home",
+      "hash": "q=high&hud=0&t=12&pose=0.1082,-0.2712,0.6564,0.6956,0.7877",
+      "stats": {
+        "frameMs": 16.69999999999891,
+        "jsMs": 1.7999999970197678,
+        "gpuMs": 3.46112,
+        "drawCalls": 51,
+        "triangles": 4936941,
+        "trianglesSubmitted": 4936941,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 30,
+        "programs": 33,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 147,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7837.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Dense tulips wherever you wander",
+          "instances": 50176,
+          "triangles": 64
+        },
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 67270,
+          "triangles": 22
+        }
+      ]
+    },
+    {
+      "name": "garden",
+      "hash": "q=high&hud=0&t=12&pose=0.0769,-0.2641,0.6466,0.7115,0.685",
+      "stats": {
+        "frameMs": 16.69999999999891,
+        "jsMs": 1.5,
+        "gpuMs": 4.25984,
+        "drawCalls": 51,
+        "triangles": 4947797,
+        "trianglesSubmitted": 4947797,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 30,
+        "programs": 33,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 144,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7837.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Dense tulips wherever you wander",
+          "instances": 50176,
+          "triangles": 64
+        },
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 67270,
+          "triangles": 22
+        }
+      ]
+    },
+    {
+      "name": "middle-distance",
+      "hash": "cam=overview&q=high&hud=0&t=12&pose=0.0769,-0.2641,0.6466,0.7115,0.4961",
+      "stats": {
+        "frameMs": 16.700000000000728,
+        "jsMs": 1.300000000745058,
+        "gpuMs": 3.2,
+        "drawCalls": 50,
+        "triangles": 4915739,
+        "trianglesSubmitted": 4915739,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 30,
+        "programs": 33,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 106,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7837.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Dense tulips wherever you wander",
+          "instances": 50176,
+          "triangles": 64
+        },
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 67270,
+          "triangles": 22
+        }
+      ]
+    },
+    {
+      "name": "planet",
+      "hash": "cam=overview&q=high&hud=0&t=12&pose=0.0769,-0.2641,0.6466,0.7115,0",
+      "stats": {
+        "frameMs": 16.700000000000728,
+        "jsMs": 0.9000000022351742,
+        "gpuMs": 1.696768,
+        "drawCalls": 46,
+        "triangles": 1568047,
+        "trianglesSubmitted": 1568047,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 23,
+        "geometries": 33,
+        "programs": 34,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 14,
+        "lodMin": 0,
+        "lodMax": 1,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7837.39999999851,
+        "time": 12,
+        "frozen": true
+      },
+      "batches": [
+        {
+          "name": "Dense tulips wherever you wander",
+          "instances": 50176,
+          "triangles": 64
+        },
+        {
+          "name": "Six-colour tulip fields",
+          "instances": 67270,
+          "triangles": 22
+        }
+      ]
+    }
+  ],
+  "source": {
+    "branch": "environment/tulip-windmill-meadows",
+    "base": "791263247a656a90c8950f4ef866eac564f2ea1f",
+    "uncommitted": true,
+    "files": [
+      {
+        "path": "core/hashSync.ts",
+        "sha256": "fc0c7c1357991b49a703494dbbaea35586dd7b00bac0a593e13e9e09f227666b"
+      },
+      {
+        "path": "dev/harness.ts",
+        "sha256": "eef326282b971b11b41d5646eca61fcf5f23a9ae83080602edcffa73708bbafd"
+      },
+      {
+        "path": "dev/hud.ts",
+        "sha256": "954362a933f0e3243adb1b97215fc18d5a279b570d529751d145b10e2791af35"
+      },
+      {
+        "path": "dev/invariants/growth.test.ts",
+        "sha256": "bcf69b8714a3b6c9a8b3abcd3fad8bfd7051aeef8f153ad73d798a207f73228e"
+      },
+      {
+        "path": "dev/invariants/params.test.ts",
+        "sha256": "c52b5f7317d282ea16d92195a08a3a6ecc9b3e7d9dfeefee8143d3a96aff6f3b"
+      },
+      {
+        "path": "dev/invariants/scale.test.ts",
+        "sha256": "f4eb7a2f1ce61a06a009586c57f1bf8cce256eb4fdf3871ef9cfd75318a0b184"
+      },
+      {
+        "path": "dev/invariants.spec.ts",
+        "sha256": "af016fdf2615ee2c34a92295bf87e1bc5fa66aefcedb2ce70af1dc2915a75e16"
+      },
+      {
+        "path": "dev/lock.spec.ts",
+        "sha256": "a1a17785e6051eb9273d990fd098f8159e03a9784f7a6980874e007fdf39b238"
+      },
+      {
+        "path": "dev/parity.ts",
+        "sha256": "d0b437d88bf2fd687d836e5f11a96679a2a0f65d7ee912a9a3f320ca34c4d2c1"
+      },
+      {
+        "path": "dev/tulip.test.ts",
+        "sha256": "6453dfba8fd257f8a7a1e78b03860eed81b2b8ce11f97390bed2d70578c9e44d"
+      },
+      {
+        "path": "dev/world.spec.ts",
+        "sha256": "0d51bff6fd34df7b5f7156e4112681ba4412c1a30d13ffc31057580ad52489f2"
+      },
+      {
+        "path": "garden/placement.ts",
+        "sha256": "3173e7134df87369eda9429a87c6cb36a6381f0982ef7f6208026d763e3ff29a"
+      },
+      {
+        "path": "garden/state.ts",
+        "sha256": "17f5c9e126d1d9c4b8e1c3fb4c120db9aee18961acc84c7484627c1956541894"
+      },
+      {
+        "path": "life/birds.ts",
+        "sha256": "de9f19686aa329712a92090e764441f3ed9e3796e8c47919b84b22d0ad134d93"
+      },
+      {
+        "path": "life/butterflies.ts",
+        "sha256": "5625ad2ad3d9cc32918cdc3532e34ac8f33968ec93bc562e95025e4c6ebf3fa5"
+      },
+      {
+        "path": "life/denseTulips.ts",
+        "sha256": "00658eee53357a8e93dc95c855aeeeac5e3ec2ff1df88c6f827341d1f7994d87"
+      },
+      {
+        "path": "life/farmLayout.ts",
+        "sha256": "3e6749dcc90bac9adefde2245bcbec6510a6ace99eac0739851ed213cf67c87d"
+      },
+      {
+        "path": "life/findBeds.ts",
+        "sha256": "8a4a47c2ad8ef82a67eb68e01d49a3b132757004908e4bf21c14ee4f78c66247"
+      },
+      {
+        "path": "life/flower.vert.glsl",
+        "sha256": "c0cafd22b1172cdc80ee399944521b86cde3543d7a3318855acea343dcb2cac4"
+      },
+      {
+        "path": "life/flowerMeshes.ts",
+        "sha256": "6c89f1dee8486e17f70b647d6750f331126c018514b2e51c47ab4ebcba55d264"
+      },
+      {
+        "path": "life/flowers.ts",
+        "sha256": "3b212c4a8d3d0f7782c80eb367e8ad35ef3b388a65acb5d7942ebb94d8bc304f"
+      },
+      {
+        "path": "life/grass.ts",
+        "sha256": "70f75ce68688d4a2a2cdc6eacb27ee0d9ab7825e3f1e4fc5df7952fa13515e27"
+      },
+      {
+        "path": "life/muse.ts",
+        "sha256": "d200eb33c36cfa2efb30dd959f62e145750b11d6bbb9a9619f208f1f5ac5b151"
+      },
+      {
+        "path": "life/museProps.ts",
+        "sha256": "501bd83752dd9cba9d9bfc6806bd7c52b92422e572fb957764553cbb63c4720c"
+      },
+      {
+        "path": "life/museRoam.ts",
+        "sha256": "9c233cb8b25165614258767d7c7985fa4b0b200dbe57252fdbfad8404681b5e0"
+      },
+      {
+        "path": "life/props.frag.glsl",
+        "sha256": "7b6c2955e7ad2c620477cb17aed665e860c91fb41fe0658d66e29f20dcee5e4d"
+      },
+      {
+        "path": "life/props.ts",
+        "sha256": "31cd8394bec19d8b4a829b1a131b1473655ea11a7f44a979289bf1db9bca9eb6"
+      },
+      {
+        "path": "life/props.vert.glsl",
+        "sha256": "c098e5f88f42a10e444b6c17aae3ef8e1d7060e837a8bf20291001fe7bead014"
+      },
+      {
+        "path": "life/tulipGeometry.ts",
+        "sha256": "287aefc4ceaab20bb0a4af28b0f19af1c2a483798605af9f3ae6b0de4bfaf47e"
+      },
+      {
+        "path": "life/tulipScenery.frag.glsl",
+        "sha256": "4a4b3ff3af201545b21438c767ff97d4d8a79cc3071b8bb268c77f496b4a1f18"
+      },
+      {
+        "path": "life/tulipScenery.ts",
+        "sha256": "7037b99e9f5c5b85d99bf148b57fedeb93e18f66136ad28f981475cbab67ae55"
+      },
+      {
+        "path": "life/tulipScenery.vert.glsl",
+        "sha256": "43ccf0297bc6736eadbc8388a7a1b6731f687549692d2ec1b48ec7051384e590"
+      },
+      {
+        "path": "life/windmill.vert.glsl",
+        "sha256": "2c2327cb5c9353864a01a870e537d584c364218aeb4ce9ef492060186ae94b53"
+      },
+      {
+        "path": "main.ts",
+        "sha256": "86d5dab3c0264bb8bac52c4114c7a2db8400f85b8ad98116a78fefff356c2e56"
+      },
+      {
+        "path": "muse/ui/body.ts",
+        "sha256": "5b504e757e32eb32a62fd051b726602eab63cb3c8855494e5d30d9ec876e775f"
+      },
+      {
+        "path": "muse/ui/overlay.ts",
+        "sha256": "dd93639efb76569918058298e1da049d0ec170739bbfb5e990e29533ff3a168f"
+      },
+      {
+        "path": "params.ts",
+        "sha256": "6ca2a90fe82eb9f80cdec7c7cafdf82ed3070a6d5726e4f7af9fc8aca36fd9db"
+      },
+      {
+        "path": "planet/bake.frag.glsl",
+        "sha256": "3e80b30cfb0960599a5e20025dd87b346b80107bdeb6b62c82d6e7e7f62cb5dc"
+      },
+      {
+        "path": "planet/bake.ts",
+        "sha256": "a05a20b821ff866f6ff7e3ce27e23d1eb3fecc625ee2feca58ffc24154590d0a"
+      },
+      {
+        "path": "planet/fields.glsl",
+        "sha256": "a4a41cad2df2b2bb6da5ca9ed0b26d2b88d612ac693f41472fd4ce626e2bc318"
+      },
+      {
+        "path": "planet/fields.ts",
+        "sha256": "191eb2158dabd73af6f44a8dc365cce10afaf6d93825304c928950eb9974bf23"
+      },
+      {
+        "path": "planet/meadow.glsl",
+        "sha256": "18803239b9fe3908b24e0931d823bb9399c42ba9967f6fa6034dd66b55e210d7"
+      },
+      {
+        "path": "planet/surface.frag.glsl",
+        "sha256": "f70689b5b63731ef405b5e2cba8314e8f647b0d5b79aaca71e600caa10a83ca5"
+      },
+      {
+        "path": "planet/surface.ts",
+        "sha256": "f1116773bdb0235773e0c7612601a1da7468949ade88917e0a153d084232e859"
+      },
+      {
+        "path": "planet/surface.vert.glsl",
+        "sha256": "c30c9e29fb028ff21c5587a5773a9b2ca5e1535a280798a20935cbd0a9aec507"
+      },
+      {
+        "path": "planet/terrain.glsl",
+        "sha256": "1a21d99bb8de24265d66d82408fabd485050a66bba624ea11f42a942500bf55a"
+      },
+      {
+        "path": "planet/terrain.ts",
+        "sha256": "4ab609198f9a7fc0ee6c5398c70ba1686111bc25eb0acca518547d49c57150f8"
+      },
+      {
+        "path": "planet/water.glsl",
+        "sha256": "050cd9b5f07a429e8885a9e2eb18aeade2640a41e96754068e973635eb229c1e"
+      },
+      {
+        "path": "render/glsl.ts",
+        "sha256": "adca51852e167a25ac51d865fa58e3bd4c853752f540904d02ef95cc2259db10"
+      },
+      {
+        "path": "render/palette.ts",
+        "sha256": "4a44b568d78d6a9d4e8444b497b686e8fbfb5bcc7106d5c65d55273dc4b49ad1"
+      },
+      {
+        "path": "render/sky.ts",
+        "sha256": "2e87f69b54592156dbf7e44017ee45d993464182f88b6dad7b6ee61de6cc8a52"
+      },
+      {
+        "path": "render/toon.glsl",
+        "sha256": "373e6cc33012ecebeb0f5ec0e19d1820453ceb19e6f03472d59f1edbb3a2b49b"
+      },
+      {
+        "path": "ui/controlBar.ts",
+        "sha256": "058f64b764843ef09114d59a164c6f896d577fbb723bdba2a80ef4639bcae1a4"
+      },
+      {
+        "path": "ui/format.ts",
+        "sha256": "f1a3ca0cc11f2eada1cdcb937baa23eb8b856d07790c281eb797e354d3786a7a"
+      },
+      {
+        "path": "ui/garden/basketFlight.ts",
+        "sha256": "8e2f55f606a4dd322351220f08ded508c5d04de138b0eb9e99ac131fae6b4d52"
+      },
+      {
+        "path": "ui/garden/baskets.ts",
+        "sha256": "2e2609e3db4b3365084ac38043cc0f5aeeb9e0cb991eca89de520798b52058d4"
+      },
+      {
+        "path": "ui/garden/gardenUi.ts",
+        "sha256": "94a38b376c203909709b364b27cddf4a2498554312c152375cc7a9d741e15469"
+      },
+      {
+        "path": "ui/garden/mail.ts",
+        "sha256": "ab6ba3c5415e298679ff1e92f9ecc4df4d22edf07adb55caa047b16b2631e46c"
+      },
+      {
+        "path": "ui/garden/musePage.ts",
+        "sha256": "e3fb3a9cd3ed60369715c719f8731dd82297d3143755c041755105f7107d55a8"
+      },
+      {
+        "path": "ui/garden/travel.ts",
+        "sha256": "e8aefada2cb5e71fad0ed68da77971ff6cdbd699aae450306d73ced5b999515a"
+      },
+      {
+        "path": "ui/panel.ts",
+        "sha256": "8cb5048747ba53290d138db8b67aeb1539baa57b1648263a518efac22422be66"
+      },
+      {
+        "path": "ui/postcard.ts",
+        "sha256": "cc57880cc4f4b48251e65bfadc0ae1ce2f69753f262cd0bef448f30d65400e11"
+      },
+      {
+        "path": "ui/tulip.css",
+        "sha256": "c273c3b3cfb07982f6f8cc614e7d843cce2a1eef793f97e8a1b00be9bbc0b18a"
+      },
+      {
+        "path": "ui/ui.ts",
+        "sha256": "b689122000e7c6f350c72e4352dab60045240468ec482c0a161b05d270317ec2"
+      },
+      {
+        "path": "view/picking.ts",
+        "sha256": "a3c9b7bf7e7a6807c22a6bc7d1a6feb4cb486f9ec5b45a7d8d895a467a24572b"
+      },
+      {
+        "path": "view/vista.ts",
+        "sha256": "0ae243dcda2f331ebb9d15c3b6f87c66c60f107cf8e88faef07282f28c73ec5a"
+      },
+      {
+        "path": "vite.config.ts",
+        "sha256": "0e160aae1ab08deceb542c9385b266e1ff85e6e67a9c411332d5136282c160e6"
+      },
+      {
+        "path": "world.ts",
+        "sha256": "cbcd5acaff1d9c6a0dd04186397a5a25324abda9bdf44f07d37181cadeb00246"
+      }
+    ]
+  },
+  "media": [
+    {
+      "path": "after-garden.png",
+      "sha256": "0b7793fe0eee46d7b34a8048ceaefed7cb4bfe84949423d328e2525cc36adbd0"
+    },
+    {
+      "path": "after-home.png",
+      "sha256": "0777f8492cb9dbd4af0012ce738747a5e5eb7d085df92ca9a63922984c867aed"
+    },
+    {
+      "path": "after-middle-distance.png",
+      "sha256": "6e30bf55559503a590a78b5834ea8caec34ebf1ab0a031c7d9b2626567052767"
+    },
+    {
+      "path": "after-planet.png",
+      "sha256": "b216d189b25f2839aa1a2c9b814e7c34c3a484ec229e316019a587a5d2697b62"
+    },
+    {
+      "path": "after-user-fields.png",
+      "sha256": "2c94eba7ada6defe002d3382018652346db64d5e0b68b47db54db2e642ef0e89"
+    }
+  ]
+}

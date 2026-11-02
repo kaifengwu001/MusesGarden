@@ -59,4 +59,6 @@ records the meadow commit it was copied from.
 
 [Cobalt Windfields](cobalt-windfields/README.md) is served on port 5217 with `npm run dev:cobalt`. Its blue rock formations, peach sand, native plants, wildlife and local residents live entirely inside its own environment folder.
 
+[Tulipwind Meadows](tulip-windmill-meadows/README.md) is served on port 5241 with `npm run dev:tulip`. Dense tulip ribbons, turning windmills and varied cottage gardens form a separate cultivated planet.
+
 [Cherry Blossom Waterways](cherry-blossom-waterways/README.md) is served on port 5249 with `npm run dev:cherry`. It combines pink and ivory cherry groves, green willows, blue canals, a tiled pavilion and duck flocks.

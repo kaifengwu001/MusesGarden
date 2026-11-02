@@ -1,0 +1,5 @@
+.masthead { color: #466d88; }
+.masthead h1 { font-size: clamp(30px, 4.5vw, 58px); letter-spacing: -.025em; }
+.masthead .world-line { color: #527e93; }
+.controlbar { background: #fff7e6e8; border-color: #e6d6bf; }
+.hints { color: #4a6f7d; }
