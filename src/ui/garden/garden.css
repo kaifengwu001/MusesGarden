@@ -2830,11 +2830,12 @@ body.postcard .garden {
   opacity: 1;
 }
 
-/* a flower's preview: its find's card, light, beside it */
+/* a flower's preview: its find's card, light, above it (the basket's beside it) */
 .g-peek {
   position: absolute;
   left: 0;
   top: 0;
+  transform-origin: 0 0;
   width: 236px;
   box-sizing: border-box;
   padding: 9px 10px 8px;
