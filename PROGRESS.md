@@ -43,6 +43,7 @@ Started from d894754 (the paddy lab's second round). Kai (2026-11-01), on the la
 | 3 | "DO NOT measure the planet based on meshes" | |
 | 4 | "REWORK the hill generation with the new logic" | |
 | 5 | "ABANDON the old planet world segmentation and adopt a purely mathematic method for calculating this. Then, the hills can be derived from the mathematics then." | |
+| 6 | Kai, mid-round, with a reference (an aerial of flat rice fields, sent in chat): "flat field paddies can use this as reference" (long strips along gently curving lines, crossed more widely; each field its own green, yellow-green to deep; thin dark bunds between; a pale dirt track winding through) | |
 
 ### Kai's paddy lab, second round: organic banks, cuts, and the slope deciding
 
