@@ -24,14 +24,16 @@ import type { Fan } from './basketFan';
 import { DRAWING, drawingLayers } from './basketDrawing';
 import type { ButtonLayout } from './basketOverlay';
 import { el } from './dom';
+import { FLOWER_PICTURES, HEAD_SCALE, loadPictures, pictureMesh, pictureTextures, standMesh } from './flowerPictures';
 
 // The basket as the rail's icon draws it (basketDrawing.ts), and in it the
-// finds' flowers, the meadow's own flower meshes painted as their patches
-// paint them (flowerPaint.ts). It grows out of the rail's icon to the middle,
-// its flowers rise into a fan over it and bob there; they drop back in and it
-// goes home into the icon; a flower picked comes down into its patch on the
-// planet just as the camera stops over it, the size, the turn and the colour
-// its patch's hero has there, so the patch takes over from it in one frame.
+// finds' flowers as their species' pictures (flowerPictures.ts). It grows out
+// of the rail's icon to the middle, its flowers rise into a fan over it and bob
+// there; they drop back in and it goes home into the icon. A flower picked
+// turns, as it leaves, into the meadow's own flower mesh painted as its patch
+// paints it (flowerPaint.ts), and comes down into its patch on the planet just
+// as the camera stops over it, the size, the turn and the colour its patch's
+// hero has there, so the patch takes over from it in one frame.
 // One full-screen canvas of its own over the planet (pointer events go
 // through it), drawn only while the basket is out, made once when the page is
 // idle and never let go. Its camera is orthographic in CSS pixels; poses are
@@ -82,10 +84,10 @@ type Where = (t: number) => Pose;
 /** The rim's radius in the basket's frame (model units). */
 const RIM = 0.52;
 /**
- * A flower in the basket, out of sight: lying on its bottom (model units: its stem this long, its foot this deep and
- * this far to one side, raised this much, rad), a little toward the front, where the front wall hides it.
+ * A flower in the basket, out of sight: lying flat on its bottom (model units: its stem this long, its foot this deep
+ * and this far to one side), a little toward the front, where the front wall hides it.
  */
-const IN_BASKET = { stem: 0.6, foot: -0.35, reach: 0.3, raised: 0.12, front: 0.08, spread: 0.12 } as const;
+const IN_BASKET = { stem: 0.45, foot: -0.35, reach: 0.22, front: 0.08, spread: 0.12 } as const;
 /** A flower ready to go home, standing in the basket: its stem this long (model units), its foot this deep and this far out, leaning out. */
 const READY = { stem: 0.7, foot: -0.3, reach: 0.22, lean: 0.24 } as const;
 /** A fanned flower's stem against the fan's spacing, and how it is turned toward you. */
@@ -105,11 +107,16 @@ const T = { out: 0.62, home: 0.5, rise: 0.5, stagger: 0.04, vanish: 0.3, lead: 0
 const RISE_ARC = 0.3;
 /** A flower going home: the least time it takes over its whole way (s), its touch-down after the camera stops (s), and where it starts following the live view. */
 const HOMING = { least: 0.6, after: 0.08, follow: 0.7 } as const;
+/**
+ * Leaving, a flower turns from its picture into its mesh (fractions of its way home): the mesh comes in under the
+ * picture, then the picture goes, shrinking to about the mesh's head (its head scale, flowerPictures.ts).
+ */
+const TURN = { meshIn: 0.1, pictureOut: [0.06, 0.26], headScale: 0.45 } as const;
 /** Sparkles: how many at once, how long each lives (s). */
 const SPARKS = 160;
 const SPARK_LIFE = 0.75;
-/** Depths (px): fanned flowers stand in the basket's middle (their stems go down into it), flowers going home in front of all. */
-const Z = { fan: 0, home: 320 } as const;
+/** Depths (px): fanned flowers stand in the basket's middle (their stems go down into it), the one under the pointer in front of the others, flowers going home in front of all. */
+const Z = { fan: 0, hover: 100, home: 320 } as const;
 /** The canvas's passes, in order: the basket's back, the flowers in and over it, its front, then what goes home and the sparkles over all. */
 const PASS = { back: 1, inside: 2, front: 3, over: 4 } as const;
 const PASSES = [PASS.back, PASS.inside, PASS.front, PASS.over] as const;
@@ -214,6 +221,8 @@ const pose = (x: number, y: number, z: number, q: Quaternion, s: number, a = 1):
 /** One flower in the stage, where it rests and where it is going. */
 interface Bloom {
   readonly look: StageFlower;
+  /** Its picture, and the mesh it turns into on its way home. */
+  readonly picture: Mesh<BufferGeometry, ShaderMaterial>;
   readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
   /** Its place (by its index among the flowers, which is its slot in the fan): out of sight in the basket, standing in it ready to go home, or in the fan. */
   rest: { readonly in: 'basket' | 'ready' | 'fan'; readonly k: number };
@@ -248,6 +257,8 @@ interface Homing {
   /** When the camera stopped (stage s; null while it flies). */
   stopped: number | null;
   readonly land: (id: string) => void;
+  /** Whether it is seen on its way (false: it lands, unseen, as the camera stops). */
+  readonly flies: boolean;
 }
 
 /** The basket's place: its rim's middle (px), its size (px per model unit). */
@@ -296,6 +307,7 @@ export class BasketStage {
   private readonly camera = new OrthographicCamera(0, 1, 0, -1, -4000, 4000);
   private readonly basket = drawingLayers();
   private readonly geometries = [0, 1, 2, 3].map(speciesGeometry);
+  private readonly textures = pictureTextures();
   private readonly flowerMaterial = new ShaderMaterial({
     vertexShader: flowerVertex,
     fragmentShader: flowerFragment,
@@ -358,6 +370,7 @@ export class BasketStage {
       }),
     );
     this.sparks.frustumCulled = false;
+    this.sparks.renderOrder = 2;
     this.sparks.visible = false;
     this.sparks.layers.set(PASS.over);
     this.scene.add(this.sparks);
@@ -378,17 +391,16 @@ export class BasketStage {
       this.resize();
       // every program now, not at the first open
       const probe = this.flower({ id: '', species: 0, colours: new Float32Array(this.geometries[0].getAttribute('position').count * 3), size: 1 });
-      this.scene.add(probe.mesh);
+      this.scene.add(probe.mesh, probe.picture);
       this.basket.group.visible = true;
       this.sparks.visible = true;
       r.compile(this.scene, this.camera);
       // the picture too, if it has come (else it goes up at its first frame)
       if (this.basket.texture.version > 0) r.initTexture(this.basket.texture);
-      this.scene.remove(probe.mesh);
-      probe.mesh.geometry.dispose();
-      probe.mesh.material.dispose();
+      this.drop(probe);
       this.basket.group.visible = false;
       this.sparks.visible = false;
+      loadPictures(this.textures, (texture) => r.initTexture(texture));
     } catch (error) {
       console.warn('garden: the basket could not get a canvas of its own', error);
       this.failed = true;
@@ -539,7 +551,7 @@ export class BasketStage {
       const b = this.blooms.get(f.id) ?? this.flower(f);
       if (!this.blooms.has(f.id)) {
         b.rest = { in: 'basket', k };
-        this.scene.add(b.mesh);
+        this.scene.add(b.picture, b.mesh);
       }
       keep.set(f.id, b);
     });
@@ -557,7 +569,10 @@ export class BasketStage {
     const material = this.flowerMaterial.clone();
     const mesh = new Mesh(g, material);
     mesh.frustumCulled = false;
-    return { look, mesh, rest: { in: 'basket', k: 0 }, leg: null, homing: null, vanish: null, hover: 0 };
+    // over its mesh while it turns into it
+    const picture = pictureMesh(FLOWER_PICTURES[look.species], this.textures[look.species]);
+    picture.renderOrder = 1;
+    return { look, picture, mesh, rest: { in: 'basket', k: 0 }, leg: null, homing: null, vanish: null, hover: 0 };
   }
 
   /** A flower taken out of the stage to go home. */
@@ -613,9 +628,11 @@ export class BasketStage {
   }
 
   private drop(b: Bloom): void {
-    this.scene.remove(b.mesh);
-    b.mesh.geometry.dispose();
-    b.mesh.material.dispose();
+    this.scene.remove(b.picture, b.mesh);
+    for (const m of [b.picture, b.mesh]) {
+      m.geometry.dispose();
+      m.material.dispose();
+    }
   }
 
   /** A point of the basket (model units) on the screen (px, y down), and the basket's turn. */
@@ -633,7 +650,7 @@ export class BasketStage {
     const side = Math.abs(off) > 1 ? Math.sign(off) : k % 2 ? 1 : -1;
     const front = IN_BASKET.front + IN_BASKET.spread * (((k * 0.618) % 1) - 0.5);
     const foot = this.basketPoint(this.tv.set(-side * IN_BASKET.reach, IN_BASKET.foot, front), at, new Vector3());
-    const q = this.basketTurn.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -side * (Math.PI / 2 - IN_BASKET.raised)));
+    const q = this.basketTurn.clone().multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), (-side * Math.PI) / 2));
     return pose(foot.x, foot.y, foot.z, q, (at.s * IN_BASKET.stem) / HEADS[b.look.species][0]);
   }
 
@@ -649,7 +666,7 @@ export class BasketStage {
     return pose(foot.x, foot.y, foot.z, q, (at.s * READY.stem) / HEADS[b.look.species][0]);
   }
 
-  /** A flower in the fan: its head on its slot, its stem toward the basket, turned to show its face, bobbing; under the pointer it lifts and grows a little. */
+  /** A flower in the fan: its head on its slot, its stem toward the basket, turned to show its face, bobbing; under the pointer it lifts, grows a little and comes to the front. */
   private inFan(b: Bloom, k: number, t: number): Pose {
     const fan = this.fan;
     const slot = fan?.slots[k];
@@ -662,7 +679,7 @@ export class BasketStage {
       .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), FAN_TIP))
       .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (k % 2 ? 1 : -1) * 0.9));
     const stem = this.tv.set(0, HEADS[b.look.species][0] * s, 0).applyQuaternion(q);
-    return pose(slot.x - stem.x, slot.y + stem.y - 2.5 * bob - 6 * lift, Z.fan + k, q, s);
+    return pose(slot.x - stem.x, slot.y + stem.y - 2.5 * bob - 6 * lift, Z.fan + k + Z.hover * lift, q, s);
   }
 
   /** Where a flower rests, in the basket or on its slot (by default where it is going now). */
@@ -717,10 +734,9 @@ export class BasketStage {
     const was = b.leg;
     const at = was ? this.legPose(was, this.time) : this.restPose(b, this.time);
     b.leg = null;
-    b.homing = { landing, start, u: 0, setOff: at, stopped: null, land };
+    b.homing = { landing, start, u: 0, setOff: at, stopped: null, land, flies: animate };
     const home = b.mesh.geometry.getAttribute('aHome') as BufferAttribute;
     if (landing.colours.length === home.array.length) b.mesh.geometry.setAttribute('aHome', new BufferAttribute(landing.colours, 3));
-    if (!animate) b.mesh.visible = false;
     this.leaving.push(b);
   }
 
@@ -885,7 +901,7 @@ export class BasketStage {
   private stepHoming(b: Bloom, h: Homing, t: number, dt: number): void {
     const camera = this.host.cameraRemaining();
     if (camera <= 0 && h.stopped === null) h.stopped = t;
-    if (!b.mesh.visible) {
+    if (!h.flies) {
       // no motion to watch: it lands as the camera stops
       if (h.stopped !== null) this.landNow(b);
       return;
@@ -907,16 +923,35 @@ export class BasketStage {
     b.rotation.z = Math.sin(t * 9) * 0.04 * this.basketHover;
     for (const bloom of [...this.blooms.values(), ...this.leaving]) {
       const p = this.pose(bloom, t);
+      const h = bloom.homing;
+      const meshShare = h?.flies ? smoothstep(0, TURN.meshIn, h.u) : 0;
+      const turned = h?.flies ? smoothstep(TURN.pictureOut[0], TURN.pictureOut[1], h.u) : 0;
+      const pictureShare = h && !h.flies ? 0 : 1 - turned;
+      // in the basket, behind its front wall, until its picture has gone
+      const pass = pictureShare > 0 ? PASS.inside : PASS.over;
+      const top = HEADS[bloom.look.species][0];
+      const pic = bloom.picture;
+      pic.visible = pictureShare * p.a > 0;
+      if (pic.visible) {
+        const stem = this.tv.set(0, top * p.s, 0).applyQuaternion(p.q);
+        standMesh(pic, FLOWER_PICTURES[bloom.look.species], p, { x: p.x + stem.x, y: p.y - stem.y }, top * p.s, HEAD_SCALE + (TURN.headScale - HEAD_SCALE) * turned);
+        pic.position.z = p.z;
+        pic.layers.set(pass);
+        pic.material.uniforms.uAlpha.value = pictureShare * p.a;
+      }
       const m = bloom.mesh;
-      m.layers.set(bloom.homing ? PASS.over : PASS.inside);
+      m.visible = meshShare * p.a > 0;
+      if (!m.visible || !h) continue;
+      const a = meshShare * p.a;
+      m.layers.set(pass);
       m.position.set(p.x, -p.y, p.z);
       m.quaternion.copy(p.q);
       m.scale.setScalar(Math.max(p.s, 1e-4));
-      m.material.uniforms.uAlpha.value = p.a;
-      m.material.uniforms.uHome.value = bloom.homing ? smoothstep(0, 0.9, bloom.homing.u) : 0;
-      m.material.uniforms.uShade.value = bloom.homing ? 1 - smoothstep(0.1, HOMING.follow, bloom.homing.u) : 1;
-      m.material.transparent = p.a < 0.999;
-      m.material.depthWrite = p.a >= 0.999;
+      m.material.uniforms.uAlpha.value = a;
+      m.material.uniforms.uHome.value = smoothstep(0, 0.9, h.u);
+      m.material.uniforms.uShade.value = 1 - smoothstep(0.1, HOMING.follow, h.u);
+      m.material.transparent = a < 0.999;
+      m.material.depthWrite = a >= 0.999;
     }
     this.sparks.visible = t < this.sparkUntil;
     this.sparks.material.uniforms.uTime.value = t;
