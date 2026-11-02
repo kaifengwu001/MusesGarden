@@ -50,11 +50,13 @@ Started from 4e4d320. The owner's notes on the running garden (2026-11-01), with
 
 - On ui at 7e40608: npm run check clean; 897 unit tests pass, 3 skipped (three workers: under this machine's load chunks.test.ts times out with more); npm run test:gpu 14 pass, 1 skipped, and the growth-scrubbing frame budget failed once under load and passes alone (the base failed it the same way); the live tests 11 of 11 against a fresh Muse server.
 - The basket lane's meadow samecheck against 045d1f7, pins held back and baskets visited: 27 of 27 identical.
+- The planet lane's samecheck, merged against ui at 5f2a8ad, High and Medium, DPR 1 and 2: every view identical but orbit, the only one where spheres show; there every differing pixel is inside a sphere's sprite but 22, one step off nearby (the bloom's tail).
 - Recordings, before and after: scratchpad tweak-basket/recordings (1440×900 and 390×844).
 
 ### Known issues (the second look)
 
 - At eye level, pointing at a far patch through the gaps of a nearer one picks the nearer (8 of 40 points).
+- On a phone the card's arrows are hidden, so the day line over them doesn't show there.
 - The arrows' line for today's basket reads "Going to Today, Nov 1 Sun basket".
 - In a full basket on a laptop the two outermost previews each cover a neighbour; the rise turns fastest mid-way (0.19 rad a frame); new flowers no longer sparkle on another day.
 - A flower leaving the basket shows its stem in front of the wall for a frame, and in a full fan the outermost stem's foot sits outside the wall (both as before; tracked).
