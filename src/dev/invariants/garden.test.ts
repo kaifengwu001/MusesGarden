@@ -1,12 +1,13 @@
 import { PerspectiveCamera, Vector3 } from 'three';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BED_RADIUS, bedAt, layOut, type PlacementGround } from '../../garden/placement';
 import { dayBefore, placeholderSnapshot, placeholderSource } from '../../garden/placeholder';
 import { httpSource } from '../../garden/source';
 import { GardenState } from '../../garden/state';
-import type { Basket, Find, GardenSnapshot } from '../../garden/types';
+import type { Basket, Find, GardenSnapshot, Reach } from '../../garden/types';
 import { Pins, type PinSpec } from '../../life/pins';
 import { angleBetween } from '../../planet/geo';
+import { chipNote } from '../../ui/garden/dom';
 import type { FieldParams } from '../../planet/fields';
 import { createGroundSample, generateLayout, Terrain, type GroundSample } from '../../planet/terrain';
 import type { WarpFrame } from '../../render/warp';
@@ -183,7 +184,8 @@ describe('the placeholder gallery', () => {
   it('names Muses only, and tags friends known elsewhere by network alone', () => {
     for (const f of snap.friends) expect(Object.keys(f).sort()).toEqual(expect.arrayContaining(['coat', 'id', 'met', 'name', 'shared']));
     expect(snap.friends.some((f) => f.knownOn === 'instagram')).toBe(true);
-    expect(snap.postcards.filter((p) => p.invitation)).toHaveLength(1);
+    const hosts = snap.postcards.flatMap((p) => (p.invitation ? [p.invitation.from] : []));
+    expect(hosts, 'two invitations, each from its own friend').toEqual(['pip', 'juniper']);
   });
 });
 
@@ -194,11 +196,23 @@ describe('the garden’s state', () => {
     await state.start();
     expect(state.unread.map((p) => p.id).sort()).toEqual(['inv-pip', 'pc-terrace']);
     expect(state.freshBasket?.day).toBe('2026-10-31');
-    expect(state.browseOrder[0]).toBe(state.baskets[0].finds[0]);
+    expect(state.browseOrder.at(-1), 'browsed as the timeline runs: today’s last').toBe(state.baskets[0].finds.at(-1));
     vi.useRealTimers();
   });
 
-  it('likes, reads, puts away and uses an invitation once; tells the source', async () => {
+  it('steps a card back and forward in time, round at the ends, naming the day a step crosses into', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    const [newest, before] = state.baskets;
+    const oldest = state.baskets.at(-1)!;
+    expect(state.step(newest.finds[0], 1)).toEqual({ find: newest.finds[1], into: null, wraps: false });
+    expect(state.step(newest.finds[0], -1)).toEqual({ find: before.finds.at(-1), into: before.day, wraps: false });
+    expect(state.step(before.finds.at(-1)!, 1)).toEqual({ find: newest.finds[0], into: newest.day, wraps: false });
+    expect(state.step(newest.finds.at(-1)!, 1), 'the newest steps round to the oldest').toEqual({ find: oldest.finds[0], into: oldest.day, wraps: true });
+    expect(state.step(oldest.finds[0], -1)).toEqual({ find: newest.finds.at(-1), into: newest.day, wraps: true });
+  });
+
+  it('likes, stars, and uses an invitation once; tells the source', async () => {
     const source = placeholderSource();
     const reactions: unknown[] = [];
     source.react = (r) => (reactions.push(r), Promise.resolve());
@@ -207,16 +221,16 @@ describe('the garden’s state', () => {
     const id = state.browseOrder[2];
     expect(state.toggleLike(id)).toBe(true);
     expect(state.likedFindIds).toEqual([id]);
-    state.putAway('pc-terrace');
-    expect(state.mail.some((p) => p.id === 'pc-terrace')).toBe(false);
-    expect(state.isRead('pc-terrace')).toBe(true);
-    expect(state.invitations).toHaveLength(1);
+    expect(state.toggleCardFavorite('pc-terrace')).toBe(true);
+    expect([state.cardFavorite('pc-terrace'), state.cardLiked('pc-terrace')], 'a star is not a like').toEqual([true, false]);
+    expect(state.invitations.map((p) => p.id)).toEqual(['inv-pip', 'inv-juniper']);
     state.useInvitation('inv-pip');
-    expect(state.invitations).toHaveLength(0);
+    expect(state.invitations.map((p) => p.id)).toEqual(['inv-juniper']);
     state.setShared('noodles', true);
     expect(state.interest('noodles')?.shared).toBe(true);
     expect(reactions).toEqual([
       { type: 'like-find', id, liked: true },
+      { type: 'favorite-postcard', id: 'pc-terrace', favorite: true },
       { type: 'use-invitation', id: 'inv-pip' },
       { type: 'share-interest', id: 'noodles', shared: true },
     ]);
@@ -241,11 +255,49 @@ describe('the garden’s state', () => {
   });
 });
 
+describe('the post: from today, envelopes and tickets', () => {
+  const ids = (cards: readonly { id: string }[]) => cards.map((p) => p.id);
+
+  it('From today holds the day’s photos and the day’s invitation in its envelope; the older invitation is a ticket', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    expect(ids(state.today)).toEqual(['pc-terrace', 'inv-pip']);
+    expect(ids(state.tickets)).toEqual(['inv-juniper']);
+  });
+
+  it('opening the box collects the post but leaves the envelope sealed; opened, the envelope is a ticket', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    expect(ids(state.unread)).toEqual(['pc-terrace', 'inv-pip']);
+    state.collect();
+    expect(ids(state.unread)).toEqual(['inv-pip']);
+    expect(ids(state.today)).toEqual(['pc-terrace', 'inv-pip']);
+    state.markRead('inv-pip');
+    expect(ids(state.today)).toEqual(['pc-terrace']);
+    expect(ids(state.tickets)).toEqual(['inv-pip', 'inv-juniper']);
+    state.useInvitation('inv-juniper');
+    expect(ids(state.tickets), 'a used ticket is gone').toEqual(['inv-pip']);
+  });
+
+  it('counts today by the source’s day, which turns when post of a later day arrives', async () => {
+    const snapshot = placeholderSnapshot(NOW);
+    const source = placeholderSource();
+    source.load = () => Promise.resolve(snapshot);
+    const state = new GardenState(source);
+    await state.start();
+    expect(snapshot.today).toBe('2026-10-31');
+    expect(ids(state.today)).toEqual(['pc-terrace', 'inv-pip']);
+    source.push({ type: 'postcard', postcard: { ...snapshot.postcards[0], id: 'pc-next', day: '2026-11-01' } });
+    expect(ids(state.today)).toEqual(['pc-next']);
+    expect(ids(state.tickets), 'yesterday’s invitation, never opened, waits as a ticket').toEqual(['inv-pip', 'inv-juniper']);
+  });
+});
+
 describe('likes and sharing, kept by the backend', () => {
   /** A backend that keeps likes: the placeholders with every like answered. */
   function keeping(): { snapshot: GardenSnapshot; source: ReturnType<typeof placeholderSource> } {
     const s = placeholderSnapshot(NOW);
-    const snapshot = { ...s, finds: s.finds.map((f) => ({ ...f, liked: false })), postcards: s.postcards.map((p) => ({ ...p, liked: false })) };
+    const snapshot = { ...s, finds: s.finds.map((f) => ({ ...f, liked: false })), postcards: s.postcards.map((p) => ({ ...p, liked: false, favorite: false })) };
     const source = placeholderSource();
     source.load = () => Promise.resolve(snapshot);
     return { snapshot, source };
@@ -301,23 +353,25 @@ describe('likes and sharing, kept by the backend', () => {
     const find = first.browseOrder[0];
     first.toggleLike(find);
     first.toggleCardLike('pc-terrace');
+    first.toggleCardFavorite('pc-terrace');
     first.setShared('noodles', true);
     const again = new GardenState(source);
     await again.start();
-    expect([again.liked(find), again.cardLiked('pc-terrace'), again.interest('noodles')?.shared]).toEqual([false, false, false]);
+    expect([again.liked(find), again.cardLiked('pc-terrace'), again.cardFavorite('pc-terrace'), again.interest('noodles')?.shared]).toEqual([false, false, false, false]);
     vi.unstubAllGlobals();
   });
 
-  it('without a backend that keeps likes, this browser remembers them, as before', async () => {
+  it('without a backend that keeps likes and stars, this browser remembers them, as before', async () => {
     browserStorage();
     const first = new GardenState(placeholderSource());
     await first.start();
     const find = first.browseOrder[0];
     first.toggleLike(find);
     first.toggleCardLike('pc-terrace');
+    first.toggleCardFavorite('pc-pier');
     const again = new GardenState(placeholderSource());
     await again.start();
-    expect([again.liked(find), again.likedFindIds, again.cardLiked('pc-terrace')]).toEqual([true, [find], true]);
+    expect([again.liked(find), again.likedFindIds, again.cardLiked('pc-terrace'), again.cardFavorite('pc-pier'), again.cardFavorite('pc-terrace')]).toEqual([true, [find], true, true, false]);
     vi.unstubAllGlobals();
   });
 
@@ -330,12 +384,98 @@ describe('likes and sharing, kept by the backend', () => {
     state.subscribe((c) => changes.push(c));
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(state.toggleCardLike('pc-terrace')).toBe(true);
+    expect(state.toggleCardFavorite('pc-pier')).toBe(true);
     state.shareFind(state.browseOrder[0], false);
-    expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([true, false]);
+    expect([state.cardLiked('pc-terrace'), state.cardFavorite('pc-pier'), state.findShared(state.browseOrder[0])]).toEqual([true, true, false]);
     await Promise.resolve();
-    expect([state.cardLiked('pc-terrace'), state.findShared(state.browseOrder[0])]).toEqual([false, true]);
-    expect(changes).toEqual(['postcards', 'finds', 'postcards', 'finds']);
+    expect([state.cardLiked('pc-terrace'), state.cardFavorite('pc-pier'), state.findShared(state.browseOrder[0])]).toEqual([false, false, true]);
+    expect(changes).toEqual(['postcards', 'postcards', 'finds', 'postcards', 'postcards', 'finds']);
     vi.restoreAllMocks();
+  });
+});
+
+describe('the friend group', () => {
+  /** A backend that keeps the friend group: the placeholders' friends, all but Pip's inside the narrowest group. */
+  function keeping(): { source: ReturnType<typeof placeholderSource>; sent: unknown[] } {
+    const s = placeholderSnapshot(NOW);
+    let reach: Reach = 'shared';
+    const sent: unknown[] = [];
+    const source = placeholderSource();
+    source.load = () => Promise.resolve({ ...s, muse: { ...s.muse, reach }, friends: s.friends.filter((f) => reach !== 'shared' || f.id !== 'pip') });
+    source.react = (r) => {
+      sent.push(r);
+      if (r.type === 'set-reach') reach = r.reach;
+      return Promise.resolve();
+    };
+    return { source, sent };
+  }
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('shows the new group at once, tells the backend, and reads back the friends it takes in', async () => {
+    const { source, sent } = keeping();
+    const state = new GardenState(source);
+    await state.start();
+    const changes: string[] = [];
+    state.subscribe((c) => changes.push(c));
+    const friends = () => state.snapshot?.friends.map((f) => f.id);
+    expect(state.reach).toBe('shared');
+    expect(friends()).not.toContain('pip');
+
+    state.setReach('everyone');
+    expect(state.reach, 'at once').toBe('everyone');
+    expect(sent).toEqual([{ type: 'set-reach', reach: 'everyone' }]);
+    await settled();
+    expect(friends()).toContain('pip');
+    state.setReach('shared');
+    await settled();
+    expect([state.reach, friends()?.includes('pip')]).toEqual(['shared', false]);
+    expect(changes).toEqual(['friends', 'friends', 'friends', 'friends']);
+  });
+
+  it('the placeholders keep it too: friends known online show once the group takes them in', async () => {
+    const state = new GardenState(placeholderSource());
+    await state.start();
+    const known = () => state.snapshot?.friends.filter((f) => f.knownOn).length;
+    expect([state.reach, known()]).toEqual(['shared', 0]);
+    state.setReach('known');
+    await settled();
+    expect([state.reach, known()]).toEqual(['known', 2]);
+  });
+
+  it('holds the group a backend does not keep, and goes back when the backend turns it down', async () => {
+    const forgetful = placeholderSource();
+    forgetful.react = () => Promise.resolve();
+    const quiet = new GardenState(forgetful);
+    await quiet.start();
+    quiet.setReach('known');
+    await settled();
+    expect(quiet.reach, 'a backend that keeps nothing: the page still shows your pick').toBe('known');
+
+    const { source } = keeping();
+    source.react = () => Promise.reject(new Error('400'));
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const state = new GardenState(source);
+    await state.start();
+    state.setReach('everyone');
+    expect(state.reach).toBe('everyone');
+    await settled();
+    expect(state.reach).toBe('shared');
+    vi.restoreAllMocks();
+  });
+});
+
+describe('what Muse is doing, as the garden says it', () => {
+  it('falls back to at home or out exploring, and the portrait says it in lower case but keeps a Muse’s name', async () => {
+    const source = placeholderSource();
+    const state = new GardenState(source);
+    await state.start();
+    expect(state.statusNote).toBe('At home');
+    source.push({ type: 'status', status: { home: false } });
+    expect(state.statusNote).toBe('Out exploring');
+    source.push({ type: 'status', status: { home: false, note: 'Traveling outside the planet' } });
+    expect(chipNote(state.statusNote, ['Wren'])).toBe('traveling outside the planet');
+    expect(chipNote("Away at Wren's planet", ['Wren'])).toBe("away at Wren's planet");
+    expect(chipNote('Wren is visiting', ['Wren'])).toBe('Wren is visiting');
   });
 });
 
@@ -370,13 +510,21 @@ describe('the pins on the globe', () => {
   const settle = (pins: Pins): void => {
     for (let i = 0; i < 20; i++) pins.update(0.1, true, 0, camera, flat, R);
   };
+  // the bubbles are painted on a canvas: here a page whose canvas, paths and pictures take every call and draw nothing
+  const nothing: unknown = new Proxy(function () {}, { get: () => nothing, apply: () => nothing, construct: () => nothing as object });
+  beforeAll(() => {
+    vi.stubGlobal('document', { createElement: () => ({ getContext: () => nothing }) });
+    vi.stubGlobal('Path2D', nothing);
+    vi.stubGlobal('Image', nothing);
+  });
+  afterAll(() => vi.unstubAllGlobals());
 
-  it('takes a pin out whole, its head with its needle', () => {
+  it('takes a pin out whole', () => {
     const pins = new Pins();
     pins.set([spec('muse', 'muse', new Vector3(0, 0, 1)), spec('liked:a', 'liked', new Vector3(0.1, 0, 1).normalize())]);
-    expect(pins.group.children).toHaveLength(4);
-    pins.set([spec('muse', 'muse', new Vector3(0, 0, 1))]);
     expect(pins.group.children).toHaveLength(2);
+    pins.set([spec('muse', 'muse', new Vector3(0, 0, 1))]);
+    expect(pins.group.children).toHaveLength(1);
   });
 
   it('pops up a pin that arrives while the pins show, as Muse’s does when the page opens in orbit', () => {
@@ -384,7 +532,7 @@ describe('the pins on the globe', () => {
     settle(pins);
     pins.set([spec('muse', 'muse', new Vector3(0, 0, 1))]);
     settle(pins);
-    expect(pins.group.children.filter((c) => c.visible)).toHaveLength(2);
+    expect(pins.group.children.filter((c) => c.visible)).toHaveLength(1);
   });
 
   it('moves Muse’s pin to where it is told, keeping its own copy of the place', () => {
@@ -396,7 +544,7 @@ describe('the pins on the globe', () => {
     pins.move('muse', where, 2.5);
     where.set(0, 1, 0);
     settle(pins);
-    const head = new Vector3().setFromMatrixPosition(pins.group.children[1].matrix);
-    expect(head.normalize().angleTo(moved)).toBeLessThan(1e-6);
+    const bubble = pins.group.children[0].position.clone();
+    expect(bubble.normalize().angleTo(moved)).toBeLessThan(1e-6);
   });
 });

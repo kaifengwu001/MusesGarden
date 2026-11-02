@@ -5,6 +5,13 @@
 
 export type Motif = 'clay' | 'flow' | 'light' | 'slope' | 'kit' | 'sky' | 'noodles' | 'fern' | 'arch' | 'vinyl';
 
+/** A hash of some text (FNV-1a), to seed a drawing by an id. */
+export function hashOf(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
 /** A small seeded generator, so a motif draws the same every time. */
 function rand(seed: number): () => number {
   let s = seed >>> 0;
@@ -228,28 +235,72 @@ export const MOTIF_ASPECT: Record<Motif, number> = {
   vinyl: 1,
 };
 
-/** A friend's world, for its invitation and the travel sheet: a redwood grove in fog with a small shrine (placeholder). */
-export function worldArt(_world: string): string {
-  const r = rand(23);
-  let trees = '';
-  for (let i = 0; i < 9; i++) {
-    const x = 20 + i * 76 + r() * 30;
-    const w = 26 + r() * 22;
-    const far = i % 2 === 0;
-    trees += `<rect x="${f(x)}" y="0" width="${f(w)}" height="300" fill="${far ? '#b9a08a' : '#8c5e48'}" opacity="${far ? 0.55 : 1}"/>`;
-    trees += `<rect x="${f(x + w * 0.62)}" y="0" width="${f(w * 0.16)}" height="300" fill="#fff" opacity="0.08"/>`;
+/** A planet's paints: its seas, its land (two greens or sands or snows), the land's shadow, and its cottage roof. */
+const PLANETS: ReadonlyArray<{ sea: string; land: readonly [string, string]; shade: string; roof: string }> = [
+  { sea: '#5d93c9', land: ['#86b65a', '#9ccc62'], shade: '#5f8f4a', roof: '#7a6a58' },
+  { sea: '#7fb7c4', land: ['#5f8f55', '#7fae6a'], shade: '#466e43', roof: '#9b3d33' },
+  { sea: '#6c8fc9', land: ['#e9eef2', '#c8d9e6'], shade: '#9fb2c8', roof: '#5b6f8f' },
+  { sea: '#79a8c9', land: ['#e2c08a', '#efd3a0'], shade: '#bf9560', roof: '#b8443a' },
+  { sea: '#8d77ab', land: ['#e8a49a', '#f2c4a0'], shade: '#c27f78', roof: '#6d4e7a' },
+  { sea: '#4f7fa8', land: ['#e0a65a', '#c4733f'], shade: '#99562f', roof: '#3e3a36' },
+];
+
+const planets = new Map<string, string>();
+
+/**
+ * A friend's world, for its ticket: a small painted planet, drawn from a hash of the world's id, so each host's
+ * planet has its own seas and lands (and maybe a ring or a moon) and draws the same every time. Placeholder art
+ * until other worlds are built.
+ */
+export function worldArt(world: string): string {
+  let url = planets.get(world);
+  if (url) return url;
+  const r = rand(hashOf(world));
+  const look = PLANETS[Math.floor(r() * PLANETS.length)];
+  const ringed = r() < 0.4;
+  const moon = r() < 0.5;
+  let land = '';
+  const blobs = 3 + Math.floor(r() * 3);
+  for (let i = 0; i < blobs; i++) {
+    const a = r() * Math.PI * 2;
+    const d = r() * 30;
+    const x = 60 + Math.cos(a) * d;
+    const y = 62 + Math.sin(a) * d;
+    const rx = 12 + r() * 14;
+    const ry = 8 + r() * 9;
+    const turn = r() * 180;
+    land += `<ellipse cx="${f(x + 2)}" cy="${f(y + 3)}" rx="${f(rx)}" ry="${f(ry)}" transform="rotate(${f(turn)} ${f(x + 2)} ${f(y + 3)})" fill="${look.shade}" opacity="0.55"/>`;
+    land += `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${f(rx)}" ry="${f(ry)}" transform="rotate(${f(turn)} ${f(x)} ${f(y)})" fill="${look.land[i % 2]}"/>`;
   }
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  const clouds = [0, 1]
+    .map(() => {
+      const x = 30 + r() * 50;
+      const y = 40 + r() * 46;
+      return `<path d="M${f(x)} ${f(y)}q6 -5 12 0t12 0" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none" opacity="0.8"/>`;
+    })
+    .join('');
+  const tiltDeg = f(-24 + r() * 48);
+  const ring = (half: 'back' | 'front'): string =>
+    ringed
+      ? `<path d="${half === 'back' ? 'M6 62a54 13 0 0 1 108 0' : 'M114 62a54 13 0 0 1 -108 0'}" transform="rotate(${tiltDeg} 60 62)" stroke="#f3e6c4" stroke-width="4.5" fill="none" opacity="${half === 'back' ? 0.55 : 0.9}"/>`
+      : '';
+  const moonAt = r() < 0.5 ? [100, 24] : [20, 26];
+  url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
     svg(
-      720,
-      360,
-      `<defs><linearGradient id="fog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe6dc"/><stop offset="1" stop-color="#b9cdb6"/></linearGradient>` +
-        `<linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f1e6" stop-opacity="0"/><stop offset="1" stop-color="#f3f1e6" stop-opacity="0.9"/></linearGradient></defs>` +
-        `<rect width="720" height="360" fill="url(#fog)"/>${trees}` +
-        `<path d="M0 270 C140 250 260 262 360 270 C470 280 600 258 720 262 L720 360 L0 360 Z" fill="#7d9a6a"/>` +
-        `<g transform="translate(372 214)"><path d="M-46 0 L0 -30 L46 0 Z" fill="#9b3d33"/><rect x="-34" y="0" width="68" height="44" fill="#e8ddc6"/><rect x="-10" y="14" width="20" height="30" fill="#5b4636"/><rect x="-40" y="-4" width="80" height="6" fill="#7a2f28"/></g>` +
-        `<g fill="#c94f40"><rect x="250" y="226" width="7" height="60"/><rect x="300" y="226" width="7" height="60"/><rect x="240" y="222" width="78" height="7"/><rect x="246" y="236" width="66" height="5"/></g>` +
-        `<rect width="720" height="360" fill="url(#mist)"/>`,
+      120,
+      120,
+      `<defs><clipPath id="p"><circle cx="60" cy="62" r="40"/></clipPath>` +
+        `<radialGradient id="l" cx="0.34" cy="0.3" r="0.85"><stop offset="0.45" stop-color="#1c2a48" stop-opacity="0"/><stop offset="1" stop-color="#1c2a48" stop-opacity="0.42"/></radialGradient></defs>` +
+        ring('back') +
+        `<circle cx="60" cy="62" r="40" fill="${look.sea}"/>` +
+        `<g clip-path="url(#p)">${land}${clouds}</g>` +
+        `<g transform="translate(60 24)"><path d="M-7 0 0-6 7 0Z" fill="${look.roof}"/><rect x="-5.5" y="0" width="11" height="6" fill="#f3e6c4"/></g>` +
+        `<circle cx="60" cy="62" r="40" fill="url(#l)"/>` +
+        `<ellipse cx="44" cy="44" rx="11" ry="6" transform="rotate(-35 44 44)" fill="#fff" opacity="0.28"/>` +
+        ring('front') +
+        (moon ? `<circle cx="${moonAt[0]}" cy="${moonAt[1]}" r="7" fill="#f4ead2"/><circle cx="${moonAt[0] + 2}" cy="${moonAt[1] + 1.5}" r="2" fill="#d9ccb0"/>` : ''),
     ),
   )}`;
+  planets.set(world, url);
+  return url;
 }

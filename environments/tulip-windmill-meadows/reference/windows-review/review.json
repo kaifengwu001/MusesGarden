@@ -1,0 +1,116 @@
+{
+  "at": "2026-11-02T08:47:04.212Z",
+  "errors": [],
+  "states": [
+    {
+      "pose": "q=high&hud=0&t=12&pose=0.1082,-0.2712,0.6564,0.6956,0.7877",
+      "stats": {
+        "frameMs": 16.69999999999709,
+        "jsMs": 1.300000000745058,
+        "gpuMs": 1.540096,
+        "drawCalls": 44,
+        "triangles": 3445825,
+        "trianglesSubmitted": 3445825,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 22,
+        "geometries": 26,
+        "programs": 32,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 147,
+        "lodMin": 2,
+        "lodMax": 5,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7844.5,
+        "time": 12,
+        "frozen": true
+      }
+    },
+    {
+      "pose": "cam=overview&q=high&hud=0&t=12&pose=0.1082,-0.2712,0.6564,0.6956,0",
+      "stats": {
+        "frameMs": 16.599999999998545,
+        "jsMs": 1,
+        "gpuMs": 3.456576,
+        "drawCalls": 40,
+        "triangles": 3288195,
+        "trianglesSubmitted": 3288195,
+        "grassInstances": 0,
+        "flowerInstances": 0,
+        "textures": 23,
+        "geometries": 29,
+        "programs": 33,
+        "gpuBytes": 224324334,
+        "width": 1440,
+        "height": 960,
+        "pixelRatio": 1,
+        "samples": 4,
+        "tier": "high",
+        "tierChoice": "high",
+        "benchMs": null,
+        "renderScale": 1,
+        "growth": 0.1886,
+        "area": 205806.71251824812,
+        "radius": 127.97491085906613,
+        "chunks": 14,
+        "lodMin": 0,
+        "lodMax": 1,
+        "buildQueue": 0,
+        "buildMs": 0,
+        "firstFrameMs": 7844.5,
+        "time": 12,
+        "frozen": true
+      },
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    }
+  ],
+  "source": {
+    "base": "791263247a656a90c8950f4ef866eac564f2ea1f",
+    "branch": "environment/tulip-windmill-meadows",
+    "uncommitted": true,
+    "scope": "environments/tulip-windmill-meadows/",
+    "generator": "scripts/new-environment.ts at 7912632"
+  },
+  "motion": {
+    "file": "windmill-motion.webm",
+    "seconds": 4.999,
+    "width": 1440,
+    "height": 960,
+    "audio": false,
+    "decoded": true,
+    "reviewedSeconds": [
+      1,
+      3.7
+    ]
+  },
+  "media": [
+    {
+      "path": "planet.png",
+      "sha256": "c0d4bc240d5931864d69f989bbcc0d5f57ec75c49f87cc2b48d0a52135c0d7cd"
+    },
+    {
+      "path": "postcard.png",
+      "sha256": "abc67e68bd5d78c3a51d5e38866de8a20ca251670e66defc1ea7a7d660aff93e"
+    },
+    {
+      "path": "windmill-motion.webm",
+      "sha256": "3aaeeaedabf1fcb6488ee53dc5e885769be7c6aab3cd1c05f7110074df862fdc"
+    },
+    {
+      "path": "windmill.png",
+      "sha256": "c487b8472d4cd725a9f6cb7cb3ab35df378acc489961a18dfb397f423786dabe"
+    }
+  ]
+}

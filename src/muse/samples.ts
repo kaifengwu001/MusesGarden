@@ -103,7 +103,7 @@ export const sampleNowExploring: NowView = {
 export const sampleNowWorking: NowView = {
   ...sampleNowExploring,
   working: true,
-  label: 'Working (laptop out)',
+  label: 'Working',
 };
 
 export const sampleNowAway: NowView = {
@@ -118,7 +118,7 @@ export const sampleNowAway: NowView = {
 export const sampleNowBeyond: NowView = {
   ...sampleNowExploring,
   activity: 'beyond',
-  label: 'Gone beyond the planet',
+  label: 'Traveling outside the planet',
   until: at('2026-11-04T16:50:00-08:00'),
   path: null,
   away: { kind: 'beyond' },

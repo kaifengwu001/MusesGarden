@@ -1,0 +1,10 @@
+Browser tab: 1, Title: "Golden Rye", URL: "http://localhost:5251/environments/golden-rye/#cam=wander&q=high&hud=1&t=12&pose=0.2541,-0.4097,0.6666,0.5686,0.7233".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~1 AXWebArea Golden Rye, URL: localhost:5251/environments/golden-rye/#cam=wander&q=high&hud=1&t=12&pose=0.2541,-0.4097,0.6666,0.5686,0.7233
+~				202 text 165 fps · 6.1 ms · max 6.2
+~				203 text 1.52 / 4 ms
+~				204 text 2.00 ms
+~				205 text 32 / 120
+~				206 text 2.89M / 4.00M · 2.89M sent
+~				213 text 264 nodes L2–5 · queue 0 · 0.00 ms
+The focused UI element is 68 button Across the rye

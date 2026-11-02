@@ -1,0 +1,211 @@
+{
+  "recordedAt": "2026-11-02T09:10:21.638Z",
+  "baseline": "handoffs/windows/scarlet-yellow-clouds-2026-11-02T09-05-57-774Z",
+  "before": {
+    "capturedAt": "2026-11-02T09:07:55.847Z",
+    "errors": [],
+    "views": [
+      {
+        "id": "user-view",
+        "state": "cam=overview&q=high&t=12&pose=0.195,-0.1045,0.6241,0.7494,0.24",
+        "hash": "5a141ab6:1280x800",
+        "stats": {
+          "frameMs": 16.600000000000364,
+          "jsMs": 1.699999999254942,
+          "gpuMs": 1.845248,
+          "drawCalls": 48,
+          "triangles": 2751073,
+          "trianglesSubmitted": 2751073,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 104,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 129,
+          "lodMin": 2,
+          "lodMax": 3,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 4875.199999999255,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 63,
+          "total": 95
+        }
+      },
+      {
+        "id": "globe",
+        "state": "cam=overview&q=high&t=12&pose=0.195,-0.1045,0.6241,0.7494,0",
+        "hash": "685b509b:1280x800",
+        "stats": {
+          "frameMs": 16.700000000000728,
+          "jsMs": 1.5,
+          "gpuMs": 1.408,
+          "drawCalls": 50,
+          "triangles": 2535241,
+          "trianglesSubmitted": 2535241,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 106,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 23,
+          "lodMin": 1,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 4875.199999999255,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 79,
+          "total": 95
+        }
+      }
+    ]
+  },
+  "after": {
+    "capturedAt": "2026-11-02T09:08:20.346Z",
+    "errors": [],
+    "views": [
+      {
+        "id": "user-view",
+        "state": "cam=overview&q=high&t=12&pose=0.195,-0.1045,0.6241,0.7494,0.24",
+        "hash": "0078ca05:1280x800",
+        "stats": {
+          "frameMs": 16.700000000000728,
+          "jsMs": 2,
+          "gpuMs": 3.253248,
+          "drawCalls": 48,
+          "triangles": 2751073,
+          "trianglesSubmitted": 2751073,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 104,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 129,
+          "lodMin": 2,
+          "lodMax": 3,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5774.300000000745,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 63,
+          "total": 95
+        }
+      },
+      {
+        "id": "globe",
+        "state": "cam=overview&q=high&t=12&pose=0.195,-0.1045,0.6241,0.7494,0",
+        "hash": "9544a745:1280x800",
+        "stats": {
+          "frameMs": 16.600000000000364,
+          "jsMs": 1.5,
+          "gpuMs": 1.559552,
+          "drawCalls": 50,
+          "triangles": 2535241,
+          "trianglesSubmitted": 2535241,
+          "grassInstances": 0,
+          "flowerInstances": 0,
+          "textures": 22,
+          "geometries": 106,
+          "programs": 35,
+          "gpuBytes": 199230942,
+          "width": 1280,
+          "height": 800,
+          "pixelRatio": 1,
+          "samples": 4,
+          "tier": "high",
+          "tierChoice": "high",
+          "benchMs": null,
+          "renderScale": 1,
+          "growth": 0.1886,
+          "area": 205806.71251824812,
+          "radius": 127.97491085906613,
+          "chunks": 23,
+          "lodMin": 1,
+          "lodMax": 1,
+          "buildQueue": 0,
+          "buildMs": 0,
+          "firstFrameMs": 5774.300000000745,
+          "time": 12,
+          "frozen": true
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "clouds": {
+          "drawn": 79,
+          "total": 95
+        }
+      }
+    ]
+  },
+  "media": [
+    {
+      "file": "yellow-clouds-before.png",
+      "sha256": "6e0a93d8c32bb17754db4fd8c7a512900c684d85a05ff8a28fa856b00d1dd818"
+    },
+    {
+      "file": "yellow-clouds-user-view.png",
+      "sha256": "44bd8895f0095f3f1bcdbf6203931990634a81234eb71ec8fd437cbcd50784b0"
+    },
+    {
+      "file": "yellow-clouds-globe.png",
+      "sha256": "6f3ba9e61ddb8062ca5b1bb4b466fbae7c0071c5141e841abdaa254e53b6f219"
+    }
+  ],
+  "source": {
+    "file": "environments/scarlet-sail-canyon/render/palette.ts",
+    "sha256": "9fa80faca2ef94848b3bf47f59a1fc357a47972b48b72e9fb3ebdd9af01d4176"
+  },
+  "notes": [
+    "Only the five noon cloud palette cells changed; dawn/golden variation retained.",
+    "Shapes, coverage, motion and optical-depth shadows unchanged.",
+    "Earlier initial-globe and custom time-return hash diagnostics remain open."
+  ]
+}

@@ -21,10 +21,6 @@ reference/hut-interior/
 .*.mjs
 .*.py
 
-# Claude Code local config (the desktop preview launch.json), kept out of git; the project's skills are kept
-.claude/*
-!.claude/skills/
-
 # the Muse server's local garden (npm run serve)
 .muse/
 .muse-live-e2e/

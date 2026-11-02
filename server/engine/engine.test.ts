@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Instant, MuseId, MuseSeed, StoredEvent } from '../../src/muse/contract';
+import type { Instant, MuseId, MuseSeed, Reach, StoredEvent } from '../../src/muse/contract';
 import { openSqliteStore } from '../adapters/store/sqlite';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
@@ -198,11 +198,21 @@ describe('engine on SQLite', () => {
   });
 });
 
+/** Muses on the real social policy whose owners' friend groups are `reach`; moss's and wren's owners know each other online. */
+async function online(reach: Readonly<Record<string, Reach>>) {
+  const store = memoryStore();
+  const engine = new Engine({ ...stubDeps(store), social: socialPolicy, reduceSocial }, T0);
+  for (const id of Object.keys(reach)) await engine.addMuse(seed(id), `I am ${id}.`, '', T0);
+  for (let i = 0; i < 2; i++) await engine.connectOwners('moss' as MuseId, 'wren' as MuseId, 'instagram', T0);
+  for (const [id, r] of Object.entries(reach)) await engine.ownerSettings(id as MuseId, { kind: 'owner.settings', reach: r });
+  return { store, engine };
+}
+
+const encounters = (engine: Engine, id: string) => engine.log(id as MuseId).filter((e) => e.event.kind === 'encounter');
+
 describe('meeting online', () => {
   it('happens only while both Muses explore, and only between those whose owners know each other', async () => {
-    const engine = new Engine({ ...stubDeps(memoryStore()), social: socialPolicy, reduceSocial }, T0);
-    for (const id of ['moss', 'wren', 'lark']) await engine.addMuse(seed(id), `I am ${id}.`, '', T0);
-    for (let i = 0; i < 2; i++) await engine.connectOwners('moss' as MuseId, 'wren' as MuseId, 'instagram', T0);
+    const { engine } = await online({ moss: 'everyone', wren: 'everyone', lark: 'everyone' });
     await engine.advanceTo(at(7 * 24));
 
     const moss = engine.log('moss' as MuseId);
@@ -214,5 +224,38 @@ describe('meeting online', () => {
       for (const id of ['moss', 'wren']) expect(activityBefore(engine.log(id as MuseId), e.event.at)).toBe('travel');
     }
     expect(engine.log('lark' as MuseId).some((e) => e.event.kind === 'encounter')).toBe(false);
+  });
+});
+
+describe('the friend group', () => {
+  it('lets no Muses meet unless both owners take in the layer they are in', async () => {
+    for (const reach of [{ moss: 'known', wren: 'shared' }, { moss: 'shared', wren: 'everyone' }] as const) {
+      const { engine } = await online(reach);
+      await engine.advanceTo(at(7 * 24));
+      expect(encounters(engine, 'moss'), JSON.stringify(reach)).toEqual([]);
+    }
+    const { engine } = await online({ moss: 'known', wren: 'known' });
+    await engine.advanceTo(at(7 * 24));
+    expect(encounters(engine, 'moss').length).toBeGreaterThan(0);
+  });
+
+  it('calls off a meeting already drawn when an owner narrows the group before it, and widening lets them meet again', async () => {
+    const kept = await online({ moss: 'known', wren: 'known' });
+    await kept.engine.advanceTo(at(7 * 24));
+    const first = encounters(kept.engine, 'moss')[0]?.event.at;
+    expect(first, 'left alone, they meet').toBeDefined();
+
+    const { engine, store } = await online({ moss: 'known', wren: 'known' });
+    await engine.advanceTo((first - 1) as Instant);
+    const drawn = [...store.pending('moss' as MuseId), ...store.pending('wren' as MuseId)].filter((i) => i.kind === 'encounter' && i.at === first);
+    expect(drawn, 'the meeting is drawn before the narrowing').toHaveLength(1);
+    await engine.ownerSettings('wren' as MuseId, { kind: 'owner.settings', reach: 'shared' });
+    await engine.advanceTo(at(9 * 24));
+    expect(encounters(engine, 'moss')).toEqual([]);
+
+    await engine.ownerSettings('wren' as MuseId, { kind: 'owner.settings', reach: 'everyone' });
+    const widenedAt = engine.now();
+    await engine.advanceTo(at(16 * 24));
+    expect(encounters(engine, 'moss').filter((e) => e.event.at >= widenedAt).length).toBeGreaterThan(0);
   });
 });

@@ -60,3 +60,43 @@ describe('likes through the commands', () => {
     g.store.close();
   });
 });
+
+describe('favorites through the commands', () => {
+  const favorites = (g: Awaited<ReturnType<typeof garden>>): MuseEventBody[] =>
+    g.engine.log(A).flatMap((e) => (e.event.kind === 'owner.favorited' ? [e.event] : []));
+
+  it('records a star once and an unstar once, shows each on the postcard, and refuses a photo Muse never took', async () => {
+    const g = await garden();
+    const [photo] = g.engine.state(A)?.photos ?? [];
+    expect(photo).toBeDefined();
+    const card = () => g.views.garden(A, g.engine.now())?.postcards.find((p) => p.id === photo.id);
+    expect(card()?.favorite).toBe(false);
+    expect(await g.commands.favorite(A, photo.id, true)).toEqual({ ok: true });
+    expect(await g.commands.favorite(A, photo.id, true)).toEqual({ ok: true });
+    expect(card()?.favorite).toBe(true);
+    expect(await g.commands.favorite(A, photo.id, false)).toEqual({ ok: true });
+    expect(card()?.favorite).toBe(false);
+    expect(favorites(g)).toEqual([
+      { kind: 'owner.favorited', photo: photo.id, favorite: true, at: expect.any(Number) as number },
+      { kind: 'owner.favorited', photo: photo.id, favorite: false, at: expect.any(Number) as number },
+    ]);
+    expect(await g.commands.favorite(A, 'p:nowhere' as PhotoId, true)).toMatchObject({ ok: false, status: 404 });
+    expect(await g.commands.favorite('nobody' as MuseId, photo.id, true)).toMatchObject({ ok: false, status: 404 });
+    expect(favorites(g)).toHaveLength(2);
+    g.store.close();
+  });
+
+  it('never nudges Muse: a starred photo of a friend leaves its friendship as it was, where a like warms it', async () => {
+    const g = await garden();
+    const photo = g.engine.state(A)?.photos.find((p) => p.subject === 'friend' || p.subject === 'new-friend');
+    if (!photo) throw new Error('four days should bring a hangout photo');
+    const before = g.engine.state(A)!;
+    await g.commands.favorite(A, photo.id, true);
+    const starred = g.engine.state(A)!;
+    expect(starred.social.relationships.get(B)).toEqual(before.social.relationships.get(B));
+    expect(starred.interests).toEqual(before.interests);
+    await g.commands.like(A, { photo: photo.id }, true);
+    expect(g.engine.state(A)!.social.relationships.get(B)?.fondness).toBe((before.social.relationships.get(B)?.fondness ?? 0) + 1);
+    g.store.close();
+  });
+});

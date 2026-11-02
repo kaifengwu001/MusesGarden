@@ -22,7 +22,7 @@ const COPIED = [
   'life/museRoam.ts',
   'muse/ui/body.ts',
   'muse/ui/overlay.ts',
-  'ui/garden/basketFlight.ts',
+  'ui/garden/basketStage.ts',
   'ui/garden/gardenUi.ts',
   'ui/garden/travel.ts',
   'planet/surface.ts',

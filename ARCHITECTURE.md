@@ -473,7 +473,7 @@ click is what you see.
   through the front door, which swings open as it comes and shut behind it
   (museRoam.ts comeIn), to greet you, cook at the hearth or go to bed; when
   you step out it walks out onto its porch (goOut), the room seen whole
-  through the open door. Inside, Kai's Tripo furniture is fitted into
+  through the open door. Inside, Kai's furniture models is fitted into
   the room in meters and lit by the stove's fire, a candle and a lantern,
   with soft daylight from above as if the roof were on. Muse's showpiece, a
   display cabinet along the left wall, holds its favourites: its glowing dot
@@ -777,13 +777,17 @@ so any view can be shared.
         hut.ts/.glsl       Muse's hut inside, drawn only in the cutaway: the room fitted to the cottage's walls, the
                            cut through them (rubble, timber), Kai's furniture (src/assets/interior), the fire's light,
                            the showpiece and its favourites' dots (hutDot); occlude.glsl dissolves what hides the shelf
-        findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, planted from the middle out)
-                           and their glowing spheres from high up; findTable.ts each find's state (planted, card,
-                           hover, pulse, picked basket) in a float texture, any number of finds
-        pins.ts            pins in the globe from orbit: liked finds (hearts) and Muse (its face)
+        findBeds.ts/.glsl  the finds' patches of flowers (the meadow's species bunched per find, always grown) and their
+                           glowing spheres from high up; a hero plant per patch, the one a basket's flower lands
+                           into (heroStance: where and how large it stands); findTable.ts each find's state (card,
+                           hover, pulse, picked basket, its hero's focus, landing and away) in a float texture,
+                           any number of finds
+        pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo),
+                           Muse's moving with it as it roams
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
-                           react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes, post
-                           read and put away, baskets visited), where the finds grow (placement.ts)
+                           react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes and
+                           stars, post read, today's post and the tickets, baskets visited), where the finds grow
+                           (placement.ts)
       render/
         palette.ts         16×16 palette generated in code, time-of-day keys, sun path
         toon.glsl          soft bands, three-tone materials, rim
@@ -798,6 +802,19 @@ so any view can be shared.
                            flights between places (flight.ts)
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
-                           baskets, pins), the post box (a model in its own canvas), postcards, the album and
-                           invitations (mail.ts), the sheets (baskets, Muse's page, travel), the visit stand-in
+                           baskets), the post box (the hand-drawn mailbox in SVG, postboxIllustration.ts), the post
+                           (mail.ts: today's deck of polaroids, the heart and star, the Favorite and Album pages,
+                           the tickets; scrapbook.ts dresses each card on those pages from its id: the frame's tint,
+                           washi tape or a clip, sometimes a crayon scribble or a sticker),
+                           Muse's page, the visit stand-in, and the basket: its phases as one pure step
+                           (basketMachine.ts; gardenUi.ts carries out its effects), the rail icon's hand-drawn
+                           basket, flat, as two layers of the one picture split along its near rim
+                           (basketDrawing.ts), with the finds' own flower meshes drawn between them, in a
+                           full-screen canvas of its own drawn only while it is out (basketStage.ts; flowerPaint.ts
+                           paints each flower as its patch paints its hero, through the frame's grade, so it
+                           matches where it lands), and what you touch over it (basketOverlay.ts: the scrim, a
+                           button over each flower, the preview, the day timeline; basketFan.ts and timeline.ts
+                           lay them out). A press on the planet goes to a pin first, then to the hut's door or a
+                           find's patch, the nearer along the pointer's ray; in the hut, to the showpiece and its
+                           favourites (their cards are the finds' cards); hutEditor.ts lays the room out (?edit)
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest

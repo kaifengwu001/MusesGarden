@@ -56,3 +56,13 @@ records the meadow commit it was copied from.
 [Lantern Reed Gardens](lantern-reed-gardens/README.md) is available at http://localhost:5225/environments/lantern-reed-gardens/ using `npm run dev:lantern`. Its storage and build output are independent of other worlds. The original meadow remains at `/`.
 
 [Scarlet Sail Canyon](scarlet-sail-canyon/README.md) is served on port 5227. Its code, build output and resident storage are independent of the original meadow.
+
+[Cobalt Windfields](cobalt-windfields/README.md) is served on port 5217 with `npm run dev:cobalt`. Its blue rock formations, peach sand, native plants, wildlife and local residents live entirely inside its own environment folder.
+
+[Tulipwind Meadows](tulip-windmill-meadows/README.md) is served on port 5241 with `npm run dev:tulip`. Dense tulip ribbons, turning windmills and varied cottage gardens form a separate cultivated planet.
+
+[Golden Rye](golden-rye/README.md) is served on port 5251 with `npm run dev:rye`. Continuous golden grain, cypress groves, muted lavender hills and rounded clouds form a separate harvest planet.
+
+[Cherry Blossom Waterways](cherry-blossom-waterways/README.md) is served on port 5249 with `npm run dev:cherry`. It combines pink and ivory cherry groves, green willows, blue canals, a tiled pavilion and duck flocks.
+
+[Sequoia Shrine](sequoia-shrine/README.md) is served on port 5245 with `npm run dev:sequoia`. Dense ancient forest covers a planet of widely separated shrines, connected hiking trails and a separate cedar home for Muse.

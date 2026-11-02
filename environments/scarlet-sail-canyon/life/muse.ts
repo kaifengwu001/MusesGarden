@@ -4,19 +4,20 @@ import type { Terrain } from '../planet/terrain';
 import { warpPoint, type WarpFrame } from '../../../src/render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from '../../../src/life/museBody';
 import { SCULPTS, type SculptKind } from '../../../src/life/museMesh';
-import type { Loaded } from '../../../src/life/museTripo';
+import type { Loaded } from '../../../src/life/museSculptLoader';
 import BodyWorker from '../../../src/life/museBody.worker?worker&inline';
 import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from '../../../src/life/muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from '../../../src/life/museRig';
 import { MuseRoam, PACE, type Roaming } from './museRoam';
-import shadowFragment from '../../../src/life/museShadow.frag.glsl?raw';
+// Scarlet still adds optical depth into its cloud map, so retain that shader contract locally.
+import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from '../../../src/life/museShadow.vert.glsl?raw';
 
 // Muse, who lives here: a cream plush about as tall as you, built from its
 // reference (museBody.ts: one distance field, meshed off the main thread, or
-// Tripo's sculpt rigged on the same skeleton, museMesh.ts), skinned on
+// the source model's sculpt rigged on the same skeleton, museMesh.ts), skinned on
 // thirteen joints and posed in closed form (museRig.ts), drawn as its skin
 // and SHELLS shells of fur in one instanced draw (muse.vert.glsl,
 // muse.frag.glsl), and casting its shadow into the clouds' map as the birds
@@ -95,7 +96,7 @@ const sculpts = new Map<SculptKind, Promise<Loaded>>();
 function sculptBody(kind: SculptKind): Promise<Loaded> {
   let job = sculpts.get(kind);
   if (!job) {
-    job = import('../../../src/life/museTripo').then(({ loadTripo }) => loadTripo(kind));
+    job = import('../../../src/life/museSculptLoader').then(({ loadSculpt }) => loadSculpt(kind));
     sculpts.set(kind, job);
   }
   return job;
@@ -116,7 +117,7 @@ export interface MuseWhere {
 export class Muse {
   readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
   readonly shadowMesh: Mesh<BufferGeometry, ShaderMaterial>;
-  /** Muse's body: the field's own (museBody.ts), or the Tripo sculpt bound to the same skeleton (museTripo.ts). */
+  /** Muse's body: the field's own (museBody.ts), or the imported sculpt bound to the same skeleton (museSculptLoader.ts). */
   private model: MuseModel = 'field';
   private fieldBody: MuseBody | null = null;
   private loading: Promise<void>;
@@ -208,8 +209,8 @@ export class Muse {
   }
 
   /**
-   * Switch Muse's body: the field's own, or a Tripo sculpt on the same
-   * skeleton (Tripo's first, made with its arms hanging, or its T-pose; its
+   * Switch Muse's body: the field's own, or a source model sculpt on the same
+   * skeleton (the first sculpt, made with its arms hanging, or its T-pose; its
    * own paint, the same fur and light). The sculpt is loaded the first time it is asked for; where it
    * cannot be had, Muse keeps the field's.
    */
@@ -226,7 +227,7 @@ export class Muse {
         const sculpt = await sculptBody(model);
         if (!this.disposed && this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade);
       } catch (error) {
-        console.warn('Muse: the Tripo sculpt could not be loaded; keeping the field body', error);
+        console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
       }
     });
   }

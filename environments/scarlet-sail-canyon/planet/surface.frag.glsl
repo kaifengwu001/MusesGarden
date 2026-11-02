@@ -37,12 +37,6 @@ vec3 faceColour(float f) {
 
 void main() {
   vec3 dir = normalize(vDir);
-  vec3 n = normalize(vNormal);
-  vec3 toCam = cameraPosition - vWarped;
-  float viewDist = length(toCam);
-  vec3 v = toCam / viewDist;
-  float pixelMeters = viewDist * uPixelAngle / max(dot(n, v), 0.3);
-
   // Ground from the bake at every pixel (AWAY_FROM_HOME:
   // a node the homestead shapes and shades none of, surface.ts, drawn without its code)
   vec4 fields = terrainFields(dir);
@@ -51,6 +45,33 @@ void main() {
 #else
   float h = homestead(dir, fields.r);
 #endif
+
+  // Cliff lighting must follow the continuous terrain, rather than interpolated
+  // vertex normals: the latter stretch a narrow riser's normal across each
+  // triangle and produce long comb-like teeth in the toon bands. A centered,
+  // fixed physical footprint also avoids derivative noise from the height bake.
+  const float normalMeters = 0.45;
+  vec3 gradA, gradB;
+  gradientFrame(dir, gradA, gradB);
+  float normalAngle = normalMeters / uRadius;
+  vec3 da = normalize(dir + gradA * normalAngle);
+  vec3 db = normalize(dir + gradB * normalAngle);
+  vec3 dc = normalize(dir - gradA * normalAngle);
+  vec3 dd = normalize(dir - gradB * normalAngle);
+  float ha = height0(da), hb = height0(db);
+  float hc = height0(dc), hd = height0(dd);
+  vec3 pp = dir * (uRadius + h + uBank.x);
+  vec3 pa = da * (uRadius + ha + uBank.x);
+  vec3 pb = db * (uRadius + hb + uBank.x);
+  vec3 pc = dc * (uRadius + hc + uBank.x);
+  vec3 pd = dd * (uRadius + hd + uBank.x);
+  vec3 n = warpNormal(pp, normalize(cross(pa - pc, pb - pd)));
+  float slope = length(vec2(ha - hc, hb - hd)) / (2.0 * normalMeters);
+
+  vec3 toCam = cameraPosition - vWarped;
+  float viewDist = length(toCam);
+  vec3 v = toCam / viewDist;
+  float pixelMeters = viewDist * uPixelAngle / max(dot(n, v), 0.3);
   float shore = 1000.0;
   float wet = 0.0;
 
@@ -74,7 +95,7 @@ void main() {
     float nearFade = uNearField.w > 0.01 ? (1.0 - smoothstep(uNearField.w * 0.55, uNearField.w, chordAngle(dir, uNearField.xyz) * uRadius)) * (1.0 - smoothstep(0.03, 0.07, pixelMeters)) * vFlowersBuilt : 0.0;
     Meadow m;
     m.dir = dir;
-    m.slope = vSlope;
+    m.slope = slope;
     m.lush = fields.g;
     m.wet = fields.b;
     m.variant = fields.a;

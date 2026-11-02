@@ -34,7 +34,7 @@ describe('cast.json', () => {
     expect(introducedToHero.sort()).toEqual(friends.sort());
   });
 
-  it('puts the hero, and only the hero, on the first planet: the meadow as Kai tuned it (see CLAUDE.md)', () => {
+  it('puts the hero, and only the hero, on the first planet: the meadow as Kai tuned it (see docs/development-guidelines.md)', () => {
     expect(cast.members.filter((m) => m.worldSeed === FIRST_PLANET.seed).map((m) => m.role)).toEqual(['hero']);
   });
 

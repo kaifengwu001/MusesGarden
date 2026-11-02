@@ -85,10 +85,10 @@ There is no fixed bedtime. Muse can travel at any hour, and sleep is a long rest
 | --- | --- | --- | --- |
 | `rest` | Lies in the grass, waters flowers, or naps. A rest of 90 min or more shows as sleep. | Muse near its house | Sometimes a photo. A due reflection runs at the start of a rest. |
 | `travel` on its planet | Explores the internet by exploring its planet. It transports to a region, old or new, then hops from spot to spot, looks at pages, and keeps the best. | Muse moves around the region. Fog lifts when a new area opens. Plants appear where finds are kept. | Hop records, finds planted where Muse found them, new areas, questions, photos |
-| `travel` beyond | Leaves its planet to roam the space between planets, where other Muses roam too | "Muse has gone beyond the planet", with no follow | Encounters with strangers, photos. No finds. |
+| `travel` beyond | Leaves its planet to roam the space between planets, where other Muses roam too | "Traveling outside the planet", with no follow | Encounters with strangers, photos. No finds. |
 | `visit` as host | A friend's Muse comes over | The friend's Muse on the owner's planet | A gift exchange and a photo together, every time, plus rapport |
 | `visit` as guest | Muse goes to a friend's planet | "Away at Wren's planet", with no follow | The same as for the host |
-| work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot, or "working" while beyond or away | Nothing collected. Rarely a photo. |
+| work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot ("Working"), or "Working outside the planet" or "Working at Wren's planet" while beyond or away | Nothing collected. Rarely a photo. |
 
 Work is not an activity the policy draws. Work time is exactly the busy time the Muse app reports. When work starts, the current episode pauses in place. When work ends, the episode resumes at the same spot. Nothing sends Muse home. Free time depends only on how much work the owner gives Muse.
 
@@ -162,7 +162,7 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 - Muse transports between regions, so the explored pockets need not connect.
 - Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
 - The planet's growth value `g` follows the explored area.
-- Fern, the hero, lives on the first planet: the meadow, seed 412. It starts at the meadow's tuned size (R 128 m), as if it had explored that much already, and grows from there. The first planet's seed and look stay as they are; see [CLAUDE.md](../CLAUDE.md).
+- Fern, the hero, lives on the first planet: the meadow, seed 412. It starts at the meadow's tuned size (R 128 m), as if it had explored that much already, and grows from there. The first planet's seed and look stay as they are; see [development guidelines](development-guidelines.md).
 
 ### Each trip goes beyond, opens new ground, or revisits
 
@@ -321,6 +321,21 @@ Muse makes friends three ways, most likely first: its owner shares it with a fri
 | Owners are friends on Instagram or Facebook | Online, while both Muses explore, wherever they are | Familiarity 1, then a draw at 0.5 + 0.5 × the lower sociability | `known-on` |
 | Strangers | Both beyond the planet | Familiarity on both sides, then both say yes | `met-beyond` |
 
+### The friend group
+
+Each owner picks how far out Muse makes friends: `owner.settings.reach`, folded into `MuseState.reach` (`server/domain/social/reach.ts`).
+
+| Reach | Muse makes and keeps friends with |
+| --- | --- |
+| `shared` (the default) | The Muses of people the owner shared Muse with |
+| `known` | Also the Muses of the owner's Instagram and Facebook friends |
+| `everyone` | Also strangers met beyond the planet |
+
+- **A pair's layer.** It is `shared` if either owner shared Muse with the other (the relationship's origin is `introduced`), else `known` if the owners are connected online, else `everyone`. Both logs hold what decides it, so the layer reads the same from either side.
+- **Both owners decide.** Two Muses meet, beyond or online, only when both owners' groups take in their layer. `encounterRate` is 0 otherwise, and the engine checks again when a meeting falls due, so one drawn before an owner narrowed the group never happens.
+- **Narrowing hides, never ends.** Friends visit only inside both owners' groups, and each owner's garden lists only the friends inside their own. The friendship stays as it was, so widening the group brings the friend back.
+- **The sim.** `npm run sim` keeps every owner at `shared`, and `--reach known` or `--reach everyone` sets them all. Two sim checks hold the rule: every path the groups allow makes a friend, and nobody meets or befriends outside both owners' groups.
+
 ### Owners who share Muse meet soon
 
 - Owners share Muse with a share code. The two Muses are friends at once, and the owners expect them to find time to meet.
@@ -437,8 +452,9 @@ The owner watches, receives and likes. Only a like moves Muse's interests, as [L
 | Baskets with history | Delivered when at least 3 finds are waiting, or when at least 1 is waiting and 3 days have passed. Delivered at the owner's chosen time if set, otherwise as soon as the criteria are met. At most 1 a day, with at most 7 items, Muse's best by keep score. The rest live only on the planet. Every basket is stored. | `GET /baskets?before=` |
 | Photos | At most 5 a day, counted on the day the owner receives them. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Every hangout and every new friendship comes with a photo, so neither starts unless both Muses still have a photo slot that day. | `GET /photos?before=` |
 | Favorites shelf | Muse's top 10 objects, always on display at home. fondness = 0.5 × keep score + 0.5 × the current pull of its topics, which is affinity plus salience. Gifts from close friends get a small bonus. The shelf shifts as Muse's interests change. Only the owner sees it. | `GET /home/shelf` |
-| Invitations | "Travel now" uses one, once, whenever the owner likes; "Keep for later" keeps it. Only the sender's owner withdraws one. | `use-invitation` in the garden's reactions, `POST /api/invitations/:id/withdraw`, then `GET /api/visits/:id/world` |
+| Invitations | Each unused invitation waits in the post as a ticket. Boarding uses it, once, whenever the owner likes. Only the sender's owner withdraws one. | `use-invitation` in the garden's reactions, `POST /api/invitations/:id/withdraw`, then `GET /api/visits/:id/world` |
 | Likes | Like or unlike any find or photo. The first like of a thing nudges Muse toward the find's topics; see [Likes nudge Muse](#likes-nudge-muse). | `POST /api/muses/:id/garden/reactions` (`like-find`, `like-postcard`) |
+| Postcard favorites | Star or unstar any photo postcard. The garden keeps the starred ones together as the owner's Favorites. A star is the owner's own keeping and never nudges Muse. | `favorite-postcard` in the garden's reactions |
 | Sharing settings | Introduce a friend's Muse with a share code, or unshare it. "What Muse shares" lists every public interest and find with a hide toggle. Pick the basket time. | `/settings/sharing`, `/settings/introductions`, `/settings/basket-time` |
 
 Each photo is stored as a subject and a camera pose, not as an image. It maps onto the renderer's existing `pose=` URL hash in `src/view/camera.ts`, so the planet itself renders the photo.
@@ -569,7 +585,7 @@ Finds come from the media recording, `server/fixtures/media.json`, so no table c
 
 ### Two Minds sit behind one port
 
-- `MetaMind` calls OpenAI-style chat completions at `https://api.meta.ai/v1` with `MODEL_API_KEY` and the model `muse-spark-1.3`. Environment variables can override all three. It parses JSON by hand, retries once, and then falls back to `HeuristicMind`.
+- `MetaMind` calls the chat-completions protocol at `https://api.meta.ai/v1` with `MODEL_API_KEY` and the model `muse-spark-1.3`. Environment variables can override all three. It parses JSON by hand, retries once, and then falls back to `HeuristicMind`.
 - `HeuristicMind` is deterministic, so tests and fast-forward runs reproduce exactly.
 - Finds come from the media recording, which replays offline.
 - If `MODEL_API_KEY` is unset, the precomputed hero run uses `HeuristicMind` and says so.

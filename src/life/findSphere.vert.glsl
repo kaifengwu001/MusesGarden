@@ -4,6 +4,8 @@
 // sits where the find grows and goes behind the horizon with it. The one
 // under the pointer and the one whose card is up are brighter, one coming
 // home pulses, and the picked basket's are larger and take its tint.
+// A sprite is flat, so it is depth-tested at the near edge of its glow:
+// ground rising inside the glow does not cut it, a hill or a cloud between does.
 #include <meadow_common>
 #include <meadow_noise>
 #include <meadow_warp>
@@ -30,7 +32,7 @@ void main() {
   float pulse = findPulse(find);
   // the view's height in pixels
   float view = 2.0 / (projectionMatrix[1][1] * uPixelAngle);
-  vec3 at = aPlace.xyz * (uRadius + aPlace.w + 0.22 * find.lift + 0.6);
+  vec3 at = aPlace.xyz * (uRadius + aPlace.w + HOVER_LIFT * find.lift + 0.6);
   float px = view * (0.034 + 0.016 * lit) * (1.0 + 0.6 * pulse) * mix(1.0, MARK_SIZE, find.mark);
   float strength = uSpheres * (0.8 + 0.4 * lit + 0.5 * pulse);
   vec3 wp = warpPosition(at);
@@ -42,5 +44,11 @@ void main() {
   vec3 colour = mix(findGlow(), petals, 0.55);
   vColour = mix(colour, findMarkTint(), 0.7 * find.mark) * strength * (1.0 + 0.25 * find.mark);
   gl_PointSize = min(px, 480.0);
-  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+  vec4 view4 = viewMatrix * vec4(wp, 1.0);
+  gl_Position = projectionMatrix * view4;
+  // the glow's radius in metres at its depth (uPixelAngle: m a pixel at 1 m)
+  float depth = -view4.z;
+  view4.z += min(0.5 * gl_PointSize * depth * uPixelAngle, 0.5 * depth);
+  vec4 near = projectionMatrix * view4;
+  gl_Position = vec4(gl_Position.xy / gl_Position.w * near.w, near.z, near.w);
 }

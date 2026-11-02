@@ -63,8 +63,10 @@ export interface Basket {
 }
 
 export interface Invitation {
-  /** The Muse who invites you. */
+  /** The Muse who invites you: its id, its name, and its coat as a CSS colour (its ticket is printed in it). */
   from: string;
+  fromName: string;
+  coat: string;
   /** Its world: an id the travel step resolves, and the world's name. */
   world: string;
   worldName: string;
@@ -89,6 +91,8 @@ export interface Postcard {
   invitation?: Invitation;
   /** Whether you liked it, when the backend keeps likes; without it this browser remembers them. */
   liked?: boolean;
+  /** Whether you starred it, kept for you alone, when the backend keeps favorites; without it this browser remembers them. */
+  favorite?: boolean;
 }
 
 export interface Interest {
@@ -119,6 +123,13 @@ export interface MuseFriend {
   knownOn?: 'instagram' | 'facebook';
 }
 
+/**
+ * Muse's friend group, the owner's setting, widest last: the Muses of people the owner shared Muse with, then also
+ * those of the owner's Instagram and Facebook friends, then also strangers met outside the planet. Muse meets,
+ * visits and lists only friends inside it; narrowing hides the others and never ends a friendship.
+ */
+export type Reach = 'shared' | 'known' | 'everyone';
+
 export interface MuseStatus {
   /** At home in its cottage, or out exploring (its door is shut). */
   home: boolean;
@@ -133,10 +144,13 @@ export interface MuseProfile {
   /** What soul.md says about it, in a line or two: all it carries into the garden. */
   soul: string;
   status: MuseStatus;
+  reach: Reach;
 }
 
 /** Everything the garden shows, as of now. */
 export interface GardenSnapshot {
+  /** The day it is where the owner lives (ISO date), by the backend's clock: the day the post's From today is. */
+  today: string;
   /** Muse's own planet, when the backend has one: its seed and growth (0..1), as the URL's `seed` and `g`. */
   world?: { seed: number; g: number };
   muse: MuseProfile;
@@ -159,6 +173,8 @@ export type GardenEvent =
 export type Reaction =
   | { type: 'like-find'; id: string; liked: boolean }
   | { type: 'like-postcard'; id: string; liked: boolean }
+  | { type: 'favorite-postcard'; id: string; favorite: boolean }
   | { type: 'share-interest'; id: string; shared: boolean }
   | { type: 'share-find'; id: string; shared: boolean }
-  | { type: 'use-invitation'; id: string };
+  | { type: 'use-invitation'; id: string }
+  | { type: 'set-reach'; reach: Reach };

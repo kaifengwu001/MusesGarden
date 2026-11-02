@@ -7,13 +7,13 @@ import terraceUrl from '../assets/postcards/terrace.jpg';
 import { tangentToward, travel } from '../planet/geo';
 import { art, MOTIF_ASPECT, type Motif } from './art';
 import type { GardenSource } from './source';
-import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaKind, MuseFriend, Postcard } from './types';
+import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaKind, MuseFriend, Postcard, Reach } from './types';
 
 // The example gallery the garden shows until a backend is plugged in
 // (source.ts): ten interests, six baskets of finds over the last ten days
 // (reels, posts, articles and a video, every picture a placeholder from
 // art.ts, each found somewhere on the planet), Muse's postcards (photographed in the world: two Muses, Muse
-// waving), an invitation from a friend, and the friends themselves. Days are
+// waving), two invitations from friends, and the friends themselves. Days are
 // counted back from today, so the newest basket is always today's.
 
 /** An ISO date `back` days before today (local time). */
@@ -166,7 +166,15 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
     image: closeUrl,
     place: 'An invitation',
     with: 'pip',
-    invitation: { from: 'pip', world: 'mossy-hollow', worldName: 'Mossy Hollow', blurb: 'A redwood grove with a little shrine, where the fog comes in after lunch.' },
+    invitation: { from: 'pip', fromName: 'Pip', coat: '#f2c4a0', world: 'mossy-hollow', worldName: 'Mossy Hollow', blurb: 'A redwood grove with a little shrine, where the fog comes in after lunch.' },
+  },
+  {
+    id: 'inv-juniper',
+    back: 3,
+    image: pierUrl,
+    place: 'An invitation',
+    with: 'juniper',
+    invitation: { from: 'juniper', fromName: 'Juniper', coat: '#c3d6b8', world: 'starfall-ridge', worldName: 'Starfall Ridge', blurb: 'A high ridge of old snow, where the stars come out before the sun is down.' },
   },
 ];
 
@@ -203,10 +211,12 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
     return { id, day: dayBefore(b.back, now), finds: ids, ...(b.title ? { title: b.title } : {}) };
   });
   return {
+    today: dayBefore(0, now),
     muse: {
       name: 'Muse',
       soul: 'Curious and a little shy. Likes things made slowly by hand, and anything that glows in the dark.',
-      status: { home: true, note: 'Pottering about on the terrace' },
+      status: { home: true, note: 'At home' },
+      reach: 'shared',
     },
     interests,
     friends: FRIENDS.map(({ metBack, ...f }) => ({ ...f, met: dayBefore(metBack, now) })),
@@ -224,13 +234,22 @@ export interface PlaceholderSource extends GardenSource {
 
 export function placeholderSource(): PlaceholderSource {
   const listeners = new Set<(event: GardenEvent) => void>();
+  // The friend group, kept as a backend keeps it: a friend tagged with a network stands for the Instagram and Facebook
+  // layer, the rest for the people the owner shared Muse with.
+  let reach: Reach = 'shared';
   return {
-    load: () => Promise.resolve(placeholderSnapshot()),
+    load: () => {
+      const s = placeholderSnapshot();
+      return Promise.resolve({ ...s, muse: { ...s.muse, reach }, friends: s.friends.filter((f) => reach !== 'shared' || !f.knownOn) });
+    },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    react: () => Promise.resolve(),
+    react: (reaction) => {
+      if (reaction.type === 'set-reach') reach = reaction.reach;
+      return Promise.resolve();
+    },
     push(event) {
       for (const listener of listeners) listener(event);
     },

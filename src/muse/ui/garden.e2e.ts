@@ -7,14 +7,17 @@ import type {} from '../../dev/harnessApi';
 import type { Find, GardenSnapshot, MediaKind } from '../../garden/types';
 import { FIRST_PLANET } from '../../planet/firstPlanet';
 
-// The garden's interface on the real engine: the hero's planet, a basket that arrives over the event stream and
-// flies its finds to where they were found, hover and the find card, the spheres from high up, likes that reach
-// the engine's log, a find made private, a reconnect that catches up, a card of each kind, a friend known
-// elsewhere, and an invitation used once. Screenshots and the basket flight's recording go to shots/garden-live/.
+// The garden's interface on the real engine: the hero's planet, a basket that arrives over the event stream, opens
+// out of the rail with its finds as flowers, and sends them home into their patches where they were found, hover and
+// the find card, the spheres from high up, likes and stars that
+// reach the engine's log, a find made private, a reconnect that catches up, a card of each kind, a friend known
+// elsewhere, and an invitation used once from its ticket in the post. Screenshots and the basket's recording go to shots/garden-live/.
 // Every test shares one engine (playwright.live.config.ts), so each takes what it needs from where the engine
 // stands, advancing it when that isn't there yet.
 
-const API = 'http://localhost:8787/api';
+/** The engine (playwright.live.config.ts starts it; MUSE_PORT moves it). */
+const ENGINE = `http://localhost:${process.env.MUSE_PORT ?? 8787}`;
+const API = `${ENGINE}/api`;
 const HERO = 'hero';
 const PAGE = `/?dev&garden=/api/muses/${HERO}#hud=0`;
 const SHOTS = 'shots/garden-live';
@@ -41,7 +44,7 @@ interface ProbeBed {
 interface Marks {
   readonly hovered: string | null;
   readonly selected: readonly string[];
-  planted(id: string): boolean;
+  readonly focused: string | null;
   bedsShown(): boolean;
   spheresShown(): number;
 }
@@ -50,19 +53,27 @@ interface GardenProbe {
     snapshot: GardenSnapshot | null;
     baskets: { id: string; finds: readonly string[] }[];
     postcards: { id: string }[];
+    today: { id: string }[];
     basket(id: string): unknown;
     find(id: string): Find | undefined;
     visitedBasket(id: string): boolean;
+    /** The newest basket not opened yet. */
+    freshBasket?: { id: string; finds: readonly string[] };
   };
   ui: {
     marks: Marks;
-    basketFlight: { active: boolean; waiting(id: string): boolean };
     card: { shown: string | null };
     project(dir: V3, height: number, width: number, h: number): { x: number; y: number } | null;
   };
   layout(): { beds: Map<string, ProbeBed> };
+  /** The basket's canvas: where its flowers are drawn this frame (the first is the first button over them). */
+  stage: { layout(): { flowers: { id: string }[] } };
   open(id: string): void;
+  /** The basket out on a day; a flower in it picked; all of them sent home; the basket's phase. */
   basket(id?: string): void;
+  pick(id: string): void;
+  sendAll(): void;
+  phase(): string;
   flying(): boolean;
   mail(): void;
   muse(): void;
@@ -169,7 +180,7 @@ async function streamRelay() {
     if (!up) return req.socket.destroy();
     const last = req.headers['last-event-id'];
     lastEventIds.push(typeof last === 'string' ? last : null);
-    const upstream = forward(`http://localhost:8787${req.url ?? ''}`, { headers: req.headers }, (r) => {
+    const upstream = forward(`${ENGINE}${req.url ?? ''}`, { headers: req.headers }, (r) => {
       res.writeHead(r.statusCode ?? 502, r.headers);
       r.pipe(res);
     });
@@ -202,25 +213,25 @@ interface MarksView {
   /** The picked basket's finds. */
   selected: string[];
   cursor: string;
-  /** Of the finds asked about: each one planted in its bed and drawn. */
-  planted: Record<string, boolean>;
+  /** The find whose flower came home last, in focus. */
+  focused: string | null;
   bedsShown: boolean;
   spheresShown: number;
 }
 
 /** The test's only read of the garden's marks and beds; nothing else reaches into them. */
-const marks = (page: Page, ids: readonly string[] = []): Promise<MarksView> =>
-  page.evaluate((ids) => {
+const marks = (page: Page): Promise<MarksView> =>
+  page.evaluate(() => {
     const m = (window as unknown as Win).__garden.ui.marks;
     return {
       hovered: m.hovered,
       selected: [...m.selected],
       cursor: document.querySelector<HTMLCanvasElement>('#scene')?.style.cursor ?? '',
-      planted: Object.fromEntries(ids.map((id) => [id, m.planted(id)])),
+      focused: m.focused,
       bedsShown: m.bedsShown(),
       spheresShown: m.spheresShown(),
     };
-  }, ids);
+  });
 
 const hoverState = async (page: Page) => {
   const { hovered, cursor } = await marks(page);
@@ -233,10 +244,14 @@ async function openCard(page: Page, id: string): Promise<void> {
   await expect(page.locator('.g-card')).toBeVisible();
 }
 
-/** A basket's finds, flown to their beds and landed. */
+const phase = (page: Page) => page.evaluate(() => (window as unknown as Win).__garden.phase());
+
+/** A basket's finds, out of the basket and landed in their patches, the camera framing them all. */
 async function landBasket(page: Page, id: string): Promise<void> {
   await page.evaluate((id) => (window as unknown as Win).__garden.basket(id), id);
-  await expect(page.locator('.g-fly')).toHaveCount(0, { timeout: 120_000 });
+  await expect.poll(() => phase(page), { timeout: 30_000, message: 'the basket out' }).toBe('open');
+  await page.evaluate(() => (window as unknown as Win).__garden.sendAll());
+  await expect.poll(() => phase(page), { timeout: 120_000, message: 'every flower home' }).toBe('closed');
   await expect.poll(() => page.evaluate(() => (window as unknown as Win).__garden.flying()), { timeout: 60_000 }).toBe(false);
 }
 
@@ -250,7 +265,7 @@ const reaction = (page: Page, type: string, id: string) =>
 
 const newBasketsSince = (s: GardenSnapshot, had: readonly string[]) => s.baskets.find((b) => !had.includes(b.id));
 
-test('the hero’s planet is drawn, and a basket arrives over the event stream and flies its finds to where they were found', async ({ browser, request: api }) => {
+test('the hero’s planet is drawn, and a basket arrives over the event stream, opens out of the rail and sends its flowers home into their patches where they were found', async ({ browser, request: api }) => {
   test.setTimeout(30 * 60_000);
   const context = await browser.newContext({ ...contextOptions(), recordVideo: { dir: `${SHOTS}/video`, size: { width: 1280, height: 800 } } });
   const page = await context.newPage();
@@ -286,17 +301,44 @@ test('the hero’s planet is drawn, and a basket arrives over the event stream a
     .toEqual({ arrived: true, mark: 'not reloaded' });
   expect(snapshotLoads, 'the page loaded the snapshot once; the basket came over the event stream').toBe(1);
   await expect(page.locator('.g-rail .g-dot')).toHaveClass(/is-on/);
-  await page.getByRole('button', { name: 'Baskets' }).click();
-  const newest = page.locator('.g-day').first();
-  await expect(newest).toHaveClass(/is-fresh/);
   await page.screenshot({ path: `${SHOTS}/01-basket-arrived.png` });
 
-  await newest.locator('.g-day-row').click();
-  const finds = engineBasket.finds;
-  await expect.poll(() => page.evaluate((ids) => ids.filter((id) => (window as unknown as Win).__garden.ui.basketFlight.waiting(id)).length, finds), { message: 'finds in flight' }).toBeGreaterThan(0);
-  await expect(page.locator('.g-fly-find.is-leaving').first()).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({ path: `${SHOTS}/02-basket-mid-flight.png` });
-  await expect(page.locator('.g-fly')).toHaveCount(0, { timeout: 120_000 });
+  // out of the rail: the freshest basket not opened yet (the new one, unless the engine brought more at once), its
+  // finds as flowers over it, its day picked on the timeline and no longer ringed as new
+  const fresh = await page.evaluate(() => (window as unknown as Win).__garden.state.freshBasket);
+  expect(fresh, 'a basket waits to be opened').toBeDefined();
+  const opened = fresh!.id;
+  const finds = fresh!.finds;
+  if (opened === basketId) expect([...finds].sort()).toEqual([...engineBasket.finds].sort());
+  await page.getByRole('button', { name: 'Baskets' }).click();
+  await expect.poll(() => phase(page), { message: 'the basket out' }).toBe('open');
+  const flowers = page.locator('.g-basket-hit:not(.is-basket)');
+  await expect(flowers).toHaveCount(Math.min(finds.length, 12));
+  await expect(page.getByRole('slider', { name: 'Baskets by day' })).toHaveAttribute('aria-valuetext', /./);
+  expect(await page.evaluate((id) => (window as unknown as Win).__garden.state.visitedBasket(id), opened), 'the basket opened counts as seen').toBe(true);
+  await expect(page.locator('.g-days-dot.is-picked')).not.toHaveClass(/is-new/);
+  // a flower previewed under the pointer
+  await flowers.first().hover();
+  await expect(page.locator('.g-peek.is-on')).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}/02-basket-open.png` });
+
+  // one flower picked: it comes down into its patch, which stays lit, and its card rises over it
+  const picked = await page.evaluate(() => (window as unknown as Win).__garden.stage.layout().flowers[0].id);
+  expect(finds, 'the first flower is one of the basket’s finds').toContain(picked);
+  await flowers.first().click();
+  await expect.poll(() => phase(page), { message: 'the flower on its way' }).toBe('sending');
+  await expect.poll(() => phase(page), { timeout: 120_000, message: 'the flower home' }).toBe('closed');
+  await expect.poll(() => shownCard(page), { timeout: 30_000, message: 'its card' }).toBe(picked);
+  expect((await marks(page)).focused, 'the picked flower stays lit in its patch').toBe(picked);
+  await page.screenshot({ path: `${SHOTS}/03-flower-landed.png` });
+
+  // the basket out again on the same day, and all of it sent home
+  await page.evaluate((id) => (window as unknown as Win).__garden.basket(id), opened);
+  await expect.poll(() => phase(page)).toBe('open');
+  await page.locator('.g-basket-hit.is-basket').click();
+  await expect.poll(() => phase(page), { message: 'the flowers on their way' }).toBe('sendingAll');
+  await page.screenshot({ path: `${SHOTS}/04-basket-sending.png` });
+  await expect.poll(() => phase(page), { timeout: 120_000, message: 'every flower home' }).toBe('closed');
   await expect.poll(() => page.evaluate(() => (window as unknown as Win).__garden.flying()), { timeout: 60_000 }).toBe(false);
   const landed = await page.evaluate((ids) => {
     const w = window as unknown as Win;
@@ -311,19 +353,16 @@ test('the hero’s planet is drawn, and a basket arrives over the event stream a
         const cos = (bed.dir.x * place[0] + bed.dir.y * place[1] + bed.dir.z * place[2]) / n;
         off = Math.acos(Math.min(1, cos)) * R;
       }
-      return { id, waiting: g.ui.basketFlight.waiting(id), off };
+      return { id, off };
     });
   }, finds);
-  const drawn = await marks(page, finds);
-  for (const f of landed) {
-    expect({ ...f, planted: drawn.planted[f.id] }, `find ${f.id} landed and planted`).toMatchObject({ waiting: false, planted: true });
-    expect(f.off, `find ${f.id}: its bed (m) from where it was found`).toBeLessThanOrEqual(NUDGE_REACH);
-  }
+  for (const f of landed) expect(f.off, `find ${f.id}: its bed (m) from where it was found`).toBeLessThanOrEqual(NUDGE_REACH);
+  const drawn = await marks(page);
   expect(drawn.bedsShown || drawn.spheresShown > 0.5, `the landed finds are drawn, in their beds or from high up as spheres (${JSON.stringify(drawn)})`).toBe(true);
-  expect([...drawn.selected].sort(), 'the picked basket’s patches stay marked').toEqual([...finds].sort());
-  await page.screenshot({ path: `${SHOTS}/03-landed-patches.png` });
+  expect([...drawn.selected].sort(), 'the basket sent home stays marked').toEqual([...finds].sort());
+  await page.screenshot({ path: `${SHOTS}/05-landed-patches.png` });
   await context.close();
-  await page.video()?.saveAs(`${SHOTS}/basket-flight.webm`);
+  await page.video()?.saveAs(`${SHOTS}/basket.webm`);
 });
 
 test('hovering a landed find lights it, and a click opens its card with the real item', async ({ page, request: api }) => {
@@ -492,17 +531,19 @@ test('a garden that lost its event stream catches up from where it left off when
   await relay.close();
 });
 
-test('a like on a photo postcard reaches the engine’s log, and the postcard still reads liked after a reload', async ({ page, request: api }) => {
+test('a like and a star on a photo postcard reach the engine’s log, and the postcard still reads both after a reload', async ({ page, request: api }) => {
   test.setTimeout(15 * 60_000);
-  const card = await advanceUntil(api, 'a photo postcard not yet liked', (s) => s.postcards.find((p) => !p.invitation && !p.liked));
+  const card = await advanceUntil(api, 'a photo postcard neither liked nor starred', (s) => s.postcards.find((p) => !p.invitation && !p.liked && !p.favorite));
+  const side = page.locator('.g-mail-side');
+  const like = side.getByRole('button', { name: 'Like' });
+  const star = side.getByRole('button', { name: 'Favorite' });
+  const views = page.locator('.g-segments');
+  // (up close from the album, where every postcard is, whatever day it came)
   const focus = async () => {
     await page.evaluate(() => (window as unknown as Win).__garden.mail());
-    const node = page.locator(`.g-pc[data-id="${card.id}"]`);
-    await expect(node).toBeAttached();
-    await page.waitForTimeout(1500);
-    // (a tap on the card where it lies in the stack, under the postcards on top of it)
-    await node.dispatchEvent('click');
-    await expect(node).toHaveClass(/is-focus/);
+    await views.getByRole('button', { name: 'Album' }).click();
+    await page.locator(`.g-album-slot[data-id="${card.id}"]`).click();
+    await expect(page.locator(`.g-pc[data-id="${card.id}"]`)).toHaveClass(/is-top/);
     await page.waitForTimeout(800);
   };
   await openGarden(page);
@@ -510,22 +551,37 @@ test('a like on a photo postcard reaches the engine’s log, and the postcard st
   await page.screenshot({ path: `${SHOTS}/10-photo-postcard.png` });
 
   const likedBefore = log('owner.liked').length;
-  const like = page.locator('.g-mail-bar').getByRole('button', { name: 'Like' });
-  await expect(like).not.toHaveClass(/is-liked/);
-  const sent = reaction(page, 'like-postcard', card.id);
+  const starredBefore = log('owner.favorited').length;
+  await expect(like).toHaveAttribute('aria-pressed', 'false');
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  const liked = reaction(page, 'like-postcard', card.id);
   await like.click();
-  await expect(like).toHaveClass(/is-liked/);
-  expect((await sent).status(), 'the engine took the like').toBe(200);
+  await expect(like).toHaveAttribute('aria-pressed', 'true');
+  expect((await liked).status(), 'the engine took the like').toBe(200);
+  const starred = reaction(page, 'favorite-postcard', card.id);
+  await star.click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  expect((await starred).status(), 'the engine took the star').toBe(200);
   await expect
     .poll(() => log('owner.liked').slice(likedBefore).map((e) => e.body), { message: 'owner.liked in the engine log' })
     .toContainEqual(expect.objectContaining({ kind: 'owner.liked', target: { photo: card.id }, liked: true }));
-  expect((await snapshot(api)).postcards.find((p) => p.id === card.id)?.liked, 'the engine’s garden reads the postcard liked').toBe(true);
+  await expect
+    .poll(() => log('owner.favorited').slice(starredBefore).map((e) => e.body), { message: 'owner.favorited in the engine log' })
+    .toContainEqual(expect.objectContaining({ kind: 'owner.favorited', photo: card.id, favorite: true }));
+  expect((await snapshot(api)).postcards.find((p) => p.id === card.id), 'the engine’s garden reads the postcard liked and starred').toMatchObject({ liked: true, favorite: true });
 
   await page.reload();
   await ready(page);
   await focus();
-  await expect(page.locator('.g-mail-bar').getByRole('button', { name: 'Like' }), 'still liked after a reload').toHaveClass(/is-liked/);
-  await expect(page.locator('.g-mail-bar')).toContainText('Liked');
+  await expect(like, 'still liked after a reload').toHaveAttribute('aria-pressed', 'true');
+  await expect(star, 'still starred after a reload').toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await views.getByRole('button', { name: 'Favorite' }).click();
+  const kept = page.locator(`.g-album-slot[data-id="${card.id}"]`);
+  await expect(kept, 'on the Favorite page').toBeVisible();
+  await expect(kept.locator('.g-album-heart'), 'its caption ends in a heart').toHaveText('♥');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${SHOTS}/10b-favorites.png` });
 });
 
 test('a card for each kind of find: reel, post, article and video', async ({ page, request: api }) => {
@@ -546,6 +602,11 @@ test('a card for each kind of find: reel, post, article and video', async ({ pag
 
 test('Muse’s page shows a friend tagged as a friend on Instagram or Facebook', async ({ page, request: api }) => {
   test.setTimeout(20 * 60_000);
+  // Both owners' friend groups must take in Instagram and Facebook friends.
+  for (const id of [HERO, 'clover', 'bramble', 'thistle']) {
+    const set = await api.post(`${API}/muses/${id}/garden/reactions`, { data: { type: 'set-reach', reach: 'known' } });
+    expect(set.status(), `${id}'s friend group`).toBe(200);
+  }
   const friend = await advanceUntil(api, 'a friend known on Instagram or Facebook', (s) => s.friends.find((f) => f.knownOn), 12 * 60_000);
   await openGarden(page);
   await page.evaluate(() => (window as unknown as Win).__garden.muse());
@@ -558,28 +619,35 @@ test('Muse’s page shows a friend tagged as a friend on Instagram or Facebook',
   await page.screenshot({ path: `${SHOTS}/12-muse-friend-known.png` });
 });
 
-test('an invitation reaches the hero: Travel now works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
-  // invite-flap: the open envelope's flap covers Travel now and Keep for later; the fix is in mail.ts.
+test('an invitation reaches the hero as a ticket in the post: boarding works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
   test.setTimeout(20 * 60_000);
   const card = await advanceUntil(api, 'an invitation for the hero', (s) => s.postcards.find((p) => p.invitation && !p.invitation.used));
 
   await openGarden(page);
-  await expect(page.locator('.g-ticket')).toHaveClass(/has-invite/);
   await page.evaluate(() => (window as unknown as Win).__garden.mail());
-  const envelope = page.locator(`.g-env[data-id="${card.id}"]`);
-  await expect(envelope).toBeAttached();
-  await page.waitForTimeout(1500);
-  // (a tap on the envelope where it lies in the stack, under the postcards on top of it)
-  await envelope.dispatchEvent('click');
-  await expect(envelope).toHaveClass(/is-focus/);
-  await expect(envelope).toHaveClass(/is-open/);
-  const travel = envelope.getByRole('button', { name: 'Travel now' });
-  await expect(travel).toBeVisible();
+  const ticket = page.locator(`.g-tickets .g-ticket[data-id="${card.id}"]`);
+  const sealed = await page.evaluate((id) => (window as unknown as Win).__garden.state.today.some((p) => p.id === id), card.id);
+  if (sealed) {
+    // today's: it comes in its envelope, and opened, its ticket flies to the others
+    const envelope = page.locator(`.g-env[data-id="${card.id}"]`);
+    await expect(envelope).toBeAttached();
+    await page.waitForTimeout(1500);
+    for (let k = 0; k < 12 && !(await envelope.evaluate((e) => e.classList.contains('is-top'))); k++) await page.keyboard.press('ArrowRight');
+    await expect(envelope).toHaveClass(/is-top/);
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${SHOTS}/13-invitation-envelope.png` });
+    await envelope.click();
+    await expect(envelope, 'the envelope leaves the deck').not.toBeAttached({ timeout: 5000 });
+  }
+  await expect(ticket).toBeVisible();
+  await expect(ticket).not.toHaveClass(/is-incoming/);
+  await expect(ticket).toContainText(card.invitation!.worldName);
+  await expect(ticket).toContainText(`from ${card.invitation!.fromName}`);
   await page.waitForTimeout(800);
-  await page.screenshot({ path: `${SHOTS}/13-invitation-postcard.png` });
+  await page.screenshot({ path: `${SHOTS}/13-invitation-ticket.png` });
   const used = reaction(page, 'use-invitation', card.id);
-  await travel.click();
-  expect((await used).status(), 'Travel now: the engine took the invitation').toBe(200);
+  await ticket.click();
+  expect((await used).status(), 'boarding: the engine took the invitation').toBe(200);
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${SHOTS}/14-visiting.png` });
 

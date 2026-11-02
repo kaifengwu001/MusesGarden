@@ -124,14 +124,14 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0.2, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 24, 1, 40, 0.5, 'live', { unit: 'm' }),
+    coverage: num('cc', 'Coverage', 0.78, 0, 1, 0.01, 'life'),
+    altitude: num('ca', 'Altitude', 32, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.35, 0, 1, 0.01, 'live'),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
-    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'tripo', 'field'], 'tpose6', 'live'),
+    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'sculpt', 'field'], 'tpose6', 'live'),
   },
   light: {
     // one light for now (late morning); dawn and golden hour are kept in the palette for later

@@ -25,6 +25,44 @@ describe('Rock-attached Scarlet shelter', () => {
     geometry.dispose();
   });
 
+  it('pins every canopy edge to its rope while leaving the cloth interior free to move', () => {
+    const geometry = shelterGeometry(412), uv = geometry.getAttribute('uv'), kind = geometry.getAttribute('aKind');
+    const width = Math.PI / 0.324, depth = Math.PI / 0.462;
+    let boundary = 0, movingInterior = 0;
+    for (let i = 0; i < uv.count; i++) {
+      if (kind.getX(i) !== 4) continue;
+      const u = uv.getX(i), v = uv.getY(i);
+      const windWeight = Math.sin(u * 0.324) * Math.sin(v * 0.462);
+      if (Math.min(u, v, Math.abs(u - width), Math.abs(v - depth)) < 1e-5) {
+        expect(Math.abs(windWeight)).toBeLessThan(1e-5);
+        boundary++;
+      } else if (windWeight > 0.5) movingInterior++;
+    }
+    expect(boundary).toBeGreaterThan(200);
+    expect(movingInterior).toBeGreaterThan(300);
+    geometry.dispose();
+  });
+
+  it('has one sewn rear curtain surface without overlapping panel strips', () => {
+    const geometry = shelterGeometry(412), positions = geometry.getAttribute('position'), kinds = geometry.getAttribute('aKind');
+    const triangles: [Vector3, Vector3, Vector3][] = [];
+    for (let i = 0; i < positions.count; i += 3) {
+      if (kinds.getX(i) !== 5) continue;
+      const points = [0, 1, 2].map(offset => new Vector3().fromBufferAttribute(positions, i + offset)) as [Vector3, Vector3, Vector3];
+      if (points.every(point => point.z > -3.03 && point.z < -2.74)) triangles.push(points);
+    }
+    const ray = new Ray(new Vector3(), new Vector3(0, 0, -1)), hit = new Vector3();
+    let samples = 0;
+    for (let x = -3.813; x < 2.04; x += 0.137) for (let y = 1.113; y < 3.19; y += 0.127) {
+      ray.origin.set(x, y, 0);
+      const count = triangles.filter(([a, b, c]) => ray.intersectTriangle(a, b, c, false, hit)).length;
+      expect(count, `curtain coverage at ${x}, ${y}`).toBe(1);
+      samples++;
+    }
+    expect(samples).toBeGreaterThan(650);
+    geometry.dispose();
+  });
+
   it('preserves flat walking, step and sitting support surfaces', () => {
     const geometry = shelterGeometry(412);
     const sample = (x: number, z: number, height: number): void => expect(hits(geometry, x, z, height + 0.005)[0]).toBeCloseTo(height, 5);

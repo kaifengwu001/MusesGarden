@@ -29,7 +29,7 @@ import { JOINT } from '../life/museBody';
 import { Answers } from '../life/museLife';
 import { DRESSED, type DressedKind, type MuseMesh } from '../life/museMesh';
 import { BOUNCE_LENGTH, FLUFF_LENGTH, MuseRig, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
-import { loadTripo } from '../life/museTripo';
+import { loadSculpt } from '../life/museSculptLoader';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
 import { registerShaderChunks } from '../render/glsl';
@@ -298,7 +298,7 @@ const setLook = (m: Standing): void => {
 };
 const loading = KINDS.map(async (kind, i) => {
   const x = (i - (KINDS.length - 1) / 2) * SPACING;
-  const loaded = await loadTripo(kind);
+  const loaded = await loadSculpt(kind);
   const m = standing(kind, loaded.body, loaded.paint, x, i, sun);
   scene.add(m.mesh);
   const shadow = new Mesh(new PlaneGeometry(0.78, 0.5), blob);

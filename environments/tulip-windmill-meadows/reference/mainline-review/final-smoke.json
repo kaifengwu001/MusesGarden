@@ -1,0 +1,40 @@
+{
+  "at": "2026-11-02T10:05:28.416Z",
+  "base": "335104a",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "viewport": [
+    1440,
+    960
+  ],
+  "dpr": 1,
+  "frames": [
+    {
+      "view": "home",
+      "source": "28a55050:1440x960",
+      "current": "28a55050:1440x960",
+      "exact": true
+    },
+    {
+      "view": "fields",
+      "source": "dce7b3af:1440x960",
+      "current": "dce7b3af:1440x960",
+      "exact": true
+    },
+    {
+      "view": "globe",
+      "source": "594e9d36:1440x960",
+      "current": "594e9d36:1440x960",
+      "exact": true
+    }
+  ],
+  "checks": [
+    "Cottage, flower-field and globe canvases match original preview exactly",
+    "Baskets opens with six rows and closes with Escape",
+    "Post box opens, album renders and Escape closes it",
+    "Find card opens, Like updates state and Close works"
+  ],
+  "errors": [],
+  "warnings": [
+    "THREE.WebGLProgram: Program Info Log: (176,1): warning X4000: use of potentially uninitialized variable (f_wing_int)\n(134,1): warning X4000: use of potentially uninitialized variable (f_wing_int)\n(120,1): warning X4000: use of potentially uninitialized variable (f_wing_int)\n(104,1): warning X4000: use of potentially uninitialized variable (f_wing_int)"
+  ]
+}

@@ -268,15 +268,19 @@ test.describe('finds', () => {
     dot(v: V3): number;
   }
   interface GardenProbe {
-    state: { snapshot?: unknown; receive(event: unknown): void; visit(basket: string): void; setPins(on: boolean): void };
+    state: { snapshot?: unknown; receive(event: unknown): void; visit(basket: string): void };
+    pins(shown: boolean): void;
+    flying(): boolean;
     ui: {
       world: {
         terrain: { layout: { cottage: V3 }; sample(dir: V3, out: Record<string, number>): { water: number; clearing: number } };
         growth: { radius: number };
         warp: { k: number };
-        rig: { camera: { position: V3 } };
+        rig: { camera: { position: V3 }; lookAlong(dir: V3, forward: V3): void };
       };
       project(dir: V3, height: number, width: number, height2: number): { x: number; y: number } | null;
+      musePlace(): { dir: V3; ground: number };
+      tap(x: number, y: number, width: number, height: number): boolean;
     };
     layout(): { beds: Map<string, { dir: V3; ground: number }> };
     beds: {
@@ -287,7 +291,7 @@ test.describe('finds', () => {
 
   /** A garden with nothing in it yet, served in place of a backend. */
   const EMPTY = {
-    muse: { name: 'Muse', soul: 'Quiet.', status: { home: true } },
+    muse: { name: 'Muse', soul: 'Quiet.', status: { home: true }, reach: 'shared' },
     interests: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ id: `topic-${i}`, name: `Topic ${i}`, species: i % 4, variant: (i * 0.37) % 1, shared: true, since: '2026-10-01' })),
     friends: [],
     baskets: [],
@@ -302,7 +306,7 @@ test.describe('finds', () => {
     await page.goto('about:blank');
     await page.goto(`/?garden=/no-finds#${hash}`);
     await page.waitForFunction(() => window.__meadow?.isReady === true && (window as unknown as { __garden?: GardenProbe }).__garden?.state.snapshot !== undefined, undefined, { timeout: 60_000 });
-    await page.evaluate(() => (window as unknown as { __garden: GardenProbe }).__garden.state.setPins(false));
+    await page.evaluate(() => (window as unknown as { __garden: GardenProbe }).__garden.pins(false));
   }
 
   /** A basket of `count` finds scattered over the planet's land, opened. */
@@ -449,6 +453,28 @@ test.describe('finds', () => {
     expect(seen.hidden.length).toBeGreaterThan(10);
     expect(seen.visible.filter((v) => v.rise < 40)).toEqual([]);
     expect(seen.hidden.filter((v) => v.rise > 6)).toEqual([]);
+  });
+
+  test('from orbit Muse’s pin stands over its place as soon as the garden loads, and a tap on it flies to Muse', async ({ page }) => {
+    await openEmpty(page, 'q=high&hud=0&t=12&cam=overview');
+    await page.evaluate(() => {
+      const g = (window as unknown as { __garden: GardenProbe }).__garden;
+      g.pins(true);
+      // still in orbit, over Muse, north up
+      const d = g.ui.musePlace().dir;
+      const n = Math.hypot(d.x * d.y, 1 - d.y * d.y, d.z * d.y);
+      g.ui.world.rig.lookAlong(d, d.clone().set((-d.x * d.y) / n, (1 - d.y * d.y) / n, (-d.z * d.y) / n));
+    });
+    // a tap a little above the place, on the bubble
+    const tapped = (): Promise<boolean> =>
+      page.evaluate(() => {
+        const g = (window as unknown as { __garden: GardenProbe }).__garden;
+        const muse = g.ui.musePlace();
+        const at = g.ui.project(muse.dir, muse.ground, innerWidth, innerHeight);
+        return at !== null && g.ui.tap(at.x, at.y - 0.04 * innerHeight, innerWidth, innerHeight);
+      });
+    await expect.poll(tapped, { timeout: 5_000 }).toBe(true);
+    expect(await page.evaluate(() => (window as unknown as { __garden: GardenProbe }).__garden.flying())).toBe(true);
   });
 });
 

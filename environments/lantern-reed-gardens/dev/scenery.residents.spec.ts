@@ -12,7 +12,7 @@ test('Lantern scenery renders its reeds, leaf roof and four-winged pollinators',
     const w = (window as unknown as { __world: { scenery: { populationCounts: { name: string; count: number; visible: number }[] } } }).__world;
     return w.scenery.populationCounts;
   });
-  expect(batches).toHaveLength(9);
+  expect(batches).toHaveLength(12);
   for (const batch of batches) expect(batch.count, batch.name).toBeGreaterThan(0);
   expect(batches.filter(b => /Lantern reed colony/.test(b.name)).reduce((sum,b) => sum+b.count,0)).toBeGreaterThan(200);
   expect(batches.find(b => /Lamp Petals/.test(b.name))?.count).toBe(7);

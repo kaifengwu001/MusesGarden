@@ -3,21 +3,21 @@ import { JOINT } from '../../life/museBody';
 import { rigSculpt, SCULPTS, type Sculpt, type SculptKind } from '../../life/museMesh';
 import { MuseRig } from '../../life/museRig';
 
-// The Tripo sculpts rigged on Muse's skeleton (museMesh.ts): its first (arms
+// The imported sculpts rigged on Muse's skeleton (museMesh.ts): the first (arms
 // hanging, grown into the sides) and its T-poses (src/assets/muse/).
-const found = import.meta.glob<string>('/src/assets/muse/{tripo,tripo-tpose,tripo-tpose2,tripo-tpose5,tripo-tpose6}.glb', { query: '?inline', import: 'default', eager: true });
+const found = import.meta.glob<string>('/src/assets/muse/{sculpt,sculpt-tpose,sculpt-tpose2,sculpt-tpose5,sculpt-tpose6}.glb', { query: '?inline', import: 'default', eager: true });
 const GLBS: Record<SculptKind, string | undefined> = {
-  tripo: found['/src/assets/muse/tripo.glb'],
-  tpose: found['/src/assets/muse/tripo-tpose.glb'],
-  tpose2: found['/src/assets/muse/tripo-tpose2.glb'],
-  tpose5: found['/src/assets/muse/tripo-tpose5.glb'],
-  tpose6: found['/src/assets/muse/tripo-tpose6.glb'],
+  sculpt: found['/src/assets/muse/sculpt.glb'],
+  tpose: found['/src/assets/muse/sculpt-tpose.glb'],
+  tpose2: found['/src/assets/muse/sculpt-tpose2.glb'],
+  tpose5: found['/src/assets/muse/sculpt-tpose5.glb'],
+  tpose6: found['/src/assets/muse/sculpt-tpose6.glb'],
 };
 /** Where each sculpt's left arm is as made (H): out past x, between two heights. */
 /** How high each sculpt's armpits are (H): its sides below them are the body's alone. */
-const ARMPIT: Record<SculptKind, number> = { tripo: 0.34, tpose: 0.42, tpose2: 0.42, tpose5: 0.36, tpose6: 0.34 };
+const ARMPIT: Record<SculptKind, number> = { sculpt: 0.34, tpose: 0.42, tpose2: 0.42, tpose5: 0.36, tpose6: 0.34 };
 const ARM_AT: Record<SculptKind, { x: number; y: [number, number] }> = {
-  tripo: { x: 0.34, y: [0.18, 0.42] },
+  sculpt: { x: 0.34, y: [0.18, 0.42] },
   tpose: { x: 0.34, y: [0.45, 0.68] },
   tpose2: { x: 0.34, y: [0.42, 0.62] },
   tpose5: { x: 0.45, y: [0.22, 0.45] },
@@ -49,7 +49,7 @@ function readGlb(url: string): { position: Float32Array; normal: Float32Array; u
   return { position: read(p.attributes.POSITION) as Float32Array, normal: read(p.attributes.NORMAL) as Float32Array, uv: read(p.attributes.TEXCOORD_0) as Float32Array, index: read(p.indices) as Uint16Array | Uint32Array };
 }
 
-for (const kind of ['tripo', 'tpose', 'tpose2', 'tpose5', 'tpose6'] as const) describe.skipIf(!GLBS[kind])(`Muse from the Tripo sculpt (${kind})`, () => {
+for (const kind of ['sculpt', 'tpose', 'tpose2', 'tpose5', 'tpose6'] as const) describe.skipIf(!GLBS[kind])(`Muse from the imported sculpt (${kind})`, () => {
   const glb = GLBS[kind];
   const g = glb ? readGlb(glb) : null;
   const m = g ? rigSculpt(g.position, g.normal, g.uv, g.index, undefined, SCULPTS[kind]) : null;

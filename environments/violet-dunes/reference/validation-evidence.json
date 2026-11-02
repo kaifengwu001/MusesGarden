@@ -1,0 +1,364 @@
+{
+  "date": "2026-11-01",
+  "branch": "environment_violet_dune",
+  "base": "ad37acf",
+  "scope": "environments/violet-dunes/",
+  "backend": "Chromium ANGLE Metal, desktop 1600x1000 DPR1",
+  "typecheckAndLint": true,
+  "standaloneBuild": true,
+  "cpu": {
+    "tests": 52,
+    "files": 7,
+    "passed": true
+  },
+  "browserSuite": {
+    "startTime": "2026-11-01T23:05:00.184Z",
+    "duration": 136574.01,
+    "expected": 16,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "browserInvariants": {
+    "passed": 12,
+    "inheritedFixme": 1
+  },
+  "ecology": {
+    "passed": true,
+    "time": 12,
+    "renderScale": 1,
+    "errors": [],
+    "consoleErrors": [],
+    "growthParity": {
+      "planet-R40": {
+        "heightError": 0.004803349932096523,
+        "waterError": 0,
+        "warpError": 4.629611727225751e-06,
+        "samples": 64
+      },
+      "planet-R128": {
+        "heightError": 0.004146382402021587,
+        "waterError": 0,
+        "warpError": 1.251325733076885e-05,
+        "samples": 64
+      },
+      "planet-R400": {
+        "heightError": 0.01248493434853959,
+        "waterError": 0,
+        "warpError": 2.82507485450316e-05,
+        "samples": 64
+      },
+      "planet-R128-return": {
+        "heightError": 0.004146382402025139,
+        "waterError": 0,
+        "warpError": 1.2513257331102077e-05,
+        "samples": 64
+      }
+    },
+    "viewHashes": {
+      "shelter": [
+        "114a4a0b:1600x1000",
+        "114a4a0b:1600x1000",
+        "114a4a0b:1600x1000"
+      ],
+      "survey": [
+        "87553105:1600x1000",
+        "87553105:1600x1000",
+        "87553105:1600x1000"
+      ],
+      "muse": [
+        "462457ae:1600x1000",
+        "462457ae:1600x1000",
+        "462457ae:1600x1000"
+      ],
+      "dune-skipper": [
+        "db18c60b:1600x1000",
+        "db18c60b:1600x1000",
+        "db18c60b:1600x1000"
+      ],
+      "seed-glider": [
+        "e2500b13:1600x1000",
+        "e2500b13:1600x1000",
+        "e2500b13:1600x1000"
+      ],
+      "planet-R40": [
+        "3d338e5c:1600x1000",
+        "3d338e5c:1600x1000",
+        "3d338e5c:1600x1000"
+      ],
+      "planet-R128": [
+        "dd15e14b:1600x1000",
+        "dd15e14b:1600x1000",
+        "dd15e14b:1600x1000"
+      ],
+      "planet-R400": [
+        "e9d54980:1600x1000",
+        "e9d54980:1600x1000",
+        "e9d54980:1600x1000"
+      ],
+      "planet-R128-return": [
+        "dd15e14b:1600x1000",
+        "dd15e14b:1600x1000",
+        "dd15e14b:1600x1000"
+      ]
+    }
+  },
+  "materialMotion": {
+    "passed": true,
+    "closeViews": 3,
+    "orbitViews": 17,
+    "exactRedrawsPerView": 3,
+    "exactCameraReturn": true,
+    "time": 12,
+    "scale": 1,
+    "frames": [
+      "f1bf93a1:1600x1000",
+      "d7fb5b46:1600x1000",
+      "3a733ed6:1600x1000",
+      "58d40c4b:1600x1000",
+      "d443be94:1600x1000",
+      "c4315030:1600x1000",
+      "305ae367:1600x1000",
+      "9a787339:1600x1000",
+      "5e5341cf:1600x1000",
+      "38eb2dfc:1600x1000",
+      "41506586:1600x1000",
+      "b130c23a:1600x1000",
+      "ab83b28e:1600x1000",
+      "fad92576:1600x1000",
+      "b8ab32de:1600x1000",
+      "4b665701:1600x1000",
+      "b0ab156a:1600x1000"
+    ],
+    "returnHash": "f1bf93a1:1600x1000",
+    "errors": []
+  },
+  "authoredPatch": {
+    "counts": {
+      "block": 16,
+      "slab": 11,
+      "wedge": 44,
+      "comb": 117,
+      "tussock": 268,
+      "reed": 70
+    },
+    "plants": 455,
+    "previousPlants": 289,
+    "triangles": 222060,
+    "previousTriangles": 272336,
+    "triangleLimit": 300000
+  },
+  "surfaceChecks": {
+    "seeds": [
+      1,
+      412,
+      771
+    ],
+    "visibleCoplanarTriangleOverlaps": 0,
+    "beamBelowCanvas": true,
+    "singleSupportedFloor": true,
+    "plantDegenerateTriangles": 0,
+    "plantDuplicateTriangles": 0
+  },
+  "frameCaptures": {
+    "views": 19,
+    "baselineComparison": false
+  },
+  "annotations": [
+    {
+      "type": "scrub",
+      "description": "frame p95 16.70 ms, JS p95 4.50 ms, max 9.70 ms, build slice max 8.10 ms"
+    },
+    {
+      "type": "frames",
+      "description": "355 frames, 2 resizes, 0 blank, 0 tile drops, up to 364 starflowers and 5443 seeded stones and clumps drawn"
+    },
+    {
+      "type": "colour",
+      "description": "MSAA 4\u00d7, scene colours 0.018 to 1.025"
+    },
+    {
+      "type": "fixme"
+    }
+  ],
+  "isolation": {
+    "sharedSrcChanged": false,
+    "pathsOutsideEnvironment": []
+  },
+  "historicalRefinementAndIntegration": {
+    "date": "2026-11-01",
+    "branch": "planet/violet-dunes-refinement",
+    "base": "8e4b9f9",
+    "scope": "environments/violet-dunes/",
+    "cpu": {
+      "tests": 42,
+      "files": 6,
+      "passed": true
+    },
+    "typecheckAndLint": true,
+    "standaloneBuild": true,
+    "browserInvariants": {
+      "passed": 12,
+      "inheritedFixme": 1
+    },
+    "ecology": {
+      "passed": true,
+      "time": 12,
+      "renderScale": 1,
+      "errors": [],
+      "growthParity": {
+        "planet-R40": {
+          "heightError": 0.006922742372810653,
+          "waterError": 0,
+          "warpError": 4.629611727225751e-06,
+          "samples": 64
+        },
+        "planet-R128": {
+          "heightError": 0.004490510816698823,
+          "waterError": 0,
+          "warpError": 1.2513257331102077e-05,
+          "samples": 64
+        },
+        "planet-R400": {
+          "heightError": 0.012484934348540477,
+          "waterError": 0,
+          "warpError": 2.82507485450316e-05,
+          "samples": 64
+        },
+        "planet-R128-return": {
+          "heightError": 0.004490510816701487,
+          "waterError": 0,
+          "warpError": 1.2513257331086732e-05,
+          "samples": 64
+        }
+      },
+      "viewHashes": {
+        "shelter": [
+          "b4529c26:1600x1000",
+          "b4529c26:1600x1000",
+          "b4529c26:1600x1000"
+        ],
+        "survey": [
+          "d89d47fb:1600x1000",
+          "d89d47fb:1600x1000",
+          "d89d47fb:1600x1000"
+        ],
+        "muse": [
+          "de66a7c9:1600x1000",
+          "de66a7c9:1600x1000",
+          "de66a7c9:1600x1000"
+        ],
+        "dune-skipper": [
+          "65f72044:1600x1000",
+          "65f72044:1600x1000",
+          "65f72044:1600x1000"
+        ],
+        "seed-glider": [
+          "09bd9efb:1600x1000",
+          "09bd9efb:1600x1000",
+          "09bd9efb:1600x1000"
+        ],
+        "planet-R40": [
+          "608a2b76:1600x1000",
+          "608a2b76:1600x1000",
+          "608a2b76:1600x1000"
+        ],
+        "planet-R128": [
+          "aaa1d14d:1600x1000",
+          "aaa1d14d:1600x1000",
+          "aaa1d14d:1600x1000"
+        ],
+        "planet-R400": [
+          "b3f03dac:1600x1000",
+          "b3f03dac:1600x1000",
+          "b3f03dac:1600x1000"
+        ],
+        "planet-R128-return": [
+          "aaa1d14d:1600x1000",
+          "aaa1d14d:1600x1000",
+          "aaa1d14d:1600x1000"
+        ]
+      }
+    },
+    "frameCaptures": {
+      "views": 19,
+      "finalPortraitRun": {
+        "startTime": "2026-11-01T10:00:47.787Z",
+        "duration": 62520.566000000006,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "baselineComparison": false
+    },
+    "backend": "Chromium ANGLE Metal, desktop 1600x1000 DPR1",
+    "annotations": [
+      {
+        "type": "scrub",
+        "description": "frame p95 16.80 ms, JS p95 4.40 ms, max 7.30 ms, build slice max 8.30 ms"
+      },
+      {
+        "type": "frames",
+        "description": "347 frames, 2 resizes, 0 blank, 0 tile drops, up to 388 starflowers and 6052 seeded stones and clumps drawn"
+      },
+      {
+        "type": "colour",
+        "description": "MSAA 4\u00d7, scene colours 0.020 to 1.025"
+      }
+    ],
+    "isolation": {
+      "sharedSrcChanged": false,
+      "pathsOutsideEnvironment": []
+    },
+    "integration": {
+      "branch": "environment_violet_dune",
+      "base": "ad37acf",
+      "refinement": "b697519",
+      "typecheckAndLint": true,
+      "cpuTestsPassed": 42,
+      "productionBuild": true,
+      "browserSuite": {
+        "startTime": "2026-11-01T20:46:27.476Z",
+        "duration": 66724.811,
+        "expected": 13,
+        "skipped": 1,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "renderComparison": {
+        "refinementViews": [
+          "orchard",
+          "survey",
+          "muse"
+        ],
+        "pixelIdentical": true
+      },
+      "meadowComparison": {
+        "stableViews": 8,
+        "pixelIdentical": true,
+        "excludedSelfCheckVariation": {
+          "view": "bird's-eye 70 m",
+          "changedPixels": 300,
+          "maxChannelDelta": 126
+        }
+      },
+      "scope": "environments/violet-dunes/",
+      "focusedPerformanceRepeat": {
+        "startTime": "2026-11-01T20:49:04.252Z",
+        "duration": 6874.75,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      },
+      "openPerformanceCheck": {
+        "frameP95Ms": 33.4,
+        "frameLimitMs": 20,
+        "jsP95Ms": 4.2,
+        "buildSliceMaxMs": 8.2,
+        "thresholdsChanged": false
+      }
+    }
+  }
+}

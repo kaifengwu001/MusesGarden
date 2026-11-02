@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Orchard · visual review</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f5edef; color: #453d51; font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1800px; margin: auto; padding: 32px; }
+  h1 { margin: 0; font: 44px/1.2 Georgia, serif; }
+  p { max-width: 850px; }
+  a { color: #6a4776; text-underline-offset: 3px; }
+  .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  figure { margin: 0; }
+  img { display: block; width: 100%; border-radius: 10px; background: #e4d5e6; }
+  figcaption { padding: 10px 0; }
+  small { color: #746979; }
+  .views { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 12px; }
+  button { border: 1px solid #b9a6bd; border-radius: 20px; padding: 8px 14px; background: #fffaf2; color: inherit; cursor: pointer; font: inherit; }
+  button[aria-pressed="true"] { background: #72537d; color: white; }
+  button:focus-visible { outline: 3px solid #d6a931; outline-offset: 3px; }
+  .note { border-left: 3px solid #b197b7; padding-left: 16px; }
+  @media(max-width: 900px) { main { padding: 20px; } .pairs { grid-template-columns: 1fr; } h1 { font-size: 34px; } }
+</style>
+<main>
+  <h1>Paper Orchard</h1>
+  <p>Violet sand, golden Physalis, feathered ivory foliage and dusty pink daylight.
+    <a href="../#q=high&amp;hud=0">Open the living planet</a> ·
+    <a href="../VALIDATION.md">Validation and remaining gaps</a></p>
+  <div class="pairs">
+    <figure><img src="primary-concept.png" alt="Approved botanical and pink-sky concept: dense golden Physalis and slate around a canvas home in violet dunes."><figcaption><strong>Concept target</strong><br><small>Approved Physalis fruit and pink-sky direction. This is concept art.</small></figcaption></figure>
+    <figure><img src="mainline-orchard.png" alt="Current interactive orchard implementation."><figcaption><strong>Actual app · Orchard · Windows November 2</strong><br><small>Seed 412 · high quality · time 12 · render scale 1 · RTX 4070 SUPER / D3D11. Interactive 3D interpretation; visual sign-off is pending.</small></figcaption></figure>
+  </div>
+  <div class="views" aria-label="Implementation review views">
+    <button aria-pressed="true" data-file="mainline-globe.png" data-label="Final whole globe · current-main validation">Current globe</button>
+    <button aria-pressed="false" data-file="mainline-orchard.png" data-label="Final Orchard · current-main validation">Current Orchard</button>
+    <button aria-pressed="false" data-file="mainline-large-orchard.png" data-label="Final large-world Orchard · R400">Large-world Orchard</button>
+    <button aria-pressed="false" data-file="windows-wider-clouds-225.jpg" data-label="Wider clouds · 2.25× original">Wider clouds</button>
+    <button aria-pressed="false" data-file="windows-wider-clouds.jpg" data-label="Previous clouds · 1.5× original">Previous clouds</button>
+    <button aria-pressed="false" data-file="windows-globe.png" data-label="Globe before cloud widening · R128">Whole planet</button>
+    <button aria-pressed="false" data-file="windows-remote.png" data-label="Current opposite hemisphere · R128">Far hemisphere</button>
+    <button aria-pressed="false" data-file="windows-middle.png" data-label="Current middle distance · R128">Middle distance</button>
+    <button aria-pressed="false" data-file="windows-large.png" data-label="Current whole planet · R400">Large planet</button>
+    <button aria-pressed="false" data-file="windows-orchard.png" data-label="Current Orchard">Orchard</button>
+    <button aria-pressed="false" data-file="checkpoint-orchard.png" data-label="November 1 Mac Orchard checkpoint">Earlier Orchard</button>
+    <button aria-pressed="false" data-file="checkpoint-dunes.png" data-label="Dune survey">Dune survey</button>
+    <button aria-pressed="false" data-file="checkpoint-sand.png" data-label="Sand and ripple close view">Sand</button>
+    <button aria-pressed="false" data-file="checkpoint-paper.png" data-label="Paper husks and leaf veins">Paper and leaves</button>
+    <button aria-pressed="false" data-file="checkpoint-joints.png" data-label="Shelter floor and joints">Shelter joints</button>
+    <button aria-pressed="false" data-file="checkpoint-skipper.png" data-label="Dune skipper">Dune skipper</button>
+    <button aria-pressed="false" data-file="checkpoint-glider.png" data-label="Seed glider">Seed glider</button>
+    <button aria-pressed="false" data-file="checkpoint-planet.png" data-label="November 1 Mac whole planet · R128">Earlier planet</button>
+    <button aria-pressed="false" data-file="material-before.png" data-label="Before material and planting revision">Before materials</button>
+    <button aria-pressed="false" data-file="checkpoint-first-pass.png" data-label="Earlier integrated pass">Earlier pass</button>
+  </div>
+  <figure><img id="detail" src="mainline-globe.png" alt="Whole planet with wider cirrus ribbons."><figcaption id="caption">Final whole globe · R128 · actual Windows app</figcaption></figure>
+  <p>The final views include the texture and detail-budget fixes, checked against current main. <a href="mainline-globe-evidence.json">Final capture evidence</a>.</p>
+  <p>The latest live app view has ribbons at 2.25× their original width, another 50% increase from the preceding adjustment. The other Windows captures preserve the preceding globe pass.</p>
+  <p>Current globe views show vegetation and rocks around both hemispheres, broad planted regions and bare dunes, and thin cirrus moving around the sphere. Windows exports are 1600×1000 at DPR1 with four-sample terrain antialiasing. <a href="windows-globe-evidence.json">Capture evidence</a>. Other saved detail views are the November 1 Mac checkpoints.</p>
+  <p class="note">Compare the large dune shapes, open route and grouped planting first, then inspect grain, wind ripples, thin calyces, leaf veins and shelter joints. “Before materials” uses the same Orchard camera as the current checkpoint. The earlier pass is a saved intermediate state, not an untouched baseline. Broader shapes and simpler drawing detail remain visible differences from the concept.</p>
+</main>
+<script>
+  for (const button of document.querySelectorAll('button[data-file]')) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('button[data-file]')) other.setAttribute('aria-pressed', String(other === button));
+      const image = document.querySelector('#detail');
+      image.src = button.dataset.file;
+      image.alt = button.dataset.label + ' implementation checkpoint.';
+      document.querySelector('#caption').textContent = button.dataset.label + ' · actual app checkpoint';
+    });
+  }
+</script>
+</html>

@@ -154,8 +154,9 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.world).toEqual({ seed: FIRST_PLANET.seed, g: expect.any(Number) as number });
     expect(snap.world?.g, 'Fern grows from the meadow’s tuned size as it explores').toBeGreaterThanOrEqual(FIRST_PLANET.growth);
     const friendIds = [...garden.engine.state(HERO)!.social.relationships.values()].filter((r) => r.status === 'friends').map((r) => r.other);
-    expect(snap.friends.map((f) => f.id).sort()).toEqual(friendIds.sort());
-    expect(friendIds, 'the cast introduces juniper and wren').toEqual(expect.arrayContaining(['juniper', 'wren']));
+    expect(friendIds.sort(), 'the cast introduces juniper and wren, and the default friend group makes no other friends').toEqual(['juniper', 'wren']);
+    expect(snap.friends.map((f) => f.id).sort()).toEqual(friendIds);
+    expect(snap.muse.reach).toBe('shared');
     for (const f of snap.friends) {
       expect(f.name).toBe(garden.engine.state(f.id as MuseId)!.seed.name);
       expect(f.coat).toMatch(/^#[0-9a-f]{6}$/);
@@ -164,9 +165,10 @@ describe('the garden snapshot on a seeded engine', () => {
     }
   });
 
-  it('says whether Muse is home, and where it is while out on the planet', () => {
+  it('says whether Muse is home, and where it is while out on the planet, in a few words', () => {
     const now = garden.views.now(HERO, garden.engine.now())!;
-    expect(snap.muse.status.note).toBe(now.label);
+    expect(snap.muse.status.note).toBe(now.activity === 'travel' && !now.working ? 'Out exploring' : now.label);
+    expect(snap.muse.status.note, 'never the trip’s topics').not.toMatch(/Exploring:|→/);
     expect(snap.muse.status.home).toBe(now.activity !== 'travel' && now.away === null);
     if (now.activity === 'travel') expect(Math.hypot(...snap.muse.status.where!)).toBeCloseTo(1, 6);
     else expect(snap.muse.status.where).toBeUndefined();
@@ -174,7 +176,7 @@ describe('the garden snapshot on a seeded engine', () => {
 });
 
 describe('Fern on the first planet', () => {
-  it('starts on the meadow as tuned, seed 412 at R 128 m, as if it had explored that much already (see CLAUDE.md)', async () => {
+  it('starts on the meadow as tuned, seed 412 at R 128 m, as if it had explored that much already (see docs/development-guidelines.md)', async () => {
     const fresh = await seeded(0);
     expect(fresh.views.garden(HERO, fresh.engine.now())?.world).toEqual({ seed: FIRST_PLANET.seed, g: FIRST_PLANET.growth });
   });

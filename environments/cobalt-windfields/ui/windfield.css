@@ -1,0 +1,57 @@
+:root { --ink:#334d79; --ink-soft:#64748c; --paper:#f8f3e6; --sky-pale:#eee8b5; --coral:#4067a0; }
+.masthead { color:#334d79; max-width:70vw; text-shadow:0 1px 20px #f9f5e777; }
+.masthead h1 { font-size:clamp(36px,5.2vw,76px); max-width:660px; }
+.world-line { font-family:var(--font-ui); font-style:normal; font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+.windfield-community { position:fixed; left:var(--gutter); top:180px; width:262px; padding:19px 20px 10px; background:#f8f3e6e8; border:1px solid #45666a30; border-radius:4px 16px 16px 16px; box-shadow:0 12px 40px #2a53521a; pointer-events:auto; backdrop-filter:blur(12px); }
+.windfield-eyebrow { margin:0 0 7px; text-transform:uppercase; font-size:9px; letter-spacing:.18em; color:#5d6f94; }
+.windfield-community h2 { font:400 22px/1.15 var(--font-serif); margin:0 0 15px; }
+.windfield-community button { cursor:pointer; border:1px solid #58757438; border-radius:5px; background:transparent; color:inherit; font:inherit; padding:7px 9px; }
+.windfield-community button:hover { background:#dfdacf; }
+.windfield-community button:focus-visible, .windfield-name:focus-visible { outline:2px solid #355b99; outline-offset:3px; }
+.windfield-places { display:flex; gap:5px; font-size:10px; padding-bottom:13px; border-bottom:1px solid #64748c30; }
+.windfield-residents { display:flex; gap:7px; margin:14px 0 5px; }
+.windfield-resident { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:11px!important; padding:8px 5px!important; }
+.windfield-resident::before { content:''; display:block; width:23px; height:27px; background:var(--coat); border:1px solid #5767654d; border-radius:45% 45% 38% 38%; margin:0 auto 6px; box-shadow:inset -4px -3px 0 #42636612; }
+.windfield-resident[aria-pressed=true] { background:#e7d9c9; border-color:#ac7272; }
+.windfield-resident-detail { border-top:1px solid #64748c30; padding-top:13px; margin-top:13px; }
+.windfield-resident-detail[hidden] { display:none; }
+.windfield-resident-detail h3 { font:400 23px var(--font-serif); margin:0 0 3px; }
+.windfield-activity { font-size:11px; line-height:1.5; margin:0 0 11px; }
+.windfield-name-label { display:flex; align-items:center; gap:9px; font-size:10px; color:#667775; }
+.windfield-name { min-width:0; width:100%; padding:6px 8px; border:1px solid #7587844a; background:#fff9ee; color:#334d79; border-radius:4px; font:12px var(--font-ui); }
+.windfield-resident-actions { display:flex; gap:5px; font-size:10px; margin-top:10px; }
+.windfield-close { margin-left:auto; }
+.windfield-notice { font-size:10px; line-height:1.5; margin:9px 0 0; }
+.windfield-notice:empty { display:none; }
+.windfield-wildlife { display:flex; flex-wrap:wrap; gap:5px; padding-top:11px; font-size:10px; }
+.windfield-wildlife .windfield-eyebrow { width:100%; margin-bottom:1px; }
+.windfield-wildlife button { flex:1; padding:7px 5px; white-space:nowrap; }
+body.postcard .windfield-community, body.g-mail-open .windfield-community, body.g-away .windfield-community { display:none; }
+
+.masthead h1 { font-size:clamp(32px,4.1vw,62px); }
+.windfield-community { top:150px; }
+@media(max-width:700px) {
+  .masthead { top:18px; }
+  .masthead h1 { max-width:230px; font-size:32px; }
+  .world-line { max-width:230px; font-size:9px; line-height:1.5; }
+  .windfield-community { top:auto; bottom:132px; left:12px; right:12px; box-sizing:border-box; width:auto; padding:10px 12px; }
+  .windfield-community h2, .windfield-eyebrow { display:none; }
+  .windfield-places { padding:0 0 6px; }
+  .windfield-places button { flex:1; padding:6px; font-size:10px; }
+  .windfield-residents { margin:7px 0 0; }
+  .windfield-resident { display:flex; align-items:center; justify-content:center; gap:7px; padding:6px!important; }
+  .windfield-resident::before { width:14px; height:17px; margin:0; flex-shrink:0; }
+  .windfield-community.has-selection .windfield-places { display:none; }
+  .windfield-community.has-selection .windfield-wildlife { display:none; }
+  .windfield-wildlife { padding-top:7px; }
+  .windfield-resident-detail { margin-top:8px; padding-top:8px; }
+  .windfield-resident-detail h3 { display:none; }
+  .windfield-activity { margin-bottom:6px; font-size:10px; }
+  .windfield-name-label { width:100%; }
+  .windfield-name { padding:5px 7px; }
+  .windfield-resident-actions { margin-top:7px; }
+  .hints { display:none; }
+  .g-postbox { top:160px; bottom:auto; right:5px; width:100px; height:118px; }
+  .g-ticket { top:120px; bottom:auto; right:12px; height:32px; font-size:12px; }
+}
+@media(max-height:650px) and (min-width:701px) { .windfield-community { top:110px; } .windfield-eyebrow { display:none; } }
