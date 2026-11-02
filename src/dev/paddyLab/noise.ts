@@ -68,5 +68,6 @@ export function hash01(k: number, seed: number): number {
   h ^= h >>> 13;
   h = Math.imul(h, 3266489917) >>> 0;
   h ^= h >>> 16;
-  return h / 4294967296;
+  // (unsigned: the xor leaves a signed 32-bit integer)
+  return (h >>> 0) / 4294967296;
 }
