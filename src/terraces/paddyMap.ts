@@ -41,19 +41,25 @@ export class PaddyMap {
     renderer.setRenderTarget(this.target);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, false);
-    // every mesh of the terraces drawn with the map's material
-    const own: Array<[Mesh, Material | Material[]]> = [];
+    // every mesh of the terraces drawn with the map's material, none culled (the map's vertex shader places them;
+    // culled against this camera's frustum, a box at the planet's middle, every chunk was left out and the map
+    // stayed empty: no rice grew)
+    const own: Array<[Mesh, Material | Material[], boolean]> = [];
     for (const child of terraces.children) {
       const mesh = child as Mesh;
       if (!mesh.isMesh) continue;
-      own.push([mesh, mesh.material]);
+      own.push([mesh, mesh.material, mesh.frustumCulled]);
       mesh.material = this.material;
+      mesh.frustumCulled = false;
     }
     const autoClear = renderer.autoClear;
     renderer.autoClear = false;
     renderer.render(terraces, this.camera);
     renderer.autoClear = autoClear;
-    for (const [mesh, material] of own) mesh.material = material;
+    for (const [mesh, material, culled] of own) {
+      mesh.material = material;
+      mesh.frustumCulled = culled;
+    }
     renderer.setClearColor(clearColour, alpha);
     renderer.setRenderTarget(previous);
   }
