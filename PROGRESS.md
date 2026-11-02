@@ -32,6 +32,14 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### The paddy lab's terraces brought to the planet
+
+Started from d894754 (the paddy lab's second round). Kai (2026-11-01), on the lab: "Bring it to the planet". This table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | Bring the lab's construction to the planet | |
+
 ### Kai's paddy lab, second round: organic banks, cuts, and the slope deciding
 
 Started from 6b58cd8 (the paddy lab). Kai (2026-11-01), with two references (kept out of git: reference/terraces/paddy-aerial.jpg, an aerial of terraces by colour; reference/terraces/paddy-yuanyang.jpg, Yuanyang's flooded terraces); this table fills in as they are done.
