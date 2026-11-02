@@ -38,9 +38,19 @@ Started from dbd64b1 (the clouds as bands of mist). Kai (2026-11-02), on the loc
 
 | # | Note | What changed |
 |---|---|---|
-| 1 | "The curvatures should happen at a much smaller scale, about 40% of current, so that they meander between hills instead of across the whole planet" | |
-| 2 | "They should be able to branch and merge" | |
-| 3 | "There can also be multiple layers of mists at different heights and scales" | |
+| 1 | "The curvatures should happen at a much smaller scale, about 40% of current, so that they meander between hills instead of across the whole planet" | The bands no longer follow the weather's streamlines round the planet. Each lies where a winding field of its layer's own is near zero: a network of lines 46–92 m apart, each line bent by a quicker field at 15, 22 or 30 m (the bands' swing had been 55 m, the streamlines' bends planet-wide). Each layer is a shell at its own height: the hills above it rise through it, and it thins away where the ground comes up to it, so the valley mist lies between the hills and winds round them. |
+| 2 | "They should be able to branch and merge" | A field's zero line forks and joins wherever the field saddles, and the bands with it, pooling a little at a fork. Their breadth swells and thins along them, and they taper away where a slower field leaves them out, so they come and go in patches. |
+| 3 | "There can also be multiple layers of mists at different heights and scales" | Three layers. A valley mist at −5 m, with bands 7 m broad meandering at 15 m; the ground is below it over two fifths of the planet. A mist at the hilltops' height at 2 m, 8 m broad, meandering at 22 m. A high mist at 16 m over every hill, 10 m broad and meandering at 30 m, with the towers rising through it. Each drifts with the wind at its own pace (the valley mist barely). All three cast their shadows on the ground where the sun's ray meets them. |
+
+Measured (ea9c684, Chrome on this Mac):
+
+- The mist's cost, frozen frames at 2880×1800 on High, its shells against none, best of six alternating rounds: orbit +0.25 ms (10.8 against 10.6), 70 m +1.2 (15.0 against 13.8), 30 m toward the horizon +1.2 (15.4 against 14.2), vista +0.23 (12.0 against 11.7); medians +0.6 to +1.2. The ground's three lookups for the shadows are in both (not timed apart). The fields are baked once a seed (three cube maps, 512² a face).
+- The meadow, against 7d21e88: identical in all nine standard views, High and Medium at 2×, High at 1× with MSAA. The meadow's cloud files are 7d21e88's again (the terraces no longer use them).
+- `npm run check`, `npm test` (119), `npm run test:gpu` (12, one skipped) and `npm run shots` (15) pass.
+
+Trades: none in the look.
+
+Still open: the mist is still plain white (no gold or teal of the scroll-cloud paintings); its bands keep their shapes as they drift (a field baked once, turned with the wind; they do not form and fade as they go); its shadows' cost is not timed on its own. Checkpoints: docs/checkpoints/terraces-9/ (each layer alone from orbit and all three; 70 m, 30 m, 12 m and the vista).
 
 ### Kai's notes on the clouds, the build cached and a few faults in the flats
 

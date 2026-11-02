@@ -668,7 +668,7 @@ generated the lab's way, nothing on it measured off a mesh or a baked
 texture. The world it replaced (its baked fields, cells, plots, ground mesh
 and paint, its river, villages, towers, birds and fog) was abandoned; what
 of it comes back comes back as mathematics on these hills (Kai's towers and
-houses, the meadow's clouds so far). Its code is in `src/terraces/`.
+houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
 
 ### The planet's mathematics (build/field.ts)
 
@@ -804,21 +804,23 @@ houses, the meadow's clouds so far). Its code is in `src/terraces/`.
 - Kai's towers and houses (models.ts, model.*.glsl): instanced per model
   and level of detail where the build placed them, rigid, lit as the
   terraces are, full detail near (140 m a tower, 60 m a house).
-- The clouds (Kai, 2026-11-02: "meandering, thinner", the paintings' mist):
-  the meadow's weather (life/clouds.ts: its flow, streamlines and cloudy
-  stretches) in a form of the terraces' own (`CloudForm`): thin bands along
-  the streamlines, swinging across them as they go, each at its own height
-  the panel's altitude over the ground under it (the highest of the hills
-  within 12 m, eased over 8 m and kept over the highest, a 96² raster a
-  cube face), broad as its stretch's girth and tapering to its ends,
-  drifting together about the wind's axis at their altitude's own pace.
-  Each band is drawn as a sheet made again each frame (mist.*.glsl): a flat
-  white body feathered at its frayed edges, brushed with faint streaks
-  along it, light from above, denser seen aslant, thinning round the
-  camera. Its shadow is cast by a run of flat lobes under it (the cloud
-  shadow shaders' CLOUD_FLAT), read through the meadow's lookup
-  (`cloudShadowAt`); the lobes' billboards are not drawn and the lake
-  passes skipped (no lakes).
+- The mist (mist.ts, mist*.glsl; Kai, 2026-11-02: the paintings' meandering
+  mist, "meander between hills", "branch and merge", "multiple layers at
+  different heights and scales"): three shells round the planet (a valley
+  mist at −5 m, one at the hilltops' 2 m, a high one at 16 m), each with
+  bands where a winding field of its own is near zero (a network 46–92 m
+  across, its lines bent by a quicker field at 15–30 m), so they meander,
+  fork and join as its zero line does, swelling and thinning along it and
+  tapering away where a slower field leaves them out. The fields are baked
+  once a seed into a cube map a layer (the distance from the bands' middle
+  lines, the presence, the breadth: mistBake.frag.glsl); each layer drifts
+  with the wind at its own pace (its lookup turned about the wind's axis).
+  The hills above a layer rise through it, and it thins where the ground
+  (a 96² raster a cube face) comes up to it. Painted as the paintings paint
+  mist: flat white bodies feathered at frayed edges, light from above,
+  denser seen aslant but not where they meet a hillside, thinning round the
+  camera. The ground's shadow (`mistShadowAt`) reads each layer where the
+  sun's ray from it meets the layer. The meadow's clouds are not used.
 - No grade but the paper grain: a planet may carry its own final grade
   (`PlanetWorld.grade`, render/post.ts), and the terraces' is the lab's,
   which draws straight to the canvas: no tone curve, bloom, contrast or
@@ -870,7 +872,7 @@ houses, the meadow's clouds so far). Its code is in `src/terraces/`.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve (a planet may do without it and the bloom), paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker, kept in the browser), its paint, trees, rice, Kai's models (models.ts) and the meadow's clouds in a form of its own, drawn as mist (mist.*.glsl)
+      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker, kept in the browser), its paint, trees, rice, Kai's models (models.ts) and its mist (mist.ts, mist*.glsl: layers of meandering bands)
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
