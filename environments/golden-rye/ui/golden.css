@@ -1,0 +1,7 @@
+.masthead h1 { color: #58472d; font-style: italic; letter-spacing: -.035em; text-shadow: 0 1px 12px #f3eac666; }
+.world-line { color: #6c5834; }
+.rye-places { position: absolute; left: 3.3vw; top: 184px; display: flex; flex-wrap: wrap; gap: 7px; pointer-events: auto; }
+.rye-places button { border: 1px solid #a68b5266; border-radius: 22px; background: #f6edceeb; color: #58472d; padding: 10px 16px; font: 15px Georgia, serif; cursor: pointer; box-shadow: 0 2px 9px #5d48251a; }
+.rye-places button:hover { background: #fff4cc; border-color: #8a643a; }
+.controlbar { background: #f9efd9df; color: #58472d; }
+@media (max-width: 700px) { .rye-places { top: 140px; left: 20px; gap: 4px; } .rye-places button { padding: 8px 10px; font-size: 12px; } }

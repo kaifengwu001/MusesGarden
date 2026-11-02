@@ -1,0 +1,24 @@
+{
+  "recordedAt": "2026-11-02T09:50:14.203Z",
+  "browser": "In-app browser",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "dpr": 1,
+  "quality": "high",
+  "msaa": 4,
+  "time": 12,
+  "views": [
+    "field",
+    "detail",
+    "globe",
+    "far-side",
+    "remote-walk"
+  ],
+  "trackedGpuMiB": 231.1,
+  "fieldSubmittedTrianglesRounded": 2890000,
+  "fieldDraws": 32,
+  "errors": [],
+  "note": "Live HUD values, not a frame-time benchmark. Renderer identity not queried in this pass."
+}
