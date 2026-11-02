@@ -344,8 +344,10 @@ export class ParamStore {
 
   private constrain(path: ParamPath, v: ParamValue): ParamValue {
     const w = this.values.world;
-    if (path === 'world.areaMin') return Math.min(v as number, w.areaMax / AREA_GAP);
-    if (path === 'world.areaMax') return Math.max(v as number, w.areaMin * AREA_GAP);
+    // (against the other bound as the URL writes it, whole square meters, and to a whole one: so the pair
+    // round-trips through the URL as it was set, rather than coming back a square meter off)
+    if (path === 'world.areaMin') return Math.min(v as number, Math.floor(Math.round(w.areaMax) / AREA_GAP));
+    if (path === 'world.areaMax') return Math.max(v as number, Math.ceil(Math.round(w.areaMin) * AREA_GAP));
     return v;
   }
 }
