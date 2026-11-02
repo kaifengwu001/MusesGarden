@@ -32,6 +32,17 @@ as the latest alone (a fix between iterations).
 
 ## The terraces: a second planet (in progress)
 
+### Kai's notes on the flats: truly flat, divided as the aerials divide them
+
+Started from fbbf35e (the paddies painted as the lab paints them). Kai (2026-11-01), sending two aerials of flat rice fields (long fields in strips along a winding track; strips curving in families round a hut); this table fills in as they are done.
+
+| # | Note | What changed |
+|---|---|---|
+| 1 | "try relief 50" | |
+| 2 | "Neither flat is truly flat": on the planet the paddies' outlines invade the flats; in the lab the divided cells still rise up and down | |
+| 3 | "Neither gets how the cells within a flat are divided, and both feel very mechanical, not organic at all": the major and minor lines are all gentle bezier curves | |
+| 4 | "The surfaces of the cells rise above the divides, but the surfaces should be co-planar with each other" | |
+
 ### Kai's notes on the planet's paddies against the lab
 
 Started from aeeb0c7 (gaps and flats). Kai (2026-11-01), sending the aerial, the lab from above and the lab's block side by side; this table fills in as they are done.
