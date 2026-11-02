@@ -40,15 +40,19 @@ export interface DamParams {
 }
 
 export interface PlotParams {
-  /** About how much of a plain each of its major curves parts off (m²). */
-  readonly section: number;
+  /** How far apart along a plain's track its bunds branch off it, to one side and the other by turns (m, from … to). */
+  readonly bunds: readonly [number, number];
   /** A section's strips' width (m, from … to: each section its own). */
   readonly strip: readonly [number, number];
-  /** How far apart a section's strips are crossed where they are (m, from … to), and the share of sections that are. */
+  /** How far apart a section's strips are crossed (m, from … to: each section its own). */
   readonly cross: readonly [number, number];
-  readonly crossed: number;
-  /** How far each line between strips bends of its own (× a strip's width, over 18 m or so). */
-  readonly bend: number;
+  /** The share of the sections a bund bounds whose strips run along the bund (the rest along the track). */
+  readonly alongBund: number;
+  /** How far the major curves bend (their slope, × their noise's: at most about 1.7 times this; from … to), over how long (m, from … to). */
+  readonly bend: readonly [number, number];
+  readonly bendOver: readonly [number, number];
+  /** How far each line between strips and crossings bends of its own (m, over 20 m or so). */
+  readonly wobble: number;
   /** The lines' widths (m): between strips and crossings, between sections, the track along the first major curve. */
   readonly minor: number;
   readonly major: number;
@@ -86,7 +90,7 @@ export const BUILD: BuildParams = {
   minArea: 12,
   dam: { width: 0.3, widthVar: 0.08, widthScale: 7, height: 0.13, heightVar: 0.04, batter: 0.3 },
   cut: { spacing: [7, 20], cascade: 0.75, drift: 0.5, shift: 0.45, blend: 1.2 },
-  plot: { section: 450, strip: [3, 5], cross: [8, 14], crossed: 1, bend: 0.45, minor: 0.3, major: 0.6, trackWidth: 1.6 },
+  plot: { bunds: [24, 36], strip: [3, 5], cross: [8, 14], alongBund: 0.3, bend: [0.24, 0.3], bendOver: [30, 44], wobble: 0.9, minor: 0.3, major: 0.6, trackWidth: 1.6 },
   treeSpacing: 2.2,
   peaks: { groups: 7, apart: 70, height: [30, 44], share: [0.45, 0.85], foot: 0.5 },
   leastWoods: 60,
@@ -881,20 +885,29 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   stats.levels = L;
   stats.cuts = cuts.cuts.length;
   stats.cutLines = cutLines.length;
+  stats.cutDeadEnds = cuts.deadEnds;
   stats.levelled = bands.dropped;
 
-  // each plain divided as Kai's aerials of flat fields divide them (2026-11-01): a few gentle curves across it (the
-  // major lines: a track along it, bunds) part it into sections; each section is laid in strips, gentle curves too,
-  // running along its sides and fanning from one to the one across from it (or keeping a side's way where none lies
-  // across), now and then crossed; a field is a strip's cell, every field of a plain at its level, the lines between
-  // them sunk (grooves, below). Each line is the zero of a field of its own on the plane at the plain's middle,
-  // found where it crosses the grid on that field itself, as every outline is.
+  // each plain divided as a pattern of a fixed scale laid over it and cut by its matte (Kai, 2026-11-02: "flat division
+  // should simply be dividing an area against a matte that's scaled; don't try to reconstruct from mesh points"; the
+  // strips had fanned between two rails that met, lines converging to a pinch "unnatural for farmland division"): a
+  // track winding along it, and bunds branching off the track every so far, to one side and the other by turns (the
+  // major lines), gentle curves that can neither loop nor turn back (each a straight way plus a smooth bend along it,
+  // so its field rises steadily across it everywhere); each section between them laid in strips of one width, each
+  // line the track's curve moved over by a strip at a time (in some, the bund's), bending a little of its own, crossed
+  // every so far by the bund's curve moved over likewise (or by lines square to its strips where no bund bounds it).
+  // So no two strips meet, nor two crossings, and no more than two lines meet anywhere. The plain's matte (its raster,
+  // the distance from its edge) gives its middle, its way and its sections' middles; a field is a strip's cell, every
+  // field of a plain at its level, the lines between them sunk (grooves, below), each the zero of a field of its own
+  // on the plane at the plain's middle, found where it crosses the grid on that field itself, as every outline is.
   const pl = P.plot;
+  /** The most major curves a plain has (a bit each in a section's key). */
+  const MAX_CURVES = 10;
   interface Curve {
     /** Where it runs: everywhere (parent −1), or on one side (pside) of an earlier curve (parent), branching off it. */
     readonly parent: number;
     readonly pside: number;
-    /** A point it passes, its normal, how far it bends (× its scale) over its scale (m), its noise's offsets, its half-width (m). */
+    /** A point it passes; its normal (unit: its way along is (ny, −nx)); how far it bends (its slope, × its noise's) over what length (m); its noise's offsets; its half-width (m). */
     readonly x0: number;
     readonly y0: number;
     readonly nx: number;
@@ -906,40 +919,29 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     readonly track: boolean;
   }
   interface Section {
-    /** Its rails (the curves its strips run along: a, and b across from it, or none) and its side of each (±1). */
-    readonly a: Curve;
-    readonly sa: number;
-    readonly b: Curve | null;
-    readonly sb: number;
-    /** Its strips: how many between two rails (0: from one rail on, each W m wide), and a line's half-width (in strips). */
-    readonly n: number;
+    /** Its strips: its rail's curve moved over W m at a time (rs: its side of the rail); a line's half-width (in strips). */
+    readonly rail: Curve;
+    readonly rs: number;
     readonly W: number;
     readonly off: number;
-    /** Its crossings, L m apart: along a major curve (c, its side sc), or straight across (way tx, ty), or none. */
-    readonly c: Curve | null;
-    readonly sc: number;
-    readonly straight: boolean;
-    readonly tx: number;
-    readonly ty: number;
-    readonly t0: number;
+    /** Its crossings: a curve moved over L m at a time (cs: its side of it), bounded if that curve is a major line along its edge (no crossing on the far side); a line's half-width (in crossings). */
+    readonly cross: Curve;
+    readonly cs: number;
+    readonly bounded: boolean;
     readonly L: number;
     readonly coff: number;
     /** Its lines' own bend: the noise's offsets. */
     readonly wo: readonly [number, number, number];
   }
   interface Division {
-    /** The plane at the plain's middle: its middle and two ways along it (unit). */
+    /** The plane at the plain's middle (its matte's): its middle and two ways along it (unit). */
     readonly c: number[];
     readonly e1: number[];
     readonly e2: number[];
     readonly curves: Curve[];
-    /** Rails only, beyond the plain's edges (none of its lines): the far sides strips by an edge fan toward. */
-    readonly phantoms: Curve[];
     readonly sections: Map<number, Section>;
-    /** Per section (its sides of the curves, a bit each): its held ground's middle on the plane and how much of it. */
+    /** Per section (its sides of the curves, a bit each): its middle on the plane, and how much of the matte it holds (points). */
     readonly middles: Map<number, number[]>;
-    /** Its held ground's points on the plane, and each one's section. */
-    readonly points: number[];
   }
   const divisions: Division[] = [];
   const cg = new Float64Array(3);
@@ -951,20 +953,22 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     out[1] = (R * (x * d.e2[0] + y * d.e2[1] + z * d.e2[2])) / s;
     return out;
   };
-  /** A major curve's field at (X, Y) (about meters from it, signed: its zero the curve); with g, its gradient. */
+  /** A major curve's field at (X, Y) (about meters from it, signed: its zero the curve; it rises at least a meter for every meter across it); with g, its gradient. */
   const curveAt = (cv: Curve, X: number, Y: number, g?: number[]): number => {
-    const n = gnoiseGrad((X - cv.x0) / cv.scale + cv.o[0], (Y - cv.y0) / cv.scale + cv.o[1], cv.o[2], (seed + 0x5ec7) >>> 0, cg);
+    const dx = X - cv.x0;
+    const dy = Y - cv.y0;
+    const n = gnoiseGrad((cv.ny * dx - cv.nx * dy) / cv.scale + cv.o[0], cv.o[1], cv.o[2], (seed + 0x5ec7) >>> 0, cg);
     if (g) {
-      g[0] = cv.nx + cv.bend * cg[0];
-      g[1] = cv.ny + cv.bend * cg[1];
+      g[0] = cv.nx + cv.bend * cg[0] * cv.ny;
+      g[1] = cv.ny - cv.bend * cg[0] * cv.nx;
     }
-    return cv.nx * (X - cv.x0) + cv.ny * (Y - cv.y0) + cv.bend * cv.scale * n;
+    return cv.nx * dx + cv.ny * dy + cv.bend * cv.scale * n;
   };
   const gq = [0, 0];
   /** How far (X, Y) lies from a major curve (m, signed): its field over its gradient's length. */
   const curveDist = (cv: Curve, X: number, Y: number): number => {
     const f = curveAt(cv, X, Y, gq);
-    return f / Math.max(Math.hypot(gq[0], gq[1]), 0.3);
+    return f / Math.hypot(gq[0], gq[1]);
   };
   /** Whether a curve runs at (X, Y): everywhere, or on its side of the curve it branches off. */
   const curveRuns = (d: Division, cv: Curve, X: number, Y: number): boolean => cv.parent < 0 || (curveAt(d.curves[cv.parent], X, Y) >= 0 ? 1 : -1) === cv.pside;
@@ -975,102 +979,79 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     return sigma;
   };
   for (let p = 0; p < plainLevel.length; p++) {
-    // (its held ground: the flats' vertices the plain holds level)
-    let sx = 0;
-    let sy = 0;
-    let sz = 0;
-    const held: number[] = [];
-    for (let v = 0; v < V; v++) {
-      if (core[v] !== p) continue;
-      held.push(v);
-      sx += D[3 * v];
-      sy += D[3 * v + 1];
-      sz += D[3 * v + 2];
-    }
-    const l = Math.hypot(sx, sy, sz) || 1;
-    const c = [sx / l, sy / l, sz / l];
-    const F = tangentFrame(c[0], c[1], c[2], new Float64Array(6));
-    const d: Division = { c, e1: [F[0], F[1], F[2]], e2: [F[3], F[4], F[5]], curves: [], phantoms: [], sections: new Map(), middles: new Map(), points: [] };
+    const r = rasters[p];
+    const d: Division = { c: r.c, e1: r.e1, e2: r.e2, curves: [], sections: new Map(), middles: new Map() };
     divisions.push(d);
-    // its spread on the plane: the way it runs longest and how far either way
+    // its spread on the plane, from its matte: its middle, the way it runs longest and how far either way
+    const mX = (q: number): number => r.x0 + (q % r.nx) * RASTER;
+    const mY = (q: number): number => r.y0 + Math.floor(q / r.nx) * RASTER;
+    let n = 0;
     let mx = 0;
     let my = 0;
-    for (const v of held) {
-      onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
-      mx += loc[0];
-      my += loc[1];
+    for (let q = 0; q < r.sd.length; q++) {
+      if (r.sd[q] >= 0) continue;
+      n++;
+      mx += mX(q);
+      my += mY(q);
     }
-    mx /= Math.max(held.length, 1);
-    my /= Math.max(held.length, 1);
+    n = Math.max(n, 1);
+    mx /= n;
+    my /= n;
     let cxx = 0;
     let cxy = 0;
     let cyy = 0;
-    for (const v of held) {
-      onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
-      cxx += (loc[0] - mx) ** 2;
-      cxy += (loc[0] - mx) * (loc[1] - my);
-      cyy += (loc[1] - my) ** 2;
+    for (let q = 0; q < r.sd.length; q++) {
+      if (r.sd[q] >= 0) continue;
+      const dx = mX(q) - mx;
+      const dy = mY(q) - my;
+      cxx += dx * dx;
+      cxy += dx * dy;
+      cyy += dy * dy;
     }
     const th = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
     const [ux, uy] = [Math.cos(th), Math.sin(th)];
-    const n = Math.max(held.length, 1);
     const along = Math.sqrt(Math.max((cxx * ux * ux + 2 * cxy * ux * uy + cyy * uy * uy) / n, 1));
     const across = Math.sqrt(Math.max((cxx * uy * uy - 2 * cxy * ux * uy + cyy * ux * ux) / n, 1));
-    const area = (held.length * 4 * Math.PI * R * R) / V;
-    // its major curves: the first along it near its middle (a track); the rest across it, branching off the track to
-    // one side or the other, and along it, by turns, spread over it, each its own way give or take, bending gently
     let h = hash32((Math.imul(p + 1, 0x9e3779b1) ^ (seed + 0x91a1)) >>> 0);
     const rnd = (): number => unit((h = hash32((h + 0x6d2b79f5) >>> 0)));
-    const count = Math.max(2, Math.min(8, Math.round(area / pl.section)));
-    const acrossCount = Math.ceil((count - 1) / 2);
-    const alongCount = count - 1 - acrossCount;
-    for (let i = 0; i < count; i++) {
-      const isAcross = i > 0 && i % 2 === 1;
-      const rank = i === 0 ? 0 : Math.floor((i - 1) / 2);
-      const of = isAcross ? acrossCount : alongCount;
-      const turn = isAcross ? Math.PI / 2 + (rnd() - 0.5) * 0.9 : (rnd() - 0.5) * 0.5;
-      // (its place: along the plain for those across, across it for those along; the track near the middle)
-      const at = i === 0 ? (rnd() - 0.5) * 0.4 : ((rank + 0.3 + 0.4 * rnd()) / Math.max(of, 1) - 0.5) * 2.4;
-      const [px, py] = isAcross ? [mx + ux * at * along, my + uy * at * along] : [mx - uy * at * across, my + ux * at * across];
-      const dirX = Math.cos(th + turn);
-      const dirY = Math.sin(th + turn);
-      d.curves.push({
-        parent: isAcross ? 0 : -1,
-        pside: rnd() < 0.5 ? 1 : -1,
-        x0: px,
-        y0: py,
-        nx: -dirY,
-        ny: dirX,
-        bend: 0.24 + 0.12 * rnd(),
-        scale: 26 + 14 * rnd(),
-        o: [rnd() * 97, rnd() * 97, rnd() * 97],
-        half: (i === 0 ? pl.trackWidth : pl.major) / 2,
-        track: i === 0,
-      });
+    const curve = (parent: number, pside: number, x0: number, y0: number, way: number, half: number, track: boolean): Curve => ({
+      parent,
+      pside,
+      x0,
+      y0,
+      nx: -Math.sin(way),
+      ny: Math.cos(way),
+      bend: pl.bend[0] + (pl.bend[1] - pl.bend[0]) * rnd(),
+      scale: pl.bendOver[0] + (pl.bendOver[1] - pl.bendOver[0]) * rnd(),
+      o: [rnd() * 97, rnd() * 97, rnd() * 97],
+      half,
+      track,
+    });
+    // its track: along it near its middle, turned a little
+    const off = (rnd() - 0.5) * 0.4 * across;
+    const [tx, ty] = [mx - uy * off, my + ux * off];
+    const tw = th + (rnd() - 0.5) * 0.3;
+    d.curves.push(curve(-1, 1, tx, ty, tw, pl.trackWidth / 2, true));
+    // its bunds: off the track every so far along it, as far as its matte reaches along it (a spread of σ evenly along
+    // a length reaches √3 σ either way), the sides by turns, each across it give or take
+    let side = rnd() < 0.5 ? 1 : -1;
+    const reach = 1.8 * along;
+    for (let s = -reach + pl.bunds[0] * (0.4 + 0.6 * rnd()); s < reach - 0.4 * pl.bunds[0] && d.curves.length < MAX_CURVES; s += pl.bunds[0] + (pl.bunds[1] - pl.bunds[0]) * rnd()) {
+      d.curves.push(curve(0, side, tx + Math.cos(tw) * s, ty + Math.sin(tw) * s, tw + Math.PI / 2 + (rnd() - 0.5) * 0.6, pl.major / 2, false));
+      side = -side;
     }
-    // beyond each of its edges a rail of its own, turned a little and bending, for the strips by that edge to fan to
-    for (const [isAcross, sgn] of [
-      [false, 1],
-      [false, -1],
-      [true, 1],
-      [true, -1],
-    ] as const) {
-      const turn = (isAcross ? Math.PI / 2 : 0) + (rnd() - 0.5) * 0.6;
-      const out = isAcross ? 2.2 * along + 6 : 2.2 * across + 6;
-      const [px, py] = isAcross ? [mx + ux * sgn * out, my + uy * sgn * out] : [mx - uy * sgn * out, my + ux * sgn * out];
-      d.phantoms.push({ parent: -1, pside: 1, x0: px, y0: py, nx: -Math.sin(th + turn), ny: Math.cos(th + turn), bend: 0.24 + 0.12 * rnd(), scale: 26 + 14 * rnd(), o: [rnd() * 97, rnd() * 97, rnd() * 97], half: 0, track: false });
-    }
-    // each section's held ground: its middle on the plane, how much of it
-    for (const v of held) {
-      onPlane(d, D[3 * v], D[3 * v + 1], D[3 * v + 2], loc);
-      const sigma = sigmaAt(d, loc[0], loc[1]);
-      d.points.push(loc[0], loc[1], sigma);
+    // each section's middle on the plane, from the matte
+    for (let q = 0; q < r.sd.length; q++) {
+      if (r.sd[q] >= 0) continue;
+      const X = mX(q);
+      const Y = mY(q);
+      const sigma = sigmaAt(d, X, Y);
       const mid = d.middles.get(sigma);
       if (mid) {
-        mid[0] += loc[0];
-        mid[1] += loc[1];
+        mid[0] += X;
+        mid[1] += Y;
         mid[2]++;
-      } else d.middles.set(sigma, [loc[0], loc[1], 1]);
+      } else d.middles.set(sigma, [X, Y, 1]);
     }
     for (const mid of d.middles.values()) {
       mid[0] /= mid[2];
@@ -1093,111 +1074,78 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     });
     stats.villages = village.reduce((a, b) => a + b, 0);
   }
-  /** A section of a plain (its sides of the major curves, a bit each), worked out the first time it is asked for. */
+  /** A section of a plain (its sides of the major curves, a bit each), worked out the first time it is asked for: its strips along the track (in some, along its bund), crossed along its bund (or the track), or square to its strips where no bund bounds it. */
   const sectionOf = (p: number, sigma: number, X: number, Y: number): Section => {
     const d = divisions[p];
     const known = d.sections.get(sigma);
     if (known) return known;
-    const mid = d.middles.get(sigma) ?? [X, Y, 0];
-    const [cx, cy] = mid;
-    // the curves it lies along: where the nearest point of each to its middle has it on the same side of every other
-    // (and the curve runs there)
-    type Rail = { cv: Curve; d: number; nx: number; ny: number; side: number };
-    const railOf = (cv: Curve): Rail => {
-      const g = [0, 0];
-      const f = curveAt(cv, cx, cy, g);
-      const gl = Math.hypot(g[0], g[1]) || 1;
-      const side = f >= 0 ? 1 : -1;
-      return { cv, d: Math.abs(f) / Math.max(gl, 0.3), nx: (side * g[0]) / gl, ny: (side * g[1]) / gl, side };
-    };
-    const border: Rail[] = [];
-    d.curves.forEach((cv, i) => {
-      let qx = cx;
-      let qy = cy;
-      const g = [0, 0];
-      for (let it = 0; it < 4; it++) {
-        const f = curveAt(cv, qx, qy, g);
-        const gg = Math.max(g[0] * g[0] + g[1] * g[1], 0.09);
-        qx -= (f * g[0]) / gg;
-        qy -= (f * g[1]) / gg;
-      }
-      if (curveRuns(d, cv, qx, qy) && ((sigmaAt(d, qx, qy) ^ sigma) & ~(1 << i)) === 0) border.push(railOf(cv));
-    });
-    border.sort((u, w) => u.d - w.d);
-    // its rails: the two it lies between, most nearly facing each other, if any do; else the nearest, and across from
-    // it the rail beyond the plain's edge most nearly facing it; else the nearest alone
-    let a = border.length ? border[0] : railOf(d.curves[0]);
-    let b: Rail | null = null;
-    let best = -0.3;
-    for (let i = 0; i < border.length; i++) {
-      for (let j = i + 1; j < border.length; j++) {
-        const dot = border[i].nx * border[j].nx + border[i].ny * border[j].ny;
-        if (dot < best) {
-          best = dot;
-          a = border[i];
-          b = border[j];
-        }
-      }
-    }
-    if (!b) {
-      for (const ph of d.phantoms) {
-        const r = railOf(ph);
-        const dot = r.nx * a.nx + r.ny * a.ny;
-        if (dot < best) {
-          best = dot;
-          b = r;
-        }
+    const [cx, cy] = d.middles.get(sigma) ?? [X, Y, 0];
+    const track = d.curves[0];
+    const ts = (sigma & 1) === 1 ? 1 : -1;
+    // (its bund: the nearest to its middle of those on its side of the track)
+    let bund = -1;
+    let nearest = Infinity;
+    for (let i = 1; i < d.curves.length; i++) {
+      if (d.curves[i].pside !== ts) continue;
+      const dist = Math.abs(curveDist(d.curves[i], cx, cy));
+      if (dist < nearest) {
+        nearest = dist;
+        bund = i;
       }
     }
     const hs = hash32((Math.imul(p + 1, 0x85ebca6b) ^ Math.imul(sigma + 1, 0xc2b2ae35) ^ (seed + 0x5ec1)) >>> 0);
     const W = pl.strip[0] + (pl.strip[1] - pl.strip[0]) * unit(hs);
-    // (its strips as many as keep the widest of them W across: the gap between its rails at the most of its ground,
-    // not just its middle, where they part widest)
-    let gap = b ? a.d + b.d : 0;
-    if (b) {
-      const gaps: number[] = [];
-      for (let i = 0; i < d.points.length; i += 3) {
-        if (d.points[i + 2] !== sigma) continue;
-        gaps.push(Math.abs(curveDist(a.cv, d.points[i], d.points[i + 1])) + Math.abs(curveDist(b.cv, d.points[i], d.points[i + 1])));
-      }
-      gaps.sort((u, w) => u - w);
-      if (gaps.length) gap = Math.max(gap, gaps[Math.floor(0.9 * (gaps.length - 1))]);
-    }
-    const n = b ? Math.max(1, Math.round(gap / W)) : 0;
-    const width = b ? gap / n : W;
-    // its crossings, in most sections: across its strips, square to its first rail at its middle, each bending a
-    // little of its own (bendAt), L apart (a third curve's offsets far from it spread unevenly: fields grew huge)
-    const c: Curve | null = null;
-    const sc = 1;
-    let straight = false;
-    let tx = 0;
-    let ty = 0;
-    let t0 = 0;
     const L = pl.cross[0] + (pl.cross[1] - pl.cross[0]) * unit(hash32(hs ^ 0x51));
-    if (unit(hash32(hs ^ 0x52)) < pl.crossed) {
-      straight = true;
-      tx = -a.ny;
-      ty = a.nx;
-      t0 = cx * tx + cy * ty + L * unit(hash32(hs ^ 0x53));
-    }
     const wo = [unit(hash32(hs ^ 0x54)) * 97, unit(hash32(hs ^ 0x55)) * 97, unit(hash32(hs ^ 0x56)) * 97] as const;
-    const sec: Section = { a: a.cv, sa: a.side, b: b ? b.cv : null, sb: b ? b.side : 1, n, W, off: pl.minor / 2 / width, c, sc, straight, tx, ty, t0, L, coff: pl.minor / 2 / L, wo };
+    let rail = track;
+    let rs = ts;
+    let cross: Curve;
+    let cs = 1;
+    let bounded = true;
+    if (bund >= 0) {
+      const bs = ((sigma >> bund) & 1) === 1 ? 1 : -1;
+      if (unit(hash32(hs ^ 0x52)) < pl.alongBund) {
+        rail = d.curves[bund];
+        rs = bs;
+        cross = track;
+        cs = ts;
+      } else {
+        cross = d.curves[bund];
+        cs = bs;
+      }
+    } else {
+      // (no bund: lines square to its strips at its middle, bending gently of their own, a crossing's length apart)
+      const g = [0, 0];
+      curveAt(track, cx, cy, g);
+      const way = Math.atan2(g[1], g[0]);
+      const shift = L * unit(hash32(hs ^ 0x53));
+      const r = (k: number): number => unit(hash32(hs ^ (0x60 + k)));
+      cross = {
+        parent: -1,
+        pside: 1,
+        x0: cx - Math.sin(way) * shift,
+        y0: cy + Math.cos(way) * shift,
+        nx: -Math.sin(way),
+        ny: Math.cos(way),
+        bend: 0.6 * (pl.bend[0] + (pl.bend[1] - pl.bend[0]) * r(0)),
+        scale: pl.bendOver[0] + (pl.bendOver[1] - pl.bendOver[0]) * r(1),
+        o: [r(2) * 97, r(3) * 97, r(4) * 97],
+        half: 0,
+        track: false,
+      };
+      bounded = false;
+    }
+    const sec: Section = { rail, rs, W, off: pl.minor / 2 / W, cross, cs, bounded, L, coff: pl.minor / 2 / L, wo };
     d.sections.set(sigma, sec);
     return sec;
   };
-  /** A section's lines' own bend at (X, Y) (in strips: k a second noise, for its crossings). */
-  const bendAt = (sec: Section, X: number, Y: number, k: number): number =>
-    gnoise(X / 18 + sec.wo[0] + 31 * k, Y / 18 + sec.wo[1], sec.wo[2], (seed + 0x5ec3) >>> 0);
-  /** A section's strip coordinate at (X, Y): 0 along rail a, n along rail b (or a strip's width a unit from a alone), each line bending a little of its own. */
-  const stripAt = (sec: Section, X: number, Y: number): number => {
-    const da = sec.sa * curveDist(sec.a, X, Y);
-    const bend = pl.bend * bendAt(sec, X, Y, 0);
-    if (!sec.b) return da / sec.W + bend;
-    const db = sec.sb * curveDist(sec.b, X, Y);
-    const pa = Math.max(da, 0);
-    const pb = Math.max(db, 0);
-    return (sec.n * pa) / Math.max(pa + pb, 1e-9) + bend;
-  };
+  /** A section's lines' own bend at (X, Y) (m: k a second noise, for its crossings). */
+  const wobbleAt = (sec: Section, X: number, Y: number, k: number): number =>
+    pl.wobble * gnoise(X / 20 + sec.wo[0] + 31 * k, Y / 20 + sec.wo[1], sec.wo[2], (seed + 0x5ec3) >>> 0);
+  /** A section's strip coordinate at (X, Y): its rail's field over a strip's width (0 along the rail, k on its k-th line out), each line bending a little of its own. */
+  const stripAt = (sec: Section, X: number, Y: number): number => (sec.rs * curveAt(sec.rail, X, Y) + wobbleAt(sec, X, Y, 0)) / sec.W;
+  /** A section's crossing coordinate at (X, Y): its crossing curve's field over a crossing's length, likewise. */
+  const crossAt = (sec: Section, X: number, Y: number): number => (sec.cs * curveAt(sec.cross, X, Y) + 0.8 * wobbleAt(sec, X, Y, 1)) / sec.L;
   /** How far (X, Y) lies from line k of a section's coordinate (m, signed: > 0 on its higher side): the coordinate's distance from k over its gradient's length there. */
   const lineDist = (coord: (sec: Section, X: number, Y: number) => number, sec: Section, X: number, Y: number, k: number): number => {
     const h = 0.05;
@@ -1205,16 +1153,10 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     const gy = (coord(sec, X, Y + h) - coord(sec, X, Y - h)) / (2 * h);
     return (coord(sec, X, Y) - k) / Math.max(Math.hypot(gx, gy), 1e-3);
   };
-  /** Whether a section's strips are crossed. */
-  const crossed = (sec: Section): boolean => sec.c !== null || sec.straight;
-  /** A section's crossing coordinate at (X, Y) (0 where it is not crossed). */
-  const crossAt = (sec: Section, X: number, Y: number): number => {
-    if (sec.c) return (sec.sc * curveDist(sec.c, X, Y)) / sec.L + 0.6 * pl.bend * bendAt(sec, X, Y, 1);
-    if (!sec.straight) return 0;
-    return (X * sec.tx + Y * sec.ty - sec.t0) / sec.L + 0.6 * pl.bend * bendAt(sec, X, Y, 1);
-  };
+  /** A section's first crossing: before it, its crossing line 0 is a major line (its bund, the track), or none. */
+  const crossFrom = (sec: Section, g: number): number => (sec.bounded ? Math.max(Math.floor(g), 0) : Math.floor(g));
   /** A field: its plain, section, strip and crossing. */
-  const fieldKey = (p: number, sigma: number, t: number, u: number): number => ((p * 64 + sigma) * 512 + (t + 128)) * 256 + (u + 128);
+  const fieldKey = (p: number, sigma: number, t: number, u: number): number => ((p * 4096 + sigma) * 512 + (t + 128)) * 256 + (u + 128);
   /** A vertex's field, or −1 within a groove's reach (so a square whose five agree holds no line). */
   const fieldOfVertex = (v: number, p: number): number => {
     const d = divisions[p];
@@ -1223,16 +1165,15 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     for (const cv of d.curves) if (Math.abs(curveDist(cv, X, Y)) < cv.half + pl.minor && curveRuns(d, cv, X, Y)) return -1;
     const sigma = sigmaAt(d, X, Y);
     const sec = sectionOf(p, sigma, X, Y);
-    // (its strip as the cut pieces take it: before the first, the first; past the last, the last; near a line between
-    // two strips — not a rail — none)
-    const f = stripAt(sec, X, Y);
-    const t = Math.min(Math.max(Math.floor(f), 0), sec.b ? sec.n - 1 : Infinity);
+    // (its strip as the cut pieces take it: before the first line, the first; near a line between two strips — not a
+    // rail — none; its crossing likewise)
+    const t = Math.max(Math.floor(stripAt(sec, X, Y)), 0);
     const near = pl.minor / 2 + 0.3;
     if (t >= 1 && lineDist(stripAt, sec, X, Y, t) < near) return -1;
-    if ((!sec.b || t + 1 < sec.n) && -lineDist(stripAt, sec, X, Y, t + 1) < near) return -1;
-    const g = crossAt(sec, X, Y);
-    const u = Math.floor(g);
-    if (crossed(sec) && Math.min(lineDist(crossAt, sec, X, Y, u), -lineDist(crossAt, sec, X, Y, u + 1)) < near) return -1;
+    if (-lineDist(stripAt, sec, X, Y, t + 1) < near) return -1;
+    const u = crossFrom(sec, crossAt(sec, X, Y));
+    if ((u >= 1 || !sec.bounded) && lineDist(crossAt, sec, X, Y, u) < near) return -1;
+    if (-lineDist(crossAt, sec, X, Y, u + 1) < near) return -1;
     return fieldKey(p, sigma, t, u);
   };
 
@@ -1714,25 +1655,24 @@ export function buildTerraces(input: BuildInput): BuildOutput {
         fs.push(stripAt(sec, at[0], at[1]));
         gs.push(crossAt(sec, at[0], at[1]));
       }
-      // (before rail a's first line still the first strip's, past rail b's last still the last's: as fieldOfVertex)
-      const tHi = Math.max(sec.b ? Math.min(Math.floor(Math.max(...fs)), sec.n - 1) : Math.floor(Math.max(...fs)), 0);
+      // (before its rail's first line still the first strip's, and before a bounding crossing curve's first line the
+      // first crossing's: as fieldOfVertex)
+      const tHi = Math.max(Math.floor(Math.max(...fs)), 0);
       const tLo = Math.min(Math.max(Math.floor(Math.min(...fs)), 0), tHi);
-      const uLo = Math.floor(Math.min(...gs));
-      const uHi = Math.floor(Math.max(...gs));
+      const uHi = crossFrom(sec, Math.max(...gs));
+      const uLo = Math.min(crossFrom(sec, Math.min(...gs)), uHi);
       for (let t = tLo; t <= tHi; t++) {
         // (no line along a rail: the major curve's side keeps the field back there)
         let st = pc;
         // (cut where a piece comes near enough a line for its kept-back edge to fall in it: a strip's width varies, so
         // with room to spare)
         if (t > 0 && Math.min(...fs) < t + 4 * sec.off + 0.02) st = clip(st, stripSide(p, sigma, t, true));
-        if ((!sec.b || t + 1 < sec.n) && Math.max(...fs) > t + 1 - 4 * sec.off - 0.02) st = clip(st, stripSide(p, sigma, t + 1, false));
+        if (Math.max(...fs) > t + 1 - 4 * sec.off - 0.02) st = clip(st, stripSide(p, sigma, t + 1, false));
         if (st.length < 3) continue;
         for (let u = uLo; u <= uHi; u++) {
           let cu = st;
-          if (crossed(sec)) {
-            if (Math.min(...gs) < u + 4 * sec.coff + 0.02) cu = clip(cu, crossSide(p, sigma, u, true));
-            if (Math.max(...gs) > u + 1 - 4 * sec.coff - 0.02) cu = clip(cu, crossSide(p, sigma, u + 1, false));
-          }
+          if ((u > 0 || !sec.bounded) && Math.min(...gs) < u + 4 * sec.coff + 0.02) cu = clip(cu, crossSide(p, sigma, u, true));
+          if (Math.max(...gs) > u + 1 - 4 * sec.coff - 0.02) cu = clip(cu, crossSide(p, sigma, u + 1, false));
           if (cu.length < 3) continue;
           const plot = plotIndex(fieldKey(p, sigma, t, u), p);
           fan(cu, (a, b, c) => {
@@ -2297,18 +2237,13 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   // the major curves' wider and deeper; along each plain's first major curve a track, pale and barely sunk. Each line
   // traced over its plain's squares on its own field, kept where the plain is (a section's strips and crossings
   // within their section), carried on a little past its ends under whatever it runs into; its lips a hair under
-  // the fields and on under their edges, so nothing between shows a gap.
-  const groove = (src: number[], closed: boolean, half: number, depth: number, track: boolean, level: number): void => {
-    if (src.length < 6) return;
-    let pts = src;
-    if (!closed) {
-      const n = src.length / 3;
-      const head = past([src[0], src[1], src[2]], [src[3], src[4], src[5]], OVERLAP);
-      const tail = past([src[3 * n - 3], src[3 * n - 2], src[3 * n - 1]], [src[3 * n - 6], src[3 * n - 5], src[3 * n - 4]], OVERLAP);
-      pts = [...head, ...src, ...tail];
-    }
+  // the fields and on under their edges, so nothing between shows a gap. Where a line runs into a major line it
+  // passes under its surface (a bund under the track, a strip or a crossing under either), so no line crosses a road
+  // or a bund (Kai: "divisions invading onto roads").
+  /** A groove's profile across it, side to side: (offset, depth under its plain's level), m. */
+  const grooveProfile = (half: number, depth: number, track: boolean): Array<[number, number]> => {
     const lip = 0.012;
-    const prof: Array<[number, number]> = track
+    return track
       ? [
           [-(half + 0.06), lip],
           [-half, lip],
@@ -2326,6 +2261,28 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           [half, lip],
           [half + 0.06, lip],
         ];
+  };
+  /** How deep a groove's profile lies s m off its middle (its lips' depth beyond them). */
+  const profileDepth = (prof: ReadonlyArray<readonly [number, number]>, s: number): number => {
+    for (let j = 0; j + 1 < prof.length; j++) {
+      const [s0, d0] = prof[j];
+      const [s1, d1] = prof[j + 1];
+      if (s >= s0 && s <= s1) return d0 + ((d1 - d0) * (s - s0)) / Math.max(s1 - s0, 1e-9);
+    }
+    return prof[0][1];
+  };
+  /** How deep a major line's groove is sunk (m): the track barely, a bund the most. */
+  const majorDepth = (cv: Curve): number => (cv.track ? 0.035 : 0.18);
+  const groove = (src: number[], closed: boolean, half: number, depth: number, track: boolean, level: number, sink?: (x: number, y: number, z: number) => number): void => {
+    if (src.length < 6) return;
+    let pts = src;
+    if (!closed) {
+      const n = src.length / 3;
+      const head = past([src[0], src[1], src[2]], [src[3], src[4], src[5]], OVERLAP);
+      const tail = past([src[3 * n - 3], src[3 * n - 2], src[3 * n - 1]], [src[3 * n - 6], src[3 * n - 5], src[3 * n - 4]], OVERLAP);
+      pts = [...head, ...src, ...tail];
+    }
+    const prof = grooveProfile(half, depth, track);
     const c = pts.length / 3;
     const N = normals(pts, closed);
     const ch = chunks[chunkAt(pts[0], pts[1], pts[2])];
@@ -2334,7 +2291,10 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     for (let i = 0; i < c; i++) {
       for (const [s, dz] of prof) {
         const [x, y, z] = moveTo(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2], N[3 * i], N[3 * i + 1], N[3 * i + 2], -s);
-        const h = level - dz;
+        let h = level - (sink ? Math.max(dz, sink(x, y, z)) : dz);
+        // (off the plain, as where a line is carried on past its edge or a track runs along it: under the land there,
+        // so none shows on a slope down from the plain, nor over the paddy below it)
+        if (plainIn(x, y, z) < 0.3 && classAt(x, y, z) !== 1) h = Math.min(h, surfaceAt(x, y, z) - 0.02);
         ch.vertex(x * (R + h), y * (R + h), z * (R + h), part, NONE, level, 0, 0, 0);
       }
     }
@@ -2360,16 +2320,64 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   for (const [p, squares] of plainSquares) {
     const d = divisions[p];
     const level = plainLevel[p];
-    const verts = new Set<number>();
+    // (its squares and their points; a wide line's traced further all round, as far as a track's half-width and a
+    // square, across the cube's faces' edges too: its middle can run off the squares that hold fields while its
+    // width still lies over them)
+    const around = new Set<number>(squares);
+    const ring = Math.ceil((pl.trackWidth / 2 + 0.06) / grid.spacing) + 1;
+    const mid = [0, 0, 0];
+    const Fm = new Float64Array(6);
+    const sq = { face: 0, ci: 0, cj: 0 };
     for (const si of squares) {
       const f = Math.floor(si / (m * m));
       const cj = Math.floor((si - f * m * m) / m);
-      const t = grid.triangles(f, si - f * m * m - cj * m, cj);
-      for (const v of [t[0], t[3], t[6], t[9], t[2]]) verts.add(v);
+      grid.point(grid.middle(f, si - f * m * m - cj * m, cj), mid);
+      tangentFrame(mid[0], mid[1], mid[2], Fm);
+      for (let b = -ring; b <= ring; b++) {
+        for (let a = -ring; a <= ring; a++) {
+          const ox = (a * grid.spacing) / R;
+          const oy = (b * grid.spacing) / R;
+          const qx = mid[0] + ox * Fm[0] + oy * Fm[3];
+          const qy = mid[1] + ox * Fm[1] + oy * Fm[4];
+          const qz = mid[2] + ox * Fm[2] + oy * Fm[5];
+          const ql = Math.hypot(qx, qy, qz);
+          grid.square(qx / ql, qy / ql, qz / ql, sq);
+          around.add((sq.face * m + sq.cj) * m + sq.ci);
+        }
+      }
     }
+    const pointsOf = (sq: Iterable<number>): Set<number> => {
+      const vs = new Set<number>();
+      for (const si of sq) {
+        const f = Math.floor(si / (m * m));
+        const cj = Math.floor((si - f * m * m) / m);
+        const t = grid.triangles(f, si - f * m * m - cj * m, cj);
+        for (const v of [t[0], t[3], t[6], t[9], t[2]]) vs.add(v);
+      }
+      return vs;
+    };
+    const verts = pointsOf(squares);
+    const aroundVerts = pointsOf(around);
     const at = [0, 0];
-    /** The lines k of a field over the plain (value), each kept where `keep` holds and the plain is, sunk as a groove. */
-    const lines = (name: string, value: (X: number, Y: number) => number, take: (k: number) => boolean, keep: (X: number, Y: number) => boolean, half: number, depth: number, track: boolean): void => {
+    const at2 = [0, 0];
+    const majorProf = d.curves.map((cv) => grooveProfile(cv.half, majorDepth(cv), cv.track));
+    /** How deep under the plain's level a line must lie at a direction to pass under the major lines `over` holds there (their surface, a hair under), m. */
+    const under =
+      (over: (i: number) => boolean) =>
+      (x: number, y: number, z: number): number => {
+        onPlane(d, x, y, z, at2);
+        let s = 0;
+        for (let i = 0; i < d.curves.length; i++) {
+          const cv = d.curves[i];
+          if (!over(i)) continue;
+          const dist = curveDist(cv, at2[0], at2[1]);
+          if (Math.abs(dist) >= cv.half + 0.06 || !curveRuns(d, cv, at2[0], at2[1])) continue;
+          s = Math.max(s, profileDepth(majorProf[i], dist) + 0.006);
+        }
+        return s;
+      };
+    /** The lines k of a field over the plain (value), each kept where `keep` holds and the plain is (for a wide line, the plain under any of its width: a track that runs along the plain's edge), sunk as a groove (under the major lines where sink says). */
+    const lines = (name: string, value: (X: number, Y: number) => number, take: (k: number) => boolean, keep: (X: number, Y: number) => boolean, half: number, depth: number, track: boolean, sink?: (x: number, y: number, z: number) => number, wide = false): void => {
       const known = new Map<number, number>();
       const fv = (v: number): number => {
         let q = known.get(v);
@@ -2380,7 +2388,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
         }
         return q;
       };
-      for (const v of verts) lineIdx[v] = Math.floor(fv(v));
+      for (const v of wide ? aroundVerts : verts) lineIdx[v] = Math.floor(fv(v));
       const chains = grid.trace(
         lineIdx,
         (u, w, k) => {
@@ -2396,34 +2404,42 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           };
           return grid.crossing(slot, u, w, f3, (v) => fv(v) - k);
         },
-        squares,
+        wide ? around : squares,
       );
       for (const chain of chains) {
         if (!take(chain.level)) continue;
         const pts = resample(grid, chain, P.edgeSpacing);
         const c = pts.length / 3;
         const ok = new Uint8Array(c);
+        const Nw = wide ? normals(pts, chain.closed) : null;
         for (let i = 0; i < c; i++) {
           onPlane(d, pts[3 * i], pts[3 * i + 1], pts[3 * i + 2], at);
-          ok[i] = keep(at[0], at[1]) && classAt(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]) === 1 ? 1 : 0;
+          if (!keep(at[0], at[1])) continue;
+          let on = classAt(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]) === 1;
+          for (const s of Nw && !on ? [half, -half] : []) {
+            const [x, y, z] = moveTo(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2], Nw![3 * i], Nw![3 * i + 1], Nw![3 * i + 2], s);
+            on ||= classAt(x, y, z) === 1;
+          }
+          ok[i] = on ? 1 : 0;
         }
         for (const run of runs(ok, chain.closed)) {
           const r: number[] = [];
           for (const i of run.idx) r.push(pts[3 * i], pts[3 * i + 1], pts[3 * i + 2]);
-          groove(r, run.closed, half, depth, track, level);
+          groove(r, run.closed, half, depth, track, level, sink);
           grooves++;
         }
       }
     };
     d.curves.forEach((cv, i) => {
       if (village[p] && !cv.track) return;
-      lines(`m${i}`, (X, Y) => (curveAt(cv, X, Y) >= 0 ? 0.5 : -0.5), (k) => k === 0, (X, Y) => curveRuns(d, cv, X, Y), cv.half, cv.track ? 0.035 : 0.18, cv.track);
+      lines(`m${i}`, (X, Y) => (curveAt(cv, X, Y) >= 0 ? 0.5 : -0.5), (k) => k === 0, (X, Y) => curveRuns(d, cv, X, Y), cv.half, majorDepth(cv), cv.track, cv.track ? undefined : under((j) => d.curves[j].track), true);
     });
     if (village[p]) continue;
+    const underAll = under(() => true);
     for (const [sigma, sec] of d.sections) {
       const inside = (X: number, Y: number): boolean => sigmaAt(d, X, Y) === sigma;
-      lines(`s${sigma}`, (X, Y) => stripAt(sec, X, Y), (k) => k >= 1 && (!sec.b || k < sec.n), inside, pl.minor / 2, 0.12, false);
-      if (crossed(sec)) lines(`c${sigma}`, (X, Y) => crossAt(sec, X, Y), () => true, inside, pl.minor / 2, 0.12, false);
+      lines(`s${sigma}`, (X, Y) => stripAt(sec, X, Y), (k) => k >= 1, inside, pl.minor / 2, 0.12, false, underAll);
+      lines(`c${sigma}`, (X, Y) => crossAt(sec, X, Y), (k) => k >= 1 || !sec.bounded, inside, pl.minor / 2, 0.12, false, underAll);
     }
   }
   stats.grooves = grooves;

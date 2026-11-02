@@ -625,9 +625,10 @@ export class Cuts {
     }
   }
 
-  /** The cuts' lines across their bands, on the final banks: from where the cut's bank now runs up to the next bank (or to where the terraces end). */
+  /** The cuts' lines across their bands, on the final banks: from where the cut's bank now runs up to the next bank (or to where the terraces end); none that would end at nothing. */
   lines(final: Bands, within: (x: number, y: number, z: number) => boolean): CutLine[] {
     const out: CutLine[] = [];
+    this.deadEnds = 0;
     for (const cut of this.cuts) {
       const [x, y, z] = this.pointAt(cut.chain, cut.s);
       const k = cut.band;
@@ -639,11 +640,40 @@ export class Cuts {
       const pts = [lo[0], lo[1], lo[2]];
       const hi = this.walk(lo[0], lo[1], lo[2], 1, up, false, 15, pts, within);
       if (!hi) continue;
+      // (a cut up to the next level's bank where that ring was levelled into its band, a hilltop's small top: it would
+      // stop in the middle of the paddy, a dead end (Kai: "dead-end divisions going over a local hilltop's flat"))
+      if (up(hi[0], hi[1], hi[2]) >= 0 && !this.banked(final, k + 1, hi)) {
+        this.deadEnds++;
+        continue;
+      }
       let len = 0;
       for (let i = 3; i < pts.length; i += 3) len += this.R * Math.hypot(pts[i] - pts[i - 3], pts[i + 1] - pts[i - 2], pts[i + 2] - pts[i - 1]);
       if (len < 0.4) continue;
       out.push({ band: k, pts });
     }
     return out;
+  }
+
+  /** The cuts lines() left out: those that would have ended at nothing. */
+  deadEnds = 0;
+  private readonly sq = { face: 0, ci: 0, cj: 0 };
+
+  /** Whether a point of level k's bank bounds band k as the final bands have it (not a ring levelled into the band round it): a vertex of the grid's square a little up the fall line from it in band k or above. */
+  private banked(final: Bands, k: number, at: readonly number[]): boolean {
+    const g = this.grad;
+    this.field.terrace(at[0], at[1], at[2], g);
+    const l = Math.hypot(g[0], g[1], g[2]) || 1;
+    const s = 0.4 / this.R;
+    let qx = at[0] + (s * g[0]) / l;
+    let qy = at[1] + (s * g[1]) / l;
+    let qz = at[2] + (s * g[2]) / l;
+    const ql = Math.hypot(qx, qy, qz);
+    qx /= ql;
+    qy /= ql;
+    qz /= ql;
+    const { face, ci, cj } = final.grid.square(qx, qy, qz, this.sq);
+    const t = final.grid.triangles(face, ci, cj);
+    for (const v of [t[0], t[3], t[6], t[9], t[2]]) if (final.band[v] >= k) return true;
+    return false;
   }
 }
