@@ -1,4 +1,4 @@
-import { Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { CustomBlending, DoubleSide, Frustum, Matrix4, Mesh, OneFactor, OneMinusSrcAlphaFactor, Scene, ShaderMaterial, Vector3, Vector4, type BufferGeometry, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from '../core/buildQueue';
 import type { FrameClock } from '../core/clock';
 import type { Globals } from '../core/globals';
@@ -20,7 +20,7 @@ import { warpForZoom } from '../render/warp';
 import { CameraRig } from '../view/camera';
 import { pickSurface, type Pick } from '../view/picking';
 import { TerraceBuild } from './build/builder';
-import { Clouds, createCloudUniforms, type CloudParams } from '../life/clouds';
+import { Clouds, createCloudUniforms, type CloudForm, type CloudParams } from '../life/clouds';
 import { FIELD, PlanetField } from './build/field';
 import { tangentFrame } from './build/sphere';
 import { ModelSet, type Placement } from './models';
@@ -28,15 +28,24 @@ import { PaddyMap } from './paddyMap';
 import { TERRACE_ROWS } from './palette';
 import { Rice, RICE } from './rice';
 import { Trees } from './trees';
+import mistFragment from './mist.frag.glsl?raw';
+import mistVertex from './mist.vert.glsl?raw';
 
 /**
  * The cloud layer (Kai, 2026-11-02: hanging just above the ground, as the meadow's, much cloudier): the meadow's
  * clouds (life/clouds.ts) and its clouds' settings (the panel's coverage, altitude, speed and shadow), the coverage
  * `more` than the meadow's (0.45 there by default, 0.75 here); their base over the ground under them, the ground
- * taken as the highest of the hills within `reach` m (a raster of `cells` a cube face's side), so a cloud clears the
- * slopes round it as it drifts over the hills.
+ * taken as the highest of the hills within `reach` m (a raster of `cells` a cube face's side), eased over `ease` m, so
+ * a cloud clears the slopes round it as it drifts over the hills.
  */
-const CLOUDS = { more: 0.3, reach: 12, cells: 96 } as const;
+const CLOUDS = { more: 0.3, reach: 12, ease: 8, cells: 96 } as const;
+/**
+ * Their form (Kai, 2026-11-02: "full, fat cumulus" to the paintings' "meandering, thinner clouds"): ribbons, thin bands
+ * along the wind, winding across it, each at its own height over the ground under it (life/clouds.ts CloudForm),
+ * painted as the paintings paint their mist, flat sheets with feathered edges (mist.frag.glsl); their lobes, flat, cast
+ * their shadows. (Drawn as lobes they read as a lumpy tube: Kai, "that cloud looks like poop".)
+ */
+const CLOUD_FORM: CloudForm = { flat: 0.24, sep: 0.24, spacing: 0.45, meander: [1.6, 55] };
 
 /** Kai's models, made light by scripts/terraces-models.mjs (a unit tall, two levels of detail each). */
 const MODEL_URLS = (kind: 'mountain' | 'house'): string[] => [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/${kind}${k}.glb`, import.meta.url).href);
@@ -114,6 +123,8 @@ export class TerraceWorld implements PlanetWorld {
   private placedModels: Float32Array | null = null;
   readonly cloudUniforms = createCloudUniforms();
   readonly clouds: Clouds;
+  /** The clouds' bands, drawn as mist. */
+  readonly mist: Mesh<BufferGeometry, ShaderMaterial>;
   /** The ground under the clouds (m): per cube face cell, the highest of the hills within CLOUDS.reach. */
   private cloudFloor = new Float32Array(0);
   private cloudFloorFor = -1;
@@ -162,8 +173,27 @@ export class TerraceWorld implements PlanetWorld {
     this.objects = new TerraceBuild(this.shared);
     this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 32, 140);
     this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
-    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, 16, tier.maps.cloudWindow, false);
-    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.clouds.mesh);
+    this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, 16, tier.maps.cloudWindow, false, CLOUD_FORM);
+    this.mist = new Mesh(
+      this.clouds.bands as BufferGeometry,
+      new ShaderMaterial({
+        name: 'mist',
+        vertexShader: mistVertex,
+        fragmentShader: mistFragment,
+        uniforms: { ...this.shared },
+        side: DoubleSide,
+        transparent: true,
+        depthWrite: false,
+        blending: CustomBlending,
+        blendSrc: OneFactor,
+        blendDst: OneMinusSrcAlphaFactor,
+        blendSrcAlpha: OneFactor,
+        blendDstAlpha: OneMinusSrcAlphaFactor,
+      }),
+    );
+    this.mist.frustumCulled = false;
+    this.mist.renderOrder = 3;
+    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
     if (only !== null) {
@@ -189,8 +219,9 @@ export class TerraceWorld implements PlanetWorld {
         }
       }
     }
-    // (the highest within reach: a cell is about πR/2N m across)
-    const r = Math.max(1, Math.ceil(CLOUDS.reach / ((Math.PI * f.R) / (2 * N))));
+    // (the highest within reach and the ease: a cell is about πR/2N m across; eased below, the mean of the highest
+    // within reach + ease over the ease stays over the highest within reach, so a band clears all the ground under it)
+    const r = Math.max(1, Math.ceil((CLOUDS.reach + CLOUDS.ease) / ((Math.PI * f.R) / (2 * N))));
     const out = new Float32Array(6 * N * N);
     for (let face = 0; face < 6; face++) {
       for (let j = 0; j < N; j++) {
@@ -201,7 +232,25 @@ export class TerraceWorld implements PlanetWorld {
         }
       }
     }
-    this.cloudFloor = out;
+    // (eased: a band's lobes each stand over the ground under them, so it rises over a hill smoothly, not in steps)
+    const e = Math.max(1, Math.round(CLOUDS.ease / ((Math.PI * f.R) / (2 * N))));
+    const eased = new Float32Array(6 * N * N);
+    for (let face = 0; face < 6; face++) {
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          let sum = 0;
+          let n = 0;
+          for (let b = Math.max(0, j - e); b <= Math.min(N - 1, j + e); b++) {
+            for (let a = Math.max(0, i - e); a <= Math.min(N - 1, i + e); a++) {
+              sum += out[(face * N + b) * N + a];
+              n++;
+            }
+          }
+          eased[(face * N + j) * N + i] = sum / n;
+        }
+      }
+    }
+    this.cloudFloor = eased;
     this.cloudFloorFor = this.noiseSeed;
   }
 

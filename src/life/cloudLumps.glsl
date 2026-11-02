@@ -6,8 +6,12 @@
 uniform float uTime;
 uniform samplerCube uCloudLumps;
 
-/** How far lumps push a puff's outline in and out (× its radius). */
+/** How far lumps push a puff's outline in and out (× its radius): a ribbon's (CLOUD_FLAT) smoother. */
+#ifdef CLOUD_FLAT
+const float CLOUD_LUMPS = 0.06;
+#else
 const float CLOUD_LUMPS = 0.16;
+#endif
 
 // Lumps over a puff, by the direction from its centre: roughly -1 in a
 // crease … +1.5 on a bulge, 0 on average.

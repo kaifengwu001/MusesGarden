@@ -9,6 +9,9 @@ flat varying float vRadius;
 flat varying uint vSeed;
 flat varying vec3 vSideA;
 flat varying vec3 vSideB;
+#ifdef CLOUD_FLAT
+flat varying float vChord;
+#endif
 
 void main() {
   float q = length(vOff);
@@ -23,4 +26,7 @@ void main() {
   if (cover <= 0.0) discard;
   float inner = min(q, rl - 0.75 * aa);
   gl_FragColor = vec4(2.0 * vRadius * sqrt(max(rl * rl - inner * inner, 0.0)) * cover, 0.0, 0.0, 1.0);
+#ifdef CLOUD_FLAT
+  gl_FragColor.r *= vChord;
+#endif
 }
