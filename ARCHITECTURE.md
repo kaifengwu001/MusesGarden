@@ -833,8 +833,13 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   radius), thinning above by e every falloff meters; its amount along each
   view ray its exact integral from the camera's height to the point's, the
   sky's haze in colour; over the terraces, trees, towers, houses, rice and
-  mist (not the sky, which is shared). The mist's height and density are
-  the panel's Cloud height and Cloud density.
+  mist (not the sky, which is shared). Its density varies across the
+  globe by two octaves of noise (the panel's Fog patchiness and patch
+  size), taken along each ray as it is at the point and half way to it.
+  The mist's height, density and twist are the panel's Cloud height,
+  density and twist; the twist turns the strokes' way off the wind's by a
+  broad pattern over the globe (220 m and 85 m), so they leave their
+  latitude lines.
 - The paddies' water (terrace.frag.glsl, rice.glsl `paddyWater`): each
   floor shows as much water as its look says (all flooded, 45 % just
   planted, 20 % growing, 6 % grown, none deep), mirroring the sky a little
