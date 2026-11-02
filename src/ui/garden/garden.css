@@ -1821,7 +1821,7 @@ body.garden-on .hud {
   position: relative;
   min-height: 0;
   container-type: size;
-  --deck-w: min(780px, 100cqw - 190px, (100cqh - 40px) * 1.5);
+  --deck-w: min(780px, 100cqw - 190px, (100cqh - 40px) / 0.8);
 }
 
 .g-mail-stage {
@@ -1870,15 +1870,17 @@ body.garden-on .hud {
   color: var(--ink-soft);
 }
 
-/* a postcard: card stock, a white border round the photo, a soft shadow with a lift at one corner */
+/* a postcard: a polaroid, the whole photo in an even edge with a deep strip under it, a soft shadow with a lift at
+   one corner; --pc-h is its height over its width */
 .g-pc {
   --w: var(--deck-w);
+  --pc-h: 0.8;
   position: absolute;
   left: 50%;
   top: 50%;
   width: var(--w);
-  aspect-ratio: 3 / 2;
-  margin: calc(var(--w) / -3) 0 0 calc(var(--w) / -2);
+  aspect-ratio: 1 / var(--pc-h);
+  margin: calc(var(--w) * var(--pc-h) / -2) 0 0 calc(var(--w) / -2);
   perspective: 1600px;
   transform: translate(var(--x, 0px), var(--y, 0px)) rotate(var(--r, 0deg)) scale(var(--s, 1));
   transition:
@@ -1950,10 +1952,11 @@ body.garden-on .hud {
     0 28px 60px -20px rgba(20, 24, 30, 0.3);
 }
 
+/* the polaroid: an edge 4.2% of its width at the sides, 5% at the top; the photo 3:2; the strip takes the rest */
 .g-pc-front {
-  padding: 3.2%;
+  padding: 5% 4.2% 0;
   box-sizing: border-box;
-  background: var(--grain), linear-gradient(160deg, #fffdf6, #f3ecdb);
+  background: var(--grain), linear-gradient(170deg, var(--snap-top, #fdfaf1), var(--snap-low, #f1eadb));
 }
 
 .g-pc-front::after {
@@ -1967,10 +1970,26 @@ body.garden-on .hud {
 .g-pc-photo {
   display: block;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
-  border-radius: 1px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
+}
+
+/* written in the strip, in pen */
+.g-pc-caption {
+  height: calc(var(--w) * (var(--pc-h) - 0.05 - 0.916 * 2 / 3));
+  margin: 0;
+  padding: 0 4%;
+  overflow: hidden;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: calc(var(--w) * 0.052);
+  line-height: calc(var(--w) * (var(--pc-h) - 0.05 - 0.916 * 2 / 3));
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #353541;
+  transform: rotate(-0.8deg);
 }
 
 .g-pc-back {
@@ -2101,6 +2120,7 @@ body.garden-on .hud {
 
 /* an invitation: an envelope with a wax seal; its ticket slides out when it opens */
 .g-env {
+  --pc-h: 0.6667;
   perspective: 1400px;
 }
 
@@ -2260,12 +2280,12 @@ body.garden-on .hud {
   opacity: 0;
 }
 
-/* the heart and the star beside the top card, level with its photo's top edge (the top card: 10px up, its
-   photo inset 3.2% of its width); each one's word shows to its right on hover */
+/* the heart and the star beside the top card, level with its photo's top edge (the top card: 10px up, 0.8 of its
+   width tall, its photo 5% of its width down); each one's word shows to its right on hover */
 .g-mail-side {
   position: absolute;
   left: calc(50% + var(--deck-w) / 2 + 26px);
-  top: calc(50% - var(--deck-w) / 3 - 10px + var(--deck-w) * 0.032);
+  top: calc(50% - var(--deck-w) * 0.4 - 10px + var(--deck-w) * 0.05);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2357,7 +2377,8 @@ body.garden-on .hud {
   transform: translate(0, -50%);
 }
 
-/* the pages, Favorite and Album: every card held at its corners */
+/* the pages, Favorite and Album: a scrapbook's, dotted paper with each card a polaroid taped or clipped on,
+   some with a scribbled frame or a sticker; each card's trimmings are sized by its width (cqw) */
 .g-album {
   position: absolute;
   left: 50%;
@@ -2366,7 +2387,10 @@ body.garden-on .hud {
   width: min(980px, calc(100% - 2 * var(--gutter)));
   overflow-y: auto;
   border-radius: 10px;
-  background: var(--grain), linear-gradient(170deg, #f4ecda, #ebdfc4);
+  background:
+    var(--grain),
+    radial-gradient(circle, rgba(62, 58, 54, 0.13) 1px, transparent 1.5px) 11px 11px / 22px 22px,
+    linear-gradient(170deg, #f7f1e3, #eee3cb);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(62, 58, 54, 0.08);
   opacity: 0;
   transform: translate(-50%, 16px);
@@ -2384,84 +2408,75 @@ body.garden-on .hud {
 
 .g-album-page {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 34px 26px;
-  padding: 36px 34px 44px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 54px 40px;
+  padding: 56px 46px 64px;
 }
 
 .g-album-slot {
   appearance: none;
   position: relative;
-  aspect-ratio: 3 / 2;
+  display: block;
   padding: 0;
   border: 0;
-  background: #fffdf6;
-  box-shadow: 0 6px 14px rgba(40, 30, 20, 0.2);
+  background: none;
+  container-type: inline-size;
   transform: rotate(var(--r));
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 
-.g-album-slot:hover {
+.g-album-slot:hover,
+.g-album-slot:focus-visible {
+  z-index: 1;
   transform: rotate(0deg) scale(1.04);
 }
 
-.g-album-slot img {
-  position: absolute;
-  inset: 5px;
-  width: calc(100% - 10px);
-  height: calc(100% - 10px);
+.g-album-slot:focus-visible {
+  outline: none;
+}
+
+.g-album-slot:focus-visible .g-snap {
+  outline: 2px solid #2e6e9e;
+  outline-offset: 3px;
+}
+
+/* the polaroid: the deck's card in small, the same edges */
+.g-snap {
+  position: relative;
+  display: block;
+  padding: 5% 4.2% 0;
+  background: var(--grain), linear-gradient(170deg, var(--snap-top, #fdfaf1), var(--snap-low, #f1eadb));
+  box-shadow:
+    0 1px 1px rgba(40, 30, 20, 0.12),
+    0 7px 16px -4px rgba(40, 30, 20, 0.28);
+}
+
+.g-snap img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
-}
-
-.g-corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  background: linear-gradient(to bottom right, #3f3a33 50%, transparent 50%);
-  opacity: 0.86;
-}
-
-.g-corner-tl {
-  left: -4px;
-  top: -4px;
-}
-
-.g-corner-tr {
-  right: -4px;
-  top: -4px;
-  transform: rotate(90deg);
-}
-
-.g-corner-br {
-  right: -4px;
-  bottom: -4px;
-  transform: rotate(180deg);
-}
-
-.g-corner-bl {
-  left: -4px;
-  bottom: -4px;
-  transform: rotate(270deg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
 }
 
 .g-album-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 9px);
   display: flex;
   justify-content: center;
+  align-items: center;
+  height: 13.9cqw;
+  padding: 0 3cqw;
   white-space: nowrap;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
-  text-align: center;
-  color: var(--ink);
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 7cqw;
+  color: #353541;
 }
 
+/* (room under the line for the pen's tails, which overflow would clip) */
 .g-album-place {
   min-width: 0;
+  padding: 0.1em 0 0.2em;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2469,16 +2484,158 @@ body.garden-on .hud {
 .g-album-heart {
   flex: none;
   margin-left: 0.3em;
-  font-style: normal;
   color: #e8708f;
+}
+
+/* washi tape: see-through, torn at both ends */
+.g-tape {
+  position: absolute;
+  z-index: 2;
+  width: 38cqw;
+  height: 10.5cqw;
+  background: var(--tape);
+  opacity: 0.84;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  clip-path: polygon(0% 7%, 3% 0%, 97% 0%, 100% 10%, 98% 22%, 100% 36%, 97.5% 50%, 100% 64%, 98% 78%, 100% 92%, 97% 100%, 3% 100%, 0% 90%, 2.2% 76%, 0% 62%, 2.5% 48%, 0% 34%, 2% 20%);
+}
+
+.g-tape-stripes {
+  background: repeating-linear-gradient(-45deg, var(--tape) 0 2.2cqw, var(--tape-2) 2.2cqw 4.4cqw);
+}
+
+.g-tape-dots {
+  background:
+    radial-gradient(circle, var(--tape-2) 0.8cqw, transparent 1cqw) 0 0 / 3.8cqw 3.8cqw,
+    var(--tape);
+}
+
+.g-tape-gingham {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 50%, transparent 0) 0 0 / 4.2cqw 4.2cqw,
+    linear-gradient(rgba(255, 255, 255, 0.5) 50%, transparent 0) 0 0 / 4.2cqw 4.2cqw,
+    var(--tape);
+}
+
+.g-tape-top {
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -55%) rotate(var(--turn));
+}
+
+.g-tape-tl {
+  left: 4cqw;
+  top: 4cqw;
+  transform: translate(-50%, -50%) rotate(calc(-42deg + var(--turn)));
+}
+
+.g-tape-tr {
+  right: 4cqw;
+  top: 4cqw;
+  transform: translate(50%, -50%) rotate(calc(42deg + var(--turn)));
+}
+
+.g-tape-bl {
+  left: 4cqw;
+  bottom: 4cqw;
+  transform: translate(-50%, 50%) rotate(calc(42deg + var(--turn)));
+}
+
+.g-tape-br {
+  right: 4cqw;
+  bottom: 4cqw;
+  transform: translate(50%, 50%) rotate(calc(-42deg + var(--turn)));
+}
+
+/* a clip on the top edge: a binder clip's body over it (36 of its 56 down), a paper clip's lower half (26 of 60) */
+.g-clip {
+  position: absolute;
+  z-index: 3;
+  left: var(--at);
+  top: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 1.5px 1.2px rgba(30, 20, 10, 0.32));
+}
+
+.g-clip svg,
+.g-sticker svg,
+.g-scribble svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* (a crayon line's edge may run a hair past its drawing) */
+.g-scribble svg {
+  overflow: visible;
+}
+
+.g-clip-binder {
+  width: 22cqw;
+  height: calc(22cqw * 56 / 60);
+  transform: translate(-50%, -64.3%) rotate(var(--turn));
+  transform-origin: 50% 64.3%;
+}
+
+.g-clip-paper {
+  width: 7.5cqw;
+  height: 22.5cqw;
+  transform: translate(-50%, -43.3%) rotate(var(--turn));
+  transform-origin: 50% 43.3%;
+}
+
+/* a frame scribbled round the polaroid; its drawing reaches 9 past each edge of a 100 by 80 polaroid */
+.g-scribble {
+  position: absolute;
+  z-index: 1;
+  left: -9%;
+  top: -11.25%;
+  width: 118%;
+  height: 122.5%;
+  pointer-events: none;
+}
+
+/* a sticker on a corner: die-cut ones with a white edge and a shadow, doodles straight on in ink */
+.g-sticker {
+  position: absolute;
+  z-index: 4;
+  width: 21cqw;
+  height: 21cqw;
+  pointer-events: none;
+  transform: rotate(var(--turn));
+}
+
+.g-sticker.is-cut {
+  filter: drop-shadow(1.3px 0 0 #fff) drop-shadow(-1.3px 0 0 #fff) drop-shadow(0 1.3px 0 #fff) drop-shadow(0 -1.3px 0 #fff)
+    drop-shadow(0 2px 2px rgba(40, 30, 20, 0.28));
+}
+
+.g-sticker-tl {
+  left: -7cqw;
+  top: -7cqw;
+}
+
+.g-sticker-tr {
+  right: -7cqw;
+  top: -7cqw;
+}
+
+.g-sticker-bl {
+  left: -10cqw;
+  bottom: -8cqw;
+}
+
+.g-sticker-br {
+  right: -10cqw;
+  bottom: -8cqw;
 }
 
 .g-album-empty {
   margin: 0;
   padding: 54px 30px;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 17px;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: 24px;
   text-align: center;
   color: var(--ink-soft);
 }
@@ -2870,15 +3027,17 @@ button.g-ticket:focus-visible .g-ticket-go {
     overflow-y: hidden;
     --tw: 206px;
   }
+  /* its own row, so with no tickets it doesn't fall into theirs, which is as tall as nothing */
   .g-mail-desk {
-    --deck-w: min(780px, 100cqw - 24px, (100cqh - 110px) * 1.5);
+    grid-row: 3;
+    --deck-w: min(780px, 100cqw - 24px, (100cqh - 110px) / 0.8);
   }
   .g-pc {
     top: 42%;
   }
   .g-mail-side {
     left: 50%;
-    top: calc(42% - 10px + var(--deck-w) / 3 + 20px);
+    top: calc(42% - 10px + var(--deck-w) * 0.4 + 20px);
     flex-direction: row;
     gap: 22px;
     transform: translateX(-50%);
@@ -2892,8 +3051,8 @@ button.g-ticket:focus-visible .g-ticket-go {
   }
   .g-album-page {
     grid-template-columns: repeat(2, 1fr);
-    gap: 26px 16px;
-    padding: 24px 18px 36px;
+    gap: 40px 24px;
+    padding: 36px 24px 46px;
   }
   .g-visit {
     flex-wrap: wrap;

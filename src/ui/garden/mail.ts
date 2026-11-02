@@ -4,6 +4,7 @@ import type { Postcard } from '../../garden/types';
 import { button, dayName, el, reducedMotion, shortDate, wait } from './dom';
 import { ICONS } from './icons';
 import type { PostBox } from './postbox';
+import { paperOf, scrapOf, trimmings } from './scrapbook';
 
 // The post: what comes out of the post box. Its door drops and today's cards
 // fly out of its mouth into a deck, the newest on top. Swipe the top card
@@ -12,7 +13,9 @@ import type { PostBox } from './postbox';
 // postmark, a mitten print for a signature). Beside it, a heart to like it and
 // a star to keep it among your favorites. Up top, a switch: From today,
 // Favorite (the starred cards) and Album (every card Muse has sent), the last
-// two laid out on a page, each card held at its corners. Under the switch,
+// two laid out on a scrapbook page, each card taped or clipped there, some
+// with a scribbled frame or a sticker. Every card is a polaroid: the whole
+// photo, and its place and day written in the strip under it. Under the switch,
 // every invitation not yet used waits as a ticket in its host's colours, with
 // its host's name and planet on it; tap one to travel. An invitation in
 // today's post comes sealed in an envelope: tap it and its ticket slides out
@@ -121,18 +124,23 @@ function postmark(day: string): string {
   return `<svg viewBox="0 0 120 64" aria-hidden="true"><defs><path id="pm" d="M32 32 m-22 0 a22 22 0 1 1 44 0 a22 22 0 1 1 -44 0"/></defs><circle cx="32" cy="32" r="26" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="32" cy="32" r="16" fill="none" stroke="currentColor" stroke-width="1"/><text font-family="ui-sans-serif, system-ui" font-size="6.4" letter-spacing="1.1" fill="currentColor"><textPath href="#pm">${text}</textPath></text><text x="32" y="35" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-size="9" font-style="italic" fill="currentColor">${shortDate(day)}</text>${[0, 1, 2, 3].map((k) => `<path d="M62 ${18 + k * 9} q7 -5 14 0 t14 0 t14 0 t14 0" fill="none" stroke="currentColor" stroke-width="1.4"/>`).join('')}</svg>`;
 }
 
-/** A postcard as a thing you hold: its photo on the front; on the back the place and day, a stamp, a postmark. */
+/** Where and when, as written in a polaroid's strip: 'On Wren’s planet · 2 Nov'. */
+const written = (card: Postcard): string => `${card.place}\u00a0·\u00a0${shortDate(card.day)}`;
+
+/** A postcard as a thing you hold: on the front a polaroid, its photo whole and its place and day written under it;
+ *  on the back the place and day again, a stamp, a postmark. */
 function postcard(card: Postcard, withName: string | null): HTMLElement {
   const root = el('div', 'g-pc');
   root.dataset.id = card.id;
   const inner = el('div', 'g-pc-inner');
   const front = el('div', 'g-pc-front');
+  front.style.cssText = paperOf(scrapOf(card.id).tint);
   const photo = el('img', 'g-pc-photo');
   photo.src = card.image;
   photo.alt = card.place;
   photo.draggable = false;
   photo.decoding = 'async';
-  front.append(photo);
+  front.append(photo, el('p', 'g-pc-caption', written(card)));
   const back = el('div', 'g-pc-back');
   const left = el('div', 'g-pc-left');
   left.append(el('p', 'g-pc-place', card.place), el('p', 'g-pc-day', dayName(card.day)));
@@ -627,26 +635,30 @@ export class Mail {
     this.paintBoard(true);
   }
 
-  /** The page: each card held at its corners, its place and day under it, a heart after a liked one's. */
+  /** The page, a scrapbook's: each card a polaroid taped or clipped there, its place and day written under its
+   *  photo, a heart after a liked one's; some with a scribbled frame or a sticker. */
   private paintBoard(fromTop: boolean): void {
     const cards = this.boardCards();
     const page = el('div', 'g-album-page');
     cards.forEach((card, k) => {
+      const scrap = scrapOf(card.id);
       const slotEl = el('button', 'g-album-slot');
       slotEl.type = 'button';
       slotEl.dataset.id = card.id;
       slotEl.setAttribute('aria-label', `${card.place}, ${shortDate(card.day)}`);
-      slotEl.style.setProperty('--r', `${Math.sin((k + 2) * 51.3) * 2.2}deg`);
+      slotEl.style.setProperty('--r', `${scrap.tilt.toFixed(2)}deg`);
+      const snap = el('span', 'g-snap');
+      snap.style.cssText = paperOf(scrap.tint);
       const img = el('img');
       img.src = card.image;
       img.alt = card.place;
       img.draggable = false;
-      slotEl.append(img, el('span', 'g-corner g-corner-tl'), el('span', 'g-corner g-corner-tr'), el('span', 'g-corner g-corner-bl'), el('span', 'g-corner g-corner-br'));
       const label = el('span', 'g-album-label');
       // (a flex row trims its text's edge spaces: these hold)
       label.append(el('span', 'g-album-place', card.place), `\u00a0·\u00a0${shortDate(card.day)}`);
       if (this.state.cardLiked(card.id)) label.append(el('span', 'g-album-heart', '♥'));
-      slotEl.append(label);
+      snap.append(img, label);
+      slotEl.append(snap, ...trimmings(scrap, String(k)));
       slotEl.addEventListener('click', () => {
         this.board = false;
         this.el.classList.remove('is-board');

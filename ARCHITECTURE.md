@@ -803,7 +803,9 @@ so any view can be shared.
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
         garden/            the garden's interface: find cards over their beds, the rail (Muse, find Muse, cottage,
                            baskets), the post box (the hand-drawn mailbox in SVG, postboxIllustration.ts), the post
-                           (mail.ts: today's deck, the heart and star, the Favorite and Album pages, the tickets),
+                           (mail.ts: today's deck of polaroids, the heart and star, the Favorite and Album pages,
+                           the tickets; scrapbook.ts dresses each card on those pages from its id: the frame's tint,
+                           washi tape or a clip, sometimes a crayon scribble or a sticker),
                            Muse's page, the visit stand-in, and the basket: its phases as one pure step
                            (basketMachine.ts; gardenUi.ts carries out its effects), the rail icon's hand-drawn
                            basket, flat, as two layers of the one picture split along its near rim
