@@ -3,6 +3,7 @@ import { Bands } from '../../terraces/build/bands';
 import { BUILD, buildTerraces, PART } from '../../terraces/build/construct';
 import { FIELD, PlanetField, type Plains } from '../../terraces/build/field';
 import { SphereGrid, type Field } from '../../terraces/build/sphere';
+import { makeStrokes } from '../../terraces/mistStrokes';
 
 // The terraces' planet is mathematics (build/field.ts) and its terraces the
 // paddy lab's construction on it (build/): the field's gradient is its own
@@ -162,5 +163,43 @@ describe("the terraces' mathematics", () => {
         expect(Math.abs(r - 50)).toBeLessThan(FIELD.relief + 2);
       }
     }
+  });
+});
+
+// The terraces' mist is strokes (terraces/mistStrokes.ts): the same strokes for a seed, the ones shown at a smaller
+// coverage the first of those at a larger, none where the layer never clears the ground, and every segment on the
+// sphere with a breadth of its own, broad bodies and thin necks both.
+describe("the terraces' mist strokes", () => {
+  const P = { strokes: 24, half: 2.4, length: [30, 80] as const, wavelength: [24, 40] as const, sinuosity: [0.35, 1.4] as const, curl: 0.4, branch: 0.35, stack: 0.3, lobe: 2.8, steer: 0.04 };
+  const axis: [number, number, number] = [0.9, 0, -0.44];
+  const open = (): number => 5;
+  it('makes the same strokes for a seed, the fewer shown the first of the more', () => {
+    const a = makeStrokes(P, 7, 128, axis, open, 1);
+    const b = makeStrokes(P, 7, 128, axis, open, 1);
+    const c = makeStrokes(P, 7, 128, axis, open, 0.5);
+    expect(a.count).toBeGreaterThan(0);
+    expect(Array.from(b.data)).toEqual(Array.from(a.data));
+    expect(c.count).toBeLessThan(a.count);
+    expect(Array.from(c.data)).toEqual(Array.from(a.data.subarray(0, c.data.length)));
+  });
+  it('keeps no stroke where its layer never clears the ground', () => {
+    expect(makeStrokes(P, 7, 128, axis, () => -1, 1).count).toBe(0);
+  });
+  it('lays every segment on the sphere, its breadth swelling and pinching', () => {
+    const s = makeStrokes(P, 11, 128, axis, open, 1);
+    let thin = 0;
+    let broad = 0;
+    for (let i = 0; i < s.count; i++) {
+      const o = 8 * i;
+      for (const k of [0, 3]) expect(Math.abs(Math.hypot(s.data[o + k], s.data[o + k + 1], s.data[o + k + 2]) - 1)).toBeLessThan(1e-5);
+      // (a step's length on the planet: half a meter, give or take a scallop's shift)
+      const step = 128 * Math.hypot(s.data[o + 3] - s.data[o], s.data[o + 4] - s.data[o + 1], s.data[o + 5] - s.data[o + 2]);
+      expect(step).toBeLessThan(1.2);
+      expect(s.data[o + 6]).toBeGreaterThanOrEqual(0);
+      if (s.data[o + 6] < 0.5 * P.half) thin++;
+      if (s.data[o + 6] > 1.25 * P.half) broad++;
+    }
+    expect(thin).toBeGreaterThan(0.05 * s.count);
+    expect(broad).toBeGreaterThan(0.05 * s.count);
   });
 });

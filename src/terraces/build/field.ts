@@ -175,6 +175,19 @@ export class PlanetField {
     return h;
   }
 
+  /** The hills' height (m) from their octaves `scale` m and broader only: the land's broad form under its hills (the mist lies over it). */
+  smooth(x: number, y: number, z: number, scale: number): number {
+    const R = this.R;
+    let h = 0;
+    for (let o = 0; o < this.amp.length; o++) {
+      if (1 / this.freq[o] < scale) continue;
+      const f = this.freq[o] * R;
+      const s = this.shift[o];
+      h += this.amp[o] * gnoise(x * f + s, y * f - s, z * f + s, (this.p.seed + SEED.hills + o) >>> 0);
+    }
+    return h;
+  }
+
   /** The slow wander every level shares (m: subtracted from the height); with `out`, its gradient. */
   private offsetAt(x: number, y: number, z: number, out?: Float64Array): number {
     const f = this.R / this.p.offsetScale;
