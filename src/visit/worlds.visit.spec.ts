@@ -18,6 +18,7 @@ const WORLDS: readonly { readonly planet: PlanetId; readonly host: string; reado
   { planet: 'lantern-reed-gardens', host: 'lark', name: 'Lark', seed: 5512 },
   { planet: 'scarlet-sail-canyon', host: 'clover', name: 'Clover', seed: 3157 },
   { planet: 'cobalt-windfields', host: 'moss', name: 'Moss', seed: 2389 },
+  { planet: 'tulip-windmill-meadows', host: 'sorrel', name: 'Sorrel', seed: 8846 },
 ];
 
 interface VisitState {
