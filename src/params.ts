@@ -143,7 +143,7 @@ export const schema = {
     // back by e every falloff past it). Kai's settings, 2026-11-02 (the density's slider up to 3, Kai's 2 its top)
     fogDensity: num('tfd', 'Fog density', 2, 0, 3, 0.01, 'live'),
     fogRange: num('tfr', 'Fog range', 0.5, -24, 12, 0.5, 'live', { unit: 'm' }),
-    fogFalloff: num('tff', 'Fog falloff', 9.5, 0.5, 30, 0.5, 'live', { unit: 'm' }),
+    fogFalloff: num('tff', 'Fog falloff', 7, 0.5, 30, 0.5, 'live', { unit: 'm' }),
     fogPatchiness: num('tfp', 'Fog patchiness', 1, 0, 1, 0.01, 'live'),
     fogPatchSize: num('tfs', 'Fog patch size', 50, 10, 300, 1, 'live', { unit: 'm' }),
     fogTint: num('tft', 'Fog tint', 0.22, 0, 1, 0.01, 'live'),
@@ -151,9 +151,9 @@ export const schema = {
     fogPeakReduction: num('tmr', 'Fog reduced off peaks', 1, 0, 1, 0.01, 'live'),
     fogPeakRange: num('tmg', 'Fog peak range', 82, 0, 200, 1, 'live', { unit: 'm' }),
     fogPeakFalloff: num('tmf', 'Fog peak falloff', 3, 1, 100, 1, 'live', { unit: 'm' }),
-    fogNearReduction: num('tnr', 'Fog reduced near camera', 0.96, 0, 1, 0.01, 'live'),
-    fogNearRange: num('tng', 'Fog near range', 60, 0, 400, 1, 'live', { unit: 'm' }),
-    fogNearFalloff: num('tnf', 'Fog near falloff', 77, 1, 200, 1, 'live', { unit: 'm' }),
+    fogNearReduction: num('tnr', 'Fog reduced near camera', 0.95, 0, 1, 0.01, 'live'),
+    fogNearRange: num('tng', 'Fog near range', 85, 0, 400, 1, 'live', { unit: 'm' }),
+    fogNearFalloff: num('tnf', 'Fog near falloff', 29, 1, 200, 1, 'live', { unit: 'm' }),
     // the mist (terraces/mist.ts): how many stripes; the sphere they float on (its height over the planet's radius)
     // and how far each is offset up or down from it; how dense they are, how far their way twists off the wind's
     // across the globe (Kai's settings, 2026-11-02)

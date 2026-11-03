@@ -866,9 +866,12 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   the globe (220 m and 85 m), so they leave their latitude lines.
 - The paddies' water (terrace.frag.glsl, rice.glsl `paddyWater`): each
   floor shows as much water as its look says (all flooded, 45 % just
-  planted, 20 % growing, 6 % grown, none deep), mirroring the sky a little
-  paler than its own and the mist over it, a little rippled, over its own
-  shallow grey as the angle lets.
+  planted, 20 % growing, 6 % grown, none deep), mirroring the sky half
+  mixed with its own silver grey (the planet painting's flooded paddies)
+  and the mist over it, a little rippled, over its own shallow grey as the
+  angle lets. The paddies' looks and the trees' colours are graded to the
+  planet painting as it reads on screen (palette.ts); the dams keep the
+  aerial's cream (Kai).
 - No grade but the paper grain: a planet may carry its own final grade
   (`PlanetWorld.grade`, render/post.ts), and the terraces' is the lab's,
   which draws straight to the canvas: no tone curve, bloom, contrast or

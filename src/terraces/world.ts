@@ -114,13 +114,13 @@ export class TerraceWorld implements PlanetWorld {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
-    uHeightFog: { value: new Vector4(0, 0.5, 9.5, 0) },
+    uHeightFog: { value: new Vector4(0, 0.5, 7, 0) },
     uHeightFogPatches: { value: new Vector4(1, 50, 0, 0) },
     uHeightFogEye: { value: new Vector3(0, 1, 0) },
     uHeightFogTint: { value: new Vector2(0.22, 0.26) },
     uHeightFogPeaks: { value: peakMap() },
     uHeightFogPeak: { value: new Vector3(1, 82, 3) },
-    uHeightFogNear: { value: new Vector3(0.96, 60, 77) },
+    uHeightFogNear: { value: new Vector3(0.95, 85, 29) },
   };
   private posed = false;
   private noiseSeed = -1;

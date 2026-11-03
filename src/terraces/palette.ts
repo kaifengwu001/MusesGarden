@@ -20,14 +20,16 @@ export const TROW = {
 } as const;
 
 export const TERRACE_ROWS: Rows = {
-  // the paddies' looks (the lab's LOOKS): flooded (the sky's white, a touch of lilac), flooded and shallow, just
-  // planted (lime), growing, grown, grown deep
-  [TROW.RICE]: ['#F0EDF7', '#D9D6DB', '#8FA842', '#5C7830', '#3D5921', '#2B451A'],
+  // the paddies' looks (the lab's LOOKS, graded to the planet painting, 2026-11-02: as it reads on screen, its
+  // flooded paddies silver grey, its young ones yellow-green, its grown ones greyer and bluer): flooded (the water's
+  // own grey, half of what it mirrors), flooded and shallow, just planted (lime), growing, grown, grown deep
+  [TROW.RICE]: ['#A2A89E', '#BDBCB0', '#919A0F', '#56752D', '#3D563D', '#2D4B2E'],
   // a dam (cream), a riser (olive), earth (the woods' edge, the flats' bunds), a track (packed earth, pale)
   [TROW.EARTH]: ['#CCD1A3', '#788F57', '#5C5C3D', '#CFC6AE'],
-  // the trees: canopy light, mid, shade, deep, rim, trunk, floor, far, olive light (valley: round #3A5538 lit #5C775F,
-  // cypress #223A42); the woods' ground under them (the lab's, two greens a noise mixes)
-  [TROW.FOREST]: ['#5C775F', '#3A5538', '#24402F', '#1A2E2C', '#7E9670', '#3E3A36', '#22392C', '#4C6570', '#74895A', '#4D6138', '#6B6642'],
+  // the trees: canopy light, mid, shade, deep, rim, trunk, floor, far, olive light (graded to the planet painting's
+  // trees, 2026-11-02: a dark teal, lit #617571, mid #3C5455, shade #283B41 as it reads on screen); the woods'
+  // ground under them (the lab's, two greens a noise mixes)
+  [TROW.FOREST]: ['#334D4E', '#112529', '#0D2223', '#081821', '#7E9670', '#3E3A36', '#22392C', '#1F3458', '#415949', '#4D6138', '#6B6642'],
   // the towers' stone: lit, far, pale, deep, lit pale, moss (valley: lit #59718D, far #6881A1; planet: #485B6E, top #384E5E)
   [TROW.PEAK]: ['#59718D', '#6881A1', '#97A7C4', '#384E5E', '#A6B4C8', '#4D6650'],
   // the mist: lit, in shade, deep, warm paper (valley mist #B7BFCF; the cloud sea #94A1B7); the blue-green landscape's

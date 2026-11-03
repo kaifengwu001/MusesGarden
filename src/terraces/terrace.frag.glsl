@@ -76,9 +76,9 @@ void main() {
     vec2 ripple = 0.018 * vec2(gnoise(q / 1.6 + vec3(0.0, 0.0, slow), uTerrainSeed + 951u), gnoise(q / 1.6 + vec3(7.1, 0.0, slow), uTerrainSeed + 952u));
     vec3 wn = normalize(up + ripple.x * t1 + ripple.y * t2);
     vec3 r = reflect(-v, wn);
-    // (the sky it mirrors a little paler than the sky's own, as the lab's flooded white is, but blue enough for the
-    // mist mirrored in it to show white, as flooded terraces mirror their clouds)
-    vec3 sky = mix(mix(pal(ROW_SKY, 1), pal(ROW_SKY, 0), pow(clamp(dot(r, up), 0.0, 1.0), 0.62)), pal(TR_RICE, 0), 0.15) * uShadeTint;
+    // (the sky it mirrors half its own silver grey, as the planet painting's flooded paddies are, the mist mirrored in
+    // it still showing white, as flooded terraces mirror their clouds)
+    vec3 sky = mix(mix(pal(ROW_SKY, 1), pal(ROW_SKY, 0), pow(clamp(dot(r, up), 0.0, 1.0), 0.62)), pal(TR_RICE, 0), 0.5) * uShadeTint;
     vec4 mist = mistReflected(dir * (uRadius + vHeight), r);
     vec3 mirror = sky * (1.0 - mist.a) * 1.08 + mist.rgb * 1.18;
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(v, wn), 0.0), 5.0);
