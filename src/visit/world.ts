@@ -73,4 +73,6 @@ export interface VisitWorld {
   ground(dir: Vector3): { readonly height: number; readonly water: number };
   /** Changes (by identity) whenever the planet's ground does: the beds are laid out again then. */
   shape(): object;
+  /** The two Muses' framing here, where the usual one (visitUi.ts MUSES_VIEW) would be down among what grows: the camera's distance and height (m), and where it looks (m). */
+  readonly musesView?: { readonly distance: number; readonly height: number; readonly aim: number };
 }

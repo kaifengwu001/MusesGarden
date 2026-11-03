@@ -378,7 +378,7 @@ export class VisitUi {
   /** Fly to the two Muses: from in front of the host, the guest at its side. */
   frameMuses(): void {
     const where = this.world.host.where;
-    const framing: Framing = { dir: where.dir.clone(), ground: where.height, ...MUSES_VIEW, from: where.heading.clone() };
+    const framing: Framing = { dir: where.dir.clone(), ground: where.height, ...(this.world.musesView ?? MUSES_VIEW), from: where.heading.clone() };
     this.flight.to(framing, this.world.scene.growth.radius, this.ground);
   }
 
