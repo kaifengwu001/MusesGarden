@@ -38,7 +38,7 @@ On the planet, `museRoam.ts` writes a seeded itinerary of parts. The scripts wri
 
 The lab's stage (`museLab.html#model=tpose6&live=1`) is a separate ~4-minute day on a round lawn (`museLife.ts`). `stage.mjs --list` prints its parts.
 
-The muses in clothes (museMesh.ts `DRESSED`) load in the lab as `model=muse0` … `muse12`, so `poses.mjs` and `stage.mjs` take them as their model (`node poses.mjs <out> '[["idle",2,"persp:30"]]' muse5`). `look=kind` colours their fur cream, cloth blue and face pink: check it whenever a muse's fur or clothes look wrong. Their hats reach above the lab's one-muse frame: use a `persp:` or `cam:` view.
+The muses in clothes (museMesh.ts `DRESSED`) load in the lab as `model=muse0` … `muse12`, so `poses.mjs` and `stage.mjs` take them as their model (`node poses.mjs <out> '[["idle",2,"persp:30"]]' muse5`). `look=kind` colours their fur cream, cloth blue and face pink: check it whenever a muse's fur or clothes look wrong. Their hats reach above the lab's one-muse frame: use a `persp:` or `cam:` view. On the meadow the Body parameter takes them too (`mm=muse5`, drawn as in the lab by `src/life/museDress.ts`): `EXTRA="&mm=muse5" node meadow.mjs <out> '[["bench",3]]'`.
 
 ## What to check, and how
 

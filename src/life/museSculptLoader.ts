@@ -90,6 +90,27 @@ export async function loadSculpt(kind: SculptKind | DressedKind = 'sculpt'): Pro
   return { body, grade: map && !dressed ? gradeFor(map) : new Vector3(1, 1, 1), raw, paint: map };
 }
 
+/** Each sculpt as loaded and rigged once for the page. */
+const loaded = new Map<SculptKind | DressedKind, Promise<Loaded>>();
+
+/**
+ * A sculpt, loaded and rigged the first time any Muse asks for it: the Muses
+ * that wear the same body share it (its arrays read only, its paint) and each
+ * poses it on a skeleton of its own. One that could not be loaded is tried
+ * again the next time it is asked for.
+ */
+export function sculptFor(kind: SculptKind | DressedKind): Promise<Loaded> {
+  let job = loaded.get(kind);
+  if (!job) {
+    job = loadSculpt(kind).catch((error: unknown) => {
+      loaded.delete(kind);
+      throw error;
+    });
+    loaded.set(kind, job);
+  }
+  return job;
+}
+
 /** A texture's image drawn at most `size` square, read back. */
 function pixels(map: Texture, size: number): ImageData {
   const image = map.image as CanvasImageSource & { width: number; height: number };

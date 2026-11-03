@@ -26,8 +26,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { smoothstep } from '../core/math';
 import { FUR_LENGTH, MUSE_HEIGHT, SHELLS } from '../life/muse';
 import { JOINT } from '../life/museBody';
+import { dressMuse, fitOf } from '../life/museDress';
 import { Answers } from '../life/museLife';
-import { DRESSED, SCULPTS, type DressedKind, type MuseMesh, type SculptKind } from '../life/museMesh';
+import { DRESSED, type DressedKind, type MuseMesh, type SculptKind } from '../life/museMesh';
 import { BOUNCE_LENGTH, FLUFF_LENGTH, MuseRig, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
 import { loadSculpt } from '../life/museSculptLoader';
 import fragmentShader from '../life/muse.frag.glsl?raw';
@@ -157,8 +158,7 @@ interface Standing {
 
 /** A muse's body as a mesh in Muse's shaders (as the lab draws one), at its place: its paint graded (the original's to the reference's cream). */
 function standing(kind: SculptKind | DressedKind, body: MuseMesh, paint: Texture | null, grade: Vector3, at: { x: number; z: number }, seed: number, sun: Vector3): Standing {
-  const fit = body.fit ?? (kind in DRESSED ? DRESSED[kind as DressedKind].fit : SCULPTS[kind as SculptKind].fit);
-  const rig = new MuseRig(fit);
+  const rig = new MuseRig(fitOf(kind, body));
   const g = new InstancedBufferGeometry();
   g.setIndex(new BufferAttribute(body.index, 1));
   g.setAttribute('position', new BufferAttribute(body.position, 3));
@@ -184,12 +184,6 @@ function standing(kind: SculptKind | DressedKind, body: MuseMesh, paint: Texture
     g.setAttribute('aComb', new BufferAttribute(body.comb, 3));
     defines.MUSE_COMB = 1;
   }
-  if (body.cloth && body.uv && paint) {
-    g.setAttribute('aCloth', new BufferAttribute(body.cloth, 1));
-    g.setAttribute('uv', new BufferAttribute(body.uv, 2));
-    defines.MUSE_PAINTED = 1;
-  }
-  if (body.features) defines.MUSE_FEATURES = 1;
   // (the lab's looks: K colours fur, cloth and face, as museLab.ts does)
   const n = body.position.length / 3;
   const kinds = new Float32Array(n * 3);
@@ -200,7 +194,6 @@ function standing(kind: SculptKind | DressedKind, body: MuseMesh, paint: Texture
   }
   g.setAttribute('aWeightColour', new BufferAttribute(kinds, 3));
   g.instanceCount = SHELLS + 1;
-  const f = body.features;
   const uniforms: Record<string, IUniform> = {
     uBones: { value: rig.skin },
     uBoneDQ: { value: rig.dual },
@@ -223,20 +216,17 @@ function standing(kind: SculptKind | DressedKind, body: MuseMesh, paint: Texture
     uWarpK: { value: 0 },
     uTime: { value: 0 },
     uRadius: { value: 128 },
-    uMusePaint: { value: paint },
-    uMuseEyeAt: { value: new Vector3(...(f?.eye ?? [0, 0, 0])) },
-    uMuseMouthAt: { value: new Vector4(...(f?.mouth ?? [0, 0, 0, 0])) },
-    uMuseBlushAt: { value: new Vector3(...(f?.blush ?? [0, 0, 0])) },
-    uMuseFaceAt: { value: new Vector4(...(f?.plate ?? [0, 0, 0, 0])) },
   };
-  // (both sides: a garment is often a single sheet, an apron or a collar, whose back would show the sky through it)
   const material = new ShaderMaterial({
     vertexShader,
     fragmentShader: fragmentShader.replace(/}\s*$/, '  #include <colorspace_fragment>\n}\n'),
     defines,
     uniforms,
-    side: DoubleSide,
   });
+  // its clothes and face, as on a planet (museDress.ts); and both sides, the original's too (a garment is often a
+  // single sheet, an apron or a collar, whose back would show the sky through it)
+  dressMuse(g, material, body, paint);
+  material.side = DoubleSide;
   const mesh = new Mesh(g, material);
   mesh.frustumCulled = false;
   return { kind, rig, uniforms, mesh, answers: new Answers(), x: at.x, z: at.z, offset: seed * 7.3, seed, hearts: [], petted: -1 };

@@ -4,7 +4,8 @@
 //   node meadow.mjs <out-dir> '[["bench",3],["fish",20,1],["nap",30,0,{"distance":3,"height":1.2,"azimuth":0.5}]]' [w h]
 // Each moment: [part name, s into it, nth occurrence (default 0), view for world.frameMuse (default: press M)].
 // A view: { distance, height, azimuth, at } in meters/radians (MUSE_VIEW in world.ts is the default framing).
-// env: BASE (dev server), DPR (default 1), ZOOM (wheel steps in after framing), HOURS (how far its day is written, default 3).
+// env: BASE (dev server), DPR (default 1), ZOOM (wheel steps in after framing), HOURS (how far its day is written, default 3),
+//      EXTRA (more hash: e.g. "&mm=muse5" for a muse in clothes).
 import { findBase, open, meadow, listParts, report, slug } from './lib.mjs';
 
 const out = process.argv[2];
@@ -14,7 +15,7 @@ const moments = listOnly ? [] : JSON.parse(process.argv[3] ?? '[["look about",2]
 const [w, h] = [Number(process.argv[4] ?? 1200), Number(process.argv[5] ?? 750)];
 const base = await findBase();
 const { browser, page, errors } = await open({ width: w, height: h });
-const parts = await meadow(page, base);
+const parts = await meadow(page, base, { hash: `hud=0${process.env.EXTRA ?? ''}` });
 if (listOnly) listParts(parts);
 for (const [name, s, nth = 0, view] of moments) {
   const found = parts.filter((p) => p.name === name)[nth];

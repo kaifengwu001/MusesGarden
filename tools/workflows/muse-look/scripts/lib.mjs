@@ -38,6 +38,8 @@ export async function open({ width = 1200, height = 750, dpr = Number(process.en
 export async function meadow(page, base, { hash = 'hud=0', hours = Number(process.env.HOURS ?? 3) } = {}) {
   await page.goto(`${base}/#${hash}`);
   await page.waitForFunction(() => window.__meadow?.isReady === true && window.__world?.muse?.life, undefined, { timeout: 90000 });
+  // (and its body in place: a muse in clothes takes some seconds more to rig than the first frame)
+  await page.evaluate(() => window.__world.muse.ready);
   // (the control bar and the Parameters panel, lil-gui, out of the shot)
   await page.addStyleTag({ content: '#ui, .lil-gui { display: none !important; }' });
   return page.evaluate((h) => {
