@@ -127,6 +127,8 @@ export const schema = {
   clouds: {
     coverage: num('cc', 'Coverage', 0, 0, 1, 0.01, 'life'),
     altitude: num('ca', 'Altitude', 16, 1, 40, 0.5, 'live', { unit: 'm' }),
+    // the cirrus seen from orbit, above R at R 128 and growing as √R (24 m before 2 November 2026)
+    cirrusHeight: num('cih', 'Cirrus height', 14, 4, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.12, 0, 1, 0.01, 'live'),
   },

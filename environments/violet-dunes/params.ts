@@ -112,6 +112,8 @@ export const schema = {
   clouds: {
     coverage: num('cc', 'Low cloud cover', 0, 0, 1, 0.01, 'life'),
     altitude: num('ca', 'Altitude', 14, 1, 40, 0.5, 'live', { unit: 'm' }),
+    // the high streaks, above R at R 128 and growing as √R (28.8 m before 2 November 2026, 7 m over the orchard's dunes)
+    cirrusHeight: num('cih', 'Cirrus height', 12, 4, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.18, 0, 1, 0.01, 'live'),
   },

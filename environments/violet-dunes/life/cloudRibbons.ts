@@ -86,16 +86,17 @@ export class CloudRibbons {
     this.uniforms.uCirrusDepthSize.value.set(width, height);
   }
 
-  update(seed: number, radius: number, terrainHeight: number, time: number, windAxis: Vector3, eye: Vector3, speed: number): void {
+  /** The streaks on a shell `height` above R (m). */
+  update(seed: number, radius: number, height: number, time: number, windAxis: Vector3, eye: Vector3, speed: number): void {
     if (seed !== this.seed) {
       this.mesh.geometry.dispose();
       this.mesh.geometry = cloudRibbonGeometry(seed);
       gpuMemory.set('cirrus geometry', geometryBytes(this.mesh.geometry));
       this.seed = seed;
     }
-    // A continuous shell above the highest dune keeps cloud ribbons airborne
-    // even at minimum growth. Thin cirrus casts no discernible ground shadow.
-    this.uniforms.uCirrusRadius.value = radius + terrainHeight + 7 * Math.sqrt(radius / 128);
+    // Where a dune rises through the shell, the scene's depth hides the streak
+    // behind it. Thin cirrus casts no discernible ground shadow.
+    this.uniforms.uCirrusRadius.value = radius + height;
     this.rotation.makeRotationAxis(windAxis, time * (0.0007 + speed * 0.0018));
     this.uniforms.uCirrusRotation.value.setFromMatrix4(this.rotation);
     const orbit = smoothstep(0.2, 0.8, (eye.length() - radius) / radius);
