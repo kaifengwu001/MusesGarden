@@ -7,11 +7,12 @@ import { visitable, visitUrl } from '../../visit/params';
 // (src/visit/) shows it. Boarding asks the backend first: it may turn the ticket down (used up, withdrawn, not yours)
 // or not answer, and then you stay home and are told why. A trip under way can be gone back to while it lasts.
 
-/** The garden's backend and its Muse, as this page's URL names them (`?garden=…/api/muses/<id>`); null without one. */
-function gardenOf(search: string): { readonly garden: string; readonly as: string } | null {
-  const garden = new URLSearchParams(search).get('garden');
+/** The garden's backend and its Muse, as this page's URL names them (`?garden=…/api/muses/<id>`), and whether it has the dev tools (`&dev`); null without a garden. */
+function gardenOf(search: string): { readonly garden: string; readonly as: string; readonly dev?: true } | null {
+  const q = new URLSearchParams(search);
+  const garden = q.get('garden');
   const as = garden ? gardenMuse(garden) : null;
-  return garden && as ? { garden, as } : null;
+  return garden && as ? { garden, as, ...(q.has('dev') ? { dev: true as const } : {}) } : null;
 }
 
 /** Why a ticket can't be used at all yet, before the backend is asked: its host's planet isn't open for visits. Null when it is. */
@@ -26,14 +27,14 @@ export function closed(invitation: Invitation): string | null {
 export function boardingUrl(ticketId: string, invitation: Invitation, search: string): string | null {
   const at = gardenOf(search);
   if (!at || !visitable(invitation.world)) return null;
-  return visitUrl(invitation.world, { invitation: ticketId, as: at.as, garden: at.garden });
+  return visitUrl(invitation.world, { ...at, invitation: ticketId });
 }
 
 /** The way back to a trip under way: its visit's page. */
 export function tripUrl(trip: NonNullable<MuseStatus['trip']>, search: string): string | null {
   const at = gardenOf(search);
   if (!at || !visitable(trip.planet)) return null;
-  return visitUrl(trip.planet, { invitation: trip.invitation, as: at.as, garden: at.garden });
+  return visitUrl(trip.planet, { ...at, invitation: trip.invitation });
 }
 
 /** Why a ticket didn't take you anywhere, in a line. */

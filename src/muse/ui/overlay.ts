@@ -33,7 +33,7 @@ export function engineMuse(search: string): MuseId | null {
  * Connects the page to the Muse engine when the URL names one (engineMuse). The function returned gives the 3D Muse's
  * direction each frame from the engine's view (null until the engine has answered); `onView` hears each view as it
  * comes (a friend visiting: src/visit/companions.ts). `?dev` also shows the dev tools, top left, under the title; B
- * toggles them. Null when the page follows no engine.
+ * toggles them (in the dev server, on any page that follows the engine). Null when the page follows no engine.
  */
 export function connectEngine(
   root: HTMLElement,
@@ -47,7 +47,10 @@ export function connectEngine(
   const clock = new SimClock();
   let view: NowView | null = null;
   const body = new Body(world, clock, () => view);
-  const dev = new URLSearchParams(search).has('dev') ? mountDevTools(root, api, () => void refresh()) : null;
+  // `?dev` opens them at the start; in the dev server they are there, put away, on any page that follows the engine, so
+  // B brings them out without it (a trip and back keeps `?dev`, src/visit/params.ts)
+  const opened = new URLSearchParams(search).has('dev');
+  const dev = opened || import.meta.env.DEV ? mountDevTools(root, api, () => void refresh(), opened) : null;
 
   // One refresh at a time; a call during one runs another after it, so a command's effect is never missed.
   let refreshing: Promise<void> | null = null;
@@ -80,9 +83,10 @@ export function connectEngine(
   return (dt) => body.step(dt);
 }
 
-function mountDevTools(root: HTMLElement, api: MuseApi, changed: () => void): DevTools {
+function mountDevTools(root: HTMLElement, api: MuseApi, changed: () => void, shown: boolean): DevTools {
   const overlay = el('div', 'mu');
   const dev = new DevTools(api, changed);
+  dev.el.hidden = !shown;
   overlay.append(dev.el);
   root.append(overlay);
   // Keys typed into the dev tools' fields are theirs: the camera's movement keys and main.ts's shortcuts never see

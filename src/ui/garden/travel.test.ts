@@ -17,6 +17,14 @@ describe('boarding on a ticket', () => {
     );
   });
 
+  it('takes the dev tools along, and back to a trip under way', () => {
+    const dev = `${SEARCH}&dev`;
+    const url = boardingUrl('inv-1', ticket('lantern-reed-gardens'), dev);
+    expect(readVisit(url!.slice(url!.indexOf('?')))).toEqual({ invitation: 'inv-1', as: 'hero', garden: '/api/muses/hero', dev: true });
+    const back = tripUrl({ invitation: 'inv-1', host: 'wren', planet: 'golden-rye', until: 0 }, dev);
+    expect(readVisit(back!.slice(back!.indexOf('?')))?.dev).toBe(true);
+  });
+
   it('goes nowhere from the placeholder garden, or on a ticket that names no planet', () => {
     expect(boardingUrl('inv-pip', ticket('lantern-reed-gardens'), '')).toBeNull();
     expect(boardingUrl('inv-pip', ticket('mossy-hollow'), SEARCH)).toBeNull();

@@ -29,6 +29,18 @@ describe('a visit’s URL', () => {
     expect(homeUrl('golden-rye', p).startsWith('/environments/golden-rye/?')).toBe(true);
   });
 
+  it('keeps the dev tools there and back: a visit opened with them goes home with them', () => {
+    const p = readVisit('?visit=inv-1&as=hero&garden=/api/muses/hero&dev');
+    expect(p).toEqual({ invitation: 'inv-1', as: 'hero', garden: '/api/muses/hero', dev: true });
+    const url = visitUrl('golden-rye', p!);
+    expect(new URLSearchParams(url.split('?')[1]).has('dev')).toBe(true);
+    expect(readVisit(url.slice(url.indexOf('?')))).toEqual(p);
+    expect(homeUrl('meadow', p!)).toBe('/?garden=%2Fapi%2Fmuses%2Fhero&dev=');
+    expect(new URLSearchParams(homeUrl('golden-rye', p!).split('?')[1]).has('dev')).toBe(true);
+    // without them, none
+    expect(new URLSearchParams(homeUrl('meadow', { garden: '/api/muses/hero' }).split('?')[1]).has('dev')).toBe(false);
+  });
+
   it('asks the API on the garden’s own host', () => {
     const page = 'http://localhost:5173/environments/lantern-reed-gardens/?visit=x&as=hero';
     expect(apiUrl('/api/muses/hero', '/api/visits/x/world?as=hero', page)).toBe('http://localhost:5173/api/visits/x/world?as=hero');
