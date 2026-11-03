@@ -1,3 +1,4 @@
+import { Vector3 } from 'three';
 import type { VisitWorld } from '../../src/visit/world';
 import { bedAt, layOut } from './garden/placement';
 import { FindBeds } from './life/findBeds';
@@ -10,6 +11,12 @@ import type { World } from './world';
 // for its Muse), out on the sand beside it; and the finds grow in beds round the shelter, as Golden Rye's grow
 // (life/findBeds.ts, garden/placement.ts, from there). No one else lives here to keep out of sight. Each Muse is drawn
 // in its own look: the original Muse, or one of the muses in clothes (life/muse.ts takes either).
+
+/** The shelter's plinth (life/props.ts PLINTH: half sizes, its local m) and a Muse's half depth round it: no one stands there. */
+const SHELTER = { x: 2.5 + 0.45, z: 2.4 + 0.45 } as const;
+const across = new Vector3();
+const out = new Vector3();
+const rel = new Vector3();
 
 export function violetVisit(world: World): VisitWorld {
   const beds = new FindBeds(world.shared);
@@ -37,5 +44,14 @@ export function violetVisit(world: World): VisitWorld {
     bedAt: (laid, dir) => bedAt({ beds: laid }, dir, world.growth.radius),
     ground: (dir) => world.terrain.sample(dir, sample),
     shape: () => world.terrain.layout,
+    // off the shelter's plinth (its local frame as life/muse.ts takes it: across, out toward the approach)
+    standable: (dir) => {
+      const L = world.terrain.layout;
+      const R = world.terrain.radius;
+      across.crossVectors(L.cottage, L.homeBearing).normalize();
+      out.crossVectors(across, L.cottage).normalize();
+      rel.subVectors(dir, L.cottage);
+      return Math.abs(rel.dot(across) * R) > SHELTER.x || Math.abs(rel.dot(out) * R) > SHELTER.z;
+    },
   };
 }
