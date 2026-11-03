@@ -1,0 +1,74 @@
+/* A visit on a ticket (src/visit/): the host's planet as a guest sees it. The banner is the garden's .g-visit pill
+   (src/ui/garden/garden.css); a friend's find card shows without its heart and its Public/Private switch, which are
+   the friend's own; the world's controls are put away, since their seed, reset and sliders would change the host's
+   planet; the ended screen says the visit is over and goes home. */
+
+body.is-visiting .controlbar {
+  display: none;
+}
+
+.visit .g-findlayer .g-like,
+.visit .g-findlayer .g-card-share {
+  display: none;
+}
+
+/* the banner where the world's controls were, clear of its name at the top */
+.visit .visit-banner {
+  top: auto;
+  bottom: calc(var(--gutter, 24px) * 0.8);
+  transform: translate(-50%, 20px);
+}
+
+.visit .visit-banner.is-on {
+  transform: translate(-50%, 0);
+}
+
+.visit.is-single .g-step,
+.visit.is-single .g-step-hint {
+  display: none;
+}
+
+.visit-left {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.visit-ended {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(251, 248, 238, 0.74);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.visit-ended.is-on {
+  opacity: 1;
+}
+
+.visit-ended-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.visit-ended-note {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visit-ended {
+    transition: none;
+  }
+}
