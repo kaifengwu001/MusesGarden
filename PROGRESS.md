@@ -30,7 +30,7 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
-## Visits (2026-11-02, branch muse-lane/visit-server)
+## Visits (2026-11-02)
 
 A ticket from a friend's Muse takes its owner, and now their Muse with them, to the friend's own planet, and a
 friend's Muse visiting yours shows beside it. The rules are in [docs/muse-agent.md](docs/muse-agent.md) (Muse can
@@ -40,8 +40,8 @@ planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world 
 
 ### What it does
 
-- **Each Muse has a planet and a look**, in `cast.json` (provisional until Kai's cast sheet lands): Fern on the
-  meadow as the original Muse, each friend on a world of its own in a muse in clothes. `src/muse/planets.ts` names
+- **Each Muse has a planet and a look**, in `cast.json` (Kai's cast, below): Momo, the hero's, on the meadow as the
+  original Muse, each of the others on a world of its own in a muse in clothes. `src/muse/planets.ts` names
   each planet and its page. A ticket names its host's planet, and the garden's friends and the public profiles carry
   where each lives and how it looks (the profile card that shows them is still to come).
 - **A ticket is a trip** on the engine: sent, used, returned. Using it takes the guest's Muse to the host's,
@@ -52,7 +52,8 @@ planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world 
   `/?visit=…` for the meadow. A planet that isn't open for visits keeps the ticket in the post.
 - **The visit page** (`src/visit/`): the host in its look at home, the guest a step beside it, the host's finds as
   beds (public ones open their cards; private ones are flowers with no card), a banner with the time left and
-  Return home, and an ended screen that goes home on its own. Lantern Reed Gardens and the meadow take visits.
+  Return home, and an ended screen that goes home on its own. The meadow and every world but Rice Terraces and
+  Ukiyo-e Pine Hamlet take visits.
 - **A friend's Muse visiting Momo** is drawn beside it on the meadow, in its own body, with its shadow, while the
   engine says it is there. A tap on it says hello, as one on Momo does.
 
@@ -81,16 +82,52 @@ planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world 
 
 - **Rice Terraces and Ukiyo-e Pine Hamlet aren't visitable**: no engine, or not on main yet. Their tickets stay
   in the post ("… isn't open for visits yet").
-- **Only Lantern and the meadow take visits on this branch.** The other worlds get their adapters in the
-  dressed-muse lane. Until then the live travel case passes only when the ticket's host lives on one of those two,
-  and the friends in `cast.json` live elsewhere.
 - **Friends' worlds at their own seeds are unreviewed.** Every world was tuned at seed 412.
 - **On the worlds, the guest can stand against a wall.** It keeps off water only; the meadow also keeps it off the
-  house and up on the deck with its host (`MuseRoam.standable`). A tap on the guest says hello only on the meadow.
+  house and up on the deck with its host (`MuseRoam.standable`).
 - **Instagram.** An Instagram find's picture comes through the API's media cache (`/api/media/…`), so it shows on a
   visit page only when the page and its garden's backend share a host, as in development. The recording's
   Instagram share and its token's expiry (about 2026-12-30) stand as in "Muse's life on the engine".
-- **Lantern draws every look as the original Muse** until its dressed-muse port lands (`visit.ts` `model()`).
+
+## Kai's cast (2026-11-02, visits Part 3)
+
+Kai chose the cast on the cast sheet, Muse first: each Muse's look, then who it is, then its interests, and its home
+planet last. `server/fixtures/cast/README.md` has the table.
+
+### What changed
+
+- **Eleven Muses.** The hero keeps the id `hero` and is now Momo, the soup-making gardener, on the meadow in the
+  original body. The other ids are the new names: kiki, hoji, fife, moss (the old wren row), van, potato, pina, dorie
+  (the old moss row), and two new known Muses, nemo and pooh. Each kept row keeps its seed and time zone.
+- **Planets.** Rice Terraces (Nemo's) and Ukiyo-e Pine Hamlet (Pina's) join `PlanetId`. Each planet in
+  `src/muse/planets.ts` says whether a visit can go there yet: not those two, since Rice Terraces has no engine link
+  and the hamlet is only in an open pull request.
+- **Souls and memories.** Every SOUL.md is rewritten from Kai's character, personality, interests and planet, with
+  Kai's trait numbers. Every MEMORY.md seeds Kai's interests as topic-map labels, each also checked against the
+  privacy filter the engine applies.
+- **The topic map.** 23 new areas (gardening and flowers to fantasy literature): 814 pages in 37 areas, 308 before.
+- **The recording.** 303 items, 2 of each kind in every area, from 575 sources (570 answered). No Instagram: there is
+  no `META_IG_TOKEN` here, so the 17 Instagram items of the last recording are gone.
+- **Strangers.** Similarity raises the odds of meeting and befriending beyond the planet, but no longer gates them:
+  Momo can become friends with any character.
+
+### Checked (Kai's cast)
+
+- **Interests no longer converge** (the 3-week sim, default friend groups): the eleven Muses' top three interests hold
+  21 distinct topics in 33 places, and 13 of them are the Muse's own seeds. Before, the nine Muses' held 10 in 27, 1
+  of them a seed, with Origami and Jazz in five Muses' tops each. The most shared now is Origami, in four.
+- **Divergence.** The botany and jazz twins keep different finds in 10 of 12 run seeds (6 of 12 with the old
+  recording); the test asks for 9.
+- **The sim.** All 10 checks pass, with every owner at `shared` and at `everyone`.
+
+### Open (Kai's cast)
+
+- **Record with the Instagram token.** The new areas list Instagram accounts that couldn't be checked without it.
+- **YouTube descriptions.** YouTube answered the recorder's watch pages with its "sorry" page, so 89 of the 123
+  YouTube items have no description. A later recording fills them in.
+- **The voice-review scenes** in the cast README wait for Meta's model; the heuristic mind doesn't voice the souls.
+- **A bridge interest.** None of the three strangers starts with an interest of Momo's. Interests drift together
+  within days, and strangers no longer need one to meet, but Kai may want one (astronomy for Dorie, say).
 
 ## The muses in clothes (2026-11-02, in the lab)
 
@@ -484,7 +521,7 @@ now feeds Kai's garden interface. Merged into main on 2026-11-01.
 - **Friends come three ways:**
   - Owners share their Muses; those two meet within 48 h.
   - Owners are friends on Instagram or Facebook (a simulated graph in `cast.json`).
-  - Strangers meet beyond the planet, which is rare.
+  - Strangers meet beyond the planet, which is rare. Shared interests make it likelier, but strangers with nothing in common can meet and befriend too (2026-11-02).
 
   Friendships rarely end. Unpleasant hangouts make a pair distant instead.
 - **Invitations.** The guest's owner picks Travel now or Keep for later. An invitation is good for one visit, any time, and only the sender can withdraw it.
@@ -508,11 +545,9 @@ now feeds Kai's garden interface. Merged into main on 2026-11-01.
 
 ### Open
 
-- **The recording is small** (118 items, 17 from Instagram):
-  - Over three weeks every Muse sees most of it, so the cast converges on the same interests.
-  - Strangers make about 10 friendships instead of about 1.
-  - Instagram is 13% of what Muse brings home, against a 65% target.
-  - Fix: record bigger. The recorder reads every source either way, so a bigger recording costs no extra time.
+- **The recording was small** (118 items, 17 from Instagram). Since Kai's cast (2026-11-02) it is 303 items in 37
+  areas, and the cast no longer converges on the same interests (see Kai's cast, above). Still open:
+  - Instagram is 0% of what Muse brings home until a recording runs with the token, against a 65% target.
 - **The recording's contents:**
   - Leave ads and sale promotions out.
   - Keep disambiguation topics such as "Jazz (word)" out of filing.

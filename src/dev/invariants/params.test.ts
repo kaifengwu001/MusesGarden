@@ -22,7 +22,7 @@ describe('parameter schema', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('keeps the first planet the meadow as tuned, seed 412 at R 128 m, where Fern lives (see docs/development-guidelines.md)', () => {
+  it('keeps the first planet the meadow as tuned, seed 412 at R 128 m, where Momo lives (see docs/development-guidelines.md)', () => {
     expect([schema.world.seed.def, RADIUS_DEFAULT]).toEqual([412, 128]);
     expect(FIRST_PLANET, 'the Muse server reads the meadow’s defaults from planet/firstPlanet.ts').toEqual({ seed: schema.world.seed.def, growth: DEFAULT_GROWTH });
   });

@@ -1,5 +1,5 @@
 import type { PlanetId } from '../muse/contract';
-import { isPlanetId, PLANETS, type Planet } from '../muse/planets';
+import { isPlanetId, PLANETS } from '../muse/planets';
 
 // A visit is reached by its URL alone, `<the host's planet>/?visit=<ticket>&as=<guest>&garden=<base>`, so a reload is
 // the same visit. Home is the guest's own planet with its garden: `<the guest's planet>/?garden=<base>`.
@@ -13,12 +13,9 @@ export interface VisitParams {
   readonly garden: string;
 }
 
-/**
- * Whether a planet takes visits: one of the planets, and not one its entry in src/muse/planets.ts marks `visitable:
- * false` (a world with no engine, or not built here yet). A planet whose entry doesn't say takes them.
- */
+/** Whether a planet takes visits: one of the planets, and one its entry in src/muse/planets.ts marks `visitable`. */
 export function visitable(planet: string): planet is PlanetId {
-  return isPlanetId(planet) && (PLANETS[planet] as Planet & { readonly visitable?: boolean }).visitable !== false;
+  return isPlanetId(planet) && PLANETS[planet].visitable;
 }
 
 /** The visit a page's query names, or null when it names none. Without `garden`, the guest's own on this host. */

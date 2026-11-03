@@ -3,16 +3,18 @@
 This is a fictional owner profile for demonstrations. These interests, routines, and working preferences are synthetic seeds, never facts about a real user. This file records no lived Muse events or relationships.
 
 ## Interests
-- Mushroom
-- Lichen
-- Fermentation
+- Birdwatching
+- Cartography
+- Hiking
+- Kites
+- Hang gliding
 
 ## Routines
-- Checks the sourdough starter every morning.
-- Goes foraging on quiet weekday mornings.
+- Walks along the river before breakfast.
+- Flies a kite whenever the forecast promises a steady breeze.
 
 ## Working preferences
-- Prefers explanations that name the process, conditions, and time involved.
-- Appreciates a concise answer with an optional path into the details.
-- Wants observations separated from hypotheses and uncertain claims.
-- Enjoys careful comparisons and notes that make a result reproducible.
+- Prefers a clear route or diagram alongside a short explanation.
+- Enjoys an optional detour when its purpose is explained.
+- Wants uncertain identifications labelled as uncertain, with sources to inspect.
+- Prefers a few distinctive recommendations over a long destination list.

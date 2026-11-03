@@ -1,22 +1,26 @@
 {
   "members": [
-    { "id": "hero", "name": "Fern", "worldSeed": 412, "timezone": "America/Los_Angeles", "dir": "cast/hero", "role": "hero", "planet": "meadow", "look": "tpose6" },
-    { "id": "wren", "name": "Wren", "worldSeed": 4271, "timezone": "Europe/London", "dir": "cast/wren", "role": "friend", "planet": "violet-dunes", "look": "muse8" },
-    { "id": "juniper", "name": "Juniper", "worldSeed": 7703, "timezone": "Asia/Tokyo", "dir": "cast/juniper", "role": "friend", "planet": "cherry-blossom-waterways", "look": "muse6" },
-    { "id": "moss", "name": "Moss", "worldSeed": 2389, "timezone": "America/Chicago", "dir": "cast/moss", "role": "stranger", "planet": "cobalt-windfields", "look": "muse4" },
-    { "id": "lark", "name": "Lark", "worldSeed": 5512, "timezone": "Asia/Kolkata", "dir": "cast/lark", "role": "stranger", "planet": "lantern-reed-gardens", "look": "muse1" },
-    { "id": "sorrel", "name": "Sorrel", "worldSeed": 8846, "timezone": "Australia/Sydney", "dir": "cast/sorrel", "role": "stranger", "planet": "tulip-windmill-meadows", "look": "muse7" },
-    { "id": "clover", "name": "Clover", "worldSeed": 3157, "timezone": "America/Denver", "dir": "cast/clover", "role": "known", "planet": "scarlet-sail-canyon", "look": "muse2" },
-    { "id": "bramble", "name": "Bramble", "worldSeed": 6624, "timezone": "Europe/Berlin", "dir": "cast/bramble", "role": "known", "planet": "sequoia-shrine", "look": "muse3" },
-    { "id": "thistle", "name": "Thistle", "worldSeed": 9031, "timezone": "America/New_York", "dir": "cast/thistle", "role": "known", "planet": "golden-rye", "look": "muse5" }
+    { "id": "hero", "name": "Momo", "worldSeed": 412, "timezone": "America/Los_Angeles", "dir": "cast/hero", "role": "hero", "planet": "meadow", "look": "tpose6" },
+    { "id": "kiki", "name": "Kiki", "worldSeed": 9031, "timezone": "America/New_York", "dir": "cast/kiki", "role": "known", "planet": "golden-rye", "look": "muse5" },
+    { "id": "hoji", "name": "Hoji", "worldSeed": 7703, "timezone": "Asia/Tokyo", "dir": "cast/hoji", "role": "friend", "planet": "cherry-blossom-waterways", "look": "muse6" },
+    { "id": "fife", "name": "Fife", "worldSeed": 5512, "timezone": "Asia/Kolkata", "dir": "cast/fife", "role": "stranger", "planet": "sequoia-shrine", "look": "muse1" },
+    { "id": "moss", "name": "Moss", "worldSeed": 4271, "timezone": "Europe/London", "dir": "cast/moss", "role": "friend", "planet": "violet-dunes", "look": "muse8" },
+    { "id": "van", "name": "Van", "worldSeed": 8846, "timezone": "Australia/Sydney", "dir": "cast/van", "role": "stranger", "planet": "tulip-windmill-meadows", "look": "muse7" },
+    { "id": "potato", "name": "Potato", "worldSeed": 3157, "timezone": "America/Denver", "dir": "cast/potato", "role": "known", "planet": "scarlet-sail-canyon", "look": "muse2" },
+    { "id": "pina", "name": "Pina", "worldSeed": 6624, "timezone": "Europe/Berlin", "dir": "cast/pina", "role": "known", "planet": "ukiyoe-pine-hamlet", "look": "muse12" },
+    { "id": "dorie", "name": "Dorie", "worldSeed": 2389, "timezone": "America/Chicago", "dir": "cast/dorie", "role": "stranger", "planet": "cobalt-windfields", "look": "muse0" },
+    { "id": "nemo", "name": "Nemo", "worldSeed": 1847, "timezone": "Asia/Shanghai", "dir": "cast/nemo", "role": "known", "planet": "rice-terraces", "look": "muse3" },
+    { "id": "pooh", "name": "Pooh", "worldSeed": 5068, "timezone": "America/Sao_Paulo", "dir": "cast/pooh", "role": "known", "planet": "lantern-reed-gardens", "look": "muse11" }
   ],
   "introductions": [
-    ["hero", "wren"],
-    ["hero", "juniper"]
+    ["hero", "moss"],
+    ["hero", "hoji"]
   ],
   "knownOn": [
-    { "a": "hero", "b": "clover", "on": "instagram" },
-    { "a": "hero", "b": "bramble", "on": "instagram" },
-    { "a": "hero", "b": "thistle", "on": "facebook" }
+    { "a": "hero", "b": "potato", "on": "instagram" },
+    { "a": "hero", "b": "pina", "on": "instagram" },
+    { "a": "hero", "b": "kiki", "on": "facebook" },
+    { "a": "hero", "b": "nemo", "on": "facebook" },
+    { "a": "hero", "b": "pooh", "on": "instagram" }
   ]
 }

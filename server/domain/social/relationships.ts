@@ -32,8 +32,9 @@ export function familiarityNeeded(t: Temperament): number {
   return SOCIAL.familiarityBase + SOCIAL.familiaritySpan * (1 - t.sociability);
 }
 
+/** Shared interests raise the chance and sociability sets it; neither is needed for a yes. */
 export function befriendChance(sim: number, t: Temperament): number {
-  return sim * (SOCIAL.befriendBase + (1 - SOCIAL.befriendBase) * t.sociability);
+  return (SOCIAL.befriendSimBase + (1 - SOCIAL.befriendSimBase) * sim) * (SOCIAL.befriendBase + (1 - SOCIAL.befriendBase) * t.sociability);
 }
 
 /**

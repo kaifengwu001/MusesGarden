@@ -9,6 +9,7 @@ import { PLANET_IDS, PLANETS } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
 import { HeuristicMind } from '../adapters/minds/heuristic';
+import { privacyFilterIn } from '../domain/privacy';
 import { parseSoul } from '../domain/soul';
 import { FIXTURES_DIR, loadCast, parseCastFile, readMemberDocs } from './cast';
 
@@ -27,9 +28,9 @@ async function interests(memory: string): Promise<(TopicKey | null)[]> {
 }
 
 describe('cast.json', () => {
-  it('has a hero, two friends introduced to the hero, three Muses whose owners know the hero\'s, and three strangers', () => {
+  it('has a hero, two friends introduced to the hero, five Muses whose owners know the hero\'s, and three strangers', () => {
     const roles = cast.members.map((m) => m.role).sort();
-    expect(roles).toEqual(['friend', 'friend', 'hero', 'known', 'known', 'known', 'stranger', 'stranger', 'stranger']);
+    expect(roles).toEqual(['friend', 'friend', 'hero', 'known', 'known', 'known', 'known', 'known', 'stranger', 'stranger', 'stranger']);
     const hero = cast.members.find((m) => m.role === 'hero');
     expect(hero?.dir).toBe('cast/hero');
     const friends = cast.members.filter((m) => m.role === 'friend').map((m) => m.id);
@@ -41,12 +42,12 @@ describe('cast.json', () => {
     expect(cast.members.filter((m) => m.worldSeed === FIRST_PLANET.seed).map((m) => m.role)).toEqual(['hero']);
   });
 
-  it('knows the known Muses\' owners from the hero\'s: two on Instagram and one on Facebook, none introduced', () => {
+  it('knows the known Muses\' owners from the hero\'s: three on Instagram and two on Facebook, none introduced', () => {
     const hero = cast.members.find((m) => m.role === 'hero')?.id;
     const known = cast.members.filter((m) => m.role === 'known').map((m) => m.id);
     expect(cast.knownOn.map((k) => (k.a === hero ? k.b : k.a)).sort()).toEqual([...known].sort());
     expect(cast.knownOn.every((k) => k.a === hero || k.b === hero)).toBe(true);
-    expect(cast.knownOn.map((k) => k.on).sort()).toEqual(['facebook', 'instagram', 'instagram']);
+    expect(cast.knownOn.map((k) => k.on).sort()).toEqual(['facebook', 'facebook', 'instagram', 'instagram', 'instagram']);
     expect(cast.introductions.flat().some((id) => known.includes(id))).toBe(false);
   });
 
@@ -69,17 +70,21 @@ describe('cast.json', () => {
     expect(PLANETS.meadow.path).toBe('/');
   });
 
-  it('gives each of the eight friends a world of its own, and leaves the rice terraces unused', () => {
+  it('gives each of the ten other Muses a world of its own', () => {
     const others = cast.members.filter((m) => m.role !== 'hero').map((m) => m.planet);
-    expect(others).toHaveLength(8);
-    expect(new Set(others).size).toBe(8);
+    expect(others).toHaveLength(10);
+    expect(new Set(others).size).toBe(10);
     expect(others).not.toContain('meadow');
-    expect(others).not.toContain('rice-terraces');
-    expect(PLANET_IDS).not.toContain('rice-terraces');
-    for (const id of others) {
-      expect(PLANETS[id].path, id).toBe(`/environments/${id}/`);
-      expect(existsSync(fileURLToPath(new URL(`../../environments/${id}/index.html`, import.meta.url))), id).toBe(true);
-    }
+    for (const id of others) expect(PLANETS[id].path, id).toBe(`/environments/${id}/`);
+  });
+
+  it('can visit every planet whose world is on this branch with an engine, and none of the others yet', () => {
+    const page = (id: string) => existsSync(fileURLToPath(new URL(`../../environments/${id}/index.html`, import.meta.url)));
+    const visitable = PLANET_IDS.filter((id) => PLANETS[id].visitable);
+    expect(PLANET_IDS.filter((id) => !PLANETS[id].visitable).sort()).toEqual(['rice-terraces', 'ukiyoe-pine-hamlet']);
+    for (const id of visitable) if (id !== 'meadow') expect(page(id), id).toBe(true);
+    expect(page('rice-terraces'), 'a standalone viewer with no engine link').toBe(true);
+    expect(page('ukiyoe-pine-hamlet'), 'only in an open pull request: make it visitable once it lands').toBe(false);
   });
 
   it('dresses every Muse in a body the renderer has: the original Muse or one of the dressed muses', () => {
@@ -90,7 +95,7 @@ describe('cast.json', () => {
   it('refuses a planet or a look it doesn’t know', () => {
     const [member] = cast.members;
     const parse = (patch: object) => parseCastFile({ members: [{ ...member, ...patch }], introductions: [] });
-    expect(() => parse({ planet: 'rice-terraces' })).toThrow(/\.planet: rice-terraces/);
+    expect(() => parse({ planet: 'ukiyoe-hamlet' })).toThrow(/\.planet: ukiyoe-hamlet/);
     expect(() => parse({ planet: undefined })).toThrow(/\.planet: undefined/);
     expect(() => parse({ look: 'muse13' })).toThrow(/\.look: muse13/);
     expect(() => parse({ look: 'toString' })).toThrow(/\.look: toString/);
@@ -108,26 +113,29 @@ describe('member SOUL.md and MEMORY.md', () => {
     const topics = await interests(memory);
     expect(topics.length).toBeGreaterThan(0);
     expect(topics, 'every interest is a corpus topic').not.toContain(null);
+    const labels = await mind.extractInterests(memory, 'memory');
+    expect(privacyFilterIn(labels, memory), 'every interest passes the privacy filter, so it reaches the engine').toEqual(labels);
     expect(memory.match(/^## /gm)?.length, 'Interests plus another section').toBeGreaterThanOrEqual(2);
   });
 
-  it('the strangers include an introvert, an extrovert, and one who shares an interest with the hero', async () => {
+  it('the strangers include an introvert and an extrovert', () => {
     const soul = (m: CastMember) => parseSoul(readMemberDocs(m).soul).temperament;
-    const strangers = cast.members.filter((m) => m.role === 'stranger');
-    const sociability = strangers.map((m) => soul(m).sociability ?? 0.5);
+    const sociability = cast.members.filter((m) => m.role === 'stranger').map((m) => soul(m).sociability ?? 0.5);
     expect(Math.min(...sociability)).toBeLessThanOrEqual(0.3);
     expect(Math.max(...sociability)).toBeGreaterThanOrEqual(0.7);
-    const hero = cast.members.find((m) => m.role === 'hero');
-    if (hero === undefined) throw new Error('no hero');
-    const heroTopics = new Set(await interests(readMemberDocs(hero).memory));
-    const shared = await Promise.all(strangers.map(async (m) => (await interests(readMemberDocs(m).memory)).some((t) => heroTopics.has(t))));
-    expect(shared).toContain(true);
   });
 
-  it('the hero retains the demo botanical illustration seed, where the hero chain starts', async () => {
+  it('the hero seeds the interests Kai gave Momo: gardening, soup, flowers, jazz, the stars and hiking', async () => {
     const hero = cast.members.find((m) => m.role === 'hero');
     if (hero === undefined) throw new Error('no hero');
-    expect(await interests(readMemberDocs(hero).memory)).toContain('Botanical illustration');
+    expect(await interests(readMemberDocs(hero).memory)).toEqual(['Gardening', 'Soup', 'Flower', 'Jazz', 'Astronomy', 'Hiking']);
+  });
+
+  it('the hero’s placeholder memory seeds topics too, past the privacy filter', async () => {
+    const placeholder = read('cast/hero/MEMORY.placeholder.md');
+    const labels = await mind.extractInterests(placeholder, 'memory');
+    expect(await interests(placeholder)).toEqual(['Gardening', 'Soup']);
+    expect(privacyFilterIn(labels, placeholder)).toEqual(labels);
   });
 });
 

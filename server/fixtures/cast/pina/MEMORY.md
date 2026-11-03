@@ -3,18 +3,21 @@
 Fictional owner context for this demo fixture. These interests, routines, and working preferences are synthetic seed data. The fixture begins with no lived Muse interaction history.
 
 ## Interests
-- Green tea
-- Herbarium
+- Sculpture
+- Botany
+- Architecture
+- Mushroom
+- Birds
 
 ## Routines
-- Presses a leaf in a heavy book most weekends.
-- Brews a second pot of tea mid-afternoon.
+- Walks the same woodland loop every Saturday.
+- Sketches a building or a tree on the way to work.
 
 ## Working preferences
-- Enjoys close views of small natural details with an approachable explanation.
-- Prefers a welcoming opening and a short selection of useful finds.
-- Appreciates thoughtful editing that identifies the strongest specimen or image.
-- Likes optional questions and room to explore at an unhurried pace.
+- Enjoys explanations of how a form is built, supported by concrete observations.
+- Prefers a simple diagram or comparison before a long catalogue of details.
+- Appreciates a clear distinction between measured findings and open hypotheses.
+- Welcomes an exception that reveals where a model needs revision.
 
 ## Memory updates
 Keep this public fixture fictional. In a separate private owner-memory store, replace synthetic seeds with confirmed preferences and record each observation's source and date. Mark tentative interpretations as tentative.

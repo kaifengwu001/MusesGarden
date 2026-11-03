@@ -1,16 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { PLANETS } from '../muse/planets';
+import { describe, expect, it } from 'vitest';
 import { apiUrl, homeUrl, leftPhrase, readVisit, visitable, visitUrl } from './params';
-
-/** Marks a planet not open to visits, as its entry in src/muse/planets.ts may, until the test is over. */
-const shut: string[] = [];
-function close(planet: keyof typeof PLANETS): void {
-  (PLANETS[planet] as { visitable?: boolean }).visitable = false;
-  shut.push(planet);
-}
-afterEach(() => {
-  for (const planet of shut.splice(0)) delete (PLANETS[planet as keyof typeof PLANETS] as { visitable?: boolean }).visitable;
-});
 
 describe('a visit’s URL', () => {
   it('names the ticket and the guest, and keeps the garden it came from', () => {
@@ -48,18 +37,18 @@ describe('a visit’s URL', () => {
 });
 
 describe('a planet open to visits', () => {
-  it('is one of the planets whose entry doesn’t say otherwise', () => {
+  it('is one of the planets whose entry says so', () => {
     expect(visitable('lantern-reed-gardens')).toBe(true);
     expect(visitable('meadow')).toBe(true);
     expect(visitable('mossy-hollow')).toBe(false);
     expect(visitable('')).toBe(false);
-    close('golden-rye');
-    expect(visitable('golden-rye')).toBe(false);
+    expect(visitable('golden-rye')).toBe(true);
+    expect(visitable('rice-terraces')).toBe(false);
+    expect(visitable('ukiyoe-pine-hamlet')).toBe(false);
   });
 
   it('is the only kind a guest goes home to: from a planet with no garden page yet, the meadow’s', () => {
-    close('golden-rye');
-    expect(homeUrl('golden-rye', { garden: '/api/muses/hero' })).toBe('/?garden=%2Fapi%2Fmuses%2Fhero');
+    expect(homeUrl('rice-terraces', { garden: '/api/muses/hero' })).toBe('/?garden=%2Fapi%2Fmuses%2Fhero');
   });
 });
 

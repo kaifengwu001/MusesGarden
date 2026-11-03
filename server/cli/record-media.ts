@@ -10,7 +10,7 @@ import { FIXTURES_DIR, loadCorpus, loadHeroChain } from '../adapters/sources/cor
 import { fileUnder, topicIndex } from '../adapters/sources/filing';
 import { InstagramReader } from '../adapters/sources/instagram';
 import { arr, obj, str, strs } from '../adapters/sources/json';
-import { LEANS, MEDIA_PATH, parseMediaRecording, siteOf, type Lean, type MediaItemJson, type RawItem } from '../adapters/sources/media';
+import { LEANS, MEDIA_KINDS, MEDIA_PATH, parseMediaRecording, siteOf, type Lean, type MediaItemJson, type RawItem } from '../adapters/sources/media';
 import { readArticles, readBluesky, readFlickr, readVimeo, readYoutube, searchBluesky, searchYoutube, type Read, type WatchDetails } from '../adapters/sources/readers';
 
 const SOURCES_PATH = `${FIXTURES_DIR}media-sources.json`;
@@ -263,6 +263,14 @@ async function main(): Promise<void> {
   console.info(`  by kind: ${count(parsed.items, (i) => i.candidate.media.kind)}`);
   console.info(`  by network: ${count(parsed.items, (i) => i.candidate.media.network)}`);
   console.info(`  by area: ${count(parsed.items, (i) => i.area)}`);
+  const kindsIn = (area: string) => new Set(parsed.items.filter((i) => i.area === area).map((i) => i.candidate.media.kind));
+  const short = map.areas
+    .filter((a) => values.area === undefined || a.name === values.area)
+    .flatMap((a) => {
+      const missing = MEDIA_KINDS.filter((k) => !kindsIn(a.name).has(k));
+      return missing.length > 0 ? [`${a.name} (${missing.join(', ')})`] : [];
+    });
+  console.info(`  areas missing a kind, which media.test.ts refuses: ${short.join('; ') || 'none'}`);
 
   const perTopic = new Map<TopicKey, number>();
   for (const i of parsed.items) for (const t of i.candidate.topics) perTopic.set(t, (perTopic.get(t) ?? 0) + 1);

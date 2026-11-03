@@ -157,9 +157,9 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.muse.soul).not.toMatch(/^#|---|curiosity:/);
     expect(snap.muse.soul).toMatch(/[.!?…]$/);
     expect(snap.world).toEqual({ seed: FIRST_PLANET.seed, g: expect.any(Number) as number });
-    expect(snap.world?.g, 'Fern grows from the meadow’s tuned size as it explores').toBeGreaterThanOrEqual(FIRST_PLANET.growth);
+    expect(snap.world?.g, 'Momo grows from the meadow’s tuned size as it explores').toBeGreaterThanOrEqual(FIRST_PLANET.growth);
     const friendIds = [...garden.engine.state(HERO)!.social.relationships.values()].filter((r) => r.status === 'friends').map((r) => r.other);
-    expect(friendIds.sort(), 'the cast introduces juniper and wren, and the default friend group makes no other friends').toEqual(['juniper', 'wren']);
+    expect(friendIds.sort(), 'the cast introduces hoji and moss, and the default friend group makes no other friends').toEqual(['hoji', 'moss']);
     expect(snap.friends.map((f) => f.id).sort()).toEqual(friendIds);
     expect(snap.muse.reach).toBe('shared');
     for (const f of snap.friends) {
@@ -182,7 +182,7 @@ describe('the garden snapshot on a seeded engine', () => {
   });
 });
 
-describe('Fern on the first planet', () => {
+describe('Momo on the first planet', () => {
   it('starts on the meadow as tuned, seed 412 at R 128 m, as if it had explored that much already (see docs/development-guidelines.md)', async () => {
     const fresh = await seeded(0);
     expect(fresh.views.garden(HERO, fresh.engine.now())?.world).toEqual({ seed: FIRST_PLANET.seed, g: FIRST_PLANET.growth });

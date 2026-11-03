@@ -192,7 +192,7 @@ export type KnownOn = 'instagram' | 'facebook';
 
 /**
  * The planet a Muse lives on: the meadow (the first planet, in src/) or a world under environments/, by its folder
- * name. Its name and page are in src/muse/planets.ts.
+ * name. Its name, its page and whether a visit can go there yet are in src/muse/planets.ts.
  */
 export type PlanetId =
   | 'meadow'
@@ -203,7 +203,9 @@ export type PlanetId =
   | 'golden-rye'
   | 'cherry-blossom-waterways'
   | 'sequoia-shrine'
-  | 'violet-dunes';
+  | 'violet-dunes'
+  | 'rice-terraces'
+  | 'ukiyoe-pine-hamlet';
 
 /** A Muse's body: the original Muse (tpose6), or one of the dressed muses (DRESSED in src/life/museMesh.ts). */
 export type MuseLook = 'tpose6' | `muse${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
@@ -778,8 +780,8 @@ export interface NowView {
   readonly since: Instant;
   readonly until: Instant | null;
   /**
-   * "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Wren is visiting", "Wren is
-   * visiting, with its owner", "Away at Wren's planet", "Away at Wren's planet with you", "Working".
+   * "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Moss is visiting", "Moss is
+   * visiting, with its owner", "Away at Moss's planet", "Away at Moss's planet with you", "Working".
    */
   readonly label: string;
   /** Muse's route on its own planet; null while beyond or away (no follow). */

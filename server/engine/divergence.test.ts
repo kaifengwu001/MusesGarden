@@ -23,8 +23,8 @@ const twinSoul = readFileSync(join(FIXTURES_DIR, 'divergence/a/SOUL.md'), 'utf8'
 const memory = (twin: 'a' | 'b') => readFileSync(join(FIXTURES_DIR, `divergence/${twin}/MEMORY.md`), 'utf8');
 const seed = (id: string): MuseSeed => ({ id: id as MuseId, name: id, worldSeed: 412, timezone: 'America/Los_Angeles' });
 
-async function twins(days: number, db: string | null = null) {
-  const garden = buildGarden({ db, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward' });
+async function twins(days: number, db: string | null = null, runSeed = 0) {
+  const garden = buildGarden({ db, mind: 'heuristic', hero: null, start: START, clock: 'fast-forward', seed: runSeed });
   await garden.engine.addMuse(seed('twin-a'), twinSoul, memory('a'), START);
   await garden.engine.addMuse(seed('twin-b'), twinSoul, memory('b'), START);
   await garden.engine.advanceTo((START + days * 24 * H) as Instant);
@@ -62,17 +62,25 @@ function replay(id: string, log: readonly StoredEvent[]): MuseState {
 }
 
 describe('divergence: history, not hidden parameters, drives what Muse keeps', () => {
-  it('identical Muses whose owners love botany and jazz keep different finds after a free week', async () => {
-    const { engine, store } = await twins(7);
-    const a = await preferences(engine, engine.state('twin-a' as MuseId) as MuseState);
-    const b = await preferences(engine, engine.state('twin-b' as MuseId) as MuseState);
-    expect(jaccard(a, b)).toBeLessThanOrEqual(0.34);
+  /**
+   * One run can end its week on a streak: a botany twin that found jazz on its last day prefers jazz that evening. So
+   * the claim is checked over twelve run seeds, each seed's week held to the same bar, and nine of them must meet it.
+   * (The recording of 2026-10-31 met it in 6 of the 12; the larger one of 2026-11-02 in 10.)
+   */
+  it('identical Muses whose owners love botany and jazz keep different finds after a free week, in most runs', async () => {
     const botany = new Set(pool.botany.map((c) => c.canonicalUrl));
     const jazz = new Set(pool.jazz.map((c) => c.canonicalUrl));
-    expect([...a].filter((u) => botany.has(u)).length).toBeGreaterThan([...a].filter((u) => jazz.has(u)).length);
-    expect([...b].filter((u) => jazz.has(u)).length).toBeGreaterThan([...b].filter((u) => botany.has(u)).length);
-    store.close();
-  });
+    const count = (s: ReadonlySet<CanonicalUrl>, of: ReadonlySet<CanonicalUrl>) => [...s].filter((u) => of.has(u)).length;
+    const diverged: number[] = [];
+    for (let runSeed = 0; runSeed < 12; runSeed++) {
+      const { engine, store } = await twins(7, null, runSeed);
+      const a = await preferences(engine, engine.state('twin-a' as MuseId) as MuseState);
+      const b = await preferences(engine, engine.state('twin-b' as MuseId) as MuseState);
+      store.close();
+      if (jaccard(a, b) <= 0.34 && count(a, botany) > count(a, jazz) && count(b, jazz) > count(b, botany)) diverged.push(runSeed);
+    }
+    expect(diverged.length, `diverged in runs ${diverged.join(', ')}`).toBeGreaterThanOrEqual(9);
+  }, 120_000);
 
   it('control: the same inputs give the same log and the same choices', async () => {
     const one = await twins(3);

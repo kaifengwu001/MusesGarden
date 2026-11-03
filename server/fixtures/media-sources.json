@@ -307,6 +307,410 @@
         "palaisdesthes",
         "harneytea"
       ]
+    },
+    {
+      "area": "gardening and flowers",
+      "search": "garden",
+      "articles": [
+        "https://www.finegardening.com/feed",
+        "https://www.hortmag.com/feed",
+        "https://www.floretflowers.com/feed/",
+        "https://gardenrant.com/feed",
+        "https://www.thisiscolossal.com/tags/flowers/feed/"
+      ],
+      "youtube": ["@The_RHS", "@BBCGardenersWorldMagazine", "@floretflowerfarm", "@sarahraven"],
+      "vimeo": [],
+      "flickr": ["flowergarden", "cottagegarden", "garden,flowers", "dahlia"],
+      "bluesky": ["brooklynbotanic.bsky.social", "growwithkg.bsky.social", "gardeningwell.ie"],
+      "instagram": ["floretflowers", "rhshome", "brooklynbotanic", "longwoodgardens"]
+    },
+    {
+      "area": "soup",
+      "search": "soup",
+      "articles": [
+        "https://www.theguardian.com/food/soup/rss",
+        "https://www.loveandlemons.com/category/recipes/soup/feed/",
+        "https://www.onceuponachef.com/recipes/soups/feed",
+        "https://pinchofyum.com/recipes/soup/feed",
+        "https://www.skinnytaste.com/recipes/soup/feed/"
+      ],
+      "youtube": ["@foodwishes", "@RainbowPlantLife", "@Natashaskitchen"],
+      "vimeo": [],
+      "flickr": ["soup,bowl", "ramen", "chickensoup", "homemadesoup"],
+      "bluesky": ["smittenkitchen.bsky.social", "liveeatlearn.bsky.social", "nigella.bsky.social"],
+      "instagram": ["nytcooking", "smittenkitchen", "loveandlemons", "rainbowplantlife", "maangchi"]
+    },
+    {
+      "area": "hiking",
+      "search": "hiking",
+      "articles": [
+        "https://thetrek.co/feed/",
+        "https://www.backpacker.com/feed/",
+        "https://www.theguardian.com/lifeandstyle/walking/rss",
+        "https://www.outsideonline.com/outdoor-adventure/hiking-and-backpacking/feed/",
+        "https://appalachiantrail.org/feed/"
+      ],
+      "youtube": ["@kraigadams", "@TheTrek", "@HarmenHoek", "@AdventureArchives"],
+      "vimeo": [],
+      "flickr": ["hiking,trail", "hiking,mountains", "hikingtrail", "hiking"],
+      "bluesky": ["hikinghistorian.bsky.social", "slowwaysuk.bsky.social"],
+      "instagram": ["rei", "nationalparkservice", "backpackermag", "appalachiantrail"]
+    },
+    {
+      "area": "bread and baking",
+      "search": "baking",
+      "articles": [
+        "https://www.weekendbakery.com/feed/",
+        "https://www.theguardian.com/food/baking/rss",
+        "https://bakerbettie.com/feed/"
+      ],
+      "youtube": ["@KingArthurBakingCompany", "@bakewithjack", "@Breadtopia"],
+      "vimeo": [],
+      "flickr": ["homemadebread", "baking"],
+      "bluesky": ["breadtopia.bsky.social"],
+      "instagram": ["theperfectloaf", "tartinebakery"]
+    },
+    {
+      "area": "coffee",
+      "search": "coffee",
+      "articles": [
+        "https://perfectdailygrind.com/feed/",
+        "https://dailycoffeenews.com/feed/",
+        "https://www.baristamagazine.com/feed/",
+        "https://www.freshcup.com/feed/",
+        "https://sca.coffee/sca-news/rss.xml"
+      ],
+      "youtube": ["@jameshoffmann", "@MorganDrinksCoffee", "@LanceHedrick", "@EuropeanCoffeeTrip"],
+      "vimeo": [],
+      "flickr": ["latteart", "coffee,cafe", "coffeeshop", "pourover"],
+      "bluesky": ["coffeegeek.com", "baristamagazine.com"],
+      "instagram": ["jimseven", "sprudge", "baristamagazine", "morgandrinkscoffee", "bluebottle"]
+    },
+    {
+      "area": "home organisation",
+      "search": "tidying",
+      "articles": [
+        "https://www.becomingminimalist.com/feed/",
+        "https://www.theminimalists.com/feed/",
+        "https://www.clutterbug.me/feed/",
+        "https://www.aslobcomesclean.com/feed/",
+        "https://www.apartmenttherapy.com/organizing.rss"
+      ],
+      "youtube": ["@Clutterbug", "@DanaKWhite", "@TheMinimalists", "@TheMinimalMom"],
+      "vimeo": [],
+      "flickr": ["decluttering", "slowliving"],
+      "bluesky": ["life-organised.bsky.social"],
+      "instagram": ["thehomeedit", "mariekondo", "theminimalists", "neatmethod"]
+    },
+    {
+      "area": "Japanese architecture",
+      "search": "japanese",
+      "articles": [
+        "https://www.dezeen.com/tag/japanese-architecture/feed/",
+        "https://www.dezeen.com/tag/japanese-houses/feed/",
+        "https://www.spoon-tamago.com/category/architecture/feed/",
+        "https://www.thespaces.com/tag/japan/feed/",
+        "https://www.popularwoodworking.com/tag/japanese-woodworking/feed/"
+      ],
+      "youtube": [
+        "@GoodOldHousesJapan",
+        "@NokogiriJapan",
+        "@dylaniwakuni",
+        "@ShoyanJapaneseCarpenter"
+      ],
+      "vimeo": [],
+      "flickr": ["japanesearchitecture", "japan,architecture", "kyoto,architecture", "shoji"],
+      "bluesky": ["tatamispaces.bsky.social", "spoon-tamago.bsky.social"],
+      "instagram": ["spoonandtamago", "dylaniwakuni"]
+    },
+    {
+      "area": "sculpture and wood carving",
+      "search": "sculpture",
+      "articles": [
+        "https://www.thisiscolossal.com/tags/sculpture/feed/",
+        "https://www.thisiscolossal.com/tags/carving/feed/",
+        "https://sculpturemagazine.art/feed/",
+        "https://woodcarvingillustrated.com/feed/",
+        "https://www.popularwoodworking.com/tag/carving/feed/"
+      ],
+      "youtube": ["@BMSculptures", "@AtharJaber", "@AlecLaCasseArt", "@DougLinker"],
+      "vimeo": [],
+      "flickr": ["sculpture", "stonecarving", "woodsculpture", "woodcarving"],
+      "bluesky": ["thisiscolossal.com", "bloodandsawdust.bsky.social", "bisonrimant.fr"],
+      "instagram": ["thisiscolossal", "yspsculpture", "stormkingartcenter", "noguchimuseum"]
+    },
+    {
+      "area": "folk music and the flute",
+      "search": "folk",
+      "articles": [
+        "https://www.folkradio.co.uk/feed/",
+        "https://blogs.loc.gov/folklife/feed/",
+        "https://www.irishmusicmagazine.com/feed/",
+        "https://thefluteview.com/feed/",
+        "https://flutealmanac.com/feed/"
+      ],
+      "youtube": [
+        "@onlineacademyofirishmusic",
+        "@SmithsonianFolkways",
+        "@whistletutor",
+        "@TheFiddleChannel"
+      ],
+      "vimeo": [],
+      "flickr": ["folkmusic", "fiddle", "tinwhistle", "folk,festival"],
+      "bluesky": ["efdss.bsky.social", "cecilsharphouse.bsky.social", "folkworks.bsky.social"],
+      "instagram": ["smithsonianfolkways", "folkradiouk", "cecilsharphouse", "efdss"]
+    },
+    {
+      "area": "agriculture and farming",
+      "search": "farming",
+      "articles": [
+        "https://www.theguardian.com/environment/farming/rss",
+        "https://www.farmprogress.com/rss.xml",
+        "https://www.irri.org/rss.xml",
+        "https://www.thisiscolossal.com/tags/farming/feed/",
+        "https://grist.org/food-and-agriculture/feed/"
+      ],
+      "youtube": ["@WelkerFarms", "@LauraFarms", "@MillennialFarmer", "@farmaid"],
+      "vimeo": [],
+      "flickr": ["riceterraces", "ricepaddy", "combine,harvest", "farm,tractor"],
+      "bluesky": ["sustainablefarming.bsky.social", "ucanr.edu", "agroecology.bsky.social"],
+      "instagram": ["modernfarmer", "civileats", "fao", "usda", "rodaleinstitute"]
+    },
+    {
+      "area": "furniture",
+      "search": "furniture",
+      "articles": [
+        "https://www.dezeen.com/design/furniture/feed/",
+        "https://www.dezeen.com/tag/chairs/feed/",
+        "https://www.finewoodworking.com/feed",
+        "https://blog.lostartpress.com/feed/",
+        "https://www.mortiseandtenonmag.com/blogs/blog.atom"
+      ],
+      "youtube": ["@RexKrueger", "@ishitanifurniture", "@vitra", "@MattEstlea"],
+      "vimeo": [],
+      "flickr": ["woodworking", "antiquefurniture", "furniture,museum", "eames"],
+      "bluesky": ["popularwoodworking.bsky.social", "monicacortright.com"],
+      "instagram": ["vitra", "hermanmiller", "finewoodworking", "lostartpress"]
+    },
+    {
+      "area": "kites and hang gliding",
+      "search": "kite",
+      "articles": [
+        "https://xcmag.com/feed/",
+        "https://xcmag.com/tag/hang-gliding/feed/",
+        "https://www.kitist.org/feed/",
+        "https://www.thisiscolossal.com/tags/kites/feed/"
+      ],
+      "youtube": ["@MichaelKSherman", "@JimNicholls", "@xcmag", "@teobouvard"],
+      "vimeo": [],
+      "flickr": ["kitefestival", "kiteflying", "paragliding", "hanggliding"],
+      "bluesky": ["kapjasa.si"],
+      "instagram": ["xcmag", "redbullxalps", "ozoneparagliders"]
+    },
+    {
+      "area": "Dutch Golden Age painting",
+      "search": "dutch",
+      "articles": [
+        "https://codart.nl/feed/",
+        "https://www.dailyartmagazine.com/tag/dutch-golden-age/feed/",
+        "https://www.dailyartmagazine.com/tag/rembrandt/feed/",
+        "https://hyperallergic.com/tag/rembrandt/rss/",
+        "https://hnanews.org/feed/"
+      ],
+      "youtube": [
+        "@RijksmuseumAmsterdam",
+        "@hetmauritshuis",
+        "@NationalGallery",
+        "@Smarthistory-art-history"
+      ],
+      "vimeo": ["https://vimeo.com/mauritshuis/videos/rss"],
+      "flickr": ["rijksmuseum", "dutchgoldenage", "mauritshuis", "franshals"],
+      "bluesky": ["peterpaulrubens.bsky.social", "smarthistory.bsky.social"],
+      "instagram": [
+        "rijksmuseum",
+        "mauritshuis",
+        "rembrandthuis",
+        "franshalsmuseum",
+        "nationalgallery"
+      ]
+    },
+    {
+      "area": "Impressionism and abstract art",
+      "search": "painting",
+      "articles": [
+        "https://www.dailyartmagazine.com/category/impressionism/feed/",
+        "https://www.dailyartmagazine.com/tag/wassily-kandinsky/feed/",
+        "https://www.thisiscolossal.com/tags/abstract/feed/",
+        "https://www.thisiscolossal.com/tags/painting/feed/",
+        "https://www.dailyartmagazine.com/category/abstract-art/feed/"
+      ],
+      "youtube": [
+        "@themuseumofmodernart",
+        "@MuseeOrsayOfficiel",
+        "@chrisloudart",
+        "@AndrewTischlerArt"
+      ],
+      "vimeo": [],
+      "flickr": ["museedorsay", "monet,museum", "impressionism", "abstractexpressionism"],
+      "bluesky": [
+        "shawnmcnulty.bsky.social",
+        "erinhansonartist.bsky.social",
+        "impressionism-joy.bsky.social"
+      ],
+      "instagram": ["museeorsay", "themuseumofmodernart", "guggenheim", "artinstitutechi"]
+    },
+    {
+      "area": "science fiction film",
+      "search": "film",
+      "articles": [
+        "https://www.theguardian.com/film/sciencefictionandfantasy/rss",
+        "https://www.shortoftheweek.com/genre/sci-fi/feed/",
+        "https://reactormag.com/tag/movies/feed/",
+        "https://www.scifinow.co.uk/feed/",
+        "https://www.space.com/feeds/tag/science-fiction"
+      ],
+      "youtube": ["@watchdust", "@StarWars", "@StarTrekOfficial", "@thedeclineandfallofbritishsci"],
+      "vimeo": [],
+      "flickr": ["scifi,movie", "scifi,film", "starwars,movie", "startrek"],
+      "bluesky": ["reactorsff.bsky.social", "startrekshots.bsky.social"],
+      "instagram": ["starwars", "startrek", "criterioncollection", "bfi"]
+    },
+    {
+      "area": "artificial intelligence and technology",
+      "search": "ai",
+      "articles": [
+        "https://www.quantamagazine.org/tag/artificial-intelligence/feed/",
+        "https://deepmind.google/blog/rss.xml",
+        "https://news.mit.edu/rss/topic/artificial-intelligence2",
+        "https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss",
+        "https://www.technologyreview.com/topic/artificial-intelligence/feed"
+      ],
+      "youtube": ["@GoogleDeepMind", "@3blue1brown", "@IEEESpectrum", "@MITCSAIL"],
+      "vimeo": [],
+      "flickr": ["robotics", "robot,museum", "computermuseum", "datacenter"],
+      "bluesky": ["wired.com", "theverge.com", "wattenberg.bsky.social"],
+      "instagram": ["mittechreview", "googledeepmind", "wired", "verge"]
+    },
+    {
+      "area": "physics",
+      "search": "physics",
+      "articles": [
+        "https://fyfluiddynamics.com/feed/",
+        "https://physicsworld.com/c/optics-photonics/feed/",
+        "https://phys.org/rss-feed/physics-news/optics-photonics/",
+        "https://www.quantamagazine.org/physics/feed/",
+        "https://www.sciencenews.org/topic/physics/feed"
+      ],
+      "youtube": ["@veritasium", "@minutephysics", "@SteveMould", "@sixtysymbols"],
+      "vimeo": [],
+      "flickr": ["crepuscularrays", "sundog", "refraction", "kite,wind"],
+      "bluesky": ["rigb.org", "cern.bsky.social", "museumofscience.bsky.social"],
+      "instagram": ["cern", "veritasium", "quantamagazine", "exploratorium"]
+    },
+    {
+      "area": "photography",
+      "search": "photography",
+      "articles": [
+        "https://www.theguardian.com/artanddesign/photography/rss",
+        "https://aperture.org/feed/",
+        "https://petapixel.com/feed/",
+        "https://digital-photography-school.com/feed/",
+        "https://www.dpreview.com/feeds/news.xml"
+      ],
+      "youtube": ["@PeterMcKinnon", "@MarkSmithPhotography", "@NigelDanson", "@seantuck"],
+      "vimeo": [],
+      "flickr": ["streetphotography", "filmphotography", "landscapephotography", "35mm,film"],
+      "bluesky": ["timosborne.ca", "beautysurroundsyou.com", "barrybutler9.bsky.social"],
+      "instagram": ["magnumphotos", "natgeo", "aperturefoundation", "worldpressphoto", "petapixel"]
+    },
+    {
+      "area": "travel",
+      "search": "travel",
+      "articles": [
+        "https://www.atlasobscura.com/feeds/latest",
+        "https://www.theguardian.com/travel/rss",
+        "https://www.smithsonianmag.com/rss/travel/",
+        "https://www.bbc.com/travel/feed.rss",
+        "https://roadsandkingdoms.com/feed/"
+      ],
+      "youtube": ["@lonelyplanet", "@EvaZubeck", "@DrewBinsky", "@KaraandNate"],
+      "vimeo": ["https://vimeo.com/roadsandkingdoms/videos/rss"],
+      "flickr": ["travelphotography", "travel,landscape", "roadtrip,landscape", "backpacking"],
+      "bluesky": ["for91days.com", "ricksteves.bsky.social", "texashighways.bsky.social"],
+      "instagram": ["atlasobscura", "lonelyplanet", "natgeotravel", "cntraveler", "ricksteves"]
+    },
+    {
+      "area": "interior design",
+      "search": "interior",
+      "articles": [
+        "https://www.dezeen.com/interiors/feed/",
+        "https://www.dezeen.com/tag/courtyards/feed/",
+        "https://www.designboom.com/interiors/feed/",
+        "https://design-milk.com/category/interior-design/feed/",
+        "https://www.thenordroom.com/feed"
+      ],
+      "youtube": ["@nevertoosmall", "@ArchDigest", "@StudioMcGee", "@TheLocalProject"],
+      "vimeo": [],
+      "flickr": ["vernaculararchitecture", "courtyard,house", "interior,historic", "machiya"],
+      "bluesky": ["thevicsoc.bsky.social", "c20society.bsky.social"],
+      "instagram": ["archdigest", "designmilk", "nevertoosmall", "worldofinteriors"]
+    },
+    {
+      "area": "dreams",
+      "search": "dream",
+      "articles": [
+        "https://www.psychologytoday.com/us/blog/dreaming-in-the-digital-age/feed",
+        "https://www.sciencedaily.com/rss/mind_brain/sleep_disorders.xml",
+        "https://www.nature.com/subjects/sleep.rss",
+        "https://medicalxpress.com/rss-feed/search/?search=dreams",
+        "https://dreamsdemystified.substack.com/feed"
+      ],
+      "youtube": ["@BrainCraft", "@SleepDiplomat", "@luciddreamingteacher", "@drsophiebostock"],
+      "vimeo": [],
+      "flickr": ["dreamy,surreal", "dreamy,fog", "doubleexposure"],
+      "bluesky": ["sleepfoundation.bsky.social", "sleepjournals.bsky.social"],
+      "instagram": ["sleepdiplomat", "aasmorg", "hubermanlab"]
+    },
+    {
+      "area": "psychology and therapy",
+      "search": "psychology",
+      "articles": [
+        "https://greatergood.berkeley.edu/site/rss/articles",
+        "https://psyche.co/feed",
+        "https://www.psychologicalscience.org/feed",
+        "https://www.sciencedaily.com/rss/mind_brain/psychology.xml",
+        "https://www.psypost.org/feed/"
+      ],
+      "youtube": [
+        "@TherapyinaNutshell",
+        "@KatiMorton",
+        "@DrTraceyMarks",
+        "@GreaterGoodScienceCenter"
+      ],
+      "vimeo": [],
+      "flickr": ["solitude", "contemplation", "therapydog"],
+      "bluesky": [
+        "greatergoodmag.bsky.social",
+        "psychscience.bsky.social",
+        "bpsofficial.bsky.social"
+      ],
+      "instagram": ["psychologytoday", "greatergoodsc", "therapyinanutshell", "katimorton"]
+    },
+    {
+      "area": "fantasy literature",
+      "search": "fantasy",
+      "articles": [
+        "https://reactormag.com/tag/fantasy/feed/",
+        "https://fantasy-faction.com/feed",
+        "https://www.theguardian.com/books/fantasy/rss",
+        "https://www.mugglenet.com/feed/",
+        "https://www.theonering.net/torwp/feed/"
+      ],
+      "youtube": ["@BrandSanderson", "@DanielGreeneReviews", "@HarryPotter", "@NerdoftheRings"],
+      "vimeo": [],
+      "flickr": ["hogwarts", "hobbiton", "harrypotter,studiotour", "lotr,lego"],
+      "bluesky": ["tolkiensociety.org", "torbooks.bsky.social"],
+      "instagram": ["torbooks", "orbitbooks", "harrypotter", "gollancz"]
     }
   ]
 }
