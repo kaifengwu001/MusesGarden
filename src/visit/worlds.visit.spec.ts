@@ -6,8 +6,9 @@ import { sampleVisit } from '../muse/samples';
 // A visit on each world that is a destination (environments/<x>/visit.ts), on the sample backend
 // (playwright.visit.config.ts): the sample visit, as the backend serves it, with its planet set to the world, its host
 // the friend who lives there (that friend's seed, server/fixtures/cast.json) and both Muses in clothes. The view is
-// answered here, so these tests stand apart from the backend's clock, which visit.spec.ts moves on.
-// VISIT_STILLS=<dir> keeps a still of each visit, the camera on the two Muses.
+// answered here, so these tests stand apart from the backend's clock, which visit.spec.ts moves on. Each: ready, both
+// Muses together, drawn and in their clothes, the guest on its host's footing, every plant planted on dry ground, and a
+// public find's card. VISIT_STILLS=<dir> keeps a still of each visit, the camera on the two Muses.
 
 const TICKET = 'inv-wren-hero-1';
 const HOST_LOOK: MuseLook = 'muse8';
@@ -31,12 +32,15 @@ interface VisitState {
   readonly host: { readonly museId: string; readonly look: string } | null;
   readonly guest: { readonly museId: string; readonly look: string; readonly shown: boolean; readonly apart: number | null } | null;
   readonly plants: readonly { readonly id: string; readonly placed: boolean; readonly water: number | null }[];
+  readonly card: string | null;
 }
 
 interface VisitProbe {
   readonly ready: Promise<void>;
   state(): VisitState;
   flying(): boolean;
+  frameMuses(): void;
+  open(id: string): void;
 }
 
 interface MuseProbe {
@@ -70,7 +74,7 @@ async function arrive(page: Page): Promise<VisitState> {
 }
 
 for (const world of WORLDS) {
-  test(`a visit on ${world.planet}: both Muses together in their clothes, every plant on dry ground`, async ({ page }) => {
+  test(`a visit on ${world.planet}: both Muses together in their clothes, every plant on dry ground, a public find’s card`, async ({ page }) => {
     await page.route(`**/api/visits/${TICKET}/world*`, (route) => route.fulfill({ json: viewOn(world) }));
     await page.goto(`/environments/${world.planet}/?visit=${TICKET}&as=hero&garden=/api/muses/hero#hud=0`);
     const s = await arrive(page);
@@ -97,8 +101,17 @@ for (const world of WORLDS) {
     expect(drawn).toEqual({ host: true, hostDressed: true, guests: [{ drawn: true, dressed: true, footed: true }] });
     const stills = process.env.VISIT_STILLS;
     if (stills) {
+      // (framed again on the two as they are now: the host may have moved on with its day since)
+      await page.evaluate(() => (window as unknown as { __visit: VisitProbe }).__visit.frameMuses());
+      await page.waitForFunction(() => !(window as unknown as { __visit: VisitProbe }).__visit.flying(), undefined, { timeout: 30_000 });
+      await page.waitForTimeout(300);
       mkdirSync(stills, { recursive: true });
       await page.screenshot({ path: `${stills}/${world.planet}.png` });
     }
+    // a public find opens its card over its bed in this world's beds
+    const find = sampleVisit.plants.find((p) => p.card !== null)?.id as string;
+    await page.evaluate((id) => (window as unknown as { __visit: VisitProbe }).__visit.open(id), find);
+    await page.waitForFunction((id) => (window as unknown as { __visit: VisitProbe }).__visit.state().card === id, find, { timeout: 30_000 });
+    await expect(page.locator('.visit .g-card')).toContainText(`${world.name}’s garden`);
   });
 }
