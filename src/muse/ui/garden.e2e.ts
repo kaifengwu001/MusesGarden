@@ -640,6 +640,10 @@ test('a ticket takes the hero and Muse to the host’s own planet: both Muses th
   const invitation = card.invitation!;
   const planet = invitation.world;
   expect(isPlanetId(planet), `the ticket names a planet: ${planet}`).toBe(true);
+  // a ticket keeps in the post: the owner boards once neither Muse is at work, since boarding while one works only
+  // starts the wait for it (engine.test.ts has that), and work that outlasts the two hours means no trip at all
+  const free = async (id: string) => !(await get<NowView>(api, `/muses/${id}/now`)).working;
+  for (let k = 0; k < 48 && !((await free(HERO)) && (await free(invitation.from))); k++) await advance(api, 0.25);
 
   await openGarden(page);
   await page.evaluate(() => (window as unknown as Win).__garden.mail());
