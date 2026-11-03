@@ -56,6 +56,10 @@ planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world 
   Ukiyo-e Pine Hamlet take visits.
 - **A friend's Muse visiting Momo** is drawn beside it on the meadow, in its own body, with its shadow, while the
   engine says it is there. A tap on it says hello, as one on Momo does.
+- **The visit's rail** (2026-11-03), where the garden's is and made of its buttons: the guest's Muse with "Visiting
+  <Host>’s planet" under it ("<Muse> is on the way" while the two aren't together yet), Find Muse (the two Muses,
+  side on) and <Host>’s home (the world's own view of it: `VisitWorld.frameHome`, its homestead view, Sequoia's
+  cabin). None of the garden's basket, post or tickets; the world's Parameters panel stays.
 
 ### Checked (2026-11-02)
 
@@ -84,7 +88,10 @@ planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world 
   in the post ("… isn't open for visits yet").
 - **Friends' worlds at their own seeds are unreviewed.** Every world was tuned at seed 412.
 - **On the worlds, the guest can stand against a wall.** It keeps off water only; the meadow also keeps it off the
-  house and up on the deck with its host (`MuseRoam.standable`).
+  house and up on the deck with its host (`MuseRoam.standable`). A tap on the guest says hello on every world.
+- **On Violet Dunes, holding a Muse blooms the ground** rather than petting it: its Muse's rig has no petting.
+- **The home button cuts to the home's view** on most worlds (their homestead views are set at once); Violet Dunes
+  glides there.
 - **Instagram.** An Instagram find's picture comes through the API's media cache (`/api/media/…`), so it shows on a
   visit page only when the page and its garden's backend share a host, as in development. The recording's
   Instagram share and its token's expiry (about 2026-12-30) stand as in "Muse's life on the engine".

@@ -37,5 +37,7 @@ export function sequoiaVisit(world: World): VisitWorld {
     bedAt: (laid, dir) => bedAt({ beds: laid }, dir, world.growth.radius),
     ground: (dir) => world.terrain.sample(dir, sample),
     shape: () => world.terrain.layout,
+    // (the host's home: its cabin, as the Muse’s cabin view)
+    frameHome: () => world.cameraPreset('cabin', false),
   };
 }

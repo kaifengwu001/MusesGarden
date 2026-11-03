@@ -44,6 +44,8 @@ export function violetVisit(world: World): VisitWorld {
     bedAt: (laid, dir) => bedAt({ beds: laid }, dir, world.growth.radius),
     ground: (dir) => world.terrain.sample(dir, sample),
     shape: () => world.terrain.layout,
+    // (the host's home: the orchard house, as its Orchard view)
+    frameHome: () => world.cameraPreset('homestead', false),
     // off the shelter's plinth (its local frame as life/muse.ts takes it: across, out toward the approach)
     standable: (dir) => {
       const L = world.terrain.layout;

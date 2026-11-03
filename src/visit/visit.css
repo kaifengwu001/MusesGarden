@@ -1,9 +1,14 @@
 /* A visit on a ticket (src/visit/): the host's planet as a guest sees it. The banner is the garden's .g-visit pill
-   (src/ui/garden/garden.css); a friend's find card shows without its heart and its Public/Private switch, which are
-   the friend's own; the world's controls are put away, since their seed, reset and sliders would change the host's
-   planet; the ended screen says the visit is over and goes home. */
+   and the rail the garden's .g-rail (src/ui/garden/garden.css); a friend's find card shows without its heart and its
+   Public/Private switch, which are the friend's own; the world's controls are put away, since their seed, reset and
+   sliders would change the host's planet; the ended screen says the visit is over and goes home. */
 
 body.is-visiting .controlbar {
+  display: none;
+}
+
+/* the rail (the garden's .g-rail): only while visiting */
+.visit .visit-rail:not(.is-on) {
   display: none;
 }
 
