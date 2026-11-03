@@ -30,6 +30,68 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Visits (2026-11-02, branch muse-lane/visit-server)
+
+A ticket from a friend's Muse takes its owner, and now their Muse with them, to the friend's own planet, and a
+friend's Muse visiting yours shows beside it. The rules are in [docs/muse-agent.md](docs/muse-agent.md) (Muse can
+invite a friend's owner over; The visit is a page of the host's planet; A friend's Muse visiting shows on the
+planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world takes visits is in
+[environments/README.md](environments/README.md).
+
+### What it does
+
+- **Each Muse has a planet and a look**, in `cast.json` (provisional until Kai's cast sheet lands): Fern on the
+  meadow as the original Muse, each friend on a world of its own in a muse in clothes. `src/muse/planets.ts` names
+  each planet and its page. A ticket names its host's planet, and the garden's friends and the public profiles carry
+  where each lives and how it looks (the profile card that shows them is still to come).
+- **A ticket is a trip** on the engine: sent, used, returned. Using it takes the guest's Muse to the host's,
+  whatever either was doing, unless one is at work (then the other waits for it), for 2 h or until the owner
+  returns; the two hang out at the end if both have a photo slot. One trip at a time. `POST /api/visits/:id/return`.
+- **Boarding goes there.** The garden asks the backend first; a ticket it turns down stays in the post and says why.
+  Taken, the ticket is stamped and the page goes to the host's planet: `/environments/<planet>/?visit=…`, or
+  `/?visit=…` for the meadow. A planet that isn't open for visits keeps the ticket in the post.
+- **The visit page** (`src/visit/`): the host in its look at home, the guest a step beside it, the host's finds as
+  beds (public ones open their cards; private ones are flowers with no card), a banner with the time left and
+  Return home, and an ended screen that goes home on its own. Lantern Reed Gardens and the meadow take visits.
+- **A friend's Muse visiting Momo** is drawn beside it on the meadow, in its own body, with its shadow, while the
+  engine says it is there. A tap on it says hello, as one on Momo does.
+
+### Checked (2026-11-02)
+
+- **`npm run check`.** Passes.
+- **`npm test`.** 1616 pass. The 5 failures are worlds' own tests (Rice Terraces' cottage, the sequoia grove,
+  Tulipwind's scale), which fail the same on the commit this branch started from; Golden Rye's crop test fails only
+  under load and passes alone.
+- **`npm run sim`.** All 10 checks pass; the three tickets used in three weeks become three trips (one waits
+  1.25 h for work), 96 hangouts.
+- **`npm run test:visit`** (the sample backend). 7 of 7: a visit on Lantern (both Muses together, every plant on
+  dry ground, a card, a reload), a visit on the meadow (sent there from Lantern's page; a tap on the guest makes it
+  wave), a ticket turned down, a ticket boarded from the post, Return home, an ended visit, and no visit without a
+  ticket.
+- **The live end-to-end travel case** (`garden.e2e.ts`, the real engine): the hero's first ticket from the post,
+  the visit ready with both Muses and every find, Return home, the ticket returned and a second use answering 409.
+  It passes with the friends' planets set to Lantern Reed Gardens and to the meadow (about 20 to 35 s each).
+- **Frames.** With no visit and no friend visiting, the meadow is identical to the commit this branch started from
+  (check-frames samecheck, pins hidden: 9 views each at high and medium at DPR 2, and high at DPR 1), and Lantern
+  Reed Gardens' lock is identical (19 views).
+- **GPU invariants.** 14 pass and 1 is skipped; the growth scrub's frame budget fails at 33.4 ms, as it does on
+  the commit this branch started from under the same load.
+
+### Known issues
+
+- **Rice Terraces and Ukiyo-e Pine Hamlet aren't visitable**: no engine, or not on main yet. Their tickets stay
+  in the post ("… isn't open for visits yet").
+- **Only Lantern and the meadow take visits on this branch.** The other worlds get their adapters in the
+  dressed-muse lane. Until then the live travel case passes only when the ticket's host lives on one of those two,
+  and the friends in `cast.json` live elsewhere.
+- **Friends' worlds at their own seeds are unreviewed.** Every world was tuned at seed 412.
+- **On the worlds, the guest can stand against a wall.** It keeps off water only; the meadow also keeps it off the
+  house and up on the deck with its host (`MuseRoam.standable`). A tap on the guest says hello only on the meadow.
+- **Instagram.** An Instagram find's picture comes through the API's media cache (`/api/media/…`), so it shows on a
+  visit page only when the page and its garden's backend share a host, as in development. The recording's
+  Instagram share and its token's expiry (about 2026-12-30) stand as in "Muse's life on the engine".
+- **Lantern draws every look as the original Muse** until its dressed-muse port lands (`visit.ts` `model()`).
+
 ## The muses in clothes (2026-11-02, in the lab)
 
 Kai's liked concepts, made into models (`src/assets/muse/muses/muse0–12.glb`: nine, then three, then muse 0),

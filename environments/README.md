@@ -37,6 +37,39 @@ the meadow's byte for byte. From then on, it changes only inside its folder.
 - The test harness global stays `window.__meadow`, so the copied specs work
   unchanged.
 
+## Taking visits: a world as a destination
+
+A friend's owner on a ticket travels to the host's own planet, Muse and all: the host's world's page with
+`?visit=<ticket>&as=<guest>&garden=<base>`. The visit itself is shared (`src/visit/`, typed only by structure, so
+it never imports a world). A world takes visits with three small pieces in its own folder. Lantern Reed Gardens
+was the first (`lantern-reed-gardens/{visit.ts, world.ts, main.ts}`), and the meadow's are `src/meadowVisit.ts`
+and `src/main.ts`; copy them.
+
+1. **`visit.ts`, the adapter.** A function from the world's `World` to a `VisitWorld` (`src/visit/world.ts`):
+   - `planet`: the world's PlanetId. `scene`: the World itself (its rig, warp, growth and `pick`, and `frameMuse`
+     if it has one: the arrival uses it, since it knows the home's walls).
+   - `host`: the world's own Muse; `dressHost(look)` puts it in the host's body.
+   - `makeGuest(look)`: a second Muse, made as the residents are: the shared uniforms less `uMusePress` and
+     `uMusePressK` (and the Muse shadow map's, where the world has one), no props of its own, in the guest's
+     body, handed to `world.addVisitor`.
+   - `hideOthers()`: the world's own residents out of sight (`direct({ kind: 'hidden' })`), every frame.
+   - `marks`: the world's find beds (and specimens): `set(looks, radius)`, `update(altitude)`, `open(id)`.
+   - `layOut` and `bedAt` from the world's `garden/placement.ts`; `ground(dir)`, its terrain's sample;
+     `shape()`, its terrain's layout; and, if the world knows more than water, `standable(dir)` (off a house's
+     walls, on a deck's free part: the meadow's `MuseRoam.standable`).
+2. **`world.ts`.** A `visitors` list and `addVisitor(muse)`: its body, props and shadow added to the scene, and
+   each visitor updated and culled in `World.update` as the host is. Add the visitors to `pickMuse`, so a tap on
+   the guest says hello, and to any reflection pass that draws the host. With no visitor the list is empty, and
+   the world's frames must stay as they were (its `:lock` project, with `LOCK_BASELINE`).
+3. **`main.ts`.** `const visit = await prepareVisit(store, '<planet>')` before `new World(…)`, then, under a
+   visit, a `VisitUi` in the garden's place: `visit ? new VisitUi(uiRoot, <world>Visit(world), visit) : new GardenUi(…)`,
+   with no engine of its own (`connectEngine`) and none of the world's own panels.
+
+A guest out by its host is directed `{ kind: 'out' }`. For a tap on it to say hello, the world's Muse must answer
+taps while directed out, as `src/life/muse.ts` does (`MuseRoam.answerOver`). Until a world has its adapter, its
+entry in `src/muse/planets.ts` should say `visitable: false`, and the garden keeps its tickets in the post.
+`npm run test:visit` (the sample backend) runs a visit on Lantern and on the meadow.
+
 ## Running, testing and building a world
 
 | | Command |
