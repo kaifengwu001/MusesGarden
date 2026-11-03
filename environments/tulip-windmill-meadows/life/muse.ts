@@ -1,9 +1,10 @@
 import type { Ray} from 'three';
-import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform } from 'three';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform, type Texture } from 'three';
 import type { Terrain } from '../planet/terrain';
 import { warpPoint, type WarpFrame } from '../../../src/render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from '../../../src/life/museBody';
-import { SCULPTS, type SculptKind } from '../../../src/life/museMesh';
+import { dressMuse, fitOf } from '../../../src/life/museDress';
+import type { DressedKind, MuseMesh, SculptKind } from '../../../src/life/museMesh';
 import BodyWorker from '../../../src/life/museBody.worker.ts?worker&inline';
 import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from '../../../src/life/muse.vert.glsl?raw';
@@ -65,7 +66,8 @@ const BODY: readonly [number, number, number][] = [
 ];
 export const PRESSES = BODY.length;
 
-export type MuseModel = 'field' | SculptKind;
+/** Muse's body: the field's own, a sculpt of it, or one of the muses in clothes (src/life/museMesh.ts DRESSED). */
+export type MuseModel = 'field' | SculptKind | DressedKind;
 
 const tmp = new Vector3();
 const tmp2 = new Vector3();
@@ -162,7 +164,7 @@ export class Muse {
       const worker = new BodyWorker();
       worker.onmessage = (event: MessageEvent<MuseBody>) => {
         this.fieldBody = event.data;
-        if (this.model === 'field') this.take(event.data, FIELD_FIT, null);
+        if (this.model === 'field') this.take(event.data, FIELD_FIT, null, null);
         worker.terminate();
         resolve();
       };
@@ -190,21 +192,21 @@ export class Muse {
     this.loading = this.loading.then(async () => {
       if (this.model !== model) return;
       if (model === 'field') {
-        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null);
+        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null, null);
         return;
       }
       try {
         const { loadSculpt } = await import('../../../src/life/museSculptLoader');
         const sculpt = await loadSculpt(model);
-        if (this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade);
+        if (this.model === model) this.take(sculpt.body, fitOf(model, sculpt.body), sculpt.grade, sculpt.paint);
       } catch (error) {
         console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
       }
     });
   }
 
-  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit and its paint. */
-  private take(body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array }, fit: MuseFit, grade: Vector3 | null): void {
+  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit, its paint, and its clothes' (src/life/museDress.ts). */
+  private take(body: MuseBody & Partial<MuseMesh>, fit: MuseFit, grade: Vector3 | null, paint: Texture | null): void {
     const index = new BufferAttribute(body.index, 1);
     const position = new BufferAttribute(body.position, 3);
     const skinIndex = new BufferAttribute(body.skinIndex, 4);
@@ -249,6 +251,7 @@ export class Muse {
       else delete material.defines[define];
       material.needsUpdate = true;
     }
+    dressMuse(g, material, body, paint);
     const s = new BufferGeometry();
     s.setIndex(index);
     s.setAttribute('position', position);
