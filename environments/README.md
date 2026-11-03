@@ -72,6 +72,14 @@ taps while directed out, as `src/life/muse.ts` does (`MuseRoam.answerOver`). Unt
 entry in `src/muse/planets.ts` should say `visitable: false`, and the garden keeps its tickets in the post.
 `npm run test:visit` (the sample backend) runs a visit on every destination and on the meadow, its rail included.
 
+The same three pieces give a destination the photo studio: `?studio` on its page draws its own friend in its cast
+look (`server/fixtures/cast.json`) with Momo beside it, with no server, under a panel of shots, doings, faces and the
+time held (`src/visit/studio.ts`; C puts the panel away, T holds the time). In `main.ts`,
+`const studio = visit ? null : await prepareStudio(store, '<planet>')` beside `prepareVisit`, and
+`studio ? studio.open(<world>Visit(world), clock) : …` in the garden's place. What a Muse can do there is read off
+the world's Muse itself: the parts of its day its life writes, `tap`, `hold` and `letGo`, and a `pose` (its rig) to
+hold a look on.
+
 ## Running, testing and building a world
 
 | | Command |

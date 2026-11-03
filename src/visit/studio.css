@@ -1,0 +1,11 @@
+/* The photo studio (studio.ts): nothing over the planet but the studio's own panel, which C puts away for the shot.
+   The page's title, hints, controls, perf HUD and Parameters panel stay out of sight. */
+
+body.is-studio #ui,
+body.is-studio .meadow-panel {
+  display: none !important;
+}
+
+.lil-gui.studio-panel {
+  --name-width: 46%;
+}

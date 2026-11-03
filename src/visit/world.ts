@@ -1,5 +1,6 @@
-import type { PerspectiveCamera, Vector3 } from 'three';
+import type { PerspectiveCamera, Vector3, Vector4 } from 'three';
 import type { Basket, Find } from '../garden/types';
+import type { HeldLook } from '../life/museRig';
 import type { MuseLook, PlanetId } from '../muse/contract';
 import type { WarpFrame } from '../render/warp';
 import type { Flight } from '../view/flight';
@@ -22,6 +23,19 @@ export interface VisitBody {
   /** Resolved once its body is meshed and in place. */
   readonly ready: Promise<void>;
   direct(direction: VisitDirection): void;
+  // What the photo studio (studio.ts) asks of a Muse besides, where a world's Muse has it: your doings (world s) as a
+  // press on it has them, its day (to seek a part of it), its pose (to hold a look on it), and its body's spheres
+  // (planet space, m: the fourth its head's).
+  tap?(time: number): void;
+  hold?(time: number, side: number): void;
+  letGo?(time: number): void;
+  readonly life?: {
+    readonly names: readonly { readonly name: string; readonly start: number }[];
+    seek(now: number, at: number): void;
+    at(now: number, camera: Vector3): unknown;
+  } | null;
+  readonly pose?: { held: HeldLook | null };
+  readonly spheres?: readonly Vector4[];
 }
 
 /** A find's bed as it grows: its bed, and the flower it grows as (the find's topic's, from the visit view). */

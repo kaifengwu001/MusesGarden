@@ -7,16 +7,18 @@ import { mediaOf } from '../garden/media';
 import type { Basket, Find, Interest } from '../garden/types';
 import type { PlanetId, VisitPlant, VisitWorldView } from '../muse/contract';
 import { salt, unit } from '../core/hash';
-import { angleBetween, slerpUnit, tangentToward, travel } from '../planet/geo';
+import { tangentToward, travel } from '../planet/geo';
 import { warpPoint } from '../render/warp';
 import { button, el, wait } from '../ui/garden/dom';
 import { FindCard } from '../ui/garden/findCard';
 import { ICONS } from '../ui/garden/icons';
-import { Flight, type Framing } from '../view/flight';
+import { Flight } from '../view/flight';
 import { loadVisit, planetOf, returnFromVisit, type VisitLoad } from './api';
 import { FOLLOW, Follower } from './follow';
+import { homeFraming, hostFraming, musesFraming } from './framing';
 import { homeUrl, leftPhrase, readVisit, visitable, visitUrl, type VisitParams } from './params';
 import { moved, snapBeds, type SnapBed } from './snap';
+import type { Studio } from './studio';
 import { Transit } from './transit';
 import type { VisitBody, VisitWorld } from './world';
 
@@ -35,20 +37,6 @@ const POLL_MS = 30_000;
 const ENDED_MS = 4_000;
 /** A find's framing (as the garden's): the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
-/**
- * The two Muses' framing, side on to the pair (visitUi.frameMuses): the camera at least this far off and this high
- * (m), farther and higher in step where it needs the room for both, looking this high over their ground (m).
- */
-const MUSES_VIEW = { distance: 6.2, height: 1.9, aim: 0.8 } as const;
-/** Room left across the view on each side of the two Muses (m). */
-const MUSES_ROOM = 1.1;
-/** How many places on the way from the camera to the two are looked at for what stands in it, and how near a house's middle (m) is in its walls. */
-const SIGHT_SAMPLES = 8;
-const HOUSE_REACH = 6;
-/** How much the side the host faces counts toward the camera's side, against open places (of SIGHT_SAMPLES): its face over a little more room. */
-const FACING = 3;
-/** The host's house as the camera comes to it, where the world has no view of its own (visitUi.goToHostHome). */
-const HOME_VIEW = { distance: 16, height: 6, aim: 1.5 } as const;
 /** A friend's garden round its home on its own planet (visitUi.gardenPlaces): its nearest find this far from the house's middle (m), past its walls, and each next one farther by this times the square root of its place (m). */
 const GARDEN_FROM = 9;
 const GARDEN_STEP = 3;
@@ -90,6 +78,16 @@ export async function prepareVisit(store: VisitStore, planet: PlanetId, search: 
     store.flush();
   }
   return { params, load };
+}
+
+/**
+ * Or, before the page makes its World, the photo studio its URL asks for (`?studio`: studio.ts, loaded only then), the
+ * planet set as a visit to it has it. Null when the URL asks for none. The page then opens it in place of its garden.
+ */
+export async function prepareStudio(store: VisitStore, planet: PlanetId, search: string = location.search): Promise<Studio | null> {
+  if (!new URLSearchParams(search).has('studio')) return null;
+  const { openStudio } = await import('./studio');
+  return openStudio(store, planet, search);
 }
 
 /** On the visit; over; out of reach; or the host's planet isn't open to visits (no page for it takes them yet). */
@@ -474,17 +472,17 @@ export class VisitUi {
 
   /**
    * To the two Muses (on arriving, and whenever asked again): side on to them, both in the view, from the side with
-   * open sight to them, never in toward the house. With no guest beside the host, the world's own view of its Muse
-   * where it has one (it knows its home's walls), else from in front of the host.
+   * open sight to them, never in toward the house (framing.ts musesFraming). With no guest beside the host, the
+   * world's own view of its Muse where it has one (it knows its home's walls), else from in front of the host.
    */
   frameMuses(): void {
-    const framing = this.musesFraming();
+    const framing = musesFraming(this.world, this.guest && this.guestShown ? this.guest.where : null);
     if (framing === null && this.world.scene.frameMuse) {
       this.interrupt();
       this.world.scene.frameMuse();
       return;
     }
-    this.flight.to(framing ?? this.hostFraming(), this.world.scene.growth.radius, this.ground);
+    this.flight.to(framing ?? hostFraming(this.world), this.world.scene.growth.radius, this.ground);
   }
 
   /** To the host's home: the world's own view of it where it has one, else from out in front of its house. */
@@ -494,83 +492,7 @@ export class VisitUi {
       this.world.frameHome();
       return;
     }
-    // (every world's layout names its cottage and the way it faces; without them, wherever the host is)
-    const layout = this.world.shape() as { readonly cottage?: unknown; readonly homeBearing?: unknown };
-    const house = layout.cottage instanceof Vector3 ? layout.cottage.clone().normalize() : this.world.host.where.dir.clone();
-    const from = layout.homeBearing instanceof Vector3 ? layout.homeBearing.clone() : undefined;
-    this.flight.to({ dir: house, ground: this.world.ground(house).height, ...HOME_VIEW, from }, this.world.scene.growth.radius, this.ground);
-  }
-
-  /** The host alone, from in front of it. */
-  private hostFraming(): Framing {
-    const host = this.world.host.where;
-    return { dir: host.dir.clone(), ground: host.height, ...(this.world.musesView ?? MUSES_VIEW), from: host.heading.clone() };
-  }
-
-  /**
-   * The two Muses side on: from across the line between them, at their middle, far enough back that both fit across
-   * the view with room to spare (the world's own musesView, or MUSES_VIEW, at least; higher in step, so it looks down
-   * as steeply; and higher by as much as the camera's own ground rises above theirs, so it never stands down in what
-   * grows on a slope), from the side with more open ground between the camera and the two (no rise of the ground,
-   * wall in the way, never in toward the house) and toward the side the host faces. Null with no guest beside the host.
-   */
-  private musesFraming(): Framing | null {
-    const base = this.world.musesView ?? MUSES_VIEW;
-    const R = this.world.scene.growth.radius;
-    const host = this.world.host.where;
-    const guest = this.guest && this.guestShown ? this.guest.where : null;
-    const apart = guest ? angleBetween(host.dir, guest.dir) * R : 0;
-    if (!guest || apart < 0.3) return null;
-    const middle = slerpUnit(host.dir, guest.dir, 0.5, new Vector3());
-    const along = tangentToward(middle, guest.dir, new Vector3());
-    const across = new Vector3().crossVectors(middle, along).normalize();
-    // (the view's half width at the height it comes down to, as the rig opens its lens there)
-    const rig = this.world.scene.rig;
-    const fov = (rig.framing(rig.zoomForAltitude(base.height)).fov * Math.PI) / 180;
-    const halfWidth = Math.atan(Math.tan(fov / 2) * rig.camera.aspect);
-    const distance = Math.max(base.distance, (apart / 2 + MUSES_ROOM) / Math.tan(halfWidth));
-    const scale = distance / base.distance;
-    const framing = { dir: middle, ground: (host.height + guest.height) / 2, distance, height: base.height * scale, aim: base.aim };
-    const sides = [across, across.clone().negate()];
-    // (a side whose way runs in toward the house, through it or to a camera in it, is no side: of two opposite ways
-    // from the two, at most one runs in toward it)
-    const scores = sides.map((side) => {
-      const open = this.openness(framing, side);
-      return open < 0 ? -Infinity : open + FACING * side.dot(host.heading);
-    });
-    const from = scores[1] > scores[0] ? sides[1] : sides[0];
-    const camera = travel(middle, from, distance / R, new Vector3());
-    const rise = Math.max(0, this.world.ground(camera).height - framing.ground);
-    return { ...framing, height: framing.height + rise, from };
-  }
-
-  /**
-   * How open the way is from a framing's camera, on one side, to the two Muses: of the places along it, how many have
-   * nothing in the line of sight (the ground below it, no wall where a Muse may not stand); -1 when the way runs in
-   * toward the house (a place on it within HOUSE_REACH of the house and nearer it than the two stand, who may well be
-   * on its own deck or terrace), so the camera neither looks through it nor stands in it.
-   */
-  private openness(f: Omit<Framing, 'from'>, side: Vector3): number {
-    const R = this.world.scene.growth.radius;
-    // (every world's layout names its cottage: its house stands about it)
-    const cottage = (this.world.shape() as { readonly cottage?: unknown }).cottage;
-    const house = cottage instanceof Vector3 ? cottage : null;
-    const theirs = house ? angleBetween(f.dir, house) * R : 0;
-    const p = new Vector3();
-    let open = 0;
-    for (let k = 1; k <= SIGHT_SAMPLES; k++) {
-      const u = k / SIGHT_SAMPLES;
-      travel(f.dir, side, (f.distance * u) / R, p);
-      if (house) {
-        const d = angleBetween(p, house) * R;
-        if (d < HOUSE_REACH && d < theirs) return -1;
-      }
-      const sight = f.ground + f.aim + (f.height - f.aim) * u;
-      if (this.world.ground(p).height > sight - 0.25) continue;
-      if (this.world.standable && !this.world.standable(p)) continue;
-      open++;
-    }
-    return open;
+    this.flight.to(homeFraming(this.world), this.world.scene.growth.radius, this.ground);
   }
 
   // ---- the dev harness -------------------------------------------------------------------------------

@@ -71,6 +71,8 @@ export class MuseRig {
   smile = 0;
   /** How far the left arm is up in a wave (0 … 1): the shoulder's corrective plays in with it (museMesh.ts). */
   raised = 0;
+  /** A look held over every pose, for a photo (src/visit/studio.ts): the eyes and the smile, and where the head turns (rad, as the action's look); or null, the poses' own. */
+  held: { face?: { eyes?: number; smile?: number }; look?: { yaw: number; pitch: number } } | null = null;
 
   constructor(readonly fit: MuseFit = FIELD_FIT) {
     // the frames the mesh was made in: the skeleton's rest, the arms turned as bound
@@ -150,10 +152,12 @@ export class MuseRig {
     this.idle(a.time, a.walk);
     if (a.walk > 0) this.walkPose(a.gait, a.walk, a.stride);
     if (waving) this.wavePose(a.wave);
-    if (a.look > 0) this.lookPose(a.lookYaw * a.look, a.lookPitch * a.look);
-    this.eyes = blink(a.time);
+    const held = this.held;
+    if (held?.look) this.lookPose(held.look.yaw, held.look.pitch);
+    else if (a.look > 0) this.lookPose(a.lookYaw * a.look, a.lookPitch * a.look);
+    this.eyes = held?.face?.eyes ?? blink(a.time);
     // a little smile always, beaming while it waves
-    this.smile = 0.15 + 0.85 * this.raised;
+    this.smile = held?.face?.smile ?? 0.15 + 0.85 * this.raised;
     this.shoulders();
     this.compute();
   }

@@ -796,7 +796,10 @@ so any view can be shared.
                            the host's finds as beds and their cards, the banner, the ended screen), world.ts (a
                            destination, typed only by structure), follow.ts (the guest a step from its host, on ground
                            it can stand on), snap.ts (beds the layout left on water, moved to dry ground), transit.ts
-                           (the ticket's stamp), companions.ts (a friend's Muse visiting, drawn beside Muse)
+                           (the ticket's stamp), companions.ts (a friend's Muse visiting, drawn beside Muse),
+                           framing.ts (the camera on the two Muses, the host, its home, a selfie), studio.ts (the
+                           photo studio, `?studio`: a visit's planet and Muses with no server, their doings, faces
+                           and the time held for photos taken by hand, over the rig's held look, museRig.ts)
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
                            react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes and
                            stars, post read, today's post and the tickets, baskets visited), where the finds grow
