@@ -3,12 +3,15 @@
 Fictional owner context for this demo fixture. These interests, routines, and working preferences are synthetic seed data. The fixture begins with no lived Muse interaction history.
 
 ## Interests
-- Botanical illustration
+- Dutch golden age painting
 - Pigment
 - Typography
+- Oil painting
+- Impressionism
+- Kandinsky
 
 ## Routines
-- Grinds a little watercolour paint on Sunday mornings.
+- Grinds a little paint on weekend mornings.
 - Reads type specimens on the train.
 
 ## Working preferences

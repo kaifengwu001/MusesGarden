@@ -5,11 +5,13 @@ This is a fictional owner profile for demonstrations. These interests, routines,
 ## Interests
 - Birdwatching
 - Cartography
-- Sailing
+- Hiking
+- Kites
+- Hang gliding
 
 ## Routines
 - Walks along the river before breakfast.
-- Keeps a notebook of every bird seen from the kitchen window.
+- Flies a kite whenever the forecast promises a steady breeze.
 
 ## Working preferences
 - Prefers a clear route or diagram alongside a short explanation.

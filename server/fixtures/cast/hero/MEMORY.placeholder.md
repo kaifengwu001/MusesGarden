@@ -1,9 +1,9 @@
 # Memory
 
 ## Interests
-- Botanical illustration
-- Tea
+- Gardening
+- Soup
 
 ## Routines
-- Sketches in the garden on Saturday mornings.
-- Makes a pot of tea before starting work.
+- Checks the garden beds before breakfast.
+- Makes a pot of soup on cold afternoons.

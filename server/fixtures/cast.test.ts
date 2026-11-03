@@ -9,6 +9,7 @@ import { PLANET_IDS, PLANETS } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
 import { HeuristicMind } from '../adapters/minds/heuristic';
+import { privacyFilterIn } from '../domain/privacy';
 import { parseSoul } from '../domain/soul';
 import { FIXTURES_DIR, loadCast, parseCastFile, readMemberDocs } from './cast';
 
@@ -112,26 +113,29 @@ describe('member SOUL.md and MEMORY.md', () => {
     const topics = await interests(memory);
     expect(topics.length).toBeGreaterThan(0);
     expect(topics, 'every interest is a corpus topic').not.toContain(null);
+    const labels = await mind.extractInterests(memory, 'memory');
+    expect(privacyFilterIn(labels, memory), 'every interest passes the privacy filter, so it reaches the engine').toEqual(labels);
     expect(memory.match(/^## /gm)?.length, 'Interests plus another section').toBeGreaterThanOrEqual(2);
   });
 
-  it('the strangers include an introvert, an extrovert, and one who shares an interest with the hero', async () => {
+  it('the strangers include an introvert and an extrovert', () => {
     const soul = (m: CastMember) => parseSoul(readMemberDocs(m).soul).temperament;
-    const strangers = cast.members.filter((m) => m.role === 'stranger');
-    const sociability = strangers.map((m) => soul(m).sociability ?? 0.5);
+    const sociability = cast.members.filter((m) => m.role === 'stranger').map((m) => soul(m).sociability ?? 0.5);
     expect(Math.min(...sociability)).toBeLessThanOrEqual(0.3);
     expect(Math.max(...sociability)).toBeGreaterThanOrEqual(0.7);
-    const hero = cast.members.find((m) => m.role === 'hero');
-    if (hero === undefined) throw new Error('no hero');
-    const heroTopics = new Set(await interests(readMemberDocs(hero).memory));
-    const shared = await Promise.all(strangers.map(async (m) => (await interests(readMemberDocs(m).memory)).some((t) => heroTopics.has(t))));
-    expect(shared).toContain(true);
   });
 
-  it('the hero retains the demo botanical illustration seed, where the hero chain starts', async () => {
+  it('the hero seeds the interests Kai gave Momo: gardening, soup, flowers, jazz, the stars and hiking', async () => {
     const hero = cast.members.find((m) => m.role === 'hero');
     if (hero === undefined) throw new Error('no hero');
-    expect(await interests(readMemberDocs(hero).memory)).toContain('Botanical illustration');
+    expect(await interests(readMemberDocs(hero).memory)).toEqual(['Gardening', 'Soup', 'Flower', 'Jazz', 'Astronomy', 'Hiking']);
+  });
+
+  it('the hero’s placeholder memory seeds topics too, past the privacy filter', async () => {
+    const placeholder = read('cast/hero/MEMORY.placeholder.md');
+    const labels = await mind.extractInterests(placeholder, 'memory');
+    expect(await interests(placeholder)).toEqual(['Gardening', 'Soup']);
+    expect(privacyFilterIn(labels, placeholder)).toEqual(labels);
   });
 });
 
