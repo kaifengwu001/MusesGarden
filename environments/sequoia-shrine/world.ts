@@ -32,7 +32,7 @@ import { Palette, ROW, sunAt } from './render/palette';
 import { Sky } from './render/sky';
 import { localSun } from '../../src/render/sun';
 import { warpForZoom, type WarpFrame } from '../../src/render/warp';
-import { CameraRig } from '../../src/view/camera';
+import { CameraRig } from './view/camera';
 import { findVista, type Vista } from './view/vista';
 
 const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3 } as const;
@@ -398,7 +398,7 @@ export class World {
     this.nearFieldDrawn = grassNear > 0.5 || flowerNear > 0.5;
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.grove.update(clock.time, this.terrain, rig.up, rig.altitude, this.groveInSight());
-    this.birds.update(clock.time, this.terrain);
+    this.birds.update(clock.time, this.terrain, this.grove.canopyTop);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());

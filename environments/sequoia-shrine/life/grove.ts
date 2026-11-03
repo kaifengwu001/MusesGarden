@@ -33,10 +33,15 @@ export function canopyGrowthScale(radius:number):number {
   return Math.pow(radius/128,radius<128?0.32:0.12);
 }
 
+/** Seeded trees are sized evenly across this range of their habit's template;
+ * the hand-placed trees framing the original shrine keep their own sizes. */
+const TREE_SIZE_MIN=0.5,TREE_SIZE_MAX=1.5;
+
 /** Unequal wooded stands over a complete forest backbone, in canonical home space. */
 export function generateGroveSites(seed:number,radius=128):GroveSite[] {
   let state=hash32(seed^0x65e9b4a1);
   const rand=():number=>unit(state=hash32((state+0x9e3779b9)>>>0));
+  const treeSize=():number=>TREE_SIZE_MIN+rand()*(TREE_SIZE_MAX-TREE_SIZE_MIN);
   const sites:GroveSite[]=[];
   const addLocal=(x:number,z:number,habit:0|1|2|3,scale:number):void=>{
     if(!groveRouteClear(x,z,habit===3?1.1:2.6))return;
@@ -48,7 +53,7 @@ export function generateGroveSites(seed:number,radius=128):GroveSite[] {
   for(const [x,z,s] of [[-12,-16,0.91],[11,-22,0.95],[-31,-10,0.9],[34,-4,0.88],[-34,44,0.97],[33,34,1],[-27,59,0.91],[24,62,0.98],[-7,-31,0.86],[6,-37,0.94],[-40,-32,0.94],[42,-27,0.9],[-42,12,1],[47,21,0.88]])addLocal(x,z,1,s);
   for(let i=0;i<42;i++){
     const x=(rand()<0.5?-1:1)*(8+rand()*43),z=-43+rand()*105;
-    addLocal(x,z,2,0.62+rand()*0.52);
+    addLocal(x,z,2,treeSize());
   }
   // Ground vegetation follows root pockets, with variable satellites rather
   // than a repeated ring around every tree or a uniform carpet over the path.
@@ -81,7 +86,7 @@ export function generateGroveSites(seed:number,radius=128):GroveSite[] {
         const direction=center.clone().addScaledVector(axis,Math.cos(a)*r).addScaledVector(cross,Math.sin(a)*r*0.65).normalize();
         if(globalTrees.some(site=>site.direction.dot(direction)>Math.cos(0.057)))continue;
         const chance=rand(),habit=chance<0.34?0:chance<0.84?1:2;
-        const site:GroveSite={direction,habit,scale:0.76+rand()*0.43,turn:rand()*Math.PI*2,phase:rand()*Math.PI*2,tint:rand()};
+        const site:GroveSite={direction,habit,scale:treeSize(),turn:rand()*Math.PI*2,phase:rand()*Math.PI*2,tint:rand()};
         sites.push(site);globalTrees.push(site);break;
       }
     }
@@ -100,7 +105,7 @@ export function generateGroveSites(seed:number,radius=128):GroveSite[] {
   for(let i=0;i<68;i++){
     const theta=(i+rand()*0.85)/68*Math.PI*2,offset=(rand()<0.55?-1:1)*(8+rand()*15);
     const habit:0|1|2=rand()<0.2?0:rand()<0.65?1:2;
-    const scale=0.76+rand()*0.28,phase=rand()*Math.PI*2;
+    const scale=treeSize(),phase=rand()*Math.PI*2;
     sites.push({direction:new Vector3(0,1,0),trail:[theta,offset],habit,scale,turn:rand()*Math.PI*2,phase,tint:rand()});
     for(let k=0;k<2;k++)sites.push({direction:new Vector3(0,1,0),trail:[theta+(rand()-0.5)*0.05,offset+(rand()-0.5)*4],habit:3,scale:0.7+rand()*0.45,turn:rand()*Math.PI*2,phase,tint:rand()});
   }
@@ -117,7 +122,7 @@ export function generateGroveSites(seed:number,radius=128):GroveSite[] {
     const cross=new Vector3().crossVectors(direction,axis).normalize();
     const jitterAngle=rand()*Math.PI*2,jitter=(rand()-0.5)*spacing*0.28;
     direction.addScaledVector(axis,Math.cos(jitterAngle)*jitter).addScaledVector(cross,Math.sin(jitterAngle)*jitter).normalize();
-    sites.push({direction,coverage:true,habit:rand()<0.3?0:1,scale:0.98+rand()*0.23,turn:rand()*Math.PI*2,phase:rand()*Math.PI*2,tint:rand()});
+    sites.push({direction,coverage:true,habit:rand()<0.3?0:1,scale:treeSize(),turn:rand()*Math.PI*2,phase:rand()*Math.PI*2,tint:rand()});
   }
   return sites;
 }
@@ -142,7 +147,10 @@ interface PlacedSite {
 
 export class Grove {
   readonly group=new Group();
+  /** The forest's 90th-percentile treetop over the sphere (m); the flocks fly just above it. */
+  canopyTop=0;
   private readonly batches:Batch[]=[];
+  private readonly tops:number[]=[];
   private readonly material:ShaderMaterial;
   private readonly time={value:0};
   private seed=Number.NaN;
@@ -165,6 +173,7 @@ export class Grove {
   invalidate():void {this.dirty=true;}
 
   private batch(source:BufferGeometry,habit:number,coarse:boolean,name:string):void {
+    if(!coarse&&habit<3){source.computeBoundingBox();this.tops[habit]=source.boundingBox!.max.y;}
     const indexed=mergeVertices(source,1e-6),g=new InstancedBufferGeometry();
     for(const key of Object.keys(indexed.attributes))g.setAttribute(key,indexed.getAttribute(key));
     g.setIndex(indexed.index);source.dispose();indexed.dispose();
@@ -240,6 +249,8 @@ export class Grove {
         z.crossVectors(x,dir).normalize();turned.copy(x).multiplyScalar(Math.cos(site.turn)).addScaledVector(z,Math.sin(site.turn));
         this.placed[site.habit].push({direction:new Vector3(ax,ay,az),across:turned.clone(),ground:ground.height-(site.habit===3?0.04:0.15)*scale,scale,phase:site.phase,tint:site.tint});
       }
+    const treetops=this.placed.slice(0,3).flatMap((sites,habit)=>sites.map(site=>site.ground+this.tops[habit]*site.scale)).sort((a,b)=>a-b);
+    this.canopyTop=treetops.length?treetops[Math.floor(0.9*(treetops.length-1))]:0;
     this.selectDetail(cameraDirection,cameraAltitude,maxVisibleRootAngle);
   }
 

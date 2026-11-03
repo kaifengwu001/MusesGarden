@@ -124,10 +124,10 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0.04, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 38, 1, 40, 0.5, 'live', { unit: 'm' }),
-    speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
-    shadow: num('csh', 'Shadow', 0.16, 0, 1, 0.01, 'live'),
+    coverage: num('cc', 'Coverage', 0.9, 0, 1, 0.01, 'life'),
+    altitude: num('ca', 'Altitude', 39.5, 1, 100, 0.5, 'live', { unit: 'm' }),
+    speed: num('cs', 'Speed', 0.82, 0, 1, 0.01, 'live'),
+    shadow: num('csh', 'Shadow', 0.59, 0, 1, 0.01, 'live'),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),

@@ -26,7 +26,7 @@ import shadowVertex from '../../../src/life/birdShadow.vert.glsl?raw';
 // a long, gentle meander from side to side. Two wheel in steady loops where
 // you are most likely to be: over the meadow just behind the cottage (above
 // its roof seen across the pond), and over the wetland's edge nearest it. They fly level, a few meters above the
-// highest ground (rising over the cottage), in loose V's or clusters, each
+// forest's 90th-percentile treetops (rising over the cottage), in loose V's or clusters, each
 // bird keeping its place with only a slight drift, with the slow, deep
 // beats of an egret (about two a second) and long glides on raised wings,
 // banking into the turns. Every pose is a
@@ -42,10 +42,11 @@ const MAX_FLOCKS = 32;
 /** Half wingspan (m) of the bird mesh below. */
 const HALF_SPAN = 0.48;
 /**
- * Level flight: the hilltops stand at about this share of the terrain's
- * height bound (the bound is four spreads up; the highest ground seen is
- * nearer two and a half), flocks fly this far over them (m), and rise this
- * much more within this far of the cottage (m).
+ * Level flight: flocks fly this far (m) over the forest's 90th-percentile
+ * treetops, or over the hilltops where those stand higher (at about this
+ * share of the terrain's height bound: the bound is four spreads up; the
+ * highest ground seen is nearer two and a half), and rise this much more
+ * within this far of the cottage (m).
  */
 const FLIGHT = { hilltops: 0.5, height: [2.4, 3.8], cottage: 1.5, cottageRadius: 16 } as const;
 /** Wingbeat (Hz), its swing at the shoulder (rad), and the glides: their rhythm (s a cycle) and the sine level below which a bird glides. */
@@ -75,7 +76,7 @@ interface Flock {
   meander: [number, number, number];
   /** The wheeling flocks loop about a centre instead: behind the cottage (null centre) or over the marsh; radius (m), rate (rad/s). */
   loop: { centre: Vector3 | null; radius: number; rate: number } | null;
-  /** Height above the highest ground (m), its slow swell (m, rad/s, phase). */
+  /** Height above the treetops (m), its slow swell (m, rad/s, phase). */
   height: number;
   swell: [number, number, number];
   birds: Bird[];
@@ -304,15 +305,15 @@ export class Birds {
     return travel(out, this.e1, (f.meander[0] * Math.sin(f.meander[1] * t + f.meander[2])) / R, out);
   }
 
-  /** Fly every bird to where it is at `time` (s). */
-  update(time: number, terrain: Terrain): void {
+  /** Fly every bird to where it is at `time` (s), over `treetops`: the grove's 90th-percentile treetop over the sphere (m). */
+  update(time: number, terrain: Terrain, treetops = 0): void {
     const R = terrain.radius;
     if (terrain.layout.seed !== this.layoutSeed) this.build(terrain);
     const count = Math.min(MAX_FLOCKS, Math.max(3, Math.round((FLOCKS * R) / 128)));
     const pos = this.pos.array as Float32Array;
     const frame = this.frame.array as Float32Array;
     const wing = this.wing.array as Float32Array;
-    const top = FLIGHT.hilltops * terrain.maxHeight;
+    const top = Math.max(FLIGHT.hilltops * terrain.maxHeight, treetops);
     const cottage = terrain.layout.cottage;
     const dt = 0.25;
     let n = 0;
@@ -330,7 +331,7 @@ export class Birds {
       const turn = Math.asin(clamp(this.q.crossVectors(back, fore).dot(this.centre), -1, 1)) / dt;
       const speed = (this.b.distanceTo(this.a) * R) / (2 * dt);
       const bank = clamp(Math.atan((speed * turn) / 9.81) * 2.2, -0.6, 0.6);
-      // level flight over the highest ground, rising over the cottage
+      // level flight over the treetops, rising over the cottage
       const near = smoothstep(FLIGHT.cottageRadius, FLIGHT.cottageRadius * 0.4, Math.acos(clamp(this.centre.dot(cottage), -1, 1)) * R);
       const lift = R + top + f.height + FLIGHT.cottage * near + f.swell[0] * Math.sin(f.swell[1] * time + f.swell[2]);
       for (const b of f.birds) {

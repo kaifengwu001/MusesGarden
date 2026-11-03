@@ -1,0 +1,35 @@
+/* TEMPORARY: the cloud colour panel (cloudColours.ts), as Lantern Reed's and Scarlet Sail's, above the hints. */
+.cloud-colours { position:fixed; left:var(--gutter); bottom:168px; width:262px; padding:13px 20px 12px; background:#f8f3e6e8; border:1px solid #45666a30; border-radius:4px 16px 16px 16px; box-shadow:0 12px 40px #2a53521a; pointer-events:auto; backdrop-filter:blur(12px); font-size:11px; }
+.cloud-colours summary { cursor:pointer; list-style:none; }
+.cloud-colours summary::-webkit-details-marker { display:none; }
+.cloud-colours > summary { display:flex; align-items:baseline; gap:10px; }
+.cloud-colours-eyebrow { margin:0; text-transform:uppercase; font-size:9px; letter-spacing:.18em; color:#936c51; }
+.cloud-colours-title { font:400 17px/1.2 var(--font-serif); }
+.cloud-colours[open] > summary { margin-bottom:10px; }
+.cloud-colours-row { margin:0 0 10px; }
+.cloud-colours-label { display:block; margin:0 0 6px; font-size:10px; letter-spacing:.04em; color:#667775; }
+.cloud-colours-swatches { display:flex; gap:5px; }
+.cloud-colours-swatch, .cloud-colours-any { width:20px; height:20px; flex:none; padding:0; border-radius:50%; cursor:pointer; transition:transform .12s; }
+.cloud-colours-swatch { border:1px solid #4a5f6040; }
+.cloud-colours-own { border:1.5px dashed #5b4636b0; }
+.cloud-colours-swatch:hover, .cloud-colours-any:hover { transform:scale(1.18); }
+.cloud-colours-swatch[aria-pressed=true], .cloud-colours-any.on { box-shadow:0 0 0 2px #f8f3e6, 0 0 0 3.5px #5b4636; }
+.cloud-colours-any { border:0; background:conic-gradient(#f2a3a3, #f4e39c, #a8e8b4, #a3cff2, #c7a8f0, #f2a3a3); }
+.cloud-colours-any::-webkit-color-swatch-wrapper { padding:3px; }
+.cloud-colours-any::-webkit-color-swatch { border:0; border-radius:50%; }
+.cloud-colours-parts > summary { font-size:10px; letter-spacing:.04em; color:#667775; margin:0 0 4px; }
+.cloud-colours-parts > summary::before { content:'▸ '; }
+.cloud-colours-parts[open] > summary::before { content:'▾ '; }
+.cloud-colours-part { display:grid; grid-template-columns:36px 1fr 76px; align-items:center; gap:10px; padding:2px 0; }
+.cloud-colours-part.picked span::after { content:'  •'; color:#b0744f; }
+.cloud-colours-part input[type=color] { width:36px; height:20px; padding:0; border:1px solid #58757438; border-radius:5px; background:none; cursor:pointer; }
+.cloud-colours-part input[type=color]::-webkit-color-swatch-wrapper { padding:2px; }
+.cloud-colours-part input[type=color]::-webkit-color-swatch { border:0; border-radius:3px; }
+.cloud-colours-hex { width:100%; padding:3px 6px; border:1px solid #7587844a; background:#fff9ee; color:#344c50; border-radius:4px; font:11px ui-monospace, Menlo, monospace; }
+.cloud-colours :focus-visible { outline:2px solid #9d714e; outline-offset:2px; }
+.cloud-colours-actions { display:flex; gap:5px; margin-top:8px; font-size:10px; }
+.cloud-colours-actions button { cursor:pointer; border:1px solid #58757438; border-radius:5px; background:transparent; color:inherit; font:inherit; padding:6px 9px; }
+.cloud-colours-actions button:hover { background:#dfdacf; }
+.cloud-colours-note { margin:8px 0 0; font-size:10px; line-height:1.45; color:#667775; overflow-wrap:anywhere; }
+body.postcard .cloud-colours, body.g-mail-open .cloud-colours, body.g-away .cloud-colours { display:none; }
+@media(max-width:700px) { .cloud-colours { display:none; } }

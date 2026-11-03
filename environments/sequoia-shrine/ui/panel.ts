@@ -73,12 +73,11 @@ export function createPanel(store: ParamStore): Panel {
     }
   });
 
-  gui.hide();
-  let visible=false;
+  gui.close();
   return {
     gui,
     toggle() {
-      visible=!visible;gui.show(visible);if(visible)gui.open();
+      gui.open(gui._closed);
     },
   };
 }

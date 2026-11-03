@@ -44,7 +44,7 @@ const NOON: Rows = {
   // zenith, horizon, haze, sun glow, mid sky, haze over the far meadow
   [ROW.SKY]: ['#648c97', '#bdcfc1', '#bdcfc6', '#f4e7b9', '#85aaab', '#93b3ae'],
   // lit, shadowed, mid, rim, base (the meadow's green through it)
-  [ROW.CLOUD]: ['#F7FAFB', '#CAD7DF', '#E3EBEF', '#FFFFFF', '#B2C6C1'],
+  [ROW.CLOUD]: ['#DDE6EE', '#9DBFC1', '#C7D8DD', '#EDEEEB', '#A9C6C9'],
   // rock, shadow, light, lilac shade
   [ROW.ROCK]: ['#76887d', '#455d58', '#a0ac92', '#5c7875'],
   // snow, blue-lilac shade, mid, highlight
@@ -102,11 +102,15 @@ export class Palette {
   readonly texture: DataTexture;
   private readonly data = new Uint8Array(SIZE * SIZE * 4);
   private readonly linear: Color[] = Array.from({ length: SIZE * SIZE }, () => new Color(1, 0, 1));
+  /** What the time-of-day keys give each cell now, pinned or not. */
+  private readonly keyed: Color[] = Array.from({ length: SIZE * SIZE }, () => new Color(1, 0, 1));
   private hours = Number.NaN;
   private readonly noon = expand(NOON);
   private readonly dawn = expand(DAWN);
   private readonly golden = expand(GOLDEN);
   private readonly tint = { dawn: toLinear(TINT.dawn), noon: toLinear(TINT.noon), golden: toLinear(TINT.golden) };
+  /** Cells held at one colour at every time of day (the cloud colour panel's picks). */
+  private readonly pins = new Map<number, Color>();
 
   constructor() {
     this.texture = new DataTexture(this.data, SIZE, SIZE, RGBAFormat, UnsignedByteType);
@@ -120,6 +124,21 @@ export class Palette {
   /** Linear colour of a palette cell (for CPU-side uniforms). */
   get(row: number, col: number, out = new Color()): Color {
     return out.copy(this.linear[row * SIZE + col]);
+  }
+
+  /** Linear colour the time-of-day keys give a cell now, whether or not it is pinned. */
+  unpinned(row: number, col: number, out = new Color()): Color {
+    return out.copy(this.keyed[row * SIZE + col]);
+  }
+
+  /** Hold a cell at one colour (sRGB hex) at every time of day, or hand it back to the keys (null): for live tuning. */
+  pin(row: number, col: number, hex: string | null): void {
+    const i = row * SIZE + col;
+    if (hex === null) this.pins.delete(i);
+    else this.pins.set(i, toLinear(hex));
+    const hours = this.hours;
+    this.hours = Number.NaN; // rebuild at the same hour
+    this.update(hours);
   }
 
   /** Rebuild for a time of day in hours; cheap, and skipped when unchanged. */
@@ -137,6 +156,9 @@ export class Palette {
       if (this.dawn[i]) c.lerp(this.dawn[i]!, toDawn);
       if (this.golden[i]) c.lerp(this.golden[i]!, toGolden);
       if (row !== ROW.SKY && row !== ROW.LIGHT && row !== ROW.CLOUD) c.multiply(tint);
+      this.keyed[i].copy(c);
+      const pin = this.pins.get(i);
+      if (pin) c.copy(pin);
       this.linear[i].copy(c);
       const s = c.clone().convertLinearToSRGB();
       this.data[i * 4] = Math.round(clamp(s.r, 0, 1) * 255);

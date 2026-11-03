@@ -16,6 +16,7 @@ import { PerfHud, createFrameStats } from './dev/hud';
 import { ParamStore } from './params';
 import { registerShaderChunks } from './render/glsl';
 import { Post } from '../../src/render/post';
+import { CloudColours } from './ui/cloudColours';
 import { ControlBar } from './ui/controlBar';
 import { GardenUi } from './ui/garden/gardenUi';
 import { worldLine } from './ui/format';
@@ -157,6 +158,8 @@ async function boot(): Promise<void> {
       userPosed = true;
     },
   });
+  // temporary: the clouds' colours, tuned live; hidden now their colours are in palette.ts (`?cloud-colours` shows it)
+  const cloudColours = new URLSearchParams(location.search).has('cloud-colours') ? new CloudColours(uiRoot, world.palette) : null;
 
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
@@ -283,6 +286,7 @@ async function boot(): Promise<void> {
     garden?.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     garden?.frame(clock.realDt);
+    cloudColours?.update();
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);
