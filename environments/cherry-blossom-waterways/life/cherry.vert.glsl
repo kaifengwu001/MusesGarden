@@ -6,6 +6,7 @@ uniform vec4 uWindVec;
 uniform vec4 uBloom;
 uniform vec4 uCottage;
 uniform vec4 uUserBloom[8];
+uniform vec3 uSunDir;
 varying float vBloom;
 attribute vec4 aAnchor;
 attribute vec4 aStyle;
@@ -13,8 +14,15 @@ attribute float aKind;
 attribute float aTint;
 attribute vec4 aFlex;
 attribute float aShade;
+attribute vec3 aPuff;
+varying vec3 vPuff;
+varying vec3 vViewT;
+varying vec3 vSunT;
 varying float vShade;
 varying float vScale;
+varying float vSeed;
+varying vec2 vUv;
+varying vec3 vLocalNormal;
 varying vec3 vNormal;
 varying vec3 vPlanet;
 varying vec3 vLocal;
@@ -54,6 +62,14 @@ void main() {
   vTint = aTint;
   vShade = aShade;
   vScale = aStyle.x;
+  vSeed = aStyle.z;
+  vUv = uv;
+  vLocalNormal = normal;
   vWorld = warpPosition(world);
+  // The view and the sun in the tree's own frame, where a far puff traces its ellipsoid.
+  vPuff = aPuff;
+  vec3 toCamera = cameraPosition - vWorld;
+  vViewT = vec3(dot(toCamera, XX), dot(toCamera, U), dot(toCamera, ZZ));
+  vSunT = vec3(dot(uSunDir, XX), dot(uSunDir, U), dot(uSunDir, ZZ));
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld,1.0);
 }

@@ -62,6 +62,23 @@ Mac checkout `cherry-fix` from `4fe29c7`, preview on port 5289. **Passed:** 48 C
 
 Actual app captures at 1280×800, DPR 1, high tier, frozen time 12, seed 412, R 128 on ANGLE Metal (Apple M1 Pro): homestead, a view over the home pond, the globe, Vista and Muse, with no page or console errors. 1,360 trees. No browser suite was run: this checkout has no Playwright project for Cherry, and no frame-rate benchmark was taken.
 
+## Blossom puffs covered in cherry blossoms · 3 November 2026
+
+Mac checkout `cherry-fix` from `24e7852`, preview on port 5289. **Passed:** 48 CPU tests in ten files, scoped TypeScript/ESLint and the production build (with the existing chunk-size warning). Geometry budgets are unchanged and met: near 4.6k–9.8k triangles, far 0.55k–1.03k.
+
+Actual app captures at 1280×800, DPR 1 and 2, high tier, frozen time 12, seed 412, R 128 on ANGLE Metal (Apple M1 Pro): homestead, a view over the home pond, the globe, Vista and Muse, with no page or console errors.
+
+Frame time, `renderFrame()` with a GPU read after each ten frames, median of five, against `24e7852` served from a separate checkout on the same machine:
+
+| View | DPR 1 before | DPR 1 after | DPR 2 before | DPR 2 after |
+| --- | --- | --- | --- | --- |
+| Homestead | 15.9 ms | 18.1 ms | 23.2 ms | 31.6 ms |
+| Muse | 12.0 ms | 14.6 ms | 16.1 ms | 21.3 ms |
+| Over the pond | 9.7 ms | 10.3 ms | 19.1 ms | 24.6 ms |
+| Globe | 10.3 ms | 9.6 ms | 13.9 ms | 13.2 ms |
+
+No browser suite was run (this checkout has no Playwright project for Cherry).
+
 ## Known scope and limits
 
 - This is a reference-inspired 3D interpretation, with visible polygonal geometry at close range; the images remain the art direction and user visual acceptance is pending.
