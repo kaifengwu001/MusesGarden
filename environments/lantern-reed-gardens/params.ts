@@ -124,8 +124,8 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 16, 1, 40, 0.5, 'live', { unit: 'm' }),
+    coverage: num('cc', 'Coverage', 0.43, 0, 1, 0.01, 'life'),
+    altitude: num('ca', 'Altitude', 18.5, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.24, 0, 1, 0.01, 'live'),
   },

@@ -44,7 +44,7 @@ const NOON: Rows = {
   // zenith, horizon, haze, sun glow, mid sky, haze over the far meadow
   [ROW.SKY]: ['#426FA7', '#DDD6DC', '#8CA4C5', '#FFE5BB', '#7B9DC5', '#8AA2C5'],
   // lit, shadowed, mid, rim, base (the meadow's green through it)
-  [ROW.CLOUD]: ['#F4E5D6', '#A9B4CC', '#DDD4D6', '#FFF0D5', '#B9C2CF'],
+  [ROW.CLOUD]: ['#D9C5B5', '#99A4C7', '#C3B9BC', '#EBDECE', '#A5A9C4'],
   // rock, shadow, light, lilac shade
   [ROW.ROCK]: ['#CBCBD6', '#A0ACBF', '#ECE4DB', '#ADB1CD'],
   // snow, blue-lilac shade, mid, highlight
@@ -70,7 +70,7 @@ const DAWN: Rows = {
 
 const GOLDEN: Rows = {
   [ROW.SKY]: ['#5886BD', '#F1BEA6', '#8A9DBE', '#FFD2A1', '#7D94C1', '#839BC0'],
-  [ROW.CLOUD]: ['#F2D7C5', '#A3AEC5', '#D8C5CE', '#FFE7CC', '#B4B9CB'],
+  [ROW.CLOUD]: ['#D9C5B5', '#99A4C7', '#C3B9BC', '#EBDECE', '#A5A9C4'], // as noon's: daylight and dusk share their clouds
   [ROW.LIGHT]: ['#FFE0B5', '#C7D4E8', '#B9C4BF', '#FFDFAD', '#919AB3'],
 };
 
@@ -102,11 +102,15 @@ export class Palette {
   readonly texture: DataTexture;
   private readonly data = new Uint8Array(SIZE * SIZE * 4);
   private readonly linear: Color[] = Array.from({ length: SIZE * SIZE }, () => new Color(1, 0, 1));
+  /** What the time-of-day keys give each cell now, pinned or not. */
+  private readonly keyed: Color[] = Array.from({ length: SIZE * SIZE }, () => new Color(1, 0, 1));
   private hours = Number.NaN;
   private readonly noon = expand(NOON);
   private readonly dawn = expand(DAWN);
   private readonly golden = expand(GOLDEN);
   private readonly tint = { dawn: toLinear(TINT.dawn), noon: toLinear(TINT.noon), golden: toLinear(TINT.golden) };
+  /** Cells held at one colour at every time of day (the cloud colour panel's picks). */
+  private readonly pins = new Map<number, Color>();
 
   constructor() {
     this.texture = new DataTexture(this.data, SIZE, SIZE, RGBAFormat, UnsignedByteType);
@@ -120,6 +124,21 @@ export class Palette {
   /** Linear colour of a palette cell (for CPU-side uniforms). */
   get(row: number, col: number, out = new Color()): Color {
     return out.copy(this.linear[row * SIZE + col]);
+  }
+
+  /** Linear colour the time-of-day keys give a cell now, whether or not it is pinned. */
+  unpinned(row: number, col: number, out = new Color()): Color {
+    return out.copy(this.keyed[row * SIZE + col]);
+  }
+
+  /** Hold a cell at one colour (sRGB hex) at every time of day, or hand it back to the keys (null): for live tuning. */
+  pin(row: number, col: number, hex: string | null): void {
+    const i = row * SIZE + col;
+    if (hex === null) this.pins.delete(i);
+    else this.pins.set(i, toLinear(hex));
+    const hours = this.hours;
+    this.hours = Number.NaN; // rebuild at the same hour
+    this.update(hours);
   }
 
   /** Rebuild for a time of day in hours; cheap, and skipped when unchanged. */
@@ -137,6 +156,9 @@ export class Palette {
       if (this.dawn[i]) c.lerp(this.dawn[i]!, toDawn);
       if (this.golden[i]) c.lerp(this.golden[i]!, toGolden);
       if (row !== ROW.SKY && row !== ROW.LIGHT && row !== ROW.CLOUD) c.multiply(tint);
+      this.keyed[i].copy(c);
+      const pin = this.pins.get(i);
+      if (pin) c.copy(pin);
       this.linear[i].copy(c);
       const s = c.clone().convertLinearToSRGB();
       this.data[i * 4] = Math.round(clamp(s.r, 0, 1) * 255);

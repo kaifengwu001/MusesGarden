@@ -1,6 +1,7 @@
 import '../../src/ui/style.css';
 import './ui/canyon.css';
 import { CanyonUi } from './ui/canyonUi';
+import { CloudColours } from './ui/cloudColours';
 import { NoToneMapping, SRGBColorSpace, Vector2, WebGLRenderer } from 'three';
 import { BuildBudget } from '../../src/core/buildBudget';
 import { FrameClock } from '../../src/core/clock';
@@ -160,6 +161,7 @@ async function boot(): Promise<void> {
   const garden = new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
   cancelView = () => garden.interrupt();
   const canyon = new CanyonUi(uiRoot, world, () => clock.time, () => { garden.interrupt(); userPosed = true; }, store);
+  const cloudColours = new CloudColours(uiRoot, world.palette); // temporary: the clouds' colours, tuned live
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
@@ -294,6 +296,7 @@ async function boot(): Promise<void> {
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     garden.frame(clock.realDt);
     canyon.update();
+    cloudColours.update();
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);

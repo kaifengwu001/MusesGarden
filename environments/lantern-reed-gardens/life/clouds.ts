@@ -76,7 +76,7 @@ const HEADER = 3;
 /** Texels per cloud: the header, the puffs, then the puffs' self-shadows (four a texel). */
 const COLUMNS = HEADER + PUFFS + 2;
 /** A cloud's size on an R = 128 m planet (m; the heap is about this tall). */
-const SIZE = 10;
+const SIZE = 15;
 /**
  * Streamlines (radians): spacing between neighbours (about a cloud's width at
  * R 128, so neighbouring streaks merge), the closest a line may come to
@@ -84,7 +84,7 @@ const SIZE = 10;
  */
 const STREAM = { sep: 0.17, test: 0.55, step: 0.25, minLength: 0.45, maxLength: 3.4 } as const;
 /** Share of the streamline slots that hold a cloud at coverage 0 and 1. */
-const SHARE = [0, 0.52] as const;
+const SHARE = [0, 0.728] as const;
 /** The lakes read the clouds from orbit between these camera altitudes (× R): none below, fully above. */
 const ORBIT_REFLECTION = [0.35, 0.8] as const;
 /** The most the wind's ruffle turns a lake's mirrored ray, per unit of wind strength (rad): water.glsl's 0.06 × (0.2 + a full gust). */
@@ -215,13 +215,15 @@ function rng(seed: number): () => number {
 
 /** A cumulus heap: a broad base row, a middle heap and a crown, over a flat base at y = 0. */
 function makePuffs(rand: () => number): Puff[] {
-  const stretch = 1.8 + rand() * 0.5;
-  return Array.from({ length: PUFFS }, (_, i) => {
-    const t = i / (PUFFS - 1);
-    return { x: (t - 0.5) * stretch, y: 0.13 + Math.sin(t * Math.PI) * 0.08,
-      z: (rand() - 0.5) * 0.12, r: 0.13 + Math.sin(t * Math.PI) * 0.10,
-      phase: rand() * Math.PI * 2 };
-  });
+  const e = 1.05 + 0.5 * rand(); // elongation along the flow
+  const puffs: Puff[] = [];
+  const add = (x: number, y: number, z: number, r: number): void => {
+    puffs.push({ x, y, z, r, phase: rand() * Math.PI * 2 });
+  };
+  for (let i = 0; i < 4; i++) add((i / 3 - 0.5) * 1.5 * e + (rand() - 0.5) * 0.2, 0.2 + 0.06 * rand(), (rand() - 0.5) * 0.5, 0.34 + 0.1 * rand());
+  for (let i = 0; i < 3; i++) add((i / 2 - 0.5) * 0.85 * e + (rand() - 0.5) * 0.2, 0.44 + 0.14 * rand(), (rand() - 0.5) * 0.35, 0.36 + 0.12 * rand());
+  add((rand() - 0.5) * 0.5 * e, 0.72 + 0.16 * rand(), (rand() - 0.5) * 0.2, 0.28 + 0.1 * rand());
+  return puffs;
 }
 
 /** `count` directions, each placed farthest from those before it: any prefix is evenly spread. */
