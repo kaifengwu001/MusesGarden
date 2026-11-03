@@ -214,6 +214,8 @@ export class Muse {
   private readonly shadowFeet: Vector3;
   private readonly sunAngles: Vector4;
   private readonly cloudLook: Vector4 | null;
+  /** Muses beside this one (a friend's, visiting: src/visit/): their shadows drawn into this one's map, which widens to take them in. */
+  private readonly guests: Muse[] = [];
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -361,7 +363,7 @@ export class Muse {
   update(time: number, terrain: Terrain, camera: Vector3, wind: Vector4, pixelAngle: number, show: boolean): void {
     if (!this.roam?.fits(terrain)) this.roam = new MuseRoam(terrain, MUSE_HEIGHT);
     const R = terrain.radius;
-    const l = this.lifeAt(time, terrain, camera, this.roam);
+    const l = this.lifeAt(time, camera, this.roam);
     this.living = l;
     this.time = time;
     this.door = this.roam.doorAt(time);
@@ -418,17 +420,18 @@ export class Muse {
   }
 
   /**
-   * Where its shadow falls, for its map: its body's spheres carried down the sun at Muse to the water table, the map
-   * centred among them (its frame turned toward the sun's bearing) and wide enough for each sphere's shadow, stretched
-   * along the sun as it gets low. Off (strength 0) while Muse isn't drawn.
+   * Where its shadow falls, for its map: its body's spheres (and any drawn guest's) carried down the sun at Muse to the
+   * water table, the map centred among them (its frame turned toward the sun's bearing) and wide enough for each
+   * sphere's shadow, stretched along the sun as it gets low. Off (strength 0) while Muse isn't drawn.
    */
   private placeShadow(R: number, seen: boolean): void {
     const a = this.sunAngles;
     localSun(this.up, Math.atan2(a.x, a.y), Math.atan2(a.w, a.z), sun);
     this.shadowWindow.y = 0;
     if (!seen) return;
+    const spheres = this.casting();
     centre.set(0, 0, 0);
-    for (const s of this.spheres) centre.add(down(tmp.set(s.x, s.y, s.z), R));
+    for (const s of spheres) centre.add(down(tmp.set(s.x, s.y, s.z), R));
     centre.normalize();
     across.copy(sun).addScaledVector(centre, -sun.dot(centre));
     if (across.lengthSq() < 1e-8) across.copy(this.forward);
@@ -436,7 +439,7 @@ export class Muse {
     upMap.crossVectors(centre, across);
     const sinE = Math.max(sun.dot(this.up), 0.2);
     let half: number = SHADOW.min;
-    for (const s of this.spheres) {
+    for (const s of spheres) {
       const g = down(tmp.set(s.x, s.y, s.z), R);
       const out = g.dot(centre);
       half = Math.max(half, (R * Math.abs(g.dot(across))) / out + s.w / sinE + SHADOW.soft, (R * Math.abs(g.dot(upMap))) / out + s.w + SHADOW.soft);
@@ -449,6 +452,25 @@ export class Muse {
     this.shadowSun.set(sun.x, sun.y, sun.z, reach * reach);
     this.shadowFeet.copy(this.uniforms.uMusePos.value);
     this.shadowWindow.set(R / half, this.cloudLook?.x ?? 0.7, SHADOW.soft / (2 * half * Math.SQRT2), 0);
+  }
+
+  /**
+   * A guest beside this Muse (a friend's Muse visiting, made without the shadow's shared uniforms: world.ts
+   * addVisitor): its shadow is drawn into this Muse's map, in this Muse's frame, and the map is placed to take it in
+   * while it is drawn. Only this Muse's map reaches the ground, so a guest never takes it over.
+   */
+  shadowWith(guest: Muse): void {
+    const uniforms = guest.shadowMesh.material.uniforms;
+    uniforms.uCubeFace.value = this.shadowFrame;
+    uniforms.uFaceWindow.value = this.shadowScale;
+    this.shadowScene.add(guest.shadowMesh);
+    this.guests.push(guest);
+  }
+
+  /** The spheres its shadow's map holds: its own, and any drawn guest's. (Update its guests first: world.ts does.) */
+  private casting(): readonly Vector4[] {
+    if (this.guests.length === 0) return this.spheres;
+    return [...this.spheres, ...this.guests.filter((g) => g.shadowMesh.visible).flatMap((g) => g.spheres)];
   }
 
   /** Draw its shadow's map (after update, before the scene that reads it). */
@@ -473,7 +495,7 @@ export class Muse {
   }
 
   /** Its life at a time, unless the engine has it out on the planet or working at home. */
-  private lifeAt(time: number, terrain: Terrain, camera: Vector3, roam: MuseRoam): Roaming {
+  private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
     const d = this.direction;
     if (d.kind === 'inside') {
       // in its hut: its life puts it there, cooking if there is a pot, answering you as anywhere
@@ -503,9 +525,9 @@ export class Muse {
       r.home = true;
       return r;
     }
-    // out on the planet: on the ground at its spot, facing the way it goes
+    // out on the planet: on the ground at its spot (or the deck, standing by its own Muse), facing the way it goes
     r.dir.copy(d.dir).normalize();
-    r.height = terrain.height(r.dir);
+    r.height = roam.groundAt(r.dir);
     if (d.toward) r.heading.subVectors(d.toward, r.dir);
     r.heading.addScaledVector(r.dir, -r.heading.dot(r.dir));
     if (r.heading.lengthSq() < 1e-10) r.heading.set(r.dir.y, -r.dir.x, 0);

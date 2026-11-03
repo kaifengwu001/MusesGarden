@@ -451,6 +451,17 @@ export class MuseRoam {
     return this.terrain.sample(dir, ground).height;
   }
 
+  /**
+   * Whether a Muse could stand at a place: on the deck where it is free (clear of its edges, the house, the bench and
+   * the chair), off it anywhere but against the house's walls. For a friend's Muse standing by this one (src/visit/).
+   */
+  standable(dir: Vector3): boolean {
+    const c = this.terrain.cottageLocal(dir, localTmp);
+    if (Math.abs(c.x) >= 14 || Math.abs(c.z) >= 14) return true;
+    if (this.deckAt(c.x, c.z) !== null) return this.deckFree(c.x, c.z);
+    return !(Math.abs(c.x) < SIDE + GIRTH && c.z > -OUTER.z - GIRTH && c.z < OUTER.z + GIRTH);
+  }
+
   /** A unit tangent at a spot toward a direction. */
   private toward(at: Spot, dir: Vector3): Vector3 {
     return tangentToward(at.dir, dir, new Vector3());

@@ -73,4 +73,6 @@ export interface VisitWorld {
   ground(dir: Vector3): { readonly height: number; readonly water: number };
   /** Changes (by identity) whenever the planet's ground does: the beds are laid out again then. */
   shape(): object;
+  /** Where a Muse may stand beyond dry ground (off the walls of a house, on a deck's free part), if the world knows. */
+  standable?(dir: Vector3): boolean;
 }

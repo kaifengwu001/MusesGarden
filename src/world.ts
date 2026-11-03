@@ -12,7 +12,7 @@ import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from './life/petals';
 import { VeilFog } from './life/veilFog';
-import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
+import { Muse, MUSE_HEIGHT, PRESSES, type MuseModel } from './life/muse';
 import { HutInterior } from './life/hut';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
@@ -97,6 +97,8 @@ export class World {
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
+  /** Muses visiting (src/visit/): a friend's beside this one, drawn, kept up to date and culled with it. None until one comes. */
+  readonly visitors: Muse[] = [];
   readonly petals: Petals;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
@@ -449,6 +451,8 @@ export class World {
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
+    // (visitors first: Muse's shadow map takes in theirs as they stand now)
+    for (const visitor of this.visitors) visitor.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.muse.walled = !this.hut.shown;
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.muse.renderShadow(this.renderer);
@@ -468,6 +472,7 @@ export class World {
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     this.muse.cull(this.frustum, this.warp);
+    for (const visitor of this.visitors) visitor.cull(this.frustum, this.warp);
     const sweep = this.terrainUniforms.uCottageSun.value;
     this.terrain.homeAreas(sweep.x, sweep.y, this.homeAreas);
     this.surface.update(
@@ -645,6 +650,20 @@ export class World {
       wasted += (drawn - (f.visibleInstances * drawn) / all) * tris;
     });
     return Math.max(0, submitted - (this.grass.mesh.visible ? wasted : 0));
+  }
+
+  /**
+   * A visiting Muse in a body, beside this one: made from the shared uniforms but for Muse's press on the grass and its
+   * shadow's map, which stay Muse's own (its shadow is drawn into Muse's: muse.ts shadowWith). Its props are not drawn.
+   */
+  addVisitor(model: MuseModel): Muse {
+    const owns = new Set(['uMusePress', 'uMusePressK', 'uMuseShadow', 'uMuseShadowFrame', 'uMuseShadowSun', 'uMuseShadowWindow', 'uMuseShadowFeet']);
+    const guest = new Muse(Object.fromEntries(Object.entries(this.shared).filter(([key]) => !owns.has(key))));
+    guest.useModel(model);
+    this.visitors.push(guest);
+    this.scene.add(guest.mesh);
+    this.muse.shadowWith(guest);
+    return guest;
   }
 
   /**

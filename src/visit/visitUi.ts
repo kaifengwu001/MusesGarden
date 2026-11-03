@@ -10,7 +10,7 @@ import { FindCard } from '../ui/garden/findCard';
 import { ICONS } from '../ui/garden/icons';
 import { Flight, type Framing } from '../view/flight';
 import { loadVisit, planetOf, returnFromVisit, type VisitLoad } from './api';
-import { Follower } from './follow';
+import { FOLLOW, Follower } from './follow';
 import { homeUrl, leftPhrase, readVisit, visitable, visitUrl, type VisitParams } from './params';
 import { moved, snapBeds, type SnapBed } from './snap';
 import { Transit } from './transit';
@@ -34,8 +34,6 @@ const MUSES_VIEW = { distance: 6.2, height: 1.9, aim: 0.8 } as const;
 /** Where the card stands over its bed (m), and above which height (m) it is put away. */
 const CARD_AT = 1.9;
 const CARD_UNDER = 30;
-/** Ground this far from the shore (m) is dry enough for the guest to stand on. */
-const DRY = 0.3;
 
 /** What prepareVisit hands the page: the visit its URL names, as the server answered. */
 export interface VisitStart {
@@ -236,7 +234,7 @@ export class VisitUi {
       this.guest.direct({ kind: 'hidden' });
       return;
     }
-    const f = this.follower.step(host.where, dt, this.world.scene.growth.radius, (dir) => this.world.ground(dir).water > DRY);
+    const f = this.follower.step(host.where, dt, this.world.scene.growth.radius, (dir) => this.world.ground(dir).water > FOLLOW.dry && (this.world.standable?.(dir) ?? true));
     this.guest.direct({ kind: 'out', dir: f.dir, toward: f.toward, walk: f.walk, busy: view.guest.working });
   }
 
