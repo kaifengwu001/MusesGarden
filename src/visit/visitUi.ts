@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
 import museFace from '../assets/garden/muse-face.jpg';
+import { faceOf } from '../ui/garden/faces';
 import '../ui/garden/garden.css';
 import './visit.css';
 import { mediaOf } from '../garden/media';
@@ -180,6 +181,8 @@ export class VisitUi {
     this.home = homeUrl(view.guest.planet, this.params);
     this.where.textContent = `Visiting ${view.host.name}’s planet`;
     this.banner.classList.add('is-on');
+    // the guest's own face, by the body it wears
+    this.portrait.style.backgroundImage = `url(${faceOf(view.guest.look) ?? museFace})`;
     this.portrait.dataset.label = view.guest.name;
     this.portrait.setAttribute('aria-label', view.guest.name);
     this.portrait.title = view.guest.name;

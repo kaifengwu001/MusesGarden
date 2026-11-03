@@ -1501,6 +1501,16 @@ body.garden-on .hud {
   opacity: 0.55;
 }
 
+/* a friend's own face (faces.ts): as it looks, a little less close, so its hat shows */
+.g-friend-face.is-own {
+  background-position: center 30%;
+  background-size: 112%;
+}
+
+.g-friend-face.is-own::after {
+  display: none;
+}
+
 .g-friend-text {
   flex: 1;
   min-width: 0;

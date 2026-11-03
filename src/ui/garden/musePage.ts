@@ -1,6 +1,7 @@
 import type { GardenState } from '../../garden/state';
 import type { Reach } from '../../garden/types';
 import { agoPhrase, el, shortDate, toggle } from './dom';
+import { faceOf } from './faces';
 import { topicColour } from './findCard';
 import { ICONS } from './icons';
 import { Sheet } from './sheet';
@@ -98,8 +99,10 @@ export class MuseSheet extends Sheet {
     const list = el('ul', 'g-friends');
     for (const f of friends) {
       const li = el('li', 'g-friend');
-      const face = el('span', 'g-friend-face');
-      face.style.backgroundImage = `url(${this.faces.friend})`;
+      // its own face, by the body it wears; without one, the stand-in tinted with its coat
+      const own = faceOf(f.look);
+      const face = el('span', `g-friend-face${own ? ' is-own' : ''}`);
+      face.style.backgroundImage = `url(${own ?? this.faces.friend})`;
       face.style.setProperty('--coat', f.coat);
       const text = el('div', 'g-friend-text');
       const top = el('p', 'g-friend-name');
