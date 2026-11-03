@@ -1,13 +1,14 @@
 // Files a recorded item under topics of the topic map by matching its words against topic names and their aliases.
 import type { TopicKey } from '../../../src/muse/contract';
 import type { Corpus } from './corpus';
-import { wordPattern } from './text';
+import { hasWords } from './text';
 
 interface Name {
   readonly topic: TopicKey;
   readonly area: string;
   readonly name: string;
-  readonly pattern: RegExp;
+  /** The name lower-cased, matched as whole words. */
+  readonly lower: string;
   /** The name lower-cased without spaces or punctuation, as hashtags and photo tags write it. */
   readonly squashed: string;
 }
@@ -31,7 +32,7 @@ export function topicIndex(map: Corpus): TopicIndex {
     const topic = p.candidate.topics[0];
     const own = topic.replace(/\s*\([^)]*\)$/, '');
     const all = new Set([own, ...p.aliases.map((a) => a.replace(/\s*\([^)]*\)$/, '')).filter((a) => a.length >= ALIAS_MIN)]);
-    for (const name of all) names.push({ topic, area: p.area, name, pattern: wordPattern(name), squashed: squash(name) });
+    for (const name of all) names.push({ topic, area: p.area, name, lower: name.toLowerCase(), squashed: squash(name) });
   }
   const titles = new Set(map.pages.map((p) => p.candidate.topics[0] as string));
   const roots = new Map<string, TopicKey>();
@@ -49,12 +50,14 @@ export function topicIndex(map: Corpus): TopicIndex {
  */
 export function fileUnder(index: TopicIndex, area: string, item: { readonly title: string; readonly text: string; readonly tags?: readonly string[] }): TopicKey[] {
   const tags = new Set((item.tags ?? []).map(squash));
+  const title = item.title.toLowerCase();
+  const text = item.text.toLowerCase();
   const scored = new Map<TopicKey, number>();
   for (const n of index.names) {
     const home = n.area === area;
     if (!home && !specific(n.name)) continue;
-    const inTitle = n.pattern.test(item.title);
-    const hit = inTitle || n.pattern.test(item.text) || tags.has(n.squashed);
+    const inTitle = hasWords(title, n.lower);
+    const hit = inTitle || hasWords(text, n.lower) || tags.has(n.squashed);
     if (!hit) continue;
     const score = (home ? 1000 : 0) + (inTitle ? 100 : 0) + Math.min(99, n.name.length);
     scored.set(n.topic, Math.max(scored.get(n.topic) ?? 0, score));
