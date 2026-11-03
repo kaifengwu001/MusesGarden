@@ -891,9 +891,21 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
 - The trees (tree.*.glsl) are traced billboards where the build placed
   them; the rice blades near the camera read a map of the floors drawn
   from above (paddyMap.ts, its chunks drawn unculled: its camera is a
-  placeholder): their floor and crop, each blade its paddy's look under
-  the same light, darker at its root, as dense as the paddy is crop (none
-  flooded, densest grown deep, 160 a m² at full).
+  placeholder; only the ground within twice its reach of the focus, the
+  rest past its far plane: its angle wraps round the planet, and the
+  triangle over the focus's antipode once spread over the whole map, the
+  rice taking its floor, meters up, wherever it stood higher): their floor
+  and crop, each blade its paddy's look under the same light, darker at
+  its root, as dense as the paddy is crop (none flooded, densest grown
+  deep, 160 a m² at full).
+- **The camera** (camera.ts): the shared rig, its tilt running ahead of
+  the shared one's round the bird's-eye height by up to 0.16 of zoom (as
+  it would tilt a little lower; in from zoom 0.1, gone by 0.65, the tilt
+  only ever rising on the way in), so that the bird's-eye stop (70 m up)
+  looks 38.5° from straight down (14.4° on the shared rig), out to the
+  rim and the towers' tops over it (Kai). The named views keep their
+  framing: the vista's tilt is its own, the flats' view looks up from the
+  shared rig's tilt.
 
 ## Module map
 
