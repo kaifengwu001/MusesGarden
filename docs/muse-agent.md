@@ -392,12 +392,18 @@ stateDiagram-v2
 - More friends share the same budget. Close friends get more of it and others get less, so total social time per day stays steady. A sim check holds social hours within ±25% as friends grow from 1 to 6.
 - A goes to B's planet with P = 0.5, or with P = 0.3 if A was the guest last time.
 
+### Photos and the backs of postcards
+
+What Muse photographs follows its temperament. Each context has a base mix (out exploring: finds, the view, the sky, close-ups, creatures, selfies; at rest: home too; at work: Muse at work), and each subject's weight is scaled by 0.4 + 1.2 × the Muse's pull toward it: novelty for the view, whimsy and novelty for the sky, focus and curiosity for close-ups, curiosity for creatures and finds, whimsy and sociability for selfies, focus for work, 1 − novelty for home (server/domain/policy/photo.ts). Photos taken during a work block are taken when it ends.
+
+Every photo's postcard has a back, written in the same commit as the photo (`photo.written`). The policy picks its kind by the photo and the Muse (server/domain/policy/postcard.ts): a line, a doodle, a map with an X, a note, a list, a pressed find, a ticket stub (only from beyond the planet), noughts and crosses with the friend in the photo, a riddle, a tally or a little poem. The Muse's mind writes the words in its voice (Mind.writePostcard): the model for the hero when a key is set, bounded to the card's room, and template words otherwise.
+
 ### Every hangout brings a gift and a photo
 
 A hangout always happens on the host's planet. In every hangout:
 
 - Each Muse gives the other the find that best stretches the other's interests.
-- The two take a photo together, and it goes to both owners.
+- The two take a photo together, and it goes to both owners. Half the time it is of the two of them; otherwise of what they looked at (the view, the sky, something small, a creature, the host's home), by both Muses' tastes.
 - Their rapport grows by the hangout's pleasantness p.
 
 Gifts come from the giver's public finds, because anything social sees only `PublicProfile`. A gift keeps a place like any other object. It sits where Muse received it on its own planet, or near home if Muse received it away.

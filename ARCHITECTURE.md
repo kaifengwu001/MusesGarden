@@ -805,7 +805,10 @@ so any view can be shared.
                            baskets), the post box (the hand-drawn mailbox in SVG, postboxIllustration.ts), the post
                            (mail.ts: today's deck of polaroids, the heart and star, the Favorite and Album pages,
                            the tickets; scrapbook.ts dresses each card on those pages from its id: the frame's tint,
-                           washi tape or a clip, sometimes a crayon scribble or a sticker),
+                           washi tape or a clip, sometimes a crayon scribble or a sticker; postcardBack.ts draws
+                           what Muse put on a card's back, one of eleven kinds, in crayon and its hand; the photo
+                           is a still of what it shows, src/assets/postcards/stills.ts, rendered from the meadow by
+                           npm run postcard-stills),
                            Muse's page, the visit stand-in, and the basket: its phases as one pure step
                            (basketMachine.ts; gardenUi.ts carries out its effects), the rail icon's hand-drawn
                            basket, flat, as two layers of the one picture split along its near rim
