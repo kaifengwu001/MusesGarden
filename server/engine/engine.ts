@@ -434,8 +434,8 @@ export class Engine {
    */
   private async board(tx: Tx, id: InvitationId, guest: MuseId): Promise<void> {
     const inv = tx.state(guest).social.invitations.get(id);
-    const until = inv && this.deps.social.visitUntil(inv, guest);
-    if (!inv || until === null || until === undefined) return;
+    const until = inv ? this.deps.social.visitUntil(inv, guest) : null;
+    if (!inv || until === null) return;
     tx.schedule({ id: `close:${id}`, at: until, museId: guest, kind: 'visit.close', payload: { invitation: id } });
     for (const other of this.openTrips(tx, guest)) {
       if (other.guest !== guest || other.id === id) continue;
@@ -482,7 +482,8 @@ export class Engine {
     for (const m of [inv.guest, inv.host]) {
       const plan = tx.state(m).episode?.plan;
       if (plan?.activity === 'visit') others.push(...this.endTogether(tx, plan.role === 'host' ? m : plan.other));
-      else this.endEpisode(tx, m);
+      // Whatever is left: anything but a visit, or a visit its host has left already.
+      this.endEpisode(tx, m);
     }
     const plan = (other: MuseId, role: 'host' | 'guest'): EpisodePlan => ({ activity: 'visit', other, role, until, invitation: inv.id });
     tx.emit(inv.host, { kind: 'episode.started', n: tx.state(inv.host).episodes + 1, plan: plan(inv.guest, 'host') });
