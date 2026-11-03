@@ -187,9 +187,9 @@ export function coatOf(id: string): string {
   return COATS[salt(id) % COATS.length];
 }
 
-/** The still a postcard shows (src/assets/postcards/stills.ts): one of its subject's, picked by its id; from beyond the planet, the planet's view or sky is the whole planet. */
+/** The still a postcard shows (src/assets/postcards/stills.ts): one of its subject's, picked by its id; from beyond the planet, the whole planet. */
 export function postcardImage(id: string, subject: PhotoSubject | 'invitation', context: PhotoSpec['context'] = 'planet'): string {
-  const key: StillKey = context === 'beyond' && (subject === 'scenery' || subject === 'sky') ? 'beyond' : subject;
+  const key: StillKey = context === 'beyond' ? 'beyond' : subject;
   return `/api/postcards/${stillFor(key, id)}`;
 }
 
