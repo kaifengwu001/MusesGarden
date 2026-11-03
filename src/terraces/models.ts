@@ -1,14 +1,16 @@
-import { BufferGeometry, DynamicDrawUsage, Float32BufferAttribute, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector3, type IUniform, type Texture } from 'three';
+import { BufferGeometry, DynamicDrawUsage, Float32BufferAttribute, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector3, type IUniform, type Object3D, type Texture } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import fragmentShader from './model.frag.glsl?raw';
 import vertexShader from './model.vert.glsl?raw';
 
-// Kai's models as the planet draws them (scripts/terraces-models.mjs wrote
-// them: a node per level of detail, lod0 full and lod1 lighter, quantized and
-// compressed, a unit tall on their base): each level's triangles with its
+// Kai's models as the planet draws them: the towers as scripts/terraces-models.mjs
+// wrote them (a node per level of detail, lod0 full and lod1 lighter, quantized
+// and compressed, a unit tall on their base), each level's triangles with its
 // positions back in the model's own units (its node's translation and scale
-// undone), and the one colour texture they share.
+// undone); the houses as they came (Kai, 2026-11-03: low and clean enough as
+// they are, no lighter copy), their one mesh made a unit tall on its base. And
+// the one colour texture each model's levels share.
 
 export interface Model {
   /** Full detail, then the lighter copy. */
@@ -23,6 +25,7 @@ export async function loadModels(urls: readonly string[]): Promise<Model[]> {
   return files.map((gltf) => {
     const lods: BufferGeometry[] = [];
     let map: Texture | null = null;
+    if (!gltf.scene.getObjectByName('lod0')) return asItCame(gltf.scene);
     for (const name of ['lod0', 'lod1']) {
       const src = gltf.scene.getObjectByName(name) as Mesh | undefined;
       if (!src) continue;
@@ -40,6 +43,28 @@ export async function loadModels(urls: readonly string[]): Promise<Model[]> {
     }
     return { lods, map };
   });
+}
+
+/** A model with no levels of detail: its first mesh, in the scene's frame, scaled a unit tall from its base (y = 0 up). */
+function asItCame(scene: Object3D): Model {
+  let src: Mesh | undefined;
+  scene.traverse((o) => {
+    if (!src && (o as Mesh).isMesh) src = o as Mesh;
+  });
+  if (!src) return { lods: [], map: null };
+  scene.updateMatrixWorld(true);
+  const mesh: Mesh = src;
+  const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+  if (!g.getAttribute('normal')) g.computeVertexNormals();
+  g.computeBoundingBox();
+  const box = g.boundingBox!;
+  const tall = box.max.y - box.min.y;
+  g.translate(0, -box.min.y, 0);
+  g.scale(1 / tall, 1 / tall, 1 / tall);
+  const out = new BufferGeometry();
+  out.setIndex(g.index);
+  for (const a of ['position', 'normal', 'uv']) out.setAttribute(a, g.getAttribute(a));
+  return { lods: [out], map: (mesh.material as { map?: Texture }).map ?? null };
 }
 
 /** One model stood on the planet: which, its site's up and its x way (unit), its base's height (m), its height (m), its width × this. */

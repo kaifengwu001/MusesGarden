@@ -167,13 +167,17 @@ const LOOK_DELAY = [1, 0.55, 0.424, 0.13, 0];
 
 const SLOT = { woods: 2, flat: 3, zone: 4, base: 100000, bands: 200000, cut: 600000, fields: 1000000 } as const;
 
-/** Kai's house models (src/assets/terraces/house*.glb, a unit tall): each one's footprint with its yard (× its height), and its height as the old villages stood them (m). */
+/**
+ * Kai's house models (src/assets/terraces/house*.glb, made a unit tall: models.ts): each one's footprint (× its height),
+ * and its height as the villages stand it (m), each the width the old five had (11.4 m across at most before the
+ * villages' 0.62–0.76 of it), so the villages are laid out as before.
+ */
 const HOUSE_MODELS = [
-  { x: 1.88, z: 1.82, height: 6.2 },
-  { x: 1.36, z: 1.19, height: 8.4 },
-  { x: 1.18, z: 1.47, height: 8.0 },
-  { x: 1.65, z: 1.75, height: 6.6 },
-  { x: 1.03, z: 1.45, height: 7.4 },
+  { x: 1.63, z: 1.63, height: 7.0 },
+  { x: 1.2, z: 1.24, height: 9.2 },
+  { x: 1.06, z: 1.2, height: 9.5 },
+  { x: 1.67, z: 1.73, height: 6.6 },
+  { x: 1.26, z: 1.51, height: 7.6 },
 ] as const;
 
 /** A growable array of numbers, typed. */
