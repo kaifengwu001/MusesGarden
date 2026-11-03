@@ -1,6 +1,7 @@
 import { Box3, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import type { FieldParams } from '../../planet/fields';
+import { PLAIN_LEVEL, type FieldParams } from '../../planet/fields';
+import { defaultParams } from '../../params';
 import { travel } from '../../../../src/planet/geo';
 import { COTTAGE_TO_POND, createGroundSample, generateLayout, POND_SHIFT, Terrain } from '../../planet/terrain';
 
@@ -70,6 +71,23 @@ describe('constant scale', () => {
       });
       expect(Math.min(...heights)).toBeGreaterThan(0);
       expect(Math.max(...heights)-Math.min(...heights)).toBeGreaterThan(0.5);
+    }
+  });
+
+  it('lays the default harvest plain flat, at the cottage\'s own level', () => {
+    // Kai's references: level fields to the horizon, the farmhouse on the same ground
+    const p = defaultParams();
+    const params: FieldParams = { ...PARAMS, roll: p.terrain.roll, hummocks: p.terrain.hummocks, wetlands: p.terrain.wetlands, waterLevel: p.terrain.waterLevel, grain: p.terrain.grain };
+    const sample = createGroundSample();
+    for (const seed of [1, 412, 771]) for (const radius of [40, 128, 400]) {
+      const t = new Terrain(generateLayout(seed));
+      t.update(radius, params, (2 * radius) / 512);
+      for (const d of sphereDesign(400)) {
+        t.sample(d, sample);
+        expect(Math.abs(sample.height - t.cottageGround)).toBeLessThan(1e-6);
+        expect(t.fields.natural(d)).toBeCloseTo(PLAIN_LEVEL, 6);
+      }
+      expect(t.maxHeight - t.cottageGround).toBeLessThan(2);
     }
   });
 

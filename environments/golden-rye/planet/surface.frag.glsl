@@ -13,6 +13,7 @@ uniform vec2 uResolution;
 #include <meadow_warp>
 #include <meadow_clouds>
 #include <meadow_water>
+#include <rye_crop>
 
 uniform int uDebug;
 uniform vec4 uNearField; // focus direction xyz, blade radius (m): where real grass takes over
@@ -72,41 +73,33 @@ void main() {
   // wind on the grass (and the water)
   vec2 waves = gustWaves(dir);
   float gust = waves.x;
-  float ripple = pixelMeters < 0.6 && wet < 1.0 ? rippleAt(dir) : 0.5;
-  float sheen = windSheen(waves, ripple);
 
-  // the meadow, wherever any of it shows
+  // the fields, wherever any of them shows
   vec3 land = vec3(0.0);
   if (wet < 1.0) {
-    // the paint's flowers give way to the flowers themselves in the near field, where those are big enough on screen to carry
-    // it, and once they are built there (through iteration 13 the paint gave way first: a bare patch until a tile was built)
-    float nearFade = uNearField.w > 0.01 ? (1.0 - smoothstep(uNearField.w * 0.55, uNearField.w, chordAngle(dir, uNearField.xyz) * uRadius)) * (1.0 - smoothstep(0.03, 0.07, pixelMeters)) * vFlowersBuilt : 0.0;
-    Meadow m;
-    m.dir = dir;
-    m.lush = fields.g;
-    m.wet = fields.b;
-    m.variant = fields.a;
-    m.flora = textureLod(uFloraBake, dir, 0.0);
-    m.bloom = vBloom;
-    m.shore = shore;
-    m.light = b;
-    m.sunlit = 1.0 - cloud;
-    m.sheen = sheen;
-    m.stroke = stroke;
-    m.pixelMeters = pixelMeters;
-    m.nearFade = nearFade;
-    land = meadowPaint(m);
-    // Higher fields slowly acquire dusty lavender and weathered ochre. A wide
-    // transition and retained harvest paint avoid separate purple provinces.
-    float distant=smoothstep(24.0,64.0,chordAngle(dir,uCottage.xyz)*uRadius);
-    float ridge=distant*smoothstep(11.5,29.0,h);
-    vec3 rock=tone3(pal(ROW_ROCK,2),pal(ROW_ROCK,0),pal(ROW_ROCK,1),b);
-    rock=mix(rock,pal(ROW_ROCK,3),smoothstep(-0.05,-0.6,stroke)*0.16);
-    rock*=0.98+0.05*stroke;
-    // Gold strokes remain visible even at the highest point, connecting the
-    // cool ground to the surrounding cereal field rather than a bare rock cap.
-    vec3 weathered=mix(land,rock,0.76);
-    land=mix(land,weathered,ridge*0.62);
+    // The fields (crop.glsl): under the standing crop its dark floor (the
+    // canopy covers it but between the ears near the camera), olive grass on
+    // the bunds and yards, the farm road, and the crop's shadow on both.
+    vec4 parcel=parcelAt(dir);
+    float edgeAA=max(pixelMeters,0.02);
+    float inCrop=smoothstep(-edgeAA,edgeAA,parcel.x);
+    float onRoad=smoothstep(edgeAA,-edgeAA,parcel.z);
+    float hide=cropShade(dir,0.0,localSun(dir),uRadius);
+    vec3 cropC=cropTop(parcel.y,parcel.w);
+    // reaped ground: pale straw in mown rows; standing crop: its dark floor
+    float reaped=cropReaped(parcel);
+    float rows=0.5+0.5*sin(dot(dir,windDir(dir))*uRadius*9.0);
+    vec3 floorC=mix(cropDeep(cropC)*0.8,cropC*(0.78+0.12*rows),reaped);
+    floorC=tone3(floorC*1.05,floorC*0.85,floorC*0.62,b*0.8);
+    float tuft=smoothstep(0.2,0.7,stroke);
+    vec3 grassC=bundGrass(0.35+0.4*tuft);
+    // the grass darkens where it meets the crop's wall, and in its shadow
+    float foot=smoothstep(-0.7,0.0,parcel.x)*(1.0-onRoad);
+    grassC=tone3(grassC*1.08,grassC*0.86,grassC*vec3(0.55,0.6,0.7),b*(1.0-0.62*hide)*(1.0-0.3*foot));
+    vec3 roadC=roadDust(0.55+0.4*smoothstep(-0.4,0.6,stroke));
+    roadC*=1.0-0.14*smoothstep(-0.35,0.0,parcel.z);
+    roadC=tone3(roadC,roadC*0.9,roadC*vec3(0.62,0.66,0.78),b*(1.0-0.55*hide));
+    land=mix(mix(grassC,floorC,inCrop),roadC,onRoad);
     // the bank's face: where the turf drops to the water it is steep, and in its own shade. The
     // slope is taken per pixel (the height's screen derivatives over the position's, in the
     // ground's tangent plane), so a steep bank's face follows the shore, not the mesh's triangles

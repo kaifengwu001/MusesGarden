@@ -10,11 +10,12 @@ test('harvest views render real rye, keep the world dry and expose its controls'
   await page.getByRole('button',{name,exact:true}).click();await page.evaluate(async()=>window.__meadow!.settle());
  }
  const probe=await page.evaluate(()=>{
-  const w=(window as unknown as {__world:{rye:{instanceCount:number;triangles:number};harvest:{group:{children:{name:string}[]}};terrain:{sample(d:unknown,o:unknown):{water:number;depth:number};layout:{cottage:unknown}}}}).__world;
+  const w=(window as unknown as {__world:{rye:{instanceCount:number;triangles:number;canopy:{shellCount:number}};harvest:{group:{children:{name:string}[]}};terrain:{sample(d:unknown,o:unknown):{water:number;depth:number};layout:{cottage:unknown}}}}).__world;
   const sample=w.terrain.sample(w.terrain.layout.cottage,{});
-  return{rye:w.rye.instanceCount,triangles:w.rye.triangles,dry:sample.water,depth:sample.depth,groups:w.harvest.group.children.map(g=>g.name),flowerInstances:window.__meadow!.stats().flowerInstances,gpuBytes:window.__meadow!.stats().gpuBytes};
+  return{rye:w.rye.instanceCount,shells:w.rye.canopy.shellCount,triangles:w.rye.triangles,dry:sample.water,depth:sample.depth,groups:w.harvest.group.children.map(g=>g.name),flowerInstances:window.__meadow!.stats().flowerInstances,gpuBytes:window.__meadow!.stats().gpuBytes};
  });
- expect(probe.gpuBytes).toBeLessThan(256*1024*1024);expect(probe.rye).toBeGreaterThan(20000);expect(probe.triangles).toBeLessThan(2500000);
+ // (the last named view is the whole planet: detailed ears are off and the canopy is at its orbit shells)
+ expect(probe.gpuBytes).toBeLessThan(256*1024*1024);expect(probe.shells).toBeGreaterThanOrEqual(6);expect(probe.triangles).toBeLessThan(2500000);
  expect(probe.dry).toBeGreaterThan(.5);expect(probe.depth).toBe(0);expect(probe.flowerInstances).toBe(0);expect(probe.groups.length).toBe(3);expect(errors).toEqual([]);
 });
 

@@ -35,3 +35,13 @@ These are actual IAB screenshots at1440×900, DPR1, high/MSAA4/time12. The prior
 ## Mainline integration review
 
 [Field](mainline-field.jpg) · [globe](mainline-globe.jpg) · [basket panel](mainline-baskets.jpg). Actual in-app browser captures at its native1665×1191 viewport, high quality, frozen time12. The field and globe were compared against the source checkpoint using the same camera and browser. See [integration validation](../VALIDATION.md#mainline-integration--2-november-2026); no new benchmark or automated browser result is claimed.
+
+## Flat-fields references — 2 November 2026
+
+Three more images from Kai, kept as supplied (SHA-256 below):
+
+- [05 Flat fields](05-flat-fields-print.png): a level plain of bold yellow fields divided by thin green banks, a winding pale road, farmhouses among trees. `ed6000da…`
+- [06 Takemasa terraces](06-takemasa-terraces.png) by Ryo Takemasa: **the shape reference**. Long strips of yellow, lemon and yellow-green crop with rounded ends, following one another like contours, olive bunds of uneven width between them, a fuzzy stippled top and darker edges, so each field reads as a raised mass. `4a07cb9d…`
+- [07 Farm map](07-farm-map.jpg): the road reference. The road runs between fields with verges and hedges, fields aligned to it on both sides, in a dusty pinkish beige, a farmhouse in a small yard beside it. `82e83a58…`
+
+Contract added: flat ground and no hills; fields as long rounded strips (06); roads that belong to the field layout, never cutting across it as a separate pattern, and not white (07); the crop as a dense mass with a stippled top and darker sides, ears visible near the camera. The palette of the first fields pass was accepted ("palette is good for now"). Actual app captures (after the road and edge-on follow-up): [globe](fields-globe.jpg), [above the cottage](fields-above.jpg), [across the rye](fields-across.jpg), [among the ears](fields-among.jpg), [a far field's edge](fields-horizon-edge.jpg); before: [field](fields-before-across.jpg), [globe](fields-before-globe.jpg).

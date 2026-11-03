@@ -295,6 +295,8 @@ async function boot(): Promise<void> {
 
   const render = (): void => {
     renderer.info.reset();
+    // with MSAA the crop's stalks fade by coverage; without it they are cut at half
+    world.rye.canopy.coverage = post.samples > 0;
     post.render(world.scene, camera, store.values.style.grain, store.values.style.contrast, store.values.style.brightness);
   };
 

@@ -1,7 +1,7 @@
 import { Vector3, Vector4, type Texture } from 'three';
 import { hash32, mix, unit } from '../../../src/core/hash';
 import { smoothstep } from '../../../src/core/math';
-import { Fields, type FieldParams } from './fields';
+import { Fields, PLAIN_LEVEL, type FieldParams } from './fields';
 import { sunAt } from '../render/palette';
 import { localSun } from '../../../src/render/sun';
 import { angleBetween, tangentToward, travel } from '../../../src/planet/geo';
@@ -28,7 +28,7 @@ export const COTTAGE_FLAT = 7.5;
 export const COTTAGE_TO_POND = 4.3;
 export const POND_SHIFT = 7;
 /** The cottage clearing stands this high above the water (m): its landing is a terrace over the pond. */
-export const HOME_LEVEL = 8;
+export const HOME_LEVEL = PLAIN_LEVEL;
 /** The house's footprint (half sizes, m), and its terrace with the steps and its pier (props.ts COTTAGE, TERRACE, STEPS, PIER: x0, x1, z0, z1): cleared of plants. */
 export const HOUSE_FOOTPRINT = { halfX: 4.45, halfZ: 2.75 } as const;
 export const TERRACE_AREA = [-4.5, 4.2, -0.2, 4.8] as const;
@@ -283,7 +283,8 @@ export class Terrain {
   /** Highest the ground can stand above the water table anywhere (m), for culling. */
   get maxHeight(): number {
     const amplitudes=this.fields.relief.reduce((sum,a)=>sum+a,0)+this.fields.hummock.reduce((sum,a)=>sum+a,0);
-    return Math.max(this.cottageGround,this.fields.lift+amplitudes+14-this.fields.level+BANK.height+0.5);
+    // (+1.3: the standing crop's canopy over the ground, so the horizon reach covers it)
+    return Math.max(this.cottageGround,this.fields.lift+amplitudes+1.3-this.fields.level+BANK.height+0.5);
   }
 
   /** No grass, flowers or stones: inside the house and on the landing. */

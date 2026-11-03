@@ -3,6 +3,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash32, unit } from '../../../src/core/hash';
 import { smoothstep } from '../../../src/core/math';
 import { createGroundSample, type Terrain } from '../planet/terrain';
+import type { Clearing } from '../planet/bake';
 import { cypressGeometry, farmGeometry, harvestSheafGeometry } from './harvestGeometry';
 import vertexShader from './harvestScenery.vert.glsl?raw';
 import fragmentShader from './harvestScenery.frag.glsl?raw';
@@ -27,6 +28,30 @@ export class HarvestScenery {
   }
 
   invalidate():void {this.dirty=true;}
+
+  /**
+   * Where the fields give way (planet/parcels.glsl): a grass yard round each
+   * farm, and a ring of reaped stubble round each sheaf, so sheaves stand in a
+   * harvested patch rather than in standing crop. Same places as update().
+   */
+  clearings(terrain:Terrain):Clearing[] {
+    if(this.seed!==terrain.layout.seed)this.build(terrain);
+    const R=terrain.radius,home=terrain.layout.cottage,forward=terrain.layout.homeBearing,right=new Vector3().crossVectors(home,forward).normalize();
+    const out:Clearing[]=[];
+    for(const batch of this.batches){
+      const farm=batch.footprint>0,sheaf=batch.mesh.name.includes('sheaves');
+      if(!farm&&!sheaf)continue;
+      for(const site of batch.sites){
+        const dir=new Vector3();
+        let presence=1;
+        if(site.local){const [x,z]=site.local,d=Math.hypot(x,z),angle=Math.asin(Math.min(.95,d/R));dir.copy(home).multiplyScalar(Math.cos(angle)).addScaledVector(right,x/d*Math.sin(angle)).addScaledVector(forward,z/d*Math.sin(angle)).normalize();}
+        else{dir.copy(site.direction);presence=smoothstep(Math.min(55,R*.72),Math.min(66,R*.9),Math.acos(Math.max(-1,Math.min(1,home.dot(dir))))*R);}
+        if(presence<=0)continue;
+        out.push({direction:dir,radius:farm?3.3*site.scale*presence*2.1+2.5:-(1.9+1.5*site.scale*presence)});
+      }
+    }
+    return out;
+  }
 
   private add(source:BufferGeometry,sites:Site[],name:string,footprint=0):void{
     const indexed=mergeVertices(source,1e-7),g=new InstancedBufferGeometry();
