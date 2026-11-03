@@ -57,6 +57,8 @@ and `src/main.ts`; copy them.
    - `layOut` and `bedAt` from the world's `garden/placement.ts`; `ground(dir)`, its terrain's sample;
      `shape()`, its terrain's layout; and, if the world knows more than water, `standable(dir)` (off a house's
      walls, on a deck's free part: the meadow's `MuseRoam.standable`).
+   - `frameHome()`: the world's own view of its home, for the visit rail's home button (`cameraPreset('homestead',
+     false)`, or Sequoia's `'cabin'`); without it the visit flies to the house from out in front.
 2. **`world.ts`.** A `visitors` list and `addVisitor(muse)`: its body, props and shadow added to the scene, and
    each visitor updated and culled in `World.update` as the host is. Add the visitors to `pickMuse`, so a tap on
    the guest says hello, and to any reflection pass that draws the host. With no visitor the list is empty, and
@@ -68,7 +70,7 @@ and `src/main.ts`; copy them.
 A guest out by its host is directed `{ kind: 'out' }`. For a tap on it to say hello, the world's Muse must answer
 taps while directed out, as `src/life/muse.ts` does (`MuseRoam.answerOver`). Until a world has its adapter, its
 entry in `src/muse/planets.ts` should say `visitable: false`, and the garden keeps its tickets in the post.
-`npm run test:visit` (the sample backend) runs a visit on Lantern and on the meadow.
+`npm run test:visit` (the sample backend) runs a visit on every destination and on the meadow, its rail included.
 
 ## Running, testing and building a world
 

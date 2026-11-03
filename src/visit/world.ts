@@ -79,4 +79,6 @@ export interface VisitWorld {
   readonly musesView?: { readonly distance: number; readonly height: number; readonly aim: number };
   /** Where a Muse may stand beyond dry ground (off the walls of a house, on a deck's free part), if the world knows. */
   standable?(dir: Vector3): boolean;
+  /** The world's own view of the host's home (its homestead, or a cabin), for the rail's home button; without it the camera flies to the house from out in front. */
+  frameHome?(): void;
 }

@@ -37,6 +37,8 @@ export function tulipVisit(world: World): VisitWorld {
     bedAt: (laid, dir) => bedAt({ beds: laid }, dir, world.growth.radius),
     ground: (dir) => world.terrain.sample(dir, sample),
     shape: () => world.terrain.layout,
+    // (the host's home: its homestead view)
+    frameHome: () => world.cameraPreset('homestead', false),
     // (from over the tulips, which stand to the two Muses' shoulders)
     musesView: { distance: 5, height: 4.6, aim: 0.7 },
   };

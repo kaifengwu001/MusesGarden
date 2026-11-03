@@ -2,13 +2,14 @@ import { mkdirSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import type { MuseLook, PlanetId, VisitWorldView } from '../muse/contract';
 import { sampleVisit } from '../muse/samples';
+import { checkRail } from './railChecks.spec';
 
 // A visit on each world that is a destination (environments/<x>/visit.ts), on the sample backend
 // (playwright.visit.config.ts): the sample visit, as the backend serves it, with its planet set to the world, its host
 // the friend who lives there (that friend's seed, server/fixtures/cast.json) and both Muses in clothes. The view is
 // answered here, so these tests stand apart from the backend's clock, which visit.spec.ts moves on. Each: ready, both
-// Muses together, drawn and in their clothes, the guest on its host's footing, every plant planted on dry ground, and a
-// public find's card. VISIT_STILLS=<dir> keeps a still of each visit, the camera on the two Muses.
+// Muses together, drawn and in their clothes, the guest on its host's footing, every plant planted on dry ground, the
+// rail (railChecks.spec.ts), and a public find's card. VISIT_STILLS=<dir> keeps a still of each visit, the camera on the two Muses.
 
 const TICKET = 'inv-wren-hero-1';
 const HOST_LOOK: MuseLook = 'muse8';
@@ -76,7 +77,7 @@ async function arrive(page: Page): Promise<VisitState> {
 }
 
 for (const world of WORLDS) {
-  test(`a visit on ${world.planet}: both Muses together in their clothes, every plant on dry ground, a public find’s card`, async ({ page }) => {
+  test(`a visit on ${world.planet}: both Muses together in their clothes, every plant on dry ground, the rail, a public find’s card`, async ({ page }) => {
     await page.route(`**/api/visits/${TICKET}/world*`, (route) => route.fulfill({ json: viewOn(world) }));
     await page.goto(`/environments/${world.planet}/?visit=${TICKET}&as=hero&garden=/api/muses/hero#hud=0`);
     const s = await arrive(page);
@@ -132,6 +133,8 @@ for (const world of WORLDS) {
         { timeout: 5_000 },
       );
     }
+    // the rail: the guest's Muse visiting, Find Muse and the host's home bringing the camera in; no basket, post or tickets
+    await checkRail(page, world.name);
     const stills = process.env.VISIT_STILLS;
     if (stills) {
       // (framed again on the two as they are now: the host may have moved on with its day since)
@@ -148,3 +151,11 @@ for (const world of WORLDS) {
     await expect(page.locator('.visit .g-card')).toContainText(`${world.name}’s garden`);
   });
 }
+
+test('while the two aren’t together yet, the rail says the guest’s Muse is on its way', async ({ page }) => {
+  const world = WORLDS[0];
+  await page.route(`**/api/visits/${TICKET}/world*`, (route) => route.fulfill({ json: { ...viewOn(world), together: false } }));
+  await page.goto(`/environments/${world.planet}/?visit=${TICKET}&as=hero&garden=/api/muses/hero#hud=0`);
+  await expect(page.locator('.visit .g-rail .g-status')).toHaveText(`${sampleVisit.guest.name} is on the way`, { timeout: 120_000 });
+  await expect(page.locator('.visit .g-portrait')).toHaveClass(/is-out/);
+});

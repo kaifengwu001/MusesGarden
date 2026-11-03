@@ -1,4 +1,5 @@
 import { Vector3 } from 'three';
+import museFace from '../assets/garden/muse-face.jpg';
 import '../ui/garden/garden.css';
 import './visit.css';
 import { mediaOf } from '../garden/media';
@@ -20,7 +21,9 @@ import type { VisitBody, VisitWorld } from './world';
 // A visit on a ticket, on the host's own planet: `?visit=<ticket>&as=<guest>&garden=<base>` in place of the garden.
 // The host's finds grow as beds where it found them, its public ones open their cards; the host lives its own life at
 // home, and the guest's Muse keeps it company while the two are together; a banner says whose planet this is, how
-// long is left, and the way home. The world's main.ts calls prepareVisit before it makes its World, then uses a
+// long is left, and the way home. A rail where the garden's is (the garden's own buttons and look) has the guest's
+// Muse with where it is, a button to find the two Muses and one to the host's home; none of the garden's basket, post
+// or tickets, which are the guest's own at home. The world's main.ts calls prepareVisit before it makes its World, then uses a
 // VisitUi in place of its GardenUi: update() before the world moves, frame() after, tap() first, interrupt() on any
 // move of the camera.
 
@@ -42,6 +45,8 @@ const SIGHT_SAMPLES = 8;
 const HOUSE_REACH = 6;
 /** How much the side the host faces counts toward the camera's side, against open places (of SIGHT_SAMPLES): its face over a little more room. */
 const FACING = 3;
+/** The host's house as the camera comes to it, where the world has no view of its own (visitUi.goToHostHome). */
+const HOME_VIEW = { distance: 16, height: 6, aim: 1.5 } as const;
 /** Where the card stands over its bed (m), and above which height (m) it is put away. */
 const CARD_AT = 1.9;
 const CARD_UNDER = 30;
@@ -90,6 +95,11 @@ export class VisitUi {
   private readonly where: HTMLElement;
   private readonly left: HTMLElement;
   private readonly homeButton: HTMLButtonElement;
+  private readonly rail: HTMLElement;
+  private readonly portrait: HTMLButtonElement;
+  private readonly status: HTMLElement;
+  private readonly hostHome: HTMLButtonElement;
+  private statusNote = '';
   private readonly card: FindCard;
   private readonly transit: Transit;
   private readonly flight: Flight;
@@ -140,6 +150,18 @@ export class VisitUi {
     this.homeButton = button('g-visit-home', 'Return home', `${ICONS.house}<span>Return home</span>`, () => void this.goHome(true));
     this.banner.append(this.where, this.left, this.homeButton);
     this.root.append(this.banner);
+    // the rail: the guest's Muse and where it is, the two Muses, the host's home
+    this.rail = el('nav', 'g-rail visit-rail');
+    this.rail.setAttribute('aria-label', 'Visit');
+    this.portrait = button('g-portrait', 'Your Muse', '', () => this.frameMuses());
+    this.portrait.style.backgroundImage = `url(${museFace})`;
+    this.status = el('span', 'g-status');
+    this.portrait.append(this.status);
+    const find = button('g-railbtn', 'Find Muse', ICONS.find, () => this.frameMuses());
+    find.dataset.label = 'Find Muse';
+    this.hostHome = button('g-railbtn', 'Home', ICONS.house, () => this.goToHostHome());
+    this.rail.append(this.portrait, find, this.hostHome);
+    this.root.append(this.rail);
     this.transit = new Transit(this.root);
     if (import.meta.env.DEV || import.meta.env.VITE_PROBE) this.installProbe();
 
@@ -158,6 +180,15 @@ export class VisitUi {
     this.home = homeUrl(view.guest.planet, this.params);
     this.where.textContent = `Visiting ${view.host.name}’s planet`;
     this.banner.classList.add('is-on');
+    this.portrait.dataset.label = view.guest.name;
+    this.portrait.setAttribute('aria-label', view.guest.name);
+    this.portrait.title = view.guest.name;
+    const home = `${view.host.name}’s home`;
+    this.hostHome.dataset.label = home;
+    this.hostHome.setAttribute('aria-label', home);
+    this.hostHome.title = home;
+    this.showStatus(view);
+    this.rail.classList.add('is-on');
     const timer = window.setInterval(() => void this.poll(), POLL_MS);
     window.addEventListener('pagehide', () => window.clearInterval(timer));
     void Promise.all([this.world.host.ready, this.guest.ready]).then(async () => {
@@ -172,6 +203,16 @@ export class VisitUi {
   private sync(view: VisitWorldView): void {
     this.view = view;
     this.synced = { at: view.now, wall: performance.now() };
+    if (this.phase === 'visiting') this.showStatus(view);
+  }
+
+  /** Under the guest's Muse on the rail: visiting, once the two are together; on the way, while one still works. */
+  private showStatus(view: VisitWorldView): void {
+    const note = view.together ? `Visiting ${view.host.name}’s planet` : `${view.guest.name} is on the way`;
+    if (note === this.statusNote) return;
+    this.statusNote = note;
+    this.status.replaceChildren(el('i'), note);
+    this.portrait.classList.toggle('is-out', !view.together);
   }
 
   /** The server's clock now, as last read and run on since (ms). */
@@ -197,6 +238,7 @@ export class VisitUi {
     if (this.leaving) return;
     this.phase = phase;
     this.banner.classList.remove('is-on');
+    this.rail.classList.remove('is-on');
     this.closeCard();
     this.home ??= homeUrl(this.view?.guest.planet ?? (await planetOf(this.params)) ?? 'meadow', this.params);
     const panel = el('div', 'visit-ended');
@@ -411,6 +453,20 @@ export class VisitUi {
     this.flight.to(framing ?? this.hostFraming(), this.world.scene.growth.radius, this.ground);
   }
 
+  /** To the host's home: the world's own view of it where it has one, else from out in front of its house. */
+  goToHostHome(): void {
+    this.interrupt();
+    if (this.world.frameHome) {
+      this.world.frameHome();
+      return;
+    }
+    // (every world's layout names its cottage and the way it faces; without them, wherever the host is)
+    const layout = this.world.shape() as { readonly cottage?: unknown; readonly homeBearing?: unknown };
+    const house = layout.cottage instanceof Vector3 ? layout.cottage.clone().normalize() : this.world.host.where.dir.clone();
+    const from = layout.homeBearing instanceof Vector3 ? layout.homeBearing.clone() : undefined;
+    this.flight.to({ dir: house, ground: this.world.ground(house).height, ...HOME_VIEW, from }, this.world.scene.growth.radius, this.ground);
+  }
+
   /** The host alone, from in front of it. */
   private hostFraming(): Framing {
     const host = this.world.host.where;
@@ -490,6 +546,7 @@ export class VisitUi {
       ready: this.ready,
       state: () => this.state(),
       frameMuses: () => this.frameMuses(),
+      home: () => this.goToHostHome(),
       open: (id: string) => this.openFind(id),
       flying: () => this.flight.flying,
       poll: () => this.poll(),

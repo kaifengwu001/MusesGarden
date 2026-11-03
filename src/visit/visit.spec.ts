@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { checkRail } from './railChecks.spec';
 
 // A visit on a ticket, on Lantern Reed Gardens, against the sample backend (playwright.visit.config.ts). The sample
 // ticket (inv-wren-hero-1) was used 23 h 40 after the sample backend's clock starts, so the tests move that clock on:
@@ -77,7 +78,7 @@ test('the sample visit on Lantern: both Muses together, every plant on dry groun
   expect(Math.abs((again.left ?? 0) - (s.left ?? 0)), 'the same visit, not a fresh 2 h').toBeLessThan(60_000);
 });
 
-test('a visit to Momo’s meadow: sent there from another planet’s page, the host at home, the guest beside it, every plant on dry ground', async ({ page }) => {
+test('a visit to Momo’s meadow: sent there from another planet’s page, the host at home, the guest beside it, every plant on dry ground, the rail', async ({ page }) => {
   // (the sample visit is to Lantern Reed Gardens: here its host's planet is given as the meadow)
   await page.route('**/api/visits/inv-wren-hero-1/world?as=hero', async (route) => {
     const response = await route.fetch();
@@ -93,7 +94,7 @@ test('a visit to Momo’s meadow: sent there from another planet’s page, the h
   expect(s.guest?.apart).toBeGreaterThan(0.3);
   expect(s.guest?.apart).toBeLessThan(3);
   for (const p of s.plants) expect([p.id, p.placed, (p.water ?? -1) > 0]).toEqual([p.id, true, true]);
-  await expect(page.locator('.g-rail'), 'Momo’s own garden stays shut').toHaveCount(0);
+  await expect(page.locator('.g-basketbtn'), 'Momo’s own garden stays shut').toHaveCount(0);
   await expect(page.locator('.controlbar')).toBeHidden();
 
   // a tap on the guest says hello, as one on the host does: it waves
@@ -116,6 +117,8 @@ test('a visit to Momo’s meadow: sent there from another planet’s page, the h
     undefined,
     { timeout: 5_000 },
   );
+  // the rail: Moss visiting, Find Muse and Wren's home bringing the camera in; no basket, post or tickets
+  await checkRail(page, 'Wren');
 });
 
 /** The garden at home, its post open on the tickets. */

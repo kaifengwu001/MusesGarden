@@ -50,5 +50,7 @@ export function lanternVisit(world: World): VisitWorld {
     bedAt: (laid, dir) => bedAt({ beds: laid }, dir, world.growth.radius),
     ground: (dir) => world.terrain.sample(dir, sample),
     shape: () => world.terrain.layout,
+    // (the host's home: the shelter, as its Shelter view)
+    frameHome: () => world.cameraPreset('homestead', false),
   };
 }
