@@ -99,12 +99,13 @@ export class WindCloudRibbons {
     this.mesh.renderOrder=3;
   }
 
-  update(seed:number,radius:number,time:number,altitude:number):void {
+  /** The ribbons on a shell `height` above R (m), seen from a camera `altitude` over the ground. */
+  update(seed:number,height:number,time:number,altitude:number):void {
     if(seed!==this.seed) {
       this.mesh.geometry.dispose();this.mesh.geometry=cloudRibbonGeometry(seed);this.seed=seed;
     }
     this.time.value=time;
-    this.height.value=24*Math.sqrt(radius/128);
+    this.height.value=height;
     // The painted sky remains the close-view reference. Orbit reveals the
     // physical ribbons gradually, without covering the plants at ground level.
     const t=Math.min(1,Math.max(0,(altitude-18)/65));

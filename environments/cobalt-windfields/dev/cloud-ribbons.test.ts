@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
 import { cloudRibbonGeometry, WindCloudRibbons } from '../life/windCloudRibbons';
+import { defaultParams, schema } from '../params';
+
+// the slider's lowest and its default, at R 128; the shell grows as √R
+const HEIGHTS=[schema.clouds.cirrusHeight.min,defaultParams().clouds.cirrusHeight];
 
 test('cirrus lies on a spherical shell, spans the globe and has tapered finite ends',()=>{
   const geometry=cloudRibbonGeometry(412),repeat=cloudRibbonGeometry(412),other=cloudRibbonGeometry(413);
@@ -27,21 +31,22 @@ test('triangle interiors follow the shell instead of cutting through the planet'
     const geometry=cloudRibbonGeometry(seed);
     try {
       const p=geometry.getAttribute('position'),index=geometry.index!;
+      let lowest=Infinity;
       for(let i=0;i<index.count;i+=3) {
         const a=index.getX(i),b=index.getX(i+1),c=index.getX(i+2);
         // Vertices on a sphere alone are insufficient: the rendered face is
         // planar. Probe each edge midpoint and its interior independently.
         for(const weights of [[.5,.5,0],[0,.5,.5],[.5,0,.5],[1/3,1/3,1/3]]) {
-          const radius=Math.hypot(
+          lowest=Math.min(lowest,Math.hypot(
             p.getX(a)*weights[0]+p.getX(b)*weights[1]+p.getX(c)*weights[2],
             p.getY(a)*weights[0]+p.getY(b)*weights[1]+p.getY(c)*weights[2],
-            p.getZ(a)*weights[0]+p.getZ(b)*weights[1]+p.getZ(c)*weights[2]);
-          expect(radius).toBeGreaterThan(.995);
-          for(const planetRadius of [40,128,400]) {
-            const shellRadius=planetRadius+24*Math.sqrt(planetRadius/128);
-            expect(radius*shellRadius-planetRadius).toBeGreaterThan(12);
-          }
+            p.getZ(a)*weights[0]+p.getZ(b)*weights[1]+p.getZ(c)*weights[2]));
         }
+      }
+      expect(lowest).toBeGreaterThan(.995);
+      for(const planetRadius of [40,128,400]) for(const height of HEIGHTS) {
+        const lift=height*Math.sqrt(planetRadius/128);
+        expect(lowest*(planetRadius+lift)-planetRadius).toBeGreaterThan(lift/2);
       }
     } finally {geometry.dispose();}
   }
@@ -51,9 +56,10 @@ test('orbit reveals physical cirrus while ground views stay clear through growth
   const ribbons=new WindCloudRibbons({});
   try {
     for(const radius of [40,128,400]) {
-      ribbons.update(412,radius,12,4);expect(ribbons.mesh.visible).toBe(false);
+      const lift=defaultParams().clouds.cirrusHeight*Math.sqrt(radius/128);
+      ribbons.update(412,lift,12,4);expect(ribbons.mesh.visible).toBe(false);
       const geometry=ribbons.mesh.geometry;
-      ribbons.update(412,radius,24,radius*4.2);
+      ribbons.update(412,lift,24,radius*4.2);
       expect(ribbons.mesh.visible).toBe(true);
       expect(ribbons.mesh.geometry).toBe(geometry);
       expect(ribbons.mesh.material.depthTest).toBe(true);

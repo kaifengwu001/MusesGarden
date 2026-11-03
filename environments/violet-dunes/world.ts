@@ -479,7 +479,7 @@ export class World {
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.fauna.update(clock.time, this.terrain, rig.camera.position);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
-    this.cirrus.update(L.seed, R, this.terrain.maxHeight, clock.time, this.windAxis, rig.camera.position, p.clouds.speed);
+    this.cirrus.update(L.seed, R, p.clouds.cirrusHeight * Math.sqrt(R / 128), clock.time, this.windAxis, rig.camera.position, p.clouds.speed);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
