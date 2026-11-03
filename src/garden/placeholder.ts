@@ -13,7 +13,8 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaK
 // (source.ts): ten interests, six baskets of finds over the last ten days
 // (reels, posts, articles and a video, every picture a placeholder from
 // art.ts, each found somewhere on the planet), Muse's postcards (photographed in the world: two Muses, Muse
-// waving), two invitations from friends, and the friends themselves. Days are
+// waving; on their backs, every kind of thing Muse writes or draws there), two invitations from friends, and the
+// friends themselves. Days are
 // counted back from today, so the newest basket is always today's.
 
 /** An ISO date `back` days before today (local time). */
@@ -154,12 +155,77 @@ const FRIENDS: ReadonlyArray<Omit<MuseFriend, 'met'> & { metBack: number }> = [
   { id: 'tofu', name: 'Tofu', coat: '#efe6c8', shared: ['Model kits'], metBack: 20 },
 ];
 
+/** Muse's photos, each with what it wrote or drew on the back (every kind of back once), and two invitations. */
 const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
-  { id: 'pc-close', ago: 9, image: closeUrl, place: 'On the doorstep', with: 'pip' },
-  { id: 'pc-pier', ago: 6, image: pierUrl, place: 'Out on the pier', with: 'juniper' },
-  { id: 'pc-meadow', ago: 4, image: meadowUrl, place: 'In the long grass', with: 'marlo' },
-  { id: 'pc-cottage', ago: 2, image: cottageUrl, place: 'Home from the hill', with: 'tofu' },
-  { id: 'pc-terrace', ago: 0, image: terraceUrl, place: 'Pip came by', with: 'pip' },
+  {
+    id: 'pc-note-weather',
+    ago: 11,
+    image: cottageUrl,
+    place: 'Up on the hill',
+    with: 'tofu',
+    back: { kind: 'note', title: 'Weather report', lines: ['Sky: blue, a few sheep', 'Wind: a light push from behind', 'Mood: sunny, chance of nap'] },
+  },
+  {
+    id: 'pc-close',
+    ago: 9,
+    image: closeUrl,
+    place: 'On the doorstep',
+    with: 'pip',
+    back: { kind: 'line', text: 'Pip knocked twice, then sat on my step until I came out. The best kind of visitor.' },
+  },
+  { id: 'pc-poem-pond', ago: 8, image: pierUrl, place: 'By the pond', with: 'juniper', back: { kind: 'poem', lines: ['the pond holds the sky', 'a frog edits it, once', 'then lets it be'] } },
+  {
+    id: 'pc-riddle-hole',
+    ago: 7,
+    image: terraceUrl,
+    place: 'On the porch',
+    with: 'marlo',
+    back: { kind: 'riddle', question: 'What gets bigger the more you take away from it?', answer: 'A hole. I dug one to check.' },
+  },
+  { id: 'pc-pier', ago: 6, image: pierUrl, place: 'Out on the pier', with: 'juniper', back: { kind: 'doodle', doodle: 'fish', caption: 'the one that got away' } },
+  {
+    id: 'pc-ticket-ridge',
+    ago: 5,
+    image: pierUrl,
+    place: 'Back from Starfall Ridge',
+    with: 'juniper',
+    back: { kind: 'ticket', from: 'The meadow', to: 'Starfall Ridge', note: 'window seat. I waved at every star.' },
+  },
+  { id: 'pc-meadow', ago: 4, image: meadowUrl, place: 'In the long grass', with: 'marlo', back: { kind: 'tally', what: 'clouds shaped like sheep', count: 12 } },
+  {
+    id: 'pc-pressed-fern',
+    ago: 3,
+    image: meadowUrl,
+    place: 'By the wet meadow',
+    with: 'pip',
+    back: { kind: 'pressed', species: 0, variant: 0.8, label: 'Why ferns unfurl the way they do' },
+  },
+  {
+    id: 'pc-cottage',
+    ago: 2,
+    image: cottageUrl,
+    place: 'Home from the hill',
+    with: 'tofu',
+    back: {
+      kind: 'list',
+      title: 'Before supper',
+      items: [
+        { text: 'walk down the hill', done: true },
+        { text: 'wave at Tofu', done: true },
+        { text: 'wash my mittens', done: false },
+        { text: 'tea', done: false },
+      ],
+    },
+  },
+  { id: 'pc-map-hill', ago: 1, image: cottageUrl, place: 'On the dry hill', with: 'marlo', back: { kind: 'map', dir: AREAS.hill, label: 'X marks where I sat (for ages)' } },
+  {
+    id: 'pc-terrace',
+    ago: 0,
+    image: terraceUrl,
+    place: 'Pip came by',
+    with: 'pip',
+    back: { kind: 'game', friend: 'Pip', board: 'xo..ox.o.', caption: 'Pip won. Again. Rematch tomorrow.' },
+  },
   {
     id: 'inv-pip',
     ago: 0,

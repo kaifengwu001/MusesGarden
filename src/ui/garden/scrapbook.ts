@@ -16,7 +16,7 @@ export const TINTS = {
 export type Tint = keyof typeof TINTS;
 
 /** Washi tape, each colour see-through. */
-const TAPE_COLOURS = ['#f4b4c4', '#f6df85', '#a9c9ee', '#addcc0', '#f6c29b', '#cdb6ec'] as const;
+export const TAPE_COLOURS = ['#f4b4c4', '#f6df85', '#a9c9ee', '#addcc0', '#f6c29b', '#cdb6ec'] as const;
 export type TapePattern = 'plain' | 'stripes' | 'dots' | 'gingham';
 
 export type Corner = 'tl' | 'tr' | 'bl' | 'br';
@@ -62,7 +62,7 @@ const PAPER_CLIPS = ['#e98aa8', '#79a7e0', '#d4b24c', '#9aa3ad', '#6fbf94'] as c
 const BINDER_CLIPS = ['#2b2b30', '#2b2b30', '#2b2b30', '#ef8fae', '#7fc3a3', '#8fb2ea'] as const;
 
 /** A small seeded generator (mulberry32). */
-function seeded(seed: number): () => number {
+export function seeded(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -74,7 +74,7 @@ function seeded(seed: number): () => number {
 }
 
 /** One of `items`, by weight where given. */
-function pick<T>(next: () => number, items: readonly T[], weights?: readonly number[]): T {
+export function pick<T>(next: () => number, items: readonly T[], weights?: readonly number[]): T {
   const w = weights ?? items.map(() => 1);
   let r = next() * w.reduce((a, b) => a + b, 0);
   for (let i = 0; i < items.length; i++) {
@@ -84,7 +84,7 @@ function pick<T>(next: () => number, items: readonly T[], weights?: readonly num
   return items[items.length - 1];
 }
 
-const between = (next: () => number, lo: number, hi: number): number => lo + next() * (hi - lo);
+export const between = (next: () => number, lo: number, hi: number): number => lo + next() * (hi - lo);
 
 /** The corners a holder covers, where no sticker goes (a clip or a strip across the top crowds both top corners). */
 export function covered(holder: Holder): readonly Corner[] {
@@ -138,7 +138,7 @@ export function paperOf(tint: Tint): string {
 
 // ---- the drawings ---------------------------------------------------------------------------------------------
 
-const n1 = (v: number): string => v.toFixed(1);
+export const n1 = (v: number): string => v.toFixed(1);
 
 /** A polaroid is 100 wide and 80 tall here; a scribble's drawing reaches PAD past each edge. */
 export const SNAP = { w: 100, h: 80, pad: 9 } as const;
@@ -158,7 +158,7 @@ function round(s: number, d: number): { x: number; y: number; tx: number; ty: nu
 const perimeter = (d: number): number => 2 * (SNAP.w + SNAP.h + 4 * d);
 
 /** A line through points, as a path. */
-const polyline = (points: readonly (readonly [number, number])[]): string => `M${points.map(([x, y]) => `${n1(x)} ${n1(y)}`).join('L')}`;
+export const polyline = (points: readonly (readonly [number, number])[]): string => `M${points.map(([x, y]) => `${n1(x)} ${n1(y)}`).join('L')}`;
 
 /** A coil of loops all the way round, like a telephone cord drawn in crayon. */
 function loops(): string {
@@ -251,6 +251,14 @@ const SCRIBBLES: Record<ScribbleKind, { draw: (next: () => number) => string; wi
   brackets: { draw: brackets, width: 2.6 },
 };
 
+/** Crayon's grain: what it draws, speckled where the paper's tooth shows through. `uid` names the filter. */
+export function crayonFilter(uid: string, seed: number): string {
+  return (
+    `<filter id="${uid}" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="2" seed="${seed % 97}" result="n"/>` +
+    `<feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3.2 0 0 0 -0.75" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter>`
+  );
+}
+
 /** A scribbled frame round a polaroid, in crayon: grainy, and gone over twice. `uid` names its grain filter. */
 export function scribbleSvg(scribble: Scribble, uid: string): string {
   const { draw, width } = SCRIBBLES[scribble.kind];
@@ -258,15 +266,14 @@ export function scribbleSvg(scribble: Scribble, uid: string): string {
   const { w, h, pad } = SNAP;
   return (
     `<svg viewBox="${-pad} ${-pad} ${w + 2 * pad} ${h + 2 * pad}" preserveAspectRatio="none" aria-hidden="true">` +
-    `<filter id="${uid}" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="2" seed="${scribble.seed % 97}" result="n"/>` +
-    `<feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3.2 0 0 0 -0.75" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter>` +
+    crayonFilter(uid, scribble.seed) +
     `<g filter="url(#${uid})" fill="none" stroke="${scribble.colour}" stroke-linecap="round" stroke-linejoin="round">` +
     `<path d="${d}" stroke-width="${width}"/><path d="${d}" stroke-width="${n1(width * 0.55)}" opacity="0.6" transform="translate(0.45 0.35)"/></g></svg>`
   );
 }
 
 /** Points of a star, as a path. */
-function star(cx: number, cy: number, outer: number, inner: number): string {
+export function star(cx: number, cy: number, outer: number, inner: number): string {
   const points: [number, number][] = [];
   for (let k = 0; k < 10; k++) {
     const r = k % 2 === 0 ? outer : inner;
@@ -276,7 +283,7 @@ function star(cx: number, cy: number, outer: number, inner: number): string {
   return `${polyline(points)}Z`;
 }
 
-const INK = '#3b3530';
+export const INK = '#3b3530';
 
 /** Stickers on a 40 by 40 sheet: `cut` ones are die-cut, with a white edge and a shadow; the others are doodles in ink. */
 export const STICKERS = {
@@ -358,7 +365,7 @@ function paperSvg(colour: string): string {
   return `<svg viewBox="0 0 20 60" aria-hidden="true"><path d="M7 22v24a3.5 3.5 0 0 0 7 0V10a6 6 0 0 0-12 0v40a8 8 0 0 0 16 0V18" stroke="${colour}" stroke-width="2.3" fill="none" stroke-linecap="round"/><path d="M3.4 10a5 5 0 0 1 3-4.4" stroke="#fff" stroke-opacity=".6" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`;
 }
 
-function tapeNode(tape: Tape, at: 'top' | Corner, turn: number): HTMLElement {
+export function tapeNode(tape: Tape, at: 'top' | Corner, turn: number): HTMLElement {
   const node = el('span', `g-tape g-tape-${at} g-tape-${tape.pattern}`);
   node.style.setProperty('--tape', tape.colour);
   node.style.setProperty('--tape-2', tape.second);
