@@ -38,21 +38,28 @@ export function whereIs(s: MuseState): Dir {
   return latest ? latest.dir : hashedDir(s.seed.id);
 }
 
-/** The photo of a hangout or a new friendship, one for both logs; `shows` is what it is of, the two of them by default. */
+/**
+ * The photo of a hangout or a new friendship, one for both logs; `shows` is what it is of, the two of them by default.
+ * Its id names the two and the moment; a second photo of the two at the same moment (one hangout ending as the next
+ * begins) is numbered on, so each photo is its own card with its own still.
+ */
 export function photoTogether(
   kind: 'friend' | 'new-friend',
-  a: MuseId,
-  b: MuseId,
+  a: MuseState,
+  b: MuseState,
   where: Pick<PhotoSpec, 'context' | 'planetOf' | 'dir' | 'zoom'>,
   now: Instant,
   draw: Draw,
   shows: PhotoSubject = kind,
 ): { readonly id: PhotoId; readonly a: MuseEventBody; readonly b: MuseEventBody } {
-  const pair = [a, b].sort(compare).join('+');
-  const id = `photo:${kind}:${pair}:${now}` as PhotoId;
+  const pair = [a.seed.id, b.seed.id].sort(compare).join('+');
+  const stamp = `photo:${kind}:${pair}:${now}`;
+  const held = (id: string) => a.photos.some((p) => p.id === id) || b.photos.some((p) => p.id === id);
+  let id = stamp as PhotoId;
+  for (let k = 2; held(id); k++) id = `${stamp}:${k}` as PhotoId;
   const base = { id, at: now, subject: shows, ...where, forward: tangentAt(where.dir, draw) };
   const taken = (companion: MuseId): MuseEventBody => ({ kind: 'photo.taken', photo: { ...base, companions: [companion] } satisfies PhotoSpec });
-  return { id, a: taken(b), b: taken(a) };
+  return { id, a: taken(b.seed.id), b: taken(a.seed.id) };
 }
 
 /**

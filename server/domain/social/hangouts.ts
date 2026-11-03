@@ -124,7 +124,7 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
 
   const where = { context: 'planet', planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom } as const;
   const shows = togetherSubject(host.temperament, guest.temperament, draw('photo.subject', 0));
-  const photo = photoTogether('friend', host.seed.id, guest.seed.id, where, now, draw, shows);
+  const photo = photoTogether('friend', host, guest, where, now, draw, shows);
   const hostLog: MuseEventBody[] = [photo.a, hangoutEvent(guest.seed.id, 'host', pleasantness, photo.id, fromHost, fromGuest)];
   const guestLog: MuseEventBody[] = [photo.b, hangoutEvent(host.seed.id, 'guest', pleasantness, photo.id, fromGuest, fromHost)];
 

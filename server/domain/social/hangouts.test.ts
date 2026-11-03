@@ -49,6 +49,25 @@ describe('every hangout', () => {
     expect(guestSide.gave).toBe(hostSide.received?.id);
   });
 
+  it('a second hangout of the two at the same moment (the one ending as the next begins) takes a photo of its own', () => {
+    const [a, b] = introduce(host, muse('bo', guestSpec));
+    const now = at(T0 + 5 * HOUR);
+    // (each Muse keeps the photos it has taken)
+    const keep = (s: MuseState, events: readonly MuseEventBody[]): MuseState => ({ ...s, photos: [...s.photos, ...ofKind(events, 'photo.taken').map((e) => e.photo)] });
+    const first = policy.hangout(a, b, now, draws(1));
+    const [a1, b1] = [keep(a, first.host), keep(b, first.guest)];
+    // the other way round, as when the guest's owner boards a ticket to the host just as its visit ends
+    const second = policy.hangout(b1, a1, now, draws(2));
+    const one = ofKind(first.host, 'photo.taken')[0].photo.id;
+    const two = ofKind(second.host, 'photo.taken')[0].photo.id;
+    expect(two).not.toBe(one);
+    expect(ofKind(second.guest, 'photo.taken')[0].photo.id).toBe(two);
+    expect(ofKind(second.host, 'hangout')[0].photo).toBe(two);
+    // a third at that moment numbers on again
+    const third = policy.hangout(keep(b1, second.host), keep(a1, second.guest), now, draws(3));
+    expect(new Set([one, two, ofKind(third.host, 'photo.taken')[0].photo.id]).size).toBe(3);
+  });
+
   it('gives the find that best stretches the other: some overlap with what it shares, not total', () => {
     const [a, b] = introduce(host, muse('bo', guestSpec));
     const out = policy.hangout(a, b, at(T0 + HOUR), draws(2));
