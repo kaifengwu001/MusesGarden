@@ -62,6 +62,9 @@ void main() {
     // a village's ground: packed earth worn pale round its houses, grass in patches a few meters across
     float grass = smoothstep(-0.25, 0.35, gnoise(dir * uRadius / 4.0, uTerrainSeed + 941u) + 0.4 * gnoise(dir * uRadius / 1.3, uTerrainSeed + 942u));
     albedo = mix(pal(TR_EARTH, 3), mix(pal(TR_RICE, 2), pal(TR_RICE, 3), 0.35), grass) * (0.95 + 0.07 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u));
+  } else if (part == 9) {
+    // Muse's hut's knoll (hut.ts): grass, two greens mixed by a noise a couple of meters across
+    albedo = mix(pal(TR_RICE, 3), pal(TR_FOREST, 9), 0.5 + 0.5 * gnoise(dir * uRadius / 2.5, uTerrainSeed + 961u));
   } else if (part == 5) {
     // a ridge along a cut: its top the dams' cream, its sides their green
     albedo = mix(pal(TR_EARTH, 1), pal(TR_EARTH, 0), smoothstep(0.84, 0.94, dot(n, up)));

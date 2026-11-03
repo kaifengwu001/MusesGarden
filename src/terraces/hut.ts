@@ -1,4 +1,4 @@
-import { BoxGeometry, BufferAttribute, BufferGeometry, Color, CylinderGeometry, DoubleSide, Float32BufferAttribute, IcosahedronGeometry, Matrix4, Mesh, Quaternion, ShaderMaterial, Vector3, Vector4, type Group, type IUniform } from 'three';
+import { BoxGeometry, BufferAttribute, BufferGeometry, Color, CylinderGeometry, DataTexture, DoubleSide, Float32BufferAttribute, FloatType, IcosahedronGeometry, Matrix4, Mesh, Quaternion, RedFormat, ShaderMaterial, Vector3, Vector4, type Group, type IUniform } from 'three';
 import { hash32, unit } from '../core/hash';
 import { PART } from './build/construct';
 import fragmentShader from './model.frag.glsl?raw';
@@ -520,8 +520,16 @@ class Ground {
 const GATE = { x0: 0.91, x1: 3.09, tread: 0.32, rise: 0.17 } as const;
 /** Its path (m): its width, how high its top stands over the highest ground it crosses, the least step it takes, a point every so far. */
 const PATH = { width: 1, over: 0.05, step: 0.1, every: 0.25 } as const;
-/** The rocks along its footing's foot (m): one about every so far where its skirt stands so high at least. */
-const ROCKS = { every: 0.42, least: 0.12 } as const;
+/**
+ * Its knoll (m): how far out from its footing's bounding rectangle it reaches (from … to, its outline wandering), how
+ * far out it stays just under its floor (× that), how far under its floor it starts, how far under the terraces its
+ * edge goes, its lip down under them at its edge, how much under it the terraces are sunk where it stands over them;
+ * rays out from its middle and rings along them; its rocks.
+ */
+const KNOLL = { reach: [1.6, 3.2], shoulder: 0.22, below: 0.1, under: 0.2, lip: 0.45, sink: 0.06, rays: 192, rings: 10, rocks: 9 } as const;
+/** The knoll's paint in the terraces' shader (terrace.frag.glsl): grass, its own part. */
+const KNOLL_PART = 9;
+const SINK = 128;
 const ROCK_STONE = new Color('#878c83');
 const ROCK_MOSS = new Color('#66784f');
 
@@ -611,10 +619,208 @@ function smoothWay(points: ReadonlyArray<readonly [number, number]>, every: numb
   return out;
 }
 
+/**
+ * The ground round its footing raised to it (Kai: as though the building grew from the land, not set on it): on rays
+ * out from its footing's middle, from its bounding rectangle out to an outline that wanders, a shoulder just under its
+ * floor and then a slope down under the terraces round it, a little uneven, so it shows where it stands over them and
+ * the paddies and their dams come up round it where they are higher; the corners of the rectangle its footing leaves
+ * (behind its wing, beside its hall) the shoulder's height. All in its frame (m).
+ */
+class Knoll {
+  private readonly r0: Float64Array;
+  private readonly w: Float64Array;
+  /** Per ray, per ring: its height over R (m). */
+  private readonly h: Float64Array;
+  private readonly base: number;
+
+  constructor(
+    private readonly mx: number,
+    private readonly mz: number,
+    private readonly rect: Rect,
+    private readonly paving: readonly Rect[],
+    floor: number,
+    ground: (x: number, z: number) => number,
+    seed: number,
+  ) {
+    const K = KNOLL.rays;
+    const J = KNOLL.rings;
+    this.base = floor - KNOLL.below;
+    this.r0 = new Float64Array(K);
+    this.w = new Float64Array(K);
+    this.h = new Float64Array(K * (J + 1));
+    // (its outline: a few slow waves round it, each its own phase)
+    const phase = [1, 2, 3, 5].map((k) => unit(hash32((seed + k * 7477) >>> 0)) * 6.2832);
+    const amp = [0.5, 0.8, 0.5, 0.3];
+    const wave = (t: number): number => [1, 2, 3, 5].reduce((sum, k, i) => sum + amp[i] * Math.sin(k * t + phase[i]), 0) / amp.reduce((a, b) => a + b, 0);
+    // (the terraces' height smoothed: the middle of five a little apart, so its foot meets the paddies, not each dam)
+    const smooth = (x: number, z: number): number => {
+      const v = [ground(x, z), ground(x + 0.6, z), ground(x - 0.6, z), ground(x, z + 0.6), ground(x, z - 0.6)].sort((a, b) => a - b);
+      return v[2];
+    };
+    const bump = (x: number, z: number): number => {
+      const cx = Math.floor(x / 0.9);
+      const cz = Math.floor(z / 0.9);
+      const fx = x / 0.9 - cx;
+      const fz = z / 0.9 - cz;
+      const at = (i: number, j: number): number => unit(hash32((Math.imul(cx + i, 73856093) ^ Math.imul(cz + j, 19349663) ^ seed) >>> 0)) - 0.5;
+      const sx = fx * fx * (3 - 2 * fx);
+      const sz = fz * fz * (3 - 2 * fz);
+      return (at(0, 0) * (1 - sx) + at(1, 0) * sx) * (1 - sz) + (at(0, 1) * (1 - sx) + at(1, 1) * sx) * sz;
+    };
+    for (let k = 0; k < K; k++) {
+      const t = (k / K) * 2 * Math.PI;
+      const c = Math.cos(t);
+      const sn = Math.sin(t);
+      this.r0[k] = this.exit(c, sn);
+      this.w[k] = KNOLL.reach[0] + (KNOLL.reach[1] - KNOLL.reach[0]) * (0.5 + 0.5 * wave(t));
+      // (its edge under the terraces there, so it goes down under them where it meets them, as a mound in the fields)
+      const ex = mx + c * (this.r0[k] + this.w[k]);
+      const ez = mz + sn * (this.r0[k] + this.w[k]);
+      const end = Math.min(smooth(ex, ez), ground(ex, ez), ground(ex - c * 0.5, ez - sn * 0.5)) - KNOLL.under;
+      for (let j = 0; j <= J; j++) {
+        const u = j / J;
+        const r = this.r0[k] + this.w[k] * u;
+        const x = mx + c * r;
+        const z = mz + sn * r;
+        const e = u <= KNOLL.shoulder ? 0 : smoothstep01((u - KNOLL.shoulder) / (1 - KNOLL.shoulder));
+        this.h[k * (J + 1) + j] = j === 0 ? this.base : this.base + (end - this.base) * e + 0.08 * bump(x, z) * 4 * e * (1 - e);
+      }
+    }
+  }
+
+  /** How far from its middle a ray (its way) leaves the bounding rectangle. */
+  private exit(c: number, sn: number): number {
+    const r = this.rect;
+    let t = Number.POSITIVE_INFINITY;
+    if (c > 1e-9) t = Math.min(t, (r.x1 - this.mx) / c);
+    if (c < -1e-9) t = Math.min(t, (r.x0 - this.mx) / c);
+    if (sn > 1e-9) t = Math.min(t, (r.z1 - this.mz) / sn);
+    if (sn < -1e-9) t = Math.min(t, (r.z0 - this.mz) / sn);
+    return t;
+  }
+
+  /** Its height at a point of its frame (m over R): its floor's on its paving, the shoulder's in the corners it leaves, its own out to its outline; null past it. */
+  heightAt(x: number, z: number, floor: number): number | null {
+    if (this.paving.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1)) return floor;
+    const r = this.rect;
+    if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return this.base;
+    const K = KNOLL.rays;
+    const J = KNOLL.rings;
+    const dx = x - this.mx;
+    const dz = z - this.mz;
+    let t = Math.atan2(dz, dx);
+    if (t < 0) t += 2 * Math.PI;
+    const fk = (t / (2 * Math.PI)) * K;
+    const k0 = Math.floor(fk) % K;
+    const k1 = (k0 + 1) % K;
+    const a = fk - Math.floor(fk);
+    const dist = Math.hypot(dx, dz);
+    const at = (k: number): number | null => {
+      const u = (dist - this.r0[k]) / this.w[k];
+      if (u > 1) return null;
+      const fj = Math.max(u, 0) * J;
+      const j0 = Math.min(Math.floor(fj), J - 1);
+      const b = fj - j0;
+      return this.h[k * (J + 1) + j0] * (1 - b) + this.h[k * (J + 1) + j0 + 1] * b;
+    };
+    const h0 = at(k0);
+    const h1 = at(k1);
+    if (h0 === null || h1 === null) return null;
+    return h0 * (1 - a) + h1 * a;
+  }
+
+  /** The highest the terraces may stand under its footing and where it stands over them, on a raster round it (m over R; far over the land elsewhere), and the raster's frame: its middle (x, z) and half its side (m). */
+  sink(floor: number, ground: (x: number, z: number) => number): { data: Float32Array; frame: Vector4 } {
+    let reach = 0;
+    for (let k = 0; k < KNOLL.rays; k++) reach = Math.max(reach, this.r0[k] + this.w[k]);
+    const half = reach + 0.5;
+    const data = new Float32Array(SINK * SINK);
+    for (let j = 0; j < SINK; j++)
+      for (let i = 0; i < SINK; i++) {
+        const x = this.mx + ((i + 0.5) / SINK - 0.5) * 2 * half;
+        const z = this.mz + ((j + 0.5) / SINK - 0.5) * 2 * half;
+        const onPaving = this.paving.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+        const h = this.heightAt(x, z, floor);
+        // (the terraces sunk under its paving, and under it where it stands over them; where they are higher, theirs)
+        data[j * SINK + i] = onPaving ? floor - 0.25 : h === null || h < ground(x, z) ? 1e4 : h - KNOLL.sink;
+      }
+    return { data, frame: new Vector4(this.mx, this.mz, half, 0) };
+  }
+
+  /** It as the terraces' build draws its ground (their attributes; its own paint, grass): its rays and rings, its lip down under the terraces round it, the two corners. */
+  mesh(dirAt: (x: number, z: number) => Vector3, R: number): BufferGeometry {
+    const K = KNOLL.rays;
+    const J = KNOLL.rings;
+    const positions: number[] = [];
+    const parts: number[] = [];
+    const floors: number[] = [];
+    const index: number[] = [];
+    const vertex = (x: number, z: number, h: number, part: number, slope: number): number => {
+      const v = dirAt(x, z).multiplyScalar(R + h);
+      positions.push(v.x, v.y, v.z);
+      parts.push(part);
+      floors.push(h, slope, 0, 0);
+      return positions.length / 3 - 1;
+    };
+    const ring: number[][] = [];
+    for (let k = 0; k < K; k++) {
+      const t = (k / K) * 2 * Math.PI;
+      const c = Math.cos(t);
+      const sn = Math.sin(t);
+      const row: number[] = [];
+      for (let j = 0; j <= J; j++) {
+        const r = this.r0[k] + this.w[k] * (j / J);
+        const a = this.h[k * (J + 1) + Math.max(j - 1, 0)];
+        const b = this.h[k * (J + 1) + Math.min(j + 1, J)];
+        const slope = Math.abs(b - a) / ((Math.min(j + 1, J) - Math.max(j - 1, 0)) * (this.w[k] / J));
+        row.push(vertex(this.mx + c * r, this.mz + sn * r, this.h[k * (J + 1) + j], KNOLL_PART, slope));
+      }
+      // (its lip: its edge again, and down under the terraces)
+      const r = this.r0[k] + this.w[k];
+      row.push(vertex(this.mx + c * r, this.mz + sn * r, this.h[k * (J + 1) + J], PART.earth, 1));
+      row.push(vertex(this.mx + c * r, this.mz + sn * r, this.h[k * (J + 1) + J] - KNOLL.lip, PART.earth, 1));
+      ring.push(row);
+    }
+    for (let k = 0; k < K; k++) {
+      const a = ring[k];
+      const b = ring[(k + 1) % K];
+      for (let j = 0; j < J; j++) index.push(a[j], b[j], b[j + 1], a[j], b[j + 1], a[j + 1]);
+      index.push(a[J + 1], b[J + 1], b[J + 2], a[J + 1], b[J + 2], a[J + 2]);
+    }
+    // the two corners its footing leaves in its rectangle, at the shoulder's height
+    const r = this.rect;
+    const p0 = this.paving[0];
+    for (const [x0, x1] of [
+      [r.x0, p0.x0],
+      [p0.x1, r.x1],
+    ]) {
+      if (x1 - x0 < 1e-3) continue;
+      const q = [vertex(x0, r.z0, this.base, KNOLL_PART, 0), vertex(x1, r.z0, this.base, KNOLL_PART, 0), vertex(x1, p0.z1, this.base, KNOLL_PART, 0), vertex(x0, p0.z1, this.base, KNOLL_PART, 0)];
+      index.push(q[0], q[1], q[2], q[0], q[2], q[3]);
+    }
+    const g = new BufferGeometry();
+    g.setAttribute('position', new Float32BufferAttribute(positions, 3));
+    g.setAttribute('aPart', new Float32BufferAttribute(parts, 1));
+    g.setAttribute('aPaddy', new BufferAttribute(new Uint8Array((positions.length / 3) * 4), 4, true));
+    g.setAttribute('aFloor', new Float32BufferAttribute(floors, 4));
+    g.setIndex(index);
+    g.computeVertexNormals();
+    g.computeBoundingSphere();
+    return g;
+  }
+}
+
+function smoothstep01(t: number): number {
+  const u = Math.min(Math.max(t, 0), 1);
+  return u * u * (3 - 2 * u);
+}
+
 export class MuseHut {
   readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
   /** For the rice (riceData.frag.glsl): its site's up and its floor's radius (0: none), its x and z ways, its footing's two rectangles (m). */
-  readonly uniforms: { uHutSite: IUniform<Vector4>; uHutX: IUniform<Vector4>; uHutZ: IUniform<Vector4>; uHutRects: IUniform<Vector4[]> };
+  readonly uniforms: { uHutSite: IUniform<Vector4>; uHutX: IUniform<Vector4>; uHutZ: IUniform<Vector4>; uHutRects: IUniform<Vector4[]>; uHutSink: IUniform<DataTexture>; uHutSinkFrame: IUniform<Vector4> };
+  /** The highest the terraces may stand round it (terrace.vert.glsl: under its footing and its knoll; m over R). */
+  private readonly sink = new DataTexture(new Float32Array(SINK * SINK).fill(1e4), SINK, SINK, RedFormat, FloatType);
   private site: { up: Vector3; x: Vector3; z: Vector3; radius: number; scale: number } | null = null;
   /** Its path's points (directions), to keep trees off it. */
   private pathDirs: Vector3[] = [];
@@ -625,7 +831,10 @@ export class MuseHut {
       uHutX: { value: new Vector4(1, 0, 0, 0) },
       uHutZ: { value: new Vector4(0, 0, 1, 0) },
       uHutRects: { value: [new Vector4(), new Vector4()] },
+      uHutSink: { value: this.sink },
+      uHutSinkFrame: { value: new Vector4(0, 0, 1, 0) },
     };
+    this.sink.needsUpdate = true;
     const material = new ShaderMaterial({ name: 'Muse hut', vertexShader, fragmentShader, uniforms: { ...shared, uMap: { value: null } }, vertexColors: true, side: DoubleSide });
     this.mesh = new Mesh(new BufferGeometry(), material);
     this.mesh.name = 'Muse’s hut';
@@ -635,18 +844,18 @@ export class MuseHut {
   }
 
   /**
-   * Stand it on its site over the built terraces (planet radius R), or take it away (null). Out come its path (a mesh
-   * of the terraces' own kind, for their build to draw: its top a track's, its sides a dam's, its steps earth) and the
-   * trees by it (per tree: direction, ground, seed).
+   * Stand it on its site over the built terraces (planet radius R), or take it away (null). Out come its knoll and its
+   * path (meshes of the terraces' own kind, for their build to draw: the knoll the woods' own ground; the path's top a
+   * track's, its sides a dam's, its steps earth) and the trees by it (per tree: direction, ground, seed).
    */
-  place(at: HutSite | null, terraces: Group, R: number, seed: number): { path: BufferGeometry | null; trees: Float32Array } {
+  place(at: HutSite | null, terraces: Group, R: number, seed: number): { meshes: BufferGeometry[]; trees: Float32Array } {
     this.mesh.geometry.dispose();
     this.mesh.geometry = new BufferGeometry();
     this.mesh.visible = false;
     this.site = null;
     this.pathDirs = [];
     this.uniforms.uHutSite.value.w = 0;
-    const none = { path: null, trees: new Float32Array(0) };
+    const none = { meshes: [], trees: new Float32Array(0) };
     if (!at) return none;
     const s = at.scale;
     const middle = at.centre.clone().normalize();
@@ -657,14 +866,16 @@ export class MuseHut {
     x.addScaledVector(up, -x.dot(up)).normalize();
     z.crossVectors(x, up);
     const surface = new Ground(terraces, up, R, 30);
-    // (a point of its frame, in meters, as a direction; the built ground's height there over R)
-    const dirAt = (mx: number, mz: number): Vector3 => up.clone().multiplyScalar(R).addScaledVector(x, mx).addScaledVector(z, mz).normalize();
-    const groundAt = (mx: number, mz: number): number => {
+    // (a point of its frame, in meters, as a direction, on the plane over its floor as its mesh is laid; the built
+    // ground's height there over R)
+    let level = R;
+    const dirAt = (mx: number, mz: number): Vector3 => up.clone().multiplyScalar(level).addScaledVector(x, mx).addScaledVector(z, mz).normalize();
+    const terrain = (mx: number, mz: number): number => {
       const h = surface.heightAt(dirAt(mx, mz));
       return Number.isFinite(h) ? h : 0;
     };
     // its floor: the ground under its paving at its level among its heights (what is higher sunk under the paving:
-    // terrace.vert.glsl; what is lower under its skirt), and a little
+    // terrace.vert.glsl; what is lower under its knoll), and a little
     const heights: number[] = [];
     for (const r of PAVING)
       for (let lx = r.x0; lx <= r.x1 + 1e-6; lx += 0.5 / s)
@@ -675,14 +886,22 @@ export class MuseHut {
     if (heights.length === 0) return none;
     heights.sort((a, b) => a - b);
     const floor = heights[Math.floor(at.level * (heights.length - 1))] + 0.03;
-    // (a height over R in its frame, Tracy's meters from its floor; the ground under a point of its frame so, the
-    // radius's lean on its column left out: a few centimeters at its corners)
+    level = R + floor;
+    // (a height over R in its frame, Tracy's meters from its floor)
     const lift = (h: number): number => (h - floor) / s;
+
+    // its knoll: the ground round it raised to it, out to the terraces; the ground there, its own where it reaches
+    const paving = PAVING.map((r) => ({ x0: r.x0 * s, x1: r.x1 * s, z0: r.z0 * s, z1: r.z1 * s }));
+    const rect = { x0: paving[1].x0, x1: Math.max(paving[0].x1, paving[1].x1), z0: paving[0].z0, z1: paving[1].z1 };
+    const knoll = new Knoll(MIDDLE[0] * s, MIDDLE[1] * s, rect, paving, floor, terrain, seed);
+    // (what shows: the knoll where it stands over the terraces, theirs where they come up round it)
+    const groundAt = (mx: number, mz: number): number => Math.max(knoll.heightAt(mx, mz, floor) ?? Number.NEGATIVE_INFINITY, terrain(mx, mz));
     const batch = new Batch();
     cottage(batch);
+    // (its skirt now a stone plinth over the knoll's shoulder)
     footing(batch, (lx, lz) => lift(groundAt(lx * s, lz * s)), seed);
 
-    // the steps down from its gate to its path, as many as its drop asks for, each of one rise
+    // the steps down from its gate to its path, as many as its drop asks for (none, where the knoll comes up to it)
     const gx = ((GATE.x0 + GATE.x1) / 2) * s;
     const edge = PAVING[1].z1 * s;
     const front = groundAt(gx, edge + 0.8) + PATH.over;
@@ -696,43 +915,45 @@ export class MuseHut {
       stoneBox(batch, GATE.x0 - 0.15, GATE.x1 + 0.15, z0 / s, z1 / s, lift(base), lift(floor - k * rise), 0.9 + 0.08 * unit(hash32((seed + k * 131) >>> 0)));
     }
 
-    // rocks heaped along its foot where its skirt stands high, none before its steps
+    // its path: from the foot of its steps along its way to the nearest track (its nearest point to the way's end)
+    const start: [number, number] = [gx, edge + steps * GATE.tread + 0.1];
+    const way: Array<readonly [number, number]> = [start, ...at.path];
+    const track = this.nearestTrack(terraces, up, x, z, level, way[way.length - 1]);
+    if (track) way.push(track);
+    const route = smoothWay(way, PATH.every);
+    const path = this.pathMesh(route, dirAt, groundAt, R);
+    const offPath = (px: number, pz: number, margin: number): boolean => route.every(([qx, qz]) => Math.hypot(px - qx, pz - qz) > PATH.width / 2 + margin);
+
+    // rocks in clusters over the knoll, half buried, a few at its foot where it meets the paddies; none on its path
     let h = hash32((seed ^ 0x2f5a) >>> 0);
     const rnd = (): number => unit((h = hash32((h + 0x9e3779b9) >>> 0)));
-    for (let e = 0; e < EDGE.length; e++) {
-      const [ax, az] = EDGE[e];
-      const [bx, bz] = EDGE[(e + 1) % EDGE.length];
-      const length = Math.hypot(bx - ax, bz - az) * s;
-      let ox = bz - az;
-      let oz = -(bx - ax);
-      const ol = Math.hypot(ox, oz);
-      ox /= ol;
-      oz /= ol;
-      // (outward: away from the footing's middle)
-      if (((ax + bx) / 2 - MIDDLE[0]) * ox + ((az + bz) / 2 - MIDDLE[1]) * oz < 0) {
-        ox = -ox;
-        oz = -oz;
-      }
-      for (let d = ROCKS.every * rnd(); d < length; d += ROCKS.every * (0.7 + 0.6 * rnd())) {
-        const t = d / length;
-        const ex = (ax + (bx - ax) * t) * s;
-        const ez = (az + (bz - az) * t) * s;
-        if (Math.abs(ex - gx) < 1.4 && ez > edge - 0.2) continue;
-        const out = 0.06 + 0.22 * rnd();
-        const g = groundAt(ex + ox * out, ez + oz * out);
-        const high = floor - g;
-        if (high < ROCKS.least) continue;
-        // (against the wall, most of them as high as it or nearly, so its foot is a heap of stones, not a block)
-        const w = 0.3 + 0.36 * rnd();
-        const tall = Math.min(Math.max(high * (0.7 + 0.45 * rnd()) + 0.06, 0.18), 0.8);
-        rock(batch, new Vector3((ex + ox * out) / s, lift(g - 0.06), (ez + oz * out) / s), new Vector3(w / s, tall / s, (w * (0.7 + 0.5 * rnd())) / s), rnd() * 6.283, (h = hash32(h + 17)));
-        // (and often a smaller one before it)
-        if (rnd() < 0.7) {
-          const sx = ex + ox * (out + 0.25) + oz * (rnd() - 0.5) * 0.5;
-          const sz = ez + oz * (out + 0.25) - ox * (rnd() - 0.5) * 0.5;
-          const sg = groundAt(sx, sz);
-          rock(batch, new Vector3(sx / s, lift(sg - 0.05), sz / s), new Vector3((0.12 + 0.12 * rnd()) / s, (0.1 + 0.12 * rnd()) / s, (0.12 + 0.1 * rnd()) / s), rnd() * 6.283, (h = hash32(h + 29)));
+    const middle2 = [MIDDLE[0] * s, MIDDLE[1] * s];
+    for (let c = 0; c < KNOLL.rocks; c++) {
+      const t = rnd() * 2 * Math.PI;
+      const foot = c < 3;
+      const n = 1 + Math.floor(rnd() * (foot ? 2 : 4));
+      for (let i = 0; i < n; i++) {
+        const tt = t + (rnd() - 0.5) * 0.3;
+        const cx = Math.cos(tt);
+        const cz = Math.sin(tt);
+        // (how far out, as a share of the knoll there: it reaches from its rectangle's edge to its outline)
+        let lo = 0;
+        let hi = 30;
+        for (let it = 0; it < 30; it++) {
+          const mid = (lo + hi) / 2;
+          if (knoll.heightAt(middle2[0] + cx * mid, middle2[1] + cz * mid, floor) === null) hi = mid;
+          else lo = mid;
         }
+        const r0 = this.rectExit(middle2[0], middle2[1], rect, cx, cz);
+        const share = foot ? 0.82 + 0.16 * rnd() : 0.3 + 0.45 * rnd();
+        const dist = r0 + (lo - r0) * share;
+        const px = middle2[0] + cx * dist;
+        const pz = middle2[1] + cz * dist;
+        if (!offPath(px, pz, 0.4)) continue;
+        const w = foot ? 0.25 + 0.3 * rnd() : 0.18 + 0.42 * rnd();
+        const tall = w * (0.55 + 0.35 * rnd());
+        const g = groundAt(px, pz);
+        rock(batch, new Vector3(px / s, lift(g - tall * 0.4), pz / s), new Vector3(w / s, tall / s, (w * (0.7 + 0.5 * rnd())) / s), rnd() * 6.283, (h = hash32(h + 17)));
       }
     }
 
@@ -749,25 +970,32 @@ export class MuseHut {
     this.uniforms.uHutX.value.set(x.x, x.y, x.z, 0);
     this.uniforms.uHutZ.value.set(z.x, z.y, z.z, 0);
     PAVING.forEach((r, i) => this.uniforms.uHutRects.value[i].set(r.x0 * s, r.x1 * s, r.z0 * s, r.z1 * s));
-
-    // its path: from the foot of its steps along its way to the nearest track (its nearest point to the way's end)
-    const start: [number, number] = [gx, edge + steps * GATE.tread + 0.1];
-    const way: Array<readonly [number, number]> = [start, ...at.path];
-    const track = this.nearestTrack(terraces, up, x, z, R, way[way.length - 1]);
-    if (track) way.push(track);
-    const path = this.pathMesh(smoothWay(way, PATH.every), dirAt, groundAt, R);
+    const sink = knoll.sink(floor, terrain);
+    (this.sink.image.data as Float32Array).set(sink.data);
+    this.sink.needsUpdate = true;
+    this.uniforms.uHutSinkFrame.value.copy(sink.frame);
 
     const trees: number[] = [];
     for (const [tx, tz, look] of at.trees) {
       const d = dirAt(tx, tz);
       trees.push(d.x, d.y, d.z, groundAt(tx, tz), look);
     }
-    return { path, trees: Float32Array.from(trees) };
+    return { meshes: path ? [knoll.mesh(dirAt, R), path] : [knoll.mesh(dirAt, R)], trees: Float32Array.from(trees) };
   }
 
-  /** The point of the nearest track to a point of its frame (m, its frame), within 30 m. */
-  private nearestTrack(terraces: Group, up: Vector3, x: Vector3, z: Vector3, R: number, to: readonly [number, number]): [number, number] | null {
-    const target = up.clone().multiplyScalar(R).addScaledVector(x, to[0]).addScaledVector(z, to[1]);
+  /** How far from a point a ray leaves a rectangle (m). */
+  private rectExit(mx: number, mz: number, r: Rect, c: number, sn: number): number {
+    let t = Number.POSITIVE_INFINITY;
+    if (c > 1e-9) t = Math.min(t, (r.x1 - mx) / c);
+    if (c < -1e-9) t = Math.min(t, (r.x0 - mx) / c);
+    if (sn > 1e-9) t = Math.min(t, (r.z1 - mz) / sn);
+    if (sn < -1e-9) t = Math.min(t, (r.z0 - mz) / sn);
+    return t;
+  }
+
+  /** The point of the nearest track to a point of its frame (m, its frame: its plane at radius `level`), within 30 m. */
+  private nearestTrack(terraces: Group, up: Vector3, x: Vector3, z: Vector3, level: number, to: readonly [number, number]): [number, number] | null {
+    const target = up.clone().multiplyScalar(level).addScaledVector(x, to[0]).addScaledVector(z, to[1]);
     let best = 30;
     let at: [number, number] | null = null;
     const v = new Vector3();
@@ -785,7 +1013,7 @@ export class MuseHut {
         best = d;
         // (where it meets its frame's plane, as dirAt has it)
         const dn = v.clone().normalize();
-        const t = R / dn.dot(up);
+        const t = level / dn.dot(up);
         at = [dn.dot(x) * t, dn.dot(z) * t];
       }
     }

@@ -14,7 +14,8 @@ attribute vec4 aFloor; // its floor or ground (m); fallow (the woods: their slop
 uniform vec4 uHutSite;     // Muse's hut (hut.ts): its site's up, its floor's radius (m; 0: none)
 uniform vec4 uHutX;        // its x way (along its hall)
 uniform vec4 uHutZ;        // its z way (out to its gate)
-uniform vec4 uHutRects[2]; // its footing (m, its frame): x0, x1, z0, z1
+uniform sampler2D uHutSink; // the highest the terraces stand under its footing and its knoll (m over R; far over the land past them)
+uniform vec4 uHutSinkFrame; // that raster's square: its middle in its frame (x, z, m), half its side (m)
 
 varying vec3 vDir;
 varying vec3 vWarped;
@@ -29,15 +30,13 @@ void main() {
   // stood over its own dam and apart from the paddy beside it, open between)
   Crop c = cropFrom(aPaddy.x, aPaddy.y, aPaddy.z, aPaddy.w, aPart < 0.5 ? aFloor.y : 0.0);
   vec3 p = position;
-  // (none of it over Muse's hut's floor within its footing: sunk a little under its paving)
+  // (none of it over Muse's hut's footing or its knoll: sunk under them, hut.ts)
   vec3 d = normalize(p);
   float f = dot(d, uHutSite.xyz);
   if (uHutSite.w > 0.0 && f > 0.9) {
     vec2 q = vec2(dot(d, uHutX.xyz), dot(d, uHutZ.xyz)) * (uHutSite.w / f);
-    for (int i = 0; i < 2; i++) {
-      vec4 r = uHutRects[i];
-      if (q.x > r.x && q.x < r.y && q.y > r.z && q.y < r.w) p = d * min(length(p), uHutSite.w - 0.25);
-    }
+    vec2 uv = (q - uHutSinkFrame.xy) / (2.0 * uHutSinkFrame.z) + 0.5;
+    if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) p = d * min(length(p), uRadius + textureLod(uHutSink, uv, 0.0).r);
   }
   vec3 w = warpPosition(p);
   vDir = normalize(p);

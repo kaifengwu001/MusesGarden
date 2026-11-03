@@ -432,7 +432,7 @@ export class TerraceWorld implements PlanetWorld {
     if (this.objects.trees && this.objects.trees !== this.treesFrom) {
       this.treesFrom = this.objects.trees;
       const extra = this.hut.place(this.kaiView ? MUSE_HUT : null, this.objects.group, R, this.noiseSeed);
-      if (extra.path) this.objects.add(extra.path);
+      for (const mesh of extra.meshes) this.objects.add(mesh);
       const kept = this.hut.clear(this.objects.trees, 5, 1, R);
       const trees = new Float32Array(kept.length + extra.trees.length);
       trees.set(kept);

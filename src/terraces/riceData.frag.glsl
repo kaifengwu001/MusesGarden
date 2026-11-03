@@ -21,7 +21,8 @@ uniform vec3 uMapT1;
 uniform vec4 uHutSite;      // Muse's hut (hut.ts): its site's up, its floor's radius (m; 0: none)
 uniform vec4 uHutX;         // its x way (along its hall)
 uniform vec4 uHutZ;         // its z way (out to its gate)
-uniform vec4 uHutRects[2];  // its footing (m, its frame): x0, x1, z0, z1
+uniform sampler2D uHutSink;  // under its footing and its knoll: the highest the terraces stand there (far over the land past them)
+uniform vec4 uHutSinkFrame;  // that raster's square: its middle in its frame (x, z, m), half its side (m)
 
 void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
@@ -55,14 +56,12 @@ void main() {
   float clear = min(min(textureLod(uPaddyMap, (xy + vec2(o, 0.0)) * 0.5 + 0.5, 0.0).r, textureLod(uPaddyMap, (xy - vec2(o, 0.0)) * 0.5 + 0.5, 0.0).r),
                     min(textureLod(uPaddyMap, (xy + vec2(0.0, o)) * 0.5 + 0.5, 0.0).r, textureLod(uPaddyMap, (xy - vec2(0.0, o)) * 0.5 + 0.5, 0.0).r));
   if (clear <= 0.01) here.r = 0.0;
-  // (none under Muse's hut, nor within a hand of its footing's edge)
+  // (none on Muse's hut's footing or its knoll: the paddies the map has there are sunk under them, hut.ts)
   float f = dot(dir, uHutSite.xyz);
   if (uHutSite.w > 0.0 && f > 0.9) {
     vec2 q = vec2(dot(dir, uHutX.xyz), dot(dir, uHutZ.xyz)) * (uHutSite.w / f);
-    for (int i = 0; i < 2; i++) {
-      vec4 r = uHutRects[i];
-      if (q.x > r.x - 0.3 && q.x < r.y + 0.3 && q.y > r.z - 0.3 && q.y < r.w + 0.3) here.r = 0.0;
-    }
+    vec2 uv = (q - uHutSinkFrame.xy) / (2.0 * uHutSinkFrame.z) + 0.5;
+    if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0 && textureLod(uHutSink, uv, 0.0).r < 1e3) here.r = 0.0;
   }
   gl_FragColor = here;
 }
