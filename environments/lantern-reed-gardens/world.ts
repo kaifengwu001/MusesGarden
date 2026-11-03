@@ -102,6 +102,7 @@ export class World {
   readonly wildlife: LanternWildlife;
   followingResident: string | null = null;
   private heldResident: string | null = null;
+  private heldVisitor: Muse | null = null;
   readonly petals: Petals;
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
@@ -701,30 +702,37 @@ export class World {
   }
 
   /** Pick the nearest visible Muse, including the canyon's residents. */
-  pickMuse(ndcX: number, ndcY: number): { side: number; resident?: string } | null {
+  pickMuse(ndcX: number, ndcY: number): { side: number; resident?: string; visitor?: Muse } | null {
     const cam = this.rig.camera;
     const ray = new Ray(cam.position.clone(), new Vector3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize());
     const local = this.residents.pick(ray, this.warp);
-    const host = this.muse.pick(ray, this.warp);
+    let host: { side: number; distance: number; visitor?: Muse } | null = this.muse.pick(ray, this.warp);
+    // (a visiting Muse, tapped, says hello as the host does: the nearest the ray meets)
+    for (const visitor of this.visitors) {
+      const hit = visitor.pick(ray, this.warp);
+      if (hit && (!host || hit.distance < host.distance)) host = { ...hit, visitor };
+    }
     if (local && (!host || local.distance < host.distance)) return { side: local.side, resident: local.resident.id };
-    return host;
+    return host && (host.visitor ? { side: host.side, visitor: host.visitor } : { side: host.side });
   }
 
-  tapMuse(time: number, hit: { resident?: string }): void {
+  tapMuse(time: number, hit: { resident?: string; visitor?: Muse }): void {
     if (hit.resident) this.residents.tap(hit.resident, time);
-    else this.muse.tap(time);
+    else (hit.visitor ?? this.muse).tap(time);
   }
 
-  holdMuse(time: number, hit: { side: number; resident?: string }): void {
+  holdMuse(time: number, hit: { side: number; resident?: string; visitor?: Muse }): void {
     this.heldResident = hit.resident ?? null;
+    this.heldVisitor = hit.visitor ?? null;
     if (hit.resident) this.residents.hold(hit.resident, time, hit.side);
-    else this.muse.hold(time, hit.side);
+    else (hit.visitor ?? this.muse).hold(time, hit.side);
   }
 
   releaseMuse(time: number): void {
     if (this.heldResident) this.residents.letGo(this.heldResident, time);
-    else this.muse.letGo(time);
+    else (this.heldVisitor ?? this.muse).letGo(time);
     this.heldResident = null;
+    this.heldVisitor = null;
   }
 
   /** A gust ring bursting out from a point on the meadow. */
