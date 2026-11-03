@@ -13,10 +13,11 @@
 //     side: -1, looking at you); { busy: true } has it working at home, head bowed on the bench, and
 //     { at: [x, z], facing: [x, z], busy? } stands it out on the planet. Without muse, Muse is off the planet (not drawn).
 //   hut: opens Muse's hut (the cutaway) and puts Muse in it, as when its room was laid out while it was away:
-//     { cook: s } at the hearth's stove, cooking as its life has it (museRoam.ts inside), s s into a round from the
-//       ladle coming out of its pocket (museRig.ts COOK: stirring from 1 s, the ladle lifted at 7.6, blown on, sipped
-//       at 9.3, savoured to 11.6; four rounds, then a look about); { at: [x, z], facing: [x, z] } stands it at a
-//       spot facing another (the room's meters, as the camera's), head bowed; { away: true } leaves the room empty.
+//     { doing, s } puts it there s s ago, living it as its life has it (museRoam.ts inside): 'cook' at the hearth's
+//       stove (museRig.ts COOK: the ladle out of its pocket, stirring from 1 s, the ladle lifted at 7.6, blown on,
+//       sipped at 9.3, savoured to 11.6; four rounds, then a look about), 'greet' on the rug (its eyes on you, a wave
+//       from 0.6 s to 3.9 s), 'sleep' on its bed; { at: [x, z], facing: [x, z] } stands it at a spot facing another
+//       (the room's meters, as the camera's), head bowed; { away: true } leaves the room empty.
 //   camera: in the homestead's frame, meters across the cottage's front (x) and toward its pond (z) along the planet:
 //     { at: [x, z], height, look: [x, z, h] | { yaw, pitch }, fov } stands `height` m over the ground or water there,
 //       looking at a point (h m over its ground) or along a heading (° from toward the pond, + left) and pitch (° up);
@@ -35,12 +36,17 @@
 //     coat of its own, `right` m to Muse's right and `ahead` m in front of it, turned `turn` ° from Muse's heading
 //     (+ toward its left); in Muse's pose, or waving `wave` s in while Muse doesn't; deck: on the floor Muse stands on
 //     (the terrace, the pier) rather than the ground. It casts no shadow.
-// Or a shot is the owner's own framing: { key, what, url }, url the app's address (or just its hash) after pressing T,
-//   which holds time and puts t= beside pose= in it. The still is that frame: the same t, pose and world keys, Muse
-//   living its own day at t as the app shows it, the HUD, the garden's overlay and its pins hidden, drawn at W × H
-//   (at q=high unless the URL names a tier). Without t= it fails. What a URL can't hold is lost: a tap on Muse or a
-//   knock at its hut moves its day on in that page, and an engine (?garden=, ?dev, dropped here) puts it where it
-//   is at the engine's hour. Frame at the size of the stills (960 × 640) to have the same crop.
+// Or a shot is the owner's own framing: { key, what, url, day?, muse? }, url the app's address (or just its hash) after
+//   pressing T, which holds time and puts t= beside pose= in it. The still is that frame: the same t, pose and every
+//   other key in the hash, Muse living its own day at t as the app shows it, the HUD, the garden's overlay and its
+//   pins hidden, drawn at W × H (at q=high unless the URL names a tier): the same height of view, so a wider window's
+//   sides are cut. Without t= it fails. A query naming an engine (?garden=/api/muses/<id>, ?dev) is kept, so the
+//   finds' beds are that garden's: the target must serve its API (a dev server started with MUSE_API=<the engine>),
+//   and the page only reads from it. The engine's garden and Muse move on by the engine's clock, not t: a run prints
+//   the garden's day (the engine's, which runs ahead of the calendar) and where Muse stands now, so run a framing as
+//   soon as it comes, then hold them as the owner's frame had them: day: 'YYYY-MM-DD' lays out only the baskets up to
+//   that day (later ones sprout beds into the frame), and muse: { at, facing } (as above, 3 decimals) stands Muse
+//   there. What a URL can't hold is lost: a tap on Muse or a knock at its hut moves its day on in that page.
 // The finds' beds are the garden's placeholder baskets (src/garden/placeholder.ts), dated back from today, so a run on
 // another day can frame other beds than these stills show.
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -80,15 +86,15 @@ const SHOTS = [
   { key: 'selfie', what: 'Muse’s selfie sat in the flowers, leaning into a pat', muse: { part: 'sit', s: 5, pet: 1.5 }, camera: { head: true, distance: 1.0, azimuth: 20, rise: 30, face: [-0.3, 0.05], roll: 8, fov: 68 } },
   { key: 'selfie', what: 'Muse’s selfie fishing at the pond’s edge, its cottage across the water', muse: { part: 'fish', nth: 10, s: 20, wave: 1.2 }, camera: { head: true, distance: 1.1, azimuth: -60, rise: 25, face: [-0.35, 0], roll: -6, fov: 68 } },
   { key: 'selfie', what: 'Muse’s selfie on its bench, waving', muse: { part: 'bench', s: 3, wave: 1.2 }, camera: { head: true, distance: 1.2, azimuth: -40, rise: 30, face: [-0.3, 0.1], roll: -7, fov: 72 } },
-  { key: 'selfie', what: 'Muse’s selfie in its hut, waving from the stove', hut: { cook: 3 }, muse: { wave: 1.2 }, camera: { head: true, distance: 1.0, azimuth: 50, rise: 25, face: [-0.3, 0], roll: 7, fov: 68 } },
+  { key: 'selfie', what: 'Muse’s selfie in its hut, waving from the stove', hut: { doing: 'cook', s: 3 }, muse: { wave: 1.2 }, camera: { head: true, distance: 1.0, azimuth: 50, rise: 25, face: [-0.3, 0], roll: 7, fov: 68 } },
   { key: 'selfie', what: 'Muse asleep on its back in the grass, from above', muse: { part: 'nap', s: 30 }, camera: { head: true, distance: 1.6, rise: 80, fov: 55 } },
   { key: 'selfie', what: 'Muse’s selfie watering the flowers', muse: { part: 'pour', nth: 4, s: 2 }, camera: { head: true, distance: 1.2, azimuth: 45, rise: 5, face: [0.3, 0.25], roll: 5, fov: 72 } },
   { key: 'selfie', what: 'Muse looking about, out over a lake', t: 7.9, muse: { part: 'look about', nth: 2, s: 3 }, camera: { orbit: 'muse', distance: 2.0, azimuth: 40, height: 1.4, aim: 1.1, face: [0.35, 0], fov: 55 } },
   { key: 'work', what: 'Muse at its desk in the hut, head bowed over a book', hut: { at: [-2.4, 0.85], facing: [-2.4, 2.5] }, camera: { at: [-2.4, 2.6], height: 3.1, look: [-2.4, 0.9, 1.5], fov: 50 } },
   { key: 'work', what: 'Muse working on the bench, head bowed', muse: { busy: true }, camera: { orbit: 'muse', distance: 2.6, height: 1.5, aim: 0.9, azimuth: 25, fov: 50 } },
   { key: 'work', what: 'Muse working out in the meadow, head bowed', muse: { at: [8, 10], facing: [8, 20], busy: true }, camera: { orbit: 'muse', distance: 2.4, height: 1.5, aim: 0.8, azimuth: 30, fov: 50 } },
-  { key: 'work', what: 'Muse cooking at the hearth, stirring its pot', hut: { cook: 3 }, camera: { orbit: 'muse', distance: 1.6, azimuth: 30, height: 1.9, aim: 1.0, fov: 55 } },
-  { key: 'work', what: 'Muse at the hearth, happy with a taste from its ladle', hut: { cook: 10.3 }, camera: { head: true, distance: 1.0, azimuth: 35, rise: 12, face: [0.25, -0.05], fov: 55 } },
+  { key: 'work', what: 'Muse cooking at the hearth, stirring its pot', hut: { doing: 'cook', s: 3 }, camera: { orbit: 'muse', distance: 1.6, azimuth: 30, height: 1.9, aim: 1.0, fov: 55 } },
+  { key: 'work', what: 'Muse at the hearth, happy with a taste from its ladle', hut: { doing: 'cook', s: 10.3 }, camera: { head: true, distance: 1.0, azimuth: 35, rise: 12, face: [0.25, -0.05], fov: 55 } },
   { key: 'home', what: 'the cottage, its pier and pond, as in the painting', preset: 'homestead' },
   { key: 'home', what: 'the cottage and its pier from the meadow', camera: { at: [6, 10], height: 1.6, look: [-6, 4, 1], fov: 55 } },
   { key: 'home', what: 'the terrace, the bench and the door', camera: { at: [1.5, 6.5], height: 1.7, look: [-1, 2.6, 1.3], fov: 55 } },
@@ -99,7 +105,7 @@ const SHOTS = [
   { key: 'friend', what: 'Muse and a friend side by side on its bench', muse: { part: 'bench', s: 3 }, friend: { coat: PEACH, right: 0.8, deck: true }, camera: { orbit: 'muse', distance: 2.8, azimuth: 10, height: 1.5, aim: 0.7, fov: 55 } },
   { key: 'friend', what: 'Muse and a friend napping side by side in the grass, from above', muse: { part: 'nap', s: 30 }, friend: { coat: LAVENDER, right: 0.9 }, camera: { head: true, distance: 2.8, azimuth: -90, rise: 80, face: [0, 0.3], fov: 55 } },
   { key: 'friend', what: 'Muse and a friend sat in the flowers, a selfie of the two', muse: { part: 'sit', s: 5, pet: 1.5 }, friend: { coat: PEACH, right: -0.8, ahead: -0.05, turn: -15 }, camera: { head: true, distance: 1.7, azimuth: -10, rise: 28, face: [0.05, 0], roll: -6, fov: 72 } },
-  { key: 'friend', what: 'a friend waving in Muse’s hut while it cooks', hut: { cook: 3 }, friend: { coat: LAVENDER, right: -0.95, ahead: -0.4, turn: 40, wave: 0.8, deck: true }, camera: { orbit: 'muse', distance: 2.5, azimuth: 50, height: 2.0, aim: 1.0, fov: 60 } },
+  { key: 'friend', what: 'a friend waving in Muse’s hut while it cooks', hut: { doing: 'cook', s: 3 }, friend: { coat: LAVENDER, right: -0.95, ahead: -0.4, turn: 40, wave: 0.8, deck: true }, camera: { orbit: 'muse', distance: 2.5, azimuth: 50, height: 2.0, aim: 1.0, fov: 60 } },
   { key: 'new-friend', what: 'a new friend waving hello to Muse', muse: { part: 'look about', s: 3 }, friend: { coat: SAGE, right: 1.2, ahead: 0.5, turn: 55, wave: 0.8 }, camera: { orbit: 'muse', distance: 3.6, azimuth: -20, height: 1.5, aim: 0.9, fov: 45 } },
   { key: 'new-friend', what: 'a new friend waving into Muse’s selfie', muse: { part: 'look about', s: 3, wave: 1.2 }, friend: { coat: SAGE, right: -0.85, ahead: -1.3, turn: -15, wave: 0.8 }, camera: { head: true, distance: 1.3, azimuth: 10, rise: 15, face: [-0.05, -0.15], roll: -5, fov: 72 } },
   { key: 'new-friend', what: 'a new friend come along the pier, waving hello to Muse at its fishing', muse: { part: 'fish', s: 20 }, friend: { coat: SAGE, ahead: -2.2, wave: 0.8, deck: true }, camera: { orbit: 'muse', distance: 3.2, azimuth: 60, height: 2.2, aim: 0.6, face: [-0.3, 0], fov: 52 } },
@@ -157,34 +163,40 @@ async function stage(shot) {
   const point = (dir, h) => dir.clone().multiplyScalar(R + w.terrain.height(dir) + h);
   const tangent = (at, toward) => toward.clone().addScaledVector(at, -toward.dot(at)).normalize();
   /** Where a direction is in the homestead's frame (m across the cottage's front, toward its pond). */
-  const across = (dir) => {
+  const across = (dir, digits = 1) => {
     const a = dir.clone().addScaledVector(U, -dir.dot(U)).normalize().multiplyScalar(Math.acos(Math.min(1, dir.dot(U))) * R);
-    return [+a.dot(X).toFixed(1), +a.dot(Z).toFixed(1)];
+    return [+a.dot(X).toFixed(digits), +a.dot(Z).toFixed(digits)];
   };
   const rig = w.rig;
   const muse = w.muse;
   const own = (u) => ({ value: Array.isArray(u.value) ? u.value.map((v) => v.clone()) : u.value?.clone ? u.value.clone() : u.value });
   g?.pins(false);
-  if (shot.url) {
-    await m.settle();
-    await m.settle();
-    return null;
-  }
-
-  // Muse: the garden tells it where to be every frame, so it is told once here and held there (cooking in its hut,
-  // the garden goes on putting it at the stove)
+  // Muse: the garden tells it where to be every frame, so it is told once here and held there (put in its hut to do
+  // something, the garden goes on putting it there)
   const direct = muse.direct.bind(muse);
-  const cooking = shot.hut?.cook !== undefined;
+  if (shot.url) {
+    if (shot.muse?.at) {
+      direct({ kind: 'out', dir: spot(shot.muse.at), toward: spot(shot.muse.facing), walk: 0, busy: Boolean(shot.muse.busy) });
+      muse.direct = () => {};
+    }
+    await m.settle();
+    await m.settle();
+    const garden = g.state.snapshot?.today;
+    if (!muse.drawn) return garden ? { day: garden } : null;
+    const ahead = muse.where.dir.clone().addScaledVector(muse.where.heading, 1 / R).normalize();
+    return { ...(garden ? { day: garden } : {}), muse: { at: across(muse.where.dir, 3), facing: across(ahead, 3) } };
+  }
+  const doing = shot.hut?.doing;
   if (shot.hut) {
-    g.hut(cooking ? 'cook' : 'greet', true);
+    g.hut(doing ?? 'greet', true);
     for (let k = 0; !(g.inHut().open && g.inHut().loaded); k++) {
       if (k === 60) throw new Error('the hut did not open in 30 s');
       await sleep(500);
     }
     await sleep(1500);
-    if (cooking) {
-      if (muse.direction.doing !== 'cook') throw new Error(`Muse is not at the stove: ${muse.direction.kind} ${muse.direction.doing ?? ''}`);
-      muse.insideSince = w.clock.time - shot.hut.cook;
+    if (doing) {
+      if (muse.direction.doing !== doing) throw new Error(`Muse is not at '${doing}' in its hut: ${muse.direction.kind} ${muse.direction.doing ?? ''}`);
+      muse.insideSince = w.clock.time - (shot.hut.s ?? 0);
     } else if (shot.hut.away) {
       direct({ kind: 'hidden' });
     } else {
@@ -200,7 +212,7 @@ async function stage(shot) {
   } else {
     direct({ kind: 'home', busy: Boolean(shot.muse.busy) });
   }
-  if (!cooking) muse.direct = () => {};
+  if (!doing) muse.direct = () => {};
   const life = muse.life;
   const answer = () => {
     if (shot.muse?.wave !== undefined) muse.tap(w.clock.time - shot.muse.wave);
@@ -344,15 +356,37 @@ async function stage(shot) {
   return framed;
 }
 
-/** The page a shot is drawn in: its hash and the time held there. The owner's URL keeps its own, the HUD off. */
+/** The page a shot is drawn in: its query, its hash and the time held there. The owner's URL keeps its own, the HUD off. */
 function pageFor(shot) {
-  if (!shot.url) return { hash: `hud=0&q=high&t=${shot.t ?? 12}`, t: shot.t ?? 12 };
-  const pairs = (shot.url.includes('#') ? shot.url.slice(shot.url.indexOf('#') + 1) : shot.url).split('&').filter(Boolean);
+  if (!shot.url) return { search: '', hash: `hud=0&q=high&t=${shot.t ?? 12}`, t: shot.t ?? 12 };
+  const at = shot.url.indexOf('#');
+  const before = at < 0 ? (shot.url.includes('://') ? shot.url : '') : shot.url.slice(0, at);
+  const search = before.includes('?') ? before.slice(before.indexOf('?')) : '';
+  const pairs = (at < 0 ? (shot.url.includes('://') ? '' : shot.url) : shot.url.slice(at + 1)).split('&').filter(Boolean);
   const value = (key) => pairs.find((p) => p.split('=')[0] === key)?.slice(key.length + 1);
   const t = Number(value('t') || NaN);
   if (!Number.isFinite(t)) throw new Error('no t= in its URL: press T in the app before copying the address');
   const kept = pairs.filter((p) => !/^hud(=|$)/.test(p));
-  return { hash: [...kept, 'hud=0', ...(value('q') === undefined ? ['q=high'] : [])].join('&'), t };
+  return { search, hash: [...kept, 'hud=0', ...(value('q') === undefined ? ['q=high'] : [])].join('&'), t };
+}
+
+/**
+ * In the page, before its own scripts: it reads the engine its URL names and never writes to it; given a day, the
+ * garden as it stood then (its baskets up to that day, as its today, and nothing arriving while the page is open).
+ */
+function replayed(day) {
+  const send = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    if ((init?.method ?? input?.method ?? 'GET').toUpperCase() !== 'GET') throw new Error('a replayed page only reads');
+    const response = await send(input, init);
+    if (!day || !new URL(String(input?.url ?? input), location.href).pathname.endsWith('/garden') || !response.ok) return response;
+    const garden = await response.json();
+    const baskets = garden.baskets.filter((b) => b.day <= day);
+    return new Response(JSON.stringify({ ...garden, today: day, baskets }), { headers: { 'content-type': 'application/json' } });
+  };
+  if (day) window.EventSource = class {
+    close() {}
+  };
 }
 
 const browser = await launch();
@@ -360,8 +394,9 @@ for (const shot of todo) {
   const file = join(out, shot.file);
   let opened;
   try {
-    const { hash, t } = pageFor(shot);
-    opened = await openPage(browser, target, { hash, width: W, height: H, dpr: DPR });
+    const { search, hash, t } = pageFor(shot);
+    const init = search ? [`(${replayed})(${JSON.stringify(shot.day ?? null)})`] : [];
+    opened = await openPage(browser, search ? `${target.replace(/\/+$/, '')}/${search}` : target, { hash, width: W, height: H, dpr: DPR, init });
     const { page } = opened;
     await page.waitForFunction(() => window.__world?.muse?.life && window.__garden, undefined, { timeout: 60_000 });
     await page.addStyleTag({ content: 'body > :not(canvas) { display: none !important; }' });
