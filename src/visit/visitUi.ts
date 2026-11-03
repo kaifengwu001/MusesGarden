@@ -11,7 +11,7 @@ import { ICONS } from '../ui/garden/icons';
 import { Flight, type Framing } from '../view/flight';
 import { loadVisit, planetOf, returnFromVisit, type VisitLoad } from './api';
 import { Follower } from './follow';
-import { homeUrl, leftPhrase, readVisit, visitUrl, type VisitParams } from './params';
+import { homeUrl, leftPhrase, readVisit, visitable, visitUrl, type VisitParams } from './params';
 import { moved, snapBeds, type SnapBed } from './snap';
 import { Transit } from './transit';
 import type { VisitBody, VisitWorld } from './world';
@@ -52,7 +52,8 @@ export interface VisitStore {
 /**
  * Before the page makes its World: the visit its URL names, if any, read from the server, and the planet's seed and
  * growth set to the host's, so the world's own planet never shows first. A visit to another planet goes there (and
- * this resolves never, as the page leaves). Null when the URL names no visit.
+ * this resolves never, as the page leaves), unless that planet isn't open to visits: then the VisitUi says so. Null
+ * when the URL names no visit.
  */
 export async function prepareVisit(store: VisitStore, planet: PlanetId, search: string = location.search): Promise<VisitStart | null> {
   const params = readVisit(search);
@@ -60,6 +61,7 @@ export async function prepareVisit(store: VisitStore, planet: PlanetId, search: 
   const load = await loadVisit(params);
   if (load.kind === 'open') {
     if (load.view.planet !== planet) {
+      if (!visitable(load.view.planet)) return { params, load };
       location.replace(visitUrl(load.view.planet, params));
       return new Promise<never>(() => undefined);
     }
@@ -70,7 +72,8 @@ export async function prepareVisit(store: VisitStore, planet: PlanetId, search: 
   return { params, load };
 }
 
-type Phase = 'visiting' | 'ended' | 'unreachable';
+/** On the visit; over; out of reach; or the host's planet isn't open to visits (no page for it takes them yet). */
+type Phase = 'visiting' | 'ended' | 'unreachable' | 'closed';
 
 export class VisitUi {
   private readonly root: HTMLElement;
@@ -131,7 +134,8 @@ export class VisitUi {
     this.transit = new Transit(this.root);
     if (import.meta.env.DEV || import.meta.env.VITE_PROBE) this.installProbe();
 
-    if (this.view) this.begin(this.view);
+    if (this.view && this.view.planet !== world.planet) void this.stop('closed');
+    else if (this.view) this.begin(this.view);
     else void this.stop(this.phase === 'ended' ? 'ended' : 'unreachable');
   }
 
@@ -176,19 +180,27 @@ export class VisitUi {
     else if (load.kind === 'ended') await this.stop('ended');
   }
 
-  /** The visit is over (or out of reach): a word, and the way home, taken on its own once it ended. */
-  private async stop(phase: 'ended' | 'unreachable'): Promise<void> {
+  /**
+   * The visit is over, out of reach, or its planet isn't open: a word, and the way home, taken on its own once it
+   * ended. Going home from a planet that isn't open ends the trip, which can't be taken there.
+   */
+  private async stop(phase: Exclude<Phase, 'visiting'>): Promise<void> {
     if (this.leaving) return;
     this.phase = phase;
     this.banner.classList.remove('is-on');
     this.closeCard();
-    this.home ??= homeUrl((await planetOf(this.params)) ?? 'meadow', this.params);
+    this.home ??= homeUrl(this.view?.guest.planet ?? (await planetOf(this.params)) ?? 'meadow', this.params);
     const panel = el('div', 'visit-ended');
     const name = this.view ? `${this.view.host.name}’s planet` : 'Your friend’s planet';
+    const words: Readonly<Record<typeof phase, readonly [string, string]>> = {
+      ended: ['Your visit has ended', 'You’re on your way home.'],
+      unreachable: [`${name} can’t be reached just now`, 'You can go home, and try the ticket again later.'],
+      closed: [`${name} isn’t open for visits yet`, 'You can go home, and visit once it opens.'],
+    };
     panel.append(
-      el('h2', 'visit-ended-title', phase === 'ended' ? 'Your visit has ended' : `${name} can’t be reached just now`),
-      el('p', 'visit-ended-note', phase === 'ended' ? 'You’re on your way home.' : 'You can go home, and try the ticket again later.'),
-      button('g-visit-home', 'Return home', `${ICONS.house}<span>Return home</span>`, () => void this.goHome(false)),
+      el('h2', 'visit-ended-title', words[phase][0]),
+      el('p', 'visit-ended-note', words[phase][1]),
+      button('g-visit-home', 'Return home', `${ICONS.house}<span>Return home</span>`, () => void this.goHome(phase === 'closed')),
     );
     this.root.append(panel);
     requestAnimationFrame(() => panel.classList.add('is-on'));

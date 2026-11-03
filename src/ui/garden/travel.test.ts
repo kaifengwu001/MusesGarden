@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { ReactionError } from '../../garden/source';
+import { PLANETS } from '../../muse/planets';
 import type { Invitation } from '../../garden/types';
 import { readVisit } from '../../visit/params';
-import { boardingUrl, refusal, tripUrl } from './travel';
+import { boardingUrl, closed, refusal, tripUrl } from './travel';
 
 const SEARCH = '?garden=/api/muses/hero';
 const ticket = (world: string): Invitation => ({ from: 'wren', fromName: 'Wren', coat: '#c4d0e6', world, worldName: 'Lantern Reed Gardens', blurb: '' });
+const golden = PLANETS['golden-rye'] as { visitable?: boolean };
+afterEach(() => delete golden.visitable);
 
 describe('boarding on a ticket', () => {
   it('goes to the host’s planet, on this visit, as this garden’s Muse', () => {
@@ -28,6 +31,15 @@ describe('boarding on a ticket', () => {
     expect(readVisit(url!.slice(url!.indexOf('?')))).toEqual({ invitation: 'inv-1', as: 'hero', garden: '/api/muses/hero' });
     expect(url?.startsWith('/environments/golden-rye/?')).toBe(true);
     expect(tripUrl({ invitation: 'inv-1', host: 'wren', planet: 'nowhere', until: 0 }, SEARCH)).toBeNull();
+  });
+
+  it('keeps a ticket to a planet not open for visits in the post, and says so, before the backend is asked', () => {
+    expect(closed(ticket('golden-rye'))).toBeNull();
+    golden.visitable = false;
+    expect(closed(ticket('golden-rye'))).toBe('Wren’s planet isn’t open for visits yet.');
+    expect(boardingUrl('inv-1', ticket('golden-rye'), SEARCH), 'and no visit page is ever made for it').toBeNull();
+    expect(tripUrl({ invitation: 'inv-1', host: 'wren', planet: 'golden-rye', until: 0 }, SEARCH)).toBeNull();
+    expect(closed(ticket('mossy-hollow')), 'a placeholder’s world is no planet at all').toBeNull();
   });
 
   it('says why a ticket was turned down, or couldn’t be used', () => {

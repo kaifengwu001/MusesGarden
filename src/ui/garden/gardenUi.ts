@@ -40,7 +40,7 @@ import { Mail } from './mail';
 import { MuseSheet } from './musePage';
 import { PostBox } from './postbox';
 import { dayLabel } from './timeline';
-import { boardingUrl, refusal, tripUrl } from './travel';
+import { boardingUrl, closed, refusal, tripUrl } from './travel';
 import { Transit } from '../../visit/transit';
 
 // The garden's interface over the meadow: Muse's finds as patches of flowers
@@ -1358,6 +1358,12 @@ export class GardenUi {
     }
     const card = this.state.postcards.find((p) => p.id === invitationId);
     if (!card?.invitation) return;
+    // (a planet not open to visits yet: the ticket stays unused, and you stay home)
+    const shut = closed(card.invitation);
+    if (shut) {
+      this.toast(shut);
+      return;
+    }
     const to = boardingUrl(invitationId, card.invitation, location.search);
     if (!to) {
       this.toast('Other worlds open to visits once your garden is connected to Muse.');
