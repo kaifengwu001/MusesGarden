@@ -898,6 +898,34 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   and crop, each blade its paddy's look under the same light, darker at
   its root, as dense as the paddy is crop (none flooded, densest grown
   deep, 160 a m² at full).
+- **Kai's view** (world.ts KAI_VIEW): on the planet of seed 412 the
+  opening frame and the vista are his (the rig's frame from his URL, zoom
+  0.6029), the stand presets stand there; other seeds look for theirs. The
+  painting's own vista (paintingVista) is the squint test's.
+- **Muse's hut** (hut.ts): Tracy's Hui courtyard cottage
+  (huiCottageGeometry.ts on main) at 0.6 of her size on Kai's planet, drawn
+  by model.frag.glsl by its vertex colours (hut.vert.glsl). Its yard paved
+  at the paddy it mostly stands on; a knoll round it (rays out from its
+  footing's middle to a wandering outline, going down under the terraces
+  there, painted grass: terrace.frag.glsl part 9) and a path from its gate
+  to the nearest track (a pale-topped dam stepping with the terraces),
+  both meshes of the terraces' own kind added to their build
+  (TerraceBuild.add), so the paddy map keeps rice off them; the terraces
+  sunk under its footing and where the knoll stands over them, by a
+  128² raster of how high they may stand there (uHutSink, read in
+  terrace.vert.glsl and by the rice's pass); rocks half buried on the
+  knoll, trees on it; the build's trees and the village houses kept off
+  its footing (the houses by their reach).
+- **The trees near the camera** (treesNear.ts, off by default: Tree detail
+  near): within the reach each tree drawn in full, its crown the far
+  tree's five lumps heaped of leafy clumps from one template (placed per
+  tree in treeNear.vert.glsl from its seed), a trunk and branches, fading
+  into the far tree over the reach's last 4 m on complementary dithered
+  pixels (tree.vert.glsl leaves the card out within the reach).
+- **The houses' models**: Kai's second five drawn as they came (models.ts
+  loads a model with no levels of detail as its one mesh, a unit tall);
+  the villages laid out by the first five's plots (construct.ts
+  HOUSE_MODELS), each new house as tall as fills its plot.
 - **The camera** (camera.ts): the shared rig, its tilt set by where it
   puts the horizon in the frame, which only ever moves down the frame as
   you zoom in (Kai: a tilt ahead of the shared one's by height alone
