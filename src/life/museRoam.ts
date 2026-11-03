@@ -453,13 +453,18 @@ export class MuseRoam {
 
   /**
    * Whether a Muse could stand at a place: on the deck where it is free (clear of its edges, the house, the bench and
-   * the chair), off it anywhere but against the house's walls. For a friend's Muse standing by this one (src/visit/).
+   * the chair), off it anywhere but against the house's walls or down at the deck's foot. For a friend's Muse standing
+   * by this one (src/visit/).
    */
   standable(dir: Vector3): boolean {
     const c = this.terrain.cottageLocal(dir, localTmp);
     if (Math.abs(c.x) >= 14 || Math.abs(c.z) >= 14) return true;
     if (this.deckAt(c.x, c.z) !== null) return this.deckFree(c.x, c.z);
-    return !(Math.abs(c.x) < SIDE + GIRTH && c.z > -OUTER.z - GIRTH && c.z < OUTER.z + GIRTH);
+    if (Math.abs(c.x) < SIDE + GIRTH && c.z > -OUTER.z - GIRTH && c.z < OUTER.z + GIRTH) return false;
+    // (not in the ditch at the deck's foot: up on it with its Muse, or out on the meadow)
+    const x = c.x;
+    const z = c.z;
+    return [[DECK_FOOT, 0], [-DECK_FOOT, 0], [0, DECK_FOOT], [0, -DECK_FOOT]].every(([dx, dz]) => this.deckAt(x + dx, z + dz) === null);
   }
 
   /** A unit tangent at a spot toward a direction. */
@@ -1648,6 +1653,8 @@ export class MuseRoam {
 }
 
 const localTmp = { x: 0, z: 0 };
+/** Ground this near the deck's edge (m) is at its foot, under its wall: no place to stand by a Muse up on it. */
+const DECK_FOOT = 0.8;
 /** Holding its can as it goes (walking, turning, standing between pours). */
 const holdingCan: Carry = (s, out) => {
   out.action.moves.push({ kind: 'water', time: s, amount: 1, ease: 1, tip: 0, glad: 0 });

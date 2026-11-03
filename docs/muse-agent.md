@@ -441,9 +441,23 @@ stateDiagram-v2
 
 ### Visit access is checked on every request
 
-`GET /api/visits/:id/world` returns 403 unless the requester is the guest's owner and the trip is still on: they used the invitation less than 2 h ago and have not returned. The view names the host's planet, both Muses and the bodies they wear, and whether the two are together yet.
+`GET /api/visits/:id/world` returns 403 unless the requester is the guest's owner and the trip is still on: they used the invitation less than 2 h ago and have not returned. The view names the host's planet, both Muses and the bodies they wear, where each lives, whether each is at work, and whether the two are together yet.
 
-The visitor sees the host planet with its fog. Public finds show their cards. Private finds show as plain plants with no card. The house stays closed, so a visitor never sees the favorites shelf.
+The visitor sees the host planet with its fog. Public finds show their cards. Private finds show as plain plants with no card, their flowers drawn from their id, so a private topic never shows. The house stays closed, so a visitor never sees the favorites shelf.
+
+### The visit is a page of the host's planet
+
+A trip is seen on the host's own planet: its world's page (`src/muse/planets.ts`) with `?visit=<ticket>&as=<guest>&garden=<base>`, so the URL alone is the visit and a reload is the same visit. The visit runtime is `src/visit/`.
+
+- **Before the world is made**, the page reads the visit and takes the host's seed and growth, so the world's own planet never shows first. A ticket to another planet goes there; a planet whose entry says `visitable: false` says it isn't open for visits yet.
+- **The host** is the world's own Muse in the host's body, at home, at its bench while it works. **The guest** is a second Muse in the guest's body, shown while the two are together, a step beside the host on ground it can stand on, facing it; it follows when the host wanders off and steps aside when the host comes right up to it. A tap on the host says hello; on the meadow a tap on the guest does too (a world opts in by picking its visitors: environments/README.md).
+- **The finds** are one basket laid out by the world's own rule, then moved off any water the world has where the meadow had land: a friend's finds were placed on the server's meadow ground.
+- **The banner** says whose planet it is, the time left (from the view's own clock, read again every 30 s), and Return home, which ends the trip and goes to the guest's own planet. A visit that has ended says so and goes home on its own.
+- **A world takes visits** with an adapter of its own (environments/README.md). The meadow takes them too (`src/meadowVisit.ts`).
+
+### A friend's Muse visiting shows on the planet
+
+While Muse hosts a friend's Muse, with its owner on a ticket or not, the garden draws the friend's Muse beside Muse on Muse's planet, in its own body, keeping it company as on a visit, its shadow cast with Muse's (`src/visit/companions.ts`). The friend's Muse is only made when a friend first comes, so a planet nobody visits draws exactly as before. While the owner is away on a ticket, the garden offers the way back to the host's planet.
 
 ## What the owner sees and does
 
@@ -563,6 +577,8 @@ The code is split by domain, not by pipeline phase.
 ```
 src/muse/contract.ts        types only: events, state, plans, social states, Candidate, Discovery, PhotoSpec, PublicProfile, ports, API shapes
 src/muse/planets.ts         the planets a Muse lives on: the meadow and the worlds under environments/, each with its name and page
+src/visit/                  a trip seen on the host's planet: the URL, the view, the follower, the beds off the water, the banner, a friend's Muse visiting
+src/meadowVisit.ts          the meadow as a visit's destination, and as a planet friends' Muses visit
 src/muse/ui/                dev tools (?dev) and the engine's hold on the 3D Muse; the garden's interface is src/ui/garden/
 server/domain/              pure: rng, state (reduce), interests, reflection, atlas (topics → regions, fog, unlocks), shelf, profile, renders
 server/domain/policy/       constants, life (next activity, rest budget, work pause), travel (trip start, topic pick, hops, keep), photo, basket
@@ -639,6 +655,9 @@ The plan leaves these points open. Each one needs a decision before or during im
 7. **How a visit starts for the other Muse.** Resolved: a friend is free when it is resting or exploring its own planet and not working, and a visit spends both Muses' social time, host and guest alike. A trip on a ticket starts the visit for both at once: whatever either was doing ends, and if one is working or already on a trip, the other waits for it.
 8. **What the owner-spark Jaccard compares.** The test sets a bound of 0.34 without naming the two sets.
 9. **What fatigue is.** The topic pick subtracts 0.25 × fatigue, and the plan does not define fatigue.
+10. **Friends' worlds at their own seeds.** Every world was tuned at seed 412; a friend's planet is drawn at its own `worldSeed`, which nobody has reviewed on its world.
+11. **A trip's hangout without a photo slot.** A trip ends with a hangout only if both Muses still have a photo slot that day, so a trip on a busy photo day ends with none. Whether boarding should hold a slot back is undecided.
+12. **What a visitor may do.** A visitor looks, opens the host's public finds and taps the Muses. Liking a friend's find, or anything else that would reach the host, is not designed.
 
 ## References
 

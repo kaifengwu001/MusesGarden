@@ -36,6 +36,8 @@ export const FOLLOW = {
 
 /** Bearings round the host to try for a spot (rad from the side preferred, by turns): that side, the other, then behind and between. */
 const AROUND = [0, Math.PI, Math.PI / 2, Math.PI / 4, (3 * Math.PI) / 4, -Math.PI / 4, (-3 * Math.PI) / 4, -Math.PI / 2];
+/** The rings to try them on (× FOLLOW.side): a step away, then a little nearer, then farther out (a host on a narrow pier). */
+const RINGS = [1, 0.75, 1.3, 1.7, 2.2];
 
 export interface HostAt {
   /** Where the host stands: a unit direction. */
@@ -133,9 +135,10 @@ export class Follower {
 }
 
 /**
- * A spot FOLLOW.side beside the host on dry ground, to its left or right as it faces: on the side the guest stands
- * now (so it doesn't cross over), else the other, else behind or between, else its left. Beside `at` when given (a
- * place a touch ahead of the host, for a guest walking along with it), else beside the host itself.
+ * A spot FOLLOW.side beside the host where it can stand, to its left or right as it faces: on the side the guest
+ * stands now (so it doesn't cross over), else the other, else behind or between, else its left; a little nearer or
+ * farther when none a step away is (a host on a narrow pier). Beside `at` when given (a place a touch ahead of the
+ * host, for a guest walking along with it), else beside the host itself. With nowhere to stand, its left.
  */
 export function spotBeside(host: HostAt, radius: number, dry: (dir: Vector3) => boolean, near: Vector3 | null, at: Vector3 = host.dir): Vector3 {
   const forward = tangentToward(at, host.heading.clone().add(at), new Vector3());
@@ -143,10 +146,12 @@ export function spotBeside(host: HostAt, radius: number, dry: (dir: Vector3) => 
   // (the side the guest is on: its right when it stands to the host's right)
   if (near && near.clone().sub(host.dir).dot(leftOf) < 0) leftOf.negate();
   const t = new Vector3();
-  for (const bearing of AROUND) {
-    t.copy(leftOf).applyAxisAngle(at, bearing);
-    const spot = travel(at, t, FOLLOW.side / radius, new Vector3());
-    if (dry(spot)) return spot;
+  for (const ring of RINGS) {
+    for (const bearing of AROUND) {
+      t.copy(leftOf).applyAxisAngle(at, bearing);
+      const spot = travel(at, t, (ring * FOLLOW.side) / radius, new Vector3());
+      if (dry(spot)) return spot;
+    }
   }
   return travel(at, leftOf, FOLLOW.side / radius, new Vector3());
 }

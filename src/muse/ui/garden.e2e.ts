@@ -6,12 +6,14 @@ import { expect, test, type APIRequestContext, type BrowserContextOptions, type 
 import type {} from '../../dev/harnessApi';
 import type { Find, GardenSnapshot, MediaKind } from '../../garden/types';
 import { FIRST_PLANET } from '../../planet/firstPlanet';
+import type { InvitationCard, NowView, PlanetId, VisitWorldView } from '../contract';
+import { isPlanetId, PLANETS } from '../planets';
 
 // The garden's interface on the real engine: the hero's planet, a basket that arrives over the event stream, opens
 // out of the rail with its finds as flowers, and sends them home into their patches where they were found, hover and
 // the find card, the spheres from high up, likes and stars that
 // reach the engine's log, a find made private, a reconnect that catches up, a card of each kind, a friend known
-// elsewhere, and an invitation used once from its ticket in the post. Screenshots and the basket's recording go to shots/garden-live/.
+// elsewhere, and a ticket from the post that takes the hero and Muse to the host's own planet and home again. Screenshots and the basket's recording go to shots/garden-live/.
 // Every test shares one engine (playwright.live.config.ts), so each takes what it needs from where the engine
 // stands, advancing it when that isn't there yet.
 
@@ -619,9 +621,25 @@ test('Muse’s page shows a friend tagged as a friend on Instagram or Facebook',
   await page.screenshot({ path: `${SHOTS}/12-muse-friend-known.png` });
 });
 
-test('an invitation reaches the hero as a ticket in the post: boarding works once, and a second use after its two hours answers 409', async ({ page, request: api }) => {
-  test.setTimeout(20 * 60_000);
+/** What a visit page's probe says (src/visit/visitUi.ts state()). */
+interface VisitState {
+  readonly phase: string;
+  readonly planet: string;
+  readonly together: boolean;
+  readonly host: { readonly museId: string; readonly look: string } | null;
+  readonly guest: { readonly museId: string; readonly shown: boolean; readonly apart: number | null } | null;
+  readonly plants: readonly { readonly id: string; readonly placed: boolean; readonly water: number | null }[];
+}
+type VisitWin = { __visit?: { ready: Promise<void>; state(): VisitState; frameMuses(): void; flying(): boolean } };
+
+const visitView = (api: APIRequestContext, id: string) => get<VisitWorldView>(api, `/visits/${encodeURIComponent(id)}/world?as=${HERO}`);
+
+test('a ticket takes the hero and Muse to the host’s own planet: both Muses there, every find planted; Return home ends the trip, and the ticket answers 409 after', async ({ page, request: api }) => {
+  test.setTimeout(25 * 60_000);
   const card = await advanceUntil(api, 'an invitation for the hero', (s) => s.postcards.find((p) => p.invitation && !p.invitation.used));
+  const invitation = card.invitation!;
+  const planet = invitation.world;
+  expect(isPlanetId(planet), `the ticket names a planet: ${planet}`).toBe(true);
 
   await openGarden(page);
   await page.evaluate(() => (window as unknown as Win).__garden.mail());
@@ -641,17 +659,46 @@ test('an invitation reaches the hero as a ticket in the post: boarding works onc
   }
   await expect(ticket).toBeVisible();
   await expect(ticket).not.toHaveClass(/is-incoming/);
-  await expect(ticket).toContainText(card.invitation!.worldName);
-  await expect(ticket).toContainText(`from ${card.invitation!.fromName}`);
+  await expect(ticket).toContainText(invitation.worldName);
+  await expect(ticket).toContainText(`from ${invitation.fromName}`);
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${SHOTS}/13-invitation-ticket.png` });
+
+  // boarding: the engine takes the ticket, and the page goes to the host's planet, on this visit
   const used = reaction(page, 'use-invitation', card.id);
   await ticket.click();
   expect((await used).status(), 'boarding: the engine took the invitation').toBe(200);
-  await page.waitForTimeout(2500);
+  await page.waitForURL(
+    (url) => url.pathname === PLANETS[planet as PlanetId].path && url.searchParams.get('visit') === card.id && url.searchParams.get('as') === HERO,
+    { timeout: 60_000 },
+  );
+
+  // the two set off together once neither is at work: the engine moves on, inside the visit's two hours, until they have
+  for (let k = 0; k < 6 && !(await visitView(api, card.id)).together; k++) await advance(api, 0.25);
+  const view = await visitView(api, card.id);
+  expect(view.together, 'the hero’s Muse and its host together, within the visit').toBe(true);
+  await page.reload();
+  await page.waitForFunction(() => (window as unknown as VisitWin).__visit !== undefined, undefined, { timeout: 120_000 });
+  await page.evaluate(() => (window as unknown as Required<VisitWin>).__visit.ready);
+  const state = await page.evaluate(() => (window as unknown as Required<VisitWin>).__visit.state());
+  expect(state).toMatchObject({ phase: 'visiting', planet, together: true, host: { museId: invitation.from }, guest: { museId: HERO, shown: true } });
+  expect(state.plants.map((p) => p.id).sort()).toEqual(view.plants.map((p) => p.id).sort());
+  for (const p of state.plants) expect([p.id, p.placed, (p.water ?? -1) > 0], `${p.id} planted on dry ground`).toEqual([p.id, true, true]);
+  await page.evaluate(() => (window as unknown as Required<VisitWin>).__visit.frameMuses());
+  await expect.poll(() => page.evaluate(() => (window as unknown as Required<VisitWin>).__visit.flying()), { timeout: 30_000 }).toBe(false);
+  await page.waitForTimeout(1500);
   await page.screenshot({ path: `${SHOTS}/14-visiting.png` });
 
-  await advance(api, 3);
+  // Return home: the trip ends on the engine, and the page goes back to the hero's garden
+  const returned = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes(`/api/visits/${encodeURIComponent(card.id)}/return`));
+  await page.getByRole('button', { name: 'Return home' }).first().click();
+  expect((await returned).status(), 'the return').toBe(200);
+  await page.waitForURL((url) => url.pathname === '/' && url.searchParams.get('garden') === `/api/muses/${HERO}`, { timeout: 30_000 });
+  const cards = await get<InvitationCard[]>(api, `/muses/${HERO}/invitations`);
+  expect(cards.find((c) => c.id === card.id)).toMatchObject({ state: 'returned', canVisitNow: false });
+  const now = await get<NowView>(api, `/muses/${HERO}/now`);
+  expect(now.away?.kind === 'planet' && now.away.of === invitation.from, `the hero is home again: ${now.label}`).toBe(false);
+
   const again = await api.post(`${API}/muses/${HERO}/garden/reactions`, { data: { type: 'use-invitation', id: card.id } });
-  expect(again.status(), 'a second use after the two hours').toBe(409);
+  expect(again.status(), 'the ticket again, once the trip is over').toBe(409);
 });

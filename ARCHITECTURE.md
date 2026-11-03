@@ -742,7 +742,10 @@ so any view can be shared.
 
     src/
       main.ts              boot, renderer, frame loop, quality tier wiring, input and UI wiring
-      world.ts             the scene and every system; per-frame order; interactions
+      world.ts             the scene and every system; per-frame order; interactions; a visiting Muse beside Muse
+                           (addVisitor: its own uniforms but for Muse's press and shadow map, its shadow cast in Muse's)
+      meadowVisit.ts       the meadow as a visit's destination (its adapter for src/visit, and the VisitUi main.ts uses
+                           under ?visit, the hut shut) and as a planet friends' Muses visit (its companions' world)
       params.ts            typed schema, store, URL query, presets
       core/                clock, hash sync, quality tiers, build queue and its budget, hashing, GPU memory ledger, shared uniforms
       planet/
@@ -784,6 +787,16 @@ so any view can be shared.
                            any number of finds
         pins.ts            bubbles anchored on the globe from orbit: liked finds (hearts) and Muse (its photo),
                            Muse's moving with it as it roams
+      muse/                the Muse agent's side in the page: the contract and route table shared with the server, the
+                           samples, planets.ts (the planets a Muse lives on: each one's name and page), and ui/ (the
+                           engine's hold on the 3D Muse, the dev tools)
+      visit/               a trip seen on the host's planet, for any world that opts in (environments/README.md):
+                           params.ts (the visit's URL, the way home, the time left), api.ts (the view, the return),
+                           visitUi.ts (prepareVisit before the World; VisitUi in the garden's place: the two Muses,
+                           the host's finds as beds and their cards, the banner, the ended screen), world.ts (a
+                           destination, typed only by structure), follow.ts (the guest a step from its host, on ground
+                           it can stand on), snap.ts (beds the layout left on water, moved to dry ground), transit.ts
+                           (the ticket's stamp), companions.ts (a friend's Muse visiting, drawn beside Muse)
       garden/              what the garden shows: types, the source a backend fills (source.ts: load, subscribe,
                            react; `?garden=<url>`), the placeholder gallery and its pictures, the state (likes and
                            stars, post read, today's post and the tickets, baskets visited), where the finds grow
@@ -806,7 +819,8 @@ so any view can be shared.
                            (mail.ts: today's deck of polaroids, the heart and star, the Favorite and Album pages,
                            the tickets; scrapbook.ts dresses each card on those pages from its id: the frame's tint,
                            washi tape or a clip, sometimes a crayon scribble or a sticker),
-                           Muse's page, the visit stand-in, and the basket: its phases as one pure step
+                           Muse's page, boarding a ticket (travel.ts: where it goes, why it didn't, the way back to a
+                           trip), and the basket: its phases as one pure step
                            (basketMachine.ts; gardenUi.ts carries out its effects), the rail icon's hand-drawn
                            basket, flat, as two layers of the one picture split along its near rim
                            (basketDrawing.ts), with the finds' own flower meshes drawn between them, in a

@@ -396,9 +396,26 @@ export class VisitUi {
 
   // ---- the camera ----------------------------------------------------------------------------------
 
-  /** Fly to the two Muses (on arriving, and whenever asked again): side on to them, both in the view. */
+  /**
+   * To the two Muses (on arriving, and whenever asked again): side on to them, both in the view, from the side with
+   * open sight to them. Where neither side has (the two tucked in by the home's walls) and the world has its own view
+   * of its Muse, which knows its home, that one; with no guest beside the host, the world's own view too, else from in
+   * front of the host.
+   */
   frameMuses(): void {
-    this.flight.to(this.musesFraming(), this.world.scene.growth.radius, this.ground);
+    const framing = this.musesFraming();
+    if (framing === null && this.world.scene.frameMuse) {
+      this.interrupt();
+      this.world.scene.frameMuse();
+      return;
+    }
+    this.flight.to(framing ?? this.hostFraming(), this.world.scene.growth.radius, this.ground);
+  }
+
+  /** The host alone, from in front of it. */
+  private hostFraming(): Framing {
+    const host = this.world.host.where;
+    return { dir: host.dir.clone(), ground: host.height, ...(this.world.musesView ?? MUSES_VIEW), from: host.heading.clone() };
   }
 
   /**
@@ -406,15 +423,16 @@ export class VisitUi {
    * the view with room to spare (the world's own musesView, or MUSES_VIEW, at least; higher in step, so it looks down
    * as steeply; and higher by as much as the camera's own ground rises above theirs, so it never stands down in what
    * grows on a slope), from the side with more open ground between the camera and the two (no rise of the ground,
-   * wall or house in the way) and toward the side the host faces. With the guest not there, from in front of the host.
+   * wall or house in the way) and toward the side the host faces. Null with no guest beside the host, or when neither
+   * side has half its way open.
    */
-  private musesFraming(): Framing {
+  private musesFraming(): Framing | null {
     const base = this.world.musesView ?? MUSES_VIEW;
     const R = this.world.scene.growth.radius;
     const host = this.world.host.where;
     const guest = this.guest && this.guestShown ? this.guest.where : null;
     const apart = guest ? angleBetween(host.dir, guest.dir) * R : 0;
-    if (!guest || apart < 0.3) return { dir: host.dir.clone(), ground: host.height, ...base, from: host.heading.clone() };
+    if (!guest || apart < 0.3) return null;
     const middle = slerpUnit(host.dir, guest.dir, 0.5, new Vector3());
     const along = tangentToward(middle, guest.dir, new Vector3());
     const across = new Vector3().crossVectors(middle, along).normalize();
@@ -426,7 +444,9 @@ export class VisitUi {
     const scale = distance / base.distance;
     const framing = { dir: middle, ground: (host.height + guest.height) / 2, distance, height: base.height * scale, aim: base.aim };
     const sides = [across, across.clone().negate()];
-    const scores = sides.map((side) => this.openness(framing, side) + FACING * side.dot(host.heading));
+    const open = sides.map((side) => this.openness(framing, side));
+    if (Math.max(...open) < SIGHT_SAMPLES / 2) return null;
+    const scores = sides.map((side, k) => open[k] + FACING * side.dot(host.heading));
     const from = scores[1] > scores[0] ? sides[1] : sides[0];
     const camera = travel(middle, from, distance / R, new Vector3());
     const rise = Math.max(0, this.world.ground(camera).height - framing.ground);
