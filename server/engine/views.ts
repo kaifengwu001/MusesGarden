@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import type {
   BasketId,
+  Candidate,
+  CanonicalUrl,
   BasketView,
   CommandResult,
   Dir,
@@ -27,6 +29,7 @@ import type {
   PlantCard,
   PlantPin,
   PlantPreview,
+  PublicDiscovery,
   PublicProfile,
   Reach,
   RegionKey,
@@ -37,12 +40,16 @@ import type {
   StoredEvent,
   TopicKey,
   VisitMuse,
+  VisitPlant,
   VisitWorldView,
   WorldView,
 } from '../../src/muse/contract';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { Engine } from './engine';
 import type { PlanetStills } from '../../src/assets/postcards/stills';
+import { salt } from '../../src/core/hash';
+import { regionOf } from '../domain/atlas';
+import { hashedDir, whereIs } from '../domain/social/photos';
 import { flowerOf, gardenFrames, gardenSnapshot, topicLabel, type GardenInput, type Trip } from './garden';
 
 /** Domain functions the views need, injected so this file depends only on the contract. */
@@ -61,7 +68,12 @@ export interface ViewHelpers {
   readonly soulBody: (soulMd: string) => string;
   /** Each planet's own postcard stills now (server/fixtures/planetStills.ts); without it, every photo shows the meadow's. */
   readonly planetStills?: () => ReadonlyMap<string, PlanetStills>;
+  /** Recorded finds of these topics, at once (MediaSource.recordedFor): what a host's garden grows besides its own finds, so a visit always has something to see. */
+  readonly grownHere?: (topics: readonly TopicKey[], limit: number, exclude: ReadonlySet<CanonicalUrl>) => readonly Candidate[];
 }
+
+/** A visit shows at least this many of the host's finds with cards: its own, then what grows of its interests (Views.visit). */
+export const VISIT_GARDEN = 6;
 
 const SLEEP_MS = 90 * 60_000;
 /** A Muse cast.json doesn't name: a stranger in the original body, on the meadow at its own seed. */
@@ -337,15 +349,50 @@ export class Views implements GardenQueries {
       regions: this.regionViews(host),
       together: host.episode?.plan.activity === 'visit' && host.episode.plan.invitation === invitation,
       now: at,
-      plants: [...host.discoveries.values()].map((d) => {
-        const pub = shared.get(d.id);
-        // The public copy says which trip found it only when that trip's topic is public; a bed grows from it only then.
-        return pub
-          ? { id: d.id, dir: d.place.dir, bed: flowerOf(pub.pursuing ?? d.id), preview: preview(d), card: { ...card(d), pursuing: pub.pursuing } }
-          : { id: d.id, dir: d.place.dir, bed: flowerOf(d.id), preview: null, card: null };
-      }),
+      plants: this.visitGarden(host, shared, at),
       until,
     };
+  }
+
+  /**
+   * The host's garden as a visitor finds it: every find, those it shares with their cards; and while fewer than
+   * VISIT_GARDEN have cards, what grows of its public interests besides (its most held first), as finds with cards of
+   * their own, the same on every visit. A host that has found little yet still has a garden to show.
+   */
+  private visitGarden(host: MuseState, shared: ReadonlyMap<DiscoveryId, PublicDiscovery>, at: Instant): VisitPlant[] {
+    const own: VisitPlant[] = [...host.discoveries.values()].map((d) => {
+      const pub = shared.get(d.id);
+      // The public copy says which trip found it only when that trip's topic is public; a bed grows from it only then.
+      return pub
+        ? { id: d.id, dir: d.place.dir, bed: flowerOf(pub.pursuing ?? d.id), preview: preview(d), card: { ...card(d), pursuing: pub.pursuing } }
+        : { id: d.id, dir: d.place.dir, bed: flowerOf(d.id), preview: null, card: null };
+    });
+    const missing = VISIT_GARDEN - own.filter((p) => p.card !== null).length;
+    if (missing <= 0 || !this.helpers.grownHere) return own;
+    const topics = [...this.social.publicProfile(host).interests].sort((a, b) => b.weight - a.weight).map((i) => i.topic);
+    const known = new Set([...host.discoveries.values()].map((d) => d.canonicalUrl));
+    const home = host.discoveries.size > 0 ? whereIs(host) : hashedDir(host.seed.id);
+    const grown = this.helpers.grownHere(topics, missing, known).map((c): VisitPlant => {
+      const topic = c.topics.find((t) => topics.includes(t)) ?? c.topics[0] ?? null;
+      const d: Discovery = {
+        id: `grown:${host.seed.id}:${salt(c.canonicalUrl).toString(36)}` as DiscoveryId,
+        url: c.url,
+        canonicalUrl: c.canonicalUrl,
+        title: c.title,
+        summary: c.summary,
+        topics: c.topics,
+        because: [],
+        reason: topic ? `It grows here, by everything I keep about ${topicLabel(topic)}.` : 'It grows here.',
+        keepScore: 0,
+        provenance: 'own',
+        place: { dir: home, region: regionOf(home) },
+        at,
+        media: c.media,
+        pursuing: topic,
+      };
+      return { id: d.id, dir: home, bed: flowerOf(topic ?? d.id), preview: preview(d), card: card(d) };
+    });
+    return [...own, ...grown];
   }
 
   sharing(museId: MuseId): SharingView | null {

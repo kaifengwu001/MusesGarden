@@ -48,6 +48,21 @@ function source(items: readonly MediaItemJson[]): MediaSource {
 const kinds = (cs: readonly { media: { kind: MediaKind } }[]) => cs.map((c) => c.media.kind);
 
 describe('MediaSource', () => {
+  it('names what grows of a few topics at once: one of each in turn, then their areas, any kind, none excluded or twice', () => {
+    const tea = [item('reel', ['Tea']), item('article', ['Tea']), item('post', ['Tea'])];
+    const bird = [item('video', ['Bird'], { area: 'birds' })];
+    const oolong = item('post', ['Oolong']);
+    const s = source([...tea, ...bird, oolong]);
+    const grown = s.recordedFor([t('Tea'), t('Bird')], 4, none);
+    expect(grown).toHaveLength(4);
+    expect(new Set(grown.map((c) => c.canonicalUrl)).size).toBe(4);
+    expect(grown.slice(0, 2).map((c) => c.topics[0]).sort(), 'one of each topic first').toEqual(['Bird', 'Tea']);
+    expect(s.recordedFor([t('Tea'), t('Bird')], 4, none), 'the same every time').toEqual(grown);
+    const skip = new Set(tea.map((i) => i.url as CanonicalUrl));
+    expect(s.recordedFor([t('Tea')], 5, skip).map((c) => c.topics[0]), 'past the topic: its area').toEqual(['Oolong']);
+    expect(s.recordedFor([], 3, none)).toEqual([]);
+  });
+
   it('a hop on a topic brings items of the kind it drew', async () => {
     const s = source([item('reel', ['Tea']), item('article', ['Tea']), item('reel', ['Tea']), item('post', ['Oolong'])]);
     expect(kinds(await s.search(t('Tea'), ['reel'], 8, none))).toEqual(['reel', 'reel']);

@@ -124,6 +124,84 @@ describe('an invitation, through the commands', () => {
     expect(plant('d-secret')).toEqual({ id: 'd-secret', dir: [0, 1, 0], bed: flowerOf('d-secret'), preview: null, card: null });
   });
 
+  it('always has a garden to show: what grows of the host’s public interests besides its own finds, until six have cards', () => {
+    const find = (id: string, topic: string): MuseEventBody => ({
+      kind: 'discovery.collected',
+      discovery: {
+        id: id as DiscoveryId,
+        url: `https://example.org/${id}`,
+        canonicalUrl: `https://example.org/${id}` as CanonicalUrl,
+        title: id,
+        summary: '',
+        topics: [topic as TopicKey],
+        because: [],
+        reason: 'Kept it.',
+        keepScore: 0.9,
+        provenance: 'own',
+        place: { dir: [0, 1, 0], region: '0:1:1' as RegionKey },
+        at: T0,
+        media: { kind: 'post', network: 'web' },
+        pursuing: topic as TopicKey,
+      },
+    });
+    const invitation = (to: 'sent' | 'used'): MuseEventBody => ({ kind: 'invitation', id: INVITE, host: WREN, guest: MOSS, to });
+    const members = new Map<MuseId, MemberInfo>([[WREN, { role: 'friend', planet: 'violet-dunes', look: 'muse8' }]]);
+    const { engine } = restarted(
+      [
+        [WREN, { kind: 'memory.updated', textHash: 'x', topics: ['Lichen', 'Kites', 'Secret garden'] as TopicKey[] }],
+        [WREN, find('d-lichen', 'Lichen')],
+        [WREN, { kind: 'owner.settings', hide: ['topic:Secret garden'] }],
+        ...[WREN, MOSS].flatMap((id) => [[id, invitation('sent')], [id, invitation('used')]] as const),
+      ],
+      { reduceCore, emptyState, members },
+    );
+    const asked: { topics: readonly TopicKey[]; limit: number; exclude: readonly string[] }[] = [];
+    const grownHere = (topics: readonly TopicKey[], limit: number, exclude: ReadonlySet<CanonicalUrl>) => {
+      asked.push({ topics, limit, exclude: [...exclude] });
+      return Array.from({ length: limit }, (_, k) => ({
+        url: `https://example.org/grown-${k}`,
+        canonicalUrl: `https://example.org/grown-${k}` as CanonicalUrl,
+        title: `grown ${k}`,
+        summary: '',
+        topics: [topics[k % topics.length]],
+        media: { kind: 'video', network: 'youtube' } as const,
+      }));
+    };
+    const views = new Views(engine, socialPolicy, { ...helpers, grownHere }, members);
+    const view = views.visit(INVITE, MOSS, T0);
+    if (view === 'forbidden') throw new Error('the visit is open');
+    const withCards = view.plants.filter((p) => p.card !== null);
+    expect(withCards).toHaveLength(6);
+    expect(view.plants.map((p) => p.id)).toContain('d-lichen');
+    // asked for what's missing, of its public interests only, past what it has found already
+    expect(asked[0].limit).toBe(5);
+    expect(asked[0].topics).not.toContain('Secret garden');
+    expect([...asked[0].topics].sort()).toEqual(['Kites', 'Lichen']);
+    expect(asked[0].exclude).toEqual(['https://example.org/d-lichen']);
+    const grown = view.plants.filter((p) => p.id.startsWith('grown:wren:'));
+    expect(grown).toHaveLength(5);
+    for (const p of grown) {
+      expect(p.card).toMatchObject({ id: p.id, url: expect.stringMatching(/^https:\/\/example\.org\/grown-/) as string });
+      expect(p.bed).toEqual(flowerOf(p.card!.pursuing!));
+    }
+    // the same garden on every visit
+    const again = views.visit(INVITE, MOSS, T0);
+    expect(again !== 'forbidden' && again.plants.map((p) => p.id)).toEqual(view.plants.map((p) => p.id));
+    // a host with six finds of its own to show shows only its own
+    const { engine: rich } = restarted(
+      [
+        [WREN, { kind: 'memory.updated', textHash: 'x', topics: ['Lichen'] as TopicKey[] }],
+        ...Array.from({ length: 6 }, (_, k) => [WREN, find(`d-lichen-${k}`, 'Lichen')] as const),
+        ...[WREN, MOSS].flatMap((id) => [[id, invitation('sent')], [id, invitation('used')]] as const),
+      ],
+      { reduceCore, emptyState, members },
+    );
+    asked.length = 0;
+    const own = new Views(rich, socialPolicy, { ...helpers, grownHere }, members).visit(INVITE, MOSS, T0);
+    expect(own !== 'forbidden' && own.plants.map((p) => p.id)).toEqual(Array.from({ length: 6 }, (_, k) => `d-lichen-${k}`));
+    expect(asked).toEqual([]);
+  });
+
   it('shows the trip on both sides while it lasts, and closes the view when the owner returns', async () => {
     const { engine, views, commands } = await invited(new Map([[WREN, { role: 'friend', planet: 'violet-dunes', look: 'muse8' }]]));
     await commands.advance(5 * 24);

@@ -88,7 +88,8 @@ function postcardsBy(model: Mind, rest: Mind): Mind {
 export function buildGarden(opts: GardenOptions): Garden {
   const store = opts.db ? openSqliteStore(opts.db) : openMemoryStore();
   const recording = loadMediaRecording();
-  const source: Source = new MediaSource(recording, loadCorpus());
+  const media = new MediaSource(recording, loadCorpus());
+  const source: Source = media;
   const heuristic = new HeuristicMind();
   const model = opts.mind === 'meta' ? new MetaMind({ cache: store.llmCache, fallback: heuristic }) : null;
   const heroMind: Mind = !model ? heuristic : opts.modelFor === 'all' ? model : postcardsBy(model, heuristic);
@@ -105,7 +106,7 @@ export function buildGarden(opts: GardenOptions): Garden {
     mindFor: (id) => (id === opts.hero ? heroMind : heuristic),
   };
   const engine = new Engine(deps, opts.start);
-  const views = new Views(engine, socialPolicy, viewHelpers, opts.members ?? new Map());
+  const views = new Views(engine, socialPolicy, { ...viewHelpers, grownHere: (topics, limit, exclude) => media.recordedFor(topics, limit, exclude) }, opts.members ?? new Map());
   const commands = new Commands(engine, opts.clock);
   return { engine, views, commands, store, heroMind, recording };
 }

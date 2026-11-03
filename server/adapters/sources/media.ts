@@ -291,6 +291,21 @@ export class MediaSource implements Source {
     return Promise.resolve(this.byName.get(normalizeTitle(label).toLowerCase()) ?? null);
   }
 
+  /**
+   * What grows of these topics, at once: up to `limit` recorded finds, one of each topic in turn (the first topic's
+   * first, then the next's), then from their areas, any kind; none in `exclude`, none twice. Deterministic.
+   */
+  recordedFor(topics: readonly TopicKey[], limit: number, exclude: ReadonlySet<CanonicalUrl>): Candidate[] {
+    const out = new Map<CanonicalUrl, Candidate>();
+    const take = (item: MediaItem | undefined) => {
+      if (item && out.size < limit && !exclude.has(item.candidate.canonicalUrl)) out.set(item.candidate.canonicalUrl, item.candidate);
+    };
+    const lists = topics.map((t) => this.byTopic.get(t) ?? []);
+    for (let k = 0; out.size < limit && lists.some((l) => k < l.length); k++) for (const list of lists) take(list[k]);
+    for (const t of topics) for (const item of this.inAreaOf(t)) take(item);
+    return [...out.values()];
+  }
+
   private onTopics(topics: readonly TopicKey[]): MediaItem[] {
     return [...new Set(topics.flatMap((t) => this.byTopic.get(t) ?? []))];
   }
