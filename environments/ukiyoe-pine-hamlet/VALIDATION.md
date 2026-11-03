@@ -177,6 +177,32 @@ recorded rather than changing the protected first planet or relaxing a test.
 Raw comparison output and the runtime-file hash audit are preserved in
 `reference/pr-integration-checks.txt`.
 
+### Size, woods and clouds on 2 November 2026
+
+Kai asked for a 30 % smaller planet if the layout about Muse's hut holds,
+more trees away from the hut (then half as many, their sizes spread 75 %
+more widely, then 40 % fewer again) and cumulus whose shadows lie blue on
+the snow, with his own cloud settings as the defaults; the woods' snow caps
+closed over every leaf, the hamlet's own trees left alone; and the
+parameter panel shown again. What changed is in CONSTRUCTION.md, "Size,
+woods and clouds". Checked on branch `environment_ukiyo` against its tip
+`1854fae`, built and served from disk for frames (headless Chromium on Metal,
+1600 × 1000, DPR 1, `q=high&t=12`).
+
+| Check | Result |
+| --- | --- |
+| The ground about the home | At R 90 the ground within 50 m of the cottage is `1854fae`'s at R 128 to 3 mm (p95 1.4 cm, max 14 cm under the plateau's edges; 2 m grid, cottage-local); the pond's radius and centre are identical (7.487 m, 19.327 m) |
+| The hamlet's layout | With clouds off, the Muse view is pixel-identical to a build without the woods; the bird's-eye view differs only where woods stand on the far ridge |
+| Templates drawn indexed | Lossless: the same Muse view, byte for byte |
+| Woods | 965 trees on the default planet (3,225, then 1,610, before Kai's two cuts); sizes σ 0.49 against 0.28 (×1.73), 0.3–2.1 |
+| Snow on the trees | Every woods lobe white on top, its cap in three rows; the hamlet's own templates (full and remote pine, cedar, plum, reeds, rock) byte-identical to `1854fae` (sha256 of every attribute) |
+| Frame time (`benchmark(60)`, best of 3 alternating rounds against `1854fae`) | With Kai's clouds (cc 0.5 at 9.5 m: 139 heaps): Home 21.1 ms against 20.1, Whole planet 14.0 against 13.2, Bridge 20.3 against 18.4. With a few high clouds (cc 0.15 at 20 m) the build measured 16.0, 9.7 and 15.6 in an earlier round. Other sessions shared the GPU |
+| Live growth scrub (the invariants' method, two loads each) | Frame p95 33.4 ms in every run of this build (with Kai's clouds, a few, or none), 50.1 and 33.4 ms at `1854fae` (it snaps to 30 or 20 fps); JS p95 24.2–25.0 ms against 28.2–28.9 |
+| Placing the scenery again as R changes (Node) | 27.6 ms a step (p95 34) against 30.1 (p95 46.5) at `1854fae` |
+| `npm run check:ukiyoe`, CPU suite | PASS — 81 tests in 7 files (the default-size, wetland, preset and budget tests follow the new defaults; one new test holds the ground about the home) |
+| `npm run build:ukiyoe`; isolation | PASS; `git diff --name-only -- src` empty |
+| Browser suites (ecology, residents, invariants, flicker; port 5237; rerun with the final defaults) | 23 pass, 1 skipped. Flicker passes in both seasons at DPR 1 and 2, with the reported camera moved to its place on R 90 (it failed the sweep guard, 8.4 against 8, while the pose stood 12 m from the hut instead of 17). 3 fail exactly as at `1854fae` (run there the same day, port 5240): the live growth budget (its 20 ms p95: see the row above), far-out finds (warp k 0.005 against 0.004) and the hash round-trip (`cam=wander` both) |
+
 ### Product and visual limits
 
 - The plant silhouettes, rock variation, paper texture and line work remain

@@ -46,11 +46,15 @@ describe('ukiyoe natural scenery', () => {
 
   it('keeps home/bridge routes open and remains below the complete instantiated triangle budget', () => {
     const terrain = terrainAt(), scenery = new HamletScenery({}, terrain);
-    for (const radius of [40, 128, 400]) {
+    for (const radius of [40, 90, 128, 400]) {
       terrain.update(radius, fields, radius / 256); scenery.update(12, terrain);
-      expect(meshes(scenery)).toHaveLength(9);
-      expect(scenery.triangleCount).toBeLessThan(1_500_000);
-      expect(scenery.triangleCount).toBeGreaterThan(20_000);
+      // the hamlet's nine batches and the woods' pines and cedars
+      expect(meshes(scenery)).toHaveLength(11);
+      // the hamlet's own scenery is drawn whatever the view; the woods (about 1,650 lean trees on the
+      // default planet) carry a budget of their own and are drawn only where in sight (ecology.spec.ts)
+      expect(scenery.hamletTriangleCount).toBeLessThan(1_500_000);
+      expect(scenery.hamletTriangleCount).toBeGreaterThan(20_000);
+      expect(scenery.woodsTriangleCount).toBeLessThan(1_750_000);
       for (const mesh of meshes(scenery)) {
         const anchors = mesh.geometry.getAttribute('aAnchor');
         for (let i = 0; i < mesh.geometry.instanceCount; i++) {

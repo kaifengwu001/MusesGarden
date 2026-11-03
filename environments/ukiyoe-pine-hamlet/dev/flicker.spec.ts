@@ -6,7 +6,9 @@ import type {} from '../../../src/dev/harnessApi';
 import type { World } from '../world';
 import { DETAIL_VIEWS } from './detailViews';
 
-const REPORTED_POSE = '0.1045,-0.3585,0.6614,0.6505,0.83';
+// The camera reported at R 128 (0.1045,-0.3585,0.6614,0.6505,0.83): the same place (cottage-local
+// −7.9, 15.3 m), heading and height (4.3 m) on the R 90 default, where a pose is another place.
+const REPORTED_POSE = '0.1108,-0.3397,0.6804,0.6398,0.8190';
 const VIEWS = ['reported', 'home', 'bridge', 'pine', 'steps', 'plum', 'cedar', 'roof', 'water'] as const;
 type View = typeof VIEWS[number];
 type Season = 'snow' | 'rain';

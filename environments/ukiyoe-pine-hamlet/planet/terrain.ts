@@ -1,7 +1,8 @@
 import { Vector3, Vector4, type Texture } from 'three';
 import { hash32, mix, unit } from '../../../src/core/hash';
 import { smoothstep } from '../../../src/core/math';
-import { Fields, type FieldParams } from './fields';
+import { Fields, TUNED, type FieldParams } from './fields';
+import { RADIUS_DEFAULT } from '../params';
 import { sunAt } from '../render/palette';
 import { localSun } from '../../../src/render/sun';
 import { angleBetween, tangentToward, travel } from '../../../src/planet/geo';
@@ -18,9 +19,13 @@ import { angleBetween, tangentToward, travel } from '../../../src/planet/geo';
 //   homestead  the cottage keeps its direction; a dry plateau, its clearing,
 //              its pond (in front and to the left, under its pier, as in
 //              the painting) and terrace are laid out in meters from it, so
-//              it always sits by its pond whatever the size of the planet
+//              it always sits by its pond whatever the size of the planet;
+//              about it the natural ground keeps the shape it was tuned to on
+//              a planet of R_REF (fields.ts, TUNED), so on any planet the
+//              hamlet stands on the ground it was laid out on
 
-export const R_REF = 128;
+/** The radius the homestead and the ground about it were laid out and tuned on (m). */
+export const R_REF: number = TUNED.radius;
 /** The hour the cottage is turned to face (the one light for now, params light.timeOfDay). */
 const LAYOUT_SUN_HOURS = 11.5;
 /** Distances (m) from the cottage centre: clearing flattened, the pond's near edge in front, and how far left of the middle the pond lies. */
@@ -182,11 +187,13 @@ export class Terrain {
 
   constructor(public layout: Layout) {
     this.fields = new Fields(layout.noiseSeed, layout.grain);
+    this.fields.anchorHome(layout.cottage);
   }
 
   setLayout(layout: Layout): void {
     this.layout = layout;
     this.fields = new Fields(layout.noiseSeed, layout.grain);
+    this.fields.anchorHome(layout.cottage);
   }
 
   /** Refresh everything that depends on R and the parameters (cheap). */
@@ -194,7 +201,8 @@ export class Terrain {
     this.radius = radius;
     this.fields.update(radius, p);
     const pond = this.layout.pond;
-    const r = pond.radius0 * Math.pow(radius / R_REF, 0.3);
+    // its tuned size on the planet the hamlet starts on, a little larger as it grows
+    const r = pond.radius0 * Math.pow(radius / RADIUS_DEFAULT, 0.3);
     const [a1, a2, a3, p1, p2, p3] = pond.shape;
     const edge = r * (1 + a1 * Math.cos(p1) + a2 * Math.cos(p2) + a3 * Math.cos(p3));
     this.pondRadius = r;
@@ -203,7 +211,8 @@ export class Terrain {
     this.pondShapeReach = r * (1 + a1 + a2 + a3) + Math.max(this.maxHeight, HOME_LEVEL) / POND_BANK + 0.5;
     // everything the homestead shapes: its plateau, and the pond as far as it shapes the ground
     this.pondReach = Math.max(RIDGE_REACH, Math.hypot(this.pondCentre, POND_SHIFT) + this.pondShapeReach);
-    this.gradStep = Math.max(0.6, bakeTexelMeters);
+    // (no finer than a texel of the tuned planet's bake either, so the banks about the home keep their tuned lip)
+    this.gradStep = Math.max(0.6, bakeTexelMeters * Math.max(1, R_REF / radius));
   }
 
   /**
@@ -300,7 +309,7 @@ export class Terrain {
 
   /** Highest the ground can stand above the water table anywhere (m), for culling. */
   get maxHeight(): number {
-    return this.fields.lift + 4 * this.fields.reliefStd + BANK.height + 13.5;
+    return this.fields.highest + BANK.height + 13.5;
   }
 
   /** No grass, flowers or stones: inside the house and on the landing. */

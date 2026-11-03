@@ -4,6 +4,8 @@
 #include <meadow_sun>
 #include <meadow_fog>
 #include <meadow_snow>
+uniform float uRadius;
+#include <meadow_cloud_cover>
 uniform float uSnowAmount;
 varying vec3 vWorld;
 varying vec3 vPlanet;
@@ -128,7 +130,7 @@ void main() {
     base = mix(base, hamletPigment(vec3(0.27, 0.24, 0.17)), 1.0 - smoothstep(-0.65, -0.18, vPrint.y));
     base = mix(base, hamletPigment(vec3(0.93, 0.52, 0.31)), smoothstep(0.35, 0.9, vPrint.y) * 0.45);
   } else {
-    vec3 color = snowBoundary(light, normalize(vRestNormal).y);
+    vec3 color = snowInCloud(snowBoundary(light, normalize(vRestNormal).y), cloudCoverAt(vPlanet, 0.0));
     gl_FragColor = vec4(applyAerial(color, distance(cameraPosition, vWorld), direction), 1.0);
     return;
   }

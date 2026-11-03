@@ -41,10 +41,10 @@ describe('growth model', () => {
     }
   });
 
-  it('starts the default world at R 128 m, 206,000 m², seed 0412', () => {
+  it('starts the default world at R 90 m, 102,000 m², seed 0412 (30 % smaller across than the R 128 it was laid out on)', () => {
     const s = growthState(p.world.growth, areaMin, areaMax);
-    expect(Math.round(s.radius)).toBe(128);
-    expect(formatArea(s.area)).toBe('206,000');
+    expect(Math.round(s.radius)).toBe(90);
+    expect(formatArea(s.area)).toBe('102,000');
     expect(worldLine(p)).toBe('Snowfall · A quiet home among the pines');
   });
 });

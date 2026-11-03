@@ -1,8 +1,9 @@
 import { Box3, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import type { FieldParams } from '../../planet/fields';
+import { TUNED, type FieldParams } from '../../planet/fields';
 import { travel } from '../../../../src/planet/geo';
-import { COTTAGE_TO_POND, createGroundSample, generateLayout, POND_SHIFT, Terrain } from '../../planet/terrain';
+import { RADIUS_DEFAULT } from '../../params';
+import { COTTAGE_TO_POND, createGroundSample, generateLayout, POND_SHIFT, R_REF, Terrain } from '../../planet/terrain';
 
 // Constant scale and attachment: things on the planet stay human-sized and
 // seated at every size. (The cottage geometry itself is built in meters
@@ -64,11 +65,31 @@ describe('constant scale', () => {
     expect(Math.max(...shares) - Math.min(...shares)).toBeLessThan(0.12);
   });
 
-  it('keeps the wetlands where they are as the planet grows (they live in rest space)', () => {
-    const dirs = sphereDesign(500);
+  it('keeps the wetlands where they are as the planet grows (they live in rest space), away from the home', () => {
+    // (about the home they keep the shape they were tuned to in meters instead: next test)
+    const dirs = sphereDesign(500).filter((d) => d.angleTo(layout.cottage) > (TUNED.ofRadius * 40) / 40 + 0.05);
     const small = terrainAt(40);
     const large = terrainAt(400);
     for (const d of dirs) expect(large.fields.wetness(d)).toBeCloseTo(small.fields.wetness(d), 9);
+  });
+
+  it('keeps the ground about the home as it was tuned on R_REF, at the same cottage-local meters, on a smaller planet', () => {
+    const tuned = terrainAt(R_REF);
+    const small = terrainAt(RADIUS_DEFAULT);
+    const across = new Vector3().crossVectors(layout.cottage, layout.homeBearing).normalize();
+    const at = (x: number, z: number, radius: number): Vector3 =>
+      layout.cottage.clone().multiplyScalar(Math.sqrt(1 - (x * x + z * z) / radius ** 2)).addScaledVector(across, x / radius).addScaledVector(layout.homeBearing, z / radius);
+    let checked = 0;
+    for (let z = -60; z <= 60; z += 3) for (let x = -60; x <= 60; x += 3) {
+      // out to where the tuned ground starts to fade into the planet's own (m along the ground there)
+      if (RADIUS_DEFAULT * Math.asin(Math.hypot(x, z) / RADIUS_DEFAULT) > TUNED.full) continue;
+      expect(small.fields.natural(at(x, z, RADIUS_DEFAULT)), `${x}, ${z}`).toBeCloseTo(tuned.fields.natural(at(x, z, R_REF)), 6);
+      expect(small.fields.wetness(at(x, z, RADIUS_DEFAULT))).toBeCloseTo(tuned.fields.wetness(at(x, z, R_REF)), 9);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(1000);
+    // and the pond has its tuned size on the planet the hamlet starts on
+    expect(small.pondRadius).toBeCloseTo(layout.pond.radius0, 9);
   });
 });
 

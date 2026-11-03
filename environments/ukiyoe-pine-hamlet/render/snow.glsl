@@ -12,3 +12,9 @@ vec3 snowBoundary(float light, float upFacing) {
 vec3 snowPrint(vec3 restMeters, float pixelMeters, float light) {
   return snowBoundary(light, 1.0);
 }
+
+// Snow in a cloud's shadow (cover 0..1, cloudCoverAt): washed a clear, cool
+// blue, as the prints shade their snow; the shadows of the trees keep theirs.
+vec3 snowInCloud(vec3 snow, float cover) {
+  return snow * mix(vec3(1.0), pow(vec3(0.74, 0.82, 0.95), vec3(2.2)), cover);
+}

@@ -1,11 +1,21 @@
-import { AdditiveBlending, DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeometry, LineSegments, Mesh, ShaderMaterial, Vector3, type BufferGeometry, type IUniform, type Object3D } from 'three';
+import { AdditiveBlending, DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeometry, LineSegments, Mesh, ShaderMaterial, Sphere, Vector3, type BufferGeometry, type Frustum, type IUniform, type Object3D } from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hash32, unit } from '../../../src/core/hash';
-import { createGroundSample, type Terrain } from '../planet/terrain';
-import { barleyGeometry, createHamletAssets, grassGeometry, type HamletAsset, type HamletSpecies } from './hamletGeometry';
+import { smoothstep } from '../../../src/core/math';
+import { gnoise } from '../../../src/planet/noise';
+import { warpPoint, type WarpFrame } from '../../../src/render/warp';
+import { NOISE_STD, normalQuantile } from '../planet/fields';
+import { BANK, createGroundSample, type Terrain } from '../planet/terrain';
+import { barleyGeometry, createHamletAssets, createWoodsAssets, grassGeometry, type HamletAsset, type HamletSpecies } from './hamletGeometry';
 import vertexShader from './hamletScenery.vert.glsl?raw';
 import fragmentShader from './hamletScenery.frag.glsl?raw';
 
-interface Anchor { direction: Vector3; local?: readonly [number, number]; scale: number; turn: number; phase: number; tint: number; }
+/**
+ * direction: on the planet, or (local) cottage-local meters; offset: meters
+ * from `direction` across its tangent frame, so a stand keeps its size as R
+ * grows; away: shown only as far from the home as WOODS.near … full lets it.
+ */
+interface Anchor { direction: Vector3; local?: readonly [number, number]; offset?: readonly [number, number]; away?: number; scale: number; turn: number; phase: number; tint: number; }
 interface Batch {
   kind: HamletSpecies;
   asset: HamletAsset;
@@ -16,6 +26,8 @@ interface Batch {
   anchorData: InstancedBufferAttribute;
   acrossData: InstancedBufferAttribute;
   placementData: InstancedBufferAttribute;
+  /** The woods' batches draw only what is in sight (HamletScenery.cull): every tree placed, and its bounds (centre, radius). */
+  placed?: { count: number; anchor: Float32Array; across: Float32Array; placement: Float32Array; bounds: Float32Array; drawn: Int32Array; shown: number };
 }
 export interface HamletClearing { direction: Vector3; radius: number; }
 /** Cottage-local cultivated patches. The gaps between beds remain usable paths. */
@@ -26,6 +38,19 @@ export const CULTIVATED_BEDS = [
 ] as const;
 const TAU = Math.PI * 2;
 const UP = new Vector3(0, 1, 0), EAST = new Vector3(1, 0, 0);
+/**
+ * The woods beyond the hamlet: stand centres over the globe (Fibonacci,
+ * jittered), where a seeded woodland field (direction space: `frequency`,
+ * the share of stands in it `cover`) grows close stands of pine or cedar,
+ * thinner ones at its edges and a lone tree now and then in the open, so
+ * from orbit the planet reads wooded between its snowfields and lakes. None
+ * nearer the cottage than `near` m, all of them beyond `full`: the hamlet's
+ * own trees stay as they were laid out. Their sizes are drawn about `size.mean`
+ * and spread `size.spread` times as far from it (none smaller than
+ * `size.least`): old giants among saplings, a spread 1.75 times that of the
+ * draws themselves.
+ */
+const WOODS = { stands: 322, near: 40, full: 56, frequency: 2.6, cover: 0.55, spacing: 2.8, size: { mean: 0.97, spread: 1.85, least: 0.3 } } as const;
 
 /** Natural, persistent scenery for the ukiyo-e world; no meadow-flower inheritance. */
 export class HamletScenery {
@@ -62,9 +87,19 @@ export class HamletScenery {
     this.dirty = true;
   }
 
-  /** Actual instantiated colour geometry, for performance validation. Lines are separate. */
+  /** Actual instantiated colour geometry, for performance validation (the woods as far as they are in sight). Lines are separate. */
   get triangleCount(): number {
-    return this.batches.reduce((sum, b) => sum + b.mesh.geometry.getAttribute('position').count / 3 * b.mesh.geometry.instanceCount, 0);
+    return this.batches.reduce((sum, b) => sum + triangles(b.mesh.geometry) * b.mesh.geometry.instanceCount, 0);
+  }
+
+  /** The hamlet's own scenery, drawn whatever the view. */
+  get hamletTriangleCount(): number {
+    return this.batches.reduce((sum, b) => sum + (b.placed ? 0 : triangles(b.mesh.geometry) * b.mesh.geometry.instanceCount), 0);
+  }
+
+  /** The woods with every tree placed, in sight or not (only those in sight are drawn: cull). */
+  get woodsTriangleCount(): number {
+    return this.batches.reduce((sum, b) => sum + (b.placed ? triangles(b.mesh.geometry) * b.placed.count : 0), 0);
   }
 
   /** Local trees and bank stones cast into the existing sphere shadow map.
@@ -73,7 +108,8 @@ export class HamletScenery {
     return this.batches.flatMap(b => b.shadow ? [b.shadow] : []);
   }
 
-  private addBatch(kind: HamletSpecies, asset: HamletAsset, anchors: Anchor[], distant = false): void {
+  /** distant: no shadow pass; woods: drawn only where in sight (cull). */
+  private addBatch(kind: HamletSpecies, asset: HamletAsset, anchors: Anchor[], distant = false, woods = false): void {
     const anchorData = new InstancedBufferAttribute(new Float32Array(anchors.length * 4), 4);
     const acrossData = new InstancedBufferAttribute(new Float32Array(anchors.length * 3), 3);
     const placementData = new InstancedBufferAttribute(new Float32Array(anchors.length * 4), 4);
@@ -87,7 +123,8 @@ export class HamletScenery {
       geometry.instanceCount = 0;
       return geometry;
     };
-    const mesh = new Mesh(instantiate(asset.geometry), this.material);
+    // (the templates are built a triangle at a time; shared corners are merged into one vertex, so each is shaded once)
+    const mesh = new Mesh(instantiate(asset.geometry.index ? asset.geometry : mergeVertices(asset.geometry, 1e-7)), this.material);
     const ink = new LineSegments(instantiate(asset.ink), this.inkMaterial);
     const shadow = distant ? undefined : new Mesh(mesh.geometry, this.shadowMaterial);
     if (shadow) {
@@ -95,12 +132,14 @@ export class HamletScenery {
       shadow.name = `Hamlet ${kind} shadow`;
       this.shadowParent?.add(shadow);
     }
-    mesh.name = `Hamlet ${kind}${distant ? ' distant' : ''}`;
+    mesh.name = `Hamlet ${kind}${woods ? ' woods' : distant ? ' distant' : ''}`;
     ink.name = `Hamlet ${kind} selected contours`;
     mesh.frustumCulled = false; ink.frustumCulled = false;
     ink.renderOrder = 1;
     this.group.add(mesh, ink);
-    this.batches.push({ kind, asset, mesh, ink, shadow, anchors, anchorData, acrossData, placementData });
+    const n = anchors.length;
+    const placed = woods ? { count: 0, anchor: new Float32Array(n * 4), across: new Float32Array(n * 3), placement: new Float32Array(n * 4), bounds: new Float32Array(n * 4), drawn: new Int32Array(n), shown: -1 } : undefined;
+    this.batches.push({ kind, asset, mesh, ink, shadow, anchors, anchorData, acrossData, placementData, placed });
   }
 
   private rebuild(terrain: Terrain): void {
@@ -110,6 +149,7 @@ export class HamletScenery {
     const rand = (): number => unit(state = hash32((state + 0x9e3779b9) >>> 0));
     const anchors: Record<HamletSpecies, Anchor[]> = { pine: [], cedar: [], plum: [], reeds: [], rock: [] };
     const distant: Record<'pine' | 'cedar', Anchor[]> = { pine: [], cedar: [] };
+    const woods: Record<'pine' | 'cedar', Anchor[]> = { pine: [], cedar: [] };
     const grass: Anchor[] = [];
     const local = (kind: HamletSpecies, x: number, z: number, scale: number, turn = rand() * TAU, tint = rand()): void => {
       anchors[kind].push({ direction: new Vector3(), local: [x, z], scale, turn, phase: rand() * TAU, tint });
@@ -177,39 +217,41 @@ export class HamletScenery {
       for (let k = 0; k < 3; k++) local('reeds', x + 1.3 + rand() * 0.7, z + (k - 1) * 0.7, 0.65 + rand() * 0.25);
     }
 
-    // Persistent Fibonacci sites with small mixed clusters. Sampling filters
-    // water and reserves the home; the random stream never changes each frame.
+    // The woods beyond the hamlet (WOODS): stands on a jittered Fibonacci
+    // lattice, as dense as the woodland field is there. Sampling filters water
+    // and slopes; the random stream never changes each frame.
     const home = terrain.layout.cottage, forward = terrain.layout.homeBearing;
     const right = new Vector3().crossVectors(home, forward).normalize();
-    const sites = 96;
-    for (let i = 0; i < sites; i++) {
-      const y = 1 - 2 * (i + 0.5) / sites, a = i * 2.3999632297 + this.seed * 0.001;
+    const woodSeed = hash32(this.seed ^ 0x51ed27);
+    const field = (d: Vector3, f: number, seed: number): number => gnoise(d.x * f, d.y * f, d.z * f, seed >>> 0);
+    const woodland = (d: Vector3): number => 0.75 * field(d, WOODS.frequency, woodSeed) + 0.25 * field(d, WOODS.frequency * 2.3, woodSeed + 1);
+    const threshold = NOISE_STD * Math.hypot(0.75, 0.25) * normalQuantile(1 - WOODS.cover);
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < WOODS.stands; i++) {
+      const y = 1 - 2 * (i + 0.25 + 0.5 * rand()) / WOODS.stands, a = (i + 0.3 * (rand() - 0.5)) * golden + this.seed * 0.001;
       const r = Math.sqrt(1 - y * y);
-      const direction = home.clone().multiplyScalar(y).addScaledVector(right, Math.cos(a) * r).addScaledVector(forward, Math.sin(a) * r).normalize();
-      const x = new Vector3().crossVectors(direction, Math.abs(direction.y) < 0.9 ? UP : EAST).normalize();
-      const z = new Vector3().crossVectors(x, direction).normalize();
-      const global = (kind: HamletSpecies, offsetX: number, offsetZ: number, scale: number): void => {
-        const target = kind === 'pine' || kind === 'cedar' ? distant[kind] : anchors[kind];
-        target.push({ direction: direction.clone().addScaledVector(x, offsetX / 128).addScaledVector(z, offsetZ / 128).normalize(), scale, turn: rand() * TAU, phase: rand() * TAU, tint: rand() });
+      const centre = home.clone().multiplyScalar(y).addScaledVector(right, Math.cos(a) * r).addScaledVector(forward, Math.sin(a) * r).normalize();
+      const at = (kind: HamletSpecies, x: number, z: number, scale: number): void => {
+        const target = kind === 'pine' || kind === 'cedar' ? woods[kind] : anchors[kind];
+        target.push({ direction: centre, offset: [x, z], away: rand(), scale, turn: rand() * TAU, phase: rand() * TAU, tint: rand() });
       };
-      // Some sites are open glades, some single mature trees, others dense
-      // mixed-age groves. Their centres are jittered off the Fibonacci lattice.
-      const stand = rand();
-      const centreX = (rand() - 0.5) * 12, centreZ = (rand() - 0.5) * 12;
-      const trees = stand < 0.18 ? 0 : stand < 0.4 ? 1 : stand < 0.7 ? 3 : 6;
-      if (trees) global(i % 4 === 0 ? 'cedar' : 'pine', centreX, centreZ, 1.05 + rand() * 0.76);
-      const turn = rand() * TAU, groveWidth = 3 + rand() * 5;
-      for (let k = 1; k < trees; k++) {
-        const angle = turn + k * 2.3999632297;
-        const spread = 1.4 + Math.sqrt(k / trees) * groveWidth;
-        const scale = k % 3 === 0 ? 0.38 + rand() * 0.28 : 0.65 + rand() * 0.57;
-        global((i + k) % 3 === 0 ? 'pine' : 'cedar', centreX + Math.cos(angle) * spread, centreZ + Math.sin(angle) * spread * 0.75, scale);
+      // close stands deep in the woods, thinner ones at their edges, now and then a lone tree in the open
+      const wood = smoothstep(threshold - 0.05, threshold + 0.1, woodland(centre));
+      const trees = wood > 0.6 ? 5 + Math.floor(rand() * 5) : wood > 0.15 ? 1 + Math.floor(rand() * 3) : rand() < 0.12 ? 1 : 0;
+      // a stand is mostly one kind: cedar groves, pine groves, a few of the other among them
+      const cedars = field(centre, 3.7, woodSeed + 2) > 0.06;
+      const turn = rand() * TAU;
+      for (let k = 0; k < trees; k++) {
+        const angle = turn + k * golden;
+        const spread = k ? WOODS.spacing * Math.sqrt(k) * (0.85 + 0.3 * rand()) : rand() * 1.5;
+        const drawn = k === 0 ? 1.1 + rand() * 0.5 : rand() < 0.25 ? 0.45 + rand() * 0.25 : 0.72 + rand() * 0.58;
+        const scale = Math.max(WOODS.size.least, WOODS.size.mean + WOODS.size.spread * (drawn - WOODS.size.mean));
+        at(cedars !== (rand() < 0.2) ? 'cedar' : 'pine', Math.cos(angle) * spread, Math.sin(angle) * spread, scale);
       }
-      if (i % 5 === 0) global('plum', 2.4, 1.8, 0.72 + rand() * 0.25);
-      global('rock', -2.1, 1.1, 0.62 + rand() * 0.38);
-      if (i % 2 === 0) global('rock', 2.5, -2.0, 0.48 + rand() * 0.36);
-      global('reeds', -2.6, 1.8, 0.7 + rand() * 0.35);
-      if (i % 3 === 0) global('reeds', 2.9, 1.7, 0.6 + rand() * 0.35);
+      // slate showing through the snow, reeds at the wet edges, a plum in the open
+      if (rand() < 0.24) at('rock', (rand() - 0.5) * 9, (rand() - 0.5) * 9, 0.55 + rand() * 0.45);
+      if (rand() < 0.12) at('reeds', (rand() - 0.5) * 8, (rand() - 0.5) * 8, 0.7 + rand() * 0.35);
+      if (wood < 0.4 && rand() < 0.05) at('plum', (rand() - 0.5) * 6, (rand() - 0.5) * 6, 0.72 + rand() * 0.25);
     }
     const assets = createHamletAssets();
     for (const kind of Object.keys(anchors) as HamletSpecies[]) {
@@ -221,6 +263,9 @@ export class HamletScenery {
     this.addBatch('pine', remote.pine, distant.pine, true);
     this.addBatch('cedar', remote.cedar, distant.cedar, true);
     for (const kind of ['plum', 'reeds', 'rock'] as const) { remote[kind].geometry.dispose(); remote[kind].ink.dispose(); }
+    const lean = createWoodsAssets();
+    this.addBatch('pine', lean.pine, woods.pine, true, true);
+    this.addBatch('cedar', lean.cedar, woods.cedar, true, true);
     this.dirty = true;
   }
 
@@ -248,7 +293,13 @@ export class HamletScenery {
           if (x > -8.7 - footprint && x < -3.3 + footprint && z > 7.1 - footprint && z < 10.9 + footprint) continue;
         } else {
           direction.copy(anchor.direction);
-          if (Math.acos(Math.max(-1, Math.min(1, direction.dot(home)))) * R < 37 + footprint) continue;
+          if (anchor.offset) {
+            across.crossVectors(direction, Math.abs(direction.y) < 0.9 ? UP : EAST).normalize();
+            z.crossVectors(across, direction);
+            direction.addScaledVector(across, anchor.offset[0] / R).addScaledVector(z, anchor.offset[1] / R).normalize();
+          }
+          const fromHome = Math.acos(Math.max(-1, Math.min(1, direction.dot(home)))) * R - footprint;
+          if (anchor.away === undefined ? fromHome < 37 : smoothstep(WOODS.near, WOODS.full, fromHome) <= anchor.away) continue;
         }
         if (this.clearings.some(c => Math.acos(Math.max(-1, Math.min(1, direction.dot(c.direction)))) * R < c.radius + footprint)) continue;
         terrain.sample(direction, this.ground);
@@ -259,15 +310,23 @@ export class HamletScenery {
         z.crossVectors(across, direction).normalize();
         turned.copy(across).multiplyScalar(Math.cos(anchor.turn)).addScaledVector(z, Math.sin(anchor.turn));
         let minHeight = this.ground.height, maxHeight = minHeight, supported = true;
-        // Check the whole footprint. Tree roots and the rock's bottom ring then
-        // conform to the GPU terrain at each vertex instead of hovering uphill.
-        for (let k = 0; k < 4; k++) {
-          const a = k * TAU / 4;
-          probe.copy(direction).addScaledVector(across, Math.cos(a) * footprint / R).addScaledVector(z, Math.sin(a) * footprint / R).normalize();
-          terrain.sample(probe, this.footprintGround);
-          if (batch.kind !== 'rock' && this.footprintGround.depth > 0.05) supported = false;
-          minHeight = Math.min(minHeight, this.footprintGround.height);
-          maxHeight = Math.max(maxHeight, this.footprintGround.height);
+        if (anchor.away !== undefined) {
+          // The woods are thousands, placed again each frame the planet grows: the stem's own
+          // sample stands for its footprint, the shore well beyond it and the rise across it (the
+          // ground's height over its distance to the shore is its slope, the bank lip aside).
+          supported = this.ground.water > footprint * 1.4;
+          maxHeight += 2 * footprint * Math.max(this.ground.height - BANK.height, 0) / this.ground.water;
+        } else {
+          // Check the whole footprint. Tree roots and the rock's bottom ring then
+          // conform to the GPU terrain at each vertex instead of hovering uphill.
+          for (let k = 0; k < 4; k++) {
+            const a = k * TAU / 4;
+            probe.copy(direction).addScaledVector(across, Math.cos(a) * footprint / R).addScaledVector(z, Math.sin(a) * footprint / R).normalize();
+            terrain.sample(probe, this.footprintGround);
+            if (batch.kind !== 'rock' && this.footprintGround.depth > 0.05) supported = false;
+            minHeight = Math.min(minHeight, this.footprintGround.height);
+            maxHeight = Math.max(maxHeight, this.footprintGround.height);
+          }
         }
         if (!supported || (batch.kind !== 'rock' && maxHeight - minHeight > 0.85 * anchor.scale)) continue;
         const height = batch.kind === 'rock' ? maxHeight - 0.18 * anchor.scale : this.ground.height - 0.07 * anchor.scale;
@@ -279,6 +338,74 @@ export class HamletScenery {
       batch.mesh.geometry.instanceCount = count;
       batch.ink.geometry.instanceCount = count;
       batch.anchorData.needsUpdate = true; batch.acrossData.needsUpdate = true; batch.placementData.needsUpdate = true;
+      const placed = batch.placed;
+      if (placed) {
+        placed.count = count;
+        placed.anchor.set(batch.anchorData.array.subarray(0, count * 4));
+        placed.across.set(batch.acrossData.array.subarray(0, count * 3));
+        placed.placement.set(batch.placementData.array.subarray(0, count * 4));
+        // a tree's bounds: its template's sphere, scaled, about its stem (it turns about the stem)
+        const box = batch.asset.geometry.boundingSphere!;
+        const reach = box.radius + Math.hypot(box.center.x, box.center.z);
+        for (let i = 0; i < count; i++) {
+          const a = placed.anchor, scale = placed.placement[i * 4], up = R + a[i * 4 + 3] + box.center.y * scale;
+          placed.bounds.set([a[i * 4] * up, a[i * 4 + 1] * up, a[i * 4 + 2] * up, reach * scale], i * 4);
+        }
+        placed.shown = -1;
+      }
+    }
+  }
+
+  /**
+   * Draw only the woods' trees that can be in sight: in front of the planet's
+   * horizon (from orbit, where the true sphere is drawn) and inside the view,
+   * as the warp draws them. The instances in sight are packed to the front of
+   * the woods' buffers, and uploaded only when that set changes.
+   */
+  cull(frustum: Frustum, warp: WarpFrame, eye: Vector3): void {
+    const R = this.radius;
+    const unwarped = Math.abs(warp.k) * R < 0.01;
+    const e = eye.length();
+    const horizon = Math.acos(Math.min(1, R / e));
+    for (const batch of this.batches) {
+      const placed = batch.placed;
+      if (!placed) continue;
+      let shown = 0;
+      let changed = false;
+      for (let i = 0; i < placed.count; i++) {
+        const b = placed.bounds;
+        centre.set(b[i * 4], b[i * 4 + 1], b[i * 4 + 2]);
+        const radius = b[i * 4 + 3];
+        if (unwarped) {
+          const p = centre.length();
+          const angle = Math.acos(Math.max(-1, Math.min(1, centre.dot(eye) / (p * e))));
+          if (angle > horizon + Math.acos(Math.min(1, R / (p + radius))) + radius / R) continue;
+        }
+        // the warp drops a tree by k·t² (t: its offset from the focus along the ground): it may stretch it a little
+        tangent.subVectors(centre, warp.focus);
+        tangent.addScaledVector(warp.up, -tangent.dot(warp.up));
+        warpPoint(warp, centre, bounds.center);
+        bounds.radius = radius * (1.15 + 2 * Math.abs(warp.k) * tangent.length());
+        if (!frustum.intersectsSphere(bounds)) continue;
+        if (placed.drawn[shown] !== i) changed = true;
+        placed.drawn[shown++] = i;
+      }
+      if (!changed && shown === placed.shown) continue;
+      placed.shown = shown;
+      const anchor = batch.anchorData.array as Float32Array, across = batch.acrossData.array as Float32Array, placement = batch.placementData.array as Float32Array;
+      for (let k = 0; k < shown; k++) {
+        const i = placed.drawn[k];
+        anchor.set(placed.anchor.subarray(i * 4, i * 4 + 4), k * 4);
+        across.set(placed.across.subarray(i * 3, i * 3 + 3), k * 3);
+        placement.set(placed.placement.subarray(i * 4, i * 4 + 4), k * 4);
+      }
+      for (const [attribute, size] of [[batch.anchorData, 4], [batch.acrossData, 3], [batch.placementData, 4]] as const) {
+        attribute.clearUpdateRanges();
+        attribute.addUpdateRange(0, Math.max(shown, 1) * size);
+        attribute.needsUpdate = true;
+      }
+      batch.mesh.geometry.instanceCount = shown;
+      batch.ink.geometry.instanceCount = shown;
     }
   }
 
@@ -296,4 +423,12 @@ export class HamletScenery {
   dispose(): void {
     this.releaseBatches(); this.material.dispose(); this.inkMaterial.dispose(); this.shadowMaterial.dispose(); this.shadowParent = null;
   }
+}
+
+const centre = new Vector3();
+const tangent = new Vector3();
+const bounds = new Sphere();
+
+function triangles(geometry: BufferGeometry): number {
+  return (geometry.index ? geometry.index.count : geometry.getAttribute('position').count) / 3;
 }

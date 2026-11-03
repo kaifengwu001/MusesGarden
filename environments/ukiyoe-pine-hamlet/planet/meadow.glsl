@@ -173,6 +173,7 @@ struct Meadow {
   float shore;    // signed distance to the water (m)
   float light;    // toon light band, shadows applied
   float sunlit;   // 1 in sun, 0 under cloud
+  float cover;    // under a cloud's own shadow, 0..1 (cloudCoverAt): the snow turns blue there
   float sheen;    // wind sheen: -1 in a trough … 1 on a crest (windSheen)
   float stroke;   // brushstroke noise, -1..1 (strokeAt)
   float pixelMeters;
@@ -193,7 +194,7 @@ float strokeAt(vec3 dir, float pixelMeters) {
 uniform float uSnowAmount;
 vec3 meadowPaint(Meadow m) {
   vec3 summer = tone3(pal(ROW_GRASS, 0), pal(ROW_GRASS, 1), pal(ROW_GRASS, 2), m.light);
-  vec3 snow = snowPrint(m.dir * uRadius, m.pixelMeters, m.light);
+  vec3 snow = snowInCloud(snowPrint(m.dir * uRadius, m.pixelMeters, m.light), m.cover);
   vec3 col = mix(summer, snow, uSnowAmount);
   // Narrow path relationships are authored in the home frame, not stamped over the globe.
   float dc = chordAngle(m.dir, uCottage.xyz) * uRadius;
