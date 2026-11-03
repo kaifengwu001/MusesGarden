@@ -1,8 +1,10 @@
-import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform } from 'three';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform, type Texture } from 'three';
 import { smoothstep } from '../../../src/core/math';
 import type { Terrain } from '../planet/terrain';
 import { warpPoint, type WarpFrame } from '../../../src/render/warp';
 import { FIELD_FIT, type MuseBody, type MuseFit } from '../../../src/life/museBody';
+import { dressMuse, fitOf, isDressed } from '../../../src/life/museDress';
+import type { DressedKind, MuseMesh } from '../../../src/life/museMesh';
 import { SCULPTS, type SculptKind } from './museMesh';
 import BodyWorker from '../../../src/life/museBody.worker?worker&inline';
 import fragmentShader from './muse.frag.glsl?raw';
@@ -50,7 +52,8 @@ const SEEN = 160;
 const FACE_YOU = 1.7;
 
 type Stand = keyof typeof STANDS;
-export type MuseModel = 'field' | SculptKind;
+/** Muse's body: the field's own, a Tripo sculpt of it, or one of the muses in clothes (src/life/museMesh.ts DRESSED, rigged as src rigs them). */
+export type MuseModel = 'field' | SculptKind | DressedKind;
 /** A heading on the terrace (rad from facing out, +z, toward +x), or toward the camera. */
 type Facing = number | 'you';
 type Beat =
@@ -172,7 +175,7 @@ export class Muse {
       const worker = new BodyWorker();
       worker.onmessage = (event: MessageEvent<MuseBody>) => {
         this.fieldBody = event.data;
-        if (this.model === 'field') this.take(event.data, FIELD_FIT, null);
+        if (this.model === 'field') this.take(event.data, FIELD_FIT, null, null);
         worker.terminate();
         resolve();
       };
@@ -200,21 +203,28 @@ export class Muse {
     this.loading = this.loading.then(async () => {
       if (this.model !== model) return;
       if (model === 'field') {
-        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null);
+        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null, null);
         return;
       }
       try {
+        if (isDressed(model)) {
+          // a muse in clothes, loaded and rigged once for the page as src's Muse has it (museSculptLoader.ts sculptFor)
+          const { sculptFor } = await import('../../../src/life/museSculptLoader');
+          const dressed = await sculptFor(model);
+          if (this.model === model) this.take(dressed.body, fitOf(model, dressed.body), dressed.grade, dressed.paint);
+          return;
+        }
         const { loadTripo } = await import('./museTripo');
         const sculpt = await loadTripo(model);
-        if (this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade);
+        if (this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade, null);
       } catch (error) {
         console.warn('Muse: the Tripo sculpt could not be loaded; keeping the field body', error);
       }
     });
   }
 
-  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit and its paint. */
-  private take(body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array }, fit: MuseFit, grade: Vector3 | null): void {
+  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit, its paint, and its clothes' (src/life/museDress.ts). */
+  private take(body: MuseBody & Partial<MuseMesh>, fit: MuseFit, grade: Vector3 | null, paint: Texture | null): void {
     const index = new BufferAttribute(body.index, 1);
     const position = new BufferAttribute(body.position, 3);
     const skinIndex = new BufferAttribute(body.skinIndex, 4);
@@ -259,6 +269,7 @@ export class Muse {
       else delete material.defines[define];
       material.needsUpdate = true;
     }
+    dressMuse(g, material, body, paint);
     const s = new BufferGeometry();
     s.setIndex(index);
     s.setAttribute('position', position);
