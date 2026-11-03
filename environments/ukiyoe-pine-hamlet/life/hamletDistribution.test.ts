@@ -37,9 +37,10 @@ describe('ukiyoe inhabited planting', () => {
   });
 
   it('leaves the cottage approach, bridge and complete resident courtyard lane free of crops and grass', () => {
-    for (const radius of [40, 128, 400]) {
+    for (const radius of [40, 90, 128, 400]) {
       const { terrain, scenery } = create(radius);
-      expect(scenery.triangleCount).toBeLessThan(1_500_000);
+      expect(scenery.hamletTriangleCount).toBeLessThan(1_500_000);
+      expect(scenery.woodsTriangleCount).toBeLessThan(1_750_000);
       for (const plant of placed(scenery, terrain).filter(p => p.variant < 0)) {
         const { x, z } = plant;
         expect(x > -1 && x < 6 && z > 3 && z < 31).toBe(false);

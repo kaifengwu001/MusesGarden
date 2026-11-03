@@ -142,6 +142,76 @@ simulation’s previous frames. Winter suppresses the inherited butterflies.
 Saved garden content is separate from ambient scenery and must not be deleted
 to make a screenshot cleaner.
 
+## Size, woods and clouds
+
+Kai, 2 Nov: a 30 % smaller planet so the orbit holds more of the hamlet,
+but only if the layout about Muse's hut stays as it is; more trees away
+from the hut; cumulus clouds whose shadows lie blue on the snow.
+
+- **Size.** The default is R 90 m (`RADIUS_DEFAULT`, params.ts), 30 % smaller
+  across than the R 128 the homestead was laid out and tuned on (`R_REF`).
+  Growth still runs 40–400 m from there.
+- **The ground about the home keeps its tuned shape** (`TUNED`, fields.ts). Out
+  to 64 m from the cottage (along the ground) the natural fields are those of
+  the R 128 planet at the same cottage-local meters, where the houses, trees,
+  beds, paths and the residents' lanes are laid out; by 84 m they have faded
+  into the planet's own, in rest space as before. The bake (bake.frag.glsl,
+  `homeWeight`, `homeDirection` in fields.glsl) and the CPU fields do the same.
+  The pond has its tuned size on the default planet (terrain.ts), and the bank
+  lip's gradient step is never finer than the tuned planet's bake texel. At R 90
+  the ground within 50 m of the cottage is the R 128 ground to 3 mm (2 cm
+  under the plateau's edges), measured at 2 m spacing; scale.test.ts holds it.
+  The Home view frames 1–2 % tighter (a smaller sphere curves more under the
+  same warp, and the rig's field of view follows zoom, not height). A pose in
+  the hash is a direction on the planet, so on another size it is another
+  place: flicker.spec.ts's reported camera is moved to the same place (cottage
+  local −7.9, 15.3 m), heading and height on R 90.
+- **The woods** (`WOODS`, hamletScenery.ts) replace the 96 global sites: 322
+  stands on a jittered Fibonacci lattice, as dense as a seeded woodland field
+  is there (close stands of pine or cedar, thinner ones at its edges, a lone
+  tree in the open), none nearer the cottage than 40 m and all of them beyond
+  56 m, so the hamlet's own trees stay as they were. Offsets within a stand
+  are in meters, so a stand keeps its size as R grows. About 965 trees on the
+  default planet; their sizes spread 1.75 times as widely as they are drawn
+  (σ 0.49 about 1.0, 0.3–2.1). Kai halved a first count of 3,225, asked for
+  that spread, then took off another 40 %. Each is placed from one ground sample, its shore distance and
+  slope standing for the footprint (the hamlet's own anchors keep the four
+  footprint probes), so placing everything again as the planet grows costs less
+  than it did before the woods (27.6 ms a step in Node, against 30).
+- **Their snow.** Every lobe of a woods tree is under snow, in three rows that
+  keep above its dome: on the coarser domes one row spanned the cap in a flat
+  fan that sagged under the dome, so the foliage showed through its middle,
+  and half the cedars' lobes had none. Kai: "top surfaces of leaves should all
+  be covered with white", and "do not change hamlet woods": the hamlet's own
+  templates (full and remote) are byte for byte as they were.
+- **Their cost.** The woods use leaner templates still (`createWoodsAssets`:
+  about 1,290 triangles a pine and 1,480 a cedar with their snow), and only the
+  trees in sight are drawn: in front
+  of the horizon from orbit, inside the view as the warp draws them
+  (`HamletScenery.cull`, packed and uploaded only when the set changes). Every
+  scenery template is drawn indexed, its shared corners merged (mergeVertices
+  at 1e-7, pixel for pixel the same), so each vertex is shaded once rather than
+  once per triangle. The Home view draws fewer scenery triangles than before
+  the woods (0.69 M against 1.0 M); hamletGeometry.test.ts gives the woods a
+  budget of their own (1.75 M placed; 1.33 M on the default planet) beside
+  the hamlet's (1.5 M).
+- **Clouds.** life/clouds.ts is the meadow's cumulus with one change: its cover
+  starts from none (`SHARE`), as the meadow's floor of a tenth of the slots is
+  a ring of heaps over this small planet. The defaults are Kai's, set in the
+  panel: coverage 0.5, bases about 9.5 m up, speed 0.24, shadow 0.84 (every
+  shadow in the clouds' map, the trees' and Muse's among them), blue on the
+  snow 0.95. Their shadows reach the snow through a
+  map of their own (life/cloudCover.ts, render/cloudCover.glsl: the same puffs
+  splatted down the sun into a cube a third the size of the clouds' map), so
+  the snow under a cloud turns a clear blue (`snowInCloud`, snow.glsl) on the
+  ground, the roofs and the trees' and stones' snow, while the shadows of the
+  trees, the bank stones, Muse and its neighbours stay as they were. The panel's
+  Clouds folder has "Blue on the snow" (`csn`) beside coverage and altitude.
+  At coverage 0 no cloud is placed (the meadow's places a fringe of invisible
+  ones about an infinite threshold, whose fade is NaN).
+- **The parameter panel** shows again, folded at the top right as the meadow's
+  is (P opens and folds it), for testing.
+
 ## Validation and iteration
 
 Use the commands in [README.md](README.md). The ecology suite captures the actual

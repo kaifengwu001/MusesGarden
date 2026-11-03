@@ -12,6 +12,7 @@ uniform vec2 uResolution;
 #include <meadow_wind>
 #include <meadow_warp>
 #include <meadow_clouds>
+#include <meadow_cloud_cover>
 #include <meadow_water>
 
 uniform int uDebug;
@@ -102,6 +103,7 @@ void main() {
     m.shore = shore;
     m.light = b;
     m.sunlit = 1.0 - cloud;
+    m.cover = cloudCoverAt(dir * (uRadius + max(h, 0.0)), stroke * 2.2);
     m.sheen = sheen;
     m.stroke = stroke;
     m.pixelMeters = snowPixelMeters;

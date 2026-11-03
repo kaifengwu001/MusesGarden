@@ -8,6 +8,7 @@ uniform float uRadius;
 #include <meadow_snow>
 #include <meadow_fog>
 #include <meadow_clouds>
+#include <meadow_cloud_cover>
 uniform int uKind;
 uniform float uSnowAmount;
 varying vec3 vNormal;
@@ -77,7 +78,7 @@ void main() {
     col*=1.0+detail*(0.10*smoothstep(0.40,0.60,grain)-0.13*(1.0-smoothstep(-0.60,-0.40,grain)));
     edge=0.0;
   }else{
-    col=snowBoundary(shade,normalize(vLocalNormal).y);
+    col=snowInCloud(snowBoundary(shade,normalize(vLocalNormal).y),cloudCoverAt(vPlanet,0.0));
     edge=0.0;
   }
   col=mix(col,ink,edge*(uKind==0?0.32:0.60));

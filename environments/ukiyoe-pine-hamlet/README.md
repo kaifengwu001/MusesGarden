@@ -17,7 +17,9 @@ The server uses port **5237** with `--strictPort` so another planet’s server i
 not silently reused. The toolbar offers Snow, Rain, Home, Bridge, Whole planet
 and Muse views. Select Sumi or Mugi to follow, greet or rename that neighbour;
 their names are remembered locally. Muse also retains the existing petting,
-garden and planet-growth interactions.
+garden and planet-growth interactions. The parameter panel (top right; P opens
+and folds it) holds every setting, among them the clouds' coverage, altitude
+and how blue their shadows lie on the snow.
 
 ```sh
 npm run check:ukiyoe

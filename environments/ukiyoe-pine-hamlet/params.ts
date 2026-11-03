@@ -69,11 +69,12 @@ function bool(url: string, label: string, def: boolean, effect: Effect): BoolFie
 
 export const RADIUS_MIN = 40;
 export const RADIUS_MAX = 400;
-export const RADIUS_DEFAULT = 128;
+/** The hamlet starts on a planet 30 % smaller across than the one it was laid out on (terrain.ts R_REF), so its orbit holds more of it; the ground about the home keeps its tuned shape (fields.ts TUNED). */
+export const RADIUS_DEFAULT = 90;
 const AREA_MIN = Math.round(areaOfRadius(RADIUS_MIN)); // 20,106 m²
 const AREA_MAX = Math.round(areaOfRadius(RADIUS_MAX)); // 2,010,619 m²
 
-/** Growth that puts the default world at R ≈ 128 m, A ≈ 206,000 m². */
+/** Growth that puts the default world at R ≈ 90 m, A ≈ 102,000 m². */
 export const DEFAULT_GROWTH = Math.round(growthForArea(areaOfRadius(RADIUS_DEFAULT), AREA_MIN, AREA_MAX) * 1e4) / 1e4;
 
 export const schema = {
@@ -127,10 +128,13 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 5, 1, 40, 0.5, 'live', { unit: 'm' }),
-    speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
-    shadow: num('csh', 'Shadow', 0.22, 0, 1, 0.01, 'live'),
+    // low cumulus over the snow, as Kai set them (life/clouds.ts: here the cover starts from none)
+    coverage: num('cc', 'Coverage', 0.5, 0, 1, 0.01, 'life'),
+    altitude: num('ca', 'Altitude', 9.5, 1, 40, 0.5, 'live', { unit: 'm' }),
+    speed: num('cs', 'Speed', 0.24, 0, 1, 0.01, 'live'),
+    shadow: num('csh', 'Shadow', 0.84, 0, 1, 0.01, 'live'),
+    // how blue the snow turns in a cloud's own shadow (life/cloudCover.ts); the trees' shadows keep theirs
+    snow: num('csn', 'Blue on the snow', 0.95, 0, 1, 0.01, 'live'),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),

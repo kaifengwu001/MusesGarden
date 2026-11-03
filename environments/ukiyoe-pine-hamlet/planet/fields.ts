@@ -38,6 +38,11 @@ import { gnoise } from '../../../src/planet/noise';
 //              pink cups. Drifts and colonies are baked (bake.frag.glsl);
 //              clumps are too fine for the bake, so the paint and the near
 //              flowers evaluate them where they stand (clumps(), clumpsAt())
+//   home       about the cottage the ground keeps the shape it was tuned to
+//              on a planet of R 128 m, whatever the planet's own size
+//              (TUNED, anchorHome): out to 64 m it is that planet's ground at
+//              the same cottage-local meters, where the houses, trees and
+//              paths are laid out; by 84 m it has faded into the planet's own
 
 export const RELIEF_OCTAVES = 9;
 export const RELIEF_BASE_FREQ = 1.6;
@@ -66,6 +71,13 @@ const SEED = { relief: 0, warp: 31, wet: 34, lush: 170, rich: 180, variant: 190,
 /** Twirls: how many, and the range of their angular radii (rad) and turns (rad at the centre). */
 export const TWIRLS = 4;
 const TWIRL = { radius: [0.42, 0.95], turn: [1.2, 2.3] } as const;
+/**
+ * The ground about the home (anchorHome): the radius it was tuned on (m),
+ * how far from the cottage (m along the ground) it is that planet's ground,
+ * and where it has faded into this planet's own. A small planet draws these
+ * in to `ofRadius` × R at most (well short of the cottage's horizon).
+ */
+export const TUNED = { radius: 128, full: 64, none: 84, ofRadius: 0.95 } as const;
 
 export interface Twirl {
   readonly centre: Vector3;
@@ -228,6 +240,17 @@ export interface FieldUniforms {
   /** Twirls: centre xyz, turn (rad); and their angular radii. */
   uTwirl: { value: Vector4[] };
   uTwirlRadius: { value: Vector4 };
+  /** The home's tuned ground (Fields.anchorHome): the cottage's direction, R / TUNED.radius (1: none). */
+  uHome: { value: Vector4 };
+  /** Its reach (m along the ground): at cottage-local meters to, full to, gone by; and R (m). */
+  uHomeReach: { value: Vector4 };
+  /** uRelief and uHummock on the planet it was tuned on. */
+  uReliefTuned: { value: Float32Array };
+  uHummockTuned: { value: Float32Array };
+  /** There: lift (m), drop (m), -, -. */
+  uTuned: { value: Vector4 };
+  /** There: octave pairs (level, t) of lushness and variant. */
+  uPatternTuned: { value: Vector4 };
 }
 
 export function createFieldUniforms(): FieldUniforms {
@@ -251,6 +274,12 @@ export function createFieldUniforms(): FieldUniforms {
     uSpeciesDensity: { value: new Vector4() },
     uTwirl: { value: Array.from({ length: TWIRLS }, () => new Vector4(0, 1, 0, 0)) },
     uTwirlRadius: { value: new Vector4(1, 1, 1, 1) },
+    uHome: { value: new Vector4(0, 1, 0, 1) },
+    uHomeReach: { value: new Vector4() },
+    uReliefTuned: { value: new Float32Array(RELIEF_OCTAVES) },
+    uHummockTuned: { value: new Float32Array(RELIEF_OCTAVES) },
+    uTuned: { value: new Vector4() },
+    uPatternTuned: { value: new Vector4() },
   };
 }
 
@@ -282,8 +311,15 @@ export class Fields {
   readonly speciesDensity = new Float32Array(4);
   patchiness = 0;
   readonly twirls: readonly Twirl[];
+  /** The cottage's direction, and these fields on the planet the ground about it was tuned on (anchorHome). */
+  private home: Vector3 | null = null;
+  private tuned: Fields | null = null;
+  /** R / TUNED.radius (1: the tuned planet itself, nothing to match), and the reach of the tuned ground here (m). */
+  private homeK = 1;
+  private readonly homeReach = { full: 0, none: 0 };
   private readonly st = new Vector3();
   private readonly td = new Vector3();
+  private readonly hd = new Vector3();
 
   constructor(
     readonly seed: number,
@@ -293,8 +329,21 @@ export class Fields {
     this.twirls = makeTwirls(seed);
   }
 
+  /** Keep the ground about `home` (the cottage's direction) as it was tuned, at any R (TUNED). */
+  anchorHome(home: Vector3): void {
+    this.home = home.clone().normalize();
+    this.tuned ??= new Fields(this.seed, this.grain);
+  }
+
   /** Refresh everything that depends on R and the parameters (cheap). */
   update(radius: number, p: FieldParams): void {
+    if (this.tuned) {
+      this.tuned.update(TUNED.radius, p);
+      this.homeK = radius / TUNED.radius;
+      const reach = Math.min(1, (TUNED.ofRadius * radius) / TUNED.none);
+      this.homeReach.full = TUNED.full * reach;
+      this.homeReach.none = TUNED.none * reach;
+    }
     this.radius = radius;
     let var2 = 0;
     for (let k = 0; k < RELIEF_OCTAVES; k++) {
@@ -385,6 +434,13 @@ export class Fields {
 
   /** 0 on dry upland, 1 deep in a wetland. */
   wetness(dir: Vector3): number {
+    const w = this.homeWeight(dir);
+    const own = w < 1 ? this.wetnessHere(dir) : 0;
+    // (wetness lives in rest space alone: the tuned planet's is this one's, read where the home matches it)
+    return w > 0 ? own + (this.wetnessHere(this.homeDirection(dir)) - own) * w : own;
+  }
+
+  private wetnessHere(dir: Vector3): number {
     return this.wetnessTwirled(twirl(this.twirls, dir, this.td));
   }
 
@@ -394,6 +450,12 @@ export class Fields {
 
   /** Ground height above the water table before the homestead and the banks (m). */
   natural(dir: Vector3): number {
+    const w = this.homeWeight(dir);
+    const own = w < 1 ? this.naturalHere(dir) : 0;
+    return w > 0 ? own + (this.tuned!.naturalHere(this.homeDirection(dir)) - own) * w : own;
+  }
+
+  private naturalHere(dir: Vector3): number {
     const t = twirl(this.twirls, dir, this.td);
     const wet = this.wetnessTwirled(t);
     const h = this.reliefTwirled(t, wet) + this.lift - this.drop * wet - this.level;
@@ -401,12 +463,50 @@ export class Fields {
   }
 
   lush(dir: Vector3): number {
+    const w = this.homeWeight(dir);
+    const own = w < 1 ? this.lushHere(dir) : 0;
+    return w > 0 ? own + (this.tuned!.lushHere(this.homeDirection(dir)) - own) * w : own;
+  }
+
+  private lushHere(dir: Vector3): number {
     return clamp(this.pair(twirl(this.twirls, dir, this.td), this.lushPair, SEED.lush) * 2.6, -1, 1);
   }
 
   /** Colony colour/size variant, 0..1. */
   variant(dir: Vector3): number {
+    const w = this.homeWeight(dir);
+    const own = w < 1 ? this.variantHere(dir) : 0;
+    return w > 0 ? own + (this.tuned!.variantHere(this.homeDirection(dir)) - own) * w : own;
+  }
+
+  private variantHere(dir: Vector3): number {
     return 0.5 + 0.5 * clamp(this.pair(twirl(this.twirls, dir, this.td), this.variantPair, SEED.variant) * 2.8, -1, 1);
+  }
+
+  /** How much of the ground at dir is the home's tuned ground (anchorHome): 1 about the home … 0 away from it. */
+  private homeWeight(dir: Vector3): number {
+    const home = this.home;
+    if (!home || this.homeK === 1) return 0;
+    const d = Math.atan2(this.hd.crossVectors(dir, home).length(), dir.dot(home)) * this.radius;
+    return smoothstep(this.homeReach.none, this.homeReach.full, d);
+  }
+
+  /**
+   * The direction on the tuned planet whose ground stands at dir here: the
+   * one at the same cottage-local meters (Terrain.cottageLocal: R sin θ, on
+   * the same bearing). Writes and returns a shared vector.
+   */
+  private homeDirection(dir: Vector3): Vector3 {
+    const c = this.home!;
+    const k = this.homeK;
+    const side = this.hd.copy(dir).addScaledVector(c, -dir.dot(c)).multiplyScalar(k);
+    return side.addScaledVector(c, Math.sqrt(Math.max(0, 1 - side.lengthSq())));
+  }
+
+  /** The highest the natural ground stands anywhere (m): its lift and four spreads of relief, here or about the home. */
+  get highest(): number {
+    const own = this.lift + 4 * this.reliefStd;
+    return this.tuned ? Math.max(own, this.tuned.lift + 4 * this.tuned.reliefStd) : own;
   }
 
   /**
@@ -458,6 +558,16 @@ export class Fields {
       u.uTwirl.value[i].set(t.centre.x, t.centre.y, t.centre.z, t.turn);
       u.uTwirlRadius.value.setComponent(i, t.radius);
     });
+    const home = this.home;
+    const tuned = this.tuned;
+    u.uHome.value.set(home?.x ?? 0, home?.y ?? 1, home?.z ?? 0, home ? this.homeK : 1);
+    u.uHomeReach.value.set(this.homeReach.full, this.homeReach.none, this.radius, 0);
+    if (tuned) {
+      u.uReliefTuned.value.set(tuned.relief);
+      u.uHummockTuned.value.set(tuned.hummock);
+      u.uTuned.value.set(tuned.lift, tuned.drop, 0, 0);
+      u.uPatternTuned.value.set(tuned.lushPair.level, tuned.lushPair.t, tuned.variantPair.level, tuned.variantPair.t);
+    }
   }
 }
 

@@ -17,6 +17,7 @@ import fog from '../../../src/render/fog.glsl?raw';
 import sun from '../../../src/render/sun.glsl?raw';
 import toon from './toon.glsl?raw';
 import snow from './snow.glsl?raw';
+import cloudCover from './cloudCover.glsl?raw';
 import warp from '../../../src/render/warp.glsl?raw';
 
 // Shared GLSL lives in its own files and is registered as three.js shader
@@ -37,6 +38,7 @@ const chunks: Record<string, string> = {
   meadow_water: water,
   meadow_cloud_lumps: cloudLumps,
   meadow_clouds: clouds,
+  meadow_cloud_cover: cloudCover,
   meadow_field: field,
   meadow_wind: wind,
   meadow_find: find,

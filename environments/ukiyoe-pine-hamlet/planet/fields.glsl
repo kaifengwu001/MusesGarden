@@ -30,6 +30,12 @@ uniform vec4 uColonyCover;
 uniform vec4 uSpeciesDensity;  // mean flowers per m², per species
 uniform vec4 uTwirl[4];        // twirls: centre xyz, turn at the centre (rad)
 uniform vec4 uTwirlRadius;     // their angular radii (rad)
+uniform vec4 uHome;            // the home's tuned ground (Fields.anchorHome): the cottage's direction, R / the tuned R (1: none)
+uniform vec4 uHomeReach;       // its reach (m along the ground): full to, gone by; R (m), -
+uniform float uReliefTuned[RELIEF_OCTAVES]; // uRelief and uHummock on the planet it was tuned on
+uniform float uHummockTuned[RELIEF_OCTAVES];
+uniform vec4 uTuned;           // there: lift (m), drop (m), -, -
+uniform vec4 uPatternTuned;    // there: octave pairs (level, t) of lushness and variant
 
 // A direction turned through the twirls (twirl() in fields.ts): every field
 // here is sampled at it, so hills, lakes and drifts swirl.
@@ -60,17 +66,21 @@ float pairNoise(vec3 dir, float level, float t, uint base) {
   return (a * (1.0 - t) + b * t) / sqrt((1.0 - t) * (1.0 - t) + t * t);
 }
 
-// Rolling hills plus hummocks, the hummocks raised by wetness.
-float reliefAt(vec3 dir, float wet) {
+// Rolling hills plus hummocks, the hummocks raised by wetness, with one planet's amplitudes.
+float reliefWith(vec3 dir, float wet, float relief[RELIEF_OCTAVES], float hummock[RELIEF_OCTAVES]) {
   float h = 0.0;
   float f = RELIEF_BASE_FREQ;
   float lift = 1.0 + WET_HUMMOCKS * wet;
   for (int k = 0; k < RELIEF_OCTAVES; k++) {
-    float amp = uRelief[k] + uHummock[k] * lift;
+    float amp = relief[k] + hummock[k] * lift;
     if (amp >= 1e-4) h += amp * stretched(dir, f, uFieldSeed + uint(k));
     f *= 2.0;
   }
   return h;
+}
+
+float reliefAt(vec3 dir, float wet) {
+  return reliefWith(dir, wet, uRelief, uHummock);
 }
 
 float wetNoise(vec3 dir) {
@@ -84,12 +94,36 @@ float wetnessAt(vec3 dir) {
   return smoothstep(uWet.x - uWet.y, uWet.x + uWet.y, wetNoise(dir));
 }
 
+// Lushness and colour variant at one planet's octave pair (level, t).
+float lushWith(vec3 dir, vec2 pair) {
+  return clamp(pairNoise(dir, pair.x, pair.y, 170u) * 2.6, -1.0, 1.0);
+}
+
+float variantWith(vec3 dir, vec2 pair) {
+  return 0.5 + 0.5 * clamp(pairNoise(dir, pair.x, pair.y, 190u) * 2.8, -1.0, 1.0);
+}
+
 float lushAt(vec3 dir) {
-  return clamp(pairNoise(dir, uPatternA.x, uPatternA.y, 170u) * 2.6, -1.0, 1.0);
+  return lushWith(dir, uPatternA.xy);
 }
 
 float variantAt(vec3 dir) {
-  return 0.5 + 0.5 * clamp(pairNoise(dir, uPatternA.z, uPatternA.w, 190u) * 2.8, -1.0, 1.0);
+  return variantWith(dir, uPatternA.zw);
+}
+
+// How much of the ground at dir is the home's tuned ground (Fields.homeWeight): 1 about the home … 0 away from it.
+float homeWeight(vec3 dir) {
+  if (uHome.w == 1.0) return 0.0;
+  float d = atan(length(cross(dir, uHome.xyz)), dot(dir, uHome.xyz)) * uHomeReach.z;
+  return smoothstep(uHomeReach.y, uHomeReach.x, d);
+}
+
+// The direction on the tuned planet whose ground stands at dir here (Fields.homeDirection): the one at
+// the same cottage-local meters, on the same bearing.
+vec3 homeDirection(vec3 dir) {
+  vec3 c = uHome.xyz;
+  vec3 side = (dir - c * dot(dir, c)) * uHome.w;
+  return side + c * sqrt(max(0.0, 1.0 - dot(side, side)));
 }
 
 float dampFactor(int s, float wet) {

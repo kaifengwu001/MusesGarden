@@ -142,7 +142,7 @@ describe('presets', () => {
     store.applyPreset('Rainy hamlet');
     expect(store.values.world.seed).toBe(1234);
     expect(store.values.weather.season).toBe('rain');
-    expect(store.values.clouds.coverage).toBe(0);
+    expect(store.values.clouds.coverage).toBe(fieldAt('clouds.coverage').field.def);
     store.applyPreset('Snowy hamlet');
     expect(store.toQuery()).toBe('seed=1234');
   });

@@ -7,7 +7,8 @@ import { smoothstep } from '../../src/core/math';
 import { FieldMap } from '../../src/life/fieldMap';
 import { Birds } from './life/birds';
 import { Butterflies } from './life/butterflies';
-import { Clouds, createCloudUniforms } from '../../src/life/clouds';
+import { Clouds, createCloudUniforms } from './life/clouds';
+import { CloudCover, createCloudCoverUniforms } from './life/cloudCover';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { Petals } from '../../src/life/petals';
@@ -82,6 +83,7 @@ export class World {
   readonly look = createLookUniforms();
   readonly terrainUniforms = createTerrainUniforms();
   readonly cloudUniforms = createCloudUniforms();
+  readonly cloudCoverUniforms = createCloudCoverUniforms();
   readonly band = new GrowthBand();
   readonly queue = new BuildQueue();
   readonly growth: GrowthState = { g: 0, area: 0, radius: 128 };
@@ -93,6 +95,8 @@ export class World {
   readonly flowers: Flowers;
   homestead: Homestead;
   readonly clouds: Clouds;
+  /** The clouds' own shadows, for the blue they lay on the snow. */
+  readonly cloudCover: CloudCover;
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
@@ -168,6 +172,7 @@ export class World {
       ...this.look,
       ...this.terrainUniforms,
       ...this.cloudUniforms,
+      ...this.cloudCoverUniforms,
       uGustRot: { value: new Vector4(1, 0, 1, 0) },
       uGustFreq: { value: new Vector4(8, 24, 0, 0) },
       uGustRings: { value: Array.from({ length: 4 }, () => new Vector4(0, 1, 0, -1)) },
@@ -185,6 +190,8 @@ export class World {
     this.flowers = new Flowers(this.shared, POOL_PAGES.flowers);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
+    // (a cloud's shadow is soft and meters wide: a third of the clouds' map is plenty)
+    this.cloudCover = new CloudCover(this.cloudUniforms, this.shared, this.cloudCoverUniforms, tier.maps.cloudShadow / 3);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.butterflies = new Butterflies(this.shared);
@@ -392,12 +399,15 @@ export class World {
     // Winter has birds and falling snow, without the meadow's warm-season insects.
     this.butterflies.mesh.visible &&= this.season !== 'snow';
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
-    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
+    const seen = this.groundInSight();
+    this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, seen);
+    this.cloudCover.update(this.renderer, rig.up, seen, p.clouds.snow);
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     this.muse.cull(this.frustum, this.warp);
     this.residents.cull(this.frustum, this.warp);
+    this.scenery.cull(this.frustum, this.warp, cam.position);
     const sweep = this.terrainUniforms.uCottageSun.value;
     this.terrain.homeAreas(sweep.x, sweep.y, this.homeAreas);
     this.surface.update(

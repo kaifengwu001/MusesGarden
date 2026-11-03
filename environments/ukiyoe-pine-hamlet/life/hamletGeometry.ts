@@ -7,9 +7,10 @@ export interface HamletAsset { geometry: BufferGeometry; ink: BufferGeometry; fo
 const V = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
 const TAU = Math.PI * 2;
 
-/** Solid branches, folded needle blades and selected drawn contours. No leaf billboards. */
+/** Solid branches, folded needle blades and selected drawn contours. No leaf billboards.
+ * coarse: the remote templates; lean: coarser still, for the woods beyond the hamlet. */
 class MeshBuilder {
-  constructor(readonly coarse = false, readonly species = 0) {}
+  constructor(readonly coarse = false, readonly species = 0, readonly lean = false) {}
   private readonly p: number[] = [];
   private readonly n: number[] = [];
   private readonly uv: number[] = [];
@@ -83,11 +84,12 @@ class MeshBuilder {
   }
 
   /** One rounded pine fan. Several intersecting lobes make a scalloped cloud.
-   * Its local coordinates belong to this lobe, not a repeating world texture. */
+   * Its local coordinates belong to this lobe, not a repeating world texture.
+   * (A lean lobe, the woods', is always under snow: every leaf's top white.) */
   pineLobe(center: Vector3, size: number, phase: number, turn: number, snowy: boolean): void {
     const cedar = this.species === 1;
-    const sides = this.coarse ? (cedar ? 8 : 10) : (cedar ? 14 : 20);
-    const rows = this.coarse ? (cedar ? 3 : 4) : (cedar ? 5 : 8);
+    const sides = this.lean ? (cedar ? 6 : 7) : this.coarse ? (cedar ? 8 : 10) : (cedar ? 14 : 20);
+    const rows = this.lean ? 3 : this.coarse ? (cedar ? 3 : 4) : (cedar ? 5 : 8);
     const rx = size * (cedar ? 0.76 : 0.70), ry = size * (cedar ? 0.57 : 0.73), rz = size * (cedar ? 0.59 : 0.60);
     const rotate = (v: Vector3): Vector3 => v.applyAxisAngle(V(0, 1, 0), turn);
     const vertex = (angle: number, latitude: number, snow = false) => {
@@ -114,10 +116,12 @@ class MeshBuilder {
       if (j > 0) emit(p, q, r);
       if (j < rows - 1) emit(p, r, t);
     }
-    if (!snowy) return;
+    if (!snowy && !this.lean) return;
     // Conforming snow uses the same dome, leaving the lower fan visible.
     // Its shallow lip meets the foliage rather than floating as a broad plate.
-    const snowRows = this.coarse ? 1 : (cedar ? 3 : 4);
+    // (On a lean lobe a single row spanned the cap in one flat fan that sagged
+    // under the dome, and the foliage showed through its middle.)
+    const snowRows = this.lean ? 3 : this.coarse ? 1 : (cedar ? 3 : 4);
     const edge = (a: number): number => 0.38 + 0.10 * Math.sin(a * 3 + phase) + 0.065 * Math.sin(a * 5 - phase);
     for (let j = 0; j < snowRows; j++) for (let i = 0; i < sides; i++) {
       const a = i * TAU / sides, c = (i + 1) * TAU / sides;
@@ -237,11 +241,13 @@ class MeshBuilder {
   }
 }
 
-export function pineGeometry(coarse = false): HamletAsset {
-  const b = new MeshBuilder(coarse);
+export function pineGeometry(coarse = false, lean = false): HamletAsset {
+  coarse ||= lean;
+  const b = new MeshBuilder(coarse, 0, lean);
   const trunk = [V(0, -0.16, 0), V(0.3, 1.6, -0.03), V(-0.43, 3.35, 0.12), V(-0.12, 4.7, 0), V(0.88, 6.2, -0.13), V(0.54, 7.55, 0.1), V(1.18, 8.45, 0.1)];
-  b.tube(trunk, [0.52, 0.41, 0.31, 0.25, 0.19, 0.12, 0.05], HAMLET_KIND.bark, coarse ? 5 : 9, true);
-  for (let i = 0; i < 5; i++) {
+  b.tube(trunk, [0.52, 0.41, 0.31, 0.25, 0.19, 0.12, 0.05], HAMLET_KIND.bark, lean ? 4 : coarse ? 5 : 9, true);
+  // (a lean tree stands on its trunk alone: its root flares and twigs are lost at the distance it is seen from)
+  for (let i = 0; i < (lean ? 0 : 5); i++) {
     const a = i * TAU / 5 + 0.2;
     b.tube([V(Math.cos(a) * 1.05, -0.12, Math.sin(a) * 0.95), V(Math.cos(a) * 0.58, 0.18, Math.sin(a) * 0.53), V(0.06, 0.8, 0)], [0.09, 0.18, 0.28], HAMLET_KIND.bark, 5, true);
   }
@@ -258,7 +264,7 @@ export function pineGeometry(coarse = false): HamletAsset {
   branches.forEach(({ start, end, a }, i) => {
     if (coarse && (i === 1 || i === 2 || i === 5 || i === 6)) return;
     const bend = start.clone().lerp(end, 0.5).add(V(0, -0.22, 0.16));
-    b.tube([start, bend, end], [0.22 - i * 0.016, 0.12 - i * 0.008, 0.035], HAMLET_KIND.bark, 6);
+    b.tube([start, bend, end], [0.22 - i * 0.016, 0.12 - i * 0.008, 0.035], HAMLET_KIND.bark, lean ? 4 : 6);
     const size = 1.08 - i * 0.032;
     const across = V(Math.cos(a), 0, Math.sin(a)), depth = V(-Math.sin(a), 0, Math.cos(a));
     // Back row rises behind the lower foreground lobes, like the overlapping
@@ -270,7 +276,7 @@ export function pineGeometry(coarse = false): HamletAsset {
     lobes.forEach(([x, z, y, scale], k) => {
       const center = end.clone().addScaledVector(across, x * size).addScaledVector(depth, z * size).add(V(0, y * size, 0));
       const root = center.clone().add(V(0, -scale * size * 0.43, 0));
-      b.tube([end, root], [0.035, 0.012], HAMLET_KIND.bark, 4);
+      if (!lean) b.tube([end, root], [0.035, 0.012], HAMLET_KIND.bark, 4);
       b.pineLobe(center, size * scale, i * 1.71 + k * 0.63, a + k * 0.17, k !== 3 && k !== 6);
     });
   });
@@ -280,10 +286,11 @@ export function pineGeometry(coarse = false): HamletAsset {
   return b.finish(1.15);
 }
 
-export function cedarGeometry(coarse = false): HamletAsset {
-  const b = new MeshBuilder(coarse, 1);
+export function cedarGeometry(coarse = false, lean = false): HamletAsset {
+  coarse ||= lean;
+  const b = new MeshBuilder(coarse, 1, lean);
   const trunk = Array.from({ length: 8 }, (_, i) => V(Math.sin(i * 0.7) * 0.09, i * 1.5 - 0.12, Math.cos(i * 0.8) * 0.06));
-  const trunkMesh = b.tube(trunk, trunk.map((_, i) => Math.max(0.025, 0.42 * (1 - i / 7))), HAMLET_KIND.bark, coarse ? 5 : 8, true);
+  const trunkMesh = b.tube(trunk, trunk.map((_, i) => Math.max(0.025, 0.42 * (1 - i / 7))), HAMLET_KIND.bark, lean ? 4 : coarse ? 5 : 8, true);
   const junctions: { center: number[]; ring: number[][] }[] = [];
   for (let level = 0; level < 8; level++) {
     if (coarse && (level === 1 || level === 4)) continue;
@@ -296,7 +303,7 @@ export function cedarGeometry(coarse = false): HamletAsset {
       const a = k * TAU / branches + level * 0.53;
       const mid = V(Math.cos(a) * length * 0.53, height - 0.22, Math.sin(a) * length * 0.53);
       const tip = V(Math.cos(a) * length, height - 0.39, Math.sin(a) * length);
-      const branch = b.tube([root, mid, tip], [0.085 - level * 0.008, 0.04, 0.012], HAMLET_KIND.bark, 4);
+      const branch = lean ? b.tube([root, tip], [0.085 - level * 0.008, 0.012], HAMLET_KIND.bark, 3) : b.tube([root, mid, tip], [0.085 - level * 0.008, 0.04, 0.012], HAMLET_KIND.bark, 4);
       junctions.push({ center: root.toArray(), ring: branch.rings[0].map(p => p.toArray()) });
       // Two unequal overlapping round clusters replace each rigid angled pad.
       // Their lower edge hangs below the branch, while each snow dome conforms
@@ -454,4 +461,9 @@ export function rockGeometry(): HamletAsset {
 
 export function createHamletAssets(coarse = false): Record<HamletSpecies, HamletAsset> {
   return { pine: pineGeometry(coarse), cedar: cedarGeometry(coarse), plum: plumGeometry(), reeds: reedsGeometry(), rock: rockGeometry() };
+}
+
+/** The woods' trees: the remote pine and cedar, leaner still. */
+export function createWoodsAssets(): Record<'pine' | 'cedar', HamletAsset> {
+  return { pine: pineGeometry(true, true), cedar: cedarGeometry(true, true) };
 }
