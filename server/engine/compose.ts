@@ -1,6 +1,6 @@
 // The composition root: the one place that picks concrete stores, sources and minds and wires the domain lanes
 // into the engine. Everything else depends only on the contract.
-import type { CastMember, Instant, Mind, MuseId, MuseState, Source, Store } from '../../src/muse/contract';
+import type { Instant, MemberInfo, Mind, MuseId, MuseState, Source, Store } from '../../src/muse/contract';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { HeuristicMind } from '../adapters/minds/heuristic';
 import { MetaMind } from '../adapters/minds/meta';
@@ -31,7 +31,8 @@ export interface GardenOptions {
   readonly hero: MuseId | null;
   readonly start: Instant;
   readonly clock: 'live' | 'fast-forward';
-  readonly roles?: ReadonlyMap<MuseId, CastMember['role']>;
+  /** Each cast member's role, planet and look, from cast.json; a Muse missing here is a stranger on the meadow. */
+  readonly members?: ReadonlyMap<MuseId, MemberInfo>;
   /** The run's seed for every draw (0, the default, is every earlier run). */
   readonly seed?: number;
 }
@@ -87,7 +88,7 @@ export function buildGarden(opts: GardenOptions): Garden {
     mindFor: (id) => (id === opts.hero ? heroMind : heuristic),
   };
   const engine = new Engine(deps, opts.start);
-  const views = new Views(engine, socialPolicy, viewHelpers, opts.roles ?? new Map());
+  const views = new Views(engine, socialPolicy, viewHelpers, opts.members ?? new Map());
   const commands = new Commands(engine, opts.clock);
   return { engine, views, commands, store, heroMind, recording };
 }

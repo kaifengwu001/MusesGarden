@@ -6,6 +6,7 @@ import type {
   CanonicalUrl,
   Dir,
   DiscoveryId,
+  GardenQueries,
   Instant,
   InvitationCard,
   InvitationId,
@@ -244,7 +245,9 @@ export const sampleInvitations: readonly InvitationCard[] = [
 
 export const sampleVisit: VisitWorldView = {
   invitation: INVITE,
-  host: { museId: WREN, name: 'Wren' },
+  planet: 'violet-dunes',
+  host: { museId: WREN, name: 'Wren', look: 'muse8' },
+  guest: { museId: HERO, name: 'Moss', look: 'tpose6' },
   worldSeed: 2207,
   g: 0.3,
   regions: [
@@ -255,6 +258,7 @@ export const sampleVisit: VisitWorldView = {
     {
       id: plant('w-lichen'),
       dir: dir(0.9, 0.2, 0.38),
+      bed: { species: 2, variant: 0.41 },
       preview: { title: 'Stump', thumb: 'https://live.staticflickr.com/65535/55622570515_774b7b3658_b.jpg', reason: 'Two living things sharing one body.' },
       card: {
         ...sampleCards[0],
@@ -268,7 +272,7 @@ export const sampleVisit: VisitWorldView = {
         pursuing: topic('Lichen'),
       },
     },
-    { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), preview: null, card: null },
+    { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), bed: { species: 0, variant: 0.73 }, preview: null, card: null },
   ],
   until: at('2026-11-05T17:00:00-08:00'),
 };
@@ -373,8 +377,8 @@ export const sampleJournalMd = `## 4 November
 - 15:20 Took a photo of the new patch.
 `;
 
-export const sampleMuses = [
-  { museId: HERO, name: 'Moss', role: 'hero' as const },
-  { museId: WREN, name: 'Wren', role: 'friend' as const },
-  { museId: JUNIPER, name: 'Juniper', role: 'stranger' as const },
+export const sampleMuses: ReturnType<GardenQueries['muses']> = [
+  { museId: HERO, name: 'Moss', role: 'hero', planet: 'meadow', look: 'tpose6' },
+  { museId: WREN, name: 'Wren', role: 'friend', planet: 'violet-dunes', look: 'muse8' },
+  { museId: JUNIPER, name: 'Juniper', role: 'stranger', planet: 'cherry-blossom-waterways', look: 'muse6' },
 ];

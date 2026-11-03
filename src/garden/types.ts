@@ -67,11 +67,18 @@ export interface Invitation {
   from: string;
   fromName: string;
   coat: string;
-  /** Its world: an id the travel step resolves, and the world's name. */
+  /**
+   * Its world: an id the travel step resolves, and the world's name. From the backend, the host's planet (a PlanetId,
+   * src/muse/planets.ts) and that planet's title.
+   */
   world: string;
   worldName: string;
   /** A line about the world. */
   blurb: string;
+  /** The host's planet as the backend has it, as the URL's `seed` and `g`, and the body its Muse is drawn in (a MuseLook). */
+  seed?: number;
+  g?: number;
+  look?: string;
   /** Good for one visit: set once it is used. */
   used?: boolean;
   /** The last day it can be used (ISO date), if it expires. */

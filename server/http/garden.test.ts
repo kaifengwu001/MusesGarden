@@ -6,7 +6,7 @@ import type { GardenEvent, GardenSnapshot } from '../../src/garden/types';
 import type { Instant, MuseId } from '../../src/muse/contract';
 import { seedCast } from '../cli/run';
 import { lifePolicy } from '../domain/policy/index';
-import { FIXTURES_DIR, loadCast } from '../fixtures/cast';
+import { FIXTURES_DIR, loadCast, membersOf } from '../fixtures/cast';
 import { buildGarden } from '../engine/compose';
 import { createApp, type Garden } from './app';
 import { fakeCommands, fakeQueries, type FakeCommands } from './fake';
@@ -37,7 +37,7 @@ afterEach(async () => {
 /** The real engine with the cast seeded, as `npm run serve` starts it. */
 async function engineGarden(): Promise<Garden> {
   const cast = loadCast();
-  const garden = buildGarden({ db: null, mind: 'heuristic', hero: HERO, start: START, clock: 'fast-forward', roles: new Map(cast.members.map((m) => [m.id, m.role])) });
+  const garden = buildGarden({ db: null, mind: 'heuristic', hero: HERO, start: START, clock: 'fast-forward', members: membersOf(cast) });
   const work = `${FIXTURES_DIR}work-3weeks.json`;
   await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0 });
   return {

@@ -10,7 +10,7 @@ import { lifePolicy } from '../domain/policy/index';
 import { renderSoulSection } from '../domain/soul';
 import { localDay } from '../domain/time';
 import { buildGarden } from '../engine/compose';
-import { loadCast } from '../fixtures/cast';
+import { loadCast, membersOf } from '../fixtures/cast';
 import { checks, delivered, friendships, mediaMix, run, seedCast } from './run';
 
 const { values } = parseArgs({
@@ -42,7 +42,7 @@ const garden = buildGarden({
   hero,
   start,
   clock: 'fast-forward',
-  roles: new Map(cast.members.map((m) => [m.id, m.role])),
+  members: membersOf(cast),
   seed: Number(values.seed),
 });
 const likeFrom = (start + Number(values['like-from']) * 3_600_000) as Instant;

@@ -1,6 +1,7 @@
 // The garden's interface (src/garden/types.ts) filled from the engine: one Muse's snapshot, and the events that
 // change it, read from its state and its log. Pure: Views gathers the input.
 import { hash32, salt, unit } from '../../src/core/hash';
+import { PLANETS } from '../../src/muse/planets';
 import type {
   Basket,
   Find,
@@ -25,12 +26,14 @@ import type {
   InvitationState,
   MuseEvent,
   MuseId,
+  MuseLook,
   MuseState,
   Network,
   NowView,
   PhotoId,
   PhotoSpec,
   PhotoSubject,
+  PlanetId,
   PublicProfile,
   Relationship,
   StoredEvent,
@@ -53,6 +56,15 @@ export interface GardenInput {
   readonly salienceAt: (i: MuseInterest, at: Instant) => number;
   /** Whether the owner's friend group takes in the Muse `other`. */
   readonly inReach: (other: MuseId) => boolean;
+  /** Any Muse's planet as a visitor finds it: which world, at what seed and growth, and the body its Muse wears. */
+  readonly planetOf: (id: MuseId) => HostPlanet | null;
+}
+
+export interface HostPlanet {
+  readonly planet: PlanetId;
+  readonly seed: number;
+  readonly g: number;
+  readonly look: MuseLook;
 }
 
 export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
@@ -81,7 +93,7 @@ const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   find: 'cottage',
   invitation: 'pier',
 };
-/** Invitation states the guest's owner still holds: sent (kept for later) or used. A withdrawn one is gone. */
+/** Invitation states the guest's owner still holds: sent (kept for later), or used. A withdrawn one is gone. */
 const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used']);
 
 // ─── What the log adds to the state ─────────────────────────────────────────
@@ -274,9 +286,10 @@ function friendsSince(s: MuseState, r: Relationship, index: LogIndex): Instant {
   return r.friendsSince ?? index.friendsSince.get(r.other) ?? r.lastMetAt ?? s.at;
 }
 
-/** An invitation this Muse's owner received, as a postcard; null for any other invitation. */
+/** An invitation this Muse's owner received, as a postcard: a ticket to the host's planet. Null for any other invitation. */
 function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | null {
-  if (inv.guest !== input.s.seed.id || !RECEIVED.has(inv.state)) return null;
+  const home = input.planetOf(inv.host);
+  if (inv.guest !== input.s.seed.id || !RECEIVED.has(inv.state) || !home) return null;
   const host = input.profile(inv.host);
   const name = host?.name ?? 'a friend';
   const loves = (host?.interests ?? []).slice(0, 3).map((i) => topicLabel(i.topic));
@@ -284,10 +297,13 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
     from: inv.host,
     fromName: name,
     coat: coatOf(inv.host),
-    world: inv.host,
-    worldName: `${name}’s planet`,
-    blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
-    used: inv.state === 'used',
+    world: home.planet,
+    worldName: PLANETS[home.planet].title,
+    blurb: `${name}’s planet · ${loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`}`,
+    seed: home.seed,
+    g: home.g,
+    look: home.look,
+    used: inv.state !== 'sent',
   };
   return { id: inv.id, day: input.day(inv.sentAt), image: postcardImage('invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
 }

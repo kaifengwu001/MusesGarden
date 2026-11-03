@@ -1,8 +1,11 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { DRESSED } from '../../src/life/museMesh';
 import type { CastMember, TopicKey } from '../../src/muse/contract';
+import { PLANET_IDS, PLANETS } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
 import { HeuristicMind } from '../adapters/minds/heuristic';
@@ -58,6 +61,40 @@ describe('cast.json', () => {
   it('gives each member a distinct world seed and its own time zone', () => {
     expect(new Set(cast.members.map((m) => m.worldSeed)).size).toBe(cast.members.length);
     expect(new Set(cast.members.map((m) => m.timezone)).size).toBe(cast.members.length);
+  });
+
+  it('keeps the hero on the meadow in the original Muse’s body (see docs/development-guidelines.md)', () => {
+    const hero = cast.members.find((m) => m.role === 'hero');
+    expect(hero).toMatchObject({ planet: 'meadow', look: 'tpose6', worldSeed: FIRST_PLANET.seed });
+    expect(PLANETS.meadow.path).toBe('/');
+  });
+
+  it('gives each of the eight friends a world of its own, and leaves the rice terraces unused', () => {
+    const others = cast.members.filter((m) => m.role !== 'hero').map((m) => m.planet);
+    expect(others).toHaveLength(8);
+    expect(new Set(others).size).toBe(8);
+    expect(others).not.toContain('meadow');
+    expect(others).not.toContain('rice-terraces');
+    expect(PLANET_IDS).not.toContain('rice-terraces');
+    for (const id of others) {
+      expect(PLANETS[id].path, id).toBe(`/environments/${id}/`);
+      expect(existsSync(fileURLToPath(new URL(`../../environments/${id}/index.html`, import.meta.url))), id).toBe(true);
+    }
+  });
+
+  it('dresses every Muse in a body the renderer has: the original Muse or one of the dressed muses', () => {
+    const bodies = new Set<string>(['tpose6', ...Object.keys(DRESSED)]);
+    for (const m of cast.members) expect(bodies.has(m.look), `${m.id}: ${m.look}`).toBe(true);
+  });
+
+  it('refuses a planet or a look it doesn’t know', () => {
+    const [member] = cast.members;
+    const parse = (patch: object) => parseCastFile({ members: [{ ...member, ...patch }], introductions: [] });
+    expect(() => parse({ planet: 'rice-terraces' })).toThrow(/\.planet: rice-terraces/);
+    expect(() => parse({ planet: undefined })).toThrow(/\.planet: undefined/);
+    expect(() => parse({ look: 'muse13' })).toThrow(/\.look: muse13/);
+    expect(() => parse({ look: 'toString' })).toThrow(/\.look: toString/);
+    expect(parse({ planet: 'golden-rye', look: 'muse12' }).members[0]).toMatchObject({ planet: 'golden-rye', look: 'muse12' });
   });
 });
 

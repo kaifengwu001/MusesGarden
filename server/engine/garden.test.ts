@@ -3,12 +3,13 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { GardenFrame, Instant, MuseId } from '../../src/muse/contract';
+import { PLANETS } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { loadCorpus } from '../adapters/sources/corpus';
 import { siteOf } from '../adapters/sources/media';
 import { run, seedCast } from '../cli/run';
 import { lifePolicy } from '../domain/policy/index';
-import { FIXTURES_DIR, loadCast, readMemberDocs } from '../fixtures/cast';
+import { FIXTURES_DIR, loadCast, membersOf, readMemberDocs } from '../fixtures/cast';
 import { buildGarden, type Garden } from './compose';
 import { soulLine } from './garden';
 
@@ -27,7 +28,7 @@ async function seeded(hours: number): Promise<Garden> {
     hero: HERO,
     start: START,
     clock: 'fast-forward',
-    roles: new Map(cast.members.map((m) => [m.id, m.role])),
+    members: membersOf(cast),
   });
   const work = `${FIXTURES_DIR}work-3weeks.json`;
   await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start: START, hours: 0 });
@@ -136,8 +137,12 @@ describe('the garden snapshot on a seeded engine', () => {
       }
       for (const inv of received(id)) {
         const card = cards.find((p) => p.id === inv.id);
-        expect(card?.invitation).toMatchObject({ from: inv.host, world: inv.host });
-        expect(card?.invitation?.worldName).toContain(garden.engine.state(inv.host)!.seed.name);
+        // A ticket names the host's own planet, at the seed and growth the host has, and the body its Muse wears.
+        const host = garden.engine.state(inv.host)!;
+        const member = loadCast().members.find((m) => m.id === inv.host)!;
+        expect(card?.invitation).toMatchObject({ from: inv.host, world: member.planet, worldName: PLANETS[member.planet].title, seed: host.seed.worldSeed, look: member.look });
+        expect(card?.invitation?.g).toBe(garden.views.world(inv.host)?.g);
+        expect(card?.invitation?.blurb).toMatch(new RegExp(`^${host.seed.name}’s planet · `));
       }
       const away = s.photos.find((p) => p.planetOf !== id);
       if (away) expect(cards.find((p) => p.id === away.id)?.place).toContain(garden.engine.state(away.planetOf)!.seed.name);

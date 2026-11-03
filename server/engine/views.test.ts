@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Dir, EpisodePlan, Instant, InvitationId, MuseEvent, MuseEventBody, MuseId, RegionKey, TopicKey } from '../../src/muse/contract';
+import type { CanonicalUrl, Dir, DiscoveryId, EpisodePlan, Instant, InvitationId, MemberInfo, MuseEvent, MuseEventBody, MuseId, RegionKey, TopicKey } from '../../src/muse/contract';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
-import { Engine } from './engine';
-import { museStatus } from './garden';
+import { emptyState, reduceCore } from '../domain/state';
+import { Engine, type EngineDeps } from './engine';
+import { flowerOf, museStatus } from './garden';
 import { memoryStore, stubDeps } from './testing/stubs';
 import { Commands, shareCode, Views, type ViewHelpers } from './views';
 
@@ -27,7 +28,7 @@ async function setup() {
   const deps = stubDeps(memoryStore());
   const engine = new Engine(deps, T0);
   for (const id of ['moss', 'wren']) await engine.addMuse({ id: id as MuseId, name: id, worldSeed: 7, timezone: 'UTC' }, 'x', '', T0);
-  const views = new Views(engine, deps.social, helpers, new Map([['moss' as MuseId, 'hero' as const]]));
+  const views = new Views(engine, deps.social, helpers, new Map([['moss' as MuseId, { role: 'hero', planet: 'meadow', look: 'tpose6' } as const]]));
   const commands = new Commands(engine, 'fast-forward');
   return { engine, views, commands };
 }
@@ -78,6 +79,49 @@ describe('an invitation, through the commands', () => {
     expect(await commands.withdrawInvitation(WREN, INVITE)).toEqual({ ok: true });
     expect(await commands.useInvitation(MOSS, INVITE)).toMatchObject({ ok: false, status: 409 });
     expect(views.invitations(MOSS, T0)[0]).toMatchObject({ state: 'withdrawn', actions: [] });
+  });
+
+  it('shows the host’s own planet and both Muses in their bodies, each find as a bed that never gives away a private topic', () => {
+    const find = (id: string, topic: string): MuseEventBody => ({
+      kind: 'discovery.collected',
+      discovery: {
+        id: id as DiscoveryId,
+        url: `https://example.org/${id}`,
+        canonicalUrl: `https://example.org/${id}` as CanonicalUrl,
+        title: id,
+        summary: '',
+        topics: [topic as TopicKey],
+        because: [],
+        reason: 'Kept it.',
+        keepScore: 0.9,
+        provenance: 'own',
+        place: { dir: [0, 1, 0], region: '0:1:1' as RegionKey },
+        at: T0,
+        media: { kind: 'post', network: 'web' },
+        pursuing: topic as TopicKey,
+      },
+    });
+    const invitation = (to: 'sent' | 'used'): MuseEventBody => ({ kind: 'invitation', id: INVITE, host: WREN, guest: MOSS, to });
+    const members = new Map<MuseId, MemberInfo>([[WREN, { role: 'friend', planet: 'violet-dunes', look: 'muse8' }]]);
+    const { views } = restarted(
+      [
+        [WREN, find('d-lichen', 'Lichen')],
+        [WREN, find('d-secret', 'Secret garden')],
+        [WREN, { kind: 'owner.settings', hide: ['topic:Secret garden'] }],
+        ...[WREN, MOSS].flatMap((id) => [[id, invitation('sent')], [id, invitation('used')]] as const),
+      ],
+      { reduceCore, emptyState, members },
+    );
+    const view = views.visit(INVITE, MOSS, T0);
+    if (view === 'forbidden') throw new Error('the visit is open');
+    expect(view).toMatchObject({
+      planet: 'violet-dunes',
+      host: { museId: WREN, name: 'Wren', look: 'muse8' },
+      guest: { museId: MOSS, name: 'Moss', look: 'tpose6' },
+    });
+    const plant = (id: string) => view.plants.find((p) => p.id === id)!;
+    expect(plant('d-lichen')).toMatchObject({ bed: flowerOf('Lichen'), card: { pursuing: 'Lichen' } });
+    expect(plant('d-secret')).toEqual({ id: 'd-secret', dir: [0, 1, 0], bed: flowerOf('d-secret'), preview: null, card: null });
   });
 
   it('answers 404 for an invitation nobody holds', async () => {
@@ -157,8 +201,14 @@ describe('views', () => {
   });
 });
 
-/** An engine restarted on a store that holds these events, each Muse's in order, on the real social policy. */
-function restarted(events: readonly (readonly [MuseId, MuseEventBody])[]) {
+/**
+ * An engine restarted on a store that holds these events, each Muse's in order, on the real social policy; `real`
+ * swaps in the real fold of the rest, and the cast's roles, planets and looks.
+ */
+function restarted(
+  events: readonly (readonly [MuseId, MuseEventBody])[],
+  real: Partial<Pick<EngineDeps, 'reduceCore' | 'emptyState'>> & { readonly members?: ReadonlyMap<MuseId, MemberInfo> } = {},
+) {
   const store = memoryStore();
   for (const id of [MOSS, WREN, LARK]) store.addMuse({ id, name: id[0].toUpperCase() + id.slice(1), worldSeed: 7, timezone: 'UTC' });
   const seq = new Map<MuseId, number>();
@@ -167,8 +217,9 @@ function restarted(events: readonly (readonly [MuseId, MuseEventBody])[]) {
     return { museId, seq: seq.get(museId)!, event: { ...body, at: T0 } };
   });
   store.commit({ remove: [], schedule: [], events: stored });
-  const engine = new Engine({ ...stubDeps(store), social: socialPolicy, reduceSocial }, T0);
-  return { engine, views: new Views(engine, socialPolicy, helpers, new Map()), commands: new Commands(engine, 'fast-forward') };
+  const { members = new Map(), ...fold } = real;
+  const engine = new Engine({ ...stubDeps(store), social: socialPolicy, reduceSocial, ...fold }, T0);
+  return { engine, views: new Views(engine, socialPolicy, helpers, members), commands: new Commands(engine, 'fast-forward') };
 }
 
 const LARK = 'lark' as MuseId;

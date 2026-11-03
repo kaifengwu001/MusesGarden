@@ -190,6 +190,24 @@ export interface CastFile {
 /** Where two owners are friends online. */
 export type KnownOn = 'instagram' | 'facebook';
 
+/**
+ * The planet a Muse lives on: the meadow (the first planet, in src/) or a world under environments/, by its folder
+ * name. Its name and page are in src/muse/planets.ts.
+ */
+export type PlanetId =
+  | 'meadow'
+  | 'lantern-reed-gardens'
+  | 'scarlet-sail-canyon'
+  | 'cobalt-windfields'
+  | 'tulip-windmill-meadows'
+  | 'golden-rye'
+  | 'cherry-blossom-waterways'
+  | 'sequoia-shrine'
+  | 'violet-dunes';
+
+/** A Muse's body: the original Muse (tpose6), or one of the dressed muses (DRESSED in src/life/museMesh.ts). */
+export type MuseLook = 'tpose6' | `muse${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
+
 export interface CastMember {
   readonly id: MuseId;
   readonly name: string;
@@ -200,7 +218,13 @@ export interface CastMember {
   readonly dir: string;
   /** friend: introduced to the hero; known: its owner knows the hero's owner online; stranger: neither. */
   readonly role: 'hero' | 'friend' | 'known' | 'stranger';
+  /** The planet it lives on, which its worldSeed seeds. */
+  readonly planet: PlanetId;
+  readonly look: MuseLook;
 }
+
+/** What the views know of a cast member beyond its seed: who it is to the hero, where it lives, how it looks. */
+export type MemberInfo = Pick<CastMember, 'role' | 'planet' | 'look'>;
 
 /** server/fixtures/work-*.json: when each Muse is busy with its owner's tasks. ISO 8601 with offset. */
 export type WorkSchedule = Readonly<Record<string, readonly { readonly start: string; readonly end: string }[]>>;
@@ -771,6 +795,11 @@ export interface PlantPin {
 export interface VisitPlant {
   readonly id: DiscoveryId;
   readonly dir: Dir;
+  /**
+   * The flower bed it grows as (species 0–3 and a variant in [0, 1], as the garden's interests): its trip topic's
+   * when that topic is public, else one drawn from its id, so a private topic never shows.
+   */
+  readonly bed: { readonly species: 0 | 1 | 2 | 3; readonly variant: number };
   readonly preview: PlantPreview | null;
   readonly card: PlantCard | null;
 }
@@ -834,9 +863,20 @@ export interface InvitationCard {
   readonly canVisitNow: boolean;
 }
 
+/** A Muse on a visit view: who it is and the body it is drawn in. */
+export interface VisitMuse {
+  readonly museId: MuseId;
+  readonly name: string;
+  readonly look: MuseLook;
+}
+
 export interface VisitWorldView {
   readonly invitation: InvitationId;
-  readonly host: { readonly museId: MuseId; readonly name: string };
+  /** The host's planet: the world the visit takes place in, at the host's worldSeed and growth. */
+  readonly planet: PlanetId;
+  readonly host: VisitMuse;
+  /** The Muse of the owner who travelled. */
+  readonly guest: VisitMuse;
   readonly worldSeed: number;
   readonly g: number;
   readonly regions: readonly RegionView[];
@@ -896,7 +936,7 @@ export interface GardenQueries {
   metrics(museId: MuseId): readonly MetricsRow[];
   soulMd(museId: MuseId): string | null;
   journalMd(museId: MuseId, day: string | null): string | null;
-  muses(): readonly { readonly museId: MuseId; readonly name: string; readonly role: CastMember['role'] }[];
+  muses(): readonly ({ readonly museId: MuseId; readonly name: string } & MemberInfo)[];
   /** Everything the garden's interface shows, as of `at` (src/garden/types.ts). */
   garden(museId: MuseId, at: Instant): GardenSnapshot | null;
 }

@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import type {
   BasketId,
   BasketView,
-  CastMember,
   CommandResult,
   Dir,
   Discovery,
@@ -16,6 +15,7 @@ import type {
   InvitationCard,
   InvitationId,
   LikeTarget,
+  MemberInfo,
   MetricsRow,
   MindView,
   MuseId,
@@ -35,12 +35,13 @@ import type {
   SocialPolicy,
   StoredEvent,
   TopicKey,
+  VisitMuse,
   VisitWorldView,
   WorldView,
 } from '../../src/muse/contract';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { Engine } from './engine';
-import { gardenFrames, gardenSnapshot, topicLabel, type GardenInput } from './garden';
+import { flowerOf, gardenFrames, gardenSnapshot, topicLabel, type GardenInput } from './garden';
 
 /** Domain functions the views need, injected so this file depends only on the contract. */
 export interface ViewHelpers {
@@ -59,6 +60,8 @@ export interface ViewHelpers {
 }
 
 const SLEEP_MS = 90 * 60_000;
+/** A Muse cast.json doesn't name: a stranger in the original body, on the meadow at its own seed. */
+const UNLISTED: MemberInfo = { role: 'stranger', planet: 'meadow', look: 'tpose6' };
 
 export function shareCode(s: MuseState): string {
   const h = createHash('sha256').update(`share:${s.seed.id}`).digest('hex').slice(0, 4).toUpperCase();
@@ -112,7 +115,7 @@ export class Views implements GardenQueries {
     private readonly engine: Engine,
     private readonly social: SocialPolicy,
     private readonly helpers: ViewHelpers,
-    private readonly roles: ReadonlyMap<MuseId, CastMember['role']>,
+    private readonly members: ReadonlyMap<MuseId, MemberInfo>,
   ) {}
 
   private s(id: MuseId): MuseState | null {
@@ -123,8 +126,16 @@ export class Views implements GardenQueries {
     return this.engine.state(id)?.seed.name ?? 'a friend';
   }
 
+  private member(id: MuseId): MemberInfo {
+    return this.members.get(id) ?? UNLISTED;
+  }
+
+  private visitMuse(museId: MuseId): VisitMuse {
+    return { museId, name: this.name(museId), look: this.member(museId).look };
+  }
+
   muses(): ReturnType<GardenQueries['muses']> {
-    return this.engine.museIds().map((museId) => ({ museId, name: this.name(museId), role: this.roles.get(museId) ?? 'stranger' }));
+    return this.engine.museIds().map((museId) => ({ museId, name: this.name(museId), ...this.member(museId) }));
   }
 
   garden(museId: MuseId, at: Instant): GardenSnapshot | null {
@@ -163,6 +174,11 @@ export class Views implements GardenQueries {
       },
       salienceAt: this.helpers.salienceAt,
       inReach: (id) => this.social.inReach(s, id),
+      planetOf: (id) => {
+        const other = this.s(id);
+        const { planet, look } = this.member(id);
+        return other ? { planet, seed: other.seed.worldSeed, g: this.helpers.growth(other), look } : null;
+      },
     };
   }
 
@@ -288,14 +304,18 @@ export class Views implements GardenQueries {
     const shared = new Map(this.social.publicProfile(host).discoveries.map((d) => [d.id, d]));
     return {
       invitation,
-      host: { museId: inv.host, name: host.seed.name },
+      planet: this.member(inv.host).planet,
+      host: this.visitMuse(inv.host),
+      guest: this.visitMuse(inv.guest),
       worldSeed: host.seed.worldSeed,
       g: this.helpers.growth(host),
       regions: this.regionViews(host),
       plants: [...host.discoveries.values()].map((d) => {
         const pub = shared.get(d.id);
-        // The public copy says which trip found it only when that trip's topic is public.
-        return pub ? { id: d.id, dir: d.place.dir, preview: preview(d), card: { ...card(d), pursuing: pub.pursuing } } : { id: d.id, dir: d.place.dir, preview: null, card: null };
+        // The public copy says which trip found it only when that trip's topic is public; a bed grows from it only then.
+        return pub
+          ? { id: d.id, dir: d.place.dir, bed: flowerOf(pub.pursuing ?? d.id), preview: preview(d), card: { ...card(d), pursuing: pub.pursuing } }
+          : { id: d.id, dir: d.place.dir, bed: flowerOf(d.id), preview: null, card: null };
       }),
       until,
     };
