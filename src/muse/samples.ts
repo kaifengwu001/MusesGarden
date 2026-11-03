@@ -6,6 +6,7 @@ import type {
   CanonicalUrl,
   Dir,
   DiscoveryId,
+  GardenQueries,
   Instant,
   InvitationCard,
   InvitationId,
@@ -112,7 +113,7 @@ export const sampleNowAway: NowView = {
   label: "Away at Wren's planet",
   until: at('2026-11-04T16:10:00-08:00'),
   path: null,
-  away: { kind: 'planet', of: WREN, name: 'Wren' },
+  away: { kind: 'planet', of: WREN, name: 'Wren', planet: 'lantern-reed-gardens', withOwner: false },
 };
 
 export const sampleNowBeyond: NowView = {
@@ -130,7 +131,7 @@ export const sampleNowHosting: NowView = {
   label: 'Juniper is visiting',
   until: at('2026-11-04T16:10:00-08:00'),
   path: [{ dir: dir(0.1, 0.99, 0.05), at: at('2026-11-04T15:20:00-08:00') }],
-  companion: { museId: JUNIPER, name: 'Juniper' },
+  companion: { museId: JUNIPER, name: 'Juniper', look: 'muse6', withOwner: false },
 };
 
 export const sampleNowNapping: NowView = {
@@ -242,9 +243,12 @@ export const sampleInvitations: readonly InvitationCard[] = [
   },
 ];
 
+/** The sample visit is to Lantern Reed Gardens, the first world the visit runtime (src/visit/) draws, so Wren lives there in the samples. */
 export const sampleVisit: VisitWorldView = {
   invitation: INVITE,
-  host: { museId: WREN, name: 'Wren' },
+  planet: 'lantern-reed-gardens',
+  host: { museId: WREN, name: 'Wren', look: 'muse8', planet: 'lantern-reed-gardens', working: false },
+  guest: { museId: HERO, name: 'Moss', look: 'tpose6', planet: 'meadow', working: false },
   worldSeed: 2207,
   g: 0.3,
   regions: [
@@ -255,6 +259,7 @@ export const sampleVisit: VisitWorldView = {
     {
       id: plant('w-lichen'),
       dir: dir(0.9, 0.2, 0.38),
+      bed: { species: 2, variant: 0.41 },
       preview: { title: 'Stump', thumb: 'https://live.staticflickr.com/65535/55622570515_774b7b3658_b.jpg', reason: 'Two living things sharing one body.' },
       card: {
         ...sampleCards[0],
@@ -268,9 +273,11 @@ export const sampleVisit: VisitWorldView = {
         pursuing: topic('Lichen'),
       },
     },
-    { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), preview: null, card: null },
+    { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), bed: { species: 0, variant: 0.73 }, preview: null, card: null },
   ],
   until: at('2026-11-05T17:00:00-08:00'),
+  together: true,
+  now: at('2026-11-05T15:00:00-08:00'),
 };
 
 export const sampleSharing: SharingView = {
@@ -373,8 +380,8 @@ export const sampleJournalMd = `## 4 November
 - 15:20 Took a photo of the new patch.
 `;
 
-export const sampleMuses = [
-  { museId: HERO, name: 'Moss', role: 'hero' as const },
-  { museId: WREN, name: 'Wren', role: 'friend' as const },
-  { museId: JUNIPER, name: 'Juniper', role: 'stranger' as const },
+export const sampleMuses: ReturnType<GardenQueries['muses']> = [
+  { museId: HERO, name: 'Moss', role: 'hero', planet: 'meadow', look: 'tpose6' },
+  { museId: WREN, name: 'Wren', role: 'friend', planet: 'lantern-reed-gardens', look: 'muse8' },
+  { museId: JUNIPER, name: 'Juniper', role: 'stranger', planet: 'cherry-blossom-waterways', look: 'muse6' },
 ];

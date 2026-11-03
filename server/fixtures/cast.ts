@@ -1,13 +1,32 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CastFile, CastMember, KnownOn, MuseId } from '../../src/muse/contract';
+import type { CastFile, CastMember, KnownOn, MemberInfo, MuseId, MuseLook } from '../../src/muse/contract';
+import { isPlanetId } from '../../src/muse/planets';
 import { arr, num, obj, str } from '../adapters/sources/json';
 
 export const FIXTURES_DIR = fileURLToPath(new URL('./', import.meta.url));
 
 const ROLES: readonly CastMember['role'][] = ['hero', 'friend', 'known', 'stranger'];
 const NETWORKS: readonly KnownOn[] = ['instagram', 'facebook'];
+/** Every body a Muse can wear: a record, so the compiler holds it to MuseLook exactly. */
+const LOOKS: Readonly<Record<MuseLook, true>> = {
+  tpose6: true,
+  muse0: true,
+  muse1: true,
+  muse2: true,
+  muse3: true,
+  muse4: true,
+  muse5: true,
+  muse6: true,
+  muse7: true,
+  muse8: true,
+  muse9: true,
+  muse10: true,
+  muse11: true,
+  muse12: true,
+};
+const isLook = (v: unknown): v is MuseLook => typeof v === 'string' && Object.hasOwn(LOOKS, v);
 
 function timezone(v: unknown, what: string): string {
   const zone = str(v, what);
@@ -29,6 +48,8 @@ export function parseCastFile(raw: unknown): CastFile {
     if (role === undefined) throw new Error(`${at}.role: ${String(member.role)}`);
     const worldSeed = num(member.worldSeed, `${at}.worldSeed`);
     if (!Number.isInteger(worldSeed) || worldSeed < 0 || worldSeed > 9999) throw new Error(`${at}.worldSeed: ${worldSeed}`);
+    if (!isPlanetId(member.planet)) throw new Error(`${at}.planet: ${String(member.planet)}`);
+    if (!isLook(member.look)) throw new Error(`${at}.look: ${String(member.look)}`);
     return {
       id: str(member.id, `${at}.id`) as MuseId,
       name: str(member.name, `${at}.name`),
@@ -36,6 +57,8 @@ export function parseCastFile(raw: unknown): CastFile {
       timezone: timezone(member.timezone, `${at}.timezone`),
       dir: str(member.dir, `${at}.dir`),
       role,
+      planet: member.planet,
+      look: member.look,
     };
   });
   const ids = new Set(members.map((m) => m.id));
@@ -62,6 +85,11 @@ export function parseCastFile(raw: unknown): CastFile {
 
 export function loadCast(path = join(FIXTURES_DIR, 'cast.json')): CastFile {
   return parseCastFile(JSON.parse(readFileSync(path, 'utf8')));
+}
+
+/** What the views know of each member beyond its seed: its role, its planet and its look. */
+export function membersOf(cast: CastFile): ReadonlyMap<MuseId, MemberInfo> {
+  return new Map(cast.members.map(({ id, role, planet, look }) => [id, { role, planet, look }]));
 }
 
 export interface MemberDocs {

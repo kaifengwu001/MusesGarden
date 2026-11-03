@@ -5,7 +5,7 @@ import type { Instant } from '../src/muse/contract';
 import { seedCast } from './cli/run';
 import { lifePolicy } from './domain/policy/index';
 import { buildGarden } from './engine/compose';
-import { FIXTURES_DIR, loadCast } from './fixtures/cast';
+import { FIXTURES_DIR, loadCast, membersOf } from './fixtures/cast';
 import type { Garden } from './http/app';
 import { createApp } from './http/app';
 import { startLiveClock } from './http/clock';
@@ -40,7 +40,7 @@ async function buildBackend(): Promise<Backend> {
     hero,
     start,
     clock,
-    roles: new Map(cast.members.map((m) => [m.id, m.role])),
+    members: membersOf(cast),
   });
   if (garden.engine.museIds().length === 0) {
     const work = clock === 'live' ? null : `${FIXTURES_DIR}work-3weeks.json`;

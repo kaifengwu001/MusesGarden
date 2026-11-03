@@ -190,6 +190,24 @@ export interface CastFile {
 /** Where two owners are friends online. */
 export type KnownOn = 'instagram' | 'facebook';
 
+/**
+ * The planet a Muse lives on: the meadow (the first planet, in src/) or a world under environments/, by its folder
+ * name. Its name and page are in src/muse/planets.ts.
+ */
+export type PlanetId =
+  | 'meadow'
+  | 'lantern-reed-gardens'
+  | 'scarlet-sail-canyon'
+  | 'cobalt-windfields'
+  | 'tulip-windmill-meadows'
+  | 'golden-rye'
+  | 'cherry-blossom-waterways'
+  | 'sequoia-shrine'
+  | 'violet-dunes';
+
+/** A Muse's body: the original Muse (tpose6), or one of the dressed muses (DRESSED in src/life/museMesh.ts). */
+export type MuseLook = 'tpose6' | `muse${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
+
 export interface CastMember {
   readonly id: MuseId;
   readonly name: string;
@@ -200,7 +218,13 @@ export interface CastMember {
   readonly dir: string;
   /** friend: introduced to the hero; known: its owner knows the hero's owner online; stranger: neither. */
   readonly role: 'hero' | 'friend' | 'known' | 'stranger';
+  /** The planet it lives on, which its worldSeed seeds. */
+  readonly planet: PlanetId;
+  readonly look: MuseLook;
 }
+
+/** What the views know of a cast member beyond its seed: who it is to the hero, where it lives, how it looks. */
+export type MemberInfo = Pick<CastMember, 'role' | 'planet' | 'look'>;
 
 /** server/fixtures/work-*.json: when each Muse is busy with its owner's tasks. ISO 8601 with offset. */
 export type WorkSchedule = Readonly<Record<string, readonly { readonly start: string; readonly end: string }[]>>;
@@ -329,7 +353,14 @@ export type EpisodePlan =
   | { readonly activity: 'rest'; readonly until: Instant }
   | { readonly activity: 'travel'; readonly trip: TripStart }
   | { readonly activity: 'beyond'; readonly until: Instant }
-  | { readonly activity: 'visit'; readonly other: MuseId; readonly role: 'host' | 'guest'; readonly until: Instant };
+  | {
+      readonly activity: 'visit';
+      readonly other: MuseId;
+      readonly role: 'host' | 'guest';
+      readonly until: Instant;
+      /** Set on a trip: the guest's owner used this ticket and came along. It ends when the visit closes or they return. */
+      readonly invitation?: InvitationId;
+    };
 
 export interface Verdict {
   readonly canonicalUrl: CanonicalUrl;
@@ -340,8 +371,11 @@ export interface Verdict {
   readonly kept: boolean;
 }
 
-/** Sent straight to the guest's owner. It never expires: the owner uses it once, or the host's owner withdraws it. */
-export type InvitationState = 'sent' | 'used' | 'withdrawn';
+/**
+ * Sent straight to the guest's owner. It never expires: the owner uses it once, or the host's owner withdraws it.
+ * Using it is a trip, the owner and their Muse together at the host's planet, which is returned from early or at 2 h.
+ */
+export type InvitationState = 'sent' | 'used' | 'returned' | 'withdrawn';
 export type RelationshipStatus = 'acquainted' | 'friends' | 'ended';
 export type RelationshipOrigin = 'introduced' | 'met-beyond' | 'known-on';
 /** Strangers meet beyond the planet; Muses whose owners know each other meet online, wherever they are. */
@@ -506,6 +540,8 @@ export interface Invitation {
   readonly sentAt: Instant;
   /** When the guest's owner travelled; null until then. */
   readonly usedAt: Instant | null;
+  /** When the trip ended, early or when the visit closed; null until then. */
+  readonly returnedAt: Instant | null;
 }
 
 export interface SocialState {
@@ -644,16 +680,20 @@ export interface SocialPolicy {
   /** A hangout ends: gifts, the photo together, rapport, maybe an ending or an invitation. */
   hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] };
   /**
-   * The guest's owner uses the invitation ("Travel now"), or the host's owner withdraws it. The event goes to both
-   * logs; null means nothing changes (using it again inside the visit, withdrawing it twice).
+   * The guest's owner uses the invitation ("Travel now") or returns from the trip, or the host's owner withdraws it.
+   * The event goes to both logs; null means nothing changes (using it again inside the visit, returning or withdrawing
+   * it twice).
    */
   invitationStep(
     inv: Invitation,
-    action: 'use' | 'withdraw',
+    action: 'use' | 'withdraw' | 'return',
     as: MuseId,
     now: Instant,
   ): { readonly ok: true; readonly event: MuseEventBody | null } | { readonly ok: false; readonly status: 403 | 409; readonly error: string };
-  /** When `requester`'s visit to the host's planet stops being readable: 2 h after the guest used it. Null for anyone else, or before use. */
+  /**
+   * When `requester`'s visit to the host's planet stops being readable, which is when the trip ends: when the guest
+   * returned, or 2 h after they used it. Null for anyone else, or before use.
+   */
   visitUntil(inv: Invitation | undefined, requester: MuseId): Instant | null;
   /** Photo slots left on today's delivery day. Every hangout brings a photo, so none starts without a slot. */
   photoSlotsLeft(s: MuseState, now: Instant): number;
@@ -669,6 +709,12 @@ export interface PublicProfile {
   readonly museId: MuseId;
   readonly name: string;
   readonly worldSeed: number;
+  /**
+   * The planet it lives on and the body it wears, from the cast (cast.json). The views fill them in; the domain's own
+   * profiles, which only social decisions read, leave them out.
+   */
+  readonly planet?: PlanetId;
+  readonly look?: MuseLook;
   readonly interests: readonly { readonly topic: TopicKey; readonly weight: number }[];
   readonly discoveries: readonly PublicDiscovery[];
 }
@@ -680,7 +726,9 @@ export type ScheduleKind =
   | 'trip.hop'
   | 'host.work'
   | 'basket.check'
-  | 'encounter';
+  | 'encounter'
+  /** A trip's end, 2 h after the ticket was used (`close:<invitationId>`, payload { invitation }). Work never moves it. */
+  | 'visit.close';
 
 export interface ScheduleItem {
   /** Deterministic: the same follow-up from the same cause always gets the same id. */
@@ -729,12 +777,28 @@ export interface NowView {
   readonly sleeping: boolean;
   readonly since: Instant;
   readonly until: Instant | null;
-  /** "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Wren is visiting", "Away at Wren's planet", "Working". */
+  /**
+   * "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Wren is visiting", "Wren is
+   * visiting, with its owner", "Away at Wren's planet", "Away at Wren's planet with you", "Working".
+   */
   readonly label: string;
   /** Muse's route on its own planet; null while beyond or away (no follow). */
   readonly path: readonly { readonly dir: Dir; readonly at: Instant; readonly transport?: true }[] | null;
-  readonly companion: { readonly museId: MuseId; readonly name: string } | null;
-  readonly away: { readonly kind: 'beyond' } | { readonly kind: 'planet'; readonly of: MuseId; readonly name: string } | null;
+  /** The friend's Muse visiting; `withOwner` on a trip, when its owner came along on a ticket. */
+  readonly companion: { readonly museId: MuseId; readonly name: string; readonly look: MuseLook; readonly withOwner: boolean } | null;
+  readonly away:
+    | { readonly kind: 'beyond' }
+    | {
+        readonly kind: 'planet';
+        readonly of: MuseId;
+        readonly name: string;
+        /** The host's planet. */
+        readonly planet: PlanetId;
+        /** On a trip: the owner used `invitation` and is there too. */
+        readonly withOwner: boolean;
+        readonly invitation?: InvitationId;
+      }
+    | null;
 }
 
 export interface RegionView {
@@ -771,6 +835,11 @@ export interface PlantPin {
 export interface VisitPlant {
   readonly id: DiscoveryId;
   readonly dir: Dir;
+  /**
+   * The flower bed it grows as (species 0–3 and a variant in [0, 1], as the garden's interests): its trip topic's
+   * when that topic is public, else one drawn from its id, so a private topic never shows.
+   */
+  readonly bed: { readonly species: 0 | 1 | 2 | 3; readonly variant: number };
   readonly preview: PlantPreview | null;
   readonly card: PlantCard | null;
 }
@@ -834,16 +903,35 @@ export interface InvitationCard {
   readonly canVisitNow: boolean;
 }
 
+/** A Muse on a visit view: who it is, the body it is drawn in, where it lives, and whether its owner has it at work. */
+export interface VisitMuse {
+  readonly museId: MuseId;
+  readonly name: string;
+  readonly look: MuseLook;
+  /** Its own planet: the host's is the visit's, the guest's is where its owner goes home to. */
+  readonly planet: PlanetId;
+  /** At work now, laptop out where it stands: the host stays at its bench, and a trip waits for it. */
+  readonly working: boolean;
+}
+
 export interface VisitWorldView {
   readonly invitation: InvitationId;
-  readonly host: { readonly museId: MuseId; readonly name: string };
+  /** The host's planet: the world the visit takes place in, at the host's worldSeed and growth. */
+  readonly planet: PlanetId;
+  readonly host: VisitMuse;
+  /** The Muse of the owner who travelled. */
+  readonly guest: VisitMuse;
   readonly worldSeed: number;
   readonly g: number;
   readonly regions: readonly RegionView[];
   /** The house is never included. */
   readonly plants: readonly VisitPlant[];
-  /** 2 h after the invitation was used: until then a reload is the same visit. */
+  /** When the trip ends, 2 h after the invitation was used: until then a reload is the same visit. */
   readonly until: Instant;
+  /** Both Muses are on the trip now; false while one of them still works and the other waits. */
+  readonly together: boolean;
+  /** The engine's clock as of this view, against which `until` counts down. */
+  readonly now: Instant;
 }
 
 export interface SharingView {
@@ -889,14 +977,14 @@ export interface GardenQueries {
   photos(museId: MuseId, before: PhotoId | null, limit: number): Page<PhotoView, PhotoId>;
   shelf(museId: MuseId): ShelfView | null;
   invitations(museId: MuseId, at: Instant): readonly InvitationCard[];
-  /** 'forbidden' unless `requester` is the guest's Muse and its owner used the invitation less than 2 h before `at`. */
+  /** 'forbidden' unless `requester` is the guest's Muse and its trip is still on at `at`: used less than 2 h before, not returned. */
   visit(invitation: InvitationId, requester: MuseId, at: Instant): VisitWorldView | 'forbidden';
   sharing(museId: MuseId): SharingView | null;
   mind(museId: MuseId): MindView | null;
   metrics(museId: MuseId): readonly MetricsRow[];
   soulMd(museId: MuseId): string | null;
   journalMd(museId: MuseId, day: string | null): string | null;
-  muses(): readonly { readonly museId: MuseId; readonly name: string; readonly role: CastMember['role'] }[];
+  muses(): readonly ({ readonly museId: MuseId; readonly name: string } & MemberInfo)[];
   /** Everything the garden's interface shows, as of `at` (src/garden/types.ts). */
   garden(museId: MuseId, at: Instant): GardenSnapshot | null;
 }
@@ -924,6 +1012,8 @@ export interface GardenCommands {
   useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   /** The host's owner takes back an invitation not yet used. Nothing else ever withdraws one. */
   withdrawInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
+  /** "Return home" before the trip's 2 h are up: the guest's owner and Muse leave the host's planet together. */
+  returnFromVisit(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   // The host simulator: stands in for the Muse app.
   hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult>;
   hostSoul(museId: MuseId, text: string): Promise<CommandResult>;

@@ -17,6 +17,7 @@ export const ROUTES = {
   unshare: { method: 'POST', pattern: '/api/muses/:id/settings/unshare' },
   withdraw: { method: 'POST', pattern: '/api/invitations/:id/withdraw' },
   visit: { method: 'GET', pattern: '/api/visits/:id/world' },
+  returnFromVisit: { method: 'POST', pattern: '/api/visits/:id/return' },
   hostWork: { method: 'POST', pattern: '/api/host/:id/work' },
   hostSoul: { method: 'POST', pattern: '/api/host/:id/soul' },
   hostMemory: { method: 'POST', pattern: '/api/host/:id/memory' },

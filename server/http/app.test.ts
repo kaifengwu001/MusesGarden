@@ -147,6 +147,7 @@ describe('bad input', () => {
     ['a day', 'GET', '/api/dev/hero/journal.md?day=yesterday'],
     ['a visit without as', 'GET', `/api/visits/${INVITE}/world`],
     ['a withdrawal without as', 'POST', '/api/invitations/inv-hero-juniper-1/withdraw'],
+    ['a return without as', 'POST', `/api/visits/${INVITE}/return`],
     ['hhmm 24:00', 'POST', '/api/muses/hero/settings/basket-time', { hhmm: '24:00' }],
     ['hhmm 7:30', 'POST', '/api/muses/hero/settings/basket-time', { hhmm: '7:30' }],
     ['a missing hhmm', 'POST', '/api/muses/hero/settings/basket-time', {}],
@@ -197,6 +198,7 @@ describe('commands', () => {
     ['/api/muses/hero/settings/introductions', { shareCode: 'WREN-4F2A' }, { name: 'introduce', args: ['hero', 'WREN-4F2A'] }],
     ['/api/muses/hero/settings/unshare', { other: 'wren' }, { name: 'unshare', args: ['hero', 'wren'] }],
     ['/api/invitations/inv-hero-juniper-1/withdraw?as=hero', undefined, { name: 'withdrawInvitation', args: ['hero', 'inv-hero-juniper-1'] }],
+    [`/api/visits/${INVITE}/return?as=hero`, undefined, { name: 'returnFromVisit', args: ['hero', INVITE] }],
     ['/api/host/hero/work', { state: 'started' }, { name: 'hostWork', args: ['hero', 'started'] }],
     ['/api/host/hero/work', { state: 'ended' }, { name: 'hostWork', args: ['hero', 'ended'] }],
     ['/api/host/hero/soul', { text: '# Moss\n' }, { name: 'hostSoul', args: ['hero', '# Moss\n'] }],
@@ -222,6 +224,17 @@ describe('commands', () => {
 
 describe('visits', () => {
   const visit = (as: string, invitation: string = INVITE) => call('GET', `/api/visits/${invitation}/world?as=${as}`);
+
+  it.each<[403 | 404 | 409, string]>([
+    [403, 'only the guest’s owner can return this invitation'],
+    [404, 'no such invitation'],
+    [409, 'this invitation is returned'],
+  ])('answers a return the engine refuses with %i and its reason', async (status, error) => {
+    await serve({ commands: { returnFromVisit: () => Promise.resolve({ ok: false, status, error } as const) } });
+    const res = await call('POST', `/api/visits/${INVITE}/return?as=wren`);
+    expect(res.status).toBe(status);
+    expect(JSON.parse(res.text)).toEqual({ error });
+  });
 
   it('opens only for the guest, from when they used the invitation until 2 h on', async () => {
     let t = USED_AT - 1;

@@ -29,6 +29,7 @@
   "exclude": [
     "src/dev/**/*.spec.ts",
     "src/muse/ui/**/*.e2e.ts",
+    "src/visit/**/*.spec.ts",
     "environments/**/*.spec.ts",
     "environments/*/vite.config.ts"
   ]

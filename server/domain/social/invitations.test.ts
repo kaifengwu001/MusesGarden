@@ -8,13 +8,14 @@ const GUEST = 'bo' as MuseId;
 const ID = 'inv-1' as InvitationId;
 const sent = at(T0 + HOUR);
 
-const invitation = (state: InvitationState, usedAt: number | null = null): Invitation => ({
+const invitation = (state: InvitationState, usedAt: number | null = null, returnedAt: number | null = null): Invitation => ({
   id: ID,
   host: HOST,
   guest: GUEST,
   state,
   sentAt: sent,
   usedAt: usedAt === null ? null : at(usedAt),
+  returnedAt: returnedAt === null ? null : at(returnedAt),
 });
 const event = (to: InvitationState): MuseEventBody => ({ kind: 'invitation', id: ID, host: HOST, guest: GUEST, to });
 
@@ -63,17 +64,55 @@ describe('the visit view', () => {
     expect(policy.visitUntil(invitation('withdrawn'), GUEST)).toBeNull();
     expect(policy.visitUntil(undefined, GUEST)).toBeNull();
   });
+
+  it('closes when the guest returned, whether early or at the 2 h', () => {
+    const usedAt = sent + DAY;
+    expect(policy.visitUntil(invitation('returned', usedAt, usedAt + 40 * 60_000), GUEST)).toBe(usedAt + 40 * 60_000);
+    expect(policy.visitUntil(invitation('returned', usedAt, usedAt + 2 * HOUR), GUEST)).toBe(usedAt + 2 * HOUR);
+    expect(policy.visitUntil(invitation('returned', usedAt, usedAt + 40 * 60_000), HOST)).toBeNull();
+  });
+});
+
+describe('coming home from a trip', () => {
+  const usedAt = sent + DAY;
+
+  it('lets the guest’s owner return from a trip under way, writing the same event to both logs', () => {
+    expect(policy.invitationStep(invitation('used', usedAt), 'return', GUEST, at(usedAt + HOUR))).toEqual({ ok: true, event: event('returned') });
+  });
+
+  it('lets only the guest’s owner return', () => {
+    for (const as of [HOST, 'cy' as MuseId]) expect(policy.invitationStep(invitation('used', usedAt), 'return', as, at(usedAt))).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it('returning twice changes nothing', () => {
+    expect(policy.invitationStep(invitation('returned', usedAt, usedAt + HOUR), 'return', GUEST, at(usedAt + HOUR))).toEqual({ ok: true, event: null });
+  });
+
+  it('refuses to return from a trip never taken, or a withdrawn one', () => {
+    expect(policy.invitationStep(invitation('sent'), 'return', GUEST, at(usedAt))).toMatchObject({ ok: false, status: 409 });
+    expect(policy.invitationStep(invitation('withdrawn'), 'return', GUEST, at(usedAt))).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it('ends the ticket: once returned it can’t be used again, even inside the 2 h, nor withdrawn', () => {
+    const returned = invitation('returned', usedAt, usedAt + 30 * 60_000);
+    expect(policy.invitationStep(returned, 'use', GUEST, at(usedAt + HOUR))).toMatchObject({ ok: false, status: 409, error: 'this invitation is returned' });
+    expect(policy.invitationStep(returned, 'withdraw', HOST, at(usedAt + HOUR))).toMatchObject({ ok: false, status: 409 });
+  });
 });
 
 describe('the record in both logs', () => {
-  it('folds sent, then used, keeping when each happened', () => {
-    const replay = (self: MuseId) => {
-      let s = muse(self);
-      s = fold(s, [event('sent')], sent);
-      s = fold(s, [event('used')], at(sent + 3 * DAY));
+  it('folds sent, then used, then returned, keeping when each happened', () => {
+    const replay = (self: MuseId, steps: readonly [InvitationState, number][]) => {
+      let s = fold(muse(self), [event('sent')], sent);
+      for (const [to, t] of steps) s = fold(s, [event(to)], at(t));
       return s.social.invitations.get(ID);
     };
-    for (const self of [HOST, GUEST]) expect(replay(self)).toEqual({ id: ID, host: HOST, guest: GUEST, state: 'used', sentAt: sent, usedAt: sent + 3 * DAY });
+    const used = sent + 3 * DAY;
+    for (const self of [HOST, GUEST]) {
+      expect(replay(self, [])).toEqual({ id: ID, host: HOST, guest: GUEST, state: 'sent', sentAt: sent, usedAt: null, returnedAt: null });
+      expect(replay(self, [['used', used]])).toEqual({ id: ID, host: HOST, guest: GUEST, state: 'used', sentAt: sent, usedAt: used, returnedAt: null });
+      expect(replay(self, [['used', used], ['returned', used + HOUR]])).toEqual({ id: ID, host: HOST, guest: GUEST, state: 'returned', sentAt: sent, usedAt: used, returnedAt: used + HOUR });
+    }
   });
 
   it('ignores a step for an invitation it never saw sent', () => {

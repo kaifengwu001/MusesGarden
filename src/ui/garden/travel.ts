@@ -1,5 +1,6 @@
 import type { Invitation } from '../../garden/types';
 import type { ParamPath, ParamStore, ParamValue } from '../../params';
+import { ticket } from '../../visit/transit';
 import type { World } from '../../world';
 import { button, el, nextFrame, wait } from './dom';
 import { ICONS } from './icons';
@@ -49,7 +50,7 @@ export class Visit {
     if (this.away) return;
     const friend = invitation.fromName;
     this.hooks.leaving();
-    this.transit.replaceChildren(this.ticket(invitation.worldName, friend));
+    this.transit.replaceChildren(ticket(invitation.worldName, friend));
     this.transit.classList.add('is-on');
     await nextFrame();
     this.transit.classList.add('is-stamped');
@@ -75,7 +76,7 @@ export class Visit {
   async end(): Promise<void> {
     if (!this.away) return;
     this.banner.classList.remove('is-on');
-    this.transit.replaceChildren(this.ticket('Home', 'Muse'));
+    this.transit.replaceChildren(ticket('Home', 'Muse'));
     this.transit.classList.add('is-on', 'is-home');
     await wait(450);
     for (const [p, v] of this.saved) this.store.set(p, v);
@@ -87,9 +88,4 @@ export class Visit {
     this.transit.classList.remove('is-on', 'is-home');
   }
 
-  private ticket(where: string, who: string): HTMLElement {
-    const t = el('div', 'g-transit-ticket');
-    t.append(el('p', 'g-transit-admit', 'Admit one'), el('p', 'g-transit-where', where), el('p', 'g-transit-who', where === 'Home' ? 'Back to Muse’s garden' : `Guest of ${who}`), el('span', 'g-transit-stamp', where === 'Home' ? 'Welcome back' : 'Visiting'));
-    return t;
-  }
 }

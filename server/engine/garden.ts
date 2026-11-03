@@ -1,6 +1,8 @@
 // The garden's interface (src/garden/types.ts) filled from the engine: one Muse's snapshot, and the events that
 // change it, read from its state and its log. Pure: Views gathers the input.
 import { hash32, salt, unit } from '../../src/core/hash';
+import { mediaOf } from '../../src/garden/media';
+import { PLANETS } from '../../src/muse/planets';
 import type {
   Basket,
   Find,
@@ -8,7 +10,6 @@ import type {
   GardenSnapshot,
   Interest,
   Invitation,
-  Media,
   MuseFriend,
   MuseStatus,
   Postcard,
@@ -25,12 +26,13 @@ import type {
   InvitationState,
   MuseEvent,
   MuseId,
+  MuseLook,
   MuseState,
-  Network,
   NowView,
   PhotoId,
   PhotoSpec,
   PhotoSubject,
+  PlanetId,
   PublicProfile,
   Relationship,
   StoredEvent,
@@ -53,6 +55,19 @@ export interface GardenInput {
   readonly salienceAt: (i: MuseInterest, at: Instant) => number;
   /** Whether the owner's friend group takes in the Muse `other`. */
   readonly inReach: (other: MuseId) => boolean;
+  /** Any Muse's planet as a visitor finds it: which world, at what seed and growth, and the body its Muse wears. */
+  readonly planetOf: (id: MuseId) => HostPlanet | null;
+  /** The trip the owner is on now, if any. */
+  readonly trip: Trip | null;
+}
+
+export type Trip = NonNullable<MuseStatus['trip']>;
+
+export interface HostPlanet {
+  readonly planet: PlanetId;
+  readonly seed: number;
+  readonly g: number;
+  readonly look: MuseLook;
 }
 
 export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
@@ -62,15 +77,6 @@ const TOP_INTERESTS = 12;
 /** A friend's card names this many interests the two share, the ones Muse cares for most. */
 const SHARED_SHOWN = 3;
 const COATS = ['#f2c4a0', '#c3d6b8', '#c4d0e6', '#efe6c8', '#e8c6d0', '#d4c8e6', '#c8e2dc', '#ead0b0'] as const;
-const NETWORKS: Readonly<Record<Exclude<Network, 'web'>, string>> = {
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  youtube: 'YouTube',
-  vimeo: 'Vimeo',
-  tiktok: 'TikTok',
-  flickr: 'Flickr',
-  bluesky: 'Bluesky',
-};
 /** Stand-ins in src/assets/postcards/ until a photo is rendered from its pose. */
 const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   selfie: 'close',
@@ -81,8 +87,8 @@ const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   find: 'cottage',
   invitation: 'pier',
 };
-/** Invitation states the guest's owner still holds: sent (kept for later) or used. A withdrawn one is gone. */
-const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used']);
+/** Invitation states the guest's owner still holds: sent (kept for later), used, or returned from. A withdrawn one is gone. */
+const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used', 'returned']);
 
 // ─── What the log adds to the state ─────────────────────────────────────────
 
@@ -172,11 +178,14 @@ export function soulLine(soul: string | null): string {
   return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '')}…`;
 }
 
-/** The garden says what Muse is doing in a few words: the engine's label, without the trip's topics. */
-export function museStatus(now: NowView): MuseStatus {
+/**
+ * The garden says what Muse is doing in a few words: the engine's label, without the trip's topics. While the owner
+ * is away on a ticket, it says where, so the garden can offer the way back.
+ */
+export function museStatus(now: NowView, trip: Trip | null = null): MuseStatus {
   const out = now.activity === 'travel' || now.away !== null;
   const note = now.activity === 'travel' && !now.working ? 'Out exploring' : now.label;
-  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note };
+  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note, ...(trip ? { trip } : {}) };
 }
 
 /** The flower an interest grows as, from its topic alone, so it never changes. */
@@ -193,24 +202,6 @@ export function postcardImage(subject: PhotoSubject | 'invitation'): string {
   return `/api/postcards/${POSTCARD_IMAGES[subject]}.jpg`;
 }
 
-/** Kai's card for a find: its own network's name, or an article site's own name, and the picture the server can show. */
-function mediaOf(d: Discovery): Media {
-  const info = d.media;
-  const titled = info.kind === 'article' || info.kind === 'video';
-  return {
-    kind: info.kind,
-    url: d.url,
-    source: info.site ?? (info.network === 'web' ? new URL(d.url).hostname.replace(/^www\./, '') : NETWORKS[info.network]),
-    author: info.author,
-    title: titled ? d.title : undefined,
-    text: titled ? d.summary : d.summary || d.title,
-    image: info.image,
-    aspect: info.aspect,
-    duration: info.duration,
-    minutes: info.minutes,
-    published: info.published,
-  };
-}
 
 function findTopic(d: Discovery, index: LogIndex): TopicKey {
   return d.pursuing ?? index.tripTopic.get(d.id) ?? d.topics[0] ?? (d.title as TopicKey);
@@ -274,9 +265,10 @@ function friendsSince(s: MuseState, r: Relationship, index: LogIndex): Instant {
   return r.friendsSince ?? index.friendsSince.get(r.other) ?? r.lastMetAt ?? s.at;
 }
 
-/** An invitation this Muse's owner received, as a postcard; null for any other invitation. */
+/** An invitation this Muse's owner received, as a postcard: a ticket to the host's planet. Null for any other invitation. */
 function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | null {
-  if (inv.guest !== input.s.seed.id || !RECEIVED.has(inv.state)) return null;
+  const home = input.planetOf(inv.host);
+  if (inv.guest !== input.s.seed.id || !RECEIVED.has(inv.state) || !home) return null;
   const host = input.profile(inv.host);
   const name = host?.name ?? 'a friend';
   const loves = (host?.interests ?? []).slice(0, 3).map((i) => topicLabel(i.topic));
@@ -284,10 +276,13 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
     from: inv.host,
     fromName: name,
     coat: coatOf(inv.host),
-    world: inv.host,
-    worldName: `${name}’s planet`,
-    blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
-    used: inv.state === 'used',
+    world: home.planet,
+    worldName: PLANETS[home.planet].title,
+    blurb: `${name}’s planet · ${loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`}`,
+    seed: home.seed,
+    g: home.g,
+    look: home.look,
+    used: inv.state !== 'sent',
   };
   return { id: inv.id, day: input.day(inv.sentAt), image: postcardImage('invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
 }
@@ -310,7 +305,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   return {
     today: input.day(input.now.at),
     world: { seed: s.seed.worldSeed, g: input.g },
-    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now), reach: s.reach },
+    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now, input.trip), reach: s.reach },
     interests: interests(input, finds, index),
     friends: friends(input, index),
     baskets: delivered.map(({ basket }) => basket),
@@ -352,14 +347,17 @@ function friends(input: GardenInput, index: LogIndex): MuseFriend[] {
         shared: mine.filter((i) => theirs.has(i.topic)).slice(0, SHARED_SHOWN).map((i) => topicLabel(i.topic)),
         met: input.day(friendsSince(s, r, index)),
         ...(s.social.knownOn.has(r.other) ? { knownOn: s.social.knownOn.get(r.other) } : {}),
+        ...(other?.planet ? { planet: other.planet } : {}),
+        ...(other?.look ? { look: other.look } : {}),
       };
     });
 }
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 
-/** Events that change what Muse is doing or where. */
+/** Events that change what Muse is doing or where, or where its owner is: a ticket used or returned from. */
 const MOVES: ReadonlySet<MuseEvent['kind']> = new Set(['episode.started', 'episode.ended', 'episode.paused', 'episode.resumed', 'trip.hop', 'host.work']);
+const moves = (e: MuseEvent): boolean => MOVES.has(e.kind) || (e.kind === 'invitation' && (e.to === 'used' || e.to === 'returned'));
 
 /**
  * The garden events that `events` (this Muse's, in log order) bring, each framed with the seq it came from, then
@@ -399,6 +397,6 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
       if (postcard) frame(seq, { type: 'postcard', postcard });
     }
   }
-  if (withStatus === 'always' || events.some((e) => MOVES.has(e.event.kind))) frame(s.seq, { type: 'status', status: museStatus(input.now) });
+  if (withStatus === 'always' || events.some((e) => moves(e.event))) frame(s.seq, { type: 'status', status: museStatus(input.now, input.trip) });
   return frames;
 }

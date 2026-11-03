@@ -280,9 +280,12 @@ export class Engine {
     });
   }
 
-  /** The guest's owner uses an invitation, or the host's owner withdraws it. `as` is the Muse whose owner acts. */
-  invitationAction(id: InvitationId, as: MuseId, action: 'use' | 'withdraw'): Promise<CommandResult> {
-    return this.exclusive((): CommandResult => {
+  /**
+   * The guest's owner uses an invitation, which takes them and their Muse to the host's planet, or comes home from it
+   * early; or the host's owner withdraws it. `as` is the Muse whose owner acts.
+   */
+  invitationAction(id: InvitationId, as: MuseId, action: 'use' | 'withdraw' | 'return'): Promise<CommandResult> {
+    return this.exclusive(async (): Promise<CommandResult> => {
       const inv = this.invitation(id);
       if (!inv) return { ok: false, status: 404, error: 'no such invitation' };
       const r = this.deps.social.invitationStep(inv, action, as, this.clockAt);
@@ -291,6 +294,8 @@ export class Engine {
         const tx = this.tx(this.clockAt);
         tx.emit(inv.host, r.event);
         tx.emit(inv.guest, r.event);
+        if (action === 'use') await this.board(tx, id, inv.guest);
+        if (action === 'return') await this.endTrip(tx, id, inv.guest);
         this.commit(tx);
       }
       return { ok: true };
@@ -362,6 +367,9 @@ export class Engine {
       case 'encounter':
         this.onEncounter(tx, item.museId, item.payload as unknown as EncounterPayload);
         break;
+      case 'visit.close':
+        await this.closeTrip(tx, item.payload.invitation as InvitationId, item.museId);
+        break;
     }
     this.commit(tx);
   }
@@ -379,22 +387,121 @@ export class Engine {
       this.emitPhotos(tx, m, this.deps.life.photosDuring(s, ep.plan.activity, ep.start, tx.now, draw));
     }
     if (ep.plan.activity === 'visit' && ep.plan.role === 'host') {
-      const other = ep.plan.other;
-      const os = tx.state(other);
-      const together = os.episode?.plan.activity === 'visit' && os.episode.plan.other === m;
-      if (together) {
-        const out = this.deps.social.hangout(s, os, tx.now, draw);
-        tx.emitAll(m, out.host);
-        tx.emitAll(other, out.guest);
-        const guestEp = tx.state(other).episode;
-        if (guestEp) {
-          tx.emit(other, { kind: 'episode.ended', n: guestEp.n });
-          await this.startNext(tx, other);
-        }
-      }
+      for (const next of this.endTogether(tx, m)) await this.startNext(tx, next);
+      return;
     }
     tx.emit(m, { kind: 'episode.ended', n });
     await this.startNext(tx, m);
+  }
+
+  /**
+   * The visit `host` is hosting ends. If its guest is still with it and both have a photo slot left today, they hang
+   * out first: a gift each way, a photo of the two, and rapport. Then both episodes end; returns who to start again,
+   * the guest first. Nothing pending of either episode stays scheduled.
+   */
+  private endTogether(tx: Tx, host: MuseId): MuseId[] {
+    const hs = tx.state(host);
+    const ep = hs.episode;
+    if (!ep || ep.plan.activity !== 'visit' || ep.plan.role !== 'host') return [];
+    const guest = ep.plan.other;
+    const gs = tx.state(guest);
+    const together = gs.episode?.plan.activity === 'visit' && gs.episode.plan.other === host;
+    const { social } = this.deps;
+    if (together && social.photoSlotsLeft(hs, tx.now) > 0 && social.photoSlotsLeft(gs, tx.now) > 0) {
+      const out = social.hangout(hs, gs, tx.now, this.deps.drawFor(host, ep.n));
+      tx.emitAll(host, out.host);
+      tx.emitAll(guest, out.guest);
+    }
+    const ended = together ? [guest, host] : [host];
+    for (const m of ended) this.endEpisode(tx, m);
+    return ended;
+  }
+
+  /** Ends whatever `m` is doing, unscheduling its next hop or its end. */
+  private endEpisode(tx: Tx, m: MuseId): void {
+    const ep = tx.state(m).episode;
+    if (!ep) return;
+    for (const i of this.deps.store.pending(m)) if (i.kind === 'episode.end' || i.kind === 'trip.hop') tx.remove(i.id);
+    tx.emit(m, { kind: 'episode.ended', n: ep.n });
+  }
+
+  // ─── Trips: an owner on a ticket, with their Muse ───────────────────────
+
+  /**
+   * The guest's owner boarded ticket `id`. Its visit closes in 2 h, and an owner is on one trip at a time, so any
+   * other trip of theirs ends now. The two Muses set off as soon as both are free, which is now unless one is working
+   * or is on another trip already; the one still busy joins when it is free.
+   */
+  private async board(tx: Tx, id: InvitationId, guest: MuseId): Promise<void> {
+    const inv = tx.state(guest).social.invitations.get(id);
+    const until = inv ? this.deps.social.visitUntil(inv, guest) : null;
+    if (!inv || until === null) return;
+    tx.schedule({ id: `close:${id}`, at: until, museId: guest, kind: 'visit.close', payload: { invitation: id } });
+    for (const other of this.openTrips(tx, guest)) {
+      if (other.guest !== guest || other.id === id) continue;
+      const step = this.deps.social.invitationStep(other, 'return', guest, tx.now);
+      if (step.ok && step.event) {
+        tx.emit(other.host, step.event);
+        tx.emit(other.guest, step.event);
+      }
+      await this.endTrip(tx, other.id, guest);
+    }
+    const trip = this.tripToJoin(tx, guest);
+    if (trip) await this.setOff(tx, trip);
+  }
+
+  /** The visit closes 2 h after the ticket was used: the owner comes home, and the trip ends as a return would end it. */
+  private async closeTrip(tx: Tx, id: InvitationId, guest: MuseId): Promise<void> {
+    const inv = tx.state(guest).social.invitations.get(id);
+    if (!inv || inv.state !== 'used') return;
+    const step = this.deps.social.invitationStep(inv, 'return', guest, tx.now);
+    if (!step.ok || !step.event) return;
+    tx.emit(inv.host, step.event);
+    tx.emit(inv.guest, step.event);
+    await this.endTrip(tx, id, guest);
+  }
+
+  /** A trip is over: its close comes off the schedule, and two Muses on it part with a hangout and go on with their lives. */
+  private async endTrip(tx: Tx, id: InvitationId, guest: MuseId): Promise<void> {
+    tx.remove(`close:${id}`);
+    const inv = tx.state(guest).social.invitations.get(id);
+    if (!inv || tripOf(tx.state(inv.host)) !== id) return;
+    for (const next of this.endTogether(tx, inv.host)) await this.startNext(tx, next);
+  }
+
+  /**
+   * Both Muses set off on the trip now. Whatever either was doing ends: the host comes home from a trip or from
+   * beyond, or wakes, as a knock at the door would wake it; a visit with a third Muse ends with its hangout. Then the
+   * two are together until the visit closes or the owner returns, with no end of their own scheduled, and any third
+   * Muse goes on with its life.
+   */
+  private async setOff(tx: Tx, inv: Invitation): Promise<void> {
+    const until = this.deps.social.visitUntil(inv, inv.guest);
+    if (until === null) return;
+    const others: MuseId[] = [];
+    for (const m of [inv.guest, inv.host]) {
+      const plan = tx.state(m).episode?.plan;
+      if (plan?.activity === 'visit') others.push(...this.endTogether(tx, plan.role === 'host' ? m : plan.other));
+      // Whatever is left: anything but a visit, or a visit its host has left already.
+      this.endEpisode(tx, m);
+    }
+    const plan = (other: MuseId, role: 'host' | 'guest'): EpisodePlan => ({ activity: 'visit', other, role, until, invitation: inv.id });
+    tx.emit(inv.host, { kind: 'episode.started', n: tx.state(inv.host).episodes + 1, plan: plan(inv.guest, 'host') });
+    tx.emit(inv.guest, { kind: 'episode.started', n: tx.state(inv.guest).episodes + 1, plan: plan(inv.host, 'guest') });
+    for (const m of others) await this.startNext(tx, m);
+  }
+
+  /** Tickets in use that take `m` along, as host or guest, earliest boarded first, until each one's visit closes. */
+  private openTrips(tx: Tx, m: MuseId): Invitation[] {
+    return [...tx.state(m).social.invitations.values()]
+      .filter((inv) => inv.state === 'used' && tx.now < (this.deps.social.visitUntil(inv, inv.guest) ?? tx.now))
+      .sort((a, b) => (a.usedAt ?? 0) - (b.usedAt ?? 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+
+  /** The trip `m` should be on now and isn't: one whose other Muse is free for it too. */
+  private tripToJoin(tx: Tx, m: MuseId): Invitation | null {
+    if (!freeForTrip(tx.state(m))) return null;
+    return this.openTrips(tx, m).find((inv) => freeForTrip(tx.state(inv.host === m ? inv.guest : inv.host))) ?? null;
   }
 
   private async onHop(tx: Tx, m: MuseId, p: HopPayload): Promise<void> {
@@ -501,6 +608,11 @@ export class Engine {
     }
     if (!s.working) return;
     tx.emit(m, { kind: 'host.work', state: 'ended' });
+    const trip = this.tripToJoin(tx, m);
+    if (trip) {
+      await this.setOff(tx, trip);
+      return;
+    }
     const ep = tx.state(m).episode;
     if (!ep) {
       await this.startNext(tx, m);
@@ -513,7 +625,8 @@ export class Engine {
       const last = ep.lastKept ? tx.state(m).discoveries.get(ep.lastKept) : undefined;
       const from = last ? candidateOf(last) : null;
       this.scheduleHop(tx, m, { n: ep.n, k: ep.hops, since: tx.now, from, ...(last?.pursuing ? { pursuing: last.pursuing } : {}) }, at);
-    } else if (ep.plan.activity !== 'visit' || ep.plan.role === 'host') {
+    } else if (ep.plan.activity !== 'visit' || (ep.plan.role === 'host' && ep.plan.invitation === undefined)) {
+      // A trip has no end of its own: its visit closes, or its owner returns.
       this.scheduleEnd(tx, m, ep.n, at);
     }
   }
@@ -547,10 +660,15 @@ export class Engine {
     tx.schedule({ id: `${ENCOUNTER_KEY[where].id}:${a}:${b}:${as.episodes}${idSuffix}`, at: Math.floor(at) as Instant, museId: a, kind: 'encounter', payload: { ...payload } });
   }
 
-  /** Picks and starts Muse's next episode. Does nothing while Muse works or is mid-episode. */
+  /** Picks and starts Muse's next episode, a trip first if one waits for it. Does nothing while Muse works or is mid-episode. */
   private async startNext(tx: Tx, m: MuseId): Promise<void> {
     const s = tx.state(m);
     if (s.working || s.episode) return;
+    const waiting = this.tripToJoin(tx, m);
+    if (waiting) {
+      await this.setOff(tx, waiting);
+      return;
+    }
     const n = s.episodes + 1;
     const draw = this.deps.drawFor(m, n);
     const { life, social } = this.deps;
@@ -694,6 +812,17 @@ export class Engine {
       question: question ? s.questions.get(question)?.text ?? null : null,
     };
   }
+}
+
+/** The ticket whose trip Muse is on, or null. */
+function tripOf(s: MuseState): InvitationId | null {
+  const plan = s.episode?.plan;
+  return plan?.activity === 'visit' ? (plan.invitation ?? null) : null;
+}
+
+/** Free to set off on a trip: not working, and not on a trip already. */
+function freeForTrip(s: MuseState): boolean {
+  return !s.working && tripOf(s) === null;
 }
 
 function bestOf(judgments: readonly Judgment[]): Judgment | null {

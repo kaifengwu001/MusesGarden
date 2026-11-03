@@ -84,8 +84,8 @@ export const reduceSocial: ReduceSocial = (s, stored, self) => {
       invitations.set(
         e.id,
         previous
-          ? { ...previous, state: e.to, usedAt: e.to === 'used' ? at : previous.usedAt }
-          : { id: e.id, host: e.host, guest: e.guest, state: 'sent', sentAt: at, usedAt: null },
+          ? { ...previous, state: e.to, usedAt: e.to === 'used' ? at : previous.usedAt, returnedAt: e.to === 'returned' ? at : previous.returnedAt }
+          : { id: e.id, host: e.host, guest: e.guest, state: 'sent', sentAt: at, usedAt: null, returnedAt: null },
       );
       const next = { ...s, invitations };
       if (e.to !== 'sent') return next;

@@ -67,11 +67,18 @@ export interface Invitation {
   from: string;
   fromName: string;
   coat: string;
-  /** Its world: an id the travel step resolves, and the world's name. */
+  /**
+   * Its world: an id the travel step resolves, and the world's name. From the backend, the host's planet (a PlanetId,
+   * src/muse/planets.ts) and that planet's title.
+   */
   world: string;
   worldName: string;
   /** A line about the world. */
   blurb: string;
+  /** The host's planet as the backend has it, as the URL's `seed` and `g`, and the body its Muse is drawn in (a MuseLook). */
+  seed?: number;
+  g?: number;
+  look?: string;
   /** Good for one visit: set once it is used. */
   used?: boolean;
   /** The last day it can be used (ISO date), if it expires. */
@@ -121,6 +128,9 @@ export interface MuseFriend {
   met: string;
   /** Set when this Muse's human is your friend there too (no names shown, only the network). */
   knownOn?: 'instagram' | 'facebook';
+  /** Where it lives (a PlanetId, src/muse/planets.ts) and the body it wears (a MuseLook), when the backend knows them. */
+  planet?: string;
+  look?: string;
 }
 
 /**
@@ -137,6 +147,11 @@ export interface MuseStatus {
   where?: readonly [number, number, number];
   /** A line about what it is up to. */
   note?: string;
+  /**
+   * You are away on a ticket: at whose planet (its Muse's id), which world (a PlanetId), and until when (ms since the
+   * epoch on the backend's clock), so the garden can offer the way back there.
+   */
+  trip?: { invitation: string; host: string; planet: string; until: number };
 }
 
 export interface MuseProfile {

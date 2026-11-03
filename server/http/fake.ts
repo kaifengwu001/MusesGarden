@@ -2,6 +2,7 @@
 // exists. Only the hero Muse has samples; the rest of the cast is known but empty.
 import type { Find, GardenSnapshot, Postcard } from '../../src/garden/types';
 import type { GardenCommands, GardenQueries, Instant, MuseId, Page, TopicKey } from '../../src/muse/contract';
+import { PLANETS } from '../../src/muse/planets';
 import {
   HERO,
   sampleBaskets,
@@ -80,7 +81,18 @@ function sampleGarden(): GardenSnapshot {
       image: postcardImage('invitation'),
       place: `From ${host.name}’s planet`,
       with: host.museId,
-      invitation: { from: host.museId, fromName: host.name, coat: coatOf(host.museId), world: host.museId, worldName: `${host.name}’s planet`, blurb: `Where ${host.name} keeps Lichen.`, used: false },
+      invitation: {
+        from: host.museId,
+        fromName: host.name,
+        coat: coatOf(host.museId),
+        world: sampleVisit.planet,
+        worldName: PLANETS[sampleVisit.planet].title,
+        blurb: `${host.name}’s planet · Where ${host.name} keeps Lichen.`,
+        seed: sampleVisit.worldSeed,
+        g: sampleVisit.g,
+        look: host.look,
+        used: false,
+      },
     },
   ];
   return {
@@ -118,7 +130,7 @@ export function fakeQueries(): GardenQueries {
     invitations: (museId) => heroOnly(museId, sampleInvitations) ?? [],
     visit: (invitation, requester, at) =>
       invitation === sampleVisit.invitation && requester === HERO && at >= usedAt && at < sampleVisit.until
-        ? sampleVisit
+        ? { ...sampleVisit, now: at }
         : 'forbidden',
     sharing: (museId) => heroOnly(museId, sampleSharing),
     mind: (museId) => heroOnly(museId, sampleMind),
@@ -163,6 +175,7 @@ export function fakeCommands(): FakeCommands {
     favorite: (...args) => accept({ name: 'favorite', args }),
     useInvitation: (...args) => accept({ name: 'useInvitation', args }),
     withdrawInvitation: (...args) => accept({ name: 'withdrawInvitation', args }),
+    returnFromVisit: (...args) => accept({ name: 'returnFromVisit', args }),
     hostWork: (...args) => accept({ name: 'hostWork', args }),
     hostSoul: (...args) => accept({ name: 'hostSoul', args }),
     hostMemory: (...args) => accept({ name: 'hostMemory', args }),
