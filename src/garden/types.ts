@@ -144,6 +144,11 @@ export interface MuseStatus {
   where?: readonly [number, number, number];
   /** A line about what it is up to. */
   note?: string;
+  /**
+   * You are away on a ticket: at whose planet (its Muse's id), which world (a PlanetId), and until when (ms since the
+   * epoch on the backend's clock), so the garden can offer the way back there.
+   */
+  trip?: { invitation: string; host: string; planet: string; until: number };
 }
 
 export interface MuseProfile {

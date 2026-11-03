@@ -41,7 +41,7 @@ import type {
 } from '../../src/muse/contract';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { Engine } from './engine';
-import { flowerOf, gardenFrames, gardenSnapshot, topicLabel, type GardenInput } from './garden';
+import { flowerOf, gardenFrames, gardenSnapshot, topicLabel, type GardenInput, type Trip } from './garden';
 
 /** Domain functions the views need, injected so this file depends only on the contract. */
 export interface ViewHelpers {
@@ -179,7 +179,17 @@ export class Views implements GardenQueries {
         const { planet, look } = this.member(id);
         return other ? { planet, seed: other.seed.worldSeed, g: this.helpers.growth(other), look } : null;
       },
+      trip: this.trip(s, at),
     };
+  }
+
+  /** The trip the owner is on at `at`, Muse along or not yet: a ticket they used whose visit is still open. */
+  private trip(s: MuseState, at: Instant): Trip | null {
+    for (const inv of s.social.invitations.values()) {
+      const until = this.social.visitUntil(inv, s.seed.id);
+      if (inv.state === 'used' && until !== null && at < until) return { invitation: inv.id, host: inv.host, planet: this.member(inv.host).planet, until };
+    }
+    return null;
   }
 
   now(museId: MuseId, at: Instant): NowView | null {
@@ -201,9 +211,13 @@ export class Views implements GardenQueries {
       case 'beyond':
         return { ...base, activity: 'beyond', sleeping: false, since: ep.start, until: plan.until, label: working(' outside the planet') ?? 'Traveling outside the planet', path: null, away: { kind: 'beyond' } };
       case 'visit': {
-        const other = { museId: plan.other, name: this.name(plan.other) };
+        const name = this.name(plan.other);
+        // A trip: the guest's owner came along on a ticket.
+        const withOwner = plan.invitation !== undefined;
         if (plan.role === 'host') {
-          return { ...base, activity: 'visit', sleeping: false, since: ep.start, until: plan.until, label: working('') ?? `${other.name} is visiting`, path: [{ dir: home, at }], companion: other };
+          const companion = { museId: plan.other, name, look: this.member(plan.other).look, withOwner };
+          const label = working('') ?? `${name} is visiting${withOwner ? ', with its owner' : ''}`;
+          return { ...base, activity: 'visit', sleeping: false, since: ep.start, until: plan.until, label, path: [{ dir: home, at }], companion };
         }
         return {
           ...base,
@@ -211,9 +225,9 @@ export class Views implements GardenQueries {
           sleeping: false,
           since: ep.start,
           until: plan.until,
-          label: working(` at ${other.name}'s planet`) ?? `Away at ${other.name}'s planet`,
+          label: working(` at ${name}'s planet`) ?? `Away at ${name}'s planet${withOwner ? ' with you' : ''}`,
           path: null,
-          away: { kind: 'planet', of: plan.other, name: other.name },
+          away: { kind: 'planet', of: plan.other, name, planet: this.member(plan.other).planet, withOwner, ...(plan.invitation ? { invitation: plan.invitation } : {}) },
         };
       }
       case 'travel': {
@@ -310,6 +324,8 @@ export class Views implements GardenQueries {
       worldSeed: host.seed.worldSeed,
       g: this.helpers.growth(host),
       regions: this.regionViews(host),
+      together: host.episode?.plan.activity === 'visit' && host.episode.plan.invitation === invitation,
+      now: at,
       plants: [...host.discoveries.values()].map((d) => {
         const pub = shared.get(d.id);
         // The public copy says which trip found it only when that trip's topic is public; a bed grows from it only then.
@@ -439,6 +455,10 @@ export class Commands implements GardenCommands {
 
   withdrawInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult> {
     return this.engine.invitationAction(id, museId, 'withdraw');
+  }
+
+  returnFromVisit(museId: MuseId, id: InvitationId): Promise<CommandResult> {
+    return this.engine.invitationAction(id, museId, 'return');
   }
 
   async hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult> {

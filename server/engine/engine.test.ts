@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Instant, MuseId, MuseSeed, Reach, StoredEvent } from '../../src/muse/contract';
+import type { EpisodePlan, Instant, InvitationId, MuseEventBody, MuseId, MuseSeed, Reach, RegionKey, ScheduleItem, SocialPolicy, StoredEvent, TopicKey } from '../../src/muse/contract';
 import { openSqliteStore } from '../adapters/store/sqlite';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
@@ -257,5 +257,294 @@ describe('the friend group', () => {
     const widenedAt = engine.now();
     await engine.advanceTo(at(16 * 24));
     expect(encounters(engine, 'moss').filter((e) => e.event.at >= widenedAt).length).toBeGreaterThan(0);
+  });
+});
+
+// ─── Trips: an owner on a ticket, with their Muse ─────────────────────────
+
+const MOSS = 'moss' as MuseId;
+const WREN = 'wren' as MuseId;
+const LARK = 'lark' as MuseId;
+const JUNIPER = 'juniper' as MuseId;
+const TICKET = 'inv:wren:moss' as InvitationId;
+const JUNIPERS = 'inv:juniper:moss' as InvitationId;
+const LARKS = 'inv:wren:lark' as InvitationId;
+const MIN = 60_000;
+const atMin = (minutes: number) => (T0 + minutes * MIN) as Instant;
+
+const rest = (minutes: number): EpisodePlan => ({ activity: 'rest', until: atMin(minutes) });
+const beyondFor = (minutes: number): EpisodePlan => ({ activity: 'beyond', until: atMin(minutes) });
+const exploring: EpisodePlan = { activity: 'travel', trip: { kind: 'revisit', topic: 'Pigment' as TopicKey, region: '0:1:1' as RegionKey, question: null } };
+const visiting = (other: MuseId, role: 'host' | 'guest', minutes = 50): EpisodePlan => ({ activity: 'visit', other, role, until: atMin(minutes) });
+
+/**
+ * Moss, Wren, Lark and Juniper, all friends, on the real social policy, as a restarted engine finds them at T0: each
+ * doing what `doing` says (an episode, its next hop or end scheduled as the engine schedules it, or work), the rest
+ * at home with nothing planned. Wren and Juniper have each sent Moss's owner a ticket, and Wren sent Lark's one.
+ */
+function scene(doing: Partial<Record<MuseId, EpisodePlan | 'working'>>, social: SocialPolicy = socialPolicy) {
+  const store = memoryStore();
+  const ids = [MOSS, WREN, LARK, JUNIPER];
+  for (const id of ids) store.addMuse(seed(id));
+  const events: StoredEvent[] = [];
+  const emit = (museId: MuseId, body: MuseEventBody) =>
+    events.push({ museId, seq: events.filter((e) => e.museId === museId).length + 1, event: { ...body, at: T0 } });
+  for (const a of ids) for (const b of ids) if (a !== b) emit(a, { kind: 'relationship.changed', other: b, to: 'friends', origin: 'introduced' });
+  for (const [id, host, guest] of [[TICKET, WREN, MOSS], [JUNIPERS, JUNIPER, MOSS], [LARKS, WREN, LARK]] as const) {
+    for (const m of [host, guest]) emit(m, { kind: 'invitation', id, host, guest, to: 'sent' });
+  }
+  const schedule: ScheduleItem[] = [];
+  for (const [id, d] of Object.entries(doing) as [MuseId, EpisodePlan | 'working'][]) {
+    if (d === 'working') {
+      emit(id, { kind: 'host.work', state: 'started' });
+    } else {
+      emit(id, { kind: 'episode.started', n: 1, plan: d });
+      if (d.activity === 'travel') schedule.push({ id: `hop:${id}:1:0`, at: atMin(20), museId: id, kind: 'trip.hop', payload: { n: 1, k: 0, since: T0, from: null } });
+      else if (d.activity !== 'visit' || d.role === 'host') schedule.push({ id: `end:${id}:1`, at: d.until, museId: id, kind: 'episode.end', payload: { n: 1 } });
+    }
+  }
+  store.commit({ remove: [], events, schedule });
+  const engine = new Engine({ ...stubDeps(store), social, reduceSocial }, T0);
+  /** What happened to a Muse since the scene was set, from `minutes` after T0 on: each event's body, and its minute. */
+  const log = (id: MuseId, minutes = 0) =>
+    engine
+      .log(id)
+      .filter((e) => e.seq > events.filter((x) => x.museId === id).length && e.event.at >= atMin(minutes))
+      .map(({ event: { at, ...body } }) => ({ min: (at - T0) / MIN, ...body }));
+  return { store, engine, log };
+}
+const onTrip = (id: InvitationId, other: MuseId, role: 'host' | 'guest', until: number) => ({
+  kind: 'episode.started',
+  plan: { activity: 'visit', other, role, until: atMin(until), invitation: id },
+});
+const ofKind = (log: readonly { kind: string }[], kind: string) => log.filter((e) => e.kind === kind);
+const timed = (store: ReturnType<typeof memoryStore>, id: MuseId) => store.pending(id).filter((i) => i.kind === 'episode.end' || i.kind === 'trip.hop');
+
+describe('a ticket used: the owner travels with their Muse', () => {
+  it.each<[string, EpisodePlan]>([
+    ['asleep', rest(180)],
+    ['exploring', exploring],
+    ['beyond the planet', beyondFor(180)],
+  ])('takes Moss to Wren’s planet at once, and Wren comes home or wakes though it was %s', async (_, plan) => {
+    const { engine, store, log } = scene({ [MOSS]: rest(60), [WREN]: plan });
+    expect(await engine.invitationAction(TICKET, MOSS, 'use')).toEqual({ ok: true });
+    for (const [id, other, role] of [[MOSS, WREN, 'guest'], [WREN, MOSS, 'host']] as const) {
+      expect(log(id).slice(-3), id).toMatchObject([
+        { kind: 'invitation', id: TICKET, to: 'used' },
+        { kind: 'episode.ended', n: 1 },
+        { ...onTrip(TICKET, other, role, 120), n: 2 },
+      ]);
+      expect(timed(store, id), `${id} has no end of its own`).toEqual([]);
+    }
+    expect(store.pending(MOSS).filter((i) => i.kind === 'visit.close')).toEqual([
+      { id: `close:${TICKET}`, at: atMin(120), museId: MOSS, kind: 'visit.close', payload: { invitation: TICKET } },
+    ]);
+  });
+
+  it('ends a visit either Muse was on with a third, with that visit’s hangout, and the third goes on with its life', async () => {
+    const { engine, store, log } = scene({ [MOSS]: visiting(LARK, 'guest'), [LARK]: visiting(MOSS, 'host'), [WREN]: visiting(JUNIPER, 'host'), [JUNIPER]: visiting(WREN, 'guest') });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    expect(log(LARK).slice(-4)).toMatchObject([{ kind: 'photo.taken' }, { kind: 'hangout', other: MOSS, role: 'host' }, { kind: 'episode.ended', n: 1 }, { kind: 'episode.started', n: 2 }]);
+    expect(log(JUNIPER).slice(-4)).toMatchObject([{ kind: 'photo.taken' }, { kind: 'hangout', other: WREN, role: 'guest' }, { kind: 'episode.ended', n: 1 }, { kind: 'episode.started', n: 2 }]);
+    expect(engine.state(LARK)?.episode?.plan).not.toMatchObject({ other: MOSS });
+    expect(store.pending(LARK).some((i) => i.id === `end:${LARK}:1`), 'the visit’s own end is gone').toBe(false);
+    expect(engine.state(MOSS)?.episode?.plan).toEqual(onTrip(TICKET, WREN, 'guest', 120).plan);
+    expect(engine.state(WREN)?.episode?.plan).toEqual(onTrip(TICKET, MOSS, 'host', 120).plan);
+  });
+
+  it('closes at 2 h: the owner is home, the two hang out, and each goes on with its life', async () => {
+    const { engine, store, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180) });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(119));
+    expect(ofKind(log(MOSS, 1), 'hangout'), 'nothing before the close').toEqual([]);
+    await engine.advanceTo(atMin(120));
+    for (const [id, other, role] of [[MOSS, WREN, 'guest'], [WREN, MOSS, 'host']] as const) {
+      expect(log(id, 120)).toMatchObject([
+        { min: 120, kind: 'invitation', id: TICKET, to: 'returned' },
+        { min: 120, kind: 'photo.taken' },
+        { min: 120, kind: 'hangout', other, role },
+        { min: 120, kind: 'episode.ended', n: 2 },
+        { min: 120, kind: 'episode.started', n: 3 },
+      ]);
+    }
+    expect(engine.invitation(TICKET)).toMatchObject({ state: 'returned', usedAt: T0, returnedAt: atMin(120) });
+    expect(store.pending(MOSS).filter((i) => i.kind === 'visit.close')).toEqual([]);
+    expect(await engine.invitationAction(TICKET, MOSS, 'use')).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it('comes home early when the owner returns: the trip ends at once with its hangout, and the close never comes', async () => {
+    const { engine, store, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180) });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(40));
+    expect(await engine.invitationAction(TICKET, WREN, 'return')).toMatchObject({ ok: false, status: 403 });
+    expect(await engine.invitationAction(TICKET, MOSS, 'return')).toEqual({ ok: true });
+    for (const id of [MOSS, WREN]) {
+      expect(log(id, 40).map((e) => e.kind)).toEqual(['invitation', 'photo.taken', 'hangout', 'episode.ended', 'episode.started']);
+    }
+    expect(store.pending(MOSS).some((i) => i.kind === 'visit.close')).toBe(false);
+    expect(await engine.invitationAction(TICKET, MOSS, 'return'), 'returning twice').toEqual({ ok: true });
+    await engine.advanceTo(atMin(180));
+    expect(log(MOSS).filter((e) => e.kind === 'invitation').map((e) => [e.min, (e as { to?: string }).to])).toEqual([
+      [0, 'used'],
+      [40, 'returned'],
+    ]);
+    expect(engine.invitation(TICKET)).toMatchObject({ state: 'returned', returnedAt: atMin(40) });
+  });
+
+  it('waits for a working guest: Moss joins Wren when its work ends, until the same close', async () => {
+    const { engine, log } = scene({ [MOSS]: 'working', [WREN]: rest(180) });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    expect(log(WREN).map((e) => e.kind), 'Wren sleeps on meanwhile').toEqual(['invitation']);
+    expect(log(MOSS).map((e) => e.kind)).toEqual(['invitation']);
+    await engine.advanceTo(atMin(30));
+    await engine.hostWork(MOSS, 'ended');
+    expect(log(MOSS, 30)).toMatchObject([{ kind: 'host.work', state: 'ended' }, { ...onTrip(TICKET, WREN, 'guest', 120), n: 1 }]);
+    expect(log(WREN, 30)).toMatchObject([{ kind: 'episode.ended', n: 1 }, { ...onTrip(TICKET, MOSS, 'host', 120), n: 2 }]);
+    await engine.advanceTo(atMin(120));
+    expect(ofKind(log(MOSS, 120), 'hangout')).toHaveLength(1);
+  });
+
+  it('waits for a working host: Wren takes Moss in when its work ends, whatever Moss has started meanwhile', async () => {
+    const { engine, log } = scene({ [MOSS]: rest(30), [WREN]: 'working' });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(90));
+    const meanwhile = engine.state(MOSS)?.episode;
+    expect(meanwhile?.plan.activity, 'Moss went on with its life').not.toBe('visit');
+    await engine.hostWork(WREN, 'ended');
+    expect(log(MOSS, 90)).toMatchObject([{ kind: 'episode.ended', n: meanwhile?.n }, onTrip(TICKET, WREN, 'guest', 120)]);
+    expect(log(WREN, 90)).toMatchObject([{ kind: 'host.work', state: 'ended' }, onTrip(TICKET, MOSS, 'host', 120)]);
+  });
+
+  it('never sets off if the work outlasts the visit: the owner comes home at 2 h, with no hangout', async () => {
+    const { engine, log } = scene({ [MOSS]: rest(30), [WREN]: 'working' });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(150));
+    await engine.hostWork(WREN, 'ended');
+    for (const id of [MOSS, WREN]) {
+      const since = log(id);
+      expect(ofKind(since, 'invitation').map((e) => (e as { to?: string }).to)).toEqual(['used', 'returned']);
+      expect(ofKind(since, 'hangout')).toEqual([]);
+      const plans = ofKind(since, 'episode.started').map((e) => (e as { plan?: EpisodePlan }).plan);
+      expect(plans.some((p) => p?.activity === 'visit' && p.invitation !== undefined), 'never on the trip').toBe(false);
+    }
+  });
+
+  it('pauses in place for work in the middle of the trip and carries on after, with no end of its own', async () => {
+    const { engine, store, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180) });
+    engine.scheduleWork(WREN, atMin(30), atMin(60));
+    engine.scheduleWork(MOSS, atMin(45), atMin(75));
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(100));
+    for (const id of [MOSS, WREN]) {
+      expect(ofKind(log(id, 1), 'episode.started'), `${id} stays on the trip`).toEqual([]);
+      expect(ofKind(log(id, 1), 'episode.resumed')).toHaveLength(1);
+      expect(timed(store, id), `${id} has no end of its own`).toEqual([]);
+    }
+    await engine.advanceTo(atMin(120));
+    expect(ofKind(log(WREN, 120), 'hangout')).toHaveLength(1);
+  });
+
+  it('closes on time even while a Muse works, which then starts its next episode when the work ends', async () => {
+    const { engine, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180) });
+    engine.scheduleWork(MOSS, atMin(100), atMin(150));
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(149));
+    expect(log(MOSS, 120).map((e) => e.kind)).toEqual(['invitation', 'photo.taken', 'hangout', 'episode.ended']);
+    expect(engine.state(MOSS)?.episode).toBeNull();
+    expect(engine.state(WREN)?.episode?.plan.activity).toBeDefined();
+    await engine.advanceTo(atMin(150));
+    expect(log(MOSS, 150).map((e) => e.kind)).toEqual(['host.work', 'episode.started']);
+  });
+
+  it('brings no hangout home when either Muse has no photo slot left today', async () => {
+    const full: SocialPolicy = { ...socialPolicy, photoSlotsLeft: (s, now) => (s.seed.id === WREN ? 0 : socialPolicy.photoSlotsLeft(s, now)) };
+    const { engine, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180) }, full);
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(120));
+    for (const id of [MOSS, WREN]) expect(log(id, 120).map((e) => e.kind)).toEqual(['invitation', 'episode.ended', 'episode.started']);
+  });
+
+  it('takes the owner on one trip at a time: boarding another ticket returns from the first', async () => {
+    const { engine, store, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180), [JUNIPER]: rest(180) });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(30));
+    expect(await engine.invitationAction(JUNIPERS, MOSS, 'use')).toEqual({ ok: true });
+    expect(log(WREN, 30)).toMatchObject([
+      { kind: 'invitation', id: TICKET, to: 'returned' },
+      { kind: 'photo.taken' },
+      { kind: 'hangout', other: MOSS, role: 'host' },
+      { kind: 'episode.ended', n: 2 },
+      { kind: 'episode.started', n: 3 },
+    ]);
+    expect(engine.state(MOSS)?.episode?.plan).toEqual(onTrip(JUNIPERS, JUNIPER, 'guest', 150).plan);
+    expect(engine.state(JUNIPER)?.episode?.plan).toEqual(onTrip(JUNIPERS, MOSS, 'host', 150).plan);
+    expect(store.pending(MOSS).filter((i) => i.kind === 'visit.close').map((i) => i.id)).toEqual([`close:${JUNIPERS}`]);
+    expect(engine.invitation(TICKET)).toMatchObject({ state: 'returned', returnedAt: atMin(30) });
+    expect(await engine.invitationAction(TICKET, MOSS, 'use')).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it('lets a host on one trip take the next guest in when that trip ends', async () => {
+    const { engine, log } = scene({ [MOSS]: rest(60), [WREN]: rest(180), [LARK]: rest(240) });
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(30));
+    expect(await engine.invitationAction(LARKS, LARK, 'use')).toEqual({ ok: true });
+    expect(log(LARK, 30).map((e) => e.kind), 'Lark sleeps on while Wren has Moss over').toEqual(['invitation']);
+    await engine.advanceTo(atMin(60));
+    await engine.invitationAction(TICKET, MOSS, 'return');
+    expect(log(WREN, 60)).toMatchObject([
+      { kind: 'invitation', id: TICKET, to: 'returned' },
+      { kind: 'photo.taken' },
+      { kind: 'hangout', other: MOSS },
+      { kind: 'episode.ended' },
+      onTrip(LARKS, LARK, 'host', 150),
+    ]);
+    expect(log(LARK, 60)).toMatchObject([{ kind: 'episode.ended', n: 1 }, onTrip(LARKS, WREN, 'guest', 150)]);
+  });
+
+  it('keeps every Muse in exactly one episode or working, and never starts one while working', async () => {
+    const { engine, log } = scene({ [MOSS]: rest(60), [WREN]: exploring, [LARK]: rest(40), [JUNIPER]: beyondFor(70) });
+    for (const [id, a, b] of [[MOSS, 20, 50], [WREN, 100, 130], [JUNIPER, 200, 260], [MOSS, 300, 420]] as const) engine.scheduleWork(id, atMin(a), atMin(b));
+    await engine.invitationAction(TICKET, MOSS, 'use');
+    await engine.advanceTo(atMin(150));
+    await engine.invitationAction(JUNIPERS, MOSS, 'use');
+    await engine.advanceTo(atMin(280));
+    await engine.invitationAction(JUNIPERS, MOSS, 'return');
+    await engine.advanceTo(atMin(24 * 60));
+    for (const id of [MOSS, WREN, LARK, JUNIPER]) {
+      let open = 0;
+      let working = false;
+      for (const e of engine.log(id)) {
+        if (e.event.kind === 'host.work') working = e.event.state === 'started';
+        if (e.event.kind === 'episode.started') {
+          expect(working, `${id} started an episode while working, at seq ${e.seq}`).toBe(false);
+          open++;
+        }
+        if (e.event.kind === 'episode.ended') open--;
+        expect(open === 0 || open === 1, `${id} at seq ${e.seq}`).toBe(true);
+      }
+    }
+    expect(ofKind(log(MOSS), 'hangout').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a restarted engine picks a trip up where it left off', async () => {
+    const run = async (stopAt: number | null) => {
+      const { engine, store } = scene({ [MOSS]: rest(60), [WREN]: exploring, [LARK]: rest(30) });
+      engine.scheduleWork(WREN, atMin(10), atMin(40));
+      engine.scheduleWork(MOSS, atMin(70), atMin(90));
+      await engine.invitationAction(TICKET, MOSS, 'use');
+      if (stopAt === null) {
+        await engine.advanceTo(atMin(6 * 60));
+        return engine;
+      }
+      await engine.advanceTo(atMin(stopAt));
+      const restarted = new Engine({ ...stubDeps(store), social: socialPolicy, reduceSocial }, atMin(stopAt));
+      await restarted.advanceTo(atMin(6 * 60));
+      return restarted;
+    };
+    const clean = await run(null);
+    for (const stopAt of [25, 80]) {
+      const restarted = await run(stopAt);
+      for (const id of [MOSS, WREN, LARK]) expect(strip(restarted.log(id)), `${id}, stopped at ${stopAt} min`).toEqual(strip(clean.log(id)));
+    }
   });
 });

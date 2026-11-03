@@ -141,6 +141,7 @@ function routesFor({ queries, commands, now, media, subscribe }: Garden): readon
       if (view === 'forbidden') throw new HttpError(403, 'no visit of yours is open');
       return json(view);
     },
+    returnFromVisit: async ({ params, query }) => result(await commands.returnFromVisit(requestingOwner(query), id<InvitationId>(params.id, 'id'))),
     hostWork: async ({ params, body }) => result(await commands.hostWork(muse(params.id), workState(field(body, 'state')))),
     hostSoul: async ({ params, body }) => result(await commands.hostSoul(muse(params.id), text(field(body, 'text')))),
     hostMemory: async ({ params, body }) => {

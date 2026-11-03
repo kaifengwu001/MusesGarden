@@ -123,6 +123,34 @@ describe('the garden over HTTP on the engine', () => {
     expect(replayed.at(-1)?.event).toEqual({ type: 'status', status: snapshot.muse.status });
   });
 
+  it('takes an owner on a trip with a ticket and brings them home early: 200 for the guest, 403 for the host, 409 once it’s over', async () => {
+    const garden = await engineGarden();
+    await serve(garden);
+    let ticket: { readonly id: string; readonly guest: MuseId; readonly host: MuseId } | undefined;
+    for (let h = 0; h < 14 * 24 && !ticket; h += 6) {
+      await garden.commands.advance(6);
+      for (const { museId } of garden.queries.muses()) {
+        const card = garden.queries.invitations(museId, garden.now()).find((c) => c.role === 'guest' && c.state === 'sent');
+        const host = garden.queries.muses().find((m) => m.name === card?.otherName);
+        if (card && host) ticket = { id: card.id, guest: museId, host: host.museId };
+      }
+    }
+    if (!ticket) throw new Error('no ticket in two weeks');
+    const { id, guest, host } = ticket;
+    const world = () => fetch(`${base}/api/visits/${id}/world?as=${guest}`);
+    expect(await post(`/api/muses/${guest}/garden/reactions`, { type: 'use-invitation', id })).toEqual({ status: 200, body: { ok: true } });
+    const open = await world();
+    expect(open.status).toBe(200);
+    const planet = loadCast().members.find((m) => m.id === host)!.planet;
+    expect(await open.json()).toMatchObject({ invitation: id, planet, host: { museId: host }, guest: { museId: guest }, together: expect.any(Boolean) as boolean });
+
+    expect(await post(`/api/visits/${id}/return?as=${host}`, undefined)).toMatchObject({ status: 403 });
+    expect(await post(`/api/visits/${id}/return?as=${guest}`, undefined)).toEqual({ status: 200, body: { ok: true } });
+    expect((await world()).status).toBe(403);
+    expect(await post(`/api/visits/${id}/return?as=${guest}`, undefined), 'returning twice').toEqual({ status: 200, body: { ok: true } });
+    expect(await post(`/api/muses/${guest}/garden/reactions`, { type: 'use-invitation', id })).toEqual({ status: 409, body: { error: 'this invitation is returned' } });
+  });
+
   it('keeps likes, stars and private finds: each shows in the next snapshot and reaches an open garden', async () => {
     const garden = await engineGarden();
     await garden.commands.advance(48);

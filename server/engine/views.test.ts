@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CanonicalUrl, Dir, DiscoveryId, EpisodePlan, Instant, InvitationId, MemberInfo, MuseEvent, MuseEventBody, MuseId, RegionKey, TopicKey } from '../../src/muse/contract';
+import type { CanonicalUrl, Dir, DiscoveryId, EpisodePlan, GardenFrame, Instant, InvitationId, MemberInfo, MuseEvent, MuseEventBody, MuseId, RegionKey, TopicKey } from '../../src/muse/contract';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
 import { emptyState, reduceCore } from '../domain/state';
@@ -34,7 +34,7 @@ async function setup() {
 }
 
 /** Moss's owner holds an invitation Wren sent at T0, replayed from the store as a restart would. */
-async function invited() {
+async function invited(members: ReadonlyMap<MuseId, MemberInfo> = new Map()) {
   const store = memoryStore();
   const deps = { ...stubDeps(store), social: socialPolicy, reduceSocial };
   const seeding = new Engine(deps, T0);
@@ -42,7 +42,7 @@ async function invited() {
   const event: MuseEvent = { kind: 'invitation', id: INVITE, host: WREN, guest: MOSS, to: 'sent', at: T0 };
   store.commit({ remove: [], schedule: [], events: [WREN, MOSS].map((museId) => ({ museId, seq: store.lastSeq(museId) + 1, event })) });
   const engine = new Engine(deps, T0);
-  return { engine, views: new Views(engine, socialPolicy, helpers, new Map()), commands: new Commands(engine, 'fast-forward') };
+  return { engine, views: new Views(engine, socialPolicy, helpers, members), commands: new Commands(engine, 'fast-forward') };
 }
 
 const MOSS = 'moss' as MuseId;
@@ -122,6 +122,64 @@ describe('an invitation, through the commands', () => {
     const plant = (id: string) => view.plants.find((p) => p.id === id)!;
     expect(plant('d-lichen')).toMatchObject({ bed: flowerOf('Lichen'), card: { pursuing: 'Lichen' } });
     expect(plant('d-secret')).toEqual({ id: 'd-secret', dir: [0, 1, 0], bed: flowerOf('d-secret'), preview: null, card: null });
+  });
+
+  it('shows the trip on both sides while it lasts, and closes the view when the owner returns', async () => {
+    const { engine, views, commands } = await invited(new Map([[WREN, { role: 'friend', planet: 'violet-dunes', look: 'muse8' }]]));
+    await commands.advance(5 * 24);
+    expect(await commands.useInvitation(MOSS, INVITE)).toEqual({ ok: true });
+    const usedAt = engine.now();
+    const until = usedAt + 2 * H;
+    expect(views.visit(INVITE, MOSS, usedAt)).toMatchObject({
+      planet: 'violet-dunes',
+      host: { museId: WREN, look: 'muse8' },
+      guest: { museId: MOSS, look: 'tpose6' },
+      together: true,
+      now: usedAt,
+      until,
+    });
+    expect(views.now(MOSS, usedAt)).toMatchObject({
+      activity: 'visit',
+      label: "Away at wren's planet with you",
+      until,
+      path: null,
+      away: { kind: 'planet', of: WREN, name: 'wren', planet: 'violet-dunes', withOwner: true, invitation: INVITE },
+    });
+    expect(views.now(WREN, usedAt)).toMatchObject({ label: 'moss is visiting, with its owner', companion: { museId: MOSS, name: 'moss', look: 'tpose6', withOwner: true } });
+    expect(views.garden(MOSS, usedAt)?.muse.status).toEqual({ home: false, note: "Away at wren's planet with you", trip: { invitation: INVITE, host: WREN, planet: 'violet-dunes', until } });
+    expect(views.garden(WREN, usedAt)?.muse.status).toEqual({ home: true, note: 'moss is visiting, with its owner' });
+
+    await commands.advance(0.5);
+    expect(await commands.returnFromVisit(WREN, INVITE)).toMatchObject({ ok: false, status: 403 });
+    expect(await commands.returnFromVisit(MOSS, INVITE)).toEqual({ ok: true });
+    const back = engine.now();
+    expect(views.visit(INVITE, MOSS, back)).toBe('forbidden');
+    expect(views.invitations(MOSS, back)).toEqual([expect.objectContaining({ state: 'returned', usedAt, actions: [], canVisitNow: false })]);
+    expect(views.garden(MOSS, back)?.muse.status.trip).toBeUndefined();
+    expect(views.now(MOSS, back)?.away?.kind).not.toBe('planet');
+    expect(views.garden(MOSS, back)?.postcards.find((p) => p.id === INVITE)?.invitation).toMatchObject({ world: 'violet-dunes', used: true });
+    expect(await commands.returnFromVisit(MOSS, INVITE), 'returning twice').toEqual({ ok: true });
+    expect(await commands.useInvitation(MOSS, INVITE)).toMatchObject({ ok: false, status: 409 });
+    expect(await commands.returnFromVisit(MOSS, 'inv:nobody' as InvitationId)).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it('tells the owner they are on the trip while their Muse still works, and the two are together once it’s done', async () => {
+    const { engine, views, commands } = await invited();
+    await commands.advance(5 * 24);
+    await commands.hostWork(MOSS, 'started');
+    const frames: GardenFrame[] = [];
+    const stop = views.subscribeGarden(MOSS, null, (f) => frames.push(f));
+    await commands.useInvitation(MOSS, INVITE);
+    stop();
+    const t = engine.now();
+    expect(views.visit(INVITE, MOSS, t)).toMatchObject({ together: false });
+    const trip = { invitation: INVITE, host: WREN, planet: 'meadow', until: t + 2 * H };
+    expect(views.garden(MOSS, t)?.muse.status).toMatchObject({ note: expect.stringMatching(/^Working/) as string, trip });
+    expect(frames.at(-1)?.event, 'the garden hears of the trip at once').toMatchObject({ type: 'status', status: { trip } });
+    await commands.advance(0.25);
+    await commands.hostWork(MOSS, 'ended');
+    expect(views.visit(INVITE, MOSS, engine.now())).toMatchObject({ together: true });
+    expect(views.now(MOSS, engine.now())?.label).toBe("Away at wren's planet with you");
   });
 
   it('answers 404 for an invitation nobody holds', async () => {
@@ -232,6 +290,8 @@ describe('what Muse is doing, in a few words', () => {
   const beyond = started({ activity: 'beyond', until: until(60) });
   const guest = started({ activity: 'visit', other: WREN, role: 'guest', until: until(60) });
   const host = started({ activity: 'visit', other: WREN, role: 'host', until: until(60) });
+  const guestOnTrip = started({ activity: 'visit', other: WREN, role: 'guest', until: until(120), invitation: INVITE });
+  const hostOnTrip = started({ activity: 'visit', other: WREN, role: 'host', until: until(120), invitation: INVITE });
 
   it.each<[string, MuseEventBody[], string, string]>([
     ['at home', [], 'At home', 'At home'],
@@ -246,6 +306,10 @@ describe('what Muse is doing, in a few words', () => {
     ['working at a friend’s planet', [guest, work], "Working at Wren's planet", "Working at Wren's planet"],
     ['hosting', [host], 'Wren is visiting', 'Wren is visiting'],
     ['working while hosting', [host, work], 'Working', 'Working'],
+    ['away at a friend’s planet with its owner', [guestOnTrip], "Away at Wren's planet with you", "Away at Wren's planet with you"],
+    ['working at a friend’s planet with its owner', [guestOnTrip, work], "Working at Wren's planet", "Working at Wren's planet"],
+    ['hosting a friend and its owner', [hostOnTrip], 'Wren is visiting, with its owner', 'Wren is visiting, with its owner'],
+    ['working while hosting a friend and its owner', [hostOnTrip, work], 'Working', 'Working'],
   ])('%s: the engine says it, and the garden says it shorter', (_, events, label, note) => {
     const { views } = restarted(events.map((e) => [MOSS, e] as const));
     const now = views.now(MOSS, T0)!;

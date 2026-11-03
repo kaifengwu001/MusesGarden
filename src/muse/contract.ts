@@ -353,7 +353,14 @@ export type EpisodePlan =
   | { readonly activity: 'rest'; readonly until: Instant }
   | { readonly activity: 'travel'; readonly trip: TripStart }
   | { readonly activity: 'beyond'; readonly until: Instant }
-  | { readonly activity: 'visit'; readonly other: MuseId; readonly role: 'host' | 'guest'; readonly until: Instant };
+  | {
+      readonly activity: 'visit';
+      readonly other: MuseId;
+      readonly role: 'host' | 'guest';
+      readonly until: Instant;
+      /** Set on a trip: the guest's owner used this ticket and came along. It ends when the visit closes or they return. */
+      readonly invitation?: InvitationId;
+    };
 
 export interface Verdict {
   readonly canonicalUrl: CanonicalUrl;
@@ -713,7 +720,9 @@ export type ScheduleKind =
   | 'trip.hop'
   | 'host.work'
   | 'basket.check'
-  | 'encounter';
+  | 'encounter'
+  /** A trip's end, 2 h after the ticket was used (`close:<invitationId>`, payload { invitation }). Work never moves it. */
+  | 'visit.close';
 
 export interface ScheduleItem {
   /** Deterministic: the same follow-up from the same cause always gets the same id. */
@@ -762,12 +771,28 @@ export interface NowView {
   readonly sleeping: boolean;
   readonly since: Instant;
   readonly until: Instant | null;
-  /** "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Wren is visiting", "Away at Wren's planet", "Working". */
+  /**
+   * "Exploring: Pigment → Ultramarine", "Napping", "Traveling outside the planet", "Wren is visiting", "Wren is
+   * visiting, with its owner", "Away at Wren's planet", "Away at Wren's planet with you", "Working".
+   */
   readonly label: string;
   /** Muse's route on its own planet; null while beyond or away (no follow). */
   readonly path: readonly { readonly dir: Dir; readonly at: Instant; readonly transport?: true }[] | null;
-  readonly companion: { readonly museId: MuseId; readonly name: string } | null;
-  readonly away: { readonly kind: 'beyond' } | { readonly kind: 'planet'; readonly of: MuseId; readonly name: string } | null;
+  /** The friend's Muse visiting; `withOwner` on a trip, when its owner came along on a ticket. */
+  readonly companion: { readonly museId: MuseId; readonly name: string; readonly look: MuseLook; readonly withOwner: boolean } | null;
+  readonly away:
+    | { readonly kind: 'beyond' }
+    | {
+        readonly kind: 'planet';
+        readonly of: MuseId;
+        readonly name: string;
+        /** The host's planet. */
+        readonly planet: PlanetId;
+        /** On a trip: the owner used `invitation` and is there too. */
+        readonly withOwner: boolean;
+        readonly invitation?: InvitationId;
+      }
+    | null;
 }
 
 export interface RegionView {
@@ -891,8 +916,12 @@ export interface VisitWorldView {
   readonly regions: readonly RegionView[];
   /** The house is never included. */
   readonly plants: readonly VisitPlant[];
-  /** 2 h after the invitation was used: until then a reload is the same visit. */
+  /** When the trip ends, 2 h after the invitation was used: until then a reload is the same visit. */
   readonly until: Instant;
+  /** Both Muses are on the trip now; false while one of them still works and the other waits. */
+  readonly together: boolean;
+  /** The engine's clock as of this view, against which `until` counts down. */
+  readonly now: Instant;
 }
 
 export interface SharingView {
@@ -938,7 +967,7 @@ export interface GardenQueries {
   photos(museId: MuseId, before: PhotoId | null, limit: number): Page<PhotoView, PhotoId>;
   shelf(museId: MuseId): ShelfView | null;
   invitations(museId: MuseId, at: Instant): readonly InvitationCard[];
-  /** 'forbidden' unless `requester` is the guest's Muse and its owner used the invitation less than 2 h before `at`. */
+  /** 'forbidden' unless `requester` is the guest's Muse and its trip is still on at `at`: used less than 2 h before, not returned. */
   visit(invitation: InvitationId, requester: MuseId, at: Instant): VisitWorldView | 'forbidden';
   sharing(museId: MuseId): SharingView | null;
   mind(museId: MuseId): MindView | null;
@@ -973,6 +1002,8 @@ export interface GardenCommands {
   useInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   /** The host's owner takes back an invitation not yet used. Nothing else ever withdraws one. */
   withdrawInvitation(museId: MuseId, id: InvitationId): Promise<CommandResult>;
+  /** "Return home" before the trip's 2 h are up: the guest's owner and Muse leave the host's planet together. */
+  returnFromVisit(museId: MuseId, id: InvitationId): Promise<CommandResult>;
   // The host simulator: stands in for the Muse app.
   hostWork(museId: MuseId, state: 'started' | 'ended'): Promise<CommandResult>;
   hostSoul(museId: MuseId, text: string): Promise<CommandResult>;

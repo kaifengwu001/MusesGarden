@@ -130,7 +130,7 @@ export function fakeQueries(): GardenQueries {
     invitations: (museId) => heroOnly(museId, sampleInvitations) ?? [],
     visit: (invitation, requester, at) =>
       invitation === sampleVisit.invitation && requester === HERO && at >= usedAt && at < sampleVisit.until
-        ? sampleVisit
+        ? { ...sampleVisit, now: at }
         : 'forbidden',
     sharing: (museId) => heroOnly(museId, sampleSharing),
     mind: (museId) => heroOnly(museId, sampleMind),
@@ -175,6 +175,7 @@ export function fakeCommands(): FakeCommands {
     favorite: (...args) => accept({ name: 'favorite', args }),
     useInvitation: (...args) => accept({ name: 'useInvitation', args }),
     withdrawInvitation: (...args) => accept({ name: 'withdrawInvitation', args }),
+    returnFromVisit: (...args) => accept({ name: 'returnFromVisit', args }),
     hostWork: (...args) => accept({ name: 'hostWork', args }),
     hostSoul: (...args) => accept({ name: 'hostSoul', args }),
     hostMemory: (...args) => accept({ name: 'hostMemory', args }),

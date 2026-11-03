@@ -58,7 +58,11 @@ export interface GardenInput {
   readonly inReach: (other: MuseId) => boolean;
   /** Any Muse's planet as a visitor finds it: which world, at what seed and growth, and the body its Muse wears. */
   readonly planetOf: (id: MuseId) => HostPlanet | null;
+  /** The trip the owner is on now, if any. */
+  readonly trip: Trip | null;
 }
+
+export type Trip = NonNullable<MuseStatus['trip']>;
 
 export interface HostPlanet {
   readonly planet: PlanetId;
@@ -93,8 +97,8 @@ const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   find: 'cottage',
   invitation: 'pier',
 };
-/** Invitation states the guest's owner still holds: sent (kept for later), or used. A withdrawn one is gone. */
-const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used']);
+/** Invitation states the guest's owner still holds: sent (kept for later), used, or returned from. A withdrawn one is gone. */
+const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used', 'returned']);
 
 // ─── What the log adds to the state ─────────────────────────────────────────
 
@@ -184,11 +188,14 @@ export function soulLine(soul: string | null): string {
   return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '')}…`;
 }
 
-/** The garden says what Muse is doing in a few words: the engine's label, without the trip's topics. */
-export function museStatus(now: NowView): MuseStatus {
+/**
+ * The garden says what Muse is doing in a few words: the engine's label, without the trip's topics. While the owner
+ * is away on a ticket, it says where, so the garden can offer the way back.
+ */
+export function museStatus(now: NowView, trip: Trip | null = null): MuseStatus {
   const out = now.activity === 'travel' || now.away !== null;
   const note = now.activity === 'travel' && !now.working ? 'Out exploring' : now.label;
-  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note };
+  return { home: !out, where: now.activity === 'travel' ? now.path?.at(-1)?.dir : undefined, note, ...(trip ? { trip } : {}) };
 }
 
 /** The flower an interest grows as, from its topic alone, so it never changes. */
@@ -326,7 +333,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   return {
     today: input.day(input.now.at),
     world: { seed: s.seed.worldSeed, g: input.g },
-    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now), reach: s.reach },
+    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now, input.trip), reach: s.reach },
     interests: interests(input, finds, index),
     friends: friends(input, index),
     baskets: delivered.map(({ basket }) => basket),
@@ -374,8 +381,9 @@ function friends(input: GardenInput, index: LogIndex): MuseFriend[] {
 
 // ─── Events ─────────────────────────────────────────────────────────────────
 
-/** Events that change what Muse is doing or where. */
+/** Events that change what Muse is doing or where, or where its owner is: a ticket used or returned from. */
 const MOVES: ReadonlySet<MuseEvent['kind']> = new Set(['episode.started', 'episode.ended', 'episode.paused', 'episode.resumed', 'trip.hop', 'host.work']);
+const moves = (e: MuseEvent): boolean => MOVES.has(e.kind) || (e.kind === 'invitation' && (e.to === 'used' || e.to === 'returned'));
 
 /**
  * The garden events that `events` (this Muse's, in log order) bring, each framed with the seq it came from, then
@@ -415,6 +423,6 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
       if (postcard) frame(seq, { type: 'postcard', postcard });
     }
   }
-  if (withStatus === 'always' || events.some((e) => MOVES.has(e.event.kind))) frame(s.seq, { type: 'status', status: museStatus(input.now) });
+  if (withStatus === 'always' || events.some((e) => moves(e.event))) frame(s.seq, { type: 'status', status: museStatus(input.now, input.trip) });
   return frames;
 }

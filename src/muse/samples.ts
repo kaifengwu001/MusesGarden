@@ -113,7 +113,7 @@ export const sampleNowAway: NowView = {
   label: "Away at Wren's planet",
   until: at('2026-11-04T16:10:00-08:00'),
   path: null,
-  away: { kind: 'planet', of: WREN, name: 'Wren' },
+  away: { kind: 'planet', of: WREN, name: 'Wren', planet: 'violet-dunes', withOwner: false },
 };
 
 export const sampleNowBeyond: NowView = {
@@ -131,7 +131,7 @@ export const sampleNowHosting: NowView = {
   label: 'Juniper is visiting',
   until: at('2026-11-04T16:10:00-08:00'),
   path: [{ dir: dir(0.1, 0.99, 0.05), at: at('2026-11-04T15:20:00-08:00') }],
-  companion: { museId: JUNIPER, name: 'Juniper' },
+  companion: { museId: JUNIPER, name: 'Juniper', look: 'muse6', withOwner: false },
 };
 
 export const sampleNowNapping: NowView = {
@@ -275,6 +275,8 @@ export const sampleVisit: VisitWorldView = {
     { id: plant('w-private'), dir: dir(0.88, 0.25, 0.4), bed: { species: 0, variant: 0.73 }, preview: null, card: null },
   ],
   until: at('2026-11-05T17:00:00-08:00'),
+  together: true,
+  now: at('2026-11-05T15:00:00-08:00'),
 };
 
 export const sampleSharing: SharingView = {
