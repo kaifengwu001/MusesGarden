@@ -157,7 +157,7 @@ export class MuseProps {
   /** Splashes already sent (their time), so each is sent once. */
   private readonly splashed = new Set<number>();
 
-  constructor(shared: Record<string, IUniform>) {
+  constructor(shared: Record<string, IUniform>, private readonly homeProps = true) {
     this.material = new ShaderMaterial({ name: 'muse props', vertexShader, fragmentShader, uniforms: { ...shared, uGlow: { value: this.glow } }, side: DoubleSide });
     const mesh = (geometry: BufferGeometry): Mesh => {
       const m = new Mesh(geometry, this.material);
@@ -219,7 +219,7 @@ export class MuseProps {
         [new CircleGeometry(0.18, 20), 0xd9893f, at(-0.04, 0.64, 0, -Math.PI / 2)],
       ]),
     );
-    this.stove.visible = true;
+    this.stove.visible = homeProps;
     // the fishing line
     const lineGeometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute(new Float32Array(LINE * 3), 3));
     this.line = new Line(lineGeometry, new ShaderMaterial({ name: 'muse line', vertexShader: lineVertex, fragmentShader: lineFragment, uniforms: { ...shared }, transparent: true }));
@@ -365,7 +365,7 @@ export class MuseProps {
     const cooking = c ? 1 : 0;
     const flicker = 0.85 + 0.25 * Math.sin(time * 11) * Math.sin(time * 7.3);
     this.glow.set(1.4, 0.8, 0.35).multiplyScalar((0.25 + 0.75 * cooking) * flicker);
-    if (cooking) {
+    if (cooking && this.homeProps) {
       for (let k = 0; k < 7; k++) {
         const u = (((time / 2.8 + k / 7) % 1) + 1) % 1;
         const p = v12

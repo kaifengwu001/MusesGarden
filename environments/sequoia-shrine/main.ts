@@ -24,6 +24,8 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from '../../src/view/input';
+import { prepareVisit, VisitUi } from '../../src/visit/visitUi';
+import { sequoiaVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
 import { World } from './world';
@@ -90,6 +92,8 @@ async function boot(): Promise<void> {
   };
   chooseTier(store.values.quality.tier);
 
+  // A visit on a ticket (`?visit=`): the host's planet, its seed and growth set before the world is made.
+  const visit = await prepareVisit(store, 'sequoia-shrine');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -125,7 +129,8 @@ async function boot(): Promise<void> {
     if(label==='Wayside shrines')button.title='Visit the next shrine along the woodland route';
     button.addEventListener('click',()=>{action();world.markPosed();});places.append(button);
   }
-  uiRoot.append(places);
+  // (on a visit, only the visit's banner: no places of this world's own to fly to)
+  if (!visit) uiRoot.append(places);
 
   // Camera pose in the URL; without one, frame the homestead.
   let userPosed = false;
@@ -165,7 +170,8 @@ async function boot(): Promise<void> {
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
   const useGarden=new URLSearchParams(location.search).has('garden')||new URLSearchParams(location.search).has('dev');
-  const garden = useGarden ? new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world)) : null;
+  // On a visit, the visit's interface in its place, with no engine of our own; without one, the garden only with ?garden or ?dev.
+  const garden = visit ? new VisitUi(uiRoot, sequoiaVisit(world), visit) : useGarden ? new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world)) : null;
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
