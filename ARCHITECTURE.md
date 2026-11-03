@@ -919,7 +919,8 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
 - **The trees near the camera** (treesNear.ts, off by default: Tree detail
   near): within the reach each tree drawn in full, its crown the far
   tree's five lumps heaped of leafy clumps from one template (placed per
-  tree in treeNear.vert.glsl from its seed), a trunk and branches, fading
+  tree in treeNear.vert.glsl from its seed, in right-handed frames so the
+  template's triangles keep facing out), a trunk and branches, fading
   into the far tree over the reach's last 4 m on complementary dithered
   pixels (tree.vert.glsl leaves the card out within the reach).
 - **The houses' models**: Kai's second five drawn as they came (models.ts

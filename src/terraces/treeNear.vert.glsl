@@ -53,10 +53,12 @@ void main() {
     c = crown - U * (0.42 * rc) + (S1 * cos(a + 1.0) + S2 * sin(a + 1.0)) * (0.2 * rc);
     r = 0.52 * rc;
   }
-  // (its clumps turned about its up by its seed, so the trees do not all wear the template the same way)
+  // (its clumps turned about its up by its seed, so the trees do not all wear the template the same way; the frame
+  // right-handed, T1 × U = T2, so the template's triangles still face out: a mirrored one turned each clump inside
+  // out, its near half culled and the inside of its far half drawn, lit from below and dark on top)
   float turn = seed * 19.47;
   vec3 T1 = S1 * cos(turn) + S2 * sin(turn);
-  vec3 T2 = cross(U, T1);
+  vec3 T2 = cross(T1, U);
   int kind = int(aPuff.x + 0.5);
   vec3 p;
   vec3 n;
@@ -72,7 +74,7 @@ void main() {
     float rr = kind == 2 ? rt * (1.0 - 0.35 * position.y) : rt * 0.55 * (1.0 - 0.6 * position.y);
     vec3 axis = normalize(to - from);
     vec3 B1 = normalize(cross(axis, abs(dot(axis, S1)) < 0.9 ? S1 : S2));
-    vec3 B2 = cross(axis, B1);
+    vec3 B2 = cross(B1, axis);
     p = mix(from, to, position.y) + (B1 * position.x + B2 * position.z) * rr;
     n = normalize(B1 * position.x + B2 * position.z);
   }

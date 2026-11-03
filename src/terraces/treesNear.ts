@@ -53,7 +53,8 @@ function template(): InstancedBufferGeometry {
     }
     clump(1, k, 0.64, 1, new Vector3(0, 1, 0), k * 31337);
   });
-  // the trunk (kind 2), and a branch (kind 3) up into each side lump: tapered eight-sided tubes, y along them
+  // the trunk (kind 2), and a branch (kind 3) up into each side lump: tapered eight-sided tubes, y along them, wound
+  // to face out as the clumps are
   const tube = (kind: number, k: number): void => {
     const base = positions.length / 3;
     const sides = 8;
@@ -70,7 +71,7 @@ function template(): InstancedBufferGeometry {
       for (let i = 0; i < sides; i++) {
         const a = base + j * sides + i;
         const b = base + j * sides + ((i + 1) % sides);
-        index.push(a, b, b + sides, a, b + sides, a + sides);
+        index.push(a, b + sides, b, a, a + sides, b + sides);
       }
   };
   tube(2, 0);
@@ -112,6 +113,8 @@ export class NearTrees {
     if (!placed || near <= 0) {
       this.mesh.geometry.instanceCount = 0;
       this.mesh.visible = false;
+      // (found again when the reach is back, even with the eye where it was: the far trees leave the reach to them)
+      this.placed = null;
       return;
     }
     if (placed === this.placed && Math.abs(near - this.reach) < 1e-6 && eye.distanceTo(this.at) < 0.5) return;
