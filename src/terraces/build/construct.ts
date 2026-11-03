@@ -70,9 +70,9 @@ export interface BuildParams {
   /** A tree about every this many m, where the woods are. */
   readonly treeSpacing: number;
   /**
-   * The mountains: up to `groups` groups of two to four of Kai's karst towers on the hilltops, at least `apart` m
-   * apart; a group's tallest so tall (m, from … to), the rest of it a share of that (from … to); the woods round
-   * each foot out to `foot` × its height, and some.
+   * The mountains: up to `groups` groups of two to four of Kai's karst towers on the highest hilltops, at least
+   * `apart` m apart; a group's tallest so tall (m, from … to), the rest of it a share of that (from … to); the woods
+   * round each foot out to `foot` × its height, and some.
    */
   readonly peaks: { readonly groups: number; readonly apart: number; readonly height: readonly [number, number]; readonly share: readonly [number, number]; readonly foot: number };
   /** The least woods and flats (m²): a patch of either smaller is terraced like the land round it. */
@@ -92,7 +92,11 @@ export const BUILD: BuildParams = {
   cut: { spacing: [7, 20], cascade: 0.75, drift: 0.5, shift: 0.45, blend: 1.2 },
   plot: { bunds: [24, 36], strip: [3, 5], cross: [8, 14], alongBund: 0.3, bend: [0.24, 0.3], bendOver: [30, 44], wobble: 0.9, minor: 0.3, major: 0.6, trackWidth: 1.6 },
   treeSpacing: 2.2,
-  peaks: { groups: 7, apart: 70, height: [30, 44], share: [0.45, 0.85], foot: 0.5 },
+  // (seven groups 70 m apart on the hills at the lab's size; Kai, 2026-11-02, "opportunities for more groups of sharp
+  // mountains": as many more as there are hills, as much closer. The towers' size as it was; the woods round each
+  // past its body, 0.32 of its height across (underTower), 0.18 of its height and some at the lab's hills, with the
+  // hills: they clothe its hilltop)
+  peaks: { groups: Math.round(7 / (HILLS * HILLS)), apart: 70 * HILLS, height: [30, 44], share: [0.45, 0.85], foot: 0.32 + 0.18 * HILLS },
   // (the lab's 60 and 400 m², with the hills' area)
   leastWoods: 60 * HILLS * HILLS,
   leastFlats: 400 * HILLS * HILLS,
@@ -377,7 +381,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       if (list) list.push(i);
       else cells.set(k, [i]);
     }
-    // (a top: higher than every sample within 20 m)
+    // (a top: higher than every sample within TOP m)
     const tops: number[] = [];
     for (let i = 0; i < n; i++) {
       const [x, y, z] = [dirs[3 * i], dirs[3 * i + 1], dirs[3 * i + 2]];
@@ -394,11 +398,27 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       if (top) tops.push(i);
     }
     tops.sort((a, b) => hs[b] - hs[a]);
+    // (a top on a plateau, flat all round as far as the least flats reach, left to its fields: the towers stand on
+    // the hills, the plains are farmed)
+    const flatOut = Math.sqrt(P.leastFlats / Math.PI) / R;
+    const plateau = (i: number): boolean => {
+      const F = tangentFrame(dirs[3 * i], dirs[3 * i + 1], dirs[3 * i + 2], new Float64Array(6));
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        const x = dirs[3 * i] + flatOut * (Math.cos(a) * F[0] + Math.sin(a) * F[3]);
+        const y = dirs[3 * i + 1] + flatOut * (Math.cos(a) * F[1] + Math.sin(a) * F[4]);
+        const z = dirs[3 * i + 2] + flatOut * (Math.cos(a) * F[2] + Math.sin(a) * F[5]);
+        const l = Math.hypot(x, y, z);
+        if (field.slope(x / l, y / l, z / l) >= fp.flat) return false;
+      }
+      return true;
+    };
     const PK = P.peaks;
     const chosen: number[] = [];
     for (const i of tops) {
       if (chosen.length >= PK.groups) break;
       if (chosen.some((j) => dirs[3 * i] * dirs[3 * j] + dirs[3 * i + 1] * dirs[3 * j + 1] + dirs[3 * i + 2] * dirs[3 * j + 2] > Math.cos(PK.apart / R))) continue;
+      if (plateau(i)) continue;
       chosen.push(i);
     }
     for (const i of chosen) {
@@ -436,10 +456,10 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     return best;
   };
   const footV = (v: number): number => footF(D[3 * v], D[3 * v + 1], D[3 * v + 2]);
+  // (the woods round a foot stop at the flats: the plains keep their fields)
   for (let v = 0; v < V; v++) {
-    if (footV(v) < 0) continue;
+    if (footV(v) < 0 || flatIdx[v]) continue;
     woodsIdx[v] = 1;
-    flatIdx[v] = 0;
   }
   /** The woods, the steep and the towers' feet: ≥ 0 within them. */
   const woodsF: Field = (x, y, z) => Math.max(steepF(x, y, z), footF(x, y, z));
@@ -451,7 +471,8 @@ export function buildTerraces(input: BuildInput): BuildOutput {
    */
   const classAt = (x: number, y: number, z: number): number => {
     const s = field.slope(x, y, z);
-    let woods = s - fp.steep >= 0 || footF(x, y, z) >= 0;
+    const steep = s - fp.steep >= 0;
+    let woods = steep || footF(x, y, z) >= 0;
     let w = false;
     for (const r of turned) {
       if (!r.woods || w || x * r.c[0] + y * r.c[1] + z * r.c[2] < 0.9) continue;
@@ -461,8 +482,10 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       woods = r.value === 1;
       w = true;
     }
-    if (woods) return 0;
+    if (woods && (steep || w)) return 0;
     const p = plainAt(x, y, z);
+    // (a foot's woods stop at a plain's edge: its fields its own)
+    if (woods && (p < 0 || plainDist(p, x, y, z) >= 0)) return 0;
     if (p < 0) return 2;
     const d = plainDist(p, x, y, z);
     return d < 0 || (d < rasters[p].collar && bandsNow !== null && bandsNow.bandAt(x, y, z) === plainBand[p]) ? 1 : 2;

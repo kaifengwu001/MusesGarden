@@ -705,11 +705,17 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   corner on a grid edge takes its side from where that edge's own crossing
   lies; only a corner inside a triangle has the field worked out there.
 - **The towers** first (Kai's karst towers, 2026-11-02): groups of 2–4 on
-  the highest tops of the hills' broader height (7 groups at least 70 m
-  apart), the tallest (30–44 m) on the top and the rest round it, each its
-  own model, turn and stretch; the woods round each foot (their own class
-  within half its height); each tower's base under the lowest ground round
-  it, set once the land is.
+  the highest tops of the hills' broader height (19 groups at least 42 m
+  apart: the lab's hills' 7 and 70 m, as many more as there are hills, as
+  much closer; no top on a plateau, flat all round as far as the least
+  flats reach), the tallest (30–44 m) on the top and the rest round it,
+  each its own model, turn and stretch; the woods round each foot (their
+  own class within 0.43 of its height and 3 m: its body 0.32, the woods
+  past it with the hills), stopping at the plains (their fields their own);
+  each tower's base under the lowest ground round it, set once the land
+  is. The camera's stands (the opening view, the vista) keep clear of the
+  towers once they stand: the opening view, looked for before they did,
+  looked for again if one fills it and the camera has not moved.
 - **The plains**: each stretch of the flats (joined across the grid's
   triangles) cut out of the land before the bands, as the lab's flats were:
   held level at one level (the floor of the band in the middle of the most

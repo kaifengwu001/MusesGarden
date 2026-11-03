@@ -123,6 +123,8 @@ export class TerraceWorld implements PlanetWorld {
     uHeightFogNear: { value: new Vector3(0.95, 85, 29) },
   };
   private posed = false;
+  /** The stand the opening view was given (looked for again once the towers stand, if one is by it and the camera has not moved). */
+  private openingStand: Vector3 | null = null;
   private noiseSeed = -1;
   private nextGust = 0;
   private readonly frustum = new Frustum();
@@ -156,7 +158,7 @@ export class TerraceWorld implements PlanetWorld {
     Object.assign(this.shared, this.paddyMap.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceBuild(this.shared);
-    this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 32, 140);
+    this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 96, 140);
     this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
     this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist.group);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
@@ -192,6 +194,7 @@ export class TerraceWorld implements PlanetWorld {
   defaultPose(): void {
     const stand = this.findStand();
     this.rig.lookAlong(stand.focus, stand.forward);
+    this.openingStand = stand.focus.clone();
     this.posed = true;
   }
 
@@ -271,6 +274,8 @@ export class TerraceWorld implements PlanetWorld {
       d.set(r * Math.cos(golden * i), r * Math.sin(golden * i), z);
       const s = f.slope(d.x, d.y, d.z);
       if (s < f.p.flat + 0.04 || s > f.p.steep - 0.04) continue;
+      // (and, once the towers stand, none where one would fill the view: within its height and some of it)
+      if (this.nearTower(d)) continue;
       const h0 = f.height(d.x, d.y, d.z, g);
       fwd.set(-g[0], -g[1], -g[2]);
       if (fwd.lengthSq() < 1e-12) continue;
@@ -296,6 +301,15 @@ export class TerraceWorld implements PlanetWorld {
       }
     }
     return { focus, forward };
+  }
+
+  /** Whether a direction lies within a tower's height and some of it (none before the towers are placed). */
+  private nearTower(d: Vector3): boolean {
+    const t = this.objects.peaks;
+    if (!t) return false;
+    const R = this.field.R;
+    for (let i = 0; i < t.length; i += 8) if (d.x * t[i] + d.y * t[i + 1] + d.z * t[i + 2] > Math.cos((t[i + 4] * t[i + 7] + 10) / R)) return true;
+    return false;
   }
 
   onParams(changed: ReadonlySet<ParamPath>): void {
@@ -343,6 +357,13 @@ export class TerraceWorld implements PlanetWorld {
       this.placedModels = this.objects.peaks;
       this.towers.set(placements(this.objects.peaks), R);
       mapPeaks(this.own.uHeightFogPeaks.value, this.objects.peaks, R);
+      // (the opening view looked for before the towers stood: another stand, if one fills it and the camera is still there)
+      const opening = this.openingStand;
+      this.openingStand = null;
+      if (opening && this.nearTower(opening) && rig.up.dot(opening) > Math.cos(1 / R)) {
+        const stand = this.findStand();
+        this.rig.lookAlong(stand.focus, stand.forward);
+      }
       this.houses.set(placements(this.objects.houses ?? new Float32Array(0)), R);
     }
     // (near ones in full detail: the camera's place on the planet, unwarped)
