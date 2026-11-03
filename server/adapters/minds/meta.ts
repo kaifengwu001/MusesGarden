@@ -10,6 +10,8 @@ import type {
   LlmCache,
   Mind,
   MindContext,
+  PostcardAsk,
+  PostcardWords,
   ReflectionProposal,
   Temperament,
   TopicKey,
@@ -17,6 +19,7 @@ import type {
 import { interestsPrompt, MAX_INTERESTS } from './prompts/interests';
 import { judgePrompt } from './prompts/judge';
 import type { Prompt } from './prompts/prompt';
+import { parsePostcard, postcardPrompt } from './prompts/postcard';
 import { questionPrompt } from './prompts/question';
 import { MAX_QUESTIONS, reflectPrompt, STAGES } from './prompts/reflect';
 import { temperamentPrompt, TRAITS } from './prompts/temperament';
@@ -102,6 +105,12 @@ export class MetaMind implements Mind {
     if (text.trim() === '') return Promise.resolve([]);
     return this.ask('extractInterests', interestsPrompt(text, from), parseInterests, () =>
       this.fallback.extractInterests(text, from),
+    );
+  }
+
+  writePostcard(ctx: MindContext, ask: PostcardAsk): Promise<PostcardWords> {
+    return this.ask('writePostcard', postcardPrompt(ctx, ask), (raw) => parsePostcard(raw, ask.plan.kind), () =>
+      this.fallback.writePostcard(ctx, ask),
     );
   }
 

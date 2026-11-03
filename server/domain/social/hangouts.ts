@@ -10,6 +10,7 @@ import type {
   SocialPolicy,
   VisitOffer,
 } from '../../../src/muse/contract';
+import { togetherSubject } from '../policy/photo';
 import { localClock } from './clock';
 import { SOCIAL } from './constants';
 import { invite } from './invitations';
@@ -122,7 +123,8 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const { pleasantness } = chemistry(host, guest);
 
   const where = { context: 'planet', planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom } as const;
-  const photo = photoTogether('friend', host.seed.id, guest.seed.id, where, now, draw);
+  const shows = togetherSubject(host.temperament, guest.temperament, draw('photo.subject', 0));
+  const photo = photoTogether('friend', host.seed.id, guest.seed.id, where, now, draw, shows);
   const hostLog: MuseEventBody[] = [photo.a, hangoutEvent(guest.seed.id, 'host', pleasantness, photo.id, fromHost, fromGuest)];
   const guestLog: MuseEventBody[] = [photo.b, hangoutEvent(host.seed.id, 'guest', pleasantness, photo.id, fromGuest, fromHost)];
 

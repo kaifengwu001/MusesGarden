@@ -1,6 +1,6 @@
 // Photos: a Poisson process per activity, scaled by whimsy, inside a daily cap that leaves room for the
 // hangout photos the social policy guarantees.
-import type { Activity, Dir, Draw, MuseState, PhotoSpec, PhotoSubject, Place } from '../../../src/muse/contract';
+import type { Activity, Dir, Draw, MuseState, PhotoSpec, PhotoSubject, Place, Temperament } from '../../../src/muse/contract';
 import { homePlace, placeNow } from '../atlas';
 import { instant, photoId } from '../ids';
 import { categorical, exponential } from '../rng';
@@ -10,27 +10,84 @@ import { PHOTO_DAILY_CAP, PHOTO_RATE_PER_HOUR, VISIT_MEDIAN_MS } from './constan
 
 type Context = Activity | 'work';
 
+/** What Muse photographs in each context before its temperament tips the balance (TASTE). */
 const SUBJECTS: Record<Context, readonly (readonly [PhotoSubject, number])[]> = {
   beyond: [
-    ['selfie', 0.4],
-    ['scenery', 0.6],
-  ],
-  travel: [
-    ['find', 0.35],
-    ['scenery', 0.3],
-    ['creature', 0.2],
-    ['selfie', 0.15],
-  ],
-  rest: [
-    ['scenery', 0.4],
-    ['creature', 0.3],
+    ['scenery', 0.5],
+    ['sky', 0.2],
     ['selfie', 0.3],
   ],
-  work: [['selfie', 1]],
+  travel: [
+    ['find', 0.3],
+    ['scenery', 0.2],
+    ['sky', 0.12],
+    ['closeup', 0.15],
+    ['creature', 0.1],
+    ['selfie', 0.13],
+  ],
+  rest: [
+    ['home', 0.25],
+    ['scenery', 0.15],
+    ['sky', 0.2],
+    ['closeup', 0.15],
+    ['creature', 0.12],
+    ['selfie', 0.13],
+  ],
+  work: [
+    ['work', 0.7],
+    ['selfie', 0.15],
+    ['home', 0.15],
+  ],
   visit: [],
 };
 
-const ZOOM: Record<PhotoSubject, number> = { selfie: 0.9, find: 0.95, creature: 0.85, scenery: 0.4, friend: 0.8, 'new-friend': 0.8 };
+/** What two Muses photograph when they spend time together: mostly the two of them, sometimes what they looked at. */
+const TOGETHER: readonly (readonly [PhotoSubject, number])[] = [
+  ['friend', 0.5],
+  ['scenery', 0.15],
+  ['sky', 0.12],
+  ['closeup', 0.08],
+  ['creature', 0.08],
+  ['home', 0.07],
+];
+
+/** How strongly a subject draws a Muse of this temperament, in [0, 1]; a subject's weight is scaled by 0.4 + 1.2 × it. */
+const TASTE: Readonly<Record<PhotoSubject, (t: Temperament) => number>> = {
+  scenery: (t) => t.novelty,
+  sky: (t) => (t.whimsy + t.novelty) / 2,
+  closeup: (t) => (t.focus + t.curiosity) / 2,
+  creature: (t) => t.curiosity,
+  find: (t) => t.curiosity,
+  selfie: (t) => (t.whimsy + t.sociability) / 2,
+  work: (t) => t.focus,
+  home: (t) => 1 - t.novelty,
+  friend: (t) => t.sociability,
+  'new-friend': (t) => t.sociability,
+};
+
+/** The subjects a Muse of temperament `t` photographs in `context`, weighted by its taste. */
+export function subjectMix(t: Temperament, mix: readonly (readonly [PhotoSubject, number])[]): (readonly [PhotoSubject, number])[] {
+  return mix.map(([subject, w]) => [subject, w * (0.4 + 1.2 * TASTE[subject](t))] as const);
+}
+
+/** What a hangout's photo shows, by both Muses' tastes: one photo, the same in both logs. */
+export function togetherSubject(a: Temperament, b: Temperament, u: number): PhotoSubject {
+  const both = subjectMix(a, TOGETHER).map(([subject, w], i) => [subject, w + subjectMix(b, TOGETHER)[i][1]] as const);
+  return both[Math.max(0, categorical(u, both.map(([, w]) => w)))][0];
+}
+
+const ZOOM: Record<PhotoSubject, number> = {
+  selfie: 0.9,
+  find: 0.95,
+  creature: 0.85,
+  scenery: 0.4,
+  sky: 0.3,
+  closeup: 0.98,
+  work: 0.9,
+  home: 0.6,
+  friend: 0.8,
+  'new-friend': 0.8,
+};
 /** Beyond the planet, the photo looks back at the whole of it. */
 const BEYOND_ZOOM = 0.05;
 
@@ -72,7 +129,7 @@ export function photosDuring(s: MuseState, context: Context, from: number, to: n
   const place = rate > 0 && to > from ? where(s, context, draw) : null;
   if (!place) return [];
   const lastKept = s.episode?.lastKept ?? null;
-  const subjects = SUBJECTS[context].filter(([subject]) => subject !== 'find' || lastKept !== null);
+  const subjects = subjectMix(s.temperament, SUBJECTS[context]).filter(([subject]) => subject !== 'find' || lastKept !== null);
   const taken = new Map<string, number>();
   const out: PhotoSpec[] = [];
   // The kind carries `from` so successive intervals of one episode draw fresh photo times.

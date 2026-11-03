@@ -136,7 +136,7 @@ export const MEDIUM_TILT = 0.8;
 
 // ── Photos ─────────────────────────────────────────────────────────────────
 /** Photos per hour while doing each activity, times whimsy. Hangout photos come from the social policy. */
-export const PHOTO_RATE_PER_HOUR = { beyond: 0.4, travel: 0.3, rest: 0.1, work: 0.02, visit: 0 } as const;
+export const PHOTO_RATE_PER_HOUR = { beyond: 0.4, travel: 0.3, rest: 0.1, work: 0.1, visit: 0 } as const;
 /** At most this many photos per owner-day, guaranteed social photos included. */
 export const PHOTO_DAILY_CAP = 5;
 

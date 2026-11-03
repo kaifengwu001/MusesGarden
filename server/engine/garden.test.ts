@@ -131,10 +131,16 @@ describe('the garden snapshot on a seeded engine', () => {
       const cards = (JSON.parse(JSON.stringify(garden.views.garden(id, garden.engine.now()))) as GardenSnapshot).postcards;
       expect(cards.map((p) => p.id).sort()).toEqual([...s.photos.map((p) => p.id), ...received(id).map((inv) => inv.id)].sort());
       for (const p of cards) {
-        expect(p.image).toMatch(/^\/api\/postcards\/[a-z]+\.jpg$/);
+        expect(p.image).toMatch(/^\/api\/postcards\/[a-z]+(-[a-z]+)*(-\d+)?\.jpg$/);
         expect(existsSync(POSTCARDS + p.image.split('/').at(-1)), p.image).toBe(true);
         expect(p.place.length).toBeGreaterThan(0);
       }
+      if (id === HERO) expect(new Set(cards.map((p) => p.image)).size, 'the hero’s photos vary').toBeGreaterThan(8);
+      const shown = cards.map((p) => `${p.image} ${JSON.stringify(p.look ?? null)}`);
+      expect(new Set(shown).size, `${id}: no two cards look the same`).toBe(shown.length);
+      const byDay = new Map<string, string[]>();
+      for (const p of cards) byDay.set(p.day, [...(byDay.get(p.day) ?? []), p.image]);
+      for (const [day, images] of byDay) expect(new Set(images).size, `${id} on ${day}: ${images.join(', ')}`).toBe(images.length);
       for (const inv of received(id)) {
         const card = cards.find((p) => p.id === inv.id);
         // A ticket names the host's own planet, at the seed and growth the host has, and the body its Muse wears.

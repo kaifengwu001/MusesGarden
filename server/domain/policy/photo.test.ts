@@ -4,7 +4,7 @@ import { instant, museId } from '../ids';
 import { drawFor } from '../rng';
 import { Life, MOSS, t, TEMPERAMENTS, topic } from '../testing';
 import { HOUR_MS, localDay, MINUTE_MS } from '../time';
-import { photosDuring } from './photo';
+import { photosDuring, togetherSubject } from './photo';
 
 const START = t('2026-11-02T00:30:00-08:00');
 const WREN = museId('wren');
@@ -84,5 +84,30 @@ describe('photos', () => {
     const ofFind = photos.filter((p) => p.subject === 'find');
     expect(ofFind.length).toBeGreaterThan(0);
     for (const p of ofFind) expect(p).toMatchObject({ discoveryId: find.id, dir: find.place.dir, planetOf: MOSS.id, context: 'planet' });
+  });
+
+  it('follow the Muse: a homebody photographs home more than an explorer does, and an explorer the view and the sky', () => {
+    const share = (temperament: Temperament, subjects: readonly string[]) => {
+      const life = new Life(MOSS, { ...temperament, whimsy: 1 });
+      const now = t('2026-11-02T10:00:00-08:00');
+      const photos = Array.from({ length: 60 }, (_, k) => photosDuring(life.state, 'rest', now + k * 6 * HOUR_MS, now + (k + 1) * 6 * HOUR_MS, drawFor(MOSS.id, k))).flat();
+      return photos.filter((p) => subjects.includes(p.subject)).length / photos.length;
+    };
+    expect(share(TEMPERAMENTS.homebody, ['home'])).toBeGreaterThan(share(TEMPERAMENTS.explorer, ['home']));
+    expect(share(TEMPERAMENTS.explorer, ['scenery', 'sky'])).toBeGreaterThan(share(TEMPERAMENTS.homebody, ['scenery', 'sky']));
+  });
+
+  it('while Muse works, are mostly of Muse at work', () => {
+    const life = new Life(MOSS, { ...TEMPERAMENTS.hero, whimsy: 1 });
+    const now = t('2026-11-02T10:00:00-08:00');
+    const photos = Array.from({ length: 80 }, (_, k) => photosDuring(life.state, 'work', now + k * 6 * HOUR_MS, now + (k + 1) * 6 * HOUR_MS, drawFor(MOSS.id, k))).flat();
+    expect(photos.length).toBeGreaterThan(10);
+    expect(photos.filter((p) => p.subject === 'work').length / photos.length).toBeGreaterThan(0.5);
+  });
+
+  it('of a hangout are mostly of the two together, and sometimes of what they looked at', () => {
+    const shows = Array.from({ length: 400 }, (_, k) => togetherSubject(TEMPERAMENTS.hero, TEMPERAMENTS.explorer, (k + 0.5) / 400));
+    expect(shows.filter((s) => s === 'friend').length / shows.length).toBeGreaterThan(0.35);
+    expect(new Set(shows).size).toBeGreaterThanOrEqual(4);
   });
 });

@@ -104,9 +104,9 @@ function result(r: CommandResult): Reply {
   return r.ok ? json({ ok: true }) : json({ error: r.error }, r.status);
 }
 
-/** One of the stand-in postcards in src/assets/postcards/. */
+/** One of the postcard stills in src/assets/postcards/ (stills.ts). */
 async function postcard(name: string): Promise<Reply> {
-  if (!/^[a-z]+\.jpg$/.test(name)) throw new HttpError(404, 'no such postcard');
+  if (!/^[a-z]+(-[a-z]+)*(-\d+)?\.jpg$/.test(name)) throw new HttpError(404, 'no such postcard');
   const body = await readFile(new URL(name, POSTCARDS)).catch(() => null);
   if (body === null) throw new HttpError(404, 'no such postcard');
   return { status: 200, type: 'image/jpeg', headers: { 'cache-control': 'public, max-age=86400' }, body };

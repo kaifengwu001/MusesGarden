@@ -1,9 +1,16 @@
 import { Vector3 } from 'three';
 import closeUrl from '../assets/postcards/close.jpg';
-import cottageUrl from '../assets/postcards/cottage.jpg';
-import meadowUrl from '../assets/postcards/meadow.jpg';
 import pierUrl from '../assets/postcards/pier.jpg';
 import terraceUrl from '../assets/postcards/terrace.jpg';
+import beyond1Url from '../assets/postcards/beyond-1.jpg';
+import find2Url from '../assets/postcards/find-2.jpg';
+import friend2Url from '../assets/postcards/friend-2.jpg';
+import home2Url from '../assets/postcards/home-2.jpg';
+import home4Url from '../assets/postcards/home-4.jpg';
+import scenery1Url from '../assets/postcards/scenery-1.jpg';
+import scenery4Url from '../assets/postcards/scenery-4.jpg';
+import selfie5Url from '../assets/postcards/selfie-5.jpg';
+import sky4Url from '../assets/postcards/sky-4.jpg';
 import { tangentToward, travel } from '../planet/geo';
 import { art, MOTIF_ASPECT, type Motif } from './art';
 import type { GardenSource } from './source';
@@ -13,7 +20,8 @@ import type { Basket, Find, GardenEvent, GardenSnapshot, Interest, Media, MediaK
 // (source.ts): ten interests, six baskets of finds over the last ten days
 // (reels, posts, articles and a video, every picture a placeholder from
 // art.ts, each found somewhere on the planet), Muse's postcards (photographed in the world: two Muses, Muse
-// waving), two invitations from friends, and the friends themselves. Days are
+// waving; on their backs, every kind of thing Muse writes or draws there), two invitations from friends, and the
+// friends themselves. Days are
 // counted back from today, so the newest basket is always today's.
 
 /** An ISO date `back` days before today (local time). */
@@ -154,15 +162,80 @@ const FRIENDS: ReadonlyArray<Omit<MuseFriend, 'met'> & { metBack: number }> = [
   { id: 'tofu', name: 'Tofu', coat: '#efe6c8', shared: ['Model kits'], metBack: 20 },
 ];
 
-const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
-  { id: 'pc-close', back: 9, image: closeUrl, place: 'On the doorstep', with: 'pip' },
-  { id: 'pc-pier', back: 6, image: pierUrl, place: 'Out on the pier', with: 'juniper' },
-  { id: 'pc-meadow', back: 4, image: meadowUrl, place: 'In the long grass', with: 'marlo' },
-  { id: 'pc-cottage', back: 2, image: cottageUrl, place: 'Home from the hill', with: 'tofu' },
-  { id: 'pc-terrace', back: 0, image: terraceUrl, place: 'Pip came by', with: 'pip' },
+/** Muse's photos, each with what it wrote or drew on the back (every kind of back once), and two invitations. */
+const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
+  {
+    id: 'pc-note-weather',
+    ago: 11,
+    image: scenery4Url,
+    place: 'Up on the hill',
+    with: 'tofu',
+    back: { kind: 'note', title: 'Weather report', lines: ['Sky: blue, a few sheep', 'Wind: a light push from behind', 'Mood: sunny, chance of nap'] },
+  },
+  {
+    id: 'pc-close',
+    ago: 9,
+    image: closeUrl,
+    place: 'On the doorstep',
+    with: 'pip',
+    back: { kind: 'line', text: 'Pip knocked twice, then sat on my step until I came out. The best kind of visitor.' },
+  },
+  { id: 'pc-poem-pond', ago: 8, image: home4Url, place: 'By the pond', with: 'juniper', back: { kind: 'poem', lines: ['the pond holds the sky', 'a frog edits it, once', 'then lets it be'] } },
+  {
+    id: 'pc-riddle-hole',
+    ago: 7,
+    image: friend2Url,
+    place: 'On the porch',
+    with: 'marlo',
+    back: { kind: 'riddle', question: 'What gets bigger the more you take away from it?', answer: 'A hole. I dug one to check.' },
+  },
+  { id: 'pc-pier', ago: 6, image: selfie5Url, place: 'Out on the pier', with: 'juniper', back: { kind: 'doodle', doodle: 'fish', caption: 'the one that got away' } },
+  {
+    id: 'pc-ticket-ridge',
+    ago: 5,
+    image: beyond1Url,
+    place: 'Back from Starfall Ridge',
+    with: 'juniper',
+    back: { kind: 'ticket', from: 'The meadow', to: 'Starfall Ridge', note: 'window seat. I waved at every star.' },
+  },
+  { id: 'pc-meadow', ago: 4, image: sky4Url, place: 'In the long grass', with: 'marlo', back: { kind: 'tally', what: 'clouds shaped like sheep', count: 12 } },
+  {
+    id: 'pc-pressed-fern',
+    ago: 3,
+    image: find2Url,
+    place: 'By the wet meadow',
+    with: 'pip',
+    back: { kind: 'pressed', species: 0, variant: 0.8, label: 'Why ferns unfurl the way they do' },
+  },
+  {
+    id: 'pc-cottage',
+    ago: 2,
+    image: home2Url,
+    place: 'Home from the hill',
+    with: 'tofu',
+    back: {
+      kind: 'list',
+      title: 'Before supper',
+      items: [
+        { text: 'walk down the hill', done: true },
+        { text: 'wave at Tofu', done: true },
+        { text: 'wash my mittens', done: false },
+        { text: 'tea', done: false },
+      ],
+    },
+  },
+  { id: 'pc-map-hill', ago: 1, image: scenery1Url, place: 'On the dry hill', with: 'marlo', back: { kind: 'map', dir: AREAS.hill, label: 'X marks where I sat (for ages)' } },
+  {
+    id: 'pc-terrace',
+    ago: 0,
+    image: terraceUrl,
+    place: 'Pip came by',
+    with: 'pip',
+    back: { kind: 'game', friend: 'Pip', board: 'xo..ox.o.', caption: 'Pip won. Again. Rematch tomorrow.' },
+  },
   {
     id: 'inv-pip',
-    back: 0,
+    ago: 0,
     image: closeUrl,
     place: 'An invitation',
     with: 'pip',
@@ -170,7 +243,7 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
   },
   {
     id: 'inv-juniper',
-    back: 3,
+    ago: 3,
     image: pierUrl,
     place: 'An invitation',
     with: 'juniper',
@@ -222,7 +295,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
     friends: FRIENDS.map(({ metBack, ...f }) => ({ ...f, met: dayBefore(metBack, now) })),
     baskets,
     finds,
-    postcards: POSTCARDS.map(({ back, ...p }) => ({ ...p, day: dayBefore(back, now) })),
+    postcards: POSTCARDS.map(({ ago, ...p }) => ({ ...p, day: dayBefore(ago, now) })),
     favourites: FAVOURITES.map(([back, i]) => `basket-${dayBefore(back, now)}-${i}`),
   };
 }

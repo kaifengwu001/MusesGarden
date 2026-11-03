@@ -23,6 +23,7 @@ const fallback: Mind = {
   reflect: unused,
   extractInterests: () => Promise.resolve([]),
   estimateTemperament: unused,
+  writePostcard: unused,
 };
 const mind = new MetaMind({ cache, fallback });
 

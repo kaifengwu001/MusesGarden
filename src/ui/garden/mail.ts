@@ -4,14 +4,16 @@ import type { Postcard } from '../../garden/types';
 import { button, dayName, el, reducedMotion, shortDate, wait } from './dom';
 import { ICONS } from './icons';
 import type { PostBox } from './postbox';
+import { backContent } from './postcardBack';
 import { paperOf, scrapOf, trimmings } from './scrapbook';
 
 // The post: what comes out of the post box. Its door drops and today's cards
 // fly out of its mouth into a deck, the newest on top. Swipe the top card
 // away, any way, and the next comes up; the deck goes round. Tap a card and it
-// turns over (a postcard's back: the place and the day, a stamp and a
-// postmark, a mitten print for a signature). Beside it, a heart to like it and
-// a star to keep it among your favorites. Up top, a switch: From today,
+// turns over (a postcard's back: what Muse wrote or drew there, or else the
+// place and the day; a stamp and a postmark, a mitten print for a
+// signature). Beside it, a heart to like it and a star to keep it among your
+// favorites. Up top, a switch: From today,
 // Favorite (the starred cards) and Album (every card Muse has sent), the last
 // two laid out on a scrapbook page, each card taped or clipped there, some
 // with a scribbled frame or a sticker. Every card is a polaroid: the whole
@@ -127,27 +129,50 @@ function postmark(day: string): string {
 /** Where and when, as written in a polaroid's strip: 'On Wren’s planet · 2 Nov'. */
 const written = (card: Postcard): string => `${card.place}\u00a0·\u00a0${shortDate(card.day)}`;
 
+/** A card's photo in its frame: the still as it is, or, when it has come round before, mirrored, cropped in on its own spot and toned. */
+function photoNode(card: Postcard, className: string): HTMLElement {
+  const frame = el('span', className);
+  const img = el('img');
+  img.src = card.image;
+  img.alt = card.place;
+  img.draggable = false;
+  img.decoding = 'async';
+  const look = card.look;
+  if (look) {
+    // zoomed about the middle, it can shift this far (%) either way and still fill its frame
+    const room = (look.zoom - 1) * 50;
+    const shift = (v: number) => Math.max(-room, Math.min(room, -(v - 0.5) * 100 * look.zoom));
+    const x = shift(look.x) * (look.flip ? -1 : 1);
+    img.style.transform = `translate(${x.toFixed(2)}%, ${shift(look.y).toFixed(2)}%) scale(${look.flip ? -look.zoom : look.zoom}, ${look.zoom})`;
+    if (look.tone !== 'none') img.dataset.tone = look.tone;
+  }
+  frame.append(img);
+  return frame;
+}
+
 /** A postcard as a thing you hold: on the front a polaroid, its photo whole and its place and day written under it;
- *  on the back the place and day again, a stamp, a postmark. */
+ *  on the back a stamp and a postmark, and what Muse wrote or drew there with the place and day under it (or, on a
+ *  card with nothing written, the place and day again, large). */
 function postcard(card: Postcard, withName: string | null): HTMLElement {
   const root = el('div', 'g-pc');
   root.dataset.id = card.id;
   const inner = el('div', 'g-pc-inner');
   const front = el('div', 'g-pc-front');
   front.style.cssText = paperOf(scrapOf(card.id).tint);
-  const photo = el('img', 'g-pc-photo');
-  photo.src = card.image;
-  photo.alt = card.place;
-  photo.draggable = false;
-  photo.decoding = 'async';
-  front.append(photo, el('p', 'g-pc-caption', written(card)));
-  const back = el('div', 'g-pc-back');
+  front.append(photoNode(card, 'g-pc-photo'), el('p', 'g-pc-caption', written(card)));
+  const back = el('div', card.back ? 'g-pc-back is-written' : 'g-pc-back');
   const left = el('div', 'g-pc-left');
-  left.append(el('p', 'g-pc-place', card.place), el('p', 'g-pc-day', dayName(card.day)));
-  if (withName) left.append(el('p', 'g-pc-with', `with ${withName}`));
   const mitten = el('span', 'g-pc-mitten');
   mitten.innerHTML = MITTEN;
-  left.append(mitten);
+  if (card.back) {
+    const sign = el('div', 'g-pc-sign');
+    sign.append(el('p', 'g-pc-where', [card.place, dayName(card.day), ...(withName ? [`with ${withName}`] : [])].join('\u00a0· ')), mitten);
+    left.append(backContent(card.back, card), sign);
+  } else {
+    left.append(el('p', 'g-pc-place', card.place), el('p', 'g-pc-day', dayName(card.day)));
+    if (withName) left.append(el('p', 'g-pc-with', `with ${withName}`));
+    left.append(mitten);
+  }
   const right = el('div', 'g-pc-right');
   const stamp = el('span', 'g-stamp');
   stamp.innerHTML = STAMP;
@@ -649,10 +674,7 @@ export class Mail {
       slotEl.style.setProperty('--r', `${scrap.tilt.toFixed(2)}deg`);
       const snap = el('span', 'g-snap');
       snap.style.cssText = paperOf(scrap.tint);
-      const img = el('img');
-      img.src = card.image;
-      img.alt = card.place;
-      img.draggable = false;
+      const img = photoNode(card, 'g-snap-photo');
       const label = el('span', 'g-album-label');
       // (a flex row trims its text's edge spaces: these hold)
       label.append(el('span', 'g-album-place', card.place), `\u00a0·\u00a0${shortDate(card.day)}`);

@@ -19,6 +19,7 @@
     "sim": "tsx --no-warnings server/cli/sim.ts",
     "serve": "tsx --no-warnings server/http.ts",
     "record:media": "tsx --no-warnings server/cli/record-media.ts",
+    "postcard-stills": "node tools/workflows/drive-app/scripts/postcard-stills.mjs",
     "new-environment": "node --experimental-strip-types scripts/new-environment.ts",
     "dev:lantern": "vite --port 5225 --strictPort",
     "build:lantern": "tsc -p tsconfig.json && vite build --config environments/lantern-reed-gardens/vite.config.ts",

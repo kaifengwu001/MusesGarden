@@ -1,5 +1,5 @@
 import { hash32, salt, unit } from '../../../src/core/hash';
-import type { Dir, Draw, Instant, MuseEventBody, MuseId, MuseState, PhotoId, PhotoSpec } from '../../../src/muse/contract';
+import type { Dir, Draw, Instant, MuseEventBody, MuseId, MuseState, PhotoId, PhotoSpec, PhotoSubject } from '../../../src/muse/contract';
 import { PHOTO_DAILY_CAP } from '../policy/constants';
 import { localClock } from './clock';
 import { compare } from './profile';
@@ -38,17 +38,19 @@ export function whereIs(s: MuseState): Dir {
   return latest ? latest.dir : hashedDir(s.seed.id);
 }
 
+/** The photo of a hangout or a new friendship, one for both logs; `shows` is what it is of, the two of them by default. */
 export function photoTogether(
-  subject: 'friend' | 'new-friend',
+  kind: 'friend' | 'new-friend',
   a: MuseId,
   b: MuseId,
   where: Pick<PhotoSpec, 'context' | 'planetOf' | 'dir' | 'zoom'>,
   now: Instant,
   draw: Draw,
+  shows: PhotoSubject = kind,
 ): { readonly id: PhotoId; readonly a: MuseEventBody; readonly b: MuseEventBody } {
   const pair = [a, b].sort(compare).join('+');
-  const id = `photo:${subject}:${pair}:${now}` as PhotoId;
-  const base = { id, at: now, subject, ...where, forward: tangentAt(where.dir, draw) };
+  const id = `photo:${kind}:${pair}:${now}` as PhotoId;
+  const base = { id, at: now, subject: shows, ...where, forward: tangentAt(where.dir, draw) };
   const taken = (companion: MuseId): MuseEventBody => ({ kind: 'photo.taken', photo: { ...base, companions: [companion] } satisfies PhotoSpec });
   return { id, a: taken(b), b: taken(a) };
 }

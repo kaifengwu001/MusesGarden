@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { EpisodePlan, Instant, InvitationId, MuseEventBody, MuseId, MuseSeed, Reach, RegionKey, ScheduleItem, SocialPolicy, StoredEvent, TopicKey } from '../../src/muse/contract';
+import type { EpisodePlan, Instant, InvitationId, MuseEventBody, MuseId, MuseSeed, MuseState, PhotoId, PhotoSpec, Reach, RegionKey, ScheduleItem, SocialPolicy, StoredEvent, TopicKey } from '../../src/muse/contract';
 import { openSqliteStore } from '../adapters/store/sqlite';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
@@ -196,6 +196,30 @@ describe('engine on SQLite', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('a restart that names an earlier start resumes from what the garden has lived, and lives no day twice', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'muse-engine-'));
+    try {
+      const path = join(dir, 'garden.db');
+      const reference = await world(['moss', 'wren'], { introduce: true });
+      await reference.engine.advanceTo(at(40));
+
+      const first = new Engine(stubDeps(memoryStore(openSqliteStore(path))), T0);
+      for (const id of ['moss', 'wren']) await first.addMuse(seed(id), `I am ${id}.`, '', T0);
+      await first.introduce('moss' as MuseId, 'wren' as MuseId, T0);
+      await first.advanceTo(at(20));
+      const lived = Math.max(...(['moss', 'wren'] as MuseId[]).map((id) => first.log(id).at(-1)!.event.at));
+
+      const store = openSqliteStore(path);
+      const again = new Engine(stubDeps(memoryStore(store)), T0);
+      expect(again.now()).toBe(lived);
+      await again.advanceTo(at(40));
+      for (const id of ['moss', 'wren'] as MuseId[]) expect(strip(again.log(id))).toEqual(strip(reference.engine.log(id)));
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 /** Muses on the real social policy whose owners' friend groups are `reach`; moss's and wren's owners know each other online. */
@@ -344,8 +368,8 @@ describe('a ticket used: the owner travels with their Muse', () => {
   it('ends a visit either Muse was on with a third, with that visit’s hangout, and the third goes on with its life', async () => {
     const { engine, store, log } = scene({ [MOSS]: visiting(LARK, 'guest'), [LARK]: visiting(MOSS, 'host'), [WREN]: visiting(JUNIPER, 'host'), [JUNIPER]: visiting(WREN, 'guest') });
     await engine.invitationAction(TICKET, MOSS, 'use');
-    expect(log(LARK).slice(-4)).toMatchObject([{ kind: 'photo.taken' }, { kind: 'hangout', other: MOSS, role: 'host' }, { kind: 'episode.ended', n: 1 }, { kind: 'episode.started', n: 2 }]);
-    expect(log(JUNIPER).slice(-4)).toMatchObject([{ kind: 'photo.taken' }, { kind: 'hangout', other: WREN, role: 'guest' }, { kind: 'episode.ended', n: 1 }, { kind: 'episode.started', n: 2 }]);
+    expect(log(LARK).slice(-5)).toMatchObject([{ kind: 'photo.taken' }, { kind: 'hangout', other: MOSS, role: 'host' }, { kind: 'episode.ended', n: 1 }, { kind: 'episode.started', n: 2 }, { kind: 'photo.written' }]);
+    expect(log(JUNIPER).slice(-5)).toMatchObject([{ kind: 'photo.taken' }, { kind: 'hangout', other: WREN, role: 'guest' }, { kind: 'episode.ended', n: 1 }, { kind: 'episode.started', n: 2 }, { kind: 'photo.written' }]);
     expect(engine.state(LARK)?.episode?.plan).not.toMatchObject({ other: MOSS });
     expect(store.pending(LARK).some((i) => i.id === `end:${LARK}:1`), 'the visit’s own end is gone').toBe(false);
     expect(engine.state(MOSS)?.episode?.plan).toEqual(onTrip(TICKET, WREN, 'guest', 120).plan);
@@ -365,6 +389,7 @@ describe('a ticket used: the owner travels with their Muse', () => {
         { min: 120, kind: 'hangout', other, role },
         { min: 120, kind: 'episode.ended', n: 2 },
         { min: 120, kind: 'episode.started', n: 3 },
+        { min: 120, kind: 'photo.written' },
       ]);
     }
     expect(engine.invitation(TICKET)).toMatchObject({ state: 'returned', usedAt: T0, returnedAt: atMin(120) });
@@ -379,7 +404,9 @@ describe('a ticket used: the owner travels with their Muse', () => {
     expect(await engine.invitationAction(TICKET, WREN, 'return')).toMatchObject({ ok: false, status: 403 });
     expect(await engine.invitationAction(TICKET, MOSS, 'return')).toEqual({ ok: true });
     for (const id of [MOSS, WREN]) {
-      expect(log(id, 40).map((e) => e.kind)).toEqual(['invitation', 'photo.taken', 'hangout', 'episode.ended', 'episode.started']);
+      expect(log(id, 40).map((e) => e.kind)).toEqual(['invitation', 'photo.taken', 'hangout', 'episode.ended', 'episode.started', 'photo.written']);
+      const [taken] = ofKind(log(id, 40), 'photo.taken') as { photo?: { id: string } }[];
+      expect(ofKind(log(id, 40), 'photo.written'), 'the hangout’s postcard has its back').toMatchObject([{ photo: taken.photo?.id }]);
     }
     expect(store.pending(MOSS).some((i) => i.kind === 'visit.close')).toBe(false);
     expect(await engine.invitationAction(TICKET, MOSS, 'return'), 'returning twice').toEqual({ ok: true });
@@ -449,7 +476,7 @@ describe('a ticket used: the owner travels with their Muse', () => {
     engine.scheduleWork(MOSS, atMin(100), atMin(150));
     await engine.invitationAction(TICKET, MOSS, 'use');
     await engine.advanceTo(atMin(149));
-    expect(log(MOSS, 120).map((e) => e.kind)).toEqual(['invitation', 'photo.taken', 'hangout', 'episode.ended']);
+    expect(log(MOSS, 120).map((e) => e.kind)).toEqual(['invitation', 'photo.taken', 'hangout', 'episode.ended', 'photo.written']);
     expect(engine.state(MOSS)?.episode).toBeNull();
     expect(engine.state(WREN)?.episode?.plan.activity).toBeDefined();
     await engine.advanceTo(atMin(150));
@@ -475,6 +502,7 @@ describe('a ticket used: the owner travels with their Muse', () => {
       { kind: 'hangout', other: MOSS, role: 'host' },
       { kind: 'episode.ended', n: 2 },
       { kind: 'episode.started', n: 3 },
+      { kind: 'photo.written' },
     ]);
     expect(engine.state(MOSS)?.episode?.plan).toEqual(onTrip(JUNIPERS, JUNIPER, 'guest', 150).plan);
     expect(engine.state(JUNIPER)?.episode?.plan).toEqual(onTrip(JUNIPERS, MOSS, 'host', 150).plan);
@@ -497,6 +525,7 @@ describe('a ticket used: the owner travels with their Muse', () => {
       { kind: 'hangout', other: MOSS },
       { kind: 'episode.ended' },
       onTrip(LARKS, LARK, 'host', 150),
+      { kind: 'photo.written' },
     ]);
     expect(log(LARK, 60)).toMatchObject([{ kind: 'episode.ended', n: 1 }, onTrip(LARKS, WREN, 'guest', 150)]);
   });
@@ -545,6 +574,44 @@ describe('a ticket used: the owner travels with their Muse', () => {
     for (const stopAt of [25, 80]) {
       const restarted = await run(stopAt);
       for (const id of [MOSS, WREN, LARK]) expect(strip(restarted.log(id)), `${id}, stopped at ${stopAt} min`).toEqual(strip(clean.log(id)));
+    }
+  });
+});
+
+describe('postcards', () => {
+  it('get their back in the same commit as the photo, in each Muse’s own log', async () => {
+    const store = memoryStore();
+    const deps = stubDeps(store);
+    const sky = (s: MuseState, to: number): PhotoSpec => ({
+      id: `p:${s.seed.id}:${to}` as PhotoId,
+      at: to as Instant,
+      subject: 'sky',
+      context: 'planet',
+      planetOf: s.seed.id,
+      dir: [0, 1, 0],
+      forward: [1, 0, 0],
+      zoom: 0.3,
+      companions: [],
+    });
+    const engine = new Engine({ ...deps, life: { ...deps.life, photosDuring: (s, _c, _from, to) => [sky(s, to)] } }, T0);
+    for (const id of ['a', 'b']) await engine.addMuse(seed(id), `I am ${id}.`, '', T0);
+    await engine.introduce('a' as MuseId, 'b' as MuseId, T0);
+    const committed: StoredEvent[][] = [];
+    const commit = store.commit.bind(store);
+    store.commit = (batch) => {
+      committed.push([...batch.events]);
+      commit(batch);
+    };
+    await engine.advanceTo(at(96));
+    const taken = committed.flatMap((events) => events.filter((e) => e.event.kind === 'photo.taken'));
+    expect(taken.length).toBeGreaterThan(0);
+    for (const events of committed) {
+      for (const e of events) {
+        if (e.event.kind !== 'photo.taken') continue;
+        const id = e.event.photo.id;
+        const back = events.find((w) => w.museId === e.museId && w.event.kind === 'photo.written' && w.event.photo === id);
+        expect(back, `${e.museId} ${id}`).toBeDefined();
+      }
     }
   });
 });

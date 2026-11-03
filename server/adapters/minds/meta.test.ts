@@ -42,6 +42,7 @@ const heuristic: Mind = {
   reflect: () => Promise.resolve({ deltas: [], narrative: 'heuristic', questions: [] }),
   extractInterests: () => Promise.resolve(['heuristic']),
   estimateTemperament: () => Promise.resolve(HEURISTIC_TEMPERAMENT),
+  writePostcard: () => Promise.resolve({ kind: 'line', text: 'heuristic line' }),
 };
 
 function memoryCache(): LlmCache {
