@@ -1,4 +1,6 @@
 // npm run record:media [-- --area fungi --dry --per-kind 2]
+// npm run record:media -- --only instagram [--area tea --area "coffee,soup"]: reads only that kind of source, in those
+// areas, and adds its picks to the recording, keeping everything else in it.
 // Reads the newest items of every source in server/fixtures/media-sources.json, keeps those whose links answer, files
 // each under topics of the topic map, keeps a few of each kind per area, and writes server/fixtures/media.json.
 // Instagram joins when META_IG_TOKEN is set.
@@ -10,7 +12,7 @@ import { FIXTURES_DIR, loadCorpus, loadHeroChain } from '../adapters/sources/cor
 import { fileUnder, topicIndex } from '../adapters/sources/filing';
 import { InstagramReader } from '../adapters/sources/instagram';
 import { arr, obj, str, strs } from '../adapters/sources/json';
-import { carriedInstagram, LEANS, MEDIA_KINDS, MEDIA_PATH, parseMediaRecording, recordingJson, siteOf, type Lean, type MediaItemJson, type RawItem } from '../adapters/sources/media';
+import { carriedInstagram, LEANS, MEDIA_KINDS, MEDIA_PATH, parseMediaRecording, recordingJson, recordingOrder, siteOf, withItems, type Lean, type MediaItemJson, type RawItem } from '../adapters/sources/media';
 import { readArticles, readBluesky, readFlickr, readVimeo, readYoutube, searchBluesky, searchYoutube, type Read, type WatchDetails } from '../adapters/sources/readers';
 
 const SOURCES_PATH = `${FIXTURES_DIR}media-sources.json`;
@@ -158,20 +160,34 @@ const count = <T>(xs: readonly T[], key: (x: T) => string) => {
 };
 
 async function main(): Promise<void> {
-  const { values } = parseArgs({ options: { area: { type: 'string' }, dry: { type: 'boolean', default: false }, 'per-kind': { type: 'string', default: '2' } } });
+  const { values } = parseArgs({
+    options: {
+      area: { type: 'string', multiple: true },
+      only: { type: 'string' },
+      dry: { type: 'boolean', default: false },
+      'per-kind': { type: 'string', default: '2' },
+    },
+  });
   const perKind = Number(values['per-kind']);
   if (!Number.isInteger(perKind) || perKind < 1) throw new Error('--per-kind takes a whole number of 1 or more');
   const map = loadCorpus();
   const index = topicIndex(map);
   const listed = parseSources(JSON.parse(readFileSync(SOURCES_PATH, 'utf8')), new Set(map.areas.map((a) => a.name)));
+  const areas = values.area === undefined ? null : new Set(values.area.flatMap((a) => a.split(',')).map((a) => a.trim()).filter((a) => a !== ''));
+  const unknown = [...(areas ?? [])].filter((a) => !map.areas.some((m) => m.name === a));
+  if (unknown.length > 0) throw new Error(`--area: ${unknown.join(', ')} is not an area of the topic map`);
+  const inArea = (area: string) => areas === null || areas.has(area);
+  const only = KINDS.find((k) => k === values.only);
+  if (values.only !== undefined && only === undefined) throw new Error(`--only takes one of ${KINDS.join(', ')}`);
   const instagram = InstagramReader.fromEnv();
   const readers = readerFor(instagram);
   if (instagram === null) console.info('Instagram: no META_IG_TOKEN, so Instagram accounts are skipped.');
+  if (only !== undefined && readers[only] === null) throw new Error(`--only ${only}: it can't be read (no META_IG_TOKEN)`);
 
   const tasks = listed
-    .filter((a) => values.area === undefined || a.area === values.area)
+    .filter((a) => inArea(a.area))
     .flatMap(({ area, sources }) =>
-      KINDS.flatMap((kind) => {
+      KINDS.filter((kind) => only === undefined || kind === only).flatMap((kind) => {
         const read = readers[kind];
         return read === null ? [] : sources[kind].map((ref) => () => attempt({ area, kind, ref }, () => read(ref)));
       }),
@@ -212,7 +228,7 @@ async function main(): Promise<void> {
 
   const words = new Map(listed.map((a) => [a.area, a.search]));
   const pools = [...new Set([...loadHeroChain().map((c) => c.topics[0]), ...LEANS.flatMap((l) => UNSEEN[l].topics as readonly TopicKey[])])];
-  const pages = map.pages.filter((p) => (values.area === undefined || p.area === values.area) && pools.includes(p.candidate.topics[0]));
+  const pages = only === undefined ? map.pages.filter((p) => inArea(p.area) && pools.includes(p.candidate.topics[0])) : [];
   const searches = pages.flatMap((p) => {
     const topic = p.candidate.topics[0];
     const ref = topicQuery(topic, words.get(p.area) ?? '');
@@ -233,7 +249,7 @@ async function main(): Promise<void> {
   const strip = ({ fallback: _, ...item }: Filed): MediaItemJson => item;
   const held = new Set<string>();
   const unseen: Record<Lean, MediaItemJson[]> = { botany: [], jazz: [], neutral: [] };
-  for (const lean of LEANS) {
+  for (const lean of only === undefined ? LEANS : []) {
     const want = UNSEEN[lean];
     const picked = filed
       .filter((x) => want.areas.includes(x.area) && (want.topics.length === 0 || x.topics.some((t) => want.topics.includes(t))))
@@ -242,7 +258,7 @@ async function main(): Promise<void> {
     for (const p of picked) held.add(p.id);
     unseen[lean] = picked.map(strip);
   }
-  const budgeted = budget(filed.filter((x) => !held.has(x.id)), perKind, pools, POOL_MIN);
+  const budgeted = budget(filed.filter((x) => !held.has(x.id)), perKind, only === undefined ? pools : [], POOL_MIN);
   const kept = budgeted.map(strip);
   const carried =
     instagram === null && existsSync(MEDIA_PATH)
@@ -250,11 +266,16 @@ async function main(): Promise<void> {
           const matched = fileUnder(index, x.area, x);
           const root = index.roots.get(x.area);
           return matched.length > 0 ? matched : root === undefined ? [] : [root];
-        }).filter((x) => values.area === undefined || x.area === values.area)
+        }).filter((x) => inArea(x.area))
       : [];
   if (carried.length > 0) console.info(`Instagram: kept the last recording's ${carried.length} Instagram items (${count(carried, (x) => x.area)}).`);
-  const items = [...kept, ...carried].sort((a, b) => (order.get(a.area) ?? 0) - (order.get(b.area) ?? 0) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.id < b.id ? -1 : 1));
-  const recording = { recordedAt: new Date().toISOString(), items, unseen };
+  const areaNames = map.areas.map((a) => a.name);
+  const merged = only === undefined ? null : withItems(JSON.parse(readFileSync(MEDIA_PATH, 'utf8')), kept, areaNames);
+  if (merged !== null) console.info(`Only ${only}: ${merged.joined.length} new items join the recording (${count(merged.joined, (x) => `${x.area} ${x.kind}`) || 'none'}).`);
+  const recording =
+    merged === null
+      ? { recordedAt: new Date().toISOString(), items: [...kept, ...carried].sort(recordingOrder(areaNames)), unseen }
+      : { recordedAt: merged.recordedAt, items: merged.items, unseen: merged.unseen };
   const parsed = parseMediaRecording(recording);
 
   const failed = outcomes.filter((o) => o.read === null);
@@ -269,7 +290,7 @@ async function main(): Promise<void> {
   console.info(`  by area: ${count(parsed.items, (i) => i.area)}`);
   const kindsIn = (area: string) => new Set(parsed.items.filter((i) => i.area === area).map((i) => i.candidate.media.kind));
   const short = map.areas
-    .filter((a) => values.area === undefined || a.name === values.area)
+    .filter((a) => inArea(a.name))
     .flatMap((a) => {
       const missing = MEDIA_KINDS.filter((k) => !kindsIn(a.name).has(k));
       return missing.length > 0 ? [`${a.name} (${missing.join(', ')})`] : [];
@@ -287,8 +308,8 @@ async function main(): Promise<void> {
   console.info(`  items from, linking to or naming the topic map's own site left out: ${onMap}`);
   console.info(`  without a caption: ${count(parsed.items.filter((i) => i.candidate.summary === ''), (i) => i.candidate.media.network) || 'none'}`);
 
-  if (values.dry || values.area !== undefined) {
-    console.info('\nNot written (--dry or --area).');
+  if (values.dry || (areas !== null && only === undefined)) {
+    console.info('\nNot written (--dry, or --area without --only).');
     return;
   }
   writeFileSync(MEDIA_PATH, recordingJson(recording));

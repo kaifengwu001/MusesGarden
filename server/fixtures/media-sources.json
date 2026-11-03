@@ -322,7 +322,7 @@
       "vimeo": [],
       "flickr": ["flowergarden", "cottagegarden", "garden,flowers", "dahlia"],
       "bluesky": ["brooklynbotanic.bsky.social", "growwithkg.bsky.social", "gardeningwell.ie"],
-      "instagram": ["floretflowers", "rhshome", "brooklynbotanic", "longwoodgardens"]
+      "instagram": ["brooklynbotanic", "longwoodgardens"]
     },
     {
       "area": "soup",
@@ -368,7 +368,7 @@
       "vimeo": [],
       "flickr": ["homemadebread", "baking"],
       "bluesky": ["breadtopia.bsky.social"],
-      "instagram": ["theperfectloaf", "tartinebakery"]
+      "instagram": ["tartinebakery"]
     },
     {
       "area": "coffee",
@@ -421,7 +421,7 @@
       "vimeo": [],
       "flickr": ["japanesearchitecture", "japan,architecture", "kyoto,architecture", "shoji"],
       "bluesky": ["tatamispaces.bsky.social", "spoon-tamago.bsky.social"],
-      "instagram": ["spoonandtamago", "dylaniwakuni"]
+      "instagram": ["dylaniwakuni"]
     },
     {
       "area": "sculpture and wood carving",
@@ -458,7 +458,7 @@
       "vimeo": [],
       "flickr": ["folkmusic", "fiddle", "tinwhistle", "folk,festival"],
       "bluesky": ["efdss.bsky.social", "cecilsharphouse.bsky.social", "folkworks.bsky.social"],
-      "instagram": ["smithsonianfolkways", "folkradiouk", "cecilsharphouse", "efdss"]
+      "instagram": ["smithsonianfolkways", "cecilsharphouse"]
     },
     {
       "area": "agriculture and farming",
@@ -474,7 +474,7 @@
       "vimeo": [],
       "flickr": ["riceterraces", "ricepaddy", "combine,harvest", "farm,tractor"],
       "bluesky": ["sustainablefarming.bsky.social", "ucanr.edu", "agroecology.bsky.social"],
-      "instagram": ["modernfarmer", "civileats", "fao", "usda", "rodaleinstitute"]
+      "instagram": ["civileats", "fao", "rodaleinstitute"]
     },
     {
       "area": "furniture",
@@ -526,13 +526,7 @@
       "vimeo": ["https://vimeo.com/mauritshuis/videos/rss"],
       "flickr": ["rijksmuseum", "dutchgoldenage", "mauritshuis", "franshals"],
       "bluesky": ["peterpaulrubens.bsky.social", "smarthistory.bsky.social"],
-      "instagram": [
-        "rijksmuseum",
-        "mauritshuis",
-        "rembrandthuis",
-        "franshalsmuseum",
-        "nationalgallery"
-      ]
+      "instagram": ["rijksmuseum", "franshalsmuseum", "nationalgallery"]
     },
     {
       "area": "Impressionism and abstract art",
@@ -573,7 +567,7 @@
       "vimeo": [],
       "flickr": ["scifi,movie", "scifi,film", "starwars,movie", "startrek"],
       "bluesky": ["reactorsff.bsky.social", "startrekshots.bsky.social"],
-      "instagram": ["starwars", "startrek", "criterioncollection", "bfi"]
+      "instagram": ["starwars", "startrek", "criterioncollection"]
     },
     {
       "area": "artificial intelligence and technology",
@@ -589,7 +583,7 @@
       "vimeo": [],
       "flickr": ["robotics", "robot,museum", "computermuseum", "datacenter"],
       "bluesky": ["wired.com", "theverge.com", "wattenberg.bsky.social"],
-      "instagram": ["mittechreview", "googledeepmind", "wired", "verge"]
+      "instagram": ["googledeepmind", "wired", "verge"]
     },
     {
       "area": "physics",
@@ -605,7 +599,7 @@
       "vimeo": [],
       "flickr": ["crepuscularrays", "sundog", "refraction", "kite,wind"],
       "bluesky": ["rigb.org", "cern.bsky.social", "museumofscience.bsky.social"],
-      "instagram": ["cern", "veritasium", "quantamagazine", "exploratorium"]
+      "instagram": ["cern", "exploratorium"]
     },
     {
       "area": "photography",
@@ -621,7 +615,7 @@
       "vimeo": [],
       "flickr": ["streetphotography", "filmphotography", "landscapephotography", "35mm,film"],
       "bluesky": ["timosborne.ca", "beautysurroundsyou.com", "barrybutler9.bsky.social"],
-      "instagram": ["magnumphotos", "natgeo", "aperturefoundation", "worldpressphoto", "petapixel"]
+      "instagram": ["magnumphotos", "natgeo", "worldpressphoto", "petapixel"]
     },
     {
       "area": "travel",
@@ -637,7 +631,7 @@
       "vimeo": ["https://vimeo.com/roadsandkingdoms/videos/rss"],
       "flickr": ["travelphotography", "travel,landscape", "roadtrip,landscape", "backpacking"],
       "bluesky": ["for91days.com", "ricksteves.bsky.social", "texashighways.bsky.social"],
-      "instagram": ["atlasobscura", "lonelyplanet", "natgeotravel", "cntraveler", "ricksteves"]
+      "instagram": ["atlasobscura", "lonelyplanet", "natgeotravel", "cntraveler"]
     },
     {
       "area": "interior design",
@@ -653,7 +647,7 @@
       "vimeo": [],
       "flickr": ["vernaculararchitecture", "courtyard,house", "interior,historic", "machiya"],
       "bluesky": ["thevicsoc.bsky.social", "c20society.bsky.social"],
-      "instagram": ["archdigest", "designmilk", "nevertoosmall", "worldofinteriors"]
+      "instagram": ["archdigest", "designmilk"]
     },
     {
       "area": "dreams",
@@ -669,7 +663,7 @@
       "vimeo": [],
       "flickr": ["dreamy,surreal", "dreamy,fog", "doubleexposure"],
       "bluesky": ["sleepfoundation.bsky.social", "sleepjournals.bsky.social"],
-      "instagram": ["sleepdiplomat", "aasmorg", "hubermanlab"]
+      "instagram": ["aasmorg", "hubermanlab"]
     },
     {
       "area": "psychology and therapy",
@@ -694,7 +688,7 @@
         "psychscience.bsky.social",
         "bpsofficial.bsky.social"
       ],
-      "instagram": ["psychologytoday", "greatergoodsc", "therapyinanutshell", "katimorton"]
+      "instagram": ["therapyinanutshell", "katimorton"]
     },
     {
       "area": "fantasy literature",
@@ -710,7 +704,7 @@
       "vimeo": [],
       "flickr": ["hogwarts", "hobbiton", "harrypotter,studiotour", "lotr,lego"],
       "bluesky": ["tolkiensociety.org", "torbooks.bsky.social"],
-      "instagram": ["torbooks", "orbitbooks", "harrypotter", "gollancz"]
+      "instagram": ["torbooks", "harrypotter", "gollancz"]
     }
   ]
 }

@@ -179,6 +179,39 @@ export function carriedInstagram(
   });
 }
 
+/** The recording's order: by area as the topic map lists them, then kind, then id. */
+export function recordingOrder(areas: readonly string[]): (a: MediaItemJson, b: MediaItemJson) => number {
+  const at = new Map(areas.map((a, i) => [a, i]));
+  return (a, b) => (at.get(a.area) ?? 0) - (at.get(b.area) ?? 0) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+/**
+ * `previous` with `added` merged in, for a pass that reads only one network: every item and held-out item it had stays
+ * as it was, and each added item joins unless its id or link is already there.
+ */
+export function withItems(
+  previous: unknown,
+  added: readonly MediaItemJson[],
+  areas: readonly string[],
+): { readonly recordedAt: string; readonly items: MediaItemJson[]; readonly unseen: Record<Lean, MediaItemJson[]>; readonly joined: MediaItemJson[] } {
+  parseMediaRecording(previous);
+  const o = obj(previous, 'recording');
+  const items = arr(o.items, 'recording.items') as MediaItemJson[];
+  const held = obj(o.unseen, 'recording.unseen');
+  const unseen = Object.fromEntries(LEANS.map((l) => [l, arr(held[l], `unseen.${l}`) as MediaItemJson[]])) as Record<Lean, MediaItemJson[]>;
+  const ids = new Set([...items, ...LEANS.flatMap((l) => unseen[l])].map((i) => i.id));
+  const links = new Set([...items, ...LEANS.flatMap((l) => unseen[l])].map((i) => canonicalLink(i.url)));
+  const joined: MediaItemJson[] = [];
+  for (const x of added) {
+    const link = canonicalLink(x.url);
+    if (ids.has(x.id) || links.has(link)) continue;
+    ids.add(x.id);
+    links.add(link);
+    joined.push(x);
+  }
+  return { recordedAt: str(o.recordedAt, 'recording.recordedAt'), items: [...items, ...joined].sort(recordingOrder(areas)), unseen, joined };
+}
+
 export function loadMediaRecording(path = MEDIA_PATH): MediaRecording {
   return parseMediaRecording(JSON.parse(readFileSync(path, 'utf8')));
 }

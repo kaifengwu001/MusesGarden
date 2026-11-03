@@ -106,6 +106,15 @@ describe('the Instagram reader', () => {
     expect(graph.calls.map((c) => c.pathname)).toEqual(['/v21.0/42']);
   });
 
+  it('never reports the token, even when a failure names the URL it asked', async () => {
+    const leaky: typeof globalThis.fetch = (input) => Promise.reject(new Error(`could not reach ${urlOf(input)}`));
+    const reader = InstagramReader.fromEnv({ META_IG_TOKEN: 'secret-token', META_IG_USER_ID: '42' }, leaky);
+    const failure = await reader!.latest('kewgardens', 5).catch((e: unknown) => String(e));
+    expect(failure).toMatch(/instagram: 42 failed: Error: could not reach https:\/\/graph\.facebook\.com/);
+    expect(failure).not.toContain('secret-token');
+    expect(failure).toContain('access_token=<token>');
+  });
+
   it('titles a find by its caption’s first line, cut at a word', () => {
     expect(captionTitle('\n\nFirst line\nsecond', '@x')).toBe('First line');
     expect(captionTitle('', '@x')).toBe('@x');

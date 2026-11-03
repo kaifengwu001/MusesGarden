@@ -47,8 +47,10 @@ planet last. `server/fixtures/cast/README.md` has the table.
   Kai's trait numbers. Every MEMORY.md seeds Kai's interests as topic-map labels, each also checked against the
   privacy filter the engine applies.
 - **The topic map.** 23 new areas (gardening and flowers to fantasy literature): 814 pages in 37 areas, 308 before.
-- **The recording.** 303 items, 2 of each kind in every area, from 575 sources (570 answered). No Instagram: there is
-  no `META_IG_TOKEN` here, so the 17 Instagram items of the last recording are gone.
+- **The recording.** 411 items, at least 2 of each kind in every area, from 575 sources (570 answered), then an
+  Instagram-only pass with Kai's token for the 23 new areas (`--only instagram`): 70 of their 92 accounts answered and
+  added 91 reels and posts; the 22 that answered "Invalid user id" are out of the source list. The 17 Instagram items
+  of the recording before stay: a recording made without the token now keeps the last one's.
 - **Strangers.** Similarity raises the odds of meeting and befriending beyond the planet, but no longer gates them:
   Momo can become friends with any character.
 
@@ -63,7 +65,6 @@ planet last. `server/fixtures/cast/README.md` has the table.
 
 ### Open (Kai's cast)
 
-- **Record with the Instagram token.** The new areas list Instagram accounts that couldn't be checked without it.
 - **YouTube descriptions.** YouTube answered the recorder's watch pages with its "sorry" page, so 89 of the 123
   YouTube items have no description. A later recording fills them in.
 - **The voice-review scenes** in the cast README wait for Meta's model; the heuristic mind doesn't voice the souls.
@@ -486,9 +487,10 @@ now feeds Kai's garden interface. Merged into main on 2026-11-01.
 
 ### Open
 
-- **The recording was small** (118 items, 17 from Instagram). Since Kai's cast (2026-11-02) it is 303 items in 37
-  areas, and the cast no longer converges on the same interests (see Kai's cast, above). Still open:
-  - Instagram is 0% of what Muse brings home until a recording runs with the token, against a 65% target.
+- **The recording was small** (118 items, 17 from Instagram). Since Kai's cast (2026-11-02) it is 411 items in 37
+  areas, 108 from Instagram, and the cast no longer converges on the same interests (see Kai's cast, above). Still open:
+  - Instagram is 26% of what Muse brings home in the 3-week sim, against a 65% target. The 14 first areas have only
+    the 17 items of the old recording; an Instagram-only pass for them would add more.
 - **The recording's contents:**
   - Leave ads and sale promotions out.
   - Keep disambiguation topics such as "Jazz (word)" out of filing.
