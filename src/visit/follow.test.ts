@@ -188,6 +188,27 @@ describe('the guest beside its host', () => {
     expect(nearest, 'never walks into the host').toBeGreaterThan(0.8);
   });
 
+  it('steps aside, not through, when the host sets off toward where it stands (Violet Dunes’ Muse walking along its shelter)', () => {
+    for (const blocked of [1, -1]) {
+      const f = new Follower();
+      let h = host(new Vector3(0, 1, 0));
+      const at = f.step(h, 1 / 60, R, dryEverywhere).dir.clone();
+      // the host turns toward its guest and walks that way, a wall on one side of its way
+      const going = tangentToward(h.dir, at.clone(), new Vector3());
+      h = host(h.dir, going);
+      const wallSide = new Vector3().crossVectors(h.dir, h.heading).multiplyScalar(blocked);
+      const origin = h.dir.clone();
+      const dry = (dir: Vector3) => dir.clone().sub(origin).dot(wallSide) * R < 0.3;
+      let nearest = Infinity;
+      for (let t = 0; t < 8; t += 1 / 60) {
+        h = walked(h, 0.36 / 60);
+        const g = f.step(h, 1 / 60, R, dry);
+        nearest = Math.min(nearest, meters(g.dir, h.dir));
+      }
+      expect(nearest, `the wall on its ${blocked > 0 ? 'left' : 'right'}: never walked into`).toBeGreaterThan(0.7);
+    }
+  });
+
   it('starts over beside the host after a reset', () => {
     const f = new Follower();
     f.step(host(new Vector3(0, 1, 0)), 1 / 60, R, dryEverywhere);

@@ -43,6 +43,8 @@ const RINGS = [1, 0.75, 1.3, 1.7, 2.2];
 /** Beside a host that walks (× FOLLOW.side), then behind it in single file. */
 const ABREAST = [1, 0.75, 1.3];
 const BEHIND = [1, 1.3, 1.7, 2.2];
+/** Nearer than this to a host's way (m, to one side of it), the guest stands in its way as it sets off. */
+const IN_THE_WAY = 0.5;
 
 export interface HostAt {
   /** Where the host stands: a unit direction. */
@@ -85,7 +87,7 @@ export class Follower {
     if (moving && this.at) {
       // walking with it: a step to the side it was on when the host set off, a touch ahead of where the host is now
       going.copy(this.motion).divideScalar(speed);
-      if (this.sideSign === 0) this.sideSign = this.at.clone().sub(host.dir).dot(new Vector3().crossVectors(host.dir, going)) < 0 ? -1 : 1;
+      if (this.sideSign === 0) this.sideSign = setOffSide(host.dir, going, this.at, radius, dry);
       travel(host.dir, going, Math.min(speed * FOLLOW.lead, FOLLOW.side) / radius, ahead);
       this.spot = spotAbreast(host.dir, going, ahead, this.sideSign, radius, dry);
       this.anchor = host.dir.clone();
@@ -171,6 +173,21 @@ export function spotBeside(host: HostAt, radius: number, dry: (dir: Vector3) => 
     if (best) return best;
   }
   return travel(host.dir, leftOf, FOLLOW.side / radius, new Vector3());
+}
+
+/**
+ * The side a guest walks on as its host sets off the way `going`: the side it stands on, well to one side of the
+ * host's way; standing in its way (ahead of it or behind), the side with room to stand on, its left before its right,
+ * so it steps aside rather than be walked into.
+ */
+export function setOffSide(host: Vector3, going: Vector3, at: Vector3, radius: number, dry: (dir: Vector3) => boolean): 1 | -1 {
+  const left = new Vector3().crossVectors(host, going).normalize();
+  const lateral = at.clone().sub(host).dot(left) * radius;
+  if (Math.abs(lateral) > IN_THE_WAY) return lateral < 0 ? -1 : 1;
+  const room = (sign: number) => ABREAST.some((ring) => dry(travel(host, left.clone().multiplyScalar(sign), (ring * FOLLOW.side) / radius, new Vector3())));
+  if (room(1)) return 1;
+  if (room(-1)) return -1;
+  return lateral < 0 ? -1 : 1;
 }
 
 /**
