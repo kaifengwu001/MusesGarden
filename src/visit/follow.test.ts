@@ -101,6 +101,15 @@ describe('the guest beside its host', () => {
     expect(meters(g.dir, h.dir)).toBeCloseTo(FOLLOW.side, 3);
   });
 
+  it('stands a little nearer, or farther, when nowhere a step away will do', () => {
+    const h = host(new Vector3(0, 1, 0));
+    // only ground nearer than a step to the host, or farther, is good to stand on
+    const ring = (dir: Vector3) => Math.abs(meters(dir, h.dir) - FOLLOW.side) > 0.1;
+    const g = run(new Follower(), h, 2, ring);
+    expect(meters(g.dir, h.dir)).toBeCloseTo(0.75 * FOLLOW.side, 3);
+    expect(ring(g.dir)).toBe(true);
+  });
+
   it('is simply there when the host was carried far off, rather than walking the whole way', () => {
     const f = new Follower();
     const h = host(new Vector3(0, 1, 0));

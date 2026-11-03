@@ -49,6 +49,8 @@ export interface VisitScene {
   readonly growth: { readonly radius: number };
   /** The point on the planet under a point of the screen (normalised device coordinates), if any. */
   pick(ndcX: number, ndcY: number): { readonly dir: Vector3; readonly water: number } | null;
+  /** The world's own view of its Muse, which knows its home (from out in front of its terrace, not through a wall). */
+  frameMuse?(): void;
 }
 
 /** A world as a visit's destination: environments/<x>/visit.ts makes one. */

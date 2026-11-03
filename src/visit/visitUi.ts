@@ -1,9 +1,10 @@
-import type { Vector3 } from 'three';
+import { Vector3 } from 'three';
 import '../ui/garden/garden.css';
 import './visit.css';
 import { mediaOf } from '../garden/media';
 import type { Basket, Find, Interest } from '../garden/types';
 import type { PlanetId, VisitPlant, VisitWorldView } from '../muse/contract';
+import { tangentToward } from '../planet/geo';
 import { warpPoint } from '../render/warp';
 import { button, el, wait } from '../ui/garden/dom';
 import { FindCard } from '../ui/garden/findCard';
@@ -385,10 +386,27 @@ export class VisitUi {
 
   // ---- the camera ----------------------------------------------------------------------------------
 
-  /** Fly to the two Muses: from in front of the host, the guest at its side. */
+  /**
+   * To the two Muses: the world's own view of its Muse where it has one (it knows its home's walls), the guest a step
+   * beside it; else a flight from in front of the host, where it looks out (open ground, as a rule), turned part way
+   * round so the guest stands beside it in the view rather than behind it.
+   */
   frameMuses(): void {
-    const where = this.world.host.where;
-    const framing: Framing = { dir: where.dir.clone(), ground: where.height, ...MUSES_VIEW, from: where.heading.clone() };
+    if (this.world.scene.frameMuse) {
+      this.interrupt();
+      this.world.scene.frameMuse();
+      return;
+    }
+    const host = this.world.host.where;
+    const guest = this.guestShown ? this.guest?.where : undefined;
+    const mid = guest ? host.dir.clone().add(guest.dir).normalize() : host.dir.clone();
+    const from = tangentToward(mid, host.heading.clone().add(mid), new Vector3());
+    if (guest) {
+      const along = tangentToward(mid, guest.dir, new Vector3());
+      const across = new Vector3().crossVectors(mid, along);
+      from.addScaledVector(across.dot(from) >= 0 ? across : across.negate(), 0.5).normalize();
+    }
+    const framing: Framing = { dir: mid, ground: host.height, ...MUSES_VIEW, from };
     this.flight.to(framing, this.world.scene.growth.radius, this.ground);
   }
 

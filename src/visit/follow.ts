@@ -24,6 +24,8 @@ export const FOLLOW = {
 
 /** Bearings round the host to try for a spot (rad from its left, by turns): its left, its right, behind, then between. */
 const AROUND = [0, Math.PI, Math.PI / 2, Math.PI / 4, (3 * Math.PI) / 4, -Math.PI / 4, (-3 * Math.PI) / 4, -Math.PI / 2];
+/** The rings to try them on (× FOLLOW.side): a step away, then a little nearer, then farther out (a host on a narrow pier). */
+const RINGS = [1, 0.75, 1.3, 1.7, 2.2];
 
 export interface HostAt {
   /** Where the host stands: a unit direction. */
@@ -80,25 +82,29 @@ export class Follower {
 }
 
 /**
- * A spot FOLLOW.side beside the host on dry ground: of the bearings round it, the dry one nearest where the guest
- * stands now (so it doesn't cross over), else its left. With nowhere dry, its left.
+ * A spot FOLLOW.side beside the host where it can stand: of the bearings round it, the good one nearest where the
+ * guest stands now (so it doesn't cross over), else its left; a little nearer or farther when none a step away is.
+ * With nowhere to stand, its left.
  */
 export function spotBeside(host: HostAt, radius: number, dry: (dir: Vector3) => boolean, near: Vector3 | null): Vector3 {
   const forward = tangentToward(host.dir, host.heading.clone().add(host.dir), new Vector3());
   const leftOf = new Vector3().crossVectors(host.dir, forward).normalize();
   const t = new Vector3();
-  let best: Vector3 | null = null;
-  let bestD = Infinity;
-  for (const bearing of AROUND) {
-    t.copy(leftOf).applyAxisAngle(host.dir, bearing);
-    const spot = travel(host.dir, t, FOLLOW.side / radius, new Vector3());
-    if (!dry(spot)) continue;
-    if (!near) return spot;
-    const d = angleBetween(spot, near);
-    if (d < bestD) {
-      bestD = d;
-      best = spot;
+  for (const ring of RINGS) {
+    let best: Vector3 | null = null;
+    let bestD = Infinity;
+    for (const bearing of AROUND) {
+      t.copy(leftOf).applyAxisAngle(host.dir, bearing);
+      const spot = travel(host.dir, t, (ring * FOLLOW.side) / radius, new Vector3());
+      if (!dry(spot)) continue;
+      if (!near) return spot;
+      const d = angleBetween(spot, near);
+      if (d < bestD) {
+        bestD = d;
+        best = spot;
+      }
     }
+    if (best) return best;
   }
-  return best ?? travel(host.dir, leftOf, FOLLOW.side / radius, new Vector3());
+  return travel(host.dir, leftOf, FOLLOW.side / radius, new Vector3());
 }
