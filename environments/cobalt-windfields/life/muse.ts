@@ -293,7 +293,7 @@ export class Muse {
     if (this.disposed) return;
     if (!this.suppliedLife && !this.roam?.fits(terrain)) this.roam = new MuseRoam(terrain, MUSE_HEIGHT);
     const R = terrain.radius;
-    const l = this.suppliedLife ?? this.lifeAt(time, terrain, camera, this.roam!);
+    const l = this.suppliedLife ?? this.lifeAt(time, camera, this.roam!);
     this.living = l;
     this.where.dir.copy(l.dir);
     this.where.height = l.height;
@@ -373,7 +373,7 @@ export class Muse {
   }
 
   /** Its life at a time, unless the engine has it out on the planet or working at home. */
-  private lifeAt(time: number, terrain: Terrain, camera: Vector3, roam: MuseRoam): Roaming {
+  private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
     const d = this.direction;
     const life = roam.at(time, camera);
     if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;
@@ -400,7 +400,8 @@ export class Muse {
     }
     // out on the planet: on the ground at its spot, facing the way it goes
     r.dir.copy(d.dir).normalize();
-    r.height = terrain.height(r.dir);
+    // (on what its life would stand on there: a deck or a porch where the home has one, else the planet's ground)
+    r.height = roam.groundAt(r.dir);
     if (d.toward) r.heading.subVectors(d.toward, r.dir);
     r.heading.addScaledVector(r.dir, -r.heading.dot(r.dir));
     if (r.heading.lengthSq() < 1e-10) r.heading.set(r.dir.y, -r.dir.x, 0);
