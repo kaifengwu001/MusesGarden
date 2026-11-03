@@ -12,6 +12,14 @@ body.is-visiting .controlbar {
   display: none;
 }
 
+/* the guest's status hangs from its portrait's right edge and runs inward, as the garden's does; a world's own copy of
+   the garden's stylesheet centres it (left 50%), which with the garden's right edge would pin it narrower than its words */
+.visit .visit-rail .g-portrait .g-status {
+  left: auto;
+  right: -6px;
+  transform: none;
+}
+
 .visit .g-findlayer .g-like,
 .visit .g-findlayer .g-card-share {
   display: none;

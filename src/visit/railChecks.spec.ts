@@ -41,7 +41,13 @@ function reach(page: Page, to: 'pair' | 'home'): Promise<number> {
 export async function checkRail(page: Page, host: string): Promise<void> {
   const rail = page.locator('.visit .g-rail');
   await expect(rail).toBeVisible();
-  await expect(rail.locator('.g-portrait .g-status')).toHaveText(`Visiting ${host}’s planet`);
+  const status = rail.locator('.g-portrait .g-status');
+  await expect(status).toHaveText(`Visiting ${host}’s planet`);
+  // its pill holds its words (a world's own copy of the garden's stylesheet once pinned it narrower), on the screen
+  const fit = await status.evaluate((s) => ({ box: s.getBoundingClientRect(), words: s.scrollWidth, width: s.clientWidth }));
+  expect(fit.width, 'the status pill is as wide as its words').toBeGreaterThanOrEqual(fit.words);
+  expect(fit.box.left, 'the status stays on the screen').toBeGreaterThanOrEqual(0);
+  expect(fit.box.right).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
   await expect(page.locator('.g-basketbtn, .g-postbox, .g-tickets, .g-ticket'), 'none of the garden’s basket, post or tickets').toHaveCount(0);
   const buttons = [
     { name: `${host}’s home`, to: 'home', near: 100 },
