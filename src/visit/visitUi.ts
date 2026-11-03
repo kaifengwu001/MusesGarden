@@ -453,7 +453,7 @@ export class VisitUi {
     order.forEach((plant, k) => {
       const a = turn + k * GOLDEN_ANGLE;
       t.copy(north).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
-      out.set(plant.id as string, travel(home, t, (GARDEN_FROM + GARDEN_STEP * Math.sqrt(k)) / radius, new Vector3()));
+      out.set(plant.id, travel(home, t, (GARDEN_FROM + GARDEN_STEP * Math.sqrt(k)) / radius, new Vector3()));
     });
     return out;
   }
