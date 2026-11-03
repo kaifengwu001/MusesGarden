@@ -1,6 +1,6 @@
 // One of Kai's models as its own texture paints it (a tower's grey-blue rock
 // in long streaks and dark green tufts on its ledges, a house's white plaster
-// and dark tiles), lit as the terraces are (rice.glsl labLight: the sky's
+// and dark tiles; Muse's hut by its own colours, USE_COLOR), lit as the terraces are (rice.glsl labLight: the sky's
 // hemisphere and the sun, the texture keeping its own shading, so the light a
 // little softer on it), then the haze: thick low down, thin up high, so a far
 // tower's foot fades into it while its peak keeps its colour.
@@ -15,6 +15,9 @@ uniform float uRadius;
 #include <terraces_rice>
 
 uniform sampler2D uMap;
+#ifdef USE_COLOR
+varying vec3 vColour; // its own colours (Muse's hut: hut.vert.glsl), in place of a texture
+#endif
 
 varying vec2 vUv;
 varying vec3 vNormal;
@@ -29,7 +32,11 @@ void main() {
   if (dot(n, toCam) < 0.0) n = -n;
   vec3 dir = normalize(vPlanet);
   vec3 up = warpNormal(vPlanet, dir);
+#ifdef USE_COLOR
+  vec3 albedo = vColour;
+#else
   vec3 albedo = texture2D(uMap, vUv).rgb;
+#endif
   vec3 col = mix(albedo, labLight(albedo, n, up), 0.75);
   float above = length(vPlanet) - uRadius;
   col = mix(col, applyAerial(col, dist, dir), mix(1.0, 0.4, smoothstep(5.0, 55.0, above)));

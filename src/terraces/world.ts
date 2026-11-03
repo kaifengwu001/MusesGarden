@@ -29,6 +29,7 @@ import { Rice, RICE } from './rice';
 import { Trees } from './trees';
 import { mapPeaks, peakMap } from './fogPeaks';
 import { TerraceMist } from './mist';
+import { MuseHut, type HutSite } from './hut';
 
 /** Kai's models, made light by scripts/terraces-models.mjs (a unit tall, two levels of detail each). */
 const MODEL_URLS = (kind: 'mountain' | 'house'): string[] => [1, 2, 3, 4, 5].map((k) => new URL(`../assets/terraces/${kind}${k}.glb`, import.meta.url).href);
@@ -66,6 +67,34 @@ const VISTA = { height: 24, tilt: (52 * Math.PI) / 180, widen: 28 } as const;
  * stands' too). Other seeds look for theirs (findStand).
  */
 const KAI_VIEW = { seed: 412, frame: new Quaternion(-0.3076, -0.3408, -0.5001, -0.7343).normalize(), zoom: 0.6029 } as const;
+/**
+ * Muse's hut on Kai's planet (2026-11-03: Tracy's cottage where his mockup over his view put it, give or take): the
+ * middle of its footing, the way along its hall (its gate out to the left of the view, toward the camera), its size
+ * against Tracy's (as large as the mockup drew it: 0.48–0.64 by its edges and height there), its floor at the middle
+ * of the ground's heights under it (the paddy it stands on mostly; the lower one before it under its skirt, steps down
+ * to it from its gate), its path's way and the trees by it.
+ */
+const MUSE_HUT: HutSite = {
+  centre: new Vector3(-0.70624, 0.3647, 0.60681).normalize(),
+  xWay: new Vector3(0.70009, 0.48718, 0.52204).normalize(),
+  scale: 0.6,
+  level: 0.5,
+  // (from its gate's steps out along its front, round its west wing and up to the village's street, behind it)
+  path: [
+    [0.4, 5.9],
+    [-2.4, 5.8],
+    [-4.9, 4.9],
+    [-5.6, 2.4],
+    [-5.9, -0.8],
+    [-7.2, -3.8],
+  ],
+  // (behind it at both corners, and by its east side: none before it, where Kai's view looks at it)
+  trees: [
+    [-4.4, -4.4, 0.05],
+    [4.4, -3.9, 0.31],
+    [4.9, 1.6, 0.52],
+  ],
+};
 /** The rice's pool, in pages of 2048 blades (rice.ts). */
 const RICE_PAGES = 400;
 
@@ -106,6 +135,8 @@ export class TerraceWorld implements PlanetWorld {
   }
   field: PlanetField;
   readonly trees: Trees;
+  /** Muse's hut (on Kai's planet). */
+  readonly hut: MuseHut;
   /** Kai's karst towers on the hilltops and houses in the villages, where the build placed them. */
   readonly towers: ModelSet;
   readonly houses: ModelSet;
@@ -131,6 +162,8 @@ export class TerraceWorld implements PlanetWorld {
   private posed = false;
   /** The stand the opening view was given (looked for again once the towers stand, if one is by it and the camera has not moved). */
   private openingStand: Vector3 | null = null;
+  /** The trees of the build the hut was last stood for. */
+  private treesFrom: Float32Array | null = null;
   private noiseSeed = -1;
   private nextGust = 0;
   private readonly frustum = new Frustum();
@@ -162,11 +195,13 @@ export class TerraceWorld implements PlanetWorld {
     this.trees = new Trees(this.shared);
     this.paddyMap = new PaddyMap(this.shared);
     Object.assign(this.shared, this.paddyMap.uniforms);
+    this.hut = new MuseHut(this.shared);
+    Object.assign(this.shared, this.hut.uniforms);
     this.rice = new Rice(this.shared, RICE_PAGES);
     this.objects = new TerraceBuild(this.shared);
     this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 96, 140);
     this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
-    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist.group);
+    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.hut.mesh, this.mist.group);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
     if (only !== null) {
@@ -393,7 +428,17 @@ export class TerraceWorld implements PlanetWorld {
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     // the terraces, the whole planet's, built once for this seed (in a worker: until they are, the sky alone)
     this.objects.update(this.noiseSeed);
-    if (this.objects.trees && this.objects.trees !== this.trees.placed) this.trees.place(this.objects.trees);
+    // Muse's hut once a build is in (on Kai's planet), and the trees kept off its footing
+    if (this.objects.trees && this.objects.trees !== this.treesFrom) {
+      this.treesFrom = this.objects.trees;
+      const extra = this.hut.place(this.kaiView ? MUSE_HUT : null, this.objects.group, R, this.noiseSeed);
+      if (extra.path) this.objects.add(extra.path);
+      const kept = this.hut.clear(this.objects.trees, 5, 1, R);
+      const trees = new Float32Array(kept.length + extra.trees.length);
+      trees.set(kept);
+      trees.set(extra.trees, kept.length);
+      this.trees.place(trees);
+    }
     if (this.objects.peaks && this.objects.peaks !== this.placedModels) {
       this.placedModels = this.objects.peaks;
       this.towers.set(placements(this.objects.peaks), R);
@@ -405,7 +450,8 @@ export class TerraceWorld implements PlanetWorld {
         const stand = this.findStand();
         this.rig.lookAlong(stand.focus, stand.forward);
       }
-      this.houses.set(placements(this.objects.houses ?? new Float32Array(0)), R);
+      // (the village houses too: none within a house's reach of the hut's footing; its path runs clear of them)
+      this.houses.set(placements(this.hut.clear(this.objects.houses ?? new Float32Array(0), 8, 6, R, false)), R);
     }
     // (near ones in full detail: the camera's place on the planet, unwarped)
     this.towers.update(this.eye.copy(rig.up).multiplyScalar(R + rig.altitude));

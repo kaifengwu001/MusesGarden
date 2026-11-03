@@ -92,6 +92,14 @@ export class TerraceBuild {
     for (const done of this.waiting.splice(0)) done();
   }
 
+  /** A mesh of the terraces' own kind (their attributes, their paint) added to this build's, gone with it at the next. */
+  add(geometry: BufferGeometry): Mesh {
+    const mesh = new Mesh(geometry, this.material);
+    mesh.renderOrder = -10;
+    this.group.add(mesh);
+    return mesh;
+  }
+
   /** Resolved once the build under way (if any) is in place. */
   whenBuilt(): Promise<void> {
     if (!this.building) return Promise.resolve();
