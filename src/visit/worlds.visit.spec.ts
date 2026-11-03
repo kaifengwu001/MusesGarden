@@ -20,6 +20,7 @@ const WORLDS: readonly { readonly planet: PlanetId; readonly host: string; reado
   { planet: 'cobalt-windfields', host: 'moss', name: 'Moss', seed: 2389 },
   { planet: 'tulip-windmill-meadows', host: 'sorrel', name: 'Sorrel', seed: 8846 },
   { planet: 'golden-rye', host: 'thistle', name: 'Thistle', seed: 9031 },
+  { planet: 'cherry-blossom-waterways', host: 'juniper', name: 'Juniper', seed: 7703 },
 ];
 
 interface VisitState {

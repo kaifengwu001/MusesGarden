@@ -134,7 +134,7 @@ export class Muse {
   private readonly press: { value: Vector4[] } | null;
   private readonly pressK: { value: number } | null;
 
-  constructor(shared: Record<string, IUniform>) {
+  constructor(shared: Record<string, IUniform>, options: { homeProps?: boolean } = {}) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
     this.mesh = new Mesh(
       new InstancedBufferGeometry(),
@@ -157,7 +157,8 @@ export class Muse {
       }),
     );
     this.shadowMesh.frustumCulled = false;
-    this.props = new MuseProps(shared);
+    // (a visiting Muse has none of the home's props: the porch's stove is its host's)
+    this.props = new MuseProps(shared, options.homeProps ?? true);
     // (the grass's press, shared: world.ts makes it before the grass)
     this.press = (shared.uMusePress as { value: Vector4[] } | undefined) ?? null;
     this.pressK = (shared.uMusePressK as { value: number } | undefined) ?? null;
@@ -271,7 +272,7 @@ export class Muse {
   update(time: number, terrain: Terrain, camera: Vector3, wind: Vector4, pixelAngle: number, show: boolean): void {
     if (!this.roam?.fits(terrain)) this.roam = new MuseRoam(terrain, MUSE_HEIGHT);
     const R = terrain.radius;
-    const l = this.lifeAt(time, terrain, camera, this.roam);
+    const l = this.lifeAt(time, camera, this.roam);
     this.living = l;
     this.where.dir.copy(l.dir);
     this.where.height = l.height;
@@ -329,7 +330,7 @@ export class Muse {
   }
 
   /** Its life at a time, unless the engine has it out on the planet or working at home. */
-  private lifeAt(time: number, terrain: Terrain, camera: Vector3, roam: MuseRoam): Roaming {
+  private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
     const d = this.direction;
     const life = roam.at(time, camera);
     if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;
@@ -356,7 +357,8 @@ export class Muse {
     }
     // out on the planet: on the ground at its spot, facing the way it goes
     r.dir.copy(d.dir).normalize();
-    r.height = terrain.height(r.dir);
+    // (on what its life would stand on there: a deck or a porch where the home has one, else the planet's ground)
+    r.height = roam.groundAt(r.dir);
     if (d.toward) r.heading.subVectors(d.toward, r.dir);
     r.heading.addScaledVector(r.dir, -r.heading.dot(r.dir));
     if (r.heading.lengthSq() < 1e-10) r.heading.set(r.dir.y, -r.dir.x, 0);
