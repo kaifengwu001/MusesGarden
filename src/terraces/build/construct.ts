@@ -168,16 +168,17 @@ const LOOK_DELAY = [1, 0.55, 0.424, 0.13, 0];
 const SLOT = { woods: 2, flat: 3, zone: 4, base: 100000, bands: 200000, cut: 600000, fields: 1000000 } as const;
 
 /**
- * Kai's house models (src/assets/terraces/house*.glb, made a unit tall: models.ts): each one's footprint (× its height),
- * and its height as the villages stand it (m), each the width the old five had (11.4 m across at most before the
- * villages' 0.62–0.76 of it), so the villages are laid out as before.
+ * Kai's houses in the villages: the plot each stands on (its footprint with its yard, × its height) and its height
+ * there (m), as the villages were laid out for the first five, kept so the villages keep their layout (Kai); and the
+ * longer side of the footprint (× its height) of the house now drawn there (src/assets/terraces/house*.glb, Kai's
+ * second five, made a unit tall: models.ts), which is stood as tall as fills its plot.
  */
 const HOUSE_MODELS = [
-  { x: 1.63, z: 1.63, height: 7.0 },
-  { x: 1.2, z: 1.24, height: 9.2 },
-  { x: 1.06, z: 1.2, height: 9.5 },
-  { x: 1.67, z: 1.73, height: 6.6 },
-  { x: 1.26, z: 1.51, height: 7.6 },
+  { x: 1.88, z: 1.82, height: 6.2, own: 1.63 },
+  { x: 1.36, z: 1.19, height: 8.4, own: 1.24 },
+  { x: 1.18, z: 1.47, height: 8.0, own: 1.2 },
+  { x: 1.65, z: 1.75, height: 6.6, own: 1.73 },
+  { x: 1.03, z: 1.45, height: 7.4, own: 1.51 },
 ] as const;
 
 /** A growable array of numbers, typed. */
@@ -2653,7 +2654,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       const gy = g[0] * d.e1[1] + g[1] * d.e2[1];
       const gz = g[0] * d.e1[2] + g[1] * d.e2[2];
       const way = Math.atan2(gx * F[3] + gy * F[4] + gz * F[5], gx * F[0] + gy * F[1] + gz * F[2]) + (Math.floor(rnd() * 4) * Math.PI) / 2 + (rnd() - 0.5) * 0.25;
-      houses.push(dir[0], dir[1], dir[2], plainLevel[p] - 0.3, height, model, way, stretch);
+      houses.push(dir[0], dir[1], dir[2], plainLevel[p] - 0.3, (height * Math.max(M.x, M.z)) / M.own, model, way, stretch);
     }
     // (the trees: in the gaps between the yards and round the village's edge, in clumps, the open ground between them
     // a village's own: its threshing floors and gardens)
