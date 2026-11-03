@@ -2,7 +2,7 @@ import { hash32, unit } from '../../core/hash';
 import { smoothstep } from '../../core/math';
 import { gnoise } from '../../planet/noise';
 import { Bands, Cuts, inRing, insideRing, type CutParams } from './bands';
-import { gnoiseGrad, PlanetField, type FieldParams } from './field';
+import { gnoiseGrad, HILLS, PlanetField, type FieldParams } from './field';
 import { clip, faceDirection, Side, SphereGrid, tangentFrame, vertexCorner, type Chain, type Corner, type Field } from './sphere';
 
 // The terraces' build (build/): the paddy lab's construction (src/dev/
@@ -93,8 +93,9 @@ export const BUILD: BuildParams = {
   plot: { bunds: [24, 36], strip: [3, 5], cross: [8, 14], alongBund: 0.3, bend: [0.24, 0.3], bendOver: [30, 44], wobble: 0.9, minor: 0.3, major: 0.6, trackWidth: 1.6 },
   treeSpacing: 2.2,
   peaks: { groups: 7, apart: 70, height: [30, 44], share: [0.45, 0.85], foot: 0.5 },
-  leastWoods: 60,
-  leastFlats: 400,
+  // (the lab's 60 and 400 m², with the hills' area)
+  leastWoods: 60 * HILLS * HILLS,
+  leastFlats: 400 * HILLS * HILLS,
   // (the lab's 0.12 along the banks and half that across the cuts: on the planet as many points as keep a bank's
   // bend under a millimetre off its curve, the cuts' lines all but straight)
   spacing: 0.18,
@@ -359,7 +360,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     const dirs = new Float64Array(3 * n);
     const hs = new Float64Array(n);
     const cells = new Map<number, number[]>();
-    const cell = 20 / R;
+    // (a top: no higher point within TOP m, the lab's 20 with the hills)
+    const TOP = 20 * HILLS;
+    const cell = TOP / R;
     const keyOf = (x: number, y: number, z: number): number => ((Math.floor(x / cell) + 512) * 1024 + (Math.floor(y / cell) + 512)) * 1024 + (Math.floor(z / cell) + 512);
     for (let i = 0; i < n; i++) {
       const z = 1 - (2 * (i + 0.5)) / n;
@@ -384,7 +387,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
           for (let dz = -1; dz <= 1 && top; dz++) {
             const list = cells.get(keyOf(x + dx * cell, y + dy * cell, z + dz * cell));
             if (!list) continue;
-            for (const j of list) if (j !== i && hs[j] > hs[i] && (x * dirs[3 * j] + y * dirs[3 * j + 1] + z * dirs[3 * j + 2]) > Math.cos(20 / R)) top = false;
+            for (const j of list) if (j !== i && hs[j] > hs[i] && (x * dirs[3 * j] + y * dirs[3 * j + 1] + z * dirs[3 * j + 2]) > Math.cos(TOP / R)) top = false;
           }
         }
       }
@@ -470,16 +473,17 @@ export function buildTerraces(input: BuildInput): BuildOutput {
   // the plains: each stretch of the flats (tidied, joined across the grid's triangles, its narrow bays and its
   // islands filled) cut out of the land before the bands, as the lab's flats were, and held level (field.ts Plains),
   // the whole of it, at one level: the floor of the band in the middle of the most of its ground that lies within
-  // 4 m (a hilltop's flat, a hollow's, a valley floor's). So a plain is truly flat, all of it fields, and no band's
-  // outline crosses it. Round it a collar where the land eases back to its own height, the wider the farther the
-  // plain's ground lay from its level (8 m for every meter, 14 to 32 m), by the distance from the plain's edge
+  // 2.4 m (the lab's 4, with the hills: a hilltop's flat, a hollow's, a valley floor's). So a plain is truly flat, all
+  // of it fields, and no band's outline crosses it. Round it a collar where the land eases back to its own height, the
+  // wider the farther the plain's ground lay from its level (8 m for every meter, 8.4 to 19.2 m: the lab's 14 to 32,
+  // with the hills), by the distance from the plain's edge
   // (softened where the edge bends, so the ease bends smoothly too), so the terraces step up and down from its
   // edges. The distance kept on a fine raster on the plane at the plain's middle; the field's samples taken again.
   /** How far a plain's edge's distance is softened (m). */
   const PLAIN_SOFT = 1.5;
-  /** How narrow a bay in a plain's edge it fills (half its width, m), and how large a mound in its fields (m²). */
-  const PLAIN_CLOSE = 7;
-  const PLAIN_MOUND = 800;
+  /** How narrow a bay in a plain's edge it fills (half its width, m), and how large a mound in its fields (m²): the lab's 7 m and 800 m², with the hills. */
+  const PLAIN_CLOSE = 7 * HILLS;
+  const PLAIN_MOUND = 800 * HILLS * HILLS;
   const RASTER = 0.5;
   const core = new Int32Array(V).fill(-1);
   const plainLevel: number[] = [];
@@ -541,7 +545,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
       let first = 0;
       let most = 0;
       for (let i = 0, j = 0; i < ts.length; i++) {
-        while (ts[i] - ts[j] > 4) j++;
+        while (ts[i] - ts[j] > 4 * HILLS) j++;
         if (i - j + 1 > most) {
           most = i - j + 1;
           first = j;
@@ -572,7 +576,7 @@ export function buildTerraces(input: BuildInput): BuildOutput {
         sy += D[3 * v + 1];
         sz += D[3 * v + 2];
       }
-      const collar = Math.min(Math.max(8 * off, 14), 32);
+      const collar = Math.min(Math.max(8 * off, 14 * HILLS), 32 * HILLS);
       const l = Math.hypot(sx, sy, sz) || 1;
       const c = [sx / l, sy / l, sz / l];
       const F = tangentFrame(c[0], c[1], c[2], new Float64Array(6));
@@ -1059,8 +1063,9 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     }
   }
   // the villages (Kai, 2026-11-02): some of the larger plains built on, not farmed: every other plain by size from the
-  // second (two at most), of those over 400 m²; its ground packed earth and grass round Kai's houses, its trees
-  // between them, its track its street (its only line)
+  // second (two at most at the lab's hills, as many more as the plains are for hills HILLS of theirs: so as much of the
+  // flats is built on), of those over 144 m² (the lab's 400, with the hills' area); its ground packed earth and grass
+  // round Kai's houses, its trees between them, its track its street (its only line)
   const village = new Uint8Array(plainLevel.length);
   {
     const areas = rasters.map((r, p): [number, number] => {
@@ -1070,9 +1075,10 @@ export function buildTerraces(input: BuildInput): BuildOutput {
     });
     areas.sort((a, b) => b[0] - a[0]);
     areas.forEach(([area, p], rank) => {
-      if (rank % 2 === 1 && rank < 4 && area > 400) village[p] = 1;
+      if (rank % 2 === 1 && rank < Math.round(4 / (HILLS * HILLS)) && area > 400 * HILLS * HILLS) village[p] = 1;
     });
     stats.villages = village.reduce((a, b) => a + b, 0);
+    stats.flats = Math.round(areas.reduce((s, [area]) => s + area, 0));
   }
   /** A section of a plain (its sides of the major curves, a bit each), worked out the first time it is asked for: its strips along the track (in some, along its bund), crossed along its bund (or the track), or square to its strips where no bund bounds it. */
   const sectionOf = (p: number, sigma: number, X: number, Y: number): Section => {

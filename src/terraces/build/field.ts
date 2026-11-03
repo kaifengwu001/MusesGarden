@@ -43,18 +43,27 @@ export interface FieldParams {
 }
 
 /**
+ * The hills' size against the lab's (Kai, 2026-11-02: "some of the hills that are generated are too large (both area
+ * and height)", "smaller hills (60%) with the same range of incline, and consequently more hills"): their relief and
+ * every octave's wavelength scaled by it, so every slope is as it was and the ground falls into flats, terraces and
+ * woods in the same shares; the build scales its distances of the hills' size by it too (build/construct.ts).
+ */
+export const HILLS = 0.6;
+
+/**
  * The lab's ground as Kai left it (its second round: a hillside, Perlin noise at four scales) on a planet of R 128,
- * its relief 50 m (Kai, 2026-11-01: the lab's 36 on this planet came out gentler than the lab's canvas; at 50 the
- * planet's ground falls into flats, gentle and steep terraces and woods as the canvas's does).
+ * its relief 50 m at the lab's size (Kai, 2026-11-01: the lab's 36 on this planet came out gentler than the lab's
+ * canvas; at 50 the planet's ground falls into flats, gentle and steep terraces and woods as the canvas's does), the
+ * hills HILLS of the lab's.
  */
 export const FIELD: Omit<FieldParams, 'seed'> = {
   radius: 128,
-  relief: 50,
+  relief: 50 * HILLS,
   octaves: [
-    { scale: 260, weight: 1 },
-    { scale: 80, weight: 0.35 },
-    { scale: 28, weight: 0.1 },
-    { scale: 10, weight: 0.035 },
+    { scale: 260 * HILLS, weight: 1 },
+    { scale: 80 * HILLS, weight: 0.35 },
+    { scale: 28 * HILLS, weight: 0.1 },
+    { scale: 10 * HILLS, weight: 0.035 },
   ],
   step: 0.38,
   jitter: 0.15,
@@ -66,8 +75,10 @@ export const FIELD: Omit<FieldParams, 'seed'> = {
   flat: 0.06,
 };
 
-/** The octaves the smoothed slope reads: those 12 m and broader (the lab's). */
-const BROAD = 12;
+/** The octaves the smoothed slope reads: those 12 m and broader at the lab's size (the lab's). */
+const BROAD = 12 * HILLS;
+/** The wavelength of the slope's wander at the edges of its classes (m: the lab's 13, with the hills). */
+const EDGES = 13 * HILLS;
 /**
  * The plains the build lays on the field (build/construct.ts): each a flat stretch of the land held level at its
  * own level, the land round it eased back to itself (each plain's weight: 1 on it, falling to 0 a collar's width
@@ -281,7 +292,7 @@ export class PlanetField {
   /** How steep the ground is (m per m), smoothed: the gradient of its broader octaves, wandering a little at the edges of its classes. */
   slope(x: number, y: number, z: number): number {
     this.height(x, y, z, this.sg, true);
-    const f = this.R / 13;
+    const f = this.R / EDGES;
     return Math.hypot(this.sg[0], this.sg[1], this.sg[2]) * (1 + 0.3 * gnoise(x * f, y * f, z * f, (this.p.seed + SEED.cls) >>> 0));
   }
 
@@ -312,7 +323,7 @@ export class PlanetField {
       gz += a * this.g[2];
     }
     tangent(gx, gy, gz, x, y, z, this.sg);
-    const c = this.R / 13;
+    const c = this.R / EDGES;
     out[0] = h;
     out[1] = this.flatten(x, y, z, h - this.offsetAt(x, y, z));
     out[2] = Math.hypot(this.sg[0], this.sg[1], this.sg[2]) * (1 + 0.3 * gnoise(x * c, y * c, z * c, (this.p.seed + SEED.cls) >>> 0));

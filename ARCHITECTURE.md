@@ -672,10 +672,14 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
 
 ### The planet's mathematics (build/field.ts)
 
-- **The hills**: gradient noise at four scales in meters (260, 80, 28 and
-  10 m, weights 1, 0.35, 0.1, 0.035; 50 m of relief: on this planet the
-  lab's 36 m came out gentler than the lab's canvas, at 50 its ground falls
-  into flats, terraces and woods as the canvas's does),
+- **The hills**: gradient noise at four scales in meters (the lab's 260, 80,
+  28 and 10 m, weights 1, 0.35, 0.1, 0.035, and 50 m of relief: on this
+  planet the lab's 36 m came out gentler than the lab's canvas, at 50 its
+  ground falls into flats, terraces and woods as the canvas's does), all of
+  it scaled by `HILLS` (0.6: Kai, smaller hills and more of them, their
+  inclines as they were; the build's distances of the hills' size with it:
+  the least woods and flats, a plain's bays, mounds and collar, the tops'
+  reach, the villages' least plain),
   read at the point on the sphere at R, so the hills are the same shape
   every way and wrap round the planet without a seam; their gradient worked
   out exactly from each octave's own (`gnoiseGrad`).
@@ -769,8 +773,9 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   runs into a track or a bund passes under its surface (a bund under the
   track), and any line off the plain lies under the land there. A bund runs
   round a plain where the terraces meet it.
-- **The villages**: every other plain by size from the second (two at most,
-  over 400 m²): its ground packed earth and grass at its level, its track
+- **The villages**: every other plain by size from the second (two at most
+  at the lab's hills, five at HILLS 0.6: as many more as the plains are),
+  of those over 144 m²: its ground packed earth and grass at its level, its track
   its street; Kai's houses huddled along the street and out over its ground,
   their yards meeting, square to the street; trees in clumps between them.
 - **Built in a worker** (worker.ts) when the planet is first visited (about
