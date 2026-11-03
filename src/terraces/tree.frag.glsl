@@ -18,6 +18,7 @@ varying vec3 vPoint;
 flat varying vec3 vGround;
 flat varying vec3 vUp;
 flat varying vec4 vShape;
+flat varying float vFade;
 
 // The nearest hit of a ray with a lumpy sphere (centre c, radius r): its distance, or -1.
 float lumpHit(vec3 ro, vec3 rd, vec3 c, float r, float seed) {
@@ -34,6 +35,8 @@ float lumpHit(vec3 ro, vec3 rd, vec3 c, float r, float seed) {
 }
 
 void main() {
+  // (its last meters before the near trees' reach: only on the pixels the near tree leaves, treeNear.frag.glsl)
+  if (vFade < 0.999 && fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) > vFade) discard;
   vec3 ro = cameraPosition;
   vec3 rd = normalize(vPoint - ro);
   float rc = vShape.x;

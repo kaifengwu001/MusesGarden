@@ -6,6 +6,7 @@
 #include <meadow_warp>
 uniform float uRadius;
 
+uniform float uTreeNear; // the near trees' reach (m; 0: none): within it the tree is drawn near (treesNear.ts)
 attribute vec4 aTree;  // direction, its ground (m)
 attribute float aSeed; // [0, 1)
 
@@ -13,6 +14,7 @@ varying vec3 vPoint;        // on the billboard, view space
 flat varying vec3 vGround;  // the trunk's foot, view space
 flat varying vec3 vUp;      // the tree's up, view space
 flat varying vec4 vShape;   // crown radius (m), height (m), seed, the share of rock
+flat varying float vFade;   // 0 drawn near … 1 drawn here (its last meters: each on the other's dithered pixels)
 
 void main() {
   vPoint = vec3(0.0);
@@ -28,6 +30,15 @@ void main() {
   vec3 m = warpPosition(mid);
   vec3 up = warpNormal(mid, dir);
   float r = sqrt(0.25 * H * H + 2.4 * rc * rc);
+  // (none here where it is drawn near: treeNear.vert.glsl, the same fade)
+  vFade = smoothstep(uTreeNear - 4.0, uTreeNear, length(cameraPosition - m));
+  if (vFade <= 0.001) {
+    vGround = g;
+    vUp = up;
+    vShape = vec4(rc, H, aSeed, 0.0);
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
   // the billboard: in front of the bounding sphere, facing the camera, as wide as its outline
   vec3 toCam = cameraPosition - m;
   float d = length(toCam);

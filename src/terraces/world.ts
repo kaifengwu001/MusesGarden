@@ -27,6 +27,7 @@ import { PaddyMap } from './paddyMap';
 import { TERRACE_ROWS } from './palette';
 import { Rice, RICE } from './rice';
 import { Trees } from './trees';
+import { NearTrees } from './treesNear';
 import { mapPeaks, peakMap } from './fogPeaks';
 import { TerraceMist } from './mist';
 import { MuseHut, type HutSite } from './hut';
@@ -137,6 +138,8 @@ export class TerraceWorld implements PlanetWorld {
   readonly trees: Trees;
   /** Muse's hut (on Kai's planet). */
   readonly hut: MuseHut;
+  /** The trees near the camera, in full (treesNear.ts). */
+  readonly nearTrees: NearTrees;
   /** Kai's karst towers on the hilltops and houses in the villages, where the build placed them. */
   readonly towers: ModelSet;
   readonly houses: ModelSet;
@@ -158,6 +161,7 @@ export class TerraceWorld implements PlanetWorld {
     uHeightFogPeaks: { value: peakMap() },
     uHeightFogPeak: { value: new Vector3(1, 82, 3) },
     uHeightFogNear: { value: new Vector3(0.95, 85, 29) },
+    uTreeNear: { value: 0 },
   };
   private posed = false;
   /** The stand the opening view was given (looked for again once the towers stand, if one is by it and the camera has not moved). */
@@ -193,6 +197,7 @@ export class TerraceWorld implements PlanetWorld {
     this.mist = new TerraceMist(this.shared);
     this.sky = new Sky();
     this.trees = new Trees(this.shared);
+    this.nearTrees = new NearTrees(this.shared);
     this.paddyMap = new PaddyMap(this.shared);
     Object.assign(this.shared, this.paddyMap.uniforms);
     this.hut = new MuseHut(this.shared);
@@ -201,7 +206,7 @@ export class TerraceWorld implements PlanetWorld {
     this.objects = new TerraceBuild(this.shared);
     this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 96, 140);
     this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
-    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.hut.mesh, this.mist.group);
+    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.nearTrees.mesh, this.towers.group, this.houses.group, this.hut.mesh, this.mist.group);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
     if (only !== null) {
@@ -456,6 +461,9 @@ export class TerraceWorld implements PlanetWorld {
     // (near ones in full detail: the camera's place on the planet, unwarped)
     this.towers.update(this.eye.copy(rig.up).multiplyScalar(R + rig.altitude));
     this.houses.update(this.eye);
+    // the trees near the camera drawn in full, by the panel's reach
+    this.own.uTreeNear.value = p.terraces.treeNear;
+    this.nearTrees.update(this.trees.placed, this.eye, p.terraces.treeNear, R);
     // the rice reads the built paddies round the focus from their map
     this.paddyMap.render(this.renderer, this.objects.group, rig.up, rig.forward, R, `${this.objects.version}/${this.own.uPaddy.value.y.toFixed(3)}`);
     // the rice near the focus, fewer as the camera rises, none from a bird's height
