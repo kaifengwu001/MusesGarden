@@ -33,7 +33,7 @@ interface VisitState {
   readonly together: boolean;
   readonly host: { readonly museId: string; readonly look: string } | null;
   readonly guest: { readonly museId: string; readonly look: string; readonly shown: boolean; readonly apart: number | null } | null;
-  readonly plants: readonly { readonly id: string; readonly placed: boolean; readonly water: number | null }[];
+  readonly plants: readonly { readonly id: string; readonly placed: boolean; readonly water: number | null; readonly dir: readonly number[] | null }[];
   readonly card: string | null;
 }
 
@@ -91,6 +91,14 @@ for (const world of WORLDS) {
       expect(p.placed, `${p.id} is planted`).toBe(true);
       expect(p.water, `${p.id} grows on dry ground`).toBeGreaterThan(0);
     }
+    // the host's garden grows round its home, in view from the house (not where the meadow's map would put it)
+    const fromHome = await page.evaluate((dirs) => {
+      const w = (window as unknown as { __world: { growth: { radius: number }; terrain: { layout: { cottage: { x: number; y: number; z: number } } } } }).__world;
+      const c = w.terrain.layout.cottage;
+      const n = Math.hypot(c.x, c.y, c.z);
+      return dirs.map((d) => Math.acos(Math.min(1, (d[0] * c.x + d[1] * c.y + d[2] * c.z) / n / Math.hypot(d[0], d[1], d[2]))) * w.growth.radius);
+    }, s.plants.map((p) => p.dir ?? [0, 1, 0]));
+    for (const [k, m] of fromHome.entries()) expect(m, `${s.plants[k].id}: m from the house`).toBeLessThan(40);
     // the camera comes to the two Muses: both drawn, each in its clothes, the guest standing on what its host would
     // stand on there (a deck or a porch, not inside it)
     await page.waitForFunction(() => !(window as unknown as { __visit: VisitProbe }).__visit.flying(), undefined, { timeout: 30_000 });
