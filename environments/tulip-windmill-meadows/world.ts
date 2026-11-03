@@ -635,10 +635,16 @@ export class World {
   }
 
   /** Whether a press at normalised device coordinates lands on Muse (only while it is drawn), and on which of its sides. */
-  pickMuse(ndcX: number, ndcY: number): { side: number } | null {
+  pickMuse(ndcX: number, ndcY: number): { side: number; muse: Muse } | null {
     const cam = this.rig.camera;
     const ray = new Ray(cam.position.clone(), new Vector3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize());
-    return this.muse.pick(ray, this.warp);
+    // (its Muse, or a visiting Muse: the nearest one the ray meets; a tap on a guest says hello as one on the host does)
+    let best: { side: number; muse: Muse; distance: number } | null = null;
+    for (const muse of [this.muse, ...this.visitors]) {
+      const hit = muse.pick(ray, this.warp);
+      if (hit && (!best || hit.distance < best.distance)) best = { ...hit, muse };
+    }
+    return best && { side: best.side, muse: best.muse };
   }
 
   /** A gust ring bursting out from a point on the meadow. */
