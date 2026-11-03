@@ -16,6 +16,7 @@ const GUEST_LOOK: MuseLook = 'muse5';
 /** Each destination and its host: the friend who lives there and its seed. */
 const WORLDS: readonly { readonly planet: PlanetId; readonly host: string; readonly name: string; readonly seed: number }[] = [
   { planet: 'lantern-reed-gardens', host: 'lark', name: 'Lark', seed: 5512 },
+  { planet: 'scarlet-sail-canyon', host: 'clover', name: 'Clover', seed: 3157 },
 ];
 
 interface VisitState {

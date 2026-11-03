@@ -25,6 +25,8 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from '../../src/view/input';
+import { prepareVisit, VisitUi } from '../../src/visit/visitUi';
+import { scarletVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
 import { World } from './world';
@@ -91,6 +93,8 @@ async function boot(): Promise<void> {
   };
   chooseTier(store.values.quality.tier);
 
+  // A visit on a ticket (`?visit=`): the host's planet, its seed and growth set before the world is made.
+  const visit = await prepareVisit(store, 'scarlet-sail-canyon');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -149,9 +153,10 @@ async function boot(): Promise<void> {
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
-  const garden = new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
-  const canyon = new CanyonUi(uiRoot, world, () => clock.time, () => { garden.interrupt(); userPosed = true; });
-  const cloudColours = new CloudColours(uiRoot, world.palette); // temporary: the clouds' colours, tuned live
+  // On a visit, the visit's interface in its place: no engine of our own, no canyon or cloud panel.
+  const garden = visit ? new VisitUi(uiRoot, scarletVisit(world), visit) : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
+  const canyon = visit ? null : new CanyonUi(uiRoot, world, () => clock.time, () => { garden.interrupt(); userPosed = true; });
+  const cloudColours = visit ? null : new CloudColours(uiRoot, world.palette); // temporary: the clouds' colours, tuned live
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
@@ -174,7 +179,7 @@ async function boot(): Promise<void> {
       const residentHit = onMuse(x, y);
       if (residentHit) {
         world.tapMuse(clock.time, residentHit);
-        if (residentHit.resident) canyon.select(residentHit.resident);
+        if (residentHit.resident) canyon?.select(residentHit.resident);
         return;
       }
       if (garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
@@ -190,7 +195,7 @@ async function boot(): Promise<void> {
       const residentHit = onMuse(x, y);
       if (residentHit) {
         world.tapMuse(clock.time, residentHit);
-        if (residentHit.resident) canyon.select(residentHit.resident);
+        if (residentHit.resident) canyon?.select(residentHit.resident);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -206,7 +211,7 @@ async function boot(): Promise<void> {
       if (touch) {
         pettingMuse = true;
         world.holdMuse(clock.time, touch);
-        if (touch.resident) canyon.select(touch.resident);
+        if (touch.resident) canyon?.select(touch.resident);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -281,8 +286,8 @@ async function boot(): Promise<void> {
     garden.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     garden.frame(clock.realDt);
-    canyon.update();
-    cloudColours.update();
+    canyon?.update();
+    cloudColours?.update();
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);

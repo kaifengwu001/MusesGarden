@@ -95,6 +95,8 @@ export class World {
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
+  /** Muses visiting on a ticket (src/visit/): drawn, kept up to date and culled as the host is. */
+  readonly visitors: Muse[] = [];
   readonly residents: Residents;
   readonly scenery: CanyonScenery;
   readonly fauna: CanyonFauna;
@@ -204,6 +206,13 @@ export class World {
     this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh, this.cirrus.mesh);
     this.applyTier(tier);
+  }
+
+  /** A visiting Muse joins the scene: its body, its props and its shadow. */
+  addVisitor(muse: Muse): void {
+    this.visitors.push(muse);
+    this.scene.add(muse.mesh, muse.props.group);
+    this.clouds.addShadowCaster(muse.shadowMesh);
   }
 
   applyTier(tier: Tier): void {
@@ -393,6 +402,7 @@ export class World {
     this.birds.update(clock.time, this.terrain);
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
+    for (const visitor of this.visitors) visitor.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
     // Violet Dunes' high cirrus: density sets how many streaks (0.5 would be Violet's 28); height is at R 128 and
     // grows as the clouds do (√R)
@@ -406,6 +416,7 @@ export class World {
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     this.muse.cull(this.frustum, this.warp);
+    for (const visitor of this.visitors) visitor.cull(this.frustum, this.warp);
     this.residents.cull(this.frustum, this.warp);
     const sweep = this.terrainUniforms.uCottageSun.value;
     this.terrain.homeAreas(sweep.x, sweep.y, this.homeAreas);
