@@ -146,6 +146,39 @@ export function parseMediaRecording(raw: unknown): MediaRecording {
   return { recordedAt: str(o.recordedAt, 'recording.recordedAt'), items, unseen };
 }
 
+/** The on-disk form of a recording: one item per line, so the file stays readable and its diffs show what changed. */
+export function recordingJson(r: { recordedAt: string; items: readonly MediaItemJson[]; unseen: Readonly<Record<string, readonly MediaItemJson[]>> }): string {
+  const list = (items: readonly MediaItemJson[], indent: string) => items.map((i) => `${indent}${JSON.stringify(i)}`).join(',\n');
+  const unseen = Object.entries(r.unseen).map(([lean, items]) => `    ${JSON.stringify(lean)}: [\n${list(items, '      ')}\n    ]`);
+  return `{\n  "recordedAt": ${JSON.stringify(r.recordedAt)},\n  "items": [\n${list(r.items, '    ')}\n  ],\n  "unseen": {\n${unseen.join(',\n')}\n  }\n}\n`;
+}
+
+/**
+ * An earlier recording's Instagram items, for a recording made without META_IG_TOKEN, which can't read Instagram and
+ * would otherwise lose them all: those whose area the topic map still has and whose id and link `recorded` lacks.
+ * Each keeps the topics the map still names; one left with none is filed again by `file`, and left out if that finds
+ * none either.
+ */
+export function carriedInstagram(
+  previous: unknown,
+  map: Pick<Corpus, 'areas' | 'pages'>,
+  recorded: readonly MediaItemJson[],
+  file: (item: MediaItemJson) => readonly string[],
+): MediaItemJson[] {
+  const areas = new Set(map.areas.map((a) => a.name));
+  const topics = new Set<string>(map.pages.map((p) => p.candidate.topics[0]));
+  const ids = new Set(recorded.map((i) => i.id));
+  const links = new Set(recorded.map((i) => canonicalLink(i.url)));
+  return arr(obj(previous, 'recording').items, 'recording.items').flatMap((raw, i) => {
+    const item = parseMediaItem(raw, `items[${i}]`);
+    if (item.candidate.media.network !== 'instagram' || !areas.has(item.area) || ids.has(item.id) || links.has(item.candidate.canonicalUrl)) return [];
+    const json = raw as MediaItemJson;
+    const still = json.topics.filter((t) => topics.has(t));
+    const filed = still.length > 0 ? still : file(json);
+    return filed.length > 0 ? [{ ...json, topics: filed }] : [];
+  });
+}
+
 export function loadMediaRecording(path = MEDIA_PATH): MediaRecording {
   return parseMediaRecording(JSON.parse(readFileSync(path, 'utf8')));
 }

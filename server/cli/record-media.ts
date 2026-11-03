@@ -10,7 +10,7 @@ import { FIXTURES_DIR, loadCorpus, loadHeroChain } from '../adapters/sources/cor
 import { fileUnder, topicIndex } from '../adapters/sources/filing';
 import { InstagramReader } from '../adapters/sources/instagram';
 import { arr, obj, str, strs } from '../adapters/sources/json';
-import { LEANS, MEDIA_KINDS, MEDIA_PATH, parseMediaRecording, siteOf, type Lean, type MediaItemJson, type RawItem } from '../adapters/sources/media';
+import { carriedInstagram, LEANS, MEDIA_KINDS, MEDIA_PATH, parseMediaRecording, recordingJson, siteOf, type Lean, type MediaItemJson, type RawItem } from '../adapters/sources/media';
 import { readArticles, readBluesky, readFlickr, readVimeo, readYoutube, searchBluesky, searchYoutube, type Read, type WatchDetails } from '../adapters/sources/readers';
 
 const SOURCES_PATH = `${FIXTURES_DIR}media-sources.json`;
@@ -157,13 +157,6 @@ const count = <T>(xs: readonly T[], key: (x: T) => string) => {
   return [...m].sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k} ${v}`).join(', ');
 };
 
-/** One item per line, so the file stays readable and its diffs show what changed. */
-function recordingJson(r: { recordedAt: string; items: readonly MediaItemJson[]; unseen: Readonly<Record<string, readonly MediaItemJson[]>> }): string {
-  const list = (items: readonly MediaItemJson[], indent: string) => items.map((i) => `${indent}${JSON.stringify(i)}`).join(',\n');
-  const unseen = Object.entries(r.unseen).map(([lean, items]) => `    ${JSON.stringify(lean)}: [\n${list(items, '      ')}\n    ]`);
-  return `{\n  "recordedAt": ${JSON.stringify(r.recordedAt)},\n  "items": [\n${list(r.items, '    ')}\n  ],\n  "unseen": {\n${unseen.join(',\n')}\n  }\n}\n`;
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { area: { type: 'string' }, dry: { type: 'boolean', default: false }, 'per-kind': { type: 'string', default: '2' } } });
   const perKind = Number(values['per-kind']);
@@ -249,8 +242,19 @@ async function main(): Promise<void> {
     for (const p of picked) held.add(p.id);
     unseen[lean] = picked.map(strip);
   }
-  const kept = budget(filed.filter((x) => !held.has(x.id)), perKind, pools, POOL_MIN);
-  const recording = { recordedAt: new Date().toISOString(), items: kept.map(strip), unseen };
+  const budgeted = budget(filed.filter((x) => !held.has(x.id)), perKind, pools, POOL_MIN);
+  const kept = budgeted.map(strip);
+  const carried =
+    instagram === null && existsSync(MEDIA_PATH)
+      ? carriedInstagram(JSON.parse(readFileSync(MEDIA_PATH, 'utf8')), map, [...kept, ...LEANS.flatMap((l) => unseen[l])], (x) => {
+          const matched = fileUnder(index, x.area, x);
+          const root = index.roots.get(x.area);
+          return matched.length > 0 ? matched : root === undefined ? [] : [root];
+        }).filter((x) => values.area === undefined || x.area === values.area)
+      : [];
+  if (carried.length > 0) console.info(`Instagram: kept the last recording's ${carried.length} Instagram items (${count(carried, (x) => x.area)}).`);
+  const items = [...kept, ...carried].sort((a, b) => (order.get(a.area) ?? 0) - (order.get(b.area) ?? 0) || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0) || (a.id < b.id ? -1 : 1));
+  const recording = { recordedAt: new Date().toISOString(), items, unseen };
   const parsed = parseMediaRecording(recording);
 
   const failed = outcomes.filter((o) => o.read === null);
@@ -278,7 +282,7 @@ async function main(): Promise<void> {
   const atLeast = (n: number) => topics.filter((t) => (perTopic.get(t) ?? 0) >= n).length;
   console.info(`Coverage: ${atLeast(1)} of ${topics.length} topics have an item, ${atLeast(3)} have 3 or more.`);
   console.info(`  pool topics: ${pools.map((t) => `${t} ${perTopic.get(t) ?? 0}`).join(', ')}`);
-  console.info(`  filed under the area's main topic for want of a match: ${kept.filter((x) => x.fallback).length}`);
+  console.info(`  filed under the area's main topic for want of a match: ${budgeted.filter((x) => x.fallback).length}`);
   console.info(`  topic search results left out for not naming their topic: ${offTopic}`);
   console.info(`  items from, linking to or naming the topic map's own site left out: ${onMap}`);
   console.info(`  without a caption: ${count(parsed.items.filter((i) => i.candidate.summary === ''), (i) => i.candidate.media.network) || 'none'}`);
