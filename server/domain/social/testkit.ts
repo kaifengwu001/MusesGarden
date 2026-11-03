@@ -100,6 +100,7 @@ export function muse(id: string, spec: MuseSpec = {}): MuseState {
     pendingBasket: [],
     baskets: [],
     photos: [],
+    recentWords: [],
     reflections: [],
     experiencesSinceReflection: 0,
     likes: new Map(),

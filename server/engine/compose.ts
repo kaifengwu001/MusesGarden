@@ -28,6 +28,8 @@ export interface GardenOptions {
   readonly db: string | null;
   /** 'meta' gives the hero MetaMind (falling back to HeuristicMind without a key); everyone else stays heuristic. */
   readonly mind: 'heuristic' | 'meta';
+  /** With 'meta', what the hero's model does: write its postcards only (the default), or its whole mind, a model call for every hop it judges. */
+  readonly modelFor?: 'postcards' | 'all';
   readonly hero: MuseId | null;
   readonly start: Instant;
   readonly clock: 'live' | 'fast-forward';
@@ -69,12 +71,25 @@ export const viewHelpers: ViewHelpers = {
   soulBody: (soulMd) => parseSoul(soulMd).body,
 };
 
+/** A mind that writes its postcards with `model` and thinks everything else with `rest`. */
+function postcardsBy(model: Mind, rest: Mind): Mind {
+  return {
+    judge: (ctx, candidates) => rest.judge(ctx, candidates),
+    proposeQuestion: (ctx, topic, recent) => rest.proposeQuestion(ctx, topic, recent),
+    reflect: (ctx, experiences) => rest.reflect(ctx, experiences),
+    extractInterests: (text, from) => rest.extractInterests(text, from),
+    estimateTemperament: (soul) => rest.estimateTemperament(soul),
+    writePostcard: (ctx, ask) => model.writePostcard(ctx, ask),
+  };
+}
+
 export function buildGarden(opts: GardenOptions): Garden {
   const store = opts.db ? openSqliteStore(opts.db) : openMemoryStore();
   const recording = loadMediaRecording();
   const source: Source = new MediaSource(recording, loadCorpus());
   const heuristic = new HeuristicMind();
-  const heroMind: Mind = opts.mind === 'meta' ? new MetaMind({ cache: store.llmCache, fallback: heuristic }) : heuristic;
+  const model = opts.mind === 'meta' ? new MetaMind({ cache: store.llmCache, fallback: heuristic }) : null;
+  const heroMind: Mind = !model ? heuristic : opts.modelFor === 'all' ? model : postcardsBy(model, heuristic);
   const deps: EngineDeps = {
     store,
     life: lifePolicy,

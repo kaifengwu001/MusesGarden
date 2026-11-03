@@ -372,6 +372,10 @@ export interface PostcardAsk {
   readonly find: string | null;
   /** How a game on the back ended, for Muse ('x'): won, lost, or a draw. */
   readonly outcome: 'won' | 'lost' | 'draw' | null;
+  /** The day the photo was taken (YYYY-MM-DD, the owner's). */
+  readonly day: string;
+  /** What Muse wrote on its latest postcards, oldest first: never to be said again. */
+  readonly recent: readonly string[];
 }
 
 export interface Basket {
@@ -669,6 +673,8 @@ export interface MuseState {
   readonly pendingBasket: readonly DiscoveryId[];
   readonly baskets: readonly Basket[];
   readonly photos: readonly PhotoSpec[];
+  /** The words on its latest postcards, oldest first (RECENT_WORDS of them), so it doesn't write the same one twice. */
+  readonly recentWords: readonly string[];
   readonly reflections: readonly ReflectionRecord[];
   /** The last reflection, committed or no-change: the 3-day clock restarts from it. */
   readonly lastReflectionAt: Instant;

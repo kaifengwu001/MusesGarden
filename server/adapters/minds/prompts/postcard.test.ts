@@ -35,6 +35,8 @@ const ask = (plan: PostcardPlan, subject: PhotoSubject, k = 0): PostcardAsk => (
   friend: k % 3 ? 'Wren' : null,
   find: subject === 'find' ? 'A pressed fern from 1890' : null,
   outcome: plan.kind === 'game' ? (['won', 'lost', 'draw'] as const)[k % 3] : null,
+  day: '2026-11-03',
+  recent: [],
 });
 
 /** Every piece of text on a back, to hold against the card's room. */

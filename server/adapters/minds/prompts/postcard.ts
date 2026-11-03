@@ -1,6 +1,15 @@
 import type { ListItem, MindContext, PhotoSubject, PostcardAsk, PostcardBackKind, PostcardWords } from '../../../../src/muse/contract';
 import { array, boolean, number, object, persona, string, type JsonSchema, type Prompt } from './prompt';
 
+/** How many of the Muse's latest postcards the model is shown, so it doesn't repeat them. */
+const RECENT_IN_PROMPT = 12;
+
+/** 'Tuesday 3 November' from '2026-11-03'. */
+function dayWords(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+}
+
 /** The longest each piece of a back may be, in characters: room on a postcard's message side at its smallest. */
 export const BACK_LIMITS = { text: 90, short: 40, title: 24, item: 32, question: 90 } as const;
 
@@ -72,17 +81,25 @@ export function postcardPrompt(ctx: MindContext, ask: PostcardAsk): Prompt {
     `You were ${DOING[ask.doing]}, ${ask.place}${ask.topic ? `, with "${ask.topic}" on your mind` : ''}${ask.friend ? `, with your friend ${ask.friend}` : ''}.`,
     ask.find ? `The photo is of a find you kept: "${ask.find}".` : '',
   ].filter(Boolean);
+  const recent = ask.recent.slice(-RECENT_IN_PROMPT);
   return {
     name: `muse_postcard_${ask.plan.kind}`,
     effort: 'low',
     system: persona(ctx),
     user: [
+      `It is ${dayWords(ask.day)}.`,
       ...about,
       '',
       `On the back of the postcard: ${what}`,
-      'Write it in your own voice, warm and a little playful, as if by hand. Say what the photo meant to you rather than describing it.',
+      'These are the few words you scribble on a postcard for your owner. Make them fun, cute and a little witty, the way your personality is:',
+      'one specific, surprising detail or a small joke about this exact moment. Not a general feeling, and not a description of the photo.',
+      'Skip soft, vague words (quiet, gentle, wonder, light, small things, wandering, treasure). Say what actually happened, or the odd thing you thought.',
+      'Examples of the tone only, never to be copied: "A snail beat me to the pond. I let it win." · "That cloud looked like a teapot, so I waited for it to pour." · "Wren cheats at noughts and crosses. With style."',
+      recent.length > 0 ? `What you wrote on your last postcards. Use none of their words or ideas again:\n${recent.map((r) => `- ${r}`).join('\n')}` : '',
       'No hashtags, no emoji, no quotation marks, and nothing about your owner’s private life.',
-    ].join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     schema,
   };
 }
