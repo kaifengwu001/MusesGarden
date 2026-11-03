@@ -61,35 +61,40 @@ Started from fbb25fd (the mist as brushed strokes in three layers). Kai (2026-11
 | 21 | "Can there be opportunities for more groups of sharp mountains?" | Yes: 19 groups (from 7), at least 42 m apart (from 70): the old seven and their spacing were set for the hills at the lab's size, so as many more as there are hills now, as much closer (construct.ts `peaks`). 61 towers (from 25), the tower models' cap raised to 96 (from 32, which would have cut them off). Each tower's woods reach 0.43 of its height and 3 m (from 0.5: its body, 0.32, as it was, the woods past it with the hills), and stop at the plains, so the flats keep their fields. No tower on a plateau (none was). The vista and the opening view kept clear of the towers: the opening view was looked for before the towers stood and opened beside a group; it is looked for again once they stand, if one fills it and the camera has not moved. Woods +21 % and paddies −8 % against 7 groups (the towers' woods), flats as they were (the measured table under this one). |
 | 22 | "There is a bug with rice placement where the rice plane floats above the ground" | Found and fixed: the rice took its floor from the far side of the planet. The blades read their paddy's floor and crop from a map of the paddies drawn round the focus (paddyMap.ts), an azimuthal map whose angle wraps round the planet, so the triangle over the focus's antipode, its corners every way round it, was spread across the whole map. Wherever it stood higher than the paddies under the focus it won, and every blade in view took its floor: a sheet of rice hanging over the terraces 4–13 m up (at 8 of 36 random places on the planet), or no rice at all where that triangle was a bund, a riser or the woods (12 more of the 36). It was so since the rice first grew (row 6), wherever the far side of the planet stood higher than the ground in view. Now the map draws only the ground within twice its reach of the focus: at all 36 places every blade stands on its own floor (239,589 of 239,597 blades within 5 cm, 8 just under it, by 5–15 cm), and the 12 bare ones grow their rice ([before and after](docs/checkpoints/terraces-20/rice-floating-before-after.jpg)). |
 | 23 | "For this planet specifically, adjust the zoom-in camera curve to tilt the camera up more when about 0.35 above the ground. The goal is that distant towers' tops can be seen" | The terraces have a camera rig of their own (camera.ts): its tilt runs ahead of the shared one's round the bird's-eye height by up to 0.16 of zoom, as the camera would tilt a little lower down, easing in from zoom 0.1 and gone by 0.65, never tilting back down as you zoom in. At the bird's-eye stop (zoom 0.35, 70 m up) it looks 38.5° from straight down, from 14.4°: out to the planet's rim, the towers standing over it with their tops in the frame, a third of the frame sky ([by zoom](docs/checkpoints/terraces-20/tilt-by-zoom-before-after.jpg), [the bird's-eye stop](docs/checkpoints/terraces-20/birdseye-before-after.jpg); the tilts by zoom in the table under this one). How far: 20° more showed a tower 150 m off with its top at the frame's edge, so 24°, its top with some sky over it. Orbit, the standing view and eye level are as they were, and so are the vista and the flats' view (pixel-identical: the flats' look-up now taken from the shared tilt, as the vista's always was). No dearer to draw (the table under this one). |
-| 24 | (Kai, on row 23) "Throughout the curve there is now a weird 'tilt up / tilt down / tilt up again' back and forth" | |
+| 24 | (Kai, on row 23) "Throughout the curve there is now a weird 'tilt up / tilt down / tilt up again' back and forth" | Yes: the tilt itself only ever rose, but what the eye follows is where the horizon is in the frame, and that went up, down and up again. Between zoom 0.42 and 0.62 the view's warp flattens the planet (so the meadow reaches a far horizon), which lifts the horizon fast; the shared tilt rises with it, the first try's, ahead of it by height alone, did not: the horizon was at the frame's middle at zoom 0.4 (52 m), back at its top edge by 0.6 (16 m) and in the middle again by 0.85 (4 m) (the table under this one, worked out on the planet's sphere warped as the shader warps it). Now the terraces' tilt is set by where it puts the horizon, which only ever moves down the frame as you zoom in (camera.ts): from orbit the planet fills the frame as before; the horizon comes down into it from the top by zoom 0.3, to just over its middle (56 % of the way up) by the bird's-eye stop, 38.1° from straight down; and it stays there on the way down, the towers' tops in view and growing as you come down to them, until the shared rig's own tilt would bring it lower, just before the standing view: from zoom 0.83 on the tilt is the shared one's ([the three curves along the zoom](docs/checkpoints/terraces-20/tilt-by-zoom-three-curves.jpg)). So from 29 m down to 5 m it now looks out to the horizon, about 45 % of the frame sky, as at the bird's-eye stop; that is what keeps the towers' tops in view down there too. Orbit, the standing view, eye level, the vista and the flats' view are as they were (the vista and the flats' view pixel-identical). No dearer to draw (the table under this one). |
 
-The rice and the camera: the meadow draws pixel-identical to 7d21e88 in all 27 views (the shared camera rig's tilt only made protected and its reference heights exported). `npm run check`, `npm test` (125, one new: the terraces' tilt, the shared one's outside zoom 0.1–0.65 and only ever rising), `npm run test:gpu` (12 passed, one skipped) and `npm run shots` (15) pass.
+The rice and the camera: the meadow draws pixel-identical to 7d21e88 in all 27 views (the shared camera rig's tilt only made protected and its reference heights exported). `npm run check`, `npm test` (125, one new: the terraces' horizon only ever moving down the frame, once in it, to the standing view, the tilt the shared one's in orbit and from there) and `npm run shots` (15) pass. Of the GPU tests, 11 pass, one is skipped, and the frame-budget one fails at a 30 fps lock (p95 33.3 ms against 20), three times running; it fails the same at 3f8c732, before this round, so it is the machine pacing at 30 fps, not the change.
 
-The camera's tilt from straight down by zoom, the shared rig's and the terraces':
+The camera along the zoom: its tilt from straight down, and where it puts the horizon (on the planet's sphere warped as the shader warps it), as a share of the frame's height from its bottom; the shared rig's, the first try's (row 23) and the terraces' now (row 24):
 
-| Zoom | Height | Shared | Terraces |
-|---|---|---|---|
-| 0.2 | 168 m | 1.0° | 4.5° |
-| 0.25 | 126 m | 4.0° | 14.9° |
-| 0.3 | 94 m | 8.5° | 27.8° |
-| 0.35 (bird's-eye stop) | 70 m | 14.4° | 38.5° |
-| 0.4 | 52 m | 21.3° | 44.8° |
-| 0.45 | 39 m | 28.9° | 48.1° |
-| 0.5 | 29 m | 36.9° | 50.0° |
-| 0.55 | 22 m | 45.1° | 51.8° |
-| 0.6 | 16 m | 53.1° | 55.0° |
-| 0.65 | 12 m | 60.7° | 60.7° |
+| Zoom | Height | Tilt: shared | first try | now | Horizon: shared | first try | now |
+|---|---|---|---|---|---|---|---|
+| 0.25 | 126 m | 4.0° | 14.9° | 9.0° | above | 94 % | above |
+| 0.3 | 94 m | 8.5° | 27.8° | 26.4° | above | 71 % | 75 % |
+| 0.35 (bird's-eye stop) | 70 m | 14.4° | 38.5° | 38.1° | above | 55 % | 56 % |
+| 0.4 | 52 m | 21.3° | 44.8° | 43.0° | above | 51 % | 56 % |
+| 0.45 | 39 m | 28.9° | 48.1° | 48.3° | above | 57 % | 56 % |
+| 0.5 | 29 m | 36.9° | 50.0° | 56.0° | above | 72 % | 56 % |
+| 0.55 | 22 m | 45.1° | 51.8° | 64.9° | above | 88 % | 56 % |
+| 0.6 | 16 m | 53.1° | 55.0° | 72.0° | top edge | 96 % | 56 % |
+| 0.65 | 12 m | 60.7° | 60.7° | 75.1° | 88 % | 88 % | 56 % |
+| 0.7 | 9 m | 67.6° | 67.6° | 77.2° | 77 % | 77 % | 56 % |
+| 0.75 | 7 m | 73.5° | 73.5° | 78.9° | 67 % | 67 % | 56 % |
+| 0.8 | 5 m | 78.0° | 78.0° | 80.2° | 61 % | 61 % | 56 % |
+| 0.85 | 4 m | 81.0° | 81.0° | 81.0° | 48 % | 48 % | 48 % |
 
-What it costs: frozen frames at 2880×1800 on High, looking toward a tower group 150 m off, the shared rig's tilt against the terraces' at the same place on one page, best / median of 6 alternating rounds, ms a frame (the machine fairly busy, load 4–5):
+The first try's horizon went 51 % → 96 % → 48 %: up, down and up again, as Kai saw. Now it comes down to 56 % by the bird's-eye stop and stays there to the standing view.
+
+What it costs: frozen frames at 2880×1800 on High, looking toward a tower group 150 m off, the shared rig's tilt against the terraces' at the same place on one page, best / median of 6 alternating rounds, ms a frame (the machine busy, all of it slower than in the first try's measuring, load 3–4):
 
 | Zoom | Shared tilt | Terraces' tilt |
 |---|---|---|
-| 0.3 (94 m) | 17.30 / 17.62 | 15.98 / 16.22 |
-| 0.35 (70 m) | 14.14 / 15.93 | 13.96 / 16.33 |
-| 0.4 (52 m) | 17.56 / 19.18 | 13.66 / 15.88 |
-| 0.5 (29 m) | 17.98 / 20.29 | 17.94 / 20.70 |
+| 0.35 (70 m) | 19.42 / 20.24 | 18.34 / 19.58 |
+| 0.5 (29 m) | 28.63 / 29.99 | 27.27 / 28.02 |
+| 0.6 (16 m) | 28.57 / 28.80 | 27.98 / 28.57 |
+| 0.7 (9 m) | 33.79 / 34.92 | 29.45 / 30.13 |
 
-No dearer anywhere (0.35 and 0.5 within the noise), cheaper where sky takes the place of terraces. Nothing traded in the look.
+No dearer anywhere, cheaper where sky takes the place of terraces. Nothing traded in the look.
 
 More groups of towers: what the build makes, against seven groups (the same seed and hills):
 

@@ -898,14 +898,21 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   and crop, each blade its paddy's look under the same light, darker at
   its root, as dense as the paddy is crop (none flooded, densest grown
   deep, 160 a m² at full).
-- **The camera** (camera.ts): the shared rig, its tilt running ahead of
-  the shared one's round the bird's-eye height by up to 0.16 of zoom (as
-  it would tilt a little lower; in from zoom 0.1, gone by 0.65, the tilt
-  only ever rising on the way in), so that the bird's-eye stop (70 m up)
-  looks 38.5° from straight down (14.4° on the shared rig), out to the
-  rim and the towers' tops over it (Kai). The named views keep their
-  framing: the vista's tilt is its own, the flats' view looks up from the
-  shared rig's tilt.
+- **The camera** (camera.ts): the shared rig, its tilt set by where it
+  puts the horizon in the frame, which only ever moves down the frame as
+  you zoom in (Kai: a tilt ahead of the shared one's by height alone
+  went up, down and up again, the warp flattening the planet at zoom
+  0.42–0.62 lifting the horizon faster than it). The horizon is the
+  planet's smooth sphere's, warped as warp.glsl warps it at that zoom,
+  seen from the camera's height (the root of a cubic: where the sight
+  line grazes it). From orbit as the shared rig; the horizon down into
+  the frame by zoom 0.3 and held just over its middle (0.12 of half the
+  frame) from the bird's-eye stop (70 m, 38.1° from straight down, 14.4°
+  on the shared rig: the rim and the towers' tops over it in view) until
+  the shared tilt would bring it lower, just before the standing view;
+  the shared rig's tilt from zoom 0.83 on, a soft minimum between them.
+  The named views keep their framing: the vista's tilt is its own, the
+  flats' view looks up from the shared rig's tilt.
 
 ## Module map
 
