@@ -33,6 +33,7 @@ import {
   RECENT_WORK_WINDOW_MS,
   CATEGORY_THEME_MIN_FINDS,
 } from './policy/constants';
+import { RECENT_WORDS, wordsOf } from './postcardWords';
 import { drawFor } from './rng';
 import { localDay } from './time';
 
@@ -66,6 +67,7 @@ export function emptyState(seed: MuseSeed, temperament: Temperament = NEUTRAL_TE
     pendingBasket: [],
     baskets: [],
     photos: [],
+    recentWords: [],
     reflections: [],
     experiencesSinceReflection: 0,
     likes: new Map(),
@@ -146,8 +148,8 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
       // The owner receives a photo when its event lands, so the daily cap counts by delivery, not by when it was taken.
       return { ...s, photos: [...s.photos, e.photo], day: { ...s.day, photos: s.day.photos + 1 } };
     case 'photo.written':
-      // Only the garden reads a postcard's back; nothing of Muse's does.
-      return s;
+      // Muse remembers what it wrote lately, so it doesn't write it again; its choices never read it.
+      return { ...s, recentWords: [...s.recentWords, wordsOf(e.back)].slice(-RECENT_WORDS) };
     case 'basket.delivered':
       return { ...s, baskets: [...s.baskets, e.basket], pendingBasket: [], day: { ...s.day, baskets: s.day.baskets + 1 } };
     case 'reflection.committed':

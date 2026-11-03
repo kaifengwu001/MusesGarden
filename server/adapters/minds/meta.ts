@@ -19,6 +19,7 @@ import type {
 import { interestsPrompt, MAX_INTERESTS } from './prompts/interests';
 import { judgePrompt } from './prompts/judge';
 import type { Prompt } from './prompts/prompt';
+import { tooClose, wordsOf } from '../../domain/postcardWords';
 import { parsePostcard, postcardPrompt } from './prompts/postcard';
 import { questionPrompt } from './prompts/question';
 import { MAX_QUESTIONS, reflectPrompt, STAGES } from './prompts/reflect';
@@ -109,7 +110,11 @@ export class MetaMind implements Mind {
   }
 
   writePostcard(ctx: MindContext, ask: PostcardAsk): Promise<PostcardWords> {
-    return this.ask('writePostcard', postcardPrompt(ctx, ask), (raw) => parsePostcard(raw, ask.plan.kind), () =>
+    const fresh = (raw: unknown) => {
+      const w = parsePostcard(raw, ask.plan.kind);
+      return w && !tooClose(wordsOf(w), ask.recent) ? w : null;
+    };
+    return this.ask('writePostcard', postcardPrompt(ctx, ask), fresh, () =>
       this.fallback.writePostcard(ctx, ask),
     );
   }

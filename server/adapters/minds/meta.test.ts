@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   Candidate,
+  PostcardAsk,
   CanonicalUrl,
   EventRef,
   Experience,
@@ -304,5 +305,37 @@ describe('MetaMind other calls', () => {
     const reply = { question: 'Why is\nultramarine   so costly?' };
     const q = await mind(stubFetch(completion(reply)).fetch).proposeQuestion(ctx, topic('Ultramarine'), pages);
     expect(q).toBe('Why is ultramarine so costly?');
+  });
+});
+
+describe('MetaMind.writePostcard', () => {
+  const ask = (recent: readonly string[]): PostcardAsk => ({
+    plan: { kind: 'line' },
+    subject: 'sky',
+    place: 'on my planet',
+    doing: 'rest',
+    topic: null,
+    friend: null,
+    find: null,
+    outcome: null,
+    day: '2026-11-03',
+    recent,
+  });
+
+  it('takes a fresh line from the model, and shows it what the Muse wrote lately', async () => {
+    const { fetch, calls } = stubFetch(completion({ text: 'A cloud tried to sit on the cottage. The chimney said no.' }));
+    const w = await mind(fetch).writePostcard(ctx, ask(['The sky did its blue thing again.']));
+    expect(w).toEqual({ kind: 'line', text: 'A cloud tried to sit on the cottage. The chimney said no.' });
+    const user = JSON.stringify(bodyOf(calls[0]));
+    expect(user).toContain('The sky did its blue thing again.');
+    expect(user).toContain('Tuesday 3 November');
+  });
+
+  it('turns down a line that says what the Muse wrote lately, asks again, then falls back', async () => {
+    const said = 'The clouds looked like folded paper today.';
+    const { fetch, calls } = stubFetch(completion({ text: 'Today the clouds looked like folded paper!' }), completion({ text: said }));
+    const w = await mind(fetch).writePostcard(ctx, ask([said]));
+    expect(calls).toHaveLength(2);
+    expect(w).toEqual({ kind: 'line', text: 'heuristic line' });
   });
 });

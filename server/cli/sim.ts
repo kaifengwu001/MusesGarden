@@ -39,6 +39,7 @@ const hero = cast.members.find((m) => m.role === 'hero')?.id ?? null;
 const garden = buildGarden({
   db: values.db ?? null,
   mind: values.mind === 'meta' ? 'meta' : 'heuristic',
+  modelFor: 'all',
   hero,
   start,
   clock: 'fast-forward',

@@ -37,6 +37,7 @@ async function buildBackend(): Promise<Backend> {
   const garden = buildGarden({
     db: `${dir}/garden.db`,
     mind: process.env.MODEL_API_KEY ? 'meta' : 'heuristic',
+    modelFor: process.env.MUSE_MODEL_MIND === 'all' ? 'all' : 'postcards',
     hero,
     start,
     clock,
@@ -47,7 +48,7 @@ async function buildBackend(): Promise<Backend> {
     await seedCast(garden.engine, lifePolicy, { cast: `${FIXTURES_DIR}cast.json`, work, start, hours: 0 });
   }
   return {
-    name: `engine (${clock}, ${process.env.MODEL_API_KEY ? 'MetaMind for the hero' : 'HeuristicMind'})`,
+    name: `engine (${clock}, ${process.env.MODEL_API_KEY ? (process.env.MUSE_MODEL_MIND === 'all' ? 'MetaMind for the hero' : 'MetaMind writes the hero’s postcards') : 'HeuristicMind'})`,
     queries: garden.views,
     commands: garden.commands,
     now: () => garden.engine.now(),

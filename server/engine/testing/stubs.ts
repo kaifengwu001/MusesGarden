@@ -57,6 +57,7 @@ export function emptyState(seed: MuseSeed): MuseState {
     pendingBasket: [],
     baskets: [],
     photos: [],
+    recentWords: [],
     reflections: [],
     lastReflectionAt: 0 as Instant,
     experiencesSinceReflection: 0,
