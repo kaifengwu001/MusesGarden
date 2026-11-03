@@ -142,7 +142,7 @@ describe('presets', () => {
     store.applyPreset('Gusty');
     expect(store.values.world.seed).toBe(1234);
     expect(store.values.wind.strength).toBe(0.85);
-    expect(store.values.clouds.coverage).toBe(0.55);
+    expect(store.values.clouds.speed).toBe(0.7);
     store.applyPreset('Scarlet Sail Canyon');
     expect(store.toQuery()).toBe('seed=1234');
   });

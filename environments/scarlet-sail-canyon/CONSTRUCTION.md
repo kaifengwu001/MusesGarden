@@ -107,6 +107,24 @@ The user requested the proposed light-yellow cloud color be made visible. Scarle
 
 **Superseded by user rejection:** the yellow palette was reverted to the original noon cloud row (`#F5F1DC`, `#B9CED0`, `#E5E8DA`, `#FFF7DE`, `#C0D1CD`). The same follow-up raises default cloud coverage from 0.48 to 0.78, filling more of the existing varied streamline formations. Altitude32, shapes, wind, shadows and the 512-cloud cap remain unchanged. Coverage is a placement control, not a literal percentage of sky covered. Current review and counts are in VALIDATION.md.
 
+## Rose and scarlet clouds — 2 November 2026
+
+The user chose a new noon `ROW.CLOUD` row with a temporary live colour panel: rose sunlit bodies (`#F1BCC6`), a scarlet shade (`#FD5017`), coral half-lit faces (`#F69C9E`), pale pink highlights and rims (`#F7DAD6`) and a red-orange base (`#FB6A56`). The canyon's default time of day (11.5 h) reads the noon key alone, so this is the row the clouds show; the dawn and golden-hour cloud rows are unchanged. The same row colours both reflection paths and the birds (highlight, lit and mid). Shapes and shadows are unchanged.
+
+The same day the user asked for 40% more clouds, sitting lower. `SHARE` in `life/clouds.ts` is 1.4× what it was (`[0.021, 0.504]`), so the default coverage (0.78) fills 1.4× as many streamline slots: whole-planet visible cloud mass (Σ (size × fade)²) rose 50%, fully grown clouds 30%, and all clouds counted with the fringe cloudlets 10%. The default altitude is 28 m (was 32). The canyon's shelves reach 28 m above R, so lower clouds dip into them: across five moments, the share of clouds whose flat base lies below the ground under their footprint is 1.6% at 32 m (at most 2.7 m deep), 5.3% at 28 m (6.1 m), 9% at 26 m and 15% at 24 m (9.2 m).
+
+## High cirrus from Violet Dunes — 2 November 2026
+
+At the user's request the canyon's sky is now Violet Dunes' high cirrus alone: `life/cloudRibbons.ts` and its shaders are Violet's (tapered streaks, wisps, drift and ivory-lilac colour). Violet composites them after its scene in a pass of its own post pipeline, which also draws Violet's pigment edges; here they are drawn last in the scene itself, depth-tested against the ground, and the shared post pipeline is untouched.
+
+The cumulus are removed: cloud coverage defaults to 0 and its Coverage, Altitude and Shadow controls are hidden (`cc` in a URL still brings them back), and the Morning mist and Gusty presets no longer set coverage. At zero coverage the cloud code now takes Lantern Reed's clear-sky path; before, every fringe slot's fade came out NaN and was still placed (91 cloudlets with NaN sizes at the default view).
+
+The Parameters panel is shown again, closed under its title at the top right as in the other worlds (P opens and closes it; it had been hidden since the first build). Its Clouds folder sets the cirrus: **High cirrus** (`ci`) on or off; **Cirrus density** (`cid`, the number of streaks, 0.5 being Violet's 28); **Cirrus height** (`cih`, metres above R at R 128, growing with √R; Violet's rule would give 51 m here, 7 m over the canyon's height bound); **Cirrus hue** (`cic`), **tint** (`cit`) and **brightness** (`cib`), which draw the streaks' two colours toward a hue at their own lightness (tint 0 leaves them as they are); and **Cirrus opacity** (`cio`, × Violet's).
+
+The user then chose a colour, a coral-pink swatch running from `#F8C8BF` to `#F9A39C` through `#F8B9B0`. The streaks' light is the swatch's top and the colour across their edge is `#F88178`, which puts a streak's average on the swatch's middle (its hue is about 8°). Violet's thin opacity (0.28 seen from the ground, 0.64 from orbit) lets the blue sky through: at ×1 the densest streaks look `#B9CEDF` from the Shelter (ΔE 35 to the swatch's middle) and `#E79E91` from orbit (ΔE 11); at ×2, `#DAC7CF` (ΔE 20) and `#FEBDB1` (2.4); at ×3, `#F8C3C0` (6.3) and `#FFC1B6` (2.9). The opacity's alpha is capped at one.
+
+The defaults are the user's, set in the panel: density 0.62 (35 streaks), height 35.5 m, hue 273° with tint 0 (so the coral as it is), brightness 1.08, opacity ×2.85 and cloud speed 0.62.
+
 ## Current-main compatibility — 2 November 2026
 
 The mainline merge retains local copies of `grass.vert.glsl`, `museShadow.frag.glsl`, and `museProps.vert/frag.glsl`. Scarlet's grass, Muse and fauna still share an additive optical-depth cloud shadow map, while its porch stove still supplies `aGlow`/`uGlow`. Newer shared shaders use a separate character-shadow map and omit the outdoor stove glow. The four local files preserve the original contracts byte-for-byte; their imports remain inside Scarlet. Do not replace them with the newer shared versions without migrating the complete corresponding rendering paths. Shared engine files remain untouched by this integration.

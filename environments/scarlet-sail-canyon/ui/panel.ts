@@ -74,14 +74,10 @@ export function createPanel(store: ParamStore): Panel {
   });
 
   gui.close();
-  gui.hide();
-  let visible = false;
   return {
     gui,
     toggle() {
-      visible = !visible;
-      if (visible) { gui.show(); gui.open(); }
-      else gui.hide();
+      gui.open(gui._closed);
     },
   };
 }

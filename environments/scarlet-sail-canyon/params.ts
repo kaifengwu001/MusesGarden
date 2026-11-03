@@ -124,10 +124,23 @@ export const schema = {
     sheen: num('wsh', 'Sheen', 0.5, 0, 1, 0.01, 'live'),
   },
   clouds: {
-    coverage: num('cc', 'Coverage', 0.78, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 32, 1, 40, 0.5, 'live', { unit: 'm' }),
-    speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
-    shadow: num('csh', 'Shadow', 0.35, 0, 1, 0.01, 'live'),
+    // the cumulus are gone (their controls hidden; `cc` in a URL still brings them back): the sky is Violet Dunes' high cirrus
+    coverage: num('cc', 'Coverage', 0, 0, 1, 0.01, 'life', { hidden: true }),
+    altitude: num('ca', 'Altitude', 28, 1, 40, 0.5, 'live', { unit: 'm', hidden: true }),
+    cirrus: bool('ci', 'High cirrus', true, 'live'),
+    // the defaults of the cirrus and the clouds' speed are the user's (2 November 2026); 0.5 would be Violet's 28 streaks
+    cirrusDensity: num('cid', 'Cirrus density', 0.62, 0, 1, 0.01, 'live'),
+    cirrusHeight: num('cih', 'Cirrus height', 35.5, 10, 120, 0.5, 'live', { unit: 'm' }),
+    // at tint 0, the user's coral pink (cloudRibbons.ts; its own hue is about 8°): the hue only tells once tinted
+    cirrusHue: num('cic', 'Cirrus hue', 273, 0, 360, 1, 'live', { unit: '°' }),
+    cirrusTint: num('cit', 'Cirrus tint', 0, 0, 1, 0.01, 'live'),
+    cirrusBrightness: num('cib', 'Cirrus brightness', 1.08, 0.5, 1.3, 0.01, 'live'),
+    // × Violet's opacity (thin: 0.28 from the ground, 0.64 from orbit). Over the blue sky the colour only reads where
+    // the streaks are dense: at 3 their densest parts looked like the swatch's middle from the ground (ΔE 6.3) and from
+    // orbit (ΔE 2.9); at Violet's 1, nearly sky blue from the ground (ΔE 35)
+    cirrusOpacity: num('cio', 'Cirrus opacity', 2.85, 0, 5, 0.01, 'live'),
+    speed: num('cs', 'Speed', 0.62, 0, 1, 0.01, 'live'),
+    shadow: num('csh', 'Shadow', 0.35, 0, 1, 0.01, 'live', { hidden: true }),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
@@ -237,8 +250,8 @@ export const presets = {
   'Scarlet Sail Canyon': {},
   Seedling: { world: { growth: 0, bloom: 0.2 } },
   'Wide world': { world: { growth: 1, bloom: 1 } },
-  'Morning mist': { clouds: { coverage: 0.38 }, light: { timeOfDay: 7.5 } },
-  Gusty: { wind: { strength: 0.85, gustiness: 0.9 }, clouds: { speed: 0.7, coverage: 0.55 } },
+  'Morning mist': { light: { timeOfDay: 7.5 } },
+  Gusty: { wind: { strength: 0.85, gustiness: 0.9 }, clouds: { speed: 0.7 } },
 } satisfies Record<string, ParamPatch>;
 
 export type PresetName = keyof typeof presets;

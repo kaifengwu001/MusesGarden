@@ -7,6 +7,7 @@ import { smoothstep } from '../../src/core/math';
 import { FieldMap } from './life/fieldMap';
 import { Birds } from './life/birds';
 import { Butterflies } from './life/butterflies';
+import { CIRRUS_BANDS, CloudRibbons } from './life/cloudRibbons';
 import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
@@ -90,6 +91,7 @@ export class World {
   readonly flowers: Flowers;
   homestead: Homestead;
   readonly clouds: Clouds;
+  readonly cirrus: CloudRibbons;
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
@@ -181,6 +183,7 @@ export class World {
     this.flowers = new Flowers(this.shared, POOL_PAGES.flowers);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
     this.clouds = new Clouds(this.shared, this.cloudUniforms, tier.maps.cloudShadow, tier.maps.cloudLayer, tier.maps.cloudWindow);
+    this.cirrus = new CloudRibbons(this.shared);
     this.petals = new Petals(this.shared);
     this.birds = new Birds(this.shared);
     this.butterflies = new Butterflies(this.shared);
@@ -199,7 +202,7 @@ export class World {
     this.clouds.addShadowCaster(this.muse.shadowMesh);
     // (the float's rings on the water are the meadow's own ripples)
     this.muse.props.onRipple = (dir, time) => this.ripple(dir, time);
-    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
+    this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh, this.cirrus.mesh);
     this.applyTier(tier);
   }
 
@@ -391,6 +394,14 @@ export class World {
     this.butterflies.update(clock.time, this.terrain, rig.up, rig.altitude, this.look.uBloom.value.x);
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
+    // Violet Dunes' high cirrus: density sets how many streaks (0.5 would be Violet's 28); height is at R 128 and
+    // grows as the clouds do (√R)
+    const bands = Math.round(p.clouds.cirrusDensity * 2 * CIRRUS_BANDS);
+    this.cirrus.mesh.visible = p.clouds.cirrus && bands > 0;
+    if (this.cirrus.mesh.visible) {
+      this.cirrus.update(L.seed, bands, R, p.clouds.cirrusHeight * Math.sqrt(R / 128), p.clouds.cirrusOpacity, clock.time, this.windAxis, rig.camera.position, p.clouds.speed);
+      this.cirrus.setColour(p.clouds.cirrusHue, p.clouds.cirrusTint, p.clouds.cirrusBrightness);
+    }
 
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
