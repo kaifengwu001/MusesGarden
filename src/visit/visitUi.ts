@@ -455,13 +455,15 @@ export class VisitUi {
 
   /**
    * How open the way is from a framing's camera, on one side, to the two Muses: of the places along it, how many have
-   * nothing in the line of sight (the ground below it, no wall where a Muse may not stand, clear of the house).
+   * nothing in the line of sight (the ground below it, no wall where a Muse may not stand, and not in toward the house:
+   * within HOUSE_REACH of it and nearer it than the two stand, who may well be on its own deck or terrace).
    */
   private openness(f: Omit<Framing, 'from'>, side: Vector3): number {
     const R = this.world.scene.growth.radius;
     // (every world's layout names its cottage: its house stands about it)
     const cottage = (this.world.shape() as { readonly cottage?: unknown }).cottage;
     const house = cottage instanceof Vector3 ? cottage : null;
+    const theirs = house ? angleBetween(f.dir, house) * R : 0;
     const p = new Vector3();
     let open = 0;
     for (let k = 1; k <= SIGHT_SAMPLES; k++) {
@@ -470,7 +472,10 @@ export class VisitUi {
       const sight = f.ground + f.aim + (f.height - f.aim) * u;
       if (this.world.ground(p).height > sight - 0.25) continue;
       if (this.world.standable && !this.world.standable(p)) continue;
-      if (house && angleBetween(p, house) * R < HOUSE_REACH) continue;
+      if (house) {
+        const d = angleBetween(p, house) * R;
+        if (d < HOUSE_REACH && d < theirs) continue;
+      }
       open++;
     }
     return open;
