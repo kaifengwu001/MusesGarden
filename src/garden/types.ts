@@ -93,7 +93,31 @@ export interface Postcard {
   liked?: boolean;
   /** Whether you starred it, kept for you alone, when the backend keeps favorites; without it this browser remembers them. */
   favorite?: boolean;
+  /** What Muse wrote or drew on the back. Without it (an invitation, an older photo) the back shows the place and day. */
+  back?: PostcardBack;
 }
+
+/** The drawings Muse can put on a postcard's back. */
+export type Doodle = 'sun' | 'cloud' | 'rain' | 'muse' | 'laptop' | 'flower' | 'bird' | 'fish' | 'house' | 'planet' | 'heart' | 'leaf' | 'boat' | 'stars';
+
+/** The back of a postcard: the engine's PostcardBack, with its find and its friend resolved for drawing. */
+export type PostcardBack =
+  | { kind: 'line'; text: string }
+  | { kind: 'doodle'; doodle: Doodle; caption: string }
+  /** The planet drawn small, with an X at `dir` (a unit vector from the planet's centre) where the photo was taken. */
+  | { kind: 'map'; dir: readonly [number, number, number]; label: string }
+  | { kind: 'note'; title: string; lines: readonly string[] }
+  | { kind: 'list'; title: string; items: readonly { text: string; done: boolean }[] }
+  /** The find pressed like a flower in a book: its species and colour as its bed has them, and a museum label. */
+  | { kind: 'pressed'; species: 0 | 1 | 2 | 3; variant: number; label: string }
+  /** A travel stub, for a photo from beyond the planet. */
+  | { kind: 'ticket'; from: string; to: string; note: string }
+  /** Noughts and crosses with the friend in the photo: `board` is nine cells of 'x' (Muse), 'o' (the friend) or '.'. */
+  | { kind: 'game'; friend: string; board: string; caption: string }
+  /** The answer is printed upside down. */
+  | { kind: 'riddle'; question: string; answer: string }
+  | { kind: 'tally'; what: string; count: number }
+  | { kind: 'poem'; lines: readonly string[] };
 
 export interface Interest {
   id: string;

@@ -10,6 +10,8 @@ import type {
   LlmCache,
   Mind,
   MindContext,
+  PostcardAsk,
+  PostcardWords,
   ReflectionProposal,
   Temperament,
   TopicKey,
@@ -103,6 +105,10 @@ export class MetaMind implements Mind {
     return this.ask('extractInterests', interestsPrompt(text, from), parseInterests, () =>
       this.fallback.extractInterests(text, from),
     );
+  }
+
+  writePostcard(ctx: MindContext, ask: PostcardAsk): Promise<PostcardWords> {
+    return this.fallback.writePostcard(ctx, ask);
   }
 
   estimateTemperament(soul: string): Promise<Temperament> {

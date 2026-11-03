@@ -21,6 +21,7 @@ import type {
   Store,
   TopicKey,
 } from '../../../src/muse/contract';
+import { templateWords } from '../../adapters/minds/postcard';
 import { openMemoryStore } from '../../adapters/store/memory';
 import type { EngineDeps } from '../engine';
 
@@ -201,6 +202,7 @@ export const mind: Mind = {
   reflect: () => Promise.resolve({ deltas: [], narrative: '', questions: [] }),
   extractInterests: () => Promise.resolve([]),
   estimateTemperament: () => Promise.resolve({ curiosity: 0.5, focus: 0.5, sociability: 0.5, whimsy: 0.5, novelty: 0.5 }),
+  writePostcard: (ctx, ask) => Promise.resolve(templateWords(ctx, ask)),
 };
 
 /** Lane B's memory store, plus a switch that makes the next commit fail like a crash would. */

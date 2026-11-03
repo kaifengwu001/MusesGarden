@@ -79,6 +79,10 @@ const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   scenery: 'meadow',
   creature: 'meadow',
   find: 'cottage',
+  sky: 'meadow',
+  closeup: 'close',
+  work: 'close',
+  home: 'cottage',
   invitation: 'pier',
 };
 /** Invitation states the guest's owner still holds: sent (kept for later) or used. A withdrawn one is gone. */

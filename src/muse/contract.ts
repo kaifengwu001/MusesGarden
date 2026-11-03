@@ -164,6 +164,8 @@ export interface Mind {
   extractInterests(text: string, from: 'memory' | 'soul'): Promise<string[]>;
   /** Used only when SOUL.md has no temperament frontmatter. */
   estimateTemperament(soul: string): Promise<Temperament>;
+  /** The words on a postcard's back, in Muse's voice, shaped as `ask.plan.kind` asks. */
+  writePostcard(ctx: MindContext, ask: PostcardAsk): Promise<PostcardWords>;
 }
 
 /** Caches Mind responses by a hash of (model, prompt) so reruns are free and identical. */
@@ -250,7 +252,18 @@ export interface PublicDiscovery {
   readonly pursuing: TopicKey | null;
 }
 
-export type PhotoSubject = 'selfie' | 'scenery' | 'creature' | 'find' | 'friend' | 'new-friend';
+/** What a photo shows. `work` is Muse at what it is doing for its owner; `home` its cottage and pond. */
+export type PhotoSubject =
+  | 'selfie'
+  | 'scenery'
+  | 'sky'
+  | 'closeup'
+  | 'creature'
+  | 'find'
+  | 'work'
+  | 'home'
+  | 'friend'
+  | 'new-friend';
 
 /** A photo is a reproducible view: the frontend turns dir/forward/zoom into the `pose=` hash on planetOf's world. */
 export interface PhotoSpec {
@@ -266,6 +279,71 @@ export interface PhotoSpec {
   readonly zoom: number;
   readonly companions: readonly MuseId[];
   readonly discoveryId?: DiscoveryId;
+}
+
+// ─── The back of a postcard ──────────────────────────────────────────────────
+
+/** The drawings Muse can put on a postcard's back (src/ui/garden/postcardBack.ts draws each). */
+export type Doodle = 'sun' | 'cloud' | 'rain' | 'muse' | 'laptop' | 'flower' | 'bird' | 'fish' | 'house' | 'planet' | 'heart' | 'leaf' | 'boat' | 'stars';
+
+export interface ListItem {
+  readonly text: string;
+  readonly done: boolean;
+}
+
+/** What the policy settles for each kind of back (server/domain/policy/postcard.ts). */
+interface BackPlans {
+  line: object;
+  doodle: { doodle: Doodle };
+  /** The planet drawn small with an X where the photo was taken. */
+  map: { dir: Dir };
+  note: object;
+  list: object;
+  /** The find pressed like a flower in a book, with a museum label. */
+  pressed: { find: DiscoveryId };
+  /** A travel stub, for a photo from beyond the planet. */
+  ticket: { from: string; to: string };
+  /** Noughts and crosses with the friend in the photo, nine cells of 'x', 'o' or '.'. */
+  game: { friend: MuseId; board: string };
+  riddle: object;
+  tally: object;
+  poem: object;
+}
+
+/** What Muse writes for each kind, in its own voice (Mind.writePostcard). */
+interface BackWords {
+  line: { text: string };
+  doodle: { caption: string };
+  map: { label: string };
+  note: { title: string; lines: readonly string[] };
+  list: { title: string; items: readonly ListItem[] };
+  pressed: { label: string };
+  ticket: { note: string };
+  game: { caption: string };
+  /** The answer is printed upside down. */
+  riddle: { question: string; answer: string };
+  tally: { what: string; count: number };
+  poem: { lines: readonly string[] };
+}
+
+export type PostcardBackKind = keyof BackPlans;
+export type PostcardPlan = { [K in PostcardBackKind]: { readonly kind: K } & Readonly<BackPlans[K]> }[PostcardBackKind];
+export type PostcardWords = { [K in PostcardBackKind]: { readonly kind: K } & Readonly<BackWords[K]> }[PostcardBackKind];
+export type PostcardBack = { [K in PostcardBackKind]: { readonly kind: K } & Readonly<BackPlans[K]> & Readonly<BackWords[K]> }[PostcardBackKind];
+
+/** What Muse is asked to write on a postcard's back: the plan, and what the photo was of. */
+export interface PostcardAsk {
+  readonly plan: PostcardPlan;
+  readonly subject: PhotoSubject;
+  /** As the card's front says it: "Out exploring Botany", "On Wren’s planet". */
+  readonly place: string;
+  /** What Muse was doing when it took the photo. */
+  readonly doing: Activity | 'work' | 'hangout';
+  /** The interest Muse was pursuing, as a label. */
+  readonly topic: string | null;
+  readonly friend: string | null;
+  /** The find's title, for a photo of one. */
+  readonly find: string | null;
 }
 
 export interface Basket {
@@ -390,6 +468,8 @@ export type MuseEventBody =
   | { readonly kind: 'question.opened'; readonly question: OpenQuestion }
   | { readonly kind: 'question.closed'; readonly id: QuestionId; readonly reason: 'answered' | 'dropped' }
   | { readonly kind: 'photo.taken'; readonly photo: PhotoSpec }
+  /** The back Muse wrote for a photo it took, in the same commit. */
+  | { readonly kind: 'photo.written'; readonly photo: PhotoId; readonly back: PostcardBack }
   | { readonly kind: 'basket.delivered'; readonly basket: Basket }
   | {
       readonly kind: 'reflection.committed';

@@ -145,6 +145,9 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
     case 'photo.taken':
       // The owner receives a photo when its event lands, so the daily cap counts by delivery, not by when it was taken.
       return { ...s, photos: [...s.photos, e.photo], day: { ...s.day, photos: s.day.photos + 1 } };
+    case 'photo.written':
+      // Only the garden reads a postcard's back; nothing of Muse's does.
+      return s;
     case 'basket.delivered':
       return { ...s, baskets: [...s.baskets, e.basket], pendingBasket: [], day: { ...s.day, baskets: s.day.baskets + 1 } };
     case 'reflection.committed':

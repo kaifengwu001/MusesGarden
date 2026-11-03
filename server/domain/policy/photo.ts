@@ -30,7 +30,18 @@ const SUBJECTS: Record<Context, readonly (readonly [PhotoSubject, number])[]> = 
   visit: [],
 };
 
-const ZOOM: Record<PhotoSubject, number> = { selfie: 0.9, find: 0.95, creature: 0.85, scenery: 0.4, friend: 0.8, 'new-friend': 0.8 };
+const ZOOM: Record<PhotoSubject, number> = {
+  selfie: 0.9,
+  find: 0.95,
+  creature: 0.85,
+  scenery: 0.4,
+  sky: 0.3,
+  closeup: 0.98,
+  work: 0.9,
+  home: 0.6,
+  friend: 0.8,
+  'new-friend': 0.8,
+};
 /** Beyond the planet, the photo looks back at the whole of it. */
 const BEYOND_ZOOM = 0.05;
 

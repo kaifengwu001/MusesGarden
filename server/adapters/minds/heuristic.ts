@@ -8,10 +8,13 @@ import type {
   Judgment,
   Mind,
   MindContext,
+  PostcardAsk,
+  PostcardWords,
   ReflectionProposal,
   Temperament,
   TopicKey,
 } from '../../../src/muse/contract';
+import { templateWords } from './postcard';
 
 // ─── text ───────────────────────────────────────────────────────────────────
 
@@ -306,6 +309,10 @@ export class HeuristicMind implements Mind {
 
   extractInterests(text: string, from: 'memory' | 'soul'): Promise<string[]> {
     return Promise.resolve(extract(text, from));
+  }
+
+  writePostcard(ctx: MindContext, ask: PostcardAsk): Promise<PostcardWords> {
+    return Promise.resolve(templateWords(ctx, ask));
   }
 
   estimateTemperament(soul: string): Promise<Temperament> {

@@ -154,15 +154,15 @@ const FRIENDS: ReadonlyArray<Omit<MuseFriend, 'met'> & { metBack: number }> = [
   { id: 'tofu', name: 'Tofu', coat: '#efe6c8', shared: ['Model kits'], metBack: 20 },
 ];
 
-const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
-  { id: 'pc-close', back: 9, image: closeUrl, place: 'On the doorstep', with: 'pip' },
-  { id: 'pc-pier', back: 6, image: pierUrl, place: 'Out on the pier', with: 'juniper' },
-  { id: 'pc-meadow', back: 4, image: meadowUrl, place: 'In the long grass', with: 'marlo' },
-  { id: 'pc-cottage', back: 2, image: cottageUrl, place: 'Home from the hill', with: 'tofu' },
-  { id: 'pc-terrace', back: 0, image: terraceUrl, place: 'Pip came by', with: 'pip' },
+const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
+  { id: 'pc-close', ago: 9, image: closeUrl, place: 'On the doorstep', with: 'pip' },
+  { id: 'pc-pier', ago: 6, image: pierUrl, place: 'Out on the pier', with: 'juniper' },
+  { id: 'pc-meadow', ago: 4, image: meadowUrl, place: 'In the long grass', with: 'marlo' },
+  { id: 'pc-cottage', ago: 2, image: cottageUrl, place: 'Home from the hill', with: 'tofu' },
+  { id: 'pc-terrace', ago: 0, image: terraceUrl, place: 'Pip came by', with: 'pip' },
   {
     id: 'inv-pip',
-    back: 0,
+    ago: 0,
     image: closeUrl,
     place: 'An invitation',
     with: 'pip',
@@ -170,7 +170,7 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { back: number }> = [
   },
   {
     id: 'inv-juniper',
-    back: 3,
+    ago: 3,
     image: pierUrl,
     place: 'An invitation',
     with: 'juniper',
@@ -222,7 +222,7 @@ export function placeholderSnapshot(now = new Date()): GardenSnapshot {
     friends: FRIENDS.map(({ metBack, ...f }) => ({ ...f, met: dayBefore(metBack, now) })),
     baskets,
     finds,
-    postcards: POSTCARDS.map(({ back, ...p }) => ({ ...p, day: dayBefore(back, now) })),
+    postcards: POSTCARDS.map(({ ago, ...p }) => ({ ...p, day: dayBefore(ago, now) })),
     favourites: FAVOURITES.map(([back, i]) => `basket-${dayBefore(back, now)}-${i}`),
   };
 }
