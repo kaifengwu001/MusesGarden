@@ -15,8 +15,8 @@ describe('the postcard stills', () => {
     for (const file of onDisk) if (/-\d+\.jpg$/.test(file)) expect(listed, file).toContain(file);
   });
 
-  it('has at least three stills of each subject, two of each kind of friend', () => {
-    for (const key of keys) expect(STILLS[key].length, key).toBeGreaterThanOrEqual(key === 'friend' || key === 'new-friend' ? 2 : 3);
+  it('has at least three stills of each subject', () => {
+    for (const key of keys) expect(STILLS[key].length, key).toBeGreaterThanOrEqual(3);
   });
 
   it('gives a photo the same still every time', () => {
