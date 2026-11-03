@@ -6,6 +6,7 @@ import { SphereGrid, type Field } from '../../terraces/build/sphere';
 import { TerraceRig } from '../../terraces/camera';
 import { ribbonMesh } from '../../terraces/mistRibbons';
 import { makeStrokes } from '../../terraces/mistStrokes';
+import { warpForZoom } from '../../render/warp';
 import { CameraRig } from '../../view/camera';
 
 // The terraces' planet is mathematics (build/field.ts) and its terraces the
@@ -251,25 +252,47 @@ describe("the terraces' mist strokes", () => {
 });
 
 describe("the terraces' camera", () => {
-  it("tilts up further round the bird's-eye height, as the shared rig's elsewhere, and only ever up on the way in", () => {
+  it("moves the horizon only down the frame as you zoom in, held over its middle from the bird's-eye stop, the shared rig's tilt in orbit and from the standing view", () => {
     const shared = new CameraRig();
-    const rig = new TerraceRig();
-    let last = 0;
-    for (let i = 0; i <= 200; i++) {
-      const z = i / 200;
+    const rig = new TerraceRig(128);
+    // (the horizon of the planet's sphere warped as at zoom z, seen from the camera: by brute force)
+    const horizon = (z: number, alt: number): number => {
+      const k = warpForZoom(z, 128, 60);
+      let best = 0;
+      for (let i = 1; i <= 4000; i++) {
+        const th = (i / 4000) * Math.PI;
+        const x = 128 * Math.sin(th);
+        best = Math.max(best, Math.atan2(x, 128 + alt - (128 * Math.cos(th) - k * x * x)));
+      }
+      return best;
+    };
+    let last = Number.POSITIVE_INFINITY;
+    let seenAt = -1;
+    for (let i = 0; i <= 100; i++) {
+      const z = i / 100;
       const a = shared.framing(z);
       const b = rig.framing(z);
       expect(b.altitude).toBe(a.altitude);
       expect(b.fov).toBe(a.fov);
-      if (z <= 0.1 || z >= 0.65) expect(b.tilt).toBeCloseTo(a.tilt, 9);
-      else expect(b.tilt).toBeGreaterThanOrEqual(a.tilt - 1e-12);
-      expect(b.tilt).toBeGreaterThanOrEqual(last - 1e-12);
-      last = b.tilt;
+      expect(rig.horizonAt(b.altitude, z)).toBeCloseTo(horizon(z, b.altitude), 3);
+      if (z <= 0.22 || z >= 0.83) expect(b.tilt).toBeCloseTo(a.tilt, 9);
+      // (the horizon's place in the frame, 0 its middle, 1 its top edge: once it is in the frame, only ever lower,
+      // down to the standing view, where the shared rig's own tilt goes on to eye level)
+      const place = (horizon(z, b.altitude) - b.tilt) / ((b.fov * Math.PI) / 360);
+      if (seenAt < 0 && z > 0.15 && place <= 1) seenAt = z;
+      if (seenAt >= 0 && z <= 0.85) {
+        expect(place).toBeLessThanOrEqual(last + 1e-3);
+        last = place;
+      }
     }
-    // (the bird's-eye stop, 70 m up: 38.5° from straight down, from 14.4°)
+    expect(seenAt).toBeGreaterThan(0.2);
+    expect(seenAt).toBeLessThan(0.3);
+    // (the bird's-eye stop, 70 m up: 38° from straight down, from 14.4°, the horizon 0.12 of half the frame over its middle)
     const z = rig.zoomForAltitude(70.2);
-    expect((rig.framing(z).tilt * 180) / Math.PI).toBeCloseTo(38.5, 0);
-    expect((shared.framing(z).tilt * 180) / Math.PI).toBeCloseTo(14.4, 0);
-    expect(rig.lift(z)).toBeCloseTo(rig.framing(z).tilt - shared.framing(z).tilt, 12);
+    const b = rig.framing(z);
+    expect((b.tilt * 180) / Math.PI).toBeCloseTo(38.1, 1);
+    expect((shared.framing(z).tilt * 180) / Math.PI).toBeCloseTo(14.4, 1);
+    expect((rig.horizonAt(b.altitude, z) - b.tilt) / ((b.fov * Math.PI) / 360)).toBeCloseTo(0.12, 3);
+    expect(rig.lift(z)).toBeCloseTo(b.tilt - shared.framing(z).tilt, 12);
   });
 });

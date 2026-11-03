@@ -82,7 +82,7 @@ export class TerraceWorld implements PlanetWorld {
   /** The paddy lab's grade: none (the lab draws straight to the canvas), so the colours measured from Kai's aerial reach the screen as measured: no tone curve, bloom, contrast or dimming; the paper grain stays. */
   readonly grade = { curve: false, bloom: false, contrast: 1, brightness: 1 } as const;
   readonly scene = new Scene();
-  readonly rig = new TerraceRig();
+  readonly rig = new TerraceRig(FIELD.radius);
   readonly palette = new Palette(TERRACE_ROWS);
   readonly look = createLookUniforms();
   readonly band = new GrowthBand();
@@ -333,6 +333,7 @@ export class TerraceWorld implements PlanetWorld {
     this.own.uPaddy.value.y = seasonFront(p.world.bloom);
 
     const f = this.field;
+    this.rig.visualRadius = p.view.visualRadius;
     this.rig.update(clock.realDt, R, aspect, (dir) => f.height(dir.x, dir.y, dir.z));
     const rig = this.rig;
     this.warp.focus.copy(rig.focus);
