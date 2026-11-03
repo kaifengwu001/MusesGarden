@@ -854,8 +854,13 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   as the haze (the panel's Fog tint and tint hue); over the terraces,
   trees, towers, houses, rice and mist (not the sky, which is shared). Its
   density varies across the globe by two octaves of noise (the panel's Fog
-  patchiness and patch size), taken along each ray as it is at the point
-  and half way to it. The mist's count, height, range, density and twist
+  patchiness and patch size), thins away from Kai's towers (whole within a
+  range of one, thinning by e every falloff past it: how far the nearest
+  is, on a 64² raster a cube face made once a build, fogPeaks.ts) and near
+  the camera's place on the planet (by the distance along the planet from
+  the point under the camera), each by its reduction, range and falloff
+  on the panel; all of it taken along each ray as it is at the point and
+  half way to it. The mist's count, height, range, density and twist
   are the panel's Cloud count, height, height range, density and twist;
   the twist turns the strokes' way off the wind's by a broad pattern over
   the globe (220 m and 85 m), so they leave their latitude lines.

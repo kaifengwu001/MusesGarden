@@ -76,7 +76,7 @@ export interface MistLayer extends StrokeParams {
  * from the sphere by as much as its Cloud height range; their way twisted off the wind's across the globe (the
  * panel's Cloud twist).
  */
-export const MIST: MistLayer = { strokes: 120, range: 3, half: 2.9, length: [50, 140], wavelength: [30, 55], sinuosity: [0.2, 1.75], curl: 0.4, branch: 0.35, stack: 0.3, lobe: 3, steer: 0.04, twist: 0.6, drift: 0.4 };
+export const MIST: MistLayer = { strokes: 47, range: 3, half: 2.9, length: [50, 140], wavelength: [30, 55], sinuosity: [0.2, 1.75], curl: 0.4, branch: 0.35, stack: 0.3, lobe: 3, steer: 0.04, twist: 0.71, drift: 0.4 };
 
 /** The cube maps' side, and the ground's raster's (texels a cube face). */
 const BANDS = 512;
@@ -140,7 +140,7 @@ export class TerraceMist {
     this.uniforms = {
       uMistBands: { value: this.bands.texture },
       uMistDrift: { value: new Matrix3() },
-      uMistLayer: { value: new Vector4(3.5, 0, OFFSET, 1) },
+      uMistLayer: { value: new Vector4(9, 0, OFFSET, 1) },
       uMistGround: { value: this.ground },
     };
     Object.assign(shared, this.uniforms);

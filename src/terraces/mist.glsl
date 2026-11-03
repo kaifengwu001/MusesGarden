@@ -10,22 +10,7 @@ uniform sampler2D uMistGround;  // the ground's height (m over the radius): a ra
 
 // The ground's height under a direction (m over the radius).
 float mistGround(vec3 d) {
-  vec3 a = abs(d);
-  float face;
-  vec2 uv;
-  if (a.x >= a.y && a.x >= a.z) {
-    face = d.x > 0.0 ? 0.0 : 1.0;
-    uv = d.yz / a.x;
-  } else if (a.y >= a.z) {
-    face = d.y > 0.0 ? 2.0 : 3.0;
-    uv = d.xz / a.y;
-  } else {
-    face = d.z > 0.0 ? 4.0 : 5.0;
-    uv = d.xy / a.z;
-  }
-  float n = float(textureSize(uMistGround, 0).x);
-  vec2 st = clamp(uv * 0.5 + 0.5, 0.5 / n, 1.0 - 0.5 / n);
-  return textureLod(uMistGround, vec2(st.x, (face + st.y) / 6.0), 0.0).r;
+  return textureLod(uMistGround, faceAtlas(d, float(textureSize(uMistGround, 0).x)), 0.0).r;
 }
 
 // The nearest stroke at a direction: how far inside its edge (m: < 0 outside it), and its half-breadth there (m).

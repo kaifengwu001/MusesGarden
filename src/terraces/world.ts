@@ -27,6 +27,7 @@ import { PaddyMap } from './paddyMap';
 import { TERRACE_ROWS } from './palette';
 import { Rice, RICE } from './rice';
 import { Trees } from './trees';
+import { mapPeaks, peakMap } from './fogPeaks';
 import { TerraceMist } from './mist';
 
 /** Kai's models, made light by scripts/terraces-models.mjs (a unit tall, two levels of detail each). */
@@ -108,15 +109,18 @@ export class TerraceWorld implements PlanetWorld {
   readonly rice: Rice;
   readonly objects: TerraceBuild;
   readonly paddyMap: PaddyMap;
-  /** The world's own: its noise's seed, the season's front, the rice blades' near field, the height fog (paddy.glsl, rice.vert.glsl, terrace.frag.glsl, fog.glsl). */
+  /** The world's own: its noise's seed, the season's front, the rice blades' near field, the height fog and its map of the spiky mountains (paddy.glsl, rice.vert.glsl, terrace.frag.glsl, fog.glsl, fogPeaks.ts). */
   private readonly own = {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
-    uHeightFog: { value: new Vector4(0, 3, 2.5, 0) },
-    uHeightFogPatches: { value: new Vector4(0.7, 70, 0, 0) },
+    uHeightFog: { value: new Vector4(0, 3.5, 9, 0) },
+    uHeightFogPatches: { value: new Vector4(1, 50, 0, 0) },
     uHeightFogEye: { value: new Vector3(0, 1, 0) },
-    uHeightFogTint: { value: new Vector2(0.25, 0.5) },
+    uHeightFogTint: { value: new Vector2(0.22, 0.26) },
+    uHeightFogPeaks: { value: peakMap() },
+    uHeightFogPeak: { value: new Vector3(0.7, 43, 20) },
+    uHeightFogNear: { value: new Vector3(0.6, 128, 30) },
   };
   private posed = false;
   private noiseSeed = -1;
@@ -338,6 +342,7 @@ export class TerraceWorld implements PlanetWorld {
     if (this.objects.peaks && this.objects.peaks !== this.placedModels) {
       this.placedModels = this.objects.peaks;
       this.towers.set(placements(this.objects.peaks), R);
+      mapPeaks(this.own.uHeightFogPeaks.value, this.objects.peaks, R);
       this.houses.set(placements(this.objects.houses ?? new Float32Array(0)), R);
     }
     // (near ones in full detail: the camera's place on the planet, unwarped)
@@ -356,11 +361,14 @@ export class TerraceWorld implements PlanetWorld {
     this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.speed, this.windAxis, rig.altitude, t.cloudCount, t.cloudRange, t.cloudHeight, t.cloudDensity, t.cloudTwist);
     // the height fog (fog.glsl), by the panel's sliders: its density (the slider's square, so the low end is fine:
     // 0.05 a m at Kai's 1, 0.2 at its fullest), the height it fills the valleys to, how far over that it thins; how
-    // patchy it is across the globe and how large its patches; its tint
+    // patchy it is across the globe and how large its patches; its tint; how it thins away from the spiky mountains
+    // and near the camera's place on the planet
     this.own.uHeightFog.value.set(0.05 * t.fogDensity * t.fogDensity, t.fogRange, Math.max(t.fogFalloff, 0.5), rig.altitude);
     this.own.uHeightFogPatches.value.set(t.fogPatchiness, t.fogPatchSize, 0, 0);
     this.own.uHeightFogEye.value.copy(rig.up);
     this.own.uHeightFogTint.value.set(t.fogTint, t.fogTintHue);
+    this.own.uHeightFogPeak.value.set(t.fogPeakReduction, t.fogPeakRange, Math.max(t.fogPeakFalloff, 1));
+    this.own.uHeightFogNear.value.set(t.fogNearReduction, t.fogNearRange, Math.max(t.fogNearFalloff, 1));
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }

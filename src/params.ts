@@ -137,23 +137,31 @@ export const schema = {
     forest: num('tf', 'Woods', 0.1, 0, 0.9, 0.01, 'terrain', { hidden: true }),
     fog: num('tfg', 'Valley fog', 0.55, 0, 1, 0.01, 'live', { hidden: true }),
     // the height fog (terraces/fog.glsl): how thick it is, the height it fills the valleys to, and how far over that
-    // it thins away; how patchy it is across the globe and how large its patches (Kai's settings, 2026-11-02); how far
-    // it is tinted, and toward blue (0) or green (1)
-    fogDensity: num('tfd', 'Fog density', 1, 0, 2, 0.01, 'live'),
-    fogRange: num('tfr', 'Fog range', 3, -24, 12, 0.5, 'live', { unit: 'm' }),
-    fogFalloff: num('tff', 'Fog falloff', 2.5, 0.5, 30, 0.5, 'live', { unit: 'm' }),
-    fogPatchiness: num('tfp', 'Fog patchiness', 0.7, 0, 1, 0.01, 'live'),
-    fogPatchSize: num('tfs', 'Fog patch size', 70, 10, 300, 1, 'live', { unit: 'm' }),
-    fogTint: num('tft', 'Fog tint', 0.25, 0, 1, 0.01, 'live'),
-    fogTintHue: num('tfh', 'Fog tint hue', 0.5, 0, 1, 0.01, 'live'),
-    // the mist (terraces/mist.ts): how many stripes; the sphere they float on (its height over the planet's radius:
-    // Kai's 8 m over the land's form was 3.5 m over the radius on the whole) and how far each is offset up or down
-    // from it; how dense they are, how far their way twists off the wind's across the globe
-    cloudCount: int('tcn', 'Cloud count', 120, 10, 400, 'live'),
-    cloudHeight: num('tch', 'Cloud height', 3.5, -10, 20, 0.5, 'live', { unit: 'm' }),
+    // it thins away; how patchy it is across the globe and how large its patches; how far it is tinted, and toward
+    // blue (0) or green (1); how much it thins away from the spiky mountains (whole within the range of one, thinning
+    // by e every falloff past it: 1/6 of the planet's diameter) and near the camera's place on the planet (thinned
+    // within the range of it, coming back by e every falloff past it: 1/2 of the diameter). Kai's settings, 2026-11-02
+    fogDensity: num('tfd', 'Fog density', 1.03, 0, 2, 0.01, 'live'),
+    fogRange: num('tfr', 'Fog range', 3.5, -24, 12, 0.5, 'live', { unit: 'm' }),
+    fogFalloff: num('tff', 'Fog falloff', 9, 0.5, 30, 0.5, 'live', { unit: 'm' }),
+    fogPatchiness: num('tfp', 'Fog patchiness', 1, 0, 1, 0.01, 'live'),
+    fogPatchSize: num('tfs', 'Fog patch size', 50, 10, 300, 1, 'live', { unit: 'm' }),
+    fogTint: num('tft', 'Fog tint', 0.22, 0, 1, 0.01, 'live'),
+    fogTintHue: num('tfh', 'Fog tint hue', 0.26, 0, 1, 0.01, 'live'),
+    fogPeakReduction: num('tmr', 'Fog reduced off peaks', 0.7, 0, 1, 0.01, 'live'),
+    fogPeakRange: num('tmg', 'Fog peak range', 43, 0, 200, 1, 'live', { unit: 'm' }),
+    fogPeakFalloff: num('tmf', 'Fog peak falloff', 20, 1, 100, 1, 'live', { unit: 'm' }),
+    fogNearReduction: num('tnr', 'Fog reduced near camera', 0.6, 0, 1, 0.01, 'live'),
+    fogNearRange: num('tng', 'Fog near range', 128, 0, 400, 1, 'live', { unit: 'm' }),
+    fogNearFalloff: num('tnf', 'Fog near falloff', 30, 1, 200, 1, 'live', { unit: 'm' }),
+    // the mist (terraces/mist.ts): how many stripes; the sphere they float on (its height over the planet's radius)
+    // and how far each is offset up or down from it; how dense they are, how far their way twists off the wind's
+    // across the globe (Kai's settings, 2026-11-02)
+    cloudCount: int('tcn', 'Cloud count', 47, 10, 400, 'live'),
+    cloudHeight: num('tch', 'Cloud height', 9, -10, 20, 0.5, 'live', { unit: 'm' }),
     cloudRange: num('tcr', 'Cloud height range', 3, 0, 12, 0.25, 'live', { unit: 'm' }),
-    cloudDensity: num('tcd', 'Cloud density', 0.75, 0, 2, 0.05, 'live'),
-    cloudTwist: num('tct', 'Cloud twist', 0.6, 0, 1, 0.01, 'live'),
+    cloudDensity: num('tcd', 'Cloud density', 1.2, 0, 2, 0.05, 'live'),
+    cloudTwist: num('tct', 'Cloud twist', 0.71, 0, 1, 0.01, 'live'),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
