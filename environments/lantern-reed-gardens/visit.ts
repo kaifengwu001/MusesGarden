@@ -1,23 +1,15 @@
-import type { MuseLook } from '../../src/muse/contract';
 import type { VisitWorld } from '../../src/visit/world';
 import { bedAt, layOut } from './garden/placement';
 import { FindBeds } from './life/findBeds';
 import { FindForms } from './life/findForms';
-import { Muse, type MuseModel } from './life/muse';
+import { Muse } from './life/muse';
 import { createGroundSample } from './planet/terrain';
 import type { World } from './world';
 
 // Lantern Reed Gardens as a visit's destination (src/visit/): the host is this world's own Muse, the guest a second
 // one made as the residents are (the shared uniforms without the grass press, no props of its own), the finds grow in
-// this world's beds and specimens, and the residents keep out of sight while a friend's owner is here.
-
-/**
- * The body a look is drawn in here. TODO(dressed muses): this world's Muse (life/muse.ts) takes only the original
- * bodies until the dressed-muse port lands; then a dressed look passes straight through, as src/life/muse.ts takes it.
- */
-function model(look: MuseLook): MuseModel {
-  return look === 'tpose6' ? look : 'tpose6';
-}
+// this world's beds and specimens, and the residents keep out of sight while a friend's owner is here. Each Muse is
+// drawn in its own look: the original Muse, or one of the muses in clothes (life/muse.ts takes either).
 
 export function lanternVisit(world: World): VisitWorld {
   const beds = new FindBeds(world.shared);
@@ -28,12 +20,12 @@ export function lanternVisit(world: World): VisitWorld {
     planet: 'lantern-reed-gardens',
     scene: world,
     host: world.muse,
-    dressHost: (look) => world.muse.useModel(model(look)),
+    dressHost: (look) => world.muse.useModel(look),
     makeGuest: (look) => {
       // A guest must never press the host's grass: the shared uniforms, less the press (as residents.ts).
       const isolated = Object.fromEntries(Object.entries(world.shared).filter(([key]) => key !== 'uMusePress' && key !== 'uMusePressK'));
       const guest = new Muse(isolated, { homeProps: false });
-      guest.useModel(model(look));
+      guest.useModel(look);
       world.addVisitor(guest);
       return guest;
     },
