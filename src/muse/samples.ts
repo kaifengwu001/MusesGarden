@@ -113,7 +113,7 @@ export const sampleNowAway: NowView = {
   label: "Away at Wren's planet",
   until: at('2026-11-04T16:10:00-08:00'),
   path: null,
-  away: { kind: 'planet', of: WREN, name: 'Wren', planet: 'violet-dunes', withOwner: false },
+  away: { kind: 'planet', of: WREN, name: 'Wren', planet: 'lantern-reed-gardens', withOwner: false },
 };
 
 export const sampleNowBeyond: NowView = {
@@ -243,11 +243,12 @@ export const sampleInvitations: readonly InvitationCard[] = [
   },
 ];
 
+/** The sample visit is to Lantern Reed Gardens, the first world the visit runtime (src/visit/) draws, so Wren lives there in the samples. */
 export const sampleVisit: VisitWorldView = {
   invitation: INVITE,
-  planet: 'violet-dunes',
-  host: { museId: WREN, name: 'Wren', look: 'muse8' },
-  guest: { museId: HERO, name: 'Moss', look: 'tpose6' },
+  planet: 'lantern-reed-gardens',
+  host: { museId: WREN, name: 'Wren', look: 'muse8', planet: 'lantern-reed-gardens', working: false },
+  guest: { museId: HERO, name: 'Moss', look: 'tpose6', planet: 'meadow', working: false },
   worldSeed: 2207,
   g: 0.3,
   regions: [
@@ -381,6 +382,6 @@ export const sampleJournalMd = `## 4 November
 
 export const sampleMuses: ReturnType<GardenQueries['muses']> = [
   { museId: HERO, name: 'Moss', role: 'hero', planet: 'meadow', look: 'tpose6' },
-  { museId: WREN, name: 'Wren', role: 'friend', planet: 'violet-dunes', look: 'muse8' },
+  { museId: WREN, name: 'Wren', role: 'friend', planet: 'lantern-reed-gardens', look: 'muse8' },
   { museId: JUNIPER, name: 'Juniper', role: 'stranger', planet: 'cherry-blossom-waterways', look: 'muse6' },
 ];

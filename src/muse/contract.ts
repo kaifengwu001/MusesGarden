@@ -709,6 +709,12 @@ export interface PublicProfile {
   readonly museId: MuseId;
   readonly name: string;
   readonly worldSeed: number;
+  /**
+   * The planet it lives on and the body it wears, from the cast (cast.json). The views fill them in; the domain's own
+   * profiles, which only social decisions read, leave them out.
+   */
+  readonly planet?: PlanetId;
+  readonly look?: MuseLook;
   readonly interests: readonly { readonly topic: TopicKey; readonly weight: number }[];
   readonly discoveries: readonly PublicDiscovery[];
 }
@@ -897,11 +903,15 @@ export interface InvitationCard {
   readonly canVisitNow: boolean;
 }
 
-/** A Muse on a visit view: who it is and the body it is drawn in. */
+/** A Muse on a visit view: who it is, the body it is drawn in, where it lives, and whether its owner has it at work. */
 export interface VisitMuse {
   readonly museId: MuseId;
   readonly name: string;
   readonly look: MuseLook;
+  /** Its own planet: the host's is the visit's, the guest's is where its owner goes home to. */
+  readonly planet: PlanetId;
+  /** At work now, laptop out where it stands: the host stays at its bench, and a trip waits for it. */
+  readonly working: boolean;
 }
 
 export interface VisitWorldView {

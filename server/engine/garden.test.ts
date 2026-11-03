@@ -164,6 +164,8 @@ describe('the garden snapshot on a seeded engine', () => {
     expect(snap.muse.reach).toBe('shared');
     for (const f of snap.friends) {
       expect(f.name).toBe(garden.engine.state(f.id as MuseId)!.seed.name);
+      const member = loadCast().members.find((m) => m.id === f.id)!;
+      expect([f.planet, f.look], 'where the friend lives, and the body it wears').toEqual([member.planet, member.look]);
       expect(f.coat).toMatch(/^#[0-9a-f]{6}$/);
       expect(f.shared.length).toBeGreaterThan(0);
       expect(f.shared.length).toBeLessThanOrEqual(3);

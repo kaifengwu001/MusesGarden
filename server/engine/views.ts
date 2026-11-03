@@ -27,6 +27,7 @@ import type {
   PlantCard,
   PlantPin,
   PlantPreview,
+  PublicProfile,
   Reach,
   RegionKey,
   RegionView,
@@ -131,7 +132,16 @@ export class Views implements GardenQueries {
   }
 
   private visitMuse(museId: MuseId): VisitMuse {
-    return { museId, name: this.name(museId), look: this.member(museId).look };
+    const { look, planet } = this.member(museId);
+    return { museId, name: this.name(museId), look, planet, working: this.s(museId)?.working ?? false };
+  }
+
+  /** A Muse's public profile with where it lives and how it looks, as other Muses and owners see it. */
+  private profile(id: MuseId): PublicProfile | null {
+    const s = this.s(id);
+    if (!s) return null;
+    const { planet, look } = this.member(id);
+    return { ...this.social.publicProfile(s), planet, look };
   }
 
   muses(): ReturnType<GardenQueries['muses']> {
@@ -168,10 +178,7 @@ export class Views implements GardenQueries {
       now,
       g: this.helpers.growth(s),
       day: (t) => this.helpers.localDay(t, s.seed.timezone),
-      profile: (id) => {
-        const other = this.s(id);
-        return other ? this.social.publicProfile(other) : null;
-      },
+      profile: (id) => this.profile(id),
       salienceAt: this.helpers.salienceAt,
       inReach: (id) => this.social.inReach(s, id),
       planetOf: (id) => {

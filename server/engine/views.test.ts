@@ -132,8 +132,8 @@ describe('an invitation, through the commands', () => {
     const until = usedAt + 2 * H;
     expect(views.visit(INVITE, MOSS, usedAt)).toMatchObject({
       planet: 'violet-dunes',
-      host: { museId: WREN, look: 'muse8' },
-      guest: { museId: MOSS, look: 'tpose6' },
+      host: { museId: WREN, look: 'muse8', planet: 'violet-dunes', working: false },
+      guest: { museId: MOSS, look: 'tpose6', planet: 'meadow', working: false },
       together: true,
       now: usedAt,
       until,
@@ -172,7 +172,7 @@ describe('an invitation, through the commands', () => {
     await commands.useInvitation(MOSS, INVITE);
     stop();
     const t = engine.now();
-    expect(views.visit(INVITE, MOSS, t)).toMatchObject({ together: false });
+    expect(views.visit(INVITE, MOSS, t)).toMatchObject({ together: false, guest: { working: true } });
     const trip = { invitation: INVITE, host: WREN, planet: 'meadow', until: t + 2 * H };
     expect(views.garden(MOSS, t)?.muse.status).toMatchObject({ note: expect.stringMatching(/^Working/) as string, trip });
     expect(frames.at(-1)?.event, 'the garden hears of the trip at once').toMatchObject({ type: 'status', status: { trip } });

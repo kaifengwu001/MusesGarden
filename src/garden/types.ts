@@ -128,6 +128,9 @@ export interface MuseFriend {
   met: string;
   /** Set when this Muse's human is your friend there too (no names shown, only the network). */
   knownOn?: 'instagram' | 'facebook';
+  /** Where it lives (a PlanetId, src/muse/planets.ts) and the body it wears (a MuseLook), when the backend knows them. */
+  planet?: string;
+  look?: string;
 }
 
 /**

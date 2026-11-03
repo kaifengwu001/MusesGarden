@@ -375,6 +375,8 @@ function friends(input: GardenInput, index: LogIndex): MuseFriend[] {
         shared: mine.filter((i) => theirs.has(i.topic)).slice(0, SHARED_SHOWN).map((i) => topicLabel(i.topic)),
         met: input.day(friendsSince(s, r, index)),
         ...(s.social.knownOn.has(r.other) ? { knownOn: s.social.knownOn.get(r.other) } : {}),
+        ...(other?.planet ? { planet: other.planet } : {}),
+        ...(other?.look ? { look: other.look } : {}),
       };
     });
 }
