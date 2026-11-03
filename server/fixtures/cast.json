@@ -1,9 +1,9 @@
 {
   "members": [
     { "id": "hero", "name": "Fern", "worldSeed": 412, "timezone": "America/Los_Angeles", "dir": "cast/hero", "role": "hero", "planet": "meadow", "look": "tpose6" },
-    { "id": "wren", "name": "Wren", "worldSeed": 4271, "timezone": "Europe/London", "dir": "cast/wren", "role": "friend", "planet": "violet-dunes", "look": "muse8" },
+    { "id": "wren", "name": "Wren", "worldSeed": 4271, "timezone": "Europe/London", "dir": "cast/swap-moss", "role": "friend", "planet": "violet-dunes", "look": "muse8" },
     { "id": "juniper", "name": "Juniper", "worldSeed": 7703, "timezone": "Asia/Tokyo", "dir": "cast/juniper", "role": "friend", "planet": "cherry-blossom-waterways", "look": "muse6" },
-    { "id": "moss", "name": "Moss", "worldSeed": 2389, "timezone": "America/Chicago", "dir": "cast/moss", "role": "stranger", "planet": "cobalt-windfields", "look": "muse4" },
+    { "id": "moss", "name": "Moss", "worldSeed": 2389, "timezone": "America/Chicago", "dir": "cast/dorie", "role": "stranger", "planet": "cobalt-windfields", "look": "muse4" },
     { "id": "lark", "name": "Lark", "worldSeed": 5512, "timezone": "Asia/Kolkata", "dir": "cast/lark", "role": "stranger", "planet": "lantern-reed-gardens", "look": "muse1" },
     { "id": "sorrel", "name": "Sorrel", "worldSeed": 8846, "timezone": "Australia/Sydney", "dir": "cast/sorrel", "role": "stranger", "planet": "tulip-windmill-meadows", "look": "muse7" },
     { "id": "clover", "name": "Clover", "worldSeed": 3157, "timezone": "America/Denver", "dir": "cast/clover", "role": "known", "planet": "scarlet-sail-canyon", "look": "muse2" },
