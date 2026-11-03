@@ -22,9 +22,9 @@ afterAll(() => {
 });
 
 describe('the recorded corpus', () => {
-  it('holds about 300 real Wikipedia pages across all 14 interest areas', () => {
-    expect(corpus.pages.length).toBeGreaterThanOrEqual(280);
-    expect(corpus.areas).toHaveLength(14);
+  it('holds about 800 real Wikipedia pages across all 37 interest areas', () => {
+    expect(corpus.pages.length).toBeGreaterThanOrEqual(740);
+    expect(corpus.areas).toHaveLength(37);
     for (const area of corpus.areas) {
       expect(corpus.pages.filter((p) => p.area === area.name).length, area.name).toBeGreaterThanOrEqual(20);
     }

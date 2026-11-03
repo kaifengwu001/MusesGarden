@@ -102,6 +102,122 @@ const AREAS: readonly Area[] = [
     seeds: ['Tea', 'Green tea', 'Matcha', 'Japanese tea ceremony', 'Oolong', 'Camellia sinensis'],
     keywords: /\btea\b|\bteas\b|camellia|matcha|oolong|chanoyu|darjeeling|pu'er|tisane|teapot/i,
   },
+  // Kai's cast (2026-11-02): the interests its Muses brought that no area above covered.
+  {
+    name: 'gardening and flowers',
+    seeds: ['Gardening', 'Flower', 'Flower garden', 'Cottage garden', 'Horticulture', 'Perennial'],
+    keywords: /garden|horticult|flower|\bblooms?\b|perennial|\bbulbs?\b|compost|seedling|cultivar|prun|\broses?\b|herbaceous|ornamental plant/i,
+  },
+  {
+    name: 'soup',
+    seeds: ['Soup', 'Stock (food)', 'Minestrone', 'Borscht', 'Miso soup', 'Gazpacho', 'Chowder'],
+    keywords: /\bsoups?\b|\bstews?\b|broth|\bstock\b|chowder|bisque|potage|consomm|pottage|bouillon|ramen|borscht|gazpacho|minestrone|dashi/i,
+  },
+  {
+    name: 'hiking',
+    seeds: ['Hiking', 'Long-distance trail', 'Backpacking (hiking)', 'Trail', 'Appalachian Trail'],
+    keywords: /\bhik|\btrails?\b|trek|backpack|walking|hillwalk|rambl|footpath|mountaineer|long-distance|national park|wilderness|camping/i,
+  },
+  {
+    name: 'bread and baking',
+    seeds: ['Baking', 'Bread', 'Pastry', 'Croissant', 'Oven', 'Bakery'],
+    keywords: /\bbak|bread|pastr|dough|\bloa(f|ves)\b|\bflour\b|\bovens?\b|\bcakes?\b|biscuit|croissant|\bbuns?\b|brioche|baguette|leaven|\bwheat\b|\brye\b/i,
+  },
+  {
+    name: 'coffee',
+    seeds: ['Coffee', 'Espresso', 'Coffee roasting', 'Coffeehouse', 'Coffea arabica', 'Coffee preparation'],
+    keywords: /coffee|espresso|\bcaf[eé]s?\b|roast|barista|arabica|robusta|\blatte\b|cappuccino|coffea|caffeine|moka|brewing/i,
+  },
+  {
+    name: 'home organisation',
+    seeds: ['Professional organizing', 'Simple living', 'Housekeeping', 'Marie Kondo', 'The Life-Changing Magic of Tidying Up', 'Pantry'],
+    keywords: /organi[sz]|declutter|\btid(y|ying)\b|storage|housekeep|household|\bhomes?\b|closet|cupboard|\bshel(f|ves)\b|minimalis|simple living|cleaning|pantry|laundry|home economics/i,
+  },
+  {
+    name: 'Japanese architecture',
+    seeds: ['Japanese architecture', 'Minka', 'Sukiya-zukuri', 'Chashitsu', 'Japanese carpentry', 'Shoin-zukuri', 'Machiya'],
+    keywords: /japan|zukuri|minka|chashitsu|tatami|sh[oō]ji|fusuma|engawa|torii|pagoda|shinto shrine|buddhist temple|machiya|\bkura\b|kyoto|nara\b|edo period|heian/i,
+  },
+  {
+    name: 'sculpture and wood carving',
+    seeds: ['Sculpture', 'Wood carving', 'Relief', 'Netsuke', 'Whittling', 'Chip carving'],
+    keywords: /sculpt|\bcarv|relief|\bstatues?\b|whittl|chisel|netsuke|bronze|marble|figurine|woodcraft|woodwork|\bbust\b|monument/i,
+  },
+  {
+    name: 'folk music and the flute',
+    seeds: ['Folk music', 'Flute', 'Tin whistle', 'Fife (instrument)', 'Shakuhachi', 'Fiddle'],
+    keywords: /\bfolk\b|flute|whistle|\bfifes?\b|bagpipe|\bpipes?\b|fiddle|ballad|shakuhachi|recorder \(musical|piccolo|traditional music|dance music|woodwind|\bjigs?\b|sea shant|morris danc/i,
+  },
+  {
+    name: 'agriculture and farming',
+    seeds: ['Agriculture', 'Farm', 'Harvest', 'Crop rotation', 'Paddy field', 'Terrace (earthworks)'],
+    keywords: /agricult|\bfarm|harvest|\bcrops?\b|tillage|plough|\bplow|\brice\b|paddy|terrac|irrigat|cereal|\bgrains?\b|livestock|orchard|sowing|agronom|pastoral|smallholding/i,
+  },
+  {
+    name: 'furniture',
+    seeds: ['Furniture', 'Chair', 'Windsor chair', 'Shaker furniture', 'Cabinetry', 'Woodworking'],
+    keywords: /furnitur|\bchairs?\b|\btables?\b|cabinet|\bstools?\b|joiner|woodwork|upholster|shaker|\bbench|wardrobe|\bdesks?\b|\bsofas?\b|carpentr|chest of drawers|marquetry|veneer/i,
+  },
+  {
+    name: 'kites and hang gliding',
+    seeds: ['Kite', 'Hang gliding', 'Paragliding', 'Kite types', 'Gliding', 'Kitesurfing'],
+    keywords: /\bkites?\b|glid|paraglid|soaring|\bwings?\b|thermal|aviation|\bflight\b|sailplane|parachut|kiteboard|kitesurf|aerodynam|\blift\b|windsurf|ultralight/i,
+  },
+  {
+    name: 'Dutch Golden Age painting',
+    seeds: ['Dutch Golden Age painting', 'Johannes Vermeer', 'Rembrandt', 'Girl with a Pearl Earring', 'The Night Watch', 'Still life'],
+    keywords: /dutch|netherland|flemish|vermeer|rembrandt|golden age|frans hals|still life|genre (art|painting|works)|baroque|delft|haarlem|amsterdam|\boil paint|vanitas|portrait/i,
+  },
+  {
+    name: 'Impressionism and abstract art',
+    seeds: ['Impressionism', 'Claude Monet', 'Oil painting', 'Wassily Kandinsky', 'Abstract art', 'Der Blaue Reiter'],
+    keywords: /impressionis|monet|renoir|degas|pissarro|kandinsky|abstract|expressionis|blaue reiter|bauhaus|\bpaint(ing|er|ers)\b|oil paint|canvas|plein air|modern art|fauvis|cubis|color theory|colour theory/i,
+  },
+  {
+    name: 'science fiction film',
+    seeds: ['Science fiction film', 'Science fiction', 'Film', '2001: A Space Odyssey', 'Blade Runner', 'Metropolis (1927 film)'],
+    keywords: /science fiction|sci-fi|\bfilms?\b|cinema|\bmovies?\b|film director|screenplay|space opera|cyberpunk|dystopi|special effects|visual effects|\baliens?\b/i,
+  },
+  {
+    name: 'artificial intelligence and technology',
+    seeds: ['Artificial intelligence', 'Technology', 'Machine learning', 'Robotics', 'Computer', 'Alan Turing'],
+    keywords: /artificial intelligence|machine learning|neural network|\brobot|comput|technolog|algorithm|automat|software|turing|deep learning|chatbot|language model|engineering|invention/i,
+  },
+  {
+    name: 'physics',
+    seeds: ['Physics', 'Optics', 'Light', 'Classical mechanics', 'Aerodynamics', 'Wind'],
+    keywords: /physic|optic|\blight\b|mechanic|aerodynam|fluid dynamic|refract|diffract|\bwaves?\b|\bforces?\b|motion|quantum|relativ|thermodynam|newton|electromagnet|\bwinds?\b|atmospher|turbulen/i,
+  },
+  {
+    name: 'photography',
+    seeds: ['Photography', 'Camera', 'Landscape photography', 'Long-exposure photography', 'Photographic film', 'Street photography'],
+    keywords: /photograph|camera|\blens(es)?\b|exposure|darkroom|shutter|aperture|cinematograph|daguerre|negative|photographic/i,
+  },
+  {
+    name: 'travel',
+    seeds: ['Travel', 'Tourism', 'Travel literature', 'Backpacking (travel)', 'Grand Tour'],
+    keywords: /travel|touris|journey|voyage|pilgrim|backpack|guidebook|itinerar|expedition|road trip|grand tour|hostel|explor/i,
+  },
+  {
+    name: 'interior design',
+    seeds: ['Interior design', 'Interior architecture', 'Vernacular architecture', 'Courtyard house', 'Siheyuan', 'Feng shui'],
+    keywords: /interior|architect|\bdesign|\brooms?\b|\bhouses?\b|dwelling|courtyard|vernacular|decor|furnish|feng shui|siheyuan|floor plan|lighting|wallpaper/i,
+  },
+  {
+    name: 'dreams',
+    seeds: ['Dream', 'Lucid dream', 'Sleep', 'Rapid eye movement sleep', 'Nightmare', 'Dream interpretation'],
+    keywords: /dream|sleep|nightmare|lucid|\brem\b|unconscious|hypnagog|reverie|oneir|consciousness|hallucinat|imagination/i,
+  },
+  {
+    name: 'psychology and therapy',
+    seeds: ['Psychology', 'Psychotherapy', 'Cognitive behavioral therapy', 'Emotion', 'Mindfulness', 'Positive psychology'],
+    keywords: /psycholog|therap|emotion|\bmind\b|cognit|counsel|mental|behavio|well-?being|mindful|anxiety|empathy|personality|psychiatr|self-/i,
+  },
+  {
+    name: 'fantasy literature',
+    seeds: ['Harry Potter', 'Fantasy literature', 'Hogwarts', 'Magic in fiction', 'The Hobbit', 'Magic (supernatural)'],
+    keywords: /fantasy|\bmagic|wizard|witch|harry potter|hogwarts|rowling|tolkien|dragon|fairy tale|mytholog|\bspells?\b|quidditch|sorcer|\bnovels?\b|children's literature/i,
+  },
 ];
 
 const PER_AREA = 22;
@@ -116,6 +232,8 @@ const UNSEEN: Readonly<Record<Lean, readonly string[]>> = {
   jazz: ['Village Vanguard', 'The Real Book', 'Thelonious Monk'],
   neutral: ['Suspension bridge', 'Bicycle'],
 };
+/** Those pages never join the corpus, whichever area's crawl reaches them. */
+const HELD_OUT = new Set(Object.values(UNSEEN).flat().map(normalizeTitle));
 
 const SOURCES_DIR = fileURLToPath(new URL('./', import.meta.url));
 
@@ -151,7 +269,7 @@ async function crawl(wiki: WikipediaSource): Promise<Corpus> {
       const accepted: TopicPage[] = [];
       for (const t of batch) {
         const c = looked.get(t);
-        if (c == null || taken.has(c.title) || accepted.some((a) => a.title === c.title)) continue;
+        if (c == null || HELD_OUT.has(c.title) || taken.has(c.title) || accepted.some((a) => a.title === c.title)) continue;
         if (!seeds.has(t) && !fits(area, c)) continue;
         accepted.push(c);
         if (count + accepted.length >= PER_AREA) break;
