@@ -95,6 +95,27 @@ test('a visit to Momo’s meadow: sent there from another planet’s page, the h
   for (const p of s.plants) expect([p.id, p.placed, (p.water ?? -1) > 0]).toEqual([p.id, true, true]);
   await expect(page.locator('.g-rail'), 'Momo’s own garden stays shut').toHaveCount(0);
   await expect(page.locator('.controlbar')).toBeHidden();
+
+  // a tap on the guest says hello, as one on the host does: it waves
+  await page.waitForFunction(() => !(window as unknown as { __visit: VisitProbe }).__visit.flying(), undefined, { timeout: 30_000 });
+  const at = await page.evaluate(() => {
+    const w = (window as unknown as { __world: { visitors: unknown[]; pickMuse(x: number, y: number): { muse: unknown } | null } }).__world;
+    for (let j = 0; j < 60; j++) {
+      for (let i = 0; i < 96; i++) {
+        const x = -1 + (2 * (i + 0.5)) / 96;
+        const y = -1 + (2 * (j + 0.5)) / 60;
+        if (w.pickMuse(x, y)?.muse === w.visitors[0]) return { x: ((x + 1) / 2) * innerWidth, y: ((1 - y) / 2) * innerHeight };
+      }
+    }
+    return null;
+  });
+  expect(at, 'the guest is on screen, and a press finds it').not.toBeNull();
+  await page.mouse.click(at!.x, at!.y);
+  await page.waitForFunction(
+    () => ((window as unknown as { __world: { visitors: { living: { action: { wave: number } } | null }[] } }).__world.visitors[0].living?.action.wave ?? -1) >= 0,
+    undefined,
+    { timeout: 5_000 },
+  );
 });
 
 /** The garden at home, its post open on the tickets. */

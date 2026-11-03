@@ -203,8 +203,11 @@ export class Muse {
   private loaded = false;
   private readonly press: { value: Vector4[] } | null;
   private readonly pressK: { value: number } | null;
-  /** Its shadow's map, the pass that draws it, and what the ground and the plants read it by (world.ts's shared uniforms). */
-  private readonly shadowTarget: WebGLRenderTarget;
+  /**
+   * Its shadow's map, the pass that draws it, and what the ground and the plants read it by (world.ts's shared
+   * uniforms). No map of its own for a Muse the ground doesn't read (a guest, whose shadow goes in its host's).
+   */
+  private readonly shadowTarget: WebGLRenderTarget | null;
   private readonly shadowScene: Scene;
   private readonly shadowCamera = new OrthographicCamera();
   private readonly shadowFrame: Matrix3;
@@ -249,10 +252,14 @@ export class Muse {
     );
     this.shadowMesh.frustumCulled = false;
     this.shadowScene = new Scene().add(this.shadowMesh);
-    this.shadowTarget = new WebGLRenderTarget(SHADOW.size, SHADOW.size, { format: RedFormat, type: UnsignedByteType, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter });
-    gpuMemory.set('muse shadow', SHADOW.size * SHADOW.size);
     const shadowMap = shared.uMuseShadow as IUniform<Texture | null> | undefined;
-    if (shadowMap) shadowMap.value = this.shadowTarget.texture;
+    this.shadowTarget = shadowMap
+      ? new WebGLRenderTarget(SHADOW.size, SHADOW.size, { format: RedFormat, type: UnsignedByteType, depthBuffer: false, generateMipmaps: false, minFilter: LinearFilter, magFilter: LinearFilter })
+      : null;
+    if (shadowMap && this.shadowTarget) {
+      gpuMemory.set('muse shadow', SHADOW.size * SHADOW.size);
+      shadowMap.value = this.shadowTarget.texture;
+    }
     this.props = new MuseProps(shared);
     // (the grass's press, shared: world.ts makes it before the grass)
     this.press = (shared.uMusePress as { value: Vector4[] } | undefined) ?? null;
@@ -475,7 +482,7 @@ export class Muse {
 
   /** Draw its shadow's map (after update, before the scene that reads it). */
   renderShadow(renderer: WebGLRenderer): void {
-    if (this.shadowWindow.y <= 0) return;
+    if (!this.shadowTarget || this.shadowWindow.y <= 0) return;
     const previous = renderer.getRenderTarget();
     const clearAlpha = renderer.getClearAlpha();
     renderer.getClearColor(clearColour);
@@ -537,6 +544,9 @@ export class Muse {
     a.stride = 1;
     a.gait = time * OUT_GAIT;
     r.home = false;
+    // (tapped or held out here, it answers you as at home)
+    r.cues.petted = -1;
+    roam.answerOver(time, r);
     return r;
   }
 
@@ -564,7 +574,7 @@ export class Muse {
    * body, if it does and Muse is drawn: and which of its sides it is on (+1
    * its own left), for which way its head tilts as you pet it.
    */
-  pick(ray: Ray, warp: WarpFrame): { side: number } | null {
+  pick(ray: Ray, warp: WarpFrame): { side: number; distance: number } | null {
     if (!this.drawn) return null;
     let best = Infinity;
     let side = 1;
@@ -580,7 +590,7 @@ export class Muse {
         side = tmp2.sub(tmp).dot(this.left) >= 0 ? 1 : -1;
       }
     }
-    return best < Infinity ? { side } : null;
+    return best < Infinity ? { side, distance: best } : null;
   }
 
   /** You knocked at its hut while it was about (museRoam.ts comeIn): it puts by what it was doing and comes in, to do `doing` there. */
@@ -593,17 +603,17 @@ export class Muse {
     this.roam?.goOut(this.time);
   }
 
-  /** Your doings (world time, s): a tap, a hold on one side, letting go. */
+  /** Your doings (world time, s): a tap, a hold on one side, letting go. Out where it is directed, it is awake to them. */
   tap(time: number): void {
-    this.roam?.tap(time);
+    this.roam?.tap(time, this.direction.kind === 'out');
   }
 
   hold(time: number, side: number): void {
-    this.roam?.hold(time, side);
+    this.roam?.hold(time, side, this.direction.kind === 'out');
   }
 
   letGo(time: number): void {
-    this.roam?.letGo(time);
+    this.roam?.letGo(time, this.direction.kind === 'out');
   }
 
   /** Its life (dev: seeking it, reading its parts). */

@@ -28,6 +28,7 @@ import { Keys } from './view/keys';
 import { Companions } from './visit/companions';
 import { prepareVisit } from './visit/visitUi';
 import { meadowCompanions, MeadowVisitUi, meadowVisit } from './meadowVisit';
+import type { Muse } from './life/muse';
 import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
@@ -162,8 +163,9 @@ async function boot(): Promise<void> {
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; one on a find or a
   // pin is the garden's: a tap, a double-click or a hold there opens its card. The meadow's own click, double-click
   // and hold go on everywhere else.
-  const onMuse = (x: number, y: number): { side: number } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
-  let pettingMuse = false;
+  // (Muse, or a friend's Muse visiting it: whichever the press lands on)
+  const onMuse = (x: number, y: number): { side: number; muse: Muse } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+  let pettingMuse: Muse | null = null;
   let gardenTapped = false;
   let heldOnGarden: { x: number; y: number } | null = null;
   attachInput(canvas, {
@@ -184,8 +186,9 @@ async function boot(): Promise<void> {
     tap: (x, y) => {
       if (garden.gizmo) return;
       gardenTapped = false;
-      if (onMuse(x, y)) {
-        world.muse.tap(clock.time);
+      const tapped = onMuse(x, y);
+      if (tapped) {
+        tapped.muse.tap(clock.time);
         return;
       }
       gardenTapped = garden.tap(x, y, canvas.clientWidth, canvas.clientHeight);
@@ -199,8 +202,9 @@ async function boot(): Promise<void> {
       else world.gust(hit.dir, clock.time);
     },
     doubleTap: (x, y) => {
-      if (onMuse(x, y)) {
-        world.muse.tap(clock.time);
+      const tapped = onMuse(x, y);
+      if (tapped) {
+        tapped.muse.tap(clock.time);
         return;
       }
       // (the camera may have started for a find after the first click: a second click is the find's all the same)
@@ -216,8 +220,8 @@ async function boot(): Promise<void> {
       if (garden.gizmo) return;
       const touch = onMuse(x, y);
       if (touch) {
-        pettingMuse = true;
-        world.muse.hold(clock.time, touch.side);
+        pettingMuse = touch.muse;
+        touch.muse.hold(clock.time, touch.side);
         return;
       }
       if (garden.claims(x, y, canvas.clientWidth, canvas.clientHeight)) {
@@ -230,8 +234,8 @@ async function boot(): Promise<void> {
     holdMove: () => undefined,
     holdEnd: () => {
       if (pettingMuse) {
-        pettingMuse = false;
-        world.muse.letGo(clock.time);
+        pettingMuse.letGo(clock.time);
+        pettingMuse = null;
         return;
       }
       if (heldOnGarden) {
