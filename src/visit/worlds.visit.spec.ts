@@ -102,6 +102,36 @@ for (const world of WORLDS) {
       return { host: w.muse.drawn, hostDressed: dressed(w.muse), guests: w.visitors.map((v) => ({ drawn: v.drawn, dressed: dressed(v), footed: footing(v) })) };
     });
     expect(drawn).toEqual({ host: true, hostDressed: true, guests: [{ drawn: true, dressed: true, footed: true }] });
+    // a tap on the guest says hello, as one on the host does: it waves (Violet Dunes' Muse, of an older rig, answers no taps)
+    if (world.planet !== 'violet-dunes') {
+      const at = await page.evaluate(() => {
+        type Hit = { muse?: unknown; visitor?: unknown } | null;
+        const w = (window as unknown as { __world: { visitors: unknown[]; pickMuse(x: number, y: number): Hit } }).__world;
+        // (the middle of where a press finds it, not its edge: it may be walking)
+        let n = 0;
+        let sx = 0;
+        let sy = 0;
+        for (let j = 0; j < 60; j++) {
+          for (let i = 0; i < 96; i++) {
+            const x = -1 + (2 * (i + 0.5)) / 96;
+            const y = -1 + (2 * (j + 0.5)) / 60;
+            const hit = w.pickMuse(x, y);
+            if (!hit || (hit.muse ?? hit.visitor) !== w.visitors[0]) continue;
+            n++;
+            sx += x;
+            sy += y;
+          }
+        }
+        return n ? { x: ((sx / n + 1) / 2) * innerWidth, y: ((1 - sy / n) / 2) * innerHeight } : null;
+      });
+      expect(at, 'the guest is on screen, and a press finds it').not.toBeNull();
+      await page.mouse.click(at!.x, at!.y);
+      await page.waitForFunction(
+        () => ((window as unknown as { __world: { visitors: { living: { action: { wave: number } } | null }[] } }).__world.visitors[0].living?.action.wave ?? -1) >= 0,
+        undefined,
+        { timeout: 5_000 },
+      );
+    }
     const stills = process.env.VISIT_STILLS;
     if (stills) {
       // (framed again on the two as they are now: the host may have moved on with its day since)
