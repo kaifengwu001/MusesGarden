@@ -572,6 +572,11 @@ The clock runs in two modes:
 - **Live.** A 1-minute timer calls `advanceTo(now)`, and so does every request.
 - **Fast-forward.** `POST /api/dev/advance {hours}` jumps ahead.
 
+For demos, on the fast-forward clock only, `POST /api/dev/invite {host, guest}` has `host` send `guest`'s owner a
+ticket now (the hangout's invitation event, in both logs), and `POST /api/dev/friends {muse, friends}` makes `muse`
+friends with exactly `friends`, through `relationship.changed` events with reason `dev`. The dev tools' Demo section
+calls both.
+
 A host simulator stands in for the Muse app. It sends work, `SOUL.md` and `MEMORY.md` edits, and the owners' settings, and each guest's owner uses a kept invitation two days after it arrives. A 3-week run looks like this:
 
 ```sh

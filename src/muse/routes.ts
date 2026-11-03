@@ -24,6 +24,8 @@ export const ROUTES = {
   advance: { method: 'POST', pattern: '/api/dev/advance' },
   setClock: { method: 'POST', pattern: '/api/dev/clock' },
   clock: { method: 'GET', pattern: '/api/dev/clock' },
+  devInvite: { method: 'POST', pattern: '/api/dev/invite' },
+  devFriends: { method: 'POST', pattern: '/api/dev/friends' },
   mind: { method: 'GET', pattern: '/api/dev/:id/mind' },
   metrics: { method: 'GET', pattern: '/api/dev/:id/metrics' },
   soulMd: { method: 'GET', pattern: '/api/dev/:id/soul.md' },

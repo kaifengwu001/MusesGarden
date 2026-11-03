@@ -492,6 +492,22 @@ export class Commands implements GardenCommands {
     return ok;
   }
 
+  async devInvite(host: MuseId, guest: MuseId): Promise<CommandResult> {
+    if (this.mode === 'live') return fail(409, 'switch the clock to fast-forward first');
+    if (!this.known(host) || !this.known(guest)) return fail(404, 'no such Muse');
+    if (host === guest) return fail(400, 'a Muse can’t invite its own owner');
+    await this.engine.sendInvitation(host, guest);
+    return ok;
+  }
+
+  async devFriends(museId: MuseId, friends: readonly MuseId[]): Promise<CommandResult> {
+    if (this.mode === 'live') return fail(409, 'switch the clock to fast-forward first');
+    if (!this.known(museId) || !friends.every((id) => this.known(id))) return fail(404, 'no such Muse');
+    if (friends.includes(museId)) return fail(400, 'a Muse can’t be its own friend');
+    await this.engine.setFriends(museId, friends);
+    return ok;
+  }
+
   setClock(mode: 'live' | 'fast-forward'): Promise<CommandResult> {
     this.mode = mode;
     this.lastWall = null;

@@ -190,6 +190,66 @@ describe('the garden over HTTP on the engine', () => {
   });
 });
 
+describe('the dev tools’ Demo controls, on the engine', () => {
+  const snapshot = async () => (await (await fetch(`${base}/api/muses/hero/garden`)).json()) as GardenSnapshot;
+
+  it('are refused on the live clock, as advance is, and change nothing', async () => {
+    const garden = await engineGarden();
+    await serve(garden);
+    expect((await post('/api/dev/clock', { mode: 'live' })).status).toBe(200);
+    expect(await post('/api/dev/invite', { host: 'dorie', guest: 'hero' })).toEqual({ status: 409, body: { error: 'switch the clock to fast-forward first' } });
+    expect(await post('/api/dev/friends', { muse: 'hero', friends: [] })).toEqual({ status: 409, body: { error: 'switch the clock to fast-forward first' } });
+    expect((await snapshot()).postcards.filter((p) => p.invitation)).toEqual([]);
+    expect((await snapshot()).friends.map((f) => f.id).sort()).toEqual(['hoji', 'moss']);
+  });
+
+  it('send a ticket that is any other ticket: in the post and on the stream, boarded, returned from, and 409 after', async () => {
+    const garden = await engineGarden();
+    await serve(garden);
+    const live = await listen('/api/muses/hero/garden/events');
+    await live.until((f) => f.length > 0);
+    expect(await post('/api/dev/invite', { host: 'hero', guest: 'hero' })).toMatchObject({ status: 400 });
+    expect(await post('/api/dev/invite', { host: 'dorie', guest: 'hero' }), 'a stranger’s, whatever their rapport').toEqual({ status: 200, body: { ok: true } });
+    const frames = await live.until((f) => f.some((x) => x.event.type === 'postcard' && x.event.postcard.invitation?.from === 'dorie'));
+    const card = (await snapshot()).postcards.find((p) => p.invitation?.from === 'dorie')!;
+    expect(frames.map((f) => f.event)).toContainEqual({ type: 'postcard', postcard: card });
+    expect(card.invitation).toMatchObject({ world: 'cobalt-windfields', used: false });
+
+    const { id } = card;
+    expect(await post('/api/muses/hero/garden/reactions', { type: 'use-invitation', id })).toEqual({ status: 200, body: { ok: true } });
+    const world = await fetch(`${base}/api/visits/${id}/world?as=hero`);
+    expect(world.status).toBe(200);
+    expect(await world.json()).toMatchObject({ invitation: id, planet: 'cobalt-windfields', host: { museId: 'dorie' }, guest: { museId: 'hero' } });
+    expect(await post(`/api/visits/${id}/return?as=hero`, undefined)).toEqual({ status: 200, body: { ok: true } });
+    expect(await post('/api/muses/hero/garden/reactions', { type: 'use-invitation', id })).toEqual({ status: 409, body: { error: 'this invitation is returned' } });
+
+    for (let k = 0; k < 2; k++) expect((await post('/api/dev/invite', { host: 'dorie', guest: 'hero' })).status).toBe(200);
+    const fromDorie = (await snapshot()).postcards.filter((p) => p.invitation?.from === 'dorie');
+    expect(new Set(fromDorie.map((p) => p.id)).size, 'two more at the same instant, each its own ticket').toBe(3);
+    expect(fromDorie.filter((p) => !p.invitation?.used)).toHaveLength(2);
+  });
+
+  it('set exactly who a Muse is friends with, both ways, and the garden and every view follow', async () => {
+    const garden = await engineGarden();
+    await serve(garden);
+    const status = (a: string, b: string) => garden.queries.mind(a as MuseId)?.relationships.find((r) => r.other === b)?.status;
+    const friendsOf = (a: string) => (garden.queries.mind(a as MuseId)?.relationships ?? []).filter((r) => r.status === 'friends').map((r) => r.other as string).sort();
+    expect(friendsOf('hero')).toEqual(['hoji', 'moss']);
+
+    expect(await post('/api/dev/friends', { muse: 'hero', friends: ['hero'] })).toMatchObject({ status: 400 });
+    expect(await post('/api/dev/friends', { muse: 'hero', friends: ['dorie', 'moss'] })).toEqual({ status: 200, body: { ok: true } });
+    expect(friendsOf('hero')).toEqual(['dorie', 'moss']);
+    expect([status('dorie', 'hero'), status('moss', 'hero'), status('hoji', 'hero'), status('hero', 'hoji')]).toEqual(['friends', 'friends', 'ended', 'ended']);
+    expect((await snapshot()).friends.map((f) => f.id).sort(), 'a friend the dev tools made is in every friend group').toEqual(['dorie', 'moss']);
+
+    expect((await post('/api/dev/friends', { muse: 'hero', friends: ['dorie', 'moss'] })).status, 'the same list again').toBe(200);
+    expect(friendsOf('hero')).toEqual(['dorie', 'moss']);
+    expect((await post('/api/dev/friends', { muse: 'hero', friends: [] })).status).toBe(200);
+    expect(friendsOf('hero')).toEqual([]);
+    expect((await snapshot()).friends).toEqual([]);
+  });
+});
+
 describe('reactions from the garden', () => {
   let commands: FakeCommands;
   async function serveFake() {

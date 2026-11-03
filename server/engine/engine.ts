@@ -29,6 +29,7 @@ import type {
   QuestionId,
   ReduceCore,
   ReduceSocial,
+  RelationshipOrigin,
   ScheduleItem,
   SocialPolicy,
   Source,
@@ -334,6 +335,51 @@ export class Engine {
     const s = this.states.get(id);
     if (!s) throw new Error(`unknown Muse ${id}`);
     return s;
+  }
+
+  /**
+   * Dev tools, for demos: `host` sends `guest`'s owner a ticket now, whatever their rapport, friendship or reach. It is
+   * the invitation a hangout sends, in both logs, so the post, boarding and the trip take it as any other.
+   */
+  sendInvitation(host: MuseId, guest: MuseId): Promise<InvitationId> {
+    return this.exclusive(() => {
+      const tx = this.tx(this.clockAt);
+      const stamp = `inv:${host}:${guest}:${this.clockAt}`;
+      let id = stamp as InvitationId;
+      for (let k = 2; this.invitation(id); k++) id = `${stamp}:${k}` as InvitationId;
+      const sent = { kind: 'invitation', id, host, guest, to: 'sent' } as const;
+      tx.emit(host, sent);
+      tx.emit(guest, sent);
+      this.commit(tx);
+      return id;
+    });
+  }
+
+  /**
+   * Dev tools, for demos: `m` is friends with exactly `friends`. A listed Muse not yet a friend both ways is befriended
+   * as one the owners shared, so every friend group takes it in; any other friendship of `m`'s ends. Each change goes
+   * in both logs, for reason 'dev'.
+   */
+  setFriends(m: MuseId, friends: readonly MuseId[]): Promise<void> {
+    return this.exclusive(() => {
+      const tx = this.tx(this.clockAt);
+      const want = new Set(friends);
+      for (const other of this.museIds()) {
+        if (other === m) continue;
+        const mine = tx.state(m).social.relationships.get(other);
+        const theirs = tx.state(other).social.relationships.get(m);
+        const change = (to: 'friends' | 'ended', origin: RelationshipOrigin) => {
+          tx.emit(m, { kind: 'relationship.changed', other, to, origin, reason: 'dev' });
+          tx.emit(other, { kind: 'relationship.changed', other: m, to, origin, reason: 'dev' });
+        };
+        if (want.has(other)) {
+          if (mine?.status !== 'friends' || theirs?.status !== 'friends') change('friends', 'introduced');
+        } else if (mine?.status === 'friends' || theirs?.status === 'friends') {
+          change('ended', mine?.origin ?? theirs?.origin ?? 'introduced');
+        }
+      }
+      this.commit(tx);
+    });
   }
 
   private commit(tx: Tx): void {

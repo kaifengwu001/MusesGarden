@@ -194,5 +194,7 @@ export function fakeCommands(): FakeCommands {
       return accept({ name: 'setClock', args: [next] });
     },
     clock: () => ({ mode, now: now() as Instant }),
+    devInvite: (...args) => accept({ name: 'devInvite', args }),
+    devFriends: (...args) => accept({ name: 'devFriends', args }),
   };
 }

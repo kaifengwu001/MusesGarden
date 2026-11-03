@@ -57,6 +57,18 @@ planet). The modules are in [ARCHITECTURE.md](ARCHITECTURE.md), and how a world 
 - **A friend's Muse visiting Momo** is drawn beside it on the meadow, in its own body, with its shadow, while the
   engine says it is there. A tap on it says hello, as one on Momo does.
 
+### Demo (2026-11-03)
+
+For recording a demo, the dev tools (`?dev` on the garden's page, B shows and hides them) have a Demo section. Under
+**Friends**, every other Muse is listed with its planet, ticked when it is your Muse's friend: tick the ones you want
+and press Apply, and your Muse is friends with exactly those, both ways (`POST /api/dev/friends {muse, friends}`; a
+friendship made so counts as one the owners shared, so it shows whatever the friend group). Under **Tickets**, Send
+ticket on a Muse's row has it send your owner a ticket now, whatever their rapport or friendship
+(`POST /api/dev/invite {host, guest}`); Tickets from all friends sends one from each friend whose planet takes visits.
+A ticket so sent is the invitation a hangout sends: it comes into the post over the event stream, and boards, returns
+and refuses a second use as any other. Rows whose planet isn't open for visits say so and have no button. Both
+answer 409 on the live clock, as Advance does: switch the clock to Fast-forward first.
+
 ### Checked (2026-11-02)
 
 - **`npm run check`.** Passes.

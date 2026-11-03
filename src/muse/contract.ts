@@ -534,7 +534,8 @@ export type MuseEventBody =
       readonly other: MuseId;
       readonly to: RelationshipStatus;
       readonly origin: RelationshipOrigin;
-      readonly reason?: 'drifted-apart' | 'owner-unshared';
+      /** Why it ended; or 'dev', a change the dev tools' Demo section made (POST /api/dev/friends), either way. */
+      readonly reason?: 'drifted-apart' | 'owner-unshared' | 'dev';
     }
   | { readonly kind: 'invitation'; readonly id: InvitationId; readonly host: MuseId; readonly guest: MuseId; readonly to: InvitationState };
 
@@ -1109,4 +1110,9 @@ export interface GardenCommands {
   advance(hours: number): Promise<CommandResult>;
   setClock(mode: 'live' | 'fast-forward'): Promise<CommandResult>;
   clock(): { readonly mode: 'live' | 'fast-forward'; readonly now: Instant };
+  // Dev tools for demos, refused on the live clock as `advance` is.
+  /** `host` sends `guest`'s owner a ticket now, whatever their rapport or friendship: the invitation a hangout sends. */
+  devInvite(host: MuseId, guest: MuseId): Promise<CommandResult>;
+  /** `museId` is friends with exactly `friends`, both ways: each listed Muse befriended, each other friend ended. */
+  devFriends(museId: MuseId, friends: readonly MuseId[]): Promise<CommandResult>;
 }

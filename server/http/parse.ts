@@ -51,6 +51,12 @@ export function id<T extends string>(raw: unknown, name: string): T {
   throw bad(`${name} must be an id`);
 }
 
+/** A list of ids, as a JSON array of at most 256. */
+export function ids<T extends string>(raw: unknown, name: string): T[] {
+  if (!Array.isArray(raw) || raw.length > 256) throw bad(`${name} must be an array of ids`);
+  return raw.map((v) => id<T>(v, `each of ${name}`));
+}
+
 export function before<T extends string>(query: URLSearchParams): T | null {
   const raw = query.get('before');
   return raw === null ? null : id<T>(raw, 'before');

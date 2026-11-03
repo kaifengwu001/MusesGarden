@@ -1,4 +1,4 @@
-import type { CommandResult, Instant, MetricsRow, MindView, MuseId, NowView, SharingView } from '../contract';
+import type { CommandResult, GardenQueries, Instant, MetricsRow, MindView, MuseId, NowView, SharingView } from '../contract';
 import { path } from '../routes';
 
 // The dev tools' and the 3D Muse's only door to the Muse engine (vite proxies /api to npm run serve).
@@ -43,6 +43,11 @@ export class MuseApi {
   mind = () => this.get<MindView>(path('mind', this.id));
   metrics = () => this.get<readonly MetricsRow[]>(path('metrics', this.id));
   soulMd = () => this.get<string>(path('soulMd', this.id));
+  muses = () => this.get<ReturnType<GardenQueries['muses']>>(path('muses', {}));
+  /** For demos: `host` sends this Muse's owner a ticket now. */
+  devInvite = (host: MuseId) => this.command(path('devInvite', {}), { host, guest: this.museId });
+  /** For demos: this Muse is friends with exactly `friends`. */
+  devFriends = (friends: readonly MuseId[]) => this.command(path('devFriends', {}), { muse: this.museId, friends });
 
   private async get<T>(path: string): Promise<T> {
     const r = await this.request<T>('GET', path, undefined);

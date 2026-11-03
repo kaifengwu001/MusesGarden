@@ -184,7 +184,8 @@ body.postcard .mu {
   letter-spacing: 0.06em;
 }
 
-.mu-radio {
+.mu-radio,
+.mu-check {
   display: flex;
   align-items: center;
   gap: 6px;

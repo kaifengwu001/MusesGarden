@@ -175,3 +175,25 @@ test('a visit is no visit without its ticket: the page is the world as ever', as
   await expect(page.locator('.visit')).toHaveCount(0);
   await expect(page.locator('.controlbar')).toBeVisible();
 });
+
+test('the dev tools’ Demo section sends tickets and sets friends through the dev routes', async ({ page }) => {
+  await page.goto('/?dev&garden=/api/muses/hero');
+  const demo = page.locator('.mu-dev-section', { has: page.locator('summary', { hasText: 'Demo' }) });
+  const juniper = demo.locator('button[data-host="juniper"]');
+  await expect(juniper).toBeEnabled({ timeout: 90_000 });
+  await expect(demo).toContainText('Wren · Lantern Reed Gardens');
+  const sent = (host: string) => page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/dev/invite') && (r.postDataJSON() as { host?: string } | null)?.host === host);
+  const fromJuniper = sent('juniper');
+  await juniper.click();
+  expect((await fromJuniper).postDataJSON()).toEqual({ host: 'juniper', guest: 'hero' });
+  const fromFriends = sent('wren');
+  await demo.getByRole('button', { name: 'Tickets from all friends' }).click();
+  expect((await fromFriends).postDataJSON(), 'the sample Moss’s one friend').toEqual({ host: 'wren', guest: 'hero' });
+
+  await expect(demo.getByRole('checkbox', { name: /Wren/ })).toBeChecked();
+  await demo.getByRole('checkbox', { name: /Juniper/ }).check();
+  const friends = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/dev/friends'));
+  await demo.getByRole('button', { name: 'Apply' }).click();
+  expect((await friends).postDataJSON()).toEqual({ muse: 'hero', friends: ['wren', 'juniper'] });
+  await expect(page.locator('.mu-dev .mu-note')).toHaveText('Friends: Wren, Juniper.');
+});

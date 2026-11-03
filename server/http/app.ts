@@ -26,6 +26,7 @@ import {
   hiddenRef,
   hours,
   id,
+  ids,
   lastEventId,
   limit,
   reaction,
@@ -155,6 +156,11 @@ function routesFor({ queries, commands, now, media, subscribe }: Garden): readon
     advance: async ({ body }) => result(await commands.advance(hours(field(body, 'hours')))),
     setClock: async ({ body }) => result(await commands.setClock(clockMode(field(body, 'mode')))),
     clock: () => json(commands.clock()),
+    devInvite: async ({ body }) => result(await commands.devInvite(muse(id<MuseId>(field(body, 'host'), 'host')), muse(id<MuseId>(field(body, 'guest'), 'guest')))),
+    devFriends: async ({ body }) => {
+      const museId = muse(id<MuseId>(field(body, 'muse'), 'muse'));
+      return result(await commands.devFriends(museId, ids<MuseId>(field(body, 'friends'), 'friends').map(muse)));
+    },
     mind: ({ params }) => found(queries.mind(muse(params.id))),
     metrics: ({ params }) => json(queries.metrics(muse(params.id))),
     soulMd: ({ params }) => markdown(queries.soulMd(muse(params.id))),

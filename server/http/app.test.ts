@@ -124,6 +124,8 @@ describe('not found', () => {
     ['GET', '/api/dev/hero/journal.md?day=2026-01-01'],
     ['POST', '/api/muses/nobody/settings/basket-time', { hhmm: null }],
     ['POST', '/api/host/nobody/work', { state: 'started' }],
+    ['POST', '/api/dev/invite', { host: 'nobody', guest: 'hero' }],
+    ['POST', '/api/dev/friends', { muse: 'hero', friends: ['wren', 'nobody'] }],
     ['GET', '/api/nothing'],
     ['POST', '/api/muses/hero/now'],
     ['POST', '/api/invitations/inv-wren-hero-1/ignore?as=hero'],
@@ -166,6 +168,9 @@ describe('bad input', () => {
     ['a body that is not JSON', 'POST', '/api/dev/clock', '{mode:'],
     ['a body that is not an object', 'POST', '/api/dev/advance', [1]],
     ['a missing body', 'POST', '/api/host/hero/work'],
+    ['a ticket without a guest', 'POST', '/api/dev/invite', { host: 'wren' }],
+    ['friends that are not a list', 'POST', '/api/dev/friends', { muse: 'hero', friends: 'wren' }],
+    ['a friend that is not an id', 'POST', '/api/dev/friends', { muse: 'hero', friends: ['wren', 7] }],
   ])('rejects %s with 400', async (_what, method, path, body) => {
     const res = await call(method, path, body);
     expect(res.status).toBe(400);
@@ -207,6 +212,9 @@ describe('commands', () => {
     ['/api/dev/advance', { hours: 1440 }, { name: 'advance', args: [1440] }],
     ['/api/dev/clock', { mode: 'live' }, { name: 'setClock', args: ['live'] }],
     ['/api/dev/clock', { mode: 'fast-forward' }, { name: 'setClock', args: ['fast-forward'] }],
+    ['/api/dev/invite', { host: 'wren', guest: 'hero' }, { name: 'devInvite', args: ['wren', 'hero'] }],
+    ['/api/dev/friends', { muse: 'hero', friends: ['wren', 'juniper'] }, { name: 'devFriends', args: ['hero', ['wren', 'juniper']] }],
+    ['/api/dev/friends', { muse: 'hero', friends: [] }, { name: 'devFriends', args: ['hero', []] }],
   ])('POST %s calls the command with parsed args', async (path, body, expected) => {
     const res = await call('POST', path, body);
     expect(res.status).toBe(200);

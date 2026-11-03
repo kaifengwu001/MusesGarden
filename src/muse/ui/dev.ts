@@ -1,4 +1,5 @@
-import type { CommandResult, MetricsRow, MindView, RelationshipOrigin, SharingView } from '../contract';
+import type { CommandResult, GardenQueries, MetricsRow, MindView, MuseId, RelationshipOrigin, SharingView } from '../contract';
+import { PLANETS } from '../planets';
 import type { ClockMode, MuseApi } from './api';
 import { button, day, el, time } from './dom';
 
@@ -30,9 +31,15 @@ function section(title: string, open: boolean, ...children: HTMLElement[]): HTML
   return d;
 }
 
+/** A Muse as /api/muses lists it: its name, and the planet it lives on. */
+type Listed = ReturnType<GardenQueries['muses']>[number];
+
+const planetOf = (p: Listed): string => PLANETS[p.planet].title;
+const openForVisits = (p: Listed): boolean => PLANETS[p.planet].visitable;
+
 /**
  * Dev only: the sim clock, the host simulator (the Muse app's side), the owner's share code, introductions and basket
- * time, and the Mind inspector.
+ * time, the Demo controls (who Muse is friends with, tickets from any Muse), and the Mind inspector.
  */
 export class DevTools {
   readonly el = el('aside', 'mu-dev');
@@ -45,6 +52,12 @@ export class DevTools {
   private readonly fail = el('p', 'mu-fail');
   private readonly shareCode = el('code', 'mu-code');
   private readonly basket = { whenever: radio('Whenever it’s ready'), at: radio('At'), clock: el('input', 'mu-input mu-time') };
+  /** The Demo section: every other Muse, as a friend checklist and as a row to send a ticket from. */
+  private readonly demo = { friends: el('div', 'mu-dev-box mu-demo-friends'), tickets: el('div', 'mu-dev-box mu-demo-tickets') };
+  private others: readonly Listed[] = [];
+  private friends: ReadonlySet<MuseId> = new Set();
+  /** The friend checklist was changed and not applied yet: a refresh leaves it as it is. */
+  private edited = false;
 
   constructor(
     private readonly api: MuseApi,
@@ -60,6 +73,7 @@ export class DevTools {
       section('Clock', true, this.clockControls()),
       section('Host simulator', true, this.hostControls()),
       section('Friends and baskets', true, this.ownerControls()),
+      section('Demo', true, this.demoControls()),
       this.note,
       section('Mind', true, this.mind),
       section('Metrics', false, this.metrics),
@@ -78,7 +92,14 @@ export class DevTools {
 
   async refresh(): Promise<void> {
     try {
-      const [clock, mind, metrics, soul, sharing] = await Promise.all([this.api.clock(), this.api.mind(), this.api.metrics(), this.api.soulMd(), this.api.sharing()]);
+      const [clock, mind, metrics, soul, sharing, muses] = await Promise.all([
+        this.api.clock(),
+        this.api.mind(),
+        this.api.metrics(),
+        this.api.soulMd(),
+        this.api.sharing(),
+        this.api.muses(),
+      ]);
       this.fail.textContent = '';
       this.simTime.textContent = `${day(clock.now)}, ${time(clock.now)}`;
       for (const [mode, b] of this.modes) b.setAttribute('aria-pressed', String(mode === clock.mode));
@@ -86,6 +107,7 @@ export class DevTools {
       this.renderMetrics(metrics);
       this.soul.textContent = soul;
       this.renderSharing(sharing);
+      this.renderDemo(muses, mind);
     } catch (error) {
       this.fail.textContent = `Couldn’t reach the engine (${error instanceof Error ? error.message : 'unknown error'}).`;
     }
@@ -202,6 +224,63 @@ export class DevTools {
 
     box.append(code, introduce, basket);
     return box;
+  }
+
+  /** For recording demos: who Muse is friends with, set at once, and a ticket from any Muse now, into the post. */
+  private demoControls(): HTMLElement {
+    const box = el('div', 'mu-dev-box');
+    const apply = button('Apply', 'mu-btn mu-primary', () => {
+      const chosen = [...this.demo.friends.querySelectorAll<HTMLInputElement>('input:checked')].map((i) => i.value as MuseId);
+      const names = this.others.filter((p) => chosen.includes(p.museId)).map((p) => p.name);
+      this.edited = false;
+      void this.run(this.api.devFriends(chosen), `Friends: ${names.join(', ') || 'none'}.`);
+    });
+    const friendsHead = el('div', 'mu-actions');
+    friendsHead.append(el('span', 'mu-dev-line', 'Friends'), apply);
+    const ticketsHead = el('div', 'mu-actions');
+    ticketsHead.append(el('span', 'mu-dev-line', 'Tickets'), button('Tickets from all friends', 'mu-btn mu-primary', () => void this.ticketsFromFriends()));
+    box.append(friendsHead, this.demo.friends, ticketsHead, this.demo.tickets);
+    return box;
+  }
+
+  private async ticketsFromFriends(): Promise<void> {
+    const hosts = this.others.filter((p) => this.friends.has(p.museId) && openForVisits(p));
+    if (hosts.length === 0) {
+      this.note.textContent = 'No friend lives on a planet open for visits.';
+      return;
+    }
+    const sent = await Promise.all(hosts.map((p) => this.api.devInvite(p.museId)));
+    await this.run(Promise.resolve(sent.find((r) => !r.ok) ?? { ok: true }), `Tickets from ${hosts.map((p) => p.name).join(', ')}.`);
+  }
+
+  private renderDemo(muses: readonly Listed[], m: MindView): void {
+    this.others = muses.filter((p) => p.museId !== this.api.museId);
+    this.friends = new Set(m.relationships.filter((r) => r.status === 'friends').map((r) => r.other));
+    if (!this.edited) {
+      this.demo.friends.replaceChildren(
+        ...this.others.map((p) => {
+          const label = el('label', 'mu-check');
+          const box = el('input');
+          box.type = 'checkbox';
+          box.value = p.museId;
+          box.checked = this.friends.has(p.museId);
+          box.addEventListener('change', () => (this.edited = true));
+          label.append(box, ` ${p.name} · ${planetOf(p)}`);
+          return label;
+        }),
+      );
+    }
+    this.demo.tickets.replaceChildren(
+      ...this.others.map((p) => {
+        const row = el('div', 'mu-actions');
+        const open = openForVisits(p);
+        const send = button('Send ticket', 'mu-btn', () => void this.run(this.api.devInvite(p.museId), `${p.name} sent a ticket.`));
+        send.disabled = !open;
+        send.dataset.host = p.museId;
+        row.append(el('span', 'mu-dev-line', `${p.name} · ${planetOf(p)}${open ? '' : ' (not open for visits)'}`), send);
+        return row;
+      }),
+    );
   }
 
   private renderSharing(s: SharingView): void {
