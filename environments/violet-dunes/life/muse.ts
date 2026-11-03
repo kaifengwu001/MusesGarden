@@ -490,6 +490,11 @@ export class Muse {
     return { action: this.action };
   }
 
+  /** Its pose (a photo holds a look on it: src/visit/studio.ts). */
+  get pose(): MuseRig {
+    return this.rig;
+  }
+
   /** Where Muse stands now (cottage-local m) and its heading (rad): for the camera's named view. */
   get spot(): { x: number; z: number; heading: number } {
     return { x: this.at[0], z: this.at[1], heading: this.heading };

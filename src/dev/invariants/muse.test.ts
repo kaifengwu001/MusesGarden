@@ -87,4 +87,38 @@ describe('Muse', () => {
     for (let t = 0; t < 600; t += 0.01) if (blink(t) < 0.5) shut++;
     expect(shut / 60000).toBeLessThan(0.06);
   });
+
+  it('holds a look for a photo only while one is set: a face, a turn of the head, a posture over what it does', () => {
+    const plain = new MuseRig();
+    const held = new MuseRig();
+    const bounce = { ...still(4.2), moves: [{ kind: 'bounce' as const, time: 0.4, amount: 1 }] };
+    const same = (): void => {
+      for (let j = 0; j < JOINTS; j++) expect(Array.from(held.skin[j].elements)).toEqual(Array.from(plain.skin[j].elements));
+      expect([held.eyes, held.smile, held.squint, held.squeeze, held.blush]).toEqual([plain.eyes, plain.smile, plain.squint, plain.squeeze, plain.blush]);
+    };
+    plain.pose(bounce);
+    held.pose(bounce);
+    same();
+    // a face over the bounce's own (its happy squint), every part of it as held
+    held.held = { face: { eyes: 0.35, smile: 0.2, squint: 0, squeeze: 0, blush: 0 } };
+    held.pose(bounce);
+    expect([held.eyes, held.smile, held.squint, held.squeeze, held.blush]).toEqual([0.35, 0.2, 0, 0, 0]);
+    expect(plain.squint).toBeGreaterThan(0.5);
+    // the head turned as held, whatever the action's look
+    held.held = { look: { yaw: 0.8, pitch: 0.2 } };
+    held.pose(still(4.2));
+    plain.pose({ ...still(4.2), lookYaw: 0.8, lookPitch: 0.2, look: 1 });
+    same();
+    // sat down in the grass, as a sit among its own moves would have it
+    held.held = { moves: [{ kind: 'sit', time: 3, amount: 1, ease: 1 }] };
+    held.pose(still(4.2));
+    plain.pose({ ...still(4.2), moves: [{ kind: 'sit', time: 3, amount: 1, ease: 1 }] });
+    same();
+    expect(held.skin[JOINT.pelvis].elements[13]).toBeLessThan(-0.05);
+    // and let go, its own again
+    held.held = null;
+    held.pose(bounce);
+    plain.pose(bounce);
+    same();
+  });
 });

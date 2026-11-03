@@ -149,12 +149,23 @@ export interface MuseAction {
 }
 
 /** The face as the poses set it: the eyes' openness (0 shut … 1 open), the smile (0 … 1), the squint (+1 shut in happy arcs ∩, −1 in content ones ∪), the eyes squeezed shut (> <, 0 … 1), and the blush (0 … 1 more). The mouth only smiles. */
-interface Expression {
+export interface Expression {
   eyes?: number;
   smile?: number;
   squint?: number;
   squeeze?: number;
   blush?: number;
+}
+
+/**
+ * A look held over whatever Muse is doing, for a photo (src/visit/studio.ts): a face, set over the one its poses
+ * make; where its head turns (rad, + to its left, + up), in place of where its action turns it; and moves played over
+ * its action's own. Each part only where given.
+ */
+export interface HeldLook {
+  face?: Expression;
+  look?: { yaw: number; pitch: number };
+  moves?: readonly Move[];
 }
 
 const TAU = Math.PI * 2;
@@ -367,6 +378,8 @@ export class MuseRig {
   hungRight = 1;
   /** How far it is lying on its back (0 up … 1 flat): only then does it press the grass down round it. */
   lying = 0;
+  /** A look held over every pose (a photo's: HeldLook), or null: the poses' own. */
+  held: HeldLook | null = null;
   /** Where the hands are wanted this pose. */
   private readonly reaches: Reach[] = [];
   /** Each mitten's middle in its forearm's own frame. */
@@ -491,6 +504,15 @@ export class MuseRig {
     if (e.blush !== undefined) this.blush += (e.blush - this.blush) * k;
   }
 
+  /** Set the face to an expression, as far as it goes. */
+  private hold(e: Expression): void {
+    this.eyes = e.eyes ?? this.eyes;
+    this.smile = e.smile ?? this.smile;
+    this.squint = e.squint ?? this.squint;
+    this.squeeze = e.squeeze ?? this.squeeze;
+    this.blush = e.blush ?? this.blush;
+  }
+
   /** Want a mitten at a point (H, rest), carried as a joint is posed (−1: Muse's own frame): reachArms turns the arm to it. */
   private reachFor(side: number, x: number, y: number, z: number, joint: number, amount: number): void {
     if (amount > 0) this.reaches.push({ side, x, y, z, joint, amount });
@@ -517,7 +539,11 @@ export class MuseRig {
     if (a.walk > 0) this.walkPose(a.gait, a.walk, a.stride);
     if (waving) this.wavePose(a.wave);
     for (const move of a.moves ?? []) if (move.amount > 0) this.move(move);
-    if (a.look > 0) this.lookPose(a.lookYaw * a.look, a.lookPitch * a.look);
+    const held = this.held;
+    if (held?.moves) for (const move of held.moves) if (move.amount > 0) this.move(move);
+    if (held?.look) this.lookPose(held.look.yaw, held.look.pitch);
+    else if (a.look > 0) this.lookPose(a.lookYaw * a.look, a.lookPitch * a.look);
+    if (held?.face) this.hold(held.face);
     this.reachArms();
     this.shoulders();
     this.compute();
