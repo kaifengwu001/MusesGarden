@@ -70,8 +70,7 @@ float reliefAt(vec3 dir, float wet) {
     if (amp >= 1e-4) h += amp * stretched(dir, f, uFieldSeed + uint(k));
     f *= 2.0;
   }
-  float ridge=smoothstep(0.05,0.39,gnoise(dir*2.2,uFieldSeed+730u));
-  return h+14.0*ridge*ridge;
+  return h;
 }
 
 float wetNoise(vec3 dir) {

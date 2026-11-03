@@ -8,6 +8,8 @@ import wind from '../../../src/life/wind.glsl?raw';
 import cubesphere from '../../../src/planet/cubesphere.glsl?raw';
 import fields from '../planet/fields.glsl?raw';
 import meadow from '../planet/meadow.glsl?raw';
+import parcels from '../planet/parcels.glsl?raw';
+import crop from '../life/crop.glsl?raw';
 import noise from '../../../src/planet/noise.glsl?raw';
 import rest from '../../../src/planet/rest.glsl?raw';
 import terrain from '../planet/terrain.glsl?raw';
@@ -39,6 +41,8 @@ const chunks: Record<string, string> = {
   meadow_wind: wind,
   meadow_find: find,
   meadow_muse_press: musePress,
+  rye_parcels: parcels,
+  rye_crop: crop,
 };
 
 export function registerShaderChunks(): void {

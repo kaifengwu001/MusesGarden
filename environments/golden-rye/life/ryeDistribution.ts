@@ -2,13 +2,11 @@ import { Vector3 } from 'three';
 import { hash32,unit } from '../../../src/core/hash';
 
 export interface RyeSite { direction:Vector3; size:number; turn:number; phase:number; tone:number; }
-export const RYE_FAR_GRID=128;
-export const RYE_NEAR_GRID=560;
-export const RYE_NEAR_LIMIT=12000;
-export const RYE_SITE_LIMIT=6*RYE_FAR_GRID*RYE_FAR_GRID;
+export const RYE_NEAR_GRID=780;
+export const RYE_NEAR_LIMIT=17000;
 
-/** Only the actual cottage building is excluded. Harvest lanes and the old
- * round foreground clearing are now standing crop like the rest of the world. */
+/** The cottage's own footprint never takes an ear. Bunds, roads and yards are
+ * kept clear by the baked fields in the shader (crop.glsl), not here. */
 export function ryeLaneClear(x:number,z:number):boolean {
   return !(Math.abs(x)<4.95&&Math.abs(z)<3.28);
 }
@@ -27,13 +25,6 @@ function cell(seed:number,face:number,i:number,j:number,grid:number):RyeSite {
   const u=((i+.5+(r(11)-.5)*.62)/grid)*2-1;
   const v=((j+.5+(r(29)-.5)*.62)/grid)*2-1;
   return {direction:ryeCellDirection(face,u,v),size:.85+r(73)*.42,turn:r(137)*Math.PI*2,phase:r(283)*Math.PI*2,tone:r(431)};
-}
-
-/** One distant three-ear tuft in every face cell, with no biome/height mask. */
-export function createRyeSites(seed:number):RyeSite[] {
-  const sites:RyeSite[]=[];
-  for(let face=0;face<6;face++)for(let i=0;i<RYE_FAR_GRID;i++)for(let j=0;j<RYE_FAR_GRID;j++)sites.push(cell(seed,face,i,j,RYE_FAR_GRID));
-  return sites;
 }
 
 /** Stable fine cells surrounding any walking focus. Tile rejection avoids

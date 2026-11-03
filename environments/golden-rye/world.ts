@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type Texture, type WebGLRenderer } from 'three';
 import { BuildQueue } from '../../src/core/buildQueue';
 import type { FrameClock } from '../../src/core/clock';
 import type { Globals } from '../../src/core/globals';
@@ -11,13 +11,14 @@ import { Clouds, createCloudUniforms } from './life/clouds';
 import { Flowers } from './life/flowers';
 import { Grass } from './life/grass';
 import { RyeFields } from './life/rye';
+import { CANOPY_SHELLS } from './life/ryeCanopy';
 import { HarvestScenery } from './life/harvestScenery';
 import { Petals } from '../../src/life/petals';
 import { Muse, MUSE_HEIGHT, PRESSES } from './life/muse';
 import { Homestead } from './life/props';
 import { pickSurface, type Pick } from './view/picking';
 import type { ParamPath, ParamStore } from './params';
-import { TerrainBake } from './planet/bake';
+import { TerrainBake, type Clearing } from './planet/bake';
 import { LOD_DEFAULT, type LodConfig } from '../../src/planet/chunks';
 import type { FieldParams } from './planet/fields';
 import { tangentToward, travel } from '../../src/planet/geo';
@@ -61,6 +62,8 @@ export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse';
  * distance (m) from the point it looks at (cottage-local x, y, z, m), its
  * bearing from the front toward the right end (rad).
  */
+/** Radius of the cottage's grass yard, clear of crop (m): out to the road verges (bake.ts PARCELS.home). */
+const COTTAGE_YARD = 11.5;
 const HOMESTEAD_VIEW = { height: 11, distance: 26, azimuth: 0.92, at: [-1.8, 2.6, 1.4] } as const;
 /** Muse's view: the camera's height over the ground Muse stands on (m), its distance (m), its bearing round from in front of Muse (rad, + to its left; at home, from straight out in front of the terrace), and the height it looks at (× Muse's). */
 const MUSE_VIEW = { height: 1.23 * MUSE_HEIGHT, distance: 4 * MUSE_HEIGHT, azimuth: 0.3, at: 0.55 } as const;
@@ -108,6 +111,8 @@ export class World {
   readonly warp = { focus: new Vector3(), up: new Vector3(0, 1, 0), k: 0 };
   readonly sunDir = new Vector3(0, 1, 0);
   lod: LodConfig = LOD_DEFAULT;
+  /** The baked fields (planet/parcels.glsl), read by the ground, the canopy and the ears. */
+  private readonly parcelBake: { value: Texture | null } = { value: null };
 
   /** The meadow-field parameters, and a key naming them (rebuilt only when they change). */
   private fieldParams!: FieldParams;
@@ -156,8 +161,10 @@ export class World {
     this.look.uPalette.value = this.palette.texture;
     this.terrainUniforms.uTerrainBake.value = this.bake.terrainTexture(false);
     this.terrainUniforms.uFloraBake.value = this.bake.floraTexture(false);
+    this.parcelBake.value = this.bake.parcelTexture(false);
     this.shared = {
       ...globals,
+      uParcelBake: this.parcelBake,
       ...this.look,
       ...this.terrainUniforms,
       ...this.cloudUniforms,
@@ -175,7 +182,7 @@ export class World {
     Object.assign(this.shared, this.field.uniforms);
     this.surface = new Surface(this.shared, tier.terrainGrid);
     this.grass = new Grass(this.shared, 8);
-    this.rye = new RyeFields(this.shared,this.terrain);
+    this.rye = new RyeFields(this.shared,this.terrain,CANOPY_SHELLS[tier.name]);
     this.harvest = new HarvestScenery(this.shared,this.terrain);
     this.flowers = new Flowers(this.shared, 8);
     this.homestead = new Homestead(this.shared, store.values.world.seed);
@@ -195,6 +202,7 @@ export class World {
 
   applyTier(tier: Tier): void {
     this.tier = tier;
+    this.rye?.setShells(CANOPY_SHELLS[tier.name]);
     this.lod = { ...LOD_DEFAULT, grid: tier.terrainGrid };
   }
 
@@ -282,8 +290,9 @@ export class World {
     if(name==='globe'){
       this.rig.lookAlong(L.cottage,L.homeBearing);this.rig.lookUp(0);this.rig.setZoom(0,true);
     }else{
-      const focus=name==='detail'?local(-19,24):local(-12,34);
-      const target=name==='detail'?local(-18,17):local(-3,-1);
+      // detail: in the crop by the crossroads, over the drive to the cottage
+      const focus=name==='detail'?local(22,20):local(-12,34);
+      const target=name==='detail'?local(4,6):local(-3,-1);
       const distance=Math.acos(Math.min(1,focus.dot(target)))*R;
       const above=name==='detail'?2.6:8;
       const curve=distance*distance/(2*R);
@@ -320,9 +329,13 @@ export class World {
     this.fieldsFull = full;
     this.terrain.update(R, this.fieldParams, this.bake.texelMeters(R, full));
     this.terrain.writeUniforms(this.terrainUniforms);
+    // The fields: the strips run along the cottage's front, the roads pass just outside its yard.
+    const clearings: Clearing[] = [{ direction: L.cottage, radius: COTTAGE_YARD }, ...(this.harvest?.clearings(this.terrain) ?? [])];
+    this.bake.setParcels(R, L.cottage, L.homeBearing, clearings);
     this.bake.bake(this.renderer, this.terrain.fields, `${L.seed}/${R}/${this.fieldKey}`, full);
     this.terrainUniforms.uTerrainBake.value = this.bake.terrainTexture(full);
     this.terrainUniforms.uFloraBake.value = this.bake.floraTexture(full);
+    this.parcelBake.value = this.bake.parcelTexture(full);
     this.rye?.invalidate();this.harvest?.invalidate();
   }
 

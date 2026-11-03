@@ -47,6 +47,8 @@ export const NOISE_STD = 0.27;
 export const WET_HUMMOCKS = 1.4;
 /** Wetland ground flattens toward this height above (and depth below) the water (m), keeping this much of its slope. */
 export const WET_PLATEAU = { height: 0.55, keep: 0.12 } as const;
+/** Height of a flat plain above the base sphere (m): the cottage's level (terrain.ts HOME_LEVEL), and the meadow's, so the clouds' altitude means the same here as there. */
+export const PLAIN_LEVEL = 1;
 /** Grain compression at grain = 1 (hills and islands run ≈ 3× longer than wide). */
 const GRAIN_MAX = 0.7;
 /** Pattern sizes (m). */
@@ -314,7 +316,10 @@ export class Fields {
     // |gnoise| <= 1. Lift by the full non-negative amplitude sum, not a
     // statistical estimate, so even an extreme seed stays above the base sphere.
     const bound = this.relief.reduce((sum,a)=>sum+a,0) + this.hummock.reduce((sum,a)=>sum+a,0);
-    this.lift = bound + 2;
+    // A flat plain lies at the cottage's own level (terrain.ts HOME_LEVEL), so
+    // the homestead's clearing is not a mound standing out of the fields.
+    // (with relief, the lowest ground still stands PLAIN_LEVEL over the base sphere)
+    this.lift = PLAIN_LEVEL + bound;
     this.drop = 0;
     this.level = Math.min(p.waterLevel,0);
     octavePair(radius, PATTERN.lush, this.lushPair);
@@ -368,10 +373,9 @@ export class Fields {
       if (amp < 1e-4) continue;
       h += amp * this.stretched(dir, RELIEF_BASE_FREQ * 2 ** k, this.seed + SEED.relief + k);
     }
-    // A small number of long blue hill provinces rise above the crop plain.
-    // Positive relief needs no extra dry lift; GPU reliefAt mirrors this exactly.
-    const ridge=smoothstep(0.05,0.39,gnoise(dir.x*2.2,dir.y*2.2,dir.z*2.2,(this.seed+730)>>>0));
-    return h+14*ridge*ridge;
+    // The harvest plain is flat (Kai's references: level fields of crop to the
+    // horizon); the rolling-hill slider can still raise relief. GPU reliefAt mirrors this.
+    return h;
   }
 
   /** The raw macro wetness noise (direction space, twirled and domain warped). */

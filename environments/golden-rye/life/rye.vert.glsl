@@ -2,6 +2,7 @@
 #include <meadow_warp>
 #include <meadow_toon>
 #include <meadow_fog>
+#include <rye_crop>
 uniform float uRadius;
 uniform float uRyeTime;
 uniform float uRyeRipeness;
@@ -25,8 +26,13 @@ void main(){
   float focusDistance=acos(clamp(dot(U,normalize(uRyeDetail.xyz)),-1.0,1.0))*uRadius;
   float detailed=(1.0-smoothstep(uRyeDetailRange.x,uRyeDetailRange.y,focusDistance))*uRyeDetail.w;
   float presence=aRyePlant.w<0.0?1.0-detailed:detailed;
-  if(presence<.001){gl_Position=vec4(0.0,0.0,-2.0,1.0);vColour=vec3(0.0);return;}
-  vec3 p=position*aRyePlant.x;
+  // Ears stand only in standing crop, as tall as their field's (crop.glsl):
+  // none on the bunds, the road, the yards or reaped stubble.
+  vec4 parcel=parcelAt(U);
+  float cropH=cropHeight(parcel);
+  if(presence<.001||cropH<.4){gl_Position=vec4(0.0,0.0,-2.0,1.0);vColour=vec3(0.0);return;}
+  // the ear's crest just over the canopy's tallest stalks (stalk tip at 1.37 m in the template)
+  vec3 p=position*aRyePlant.x*(cropH*1.06/1.37);
   p.xz*=abs(aRyePlant.w);
   // Keep full standing height and fixed stalk feet across the LOD blend.
   // Narrow each silhouette around its own root; shrinking both layers in Y
@@ -50,38 +56,34 @@ void main(){
   localNormal.xz-=localNormal.y*aRyeSlope;
   localNormal=normalize(localNormal);
   vec3 n=normalize(X*localNormal.x+U*localNormal.y+Z*localNormal.z);
-  // The two thin kernel faces must keep a genuine shaded side. A large
-  // up-facing ambient floor previously made every grain equally luminous.
+  // Light the ears as part of the crop's mass: their normals lean toward the
+  // field's up, and the deep stems sit in the crop's own shadow.
+  n=normalize(mix(dot(n,cameraPosition-world)<0.0?-n:n,U,0.45));
   float direct=max(0.0,dot(n,uSunDir));
-  float light=clamp(.15+.68*direct+.10*max(0.0,dot(U,uSunDir)),.12,.91);
+  float light=clamp(.12+.78*direct,.1,.95)*mix(.55,1.0,smoothstep(.15,.85,h));
   float tone=aRyePlant.z;
-  vec3 gold=mix(linearRye(vec3(.72,.43,.105)),linearRye(vec3(.91,.66,.23)),tone);
-  vec3 cream=linearRye(vec3(.96,.87,.58));
-  vec3 olive=linearRye(vec3(.31,.31,.105));
-  vec3 lit=mix(gold,cream,.10+.18*h);
-  vec3 mid=mix(olive,gold,.38+.44*h);
-  vec3 shade=mix(olive,linearRye(vec3(.52,.35,.12)),h*.56);
+  vec3 top=cropTop(parcel.y,parcel.w);
+  vec3 deep=cropDeep(top);
+  vec3 cream=linearRye(vec3(1.0,.94,.70));
+  vec3 lit=mix(top,cream,.06+.12*h);
+  vec3 mid=mix(deep,top,.35+.5*h);
+  vec3 shade=mix(deep,top*.6,h*.5);
   if(aPart>.5&&aPart<1.5){
-    lit=mix(gold,cream,.34);
-    mid=mix(linearRye(vec3(.63,.40,.13)),gold,.47);
-    shade=linearRye(vec3(.38,.30,.105));
+    // kernels: the ear itself, its field's yellow, a few paler
+    lit=mix(top,cream,.22+.3*step(.7,tone));
+    mid=mix(deep,top,.72);
+    shade=mix(deep,top,.3);
   }
   if(aPart>1.5&&aPart<2.5){
-    // Fine awns are straw marks, not a white luminous wireframe over the crop.
-    lit=mix(gold,cream,.48);mid=linearRye(vec3(.65,.52,.26));
-    shade=linearRye(vec3(.39,.36,.16));light=max(light,.36);
+    lit=mix(top,cream,.45);mid=mix(deep,top,.6);
+    shade=mix(deep,top,.25);light=max(light,.36);
   }
-  if(aPart>2.5){lit=mix(gold,cream,.08);mid=mix(olive,gold,.42);}
-  // Only selected sunward grains catch a pale stroke. The broad, coherent
-  // troughs remain ochre/olive, so the field has directional paint masses.
-  float sheen=step(.83,tone)*smoothstep(.45,.95,stream)*.14*h;
-  vec3 col=mix(tone3(lit,mid,shade,light),cream,sheen);
-  float trough=smoothstep(.1,.9,-stream);
-  col*=mix(vec3(.96),vec3(.75,.79,.63),trough*(.28+.24*(1.0-h)));
-  col*=.91+.08*sin(aRyePlant.y*3.0+h*8.0);
+  if(aPart>2.5){lit=mix(top,cream,.04);mid=mix(deep,top,.45);}
+  vec3 col=tone3(lit,mid,shade,light);
+  col*=.92+.08*sin(aRyePlant.y*3.0+h*8.0);
   float ripeness=uRyeRipeness;
   for(int i=0;i<8;i++){vec4 disc=uUserBloom[i];if(disc.w>0.0)ripeness=max(ripeness,1.0-smoothstep(disc.w*.7,disc.w,2.0*asin(clamp(length(U-disc.xyz)*0.5,0.0,1.0))));}
-  col=mix(mix(linearRye(vec3(.28,.34,.10)),linearRye(vec3(.66,.67,.27)),h*.65),col,smoothstep(0.0,1.0,ripeness));
+  col=mix(cropUnripe(h*.65),col,smoothstep(0.0,1.0,ripeness));
   vColour=applyAerial(col,length(cameraPosition-world),up);
   gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0);
 }

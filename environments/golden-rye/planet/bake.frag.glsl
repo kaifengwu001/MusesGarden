@@ -3,8 +3,12 @@
 // what was written for dir.
 //   pass 0 (terrain): natural height (m), lushness, wetness, colour variant
 //   pass 1 (flora):   flowers per m² for pink, star, yellow, blue
+//   pass 2 (fields):  crop depth (m), field tone, road (m), cut (parcels.glsl)
+//   pass 3 (areas):   how much of a disk each field covers, at half that size
+//   pass 4 (fields):  the fields again, tiny pieces of crop turned to grass
 #include <meadow_noise>
 #include <meadow_fields>
+#include <rye_parcels>
 uniform int uFace;
 uniform float uSize;
 uniform int uPass;
@@ -29,7 +33,13 @@ void main() {
     // wetlands flatten toward a plateau just above the water (plateau() in fields.ts)
     h += (WET_PLATEAU * tanh(h / WET_PLATEAU) + WET_PLATEAU_KEEP * h - h) * wet;
     gl_FragColor = vec4(h, lushAt(t), wet, variantAt(t));
-  } else {
+  } else if (uPass == 1) {
     gl_FragColor = floraAt(t, textureLod(uBakedTerrain, dir, 0.0).b);
+  } else if (uPass == 2) {
+    gl_FragColor = parcelBake(dir);
+  } else if (uPass == 3) {
+    gl_FragColor = parcelAreaBake(dir);
+  } else {
+    gl_FragColor = parcelFinalBake(dir);
   }
 }

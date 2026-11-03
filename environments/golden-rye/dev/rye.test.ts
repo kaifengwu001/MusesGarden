@@ -1,8 +1,9 @@
 import { describe,expect,it } from 'vitest';
 import { Vector3,Vector4 } from 'three';
-import { createRyeSites,createNearRyeSites,ryeLaneClear,ryeCellDirection,RYE_SITE_LIMIT,RYE_NEAR_LIMIT,RYE_FAR_GRID } from '../life/ryeDistribution';
-import { ryeStalkGeometry,ryeDistantGeometry } from '../life/ryeGeometry';
+import { createNearRyeSites,ryeLaneClear,RYE_NEAR_LIMIT } from '../life/ryeDistribution';
+import { ryeStalkGeometry } from '../life/ryeGeometry';
 import { RyeFields } from '../life/rye';
+import { canopySphere,canopyEdgeAngle,canopyLift,CANOPY_GRID,CANOPY_SHELLS,CANOPY_TOP } from '../life/ryeCanopy';
 import { Terrain,generateLayout,createGroundSample } from '../planet/terrain';
 import { gpuMemory } from '../../../src/core/gpuMemory';
 import type { FieldParams } from '../planet/fields';
@@ -20,30 +21,46 @@ describe('Golden Rye crop anatomy and placement',()=>{
       expect(Math.hypot(n.getX(i),n.getY(i),n.getZ(i))).toBeCloseTo(1,5);if(part.getX(i)===2)maxAwn=Math.max(maxAwn,p.getX(i));minRoot=Math.min(minRoot,p.getY(i));
     }
     expect(maxAwn).toBeGreaterThan(.6);expect(minRoot).toBe(0);
-    const distant=ryeDistantGeometry();expect(distant.index!.count/3).toBe(18);
-    expect(geometry.index!.count/3*RYE_NEAR_LIMIT+distant.index!.count/3*RYE_SITE_LIMIT).toBeLessThan(2_500_000);
-    geometry.dispose();distant.dispose();
+    const canopy=canopySphere(CANOPY_GRID);
+    expect(geometry.index!.count/3*RYE_NEAR_LIMIT+canopy.index!.count/3*CANOPY_SHELLS.high).toBeLessThan(2_500_000);
+    geometry.dispose();canopy.dispose();
   });
 
-  it('covers all six faces without biome gaps or harvesting-lane exclusions',()=>{
-    const a=createRyeSites(412),b=createRyeSites(412);
-    expect(a).toEqual(b);expect(a.length).toBe(RYE_SITE_LIMIT);
-    expect(createRyeSites(771)[1000]).not.toEqual(a[1000]);
-    expect(ryeLaneClear(0,0)).toBe(false);expect(ryeLaneClear(0,8)).toBe(true);expect(ryeLaneClear(0,17.5)).toBe(true);expect(ryeLaneClear(22,30)).toBe(true);
-    const perFace=RYE_FAR_GRID*RYE_FAR_GRID;
-    for(let face=0;face<6;face++){
-      const axis=ryeCellDirection(face,0,0);
-      const facePoints=a.slice(face*perFace,(face+1)*perFace);
-      expect(facePoints).toHaveLength(perFace);
-      for(let i=0;i<facePoints.length;i+=13){expect(facePoints[i].direction.length()).toBeCloseTo(1,8);expect(facePoints[i].direction.dot(axis)).toBeGreaterThan(.57);}
+  it('lays the canopy shells over the whole sphere, outward, top shell first',()=>{
+    const sphere=canopySphere(CANOPY_GRID),p=sphere.getAttribute('position'),index=sphere.index!;
+    expect(p.count).toBe(6*(CANOPY_GRID+1)**2);expect(index.count/3).toBe(6*CANOPY_GRID*CANOPY_GRID*2);
+    const a=new Vector3(),b=new Vector3(),c=new Vector3(),n=new Vector3();
+    let inward=0,longest=0;
+    for(let t=0;t<index.count;t+=3){
+      a.fromBufferAttribute(p,index.getX(t));b.fromBufferAttribute(p,index.getX(t+1));c.fromBufferAttribute(p,index.getX(t+2));
+      n.subVectors(b,a).cross(c.clone().sub(a));
+      if(n.dot(a)<=0)inward++;
+      longest=Math.max(longest,a.distanceTo(b),b.distanceTo(c),c.distanceTo(a));
     }
-    // Independent spherical probes bound empty holes, including face seams.
+    expect(inward).toBe(0);
+    // each shell lifts by the most its chords can sag below the ground, at any size and warp
+    const edge=canopyEdgeAngle(sphere);expect(edge).toBeCloseTo(2*Math.asin(longest/2),5);
+    for(const R of [40,128,400])for(const k of [0,1/(2*60),1/(2*20)]){
+      const curvature=1/R+2*k,sag=(1-Math.cos(edge*R*curvature/2))/curvature;
+      expect(canopyLift(edge,R,k)).toBeGreaterThan(sag);expect(canopyLift(edge,R,k)).toBeLessThan(sag+.03);
+    }
+    // independent probes find a vertex near every direction, faces and seams alike
     let worst=0;
-    for(let i=0;i<48;i++){
-      const y=1-2*(i+.5)/48,t=i*2.3999632297,r=Math.sqrt(1-y*y),probe=new Vector3(r*Math.cos(t),y,r*Math.sin(t));
-      let dot=-1;for(const site of a)dot=Math.max(dot,probe.dot(site.direction));worst=Math.max(worst,Math.acos(dot));
+    for(let i=0;i<64;i++){
+      const y=1-2*(i+.5)/64,t=i*2.3999632297,r=Math.sqrt(1-y*y),probe=new Vector3(r*Math.cos(t),y,r*Math.sin(t));
+      let best=-1;for(let k=0;k<p.count;k++)best=Math.max(best,probe.x*p.getX(k)+probe.y*p.getY(k)+probe.z*p.getZ(k));
+      worst=Math.max(worst,Math.acos(Math.min(1,best)));
     }
-    expect(worst).toBeLessThan(.025);
+    expect(worst).toBeLessThan(.02);
+    sphere.dispose();
+    const terrain=new Terrain(generateLayout(412));terrain.update(128,PARAMS,.5);
+    const rye=new RyeFields({},terrain,CANOPY_SHELLS.medium),shells=rye.canopy.mesh.geometry.getAttribute('aShell');
+    expect(rye.canopy.shellCount).toBe(CANOPY_SHELLS.medium);
+    for(let i=1;i<rye.canopy.shellCount;i++)expect(shells.getX(i)).toBeLessThan(shells.getX(i-1));
+    expect(shells.getX(0)*CANOPY_TOP).toBeGreaterThan(1.15);expect(shells.getX(rye.canopy.shellCount-1)*CANOPY_TOP).toBeLessThan(.06);
+    rye.setShells(CANOPY_SHELLS.low);expect(rye.canopy.shellCount).toBe(CANOPY_SHELLS.low);
+    rye.dispose();
+    expect(ryeLaneClear(0,0)).toBe(false);expect(ryeLaneClear(0,8)).toBe(true);
   });
 
   it('provides dense detailed crop at remote and polar walking focuses through growth',()=>{
@@ -62,13 +79,11 @@ describe('Golden Rye crop anatomy and placement',()=>{
     const terrain=new Terrain(generateLayout(412));terrain.update(128,PARAMS,.5);
     const shared={uWarpUp:{value:terrain.layout.cottage.clone()},uFog:{value:new Vector4(0,0,8,0)}};
     const memoryBefore=gpuMemory.total(),rye=new RyeFields(shared,terrain);rye.update(12,terrain);
-    expect(rye.instanceCount).toBeGreaterThan(100000);expect(rye.mesh.geometry.instanceCount).toBeGreaterThan(6500);expect(rye.triangles).toBeLessThan(2_500_000);
-    expect(gpuMemory.total()-memoryBefore).toBeGreaterThan(5_000_000);expect(gpuMemory.total()-memoryBefore).toBeLessThan(8_000_000);
+    expect(rye.instanceCount).toBe(rye.mesh.geometry.instanceCount);expect(rye.mesh.geometry.instanceCount).toBeGreaterThan(9000);expect(rye.triangles).toBeLessThan(2_500_000);
+    expect(gpuMemory.total()-memoryBefore).toBeGreaterThan(1_000_000);expect(gpuMemory.total()-memoryBefore).toBeLessThan(4_000_000);
     const direction=new Vector3(),ground=createGroundSample();
-    for(const mesh of [rye.mesh,rye.farMesh]){
-      const anchor=mesh.geometry.getAttribute('aRyeAnchor');
-      for(let i=0;i<mesh.geometry.instanceCount;i+=389){direction.set(anchor.getX(i),anchor.getY(i),anchor.getZ(i)).normalize();terrain.sample(direction,ground);expect(anchor.getW(i)).toBeCloseTo(ground.height-.015,4);}
-    }
+    const anchors=rye.mesh.geometry.getAttribute('aRyeAnchor');
+    for(let i=0;i<rye.mesh.geometry.instanceCount;i+=389){direction.set(anchors.getX(i),anchors.getY(i),anchors.getZ(i)).normalize();terrain.sample(direction,ground);expect(anchors.getW(i)).toBeCloseTo(ground.height-.015,4);}
     const anchor=rye.mesh.geometry.getAttribute('aRyeAnchor'),initialCount=rye.mesh.geometry.instanceCount,initial=Array.from(anchor.array).slice(0,initialCount*4);
     shared.uWarpUp.value.applyAxisAngle(terrain.layout.homeBearing,.18).normalize();rye.update(12,terrain);
     expect(Array.from(anchor.array).slice(0,rye.mesh.geometry.instanceCount*4)).not.toEqual(initial);

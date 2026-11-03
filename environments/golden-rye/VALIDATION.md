@@ -59,3 +59,27 @@ Source `32233b8` was combined with main `708e21c` in an isolated checkout. Local
 - Actual source/integration field and globe views were compared in the same in-app browser at its native 1665×1191 viewport, high quality and frozen time12. Terrain, rye, trees, clouds and cottage appearance were preserved. The basket panel opened and closed correctly. No console errors were collected. This is visual review, not a pixel-equality assertion, hardware benchmark or rerun of the historical automated browser suite. Wall-clock character activity can differ between page loads.
 
 Evidence: [integrated field](reference/mainline-field.jpg), [integrated globe](reference/mainline-globe.jpg), [basket panel](reference/mainline-baskets.jpg). Existing followup screenshots were renamed from `.png` to `.jpg` to match their actual JPEG encoding; original paintings and first-delivery PNGs are unchanged.
+
+## Flat fields and volumetric crop — 2 November 2026
+
+Branch `rye-fix` from `2b77e0a`, uncommitted. Mac (Apple GPU, ANGLE Metal), headless Chromium, 1440×900, high quality, frozen time 12. Shared `src/`, `server/` and package files unchanged.
+
+- `npm run check:rye` (TypeScript, ESLint) and `npm run build:rye` pass; the existing chunk-size advisory remains.
+- `npx vitest run environments/golden-rye`: 36 tests in five files pass. New or rewritten: the canopy sphere covers every direction, faces outward and lifts its shells above the most its chords sag at R 40/128/400 under the warp; shells are ordered top first and follow the tier; the default plain is flat at the cottage's level for seeds 1/412/771 at R 40/128/400; the detailed ears still ground at exact float32 roots and return after growth.
+- `MEADOW_PORT=5261 npx playwright test --project=golden-rye:invariants`: 10 pass (determinism ×3, CPU/GPU terrain, water and warp parity, picking, walking strips, MSAA colour range, first frame, draw calls, setHash), 1 fixme. 4 fail identically on the unchanged original commit served from a separate checkout: the growth-scrub frame budget (load average about 60 on this machine), two find-sphere tests and the URL hash round trip. `dev/rye.spec.ts` matches no Playwright project and was updated but not run.
+- Budgets at 1440×900 DPR 1: 240 MiB tracked GPU memory (was 231; the fields bake adds 15.7 MB, the far tufts' buffers are gone); 1.3–2.3 M submitted triangles by view (was 2.1–2.9 M); 27–32 draws. At DPR 2 the canopy cost about 25% more GPU time than the original before far-shell thinning and the drop from 20 to 16 shells; later comparisons were dominated by load from other work on the machine (the same view varied 2×), so no frame-time claim is made.
+- Visual review against references 05–07: [globe](reference/fields-globe.jpg), [above the cottage](reference/fields-above.jpg), [across the rye](reference/fields-across.jpg), [among the ears](reference/fields-among.jpg), and the earlier [field](reference/fields-before-across.jpg) and [globe](reference/fields-before-globe.jpg) for comparison.
+
+Known limits: shells seen almost edge-on still show faint horizontal rows on field sides within about 25 m; the reaped rings round sheaves are plain discs; the side road crosses some meandering strips at a slant. Kai's visual acceptance is pending.
+
+### Road and edge-on follow-up
+
+Kai's review: the road ended abruptly at the cottage's yard, and fields seen from a distance showed "planes made of multiple rectangles". Both fixed at their cause (see [construction](CONSTRUCTION.md#flat-fields-and-volumetric-crop--2-november-2026)): roads now pass the cottage with a drive from the porch, and the canopy samples stalks along the eye's ray and draws the undersides that the horizon needs. Isolated by hiding the detailed ears: a far field that showed as separate lines now reads as one mass ([horizon edge](reference/fields-horizon-edge.jpg), DPR 2). Close views keep faint stripes on field sides within roughly 20 m.
+
+`check:rye`, 36 CPU tests and `build:rye` pass after the change; evidence images refreshed. GPU cost of the double-sided shells, A/B in one page at load average 40–80: about +10% on ground views before the steep-underside discard; at that load the numbers are indicative only.
+
+### Tiny pieces and lower clouds
+
+Kai's next review: remove awkward tiny patches below an area threshold, and lower the clouds to the default environment's height. Implemented as two bake passes ([construction](CONSTRUCTION.md#flat-fields-and-volumetric-crop--2-november-2026)) and the plain lowered to the meadow's 1 m with the meadow's 5 m cloud altitude. The crescent the drive cut off by the cottage is grass now; a whole-planet diff with the filter off and on shows only small or sliver pieces removed ([diff](reference/fields-tiny-pieces-removed.jpg)). A drive slab that also existed round the far pole was found and removed.
+
+`check:rye`, 36 CPU tests and `build:rye` pass; `golden-rye:invariants` 10 pass and the same 4 fail as on the original commit. Tracked GPU memory 243.3 MiB at DPR 1 (budget 256). Evidence images refreshed.
