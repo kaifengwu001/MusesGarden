@@ -70,14 +70,14 @@ function sampleGarden(): GardenSnapshot {
     ...samplePhotos.items.map((p) => ({
       id: p.id,
       day: day(p.at),
-      image: postcardImage(p.subject),
+      image: postcardImage(p.id, p.subject, p.context),
       place: p.planetOf === HERO ? 'Out exploring' : `On ${p.companionNames[0]}’s planet`,
       with: p.companions[0],
     })),
     {
       id: invitation.id,
       day: day(invitation.sentAt),
-      image: postcardImage('invitation'),
+      image: postcardImage(invitation.id, 'invitation'),
       place: `From ${host.name}’s planet`,
       with: host.museId,
       invitation: { from: host.museId, fromName: host.name, coat: coatOf(host.museId), world: host.museId, worldName: `${host.name}’s planet`, blurb: `Where ${host.name} keeps Lichen.`, used: false },

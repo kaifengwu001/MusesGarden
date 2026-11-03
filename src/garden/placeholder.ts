@@ -1,9 +1,16 @@
 import { Vector3 } from 'three';
 import closeUrl from '../assets/postcards/close.jpg';
-import cottageUrl from '../assets/postcards/cottage.jpg';
-import meadowUrl from '../assets/postcards/meadow.jpg';
 import pierUrl from '../assets/postcards/pier.jpg';
 import terraceUrl from '../assets/postcards/terrace.jpg';
+import beyond1Url from '../assets/postcards/beyond-1.jpg';
+import find2Url from '../assets/postcards/find-2.jpg';
+import friend2Url from '../assets/postcards/friend-2.jpg';
+import home2Url from '../assets/postcards/home-2.jpg';
+import home4Url from '../assets/postcards/home-4.jpg';
+import scenery1Url from '../assets/postcards/scenery-1.jpg';
+import scenery4Url from '../assets/postcards/scenery-4.jpg';
+import selfie5Url from '../assets/postcards/selfie-5.jpg';
+import sky4Url from '../assets/postcards/sky-4.jpg';
 import { tangentToward, travel } from '../planet/geo';
 import { art, MOTIF_ASPECT, type Motif } from './art';
 import type { GardenSource } from './source';
@@ -160,7 +167,7 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
   {
     id: 'pc-note-weather',
     ago: 11,
-    image: cottageUrl,
+    image: scenery4Url,
     place: 'Up on the hill',
     with: 'tofu',
     back: { kind: 'note', title: 'Weather report', lines: ['Sky: blue, a few sheep', 'Wind: a light push from behind', 'Mood: sunny, chance of nap'] },
@@ -173,29 +180,29 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
     with: 'pip',
     back: { kind: 'line', text: 'Pip knocked twice, then sat on my step until I came out. The best kind of visitor.' },
   },
-  { id: 'pc-poem-pond', ago: 8, image: pierUrl, place: 'By the pond', with: 'juniper', back: { kind: 'poem', lines: ['the pond holds the sky', 'a frog edits it, once', 'then lets it be'] } },
+  { id: 'pc-poem-pond', ago: 8, image: home4Url, place: 'By the pond', with: 'juniper', back: { kind: 'poem', lines: ['the pond holds the sky', 'a frog edits it, once', 'then lets it be'] } },
   {
     id: 'pc-riddle-hole',
     ago: 7,
-    image: terraceUrl,
+    image: friend2Url,
     place: 'On the porch',
     with: 'marlo',
     back: { kind: 'riddle', question: 'What gets bigger the more you take away from it?', answer: 'A hole. I dug one to check.' },
   },
-  { id: 'pc-pier', ago: 6, image: pierUrl, place: 'Out on the pier', with: 'juniper', back: { kind: 'doodle', doodle: 'fish', caption: 'the one that got away' } },
+  { id: 'pc-pier', ago: 6, image: selfie5Url, place: 'Out on the pier', with: 'juniper', back: { kind: 'doodle', doodle: 'fish', caption: 'the one that got away' } },
   {
     id: 'pc-ticket-ridge',
     ago: 5,
-    image: pierUrl,
+    image: beyond1Url,
     place: 'Back from Starfall Ridge',
     with: 'juniper',
     back: { kind: 'ticket', from: 'The meadow', to: 'Starfall Ridge', note: 'window seat. I waved at every star.' },
   },
-  { id: 'pc-meadow', ago: 4, image: meadowUrl, place: 'In the long grass', with: 'marlo', back: { kind: 'tally', what: 'clouds shaped like sheep', count: 12 } },
+  { id: 'pc-meadow', ago: 4, image: sky4Url, place: 'In the long grass', with: 'marlo', back: { kind: 'tally', what: 'clouds shaped like sheep', count: 12 } },
   {
     id: 'pc-pressed-fern',
     ago: 3,
-    image: meadowUrl,
+    image: find2Url,
     place: 'By the wet meadow',
     with: 'pip',
     back: { kind: 'pressed', species: 0, variant: 0.8, label: 'Why ferns unfurl the way they do' },
@@ -203,7 +210,7 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
   {
     id: 'pc-cottage',
     ago: 2,
-    image: cottageUrl,
+    image: home2Url,
     place: 'Home from the hill',
     with: 'tofu',
     back: {
@@ -217,7 +224,7 @@ const POSTCARDS: ReadonlyArray<Omit<Postcard, 'day'> & { ago: number }> = [
       ],
     },
   },
-  { id: 'pc-map-hill', ago: 1, image: cottageUrl, place: 'On the dry hill', with: 'marlo', back: { kind: 'map', dir: AREAS.hill, label: 'X marks where I sat (for ages)' } },
+  { id: 'pc-map-hill', ago: 1, image: scenery1Url, place: 'On the dry hill', with: 'marlo', back: { kind: 'map', dir: AREAS.hill, label: 'X marks where I sat (for ages)' } },
   {
     id: 'pc-terrace',
     ago: 0,

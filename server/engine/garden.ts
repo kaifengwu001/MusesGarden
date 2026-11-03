@@ -1,5 +1,6 @@
 // The garden's interface (src/garden/types.ts) filled from the engine: one Muse's snapshot, and the events that
 // change it, read from its state and its log. Pure: Views gathers the input.
+import { stillFor, type StillKey } from '../../src/assets/postcards/stills';
 import { hash32, salt, unit } from '../../src/core/hash';
 import type {
   Basket,
@@ -71,20 +72,6 @@ const NETWORKS: Readonly<Record<Exclude<Network, 'web'>, string>> = {
   tiktok: 'TikTok',
   flickr: 'Flickr',
   bluesky: 'Bluesky',
-};
-/** Stand-ins in src/assets/postcards/ until a photo is rendered from its pose. */
-const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
-  selfie: 'close',
-  friend: 'terrace',
-  'new-friend': 'pier',
-  scenery: 'meadow',
-  creature: 'meadow',
-  find: 'cottage',
-  sky: 'meadow',
-  closeup: 'close',
-  work: 'close',
-  home: 'cottage',
-  invitation: 'pier',
 };
 /** Invitation states the guest's owner still holds: sent (kept for later) or used. A withdrawn one is gone. */
 const RECEIVED: ReadonlySet<InvitationState> = new Set(['sent', 'used']);
@@ -200,8 +187,10 @@ export function coatOf(id: string): string {
   return COATS[salt(id) % COATS.length];
 }
 
-export function postcardImage(subject: PhotoSubject | 'invitation'): string {
-  return `/api/postcards/${POSTCARD_IMAGES[subject]}.jpg`;
+/** The still a postcard shows (src/assets/postcards/stills.ts): one of its subject's, picked by its id; from beyond the planet, the planet's view or sky is the whole planet. */
+export function postcardImage(id: string, subject: PhotoSubject | 'invitation', context: PhotoSpec['context'] = 'planet'): string {
+  const key: StillKey = context === 'beyond' && (subject === 'scenery' || subject === 'sky') ? 'beyond' : subject;
+  return `/api/postcards/${stillFor(key, id)}`;
 }
 
 /** Kai's card for a find: its own network's name, or an article site's own name, and the picture the server can show. */
@@ -271,7 +260,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
   return {
     id: p.id,
     day: input.day(p.at),
-    image: postcardImage(p.subject),
+    image: postcardImage(p.id, p.subject, p.context),
     place: placeOf(input, p, index.moments.get(p.id)),
     with: p.companions[0],
     liked: input.s.likes.get(p.id)?.liked ?? false,
@@ -317,7 +306,7 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
     blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
     used: inv.state === 'used',
   };
-  return { id: inv.id, day: input.day(inv.sentAt), image: postcardImage('invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
+  return { id: inv.id, day: input.day(inv.sentAt), image: postcardImage(inv.id, 'invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
 }
 
 function list(items: readonly string[]): string {
