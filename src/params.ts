@@ -162,7 +162,9 @@ export const schema = {
     cloudRange: num('tcr', 'Cloud height range', 3, 0, 12, 0.25, 'live', { unit: 'm' }),
     cloudDensity: num('tcd', 'Cloud density', 1.2, 0, 2, 0.05, 'live'),
     cloudTwist: num('tct', 'Cloud twist', 0.71, 0, 1, 0.01, 'live'),
-    treeNear: num('ttn', 'Tree detail near', 0, 0, 60, 1, 'live', { unit: 'm' }),
+    // the trees near the camera (terraces/treesNear.ts): drawn in full within this reach, fading into the far ones over
+    // its last 4 m (Kai, 2026-11-03: on at 26 m)
+    treeNear: num('ttn', 'Tree detail near', 26, 0, 60, 1, 'live', { unit: 'm' }),
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
