@@ -31,7 +31,8 @@ import type { Terrain } from '../planet/terrain';
 import { localSun } from '../render/sun';
 import { warpPoint, type WarpFrame } from '../render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from './museBody';
-import { SCULPTS, type SculptKind } from './museMesh';
+import { dressMuse, fitOf } from './museDress';
+import type { DressedKind, MuseMesh, SculptKind } from './museMesh';
 import BodyWorker from './museBody.worker?worker&inline';
 import fragmentShader from './muse.frag.glsl?raw';
 import vertexShader from './muse.vert.glsl?raw';
@@ -103,7 +104,22 @@ const BODY: readonly [number, number, number][] = [
 ];
 export const PRESSES = BODY.length;
 
-export type MuseModel = 'field' | SculptKind;
+/** Muse's body: the field's own, a sculpt of it, or one of the muses in clothes (museMesh.ts DRESSED). */
+export type MuseModel = 'field' | SculptKind | DressedKind;
+
+/** The field's body, meshed once for the page however many Muses are drawn (each poses it on a skeleton of its own). */
+let fieldJob: Promise<MuseBody> | null = null;
+function fieldBody(): Promise<MuseBody> {
+  fieldJob ??= new Promise<MuseBody>((resolve, reject) => {
+    const worker = new BodyWorker();
+    worker.onmessage = (event: MessageEvent<MuseBody>) => {
+      worker.terminate();
+      resolve(event.data);
+    };
+    worker.onerror = (error) => reject(new Error(`the field's body could not be built: ${error.message}`));
+  });
+  return fieldJob;
+}
 
 const tmp = new Vector3();
 const tmp2 = new Vector3();
@@ -239,19 +255,13 @@ export class Muse {
     // (the grass's press, shared: world.ts makes it before the grass)
     this.press = (shared.uMusePress as { value: Vector4[] } | undefined) ?? null;
     this.pressK = (shared.uMusePressK as { value: number } | undefined) ?? null;
-    this.loading = new Promise<void>((resolve) => {
-      const worker = new BodyWorker();
-      worker.onmessage = (event: MessageEvent<MuseBody>) => {
-        this.fieldBody = event.data;
-        if (this.model === 'field') this.take(event.data, FIELD_FIT, null);
-        worker.terminate();
-        resolve();
-      };
-      worker.onerror = (error) => {
-        console.error('Muse: the body could not be built', error);
-        resolve();
-      };
-    });
+    this.loading = fieldBody().then(
+      (body) => {
+        this.fieldBody = body;
+        if (this.model === 'field') this.take(body, FIELD_FIT, null, null);
+      },
+      (error: unknown) => console.error('Muse: the body could not be built', error),
+    );
   }
 
   /** Resolved once the body asked for is meshed and in place (the harness waits on it before a capture). */
@@ -262,8 +272,10 @@ export class Muse {
   /**
    * Switch Muse's body: the field's own, or a source model sculpt on the same
    * skeleton (the first sculpt, made with its arms hanging, or its T-pose; its
-   * own paint, the same fur and light). The sculpt is loaded the first time it is asked for; where it
-   * cannot be had, Muse keeps the field's.
+   * own paint, the same fur and light), or a muse in clothes (its clothes and
+   * face painted, its skeleton measured off it: museDress.ts). The sculpt is
+   * loaded the first time any Muse asks for it; where it cannot be had, Muse
+   * keeps the field's.
    */
   useModel(model: MuseModel): void {
     if (model === this.model) return;
@@ -271,21 +283,21 @@ export class Muse {
     this.loading = this.loading.then(async () => {
       if (this.model !== model) return;
       if (model === 'field') {
-        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null);
+        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null, null);
         return;
       }
       try {
-        const { loadSculpt } = await import('./museSculptLoader');
-        const sculpt = await loadSculpt(model);
-        if (this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade);
+        const { sculptFor } = await import('./museSculptLoader');
+        const sculpt = await sculptFor(model);
+        if (this.model === model) this.take(sculpt.body, fitOf(model, sculpt.body), sculpt.grade, sculpt.paint);
       } catch (error) {
         console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
       }
     });
   }
 
-  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit and its paint. */
-  private take(body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array }, fit: MuseFit, grade: Vector3 | null): void {
+  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit, its paint, and its clothes' (museDress.ts). */
+  private take(body: MuseBody & Partial<MuseMesh>, fit: MuseFit, grade: Vector3 | null, paint: Texture | null): void {
     const index = new BufferAttribute(body.index, 1);
     const position = new BufferAttribute(body.position, 3);
     const skinIndex = new BufferAttribute(body.skinIndex, 4);
@@ -330,6 +342,7 @@ export class Muse {
       else delete material.defines[define];
       material.needsUpdate = true;
     }
+    dressMuse(g, material, body, paint);
     const s = new BufferGeometry();
     s.setIndex(index);
     s.setAttribute('position', position);

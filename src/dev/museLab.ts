@@ -4,7 +4,6 @@ import {
   BufferGeometry,
   Color,
   DirectionalLight,
-  DoubleSide,
   Float32BufferAttribute,
   HemisphereLight,
   InstancedBufferGeometry,
@@ -29,7 +28,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { smoothstep } from '../core/math';
 import { FUR_LENGTH, MUSE_HEIGHT, SHELLS } from '../life/muse';
 import { buildMuseBody, FIELD_FIT, PARENT, type MuseBody, type MuseFit } from '../life/museBody';
-import { DRESSED, SCULPTS, type DressedKind, type FaceLayout, type SculptKind } from '../life/museMesh';
+import { dressMuse, fitOf } from '../life/museDress';
+import { DRESSED, SCULPTS, type DressedKind, type MuseMesh, type SculptKind } from '../life/museMesh';
 import { loadSculpt } from '../life/museSculptLoader';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
@@ -154,7 +154,7 @@ function act(t: number): void {
   // (the arms hung and nothing else moving, to compare the two arms)
   if (pose === 'hang') rig.hang();
 }
-async function body(): Promise<{ body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array; cloth?: Float32Array; uv?: Float32Array; features?: FaceLayout; fit?: MuseFit }; grade: Vector3; raw: Mesh | null; paint: Texture | null }> {
+async function body(): Promise<{ body: MuseBody & Partial<MuseMesh>; grade: Vector3; raw: Mesh | null; paint: Texture | null }> {
   if (!sculpt) return { body: buildMuseBody(), grade: new Vector3(1, 1, 1), raw: null, paint: null };
   const loaded = await loadSculpt(sculpt);
   return { body: loaded.body, grade: params.get('grade') === '0' ? new Vector3(1, 1, 1) : loaded.grade, raw: loaded.raw, paint: loaded.paint };
@@ -162,7 +162,7 @@ async function body(): Promise<{ body: MuseBody & { colour?: Float32Array; raise
 
 const { body: b, grade, raw, paint: texture } = await body();
 // its skeleton's fit: a dressed muse's measured off it (museMesh.ts measureFit)
-const baseFit: MuseFit = b.fit ?? (sculpt && sculpt in SCULPTS ? SCULPTS[sculpt as SculptKind].fit : FIELD_FIT);
+const baseFit: MuseFit = sculpt ? fitOf(sculpt, b) : FIELD_FIT;
 const rig = new MuseRig({
   ...baseFit,
   hang: hang ? { ...baseFit.hang, z: hang[0], x: hang[1] ?? baseFit.hang.x } : baseFit.hang,
@@ -201,10 +201,6 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
     g.setAttribute('aHangNormal', new BufferAttribute(b.hangNormal, 3));
   }
   if (b.comb && params.get('comb') !== '0') g.setAttribute('aComb', new BufferAttribute(b.comb, 3));
-  if (b.cloth && b.uv && texture) {
-    g.setAttribute('aCloth', new BufferAttribute(b.cloth, 1));
-    g.setAttribute('uv', new BufferAttribute(b.uv, 2));
-  }
   const raised = g.getAttribute('aRaise') !== undefined;
   const hung = g.getAttribute('aHang') !== undefined;
   const combed = g.getAttribute('aComb') !== undefined;
@@ -332,8 +328,6 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
   if (raised) shared.MUSE_RAISE = 1;
   if (hung) shared.MUSE_HANG = 1;
   if (combed) shared.MUSE_COMB = 1;
-  if (g.getAttribute('aCloth') !== undefined) shared.MUSE_PAINTED = 1;
-  if (b.features) shared.MUSE_FEATURES = 1;
   /** A look's defines: the shared ones, and its own. */
   const definesFor = (l: string): Record<string, number> => {
     const d = { ...shared };
@@ -345,7 +339,7 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
   const material = new ShaderMaterial({
     vertexShader,
     fragmentShader: fragmentShader.replace(/}\s*$/, '  #include <colorspace_fragment>\n}\n'),
-    defines: definesFor(look),
+    defines: { ...shared },
     uniforms: {
       uBones: { value: rig.skin },
       uBoneDQ: { value: rig.dual },
@@ -368,15 +362,11 @@ if ((look === 'raw' || look === 'rawclay') && raw) {
       uWarpK: { value: 0 },
       uTime: { value: time },
       uRadius: { value: 128 },
-      uMusePaint: { value: texture },
-      uMuseEyeAt: { value: new Vector3(...(b.features?.eye ?? [0, 0, 0])) },
-      uMuseMouthAt: { value: new Vector4(...(b.features?.mouth ?? [0, 0, 0, 0])) },
-      uMuseBlushAt: { value: new Vector3(...(b.features?.blush ?? [0, 0, 0])) },
-      uMuseFaceAt: { value: new Vector4(...(b.features?.plate ?? [0, 0, 0, 0])) },
     },
   });
-  // (a dressed muse's both sides: a garment is often a single sheet, an apron or a collar)
-  if (b.cloth) material.side = DoubleSide;
+  // a dressed muse's clothes and face, as on a planet (museDress.ts), their defines kept in every look
+  dressMuse(g, material, b, texture);
+  Object.assign(shared, material.defines);
   const mesh = new Mesh(g, material);
   mesh.frustumCulled = false;
   // (hide=1: Muse not drawn, all else as it is: the stage's grass and shadows round it)
