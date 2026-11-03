@@ -12,6 +12,7 @@ import {
   parseMediaItem,
   parseMediaRecording,
   siteOf,
+  withItems,
   type MediaItemJson,
 } from './media';
 
@@ -164,6 +165,31 @@ describe('a recording made without the Instagram token', () => {
     const lost = ig('h1', ['Gyokuro']);
     const file = (x: MediaItemJson) => (x.id === orphan.id ? ['Tea'] : []);
     expect(carriedInstagram(earlier([partly, orphan, lost]), map(), [], file)).toEqual([{ ...partly, topics: ['Matcha'] }, { ...orphan, topics: ['Tea'] }]);
+  });
+});
+
+describe('a pass that reads one network', () => {
+  const earlier = (items: readonly MediaItemJson[], botany: readonly MediaItemJson[] = []) => ({ recordedAt: 'before', items, unseen: { botany, jazz: [], neutral: [] } });
+
+  it('keeps everything the recording had, held-out items too, and adds the new items in the recording’s order', () => {
+    const owl = item('video', ['Owl'], { id: 'x-owl', area: 'birds' });
+    const tea = item('article', ['Tea'], { id: 'x-tea' });
+    const held = item('post', ['Tea'], { id: 'x-held' });
+    const reel = item('reel', ['Owl'], { id: 'ig-r1', network: 'instagram', area: 'birds', url: 'https://www.instagram.com/reel/r1/' });
+    const post = item('post', ['Matcha'], { id: 'ig-p1', network: 'instagram', url: 'https://www.instagram.com/p/p1/' });
+    const merged = withItems(earlier([owl, tea], [held]), [reel, post], ['tea', 'birds']);
+    expect(merged.items).toEqual([tea, post, reel, owl]);
+    expect(merged.unseen.botany).toEqual([held]);
+    expect(merged.recordedAt).toBe('before');
+    expect(merged.joined).toEqual([reel, post]);
+  });
+
+  it('adds nothing the recording already has by id or link, held-out items included', () => {
+    const held = item('post', ['Tea'], { id: 'x-held2' });
+    const tea = item('article', ['Tea'], { id: 'x-tea2' });
+    const again = { ...tea, title: 'Same id' };
+    const sameLink = item('post', ['Tea'], { id: 'ig-same', url: held.url });
+    expect(withItems(earlier([tea], [held]), [again, sameLink], ['tea']).joined).toEqual([]);
   });
 });
 

@@ -93,11 +93,16 @@ export class InstagramReader {
     const url = new URL(`${GRAPH}/${path}`);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     url.searchParams.set('access_token', this.options.token);
-    const res = await this.fetchImpl(url);
+    /** Nothing it reports carries the token, whatever a failure's message holds. */
+    const redact = (text: string) => text.replaceAll(this.options.token, '<token>').replace(/access_token=[^&\s"']+/g, 'access_token=<token>');
+    // The cause stays behind on purpose: a failure's own message can carry the URL, and with it the token.
+    const res = await this.fetchImpl(url).catch((err: unknown) => {
+      throw new Error(redact(`instagram: ${path.split('?')[0]} failed: ${String(err)}`));
+    });
     const body = obj(await res.json(), 'graph reply');
     if (!res.ok || body.error !== undefined) {
       const message = body.error === undefined ? '' : (optStr(obj(body.error, 'error').message, 'error.message') ?? '');
-      throw new Error(`instagram: ${path.split('?')[0]} answered ${res.status} ${message}`.trim());
+      throw new Error(redact(`instagram: ${path.split('?')[0]} answered ${res.status} ${message}`.trim()));
     }
     return body;
   }
