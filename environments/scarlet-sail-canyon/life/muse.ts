@@ -412,6 +412,9 @@ export class Muse {
     a.stride = 1;
     a.gait = time * OUT_GAIT;
     r.home = false;
+    // (tapped or held out here, it answers you as at home)
+    r.cues.petted = -1;
+    roam.answerOver(time, r);
     return r;
   }
 
@@ -458,17 +461,17 @@ export class Muse {
     return best < Infinity ? { side, distance: best } : null;
   }
 
-  /** Your doings (world time, s): a tap, a hold on one side, letting go. */
+  /** Your doings (world time, s): a tap, a hold on one side, letting go. Out where it is directed, it is awake to them. */
   tap(time: number): void {
-    this.roam?.tap(time);
+    this.roam?.tap(time, this.direction.kind === 'out');
   }
 
   hold(time: number, side: number): void {
-    this.roam?.hold(time, side);
+    this.roam?.hold(time, side, this.direction.kind === 'out');
   }
 
   letGo(time: number): void {
-    this.roam?.letGo(time);
+    this.roam?.letGo(time, this.direction.kind === 'out');
   }
 
   /** Its life (dev: seeking it, reading its parts). */

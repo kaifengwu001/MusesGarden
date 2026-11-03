@@ -1055,16 +1055,27 @@ export class MuseRoam {
     return this.day.map((s, k) => ({ name: s.name, start: this.starts[k] }));
   }
 
-  tap(now: number): void {
-    this.you.tap(now, this.living.cues.sleep !== null);
+  /** Your doings (world s). `awake`: it is up and about whatever its own day says (a life given to it: muse.ts). */
+  tap(now: number, awake = false): void {
+    this.you.tap(now, !awake && this.living.cues.sleep !== null);
   }
 
-  hold(now: number, side: number): void {
-    this.you.hold(now, side, this.living.cues.sleep !== null);
+  hold(now: number, side: number, awake = false): void {
+    this.you.hold(now, side, !awake && this.living.cues.sleep !== null);
   }
 
-  letGo(now: number): void {
-    this.you.letGo(now, this.living.cues.sleep !== null);
+  letGo(now: number, awake = false): void {
+    this.you.letGo(now, !awake && this.living.cues.sleep !== null);
+  }
+
+  /**
+   * Its answers to you over a life given to it rather than its own (out on the planet where it is directed, a visit's
+   * guest beside its friend: muse.ts): the wave or the bounce for a tap, the petting while you hold it. Nothing while
+   * you haven't. As src/life/museRoam.ts has it.
+   */
+  answerOver(now: number, out: Roaming): void {
+    this.you.settle(now);
+    this.you.apply(now, out.action, out.cues);
   }
 
   /** Muse at a time: where it stands, its heading and action, what it looks at, the props' cues. camera: planet space, for turning to you and looking at you. */
