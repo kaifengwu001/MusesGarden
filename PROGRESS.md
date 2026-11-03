@@ -49,6 +49,8 @@ planet last. `server/fixtures/cast/README.md` has the table.
 - **The topic map.** 23 new areas (gardening and flowers to fantasy literature): 814 pages in 37 areas, 308 before.
 - **The recording.** 303 items, 2 of each kind in every area, from 575 sources (570 answered). No Instagram: there is
   no `META_IG_TOKEN` here, so the 17 Instagram items of the last recording are gone.
+- **Strangers.** Similarity raises the odds of meeting and befriending beyond the planet, but no longer gates them:
+  Momo can become friends with any character.
 
 ### Checked (Kai's cast)
 
@@ -66,7 +68,7 @@ planet last. `server/fixtures/cast/README.md` has the table.
   YouTube items have no description. A later recording fills them in.
 - **The voice-review scenes** in the cast README wait for Meta's model; the heuristic mind doesn't voice the souls.
 - **A bridge interest.** None of the three strangers starts with an interest of Momo's. Interests drift together
-  within days, but Kai may want one (astronomy for Dorie, say).
+  within days, and strangers no longer need one to meet, but Kai may want one (astronomy for Dorie, say).
 
 ## The muses in clothes (2026-11-02, in the lab)
 
@@ -460,7 +462,7 @@ now feeds Kai's garden interface. Merged into main on 2026-11-01.
 - **Friends come three ways:**
   - Owners share their Muses; those two meet within 48 h.
   - Owners are friends on Instagram or Facebook (a simulated graph in `cast.json`).
-  - Strangers meet beyond the planet, which is rare.
+  - Strangers meet beyond the planet, which is rare. Shared interests make it likelier, but strangers with nothing in common can meet and befriend too (2026-11-02).
 
   Friendships rarely end. Unpleasant hangouts make a pair distant instead.
 - **Invitations.** The guest's owner picks Travel now or Keep for later. An invitation is good for one visit, any time, and only the sender can withdraw it.

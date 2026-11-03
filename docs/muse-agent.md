@@ -316,7 +316,7 @@ Limits:
 
 ## Friends, strangers, and invitations
 
-Muse makes friends three ways, most likely first: its owner shares it with a friend's owner, it finds the Muses of its owner's Instagram and Facebook friends, or it meets a stranger beyond the planet. Friends share a fixed daily budget, rarely stop being friends, and sometimes invite each other's owners over. Each social rule takes both Muses' temperaments and their interests as input.
+Muse makes friends three ways, most likely first: its owner shares it with a friend's owner, it finds the Muses of its owner's Instagram and Facebook friends, or it meets a stranger beyond the planet. Friends share a fixed daily budget, rarely stop being friends, and sometimes invite each other's owners over. Each social rule takes both Muses' temperaments and their interests as input. Shared interests raise the odds on every path, but no path needs one: Muse can become friends with any character.
 
 | Path | How they meet | To become friends | Origin |
 | --- | --- | --- | --- |
@@ -356,16 +356,17 @@ Each owner picks how far out Muse makes friends: `owner.settings.reach`, folded 
 
 ### Strangers meet only beyond the planet
 
-- While two Muses that are not friends are both beyond, they meet at a rate of λ = 8 × sociability_A × sociability_B × similarity per hour. The 8 is a unit, not a cap. Encounters form a Poisson process over the whole time both are beyond. The plan gave no unit, and a cast of six needed one to meet at all.
+- While two Muses that are not friends are both beyond, they meet at a rate of λ = 8 × sociability_A × sociability_B × (0.1 + similarity) per hour (`encountersPerHour` and `strangerBase`). Strangers with nothing public in common still meet, at a tenth of the rate a fully alike pair adds, so similarity raises the rate without gating it. The 8 is a unit, not a cap. Encounters form a Poisson process over the whole time both are beyond. The plan gave no unit, and a cast of six needed one to meet at all.
 - Each encounter or hangout has a pleasantness p = 0.3 × warmth + 0.7 × (0.6 × similarity + 0.4 × stretch), where warmth is the two Muses' mean sociability.
 - stretch = 4 × overlap × (1 − overlap). It is 0 when two Muses share no interests or all of them, and 1 when they share half. The best encounters are with a Muse that is similar overall and still offers new topics.
 - An encounter can produce a photo. It says it was taken beyond the planet.
 - On the six-Muse cast these rules started from, 160 run seeds give 0.28 stranger friendships a run, before and after the rules for the other two paths. The three Muses known online add pairs that can meet beyond, so the nine-Muse cast makes about 0.95 a run over 20 seeds, and 1.08 over 60.
+- Kai's eleven-Muse cast with every owner at `everyone` (`npm run sim -- --reach everyone`, run seeds 0, 1, 2, 3 and 7): 121 to 165 meetings beyond a run and 1 to 4 stranger friendships, 2.8 on average, with Momo befriending a stranger in 3 of the 5. Before strangers had a base rate (similarity alone gated meeting and befriending), the same runs gave 88 to 124 meetings and 2.4 friendships, Momo's in 2. The difference is small because interests drift: within days most pairs share some public topic. The base matters for a pair with nothing in common, which before could never meet.
 
 ### Friendship beyond needs familiarity on both sides
 
 - Muse i needs familiarity F_i = 1 + 3 × (1 − sociability_i) before it considers friendship. Familiarity is the summed pleasantness of its encounters with the other Muse. F runs from 1 for the most sociable Muse to 4 for the least sociable. If each meeting is close to fully pleasant, an extrovert needs about one good meeting and an introvert needs three or four. See [Open questions](#open-questions), item 5.
-- Once both thresholds are met, each Muse decides at their next encounter. It says yes with P_i = similarity × (0.5 + 0.5 × sociability_i).
+- Once both thresholds are met, each Muse decides at their next encounter. It says yes with P_i = (0.25 + 0.75 × similarity) × (0.5 + 0.5 × sociability_i) (`befriendSimBase` and `befriendBase`), so a pair with nothing in common can still become friends, after more meetings and less often. Their pleasantness, and so their familiarity, comes from warmth alone.
 - If both say yes, they become friends with origin `met-beyond`, and a photo of the two goes to both owners.
 
 In the statechart, `strangers` means the two Muses have no relationship record yet. Distance is a matter of degree; `close` and `distant` name its two ends.

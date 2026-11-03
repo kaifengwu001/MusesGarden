@@ -3,11 +3,16 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 export const SOCIAL = {
-  /** Units for the encounter rate (per hour while both are beyond). The rate itself is sociability · sociability · similarity. */
+  /** Units for the encounter rate (per hour while both are beyond): encountersPerHour · sociability · sociability · (strangerBase + similarity). */
   encountersPerHour: 8,
+  /** Strangers with nothing public in common still meet beyond, at this much of a rate that shared interests raise. */
+  strangerBase: 0.1,
   familiarityBase: 1,
   familiaritySpan: 3,
+  /** Each Muse says yes to a stranger with chance (befriendSimBase + (1 − befriendSimBase) · similarity) · (befriendBase + (1 − befriendBase) · its sociability)... */
   befriendBase: 0.5,
+  /** ...so a pair with nothing in common can still become friends, less often than a pair alike. */
+  befriendSimBase: 0.25,
 
   /** Online, between Muses whose owners know each other: knownPerHour · sociability · sociability · (knownBase + similarity). */
   knownPerHour: 0.3,

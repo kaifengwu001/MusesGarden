@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MuseEventBody, MuseState, Reach } from '../../../src/muse/contract';
 import { socialPolicy as policy } from './policy';
+import { befriendChance } from './relationships';
 import { DAY, HOUR, T0, apply, at, constant, draws, find, fold, interest, muse, ofKind, pastHangout, topics } from './testkit';
 
 const shared = ['Lichen', 'Moss', 'Fern'];
@@ -21,15 +22,17 @@ function meetUntilFriends(a: MuseState, b: MuseState, seed: number | null, limit
 }
 
 describe('meeting strangers beyond', () => {
-  it('meets friends at rate 0, and strangers only when they share something public', () => {
+  it('meets friends at rate 0, and strangers whatever they share, more often when they share something public', () => {
     let [a, b] = pair(0.8);
-    expect(policy.encounterRate(a, b, 'beyond')).toBeGreaterThan(0);
+    const alike = policy.encounterRate(a, b, 'beyond');
+    expect(alike).toBeGreaterThan(0);
     [a, b] = apply(a, b, policy.ownerLink(a, b, 'introduce', T0), T0);
     expect(policy.encounterRate(a, b, 'beyond')).toBe(0);
     expect(policy.encounterRate(b, a, 'beyond')).toBe(0);
 
     const [c, d] = pair(0.8, ['Lichen'], ['Jazz']);
-    expect(policy.encounterRate(c, d, 'beyond')).toBe(0);
+    expect(policy.encounterRate(c, d, 'beyond'), 'nothing in common: they still meet').toBeGreaterThan(0);
+    expect(policy.encounterRate(c, d, 'beyond')).toBeLessThan(alike);
   });
 
   it('meets more often the more sociable each Muse is', () => {
@@ -43,13 +46,16 @@ describe('meeting strangers beyond', () => {
   it('meets more often the more their public interests match', () => {
     const others = [['Jazz', 'Opera', 'Blues'], ['Lichen', 'Opera', 'Blues'], ['Lichen', 'Moss', 'Blues'], shared];
     const rates = others.map((theirs) => policy.encounterRate(...pair(0.7, shared, theirs), 'beyond'));
-    expect(rates[0]).toBe(0);
+    expect(rates[0], 'nothing in common: the strangers’ base rate').toBeGreaterThan(0);
     for (let i = 1; i < rates.length; i++) expect(rates[i]).toBeGreaterThan(rates[i - 1]);
   });
 
   it('judges similarity only from what each Muse shares publicly', () => {
     const privateOnly = { interests: [interest('Lichen')], hidden: ['topic:Lichen' as const], reach: 'everyone' as const };
-    expect(policy.encounterRate(muse('ada', privateOnly), muse('bo', privateOnly), 'beyond')).toBe(0);
+    const publicToo = { interests: [interest('Lichen')], reach: 'everyone' as const };
+    const nothing = policy.encounterRate(muse('ada', { reach: 'everyone' }), muse('bo', { reach: 'everyone' }), 'beyond');
+    expect(policy.encounterRate(muse('ada', privateOnly), muse('bo', privateOnly), 'beyond')).toBe(nothing);
+    expect(policy.encounterRate(muse('ada', publicToo), muse('bo', publicToo), 'beyond')).toBeGreaterThan(nothing);
   });
 });
 
@@ -69,11 +75,11 @@ describe('meeting the Muses of people the owner knows online', () => {
 
   it('meets online only when the owners know each other, and needs no shared interest', () => {
     const [a, b] = pair(0.6, ['Lichen'], ['Jazz']);
+    const beyond = policy.encounterRate(a, b, 'beyond');
     expect(policy.encounterRate(a, b, 'online')).toBe(0);
-    expect(policy.encounterRate(a, b, 'beyond')).toBe(0);
     const [ka, kb] = connect(a, b);
     expect(policy.encounterRate(ka, kb, 'online')).toBeGreaterThan(0);
-    expect(policy.encounterRate(ka, kb, 'beyond')).toBe(0);
+    expect(policy.encounterRate(ka, kb, 'beyond'), 'knowing each other online changes nothing beyond').toBe(beyond);
     expect(policy.encounterRate(...connect(...pair(0.6)), 'online')).toBeGreaterThan(policy.encounterRate(ka, kb, 'online'));
     expect(policy.encounterRate(...connect(...pair(0.9, ['Lichen'], ['Jazz'])), 'online')).toBeGreaterThan(policy.encounterRate(ka, kb, 'online'));
   });
@@ -118,6 +124,20 @@ describe('becoming friends', () => {
       return counts.reduce((s, n) => s + n, 0) / counts.length;
     };
     expect(mean(0.25)).toBeGreaterThan(mean(0.9));
+  });
+
+  it('befriends a stranger with nothing in common too, just less often than one alike', () => {
+    const t = { curiosity: 0.5, focus: 0.5, sociability: 0.6, whimsy: 0.5, novelty: 0.5 };
+    expect(befriendChance(0, t)).toBeGreaterThan(0);
+    expect(befriendChance(0, t)).toBeLessThan(befriendChance(0.5, t));
+    expect(befriendChance(0, { ...t, sociability: 0.2 })).toBeLessThan(befriendChance(0, t));
+
+    const mean = (a: string[], b: string[]) => {
+      const counts = Array.from({ length: 40 }, (_, seed) => meetUntilFriends(...pair(0.7, a, b), seed, 1000));
+      expect(counts.every(Number.isFinite), 'every pair befriends in the end').toBe(true);
+      return counts.reduce((s, n) => s + n, 0) / counts.length;
+    };
+    expect(mean(['Lichen'], ['Jazz'])).toBeGreaterThan(mean(shared, shared));
   });
 
   it('never befriends at a first meeting, however sociable', () => {

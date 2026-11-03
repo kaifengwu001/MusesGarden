@@ -11,13 +11,14 @@ function canMeet(a: MuseState, b: MuseState): boolean {
 }
 
 /**
- * Strangers meet beyond only when they share something public. Muses whose owners know each other online meet
- * whatever their interests, more often the more alike they are. Nobody meets outside either owner's friend group.
+ * Strangers meet beyond whatever their interests, more often the more they share in public. Muses whose owners know
+ * each other online meet there too, also more often the more alike they are. Nobody meets outside either owner's
+ * friend group.
  */
 export function encounterRate(a: MuseState, b: MuseState, where: EncounterPlace): number {
   if (!canMeet(a, b) || !bothInReach(a, b)) return 0;
   const both = a.temperament.sociability * b.temperament.sociability;
-  if (where === 'beyond') return SOCIAL.encountersPerHour * both * chemistry(a, b).similarity;
+  if (where === 'beyond') return SOCIAL.encountersPerHour * both * (SOCIAL.strangerBase + chemistry(a, b).similarity);
   return a.social.knownOn.has(b.seed.id) ? SOCIAL.knownPerHour * both * (SOCIAL.knownBase + chemistry(a, b).similarity) : 0;
 }
 
