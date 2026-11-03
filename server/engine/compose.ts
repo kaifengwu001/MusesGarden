@@ -49,7 +49,7 @@ export interface Garden {
 
 /**
  * Explored area drives the planet's growth slider: home alone is small, about forty regions is full size. A Muse on
- * the first planet (Fern, on the meadow) has explored the meadow's tuned size already, and grows from there.
+ * the first planet (Momo, on the meadow) has explored the meadow's tuned size already, and grows from there.
  */
 export function growth(s: MuseState): number {
   const start = s.seed.worldSeed === FIRST_PLANET.seed ? FIRST_PLANET.growth : 0.05;

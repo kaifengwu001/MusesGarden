@@ -23,14 +23,16 @@ interface Owner {
 
 const OWNERS: Readonly<Record<string, Owner>> = {
   hero: { window: [8, 19], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'empty', 'empty'] },
-  wren: { window: [9, 20], week: ['heavy', 'heavy', 'light', 'light', 'light', 'empty', 'empty'] },
-  juniper: { window: [7, 18], week: ['heavy', 'heavy', 'heavy', 'heavy', 'light', 'empty', 'empty'] },
-  moss: { window: [11, 23], week: ['heavy', 'heavy', 'light', 'light', 'empty', 'empty', 'empty'] },
-  lark: { window: [9, 21], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'light', 'empty'] },
-  sorrel: { window: [8, 18], week: ['heavy', 'heavy', 'heavy', 'light', 'empty', 'empty', 'empty'] },
-  clover: { window: [9, 19], week: ['heavy', 'heavy', 'light', 'light', 'light', 'empty', 'empty'] },
-  bramble: { window: [8, 17], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'empty', 'empty'] },
-  thistle: { window: [10, 20], week: ['heavy', 'heavy', 'heavy', 'heavy', 'light', 'empty', 'empty'] },
+  kiki: { window: [10, 20], week: ['heavy', 'heavy', 'heavy', 'heavy', 'light', 'empty', 'empty'] },
+  hoji: { window: [7, 18], week: ['heavy', 'heavy', 'heavy', 'heavy', 'light', 'empty', 'empty'] },
+  fife: { window: [9, 21], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'light', 'empty'] },
+  moss: { window: [9, 20], week: ['heavy', 'heavy', 'light', 'light', 'light', 'empty', 'empty'] },
+  van: { window: [8, 18], week: ['heavy', 'heavy', 'heavy', 'light', 'empty', 'empty', 'empty'] },
+  potato: { window: [9, 19], week: ['heavy', 'heavy', 'light', 'light', 'light', 'empty', 'empty'] },
+  pina: { window: [8, 17], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'empty', 'empty'] },
+  dorie: { window: [11, 23], week: ['heavy', 'heavy', 'light', 'light', 'empty', 'empty', 'empty'] },
+  nemo: { window: [6, 16], week: ['heavy', 'heavy', 'heavy', 'light', 'light', 'empty', 'empty'] },
+  pooh: { window: [12, 23], week: ['heavy', 'heavy', 'light', 'light', 'light', 'empty', 'empty'] },
 };
 
 /** Each day kind: total work in quarter hours [min, max], block count [min, max], shortest block. */
