@@ -23,6 +23,7 @@ const WORLDS: readonly { readonly planet: PlanetId; readonly host: string; reado
   { planet: 'golden-rye', host: 'thistle', name: 'Thistle', seed: 9031 },
   { planet: 'cherry-blossom-waterways', host: 'juniper', name: 'Juniper', seed: 7703 },
   { planet: 'sequoia-shrine', host: 'bramble', name: 'Bramble', seed: 6624 },
+  { planet: 'violet-dunes', host: 'wren', name: 'Wren', seed: 4271 },
 ];
 
 interface VisitState {
@@ -47,13 +48,14 @@ interface MuseProbe {
   readonly drawn: boolean;
   readonly where: { readonly dir: unknown; readonly height: number };
   readonly mesh: { readonly material: { readonly defines: Record<string, unknown> } };
-  /** Its life on the planet: what it stands on at a place, a deck or a porch included. */
-  readonly life: { groundAt(dir: unknown): number };
+  /** Its life on the planet: what it stands on at a place, a deck or a porch included (Violet Dunes' Muse has none). */
+  readonly life?: { groundAt(dir: unknown): number };
 }
 
 interface WorldProbe {
   readonly muse: MuseProbe;
   readonly visitors: readonly MuseProbe[];
+  readonly terrain: { height(dir: unknown): number };
 }
 
 /** The sample visit on a world: its planet, its host and both Muses' looks. */
@@ -95,7 +97,8 @@ for (const world of WORLDS) {
     const drawn = await page.evaluate(() => {
       const w = (window as unknown as { __world: WorldProbe }).__world;
       const dressed = (m: MuseProbe) => 'MUSE_PAINTED' in m.mesh.material.defines && 'MUSE_FEATURES' in m.mesh.material.defines;
-      const footing = (v: MuseProbe) => Math.abs(v.where.height - w.muse.life.groundAt(v.where.dir)) < 0.01;
+      const ground = (dir: unknown) => (w.muse.life ? w.muse.life.groundAt(dir) : w.terrain.height(dir));
+      const footing = (v: MuseProbe) => Math.abs(v.where.height - ground(v.where.dir)) < 0.01;
       return { host: w.muse.drawn, hostDressed: dressed(w.muse), guests: w.visitors.map((v) => ({ drawn: v.drawn, dressed: dressed(v), footed: footing(v) })) };
     });
     expect(drawn).toEqual({ host: true, hostDressed: true, guests: [{ drawn: true, dressed: true, footed: true }] });

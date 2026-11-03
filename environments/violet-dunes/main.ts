@@ -21,6 +21,8 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from '../../src/view/input';
+import { prepareVisit, VisitUi } from '../../src/visit/visitUi';
+import { violetVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
 import { World } from './world';
@@ -87,6 +89,8 @@ async function boot(): Promise<void> {
   };
   chooseTier(store.values.quality.tier);
 
+  // A visit on a ticket (`?visit=`): the host's planet, its seed and growth set before the world is made.
+  const visit = await prepareVisit(store, 'violet-dunes');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -160,24 +164,32 @@ async function boot(): Promise<void> {
     button.addEventListener('click', () => { action(); userPosed = true; });
     places.append(button);
   }
-  uiRoot.append(places);
+  // (on a visit, only the visit's banner: no places of this world's own to fly to)
+  if (!visit) uiRoot.append(places);
+
+  // A visit on a ticket: its banner, the host's finds and their cards, the two Muses (this world has no garden of its own).
+  const visiting = visit ? new VisitUi(uiRoot, violetVisit(world), visit) : null;
 
   attachInput(canvas, {
     drag: (dx, dy) => {
+      visiting?.interrupt();
       world.rig.drag(dx, dy, canvas.clientWidth, canvas.clientHeight);
       userPosed = true;
     },
     zoom: (delta) => {
+      visiting?.interrupt();
       world.rig.zoomBy(delta);
       userPosed = true;
     },
     tap: (x, y) => {
+      if (visiting?.tap(x, y, canvas.clientWidth, canvas.clientHeight)) return;
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) world.gust(hit.dir, clock.time);
     },
     doubleTap: (x, y) => {
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) {
+        visiting?.interrupt();
         world.rig.glideTo(hit.dir);
         userPosed = true;
       }
@@ -240,8 +252,13 @@ async function boot(): Promise<void> {
 
   const keys = new Keys();
   const update = (): void => {
-    if (keys.update(world.rig, clock.realDt)) userPosed = true;
+    if (keys.update(world.rig, clock.realDt)) {
+      userPosed = true;
+      visiting?.interrupt();
+    }
+    visiting?.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
+    visiting?.frame(clock.realDt);
     ui.setWorldLine(worldLine(store.values, world.growth));
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;

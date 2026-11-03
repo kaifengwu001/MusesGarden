@@ -101,6 +101,8 @@ export class World {
   readonly cirrus: CloudRibbons;
   readonly birds: Birds;
   readonly muse: Muse;
+  /** Muses visiting on a ticket (src/visit/): drawn, kept up to date and culled as the host is. */
+  readonly visitors: Muse[] = [];
   /** Press-and-hold bloom discs (rest space): direction, angular radius. */
   readonly userBlooms: Vector4[] = Array.from({ length: 8 }, () => new Vector4(0, 1, 0, 0));
   private growingBloom = -1;
@@ -195,6 +197,13 @@ export class World {
     for (const mesh of this.fauna.shadowMeshes) this.clouds.addShadowCaster(mesh);
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, ...this.flowers.meshes, ...this.landmarks.meshes, this.birds.mesh, this.fauna.group, this.clouds.mesh, this.cirrus.mesh);
     this.applyTier(tier);
+  }
+
+  /** A visiting Muse joins the scene: its body and its shadow. */
+  addVisitor(muse: Muse): void {
+    this.visitors.push(muse);
+    this.scene.add(muse.mesh);
+    this.clouds.addShadowCaster(muse.shadowMesh);
   }
 
   applyTier(tier: Tier): void {
@@ -477,6 +486,7 @@ export class World {
     if (this.nearFieldDrawn) this.field.render(this.renderer, rig.up, rig.forward, R);
     this.birds.update(clock.time, this.terrain);
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
+    for (const visitor of this.visitors) visitor.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     this.fauna.update(clock.time, this.terrain, rig.camera.position);
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, this.groundInSight());
     this.cirrus.update(L.seed, R, this.terrain.maxHeight, clock.time, this.windAxis, rig.camera.position, p.clouds.speed);
@@ -484,6 +494,7 @@ export class World {
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     this.muse.cull(this.frustum, this.warp);
+    for (const visitor of this.visitors) visitor.cull(this.frustum, this.warp);
     const sweep = this.terrainUniforms.uCottageSun.value;
     this.terrain.homeAreas(sweep.x, sweep.y, this.homeAreas);
     this.surface.update(

@@ -52,6 +52,15 @@ const SEEN = 160;
 const FACE_YOU = 1.7;
 
 type Stand = keyof typeof STANDS;
+/**
+ * What a visit (src/visit/) has Muse doing: its own day at the shelter (`home`; busy or not, the same day), standing at
+ * a spot out on the planet (a unit direction) and stepping toward `toward` while `walk` is above 0 (`out`), or out of
+ * sight (`hidden`). With no visit, its own day.
+ */
+export type MuseDirection =
+  | { readonly kind: 'home'; readonly busy: boolean }
+  | { readonly kind: 'out'; readonly dir: Vector3; readonly toward: Vector3 | null; readonly walk: number; readonly busy: boolean }
+  | { readonly kind: 'hidden' };
 /** Muse's body: the field's own, a Tripo sculpt of it, or one of the muses in clothes (src/life/museMesh.ts DRESSED, rigged as src rigs them). */
 export type MuseModel = 'field' | SculptKind | DressedKind;
 /** A heading on the terrace (rad from facing out, +z, toward +x), or toward the camera. */
@@ -112,6 +121,9 @@ function wrap(a: number): number {
   return a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 }
 
+/** Its gait out on the planet (cycles of two steps a second), at its own pace. */
+const OUT_GAIT = PACE / (2 * STEP.length * MUSE_HEIGHT);
+
 const tmp = new Vector3();
 const tmp2 = new Vector3();
 const bounds = new Sphere();
@@ -147,6 +159,10 @@ export class Muse {
   private readonly forward = new Vector3();
   private readonly left = new Vector3();
   private loaded = false;
+  /** Where it is now, for a visit: a unit direction, its feet's height over R (m), the way it faces. */
+  readonly where = { dir: new Vector3(0, 1, 0), height: 0, heading: new Vector3(1, 0, 0) };
+  /** What a visit has it doing (its own day until one says otherwise). */
+  private direction: MuseDirection = { kind: 'home', busy: false };
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -299,28 +315,51 @@ export class Muse {
     const cx = rel.dot(this.X);
     const cz = rel.dot(this.Z);
     const cy = rel.dot(this.U) - MUSE_FLOOR;
-    this.day(time, cx, cz);
-    // set on its stand: bent round the planet as the shelter is (props.vert.glsl), standing straight up there
-    const [x, z] = this.at;
-    const d = Math.hypot(x, z);
-    const angle = Math.asin(Math.min(d / R, 1));
-    const t = d > 1e-5 ? tmp.copy(this.X).multiplyScalar(x / d).addScaledVector(this.Z, z / d) : tmp.copy(this.X);
-    this.up.copy(this.U).multiplyScalar(Math.cos(angle)).addScaledVector(t, Math.sin(angle));
-    const pos = this.uniforms.uMusePos.value.copy(this.up).multiplyScalar(ground + MUSE_FLOOR);
-    this.forward.copy(this.X).multiplyScalar(Math.sin(this.heading)).addScaledVector(this.Z, Math.cos(this.heading));
-    this.forward.addScaledVector(this.up, -this.forward.dot(this.up)).normalize();
+    const out = this.direction.kind === 'out' ? this.direction : null;
+    let pos: Vector3;
+    if (out) {
+      // out on the planet where a visit has it: on the ground at its spot, facing the way it goes
+      this.up.copy(out.dir).normalize();
+      this.where.height = terrain.height(this.up);
+      pos = this.uniforms.uMusePos.value.copy(this.up).multiplyScalar(R + this.where.height);
+      if (out.toward) this.forward.subVectors(out.toward, this.up);
+      this.forward.addScaledVector(this.up, -this.forward.dot(this.up));
+      if (this.forward.lengthSq() < 1e-10) this.forward.copy(this.Z).addScaledVector(this.up, -this.Z.dot(this.up));
+      this.forward.normalize();
+      const a = this.action;
+      a.walk = out.busy ? 0 : out.walk;
+      a.stride = 1;
+      a.wave = -1;
+      a.gait = time * OUT_GAIT;
+    } else {
+      this.day(time, cx, cz);
+      // set on its stand: bent round the planet as the shelter is (props.vert.glsl), standing straight up there
+      const [x, z] = this.at;
+      const d = Math.hypot(x, z);
+      const angle = Math.asin(Math.min(d / R, 1));
+      const t = d > 1e-5 ? tmp.copy(this.X).multiplyScalar(x / d).addScaledVector(this.Z, z / d) : tmp.copy(this.X);
+      this.up.copy(this.U).multiplyScalar(Math.cos(angle)).addScaledVector(t, Math.sin(angle));
+      pos = this.uniforms.uMusePos.value.copy(this.up).multiplyScalar(ground + MUSE_FLOOR);
+      this.where.height = terrain.cottageGround + MUSE_FLOOR;
+      this.forward.copy(this.X).multiplyScalar(Math.sin(this.heading)).addScaledVector(this.Z, Math.cos(this.heading));
+      this.forward.addScaledVector(this.up, -this.forward.dot(this.up)).normalize();
+    }
+    this.where.dir.copy(this.up);
+    this.where.heading.copy(this.forward);
     this.left.crossVectors(this.up, this.forward);
     const f = this.left;
     const u = this.up;
     const w = this.forward;
     this.uniforms.uMuseFrame.value.set(f.x, u.x, w.x, f.y, u.y, w.y, f.z, u.z, w.z);
-    // the look toward the camera: its bearing from Muse's heading and its height over Muse's eyes
+    // the look toward the camera: its bearing from Muse's heading and its height over Muse's eyes (out on a visit, it
+    // looks about on its own)
+    const [x, z] = this.at;
     const dx = cx - x;
     const dz = cz - z;
     const flat = Math.hypot(dx, dz);
     const yaw = wrap(Math.atan2(dx, dz) - this.heading);
     const pitch = Math.atan2(cy - 0.77 * MUSE_HEIGHT, Math.max(flat, 0.3));
-    const near = smoothstep(14, 7, flat) * smoothstep(1.9, 1.2, Math.abs(yaw));
+    const near = out ? 0 : smoothstep(14, 7, flat) * smoothstep(1.9, 1.2, Math.abs(yaw));
     // otherwise it looks about on its own
     const idleYaw = 0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time);
     const idlePitch = -0.04 + 0.06 * Math.sin(0.37 * time + 2);
@@ -340,7 +379,7 @@ export class Muse {
     const push = FUR_LENGTH * 0.9 * strength * (0.75 + 0.25 * Math.sin(1.3 * time) * Math.sin(0.41 * time + 1));
     this.uniforms.uMuseWind.value.set(along.x * push, along.y * push, along.z * push, 0.3 * strength);
     const far = camera.distanceTo(pos);
-    const seen = show && this.loaded && far < SEEN;
+    const seen = show && this.loaded && far < SEEN && this.direction.kind !== 'hidden';
     this.mesh.visible = seen;
     this.shadowMesh.visible = seen;
     // as many shells as the fur's length on screen in pixels
@@ -407,6 +446,16 @@ export class Muse {
     warpPoint(warp, bounds.center, bounds.center);
     bounds.radius = 0.8 * MUSE_HEIGHT;
     this.mesh.visible = frustum.intersectsSphere(bounds);
+  }
+
+  /** Whether Muse is drawn now: shown, near enough, in view. */
+  get drawn(): boolean {
+    return this.mesh.visible;
+  }
+
+  /** A visit's say over Muse (src/visit/): its own day, out on the planet, or out of sight. */
+  direct(direction: MuseDirection): void {
+    this.direction = direction;
   }
 
   /** Where Muse stands now (cottage-local m) and its heading (rad): for the camera's named view. */

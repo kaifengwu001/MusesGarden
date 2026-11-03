@@ -2,6 +2,7 @@ import { ShaderChunk } from 'three';
 import cloudLumps from '../life/cloudLumps.glsl?raw';
 import clouds from '../life/clouds.glsl?raw';
 import field from '../../../src/life/field.glsl?raw';
+import find from '../life/findState.glsl?raw';
 import wind from '../../../src/life/wind.glsl?raw';
 import cubesphere from '../../../src/planet/cubesphere.glsl?raw';
 import fields from '../planet/fields.glsl?raw';
@@ -33,6 +34,7 @@ const chunks: Record<string, string> = {
   meadow_clouds: clouds,
   meadow_field: field,
   meadow_wind: wind,
+  meadow_find: find,
 };
 
 export function registerShaderChunks(): void {
