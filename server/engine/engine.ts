@@ -109,6 +109,8 @@ export class Engine {
     this.fold = (s, e) => deps.reduceCore({ ...s, social: deps.reduceSocial(s.social, e, s.seed.id) }, e);
     this.clockAt = start;
     for (const seed of deps.store.muses()) this.states.set(seed.id, this.replay(seed));
+    // A saved garden resumes where it left off: its clock never starts behind what its Muses have lived.
+    for (const s of this.states.values()) if (s.seq > 0 && s.at > this.clockAt) this.clockAt = s.at;
   }
 
   now(): Instant {

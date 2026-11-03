@@ -196,6 +196,30 @@ describe('engine on SQLite', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('a restart that names an earlier start resumes from what the garden has lived, and lives no day twice', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'muse-engine-'));
+    try {
+      const path = join(dir, 'garden.db');
+      const reference = await world(['moss', 'wren'], { introduce: true });
+      await reference.engine.advanceTo(at(40));
+
+      const first = new Engine(stubDeps(memoryStore(openSqliteStore(path))), T0);
+      for (const id of ['moss', 'wren']) await first.addMuse(seed(id), `I am ${id}.`, '', T0);
+      await first.introduce('moss' as MuseId, 'wren' as MuseId, T0);
+      await first.advanceTo(at(20));
+      const lived = Math.max(...(['moss', 'wren'] as MuseId[]).map((id) => first.log(id).at(-1)!.event.at));
+
+      const store = openSqliteStore(path);
+      const again = new Engine(stubDeps(memoryStore(store)), T0);
+      expect(again.now()).toBe(lived);
+      await again.advanceTo(at(40));
+      for (const id of ['moss', 'wren'] as MuseId[]) expect(strip(again.log(id))).toEqual(strip(reference.engine.log(id)));
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 /** Muses on the real social policy whose owners' friend groups are `reach`; moss's and wren's owners know each other online. */

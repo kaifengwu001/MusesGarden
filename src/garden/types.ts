@@ -95,6 +95,17 @@ export interface Postcard {
   favorite?: boolean;
   /** What Muse wrote or drew on the back. Without it (an invitation, an older photo) the back shows the place and day. */
   back?: PostcardBack;
+  /** How the photo is shown when its still has come round before; without it, as the still is. */
+  look?: PhotoLook;
+}
+
+/** A still shown again: mirrored or not, cropped in (zoom 1 is the whole still) on the point (x, y) in 0..1, and toned. */
+export interface PhotoLook {
+  flip: boolean;
+  zoom: number;
+  x: number;
+  y: number;
+  tone: 'none' | 'warm' | 'cool' | 'dusk' | 'mist' | 'bright';
 }
 
 /** The drawings Muse can put on a postcard's back. */

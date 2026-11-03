@@ -135,6 +135,11 @@ describe('the garden snapshot on a seeded engine', () => {
         expect(p.place.length).toBeGreaterThan(0);
       }
       if (id === HERO) expect(new Set(cards.map((p) => p.image)).size, 'the hero’s photos vary').toBeGreaterThan(8);
+      const shown = cards.map((p) => `${p.image} ${JSON.stringify(p.look ?? null)}`);
+      expect(new Set(shown).size, `${id}: no two cards look the same`).toBe(shown.length);
+      const byDay = new Map<string, string[]>();
+      for (const p of cards) byDay.set(p.day, [...(byDay.get(p.day) ?? []), p.image]);
+      for (const [day, images] of byDay) expect(new Set(images).size, `${id} on ${day}: ${images.join(', ')}`).toBe(images.length);
       for (const inv of received(id)) {
         const card = cards.find((p) => p.id === inv.id);
         expect(card?.invitation).toMatchObject({ from: inv.host, world: inv.host });

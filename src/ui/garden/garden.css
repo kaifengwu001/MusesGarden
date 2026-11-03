@@ -1967,12 +1967,38 @@ body.garden-on .hud {
   pointer-events: none;
 }
 
-.g-pc-photo {
+.g-pc-photo,
+.g-snap-photo {
   display: block;
   width: 100%;
   aspect-ratio: 3 / 2;
-  object-fit: cover;
+  overflow: hidden;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
+}
+
+.g-pc-photo img,
+.g-snap-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* a still that has come round before, toned for the round (assignStills) */
+img[data-tone='warm'] {
+  filter: sepia(0.22) saturate(1.12) hue-rotate(-6deg);
+}
+img[data-tone='cool'] {
+  filter: saturate(0.92) hue-rotate(10deg) brightness(1.03);
+}
+img[data-tone='dusk'] {
+  filter: sepia(0.3) saturate(1.25) hue-rotate(-16deg) brightness(0.94) contrast(1.05);
+}
+img[data-tone='mist'] {
+  filter: contrast(0.86) brightness(1.07) saturate(0.85);
+}
+img[data-tone='bright'] {
+  filter: brightness(1.08) saturate(1.18) contrast(1.04);
 }
 
 /* written in the strip, in pen */
@@ -2918,13 +2944,7 @@ body.garden-on .hud {
     0 7px 16px -4px rgba(40, 30, 20, 0.28);
 }
 
-.g-snap img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
-}
+
 
 .g-album-label {
   display: flex;

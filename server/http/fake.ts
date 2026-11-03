@@ -20,7 +20,8 @@ import {
   sampleWorld,
 } from '../../src/muse/samples';
 import { localDay } from '../domain/time';
-import { coatOf, flowerOf, museStatus, postcardImage, soulLine, topicLabel } from '../engine/garden';
+import { assignStills } from '../../src/assets/postcards/stills';
+import { coatOf, flowerOf, museStatus, shownAs, soulLine, stillKey, topicLabel } from '../engine/garden';
 
 const HOUR = 3_600_000;
 const JOURNAL_DAY = '2026-11-04';
@@ -66,18 +67,22 @@ function sampleGarden(): GardenSnapshot {
   const topics = [...new Set([...sampleMind.interests.map((i) => i.topic as string), ...finds.map((f) => f.topic)])];
   const invitation = sampleInvitations.find((i) => i.id === sampleVisit.invitation)!;
   const host = sampleVisit.host;
+  const shown = assignStills(
+    [...samplePhotos.items.map((p) => ({ id: p.id, key: stillKey(p), day: day(p.at) })), { id: invitation.id, key: 'invitation' as const, day: day(invitation.sentAt) }],
+    HERO,
+  );
   const postcards: Postcard[] = [
     ...samplePhotos.items.map((p) => ({
       id: p.id,
       day: day(p.at),
-      image: postcardImage(p.id, p.subject, p.context),
+      ...shownAs(shown.get(p.id)),
       place: p.planetOf === HERO ? 'Out exploring' : `On ${p.companionNames[0]}’s planet`,
       with: p.companions[0],
     })),
     {
       id: invitation.id,
       day: day(invitation.sentAt),
-      image: postcardImage(invitation.id, 'invitation'),
+      ...shownAs(shown.get(invitation.id)),
       place: `From ${host.name}’s planet`,
       with: host.museId,
       invitation: { from: host.museId, fromName: host.name, coat: coatOf(host.museId), world: host.museId, worldName: `${host.name}’s planet`, blurb: `Where ${host.name} keeps Lichen.`, used: false },

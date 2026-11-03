@@ -1,6 +1,6 @@
 // The garden's interface (src/garden/types.ts) filled from the engine: one Muse's snapshot, and the events that
 // change it, read from its state and its log. Pure: Views gathers the input.
-import { stillFor, type StillKey } from '../../src/assets/postcards/stills';
+import { assignStills, PLAIN, STILLS, type Shown, type StillKey } from '../../src/assets/postcards/stills';
 import { hash32, salt, unit } from '../../src/core/hash';
 import type {
   Basket,
@@ -31,7 +31,6 @@ import type {
   NowView,
   PhotoId,
   PhotoSpec,
-  PhotoSubject,
   PostcardBack,
   PublicProfile,
   Relationship,
@@ -94,9 +93,12 @@ interface LogIndex {
   readonly friendsSince: ReadonlyMap<MuseId, Instant>;
   /** What Muse wrote or drew on the back of each photo's postcard. */
   readonly backs: ReadonlyMap<PhotoId, PostcardBack>;
+  /** The still each card shows, and how. */
+  readonly stills: ReadonlyMap<string, Shown>;
 }
 
-function indexLog(log: readonly StoredEvent[]): LogIndex {
+function indexLog(input: GardenInput): LogIndex {
+  const log = input.log();
   const tripTopic = new Map<DiscoveryId, TopicKey>();
   const moments = new Map<PhotoId, Moment>();
   const firstSeen = new Map<TopicKey, Instant>();
@@ -148,7 +150,7 @@ function indexLog(log: readonly StoredEvent[]): LogIndex {
         break;
     }
   }
-  return { tripTopic, moments, firstSeen, friendsSince, backs };
+  return { tripTopic, moments, firstSeen, friendsSince, backs, stills: stillsOf(input) };
 }
 
 // ─── One thing at a time ────────────────────────────────────────────────────
@@ -187,10 +189,23 @@ export function coatOf(id: string): string {
   return COATS[salt(id) % COATS.length];
 }
 
-/** The still a postcard shows (src/assets/postcards/stills.ts): one of its subject's, picked by its id; from beyond the planet, the whole planet. */
-export function postcardImage(id: string, subject: PhotoSubject | 'invitation', context: PhotoSpec['context'] = 'planet'): string {
-  const key: StillKey = context === 'beyond' ? 'beyond' : subject;
-  return `/api/postcards/${stillFor(key, id)}`;
+/** What a photo's still is of: its subject, or from beyond the planet the whole planet. */
+export const stillKey = (p: Pick<PhotoSpec, 'subject' | 'context'>): StillKey => (p.context === 'beyond' ? 'beyond' : p.subject);
+
+/** A card's picture: the still's address, and its look when the still has come round before. */
+export function shownAs(shown: Shown | undefined): Pick<Postcard, 'image' | 'look'> {
+  if (!shown) return { image: `/api/postcards/${STILLS.scenery[0]}` };
+  const plain = JSON.stringify(shown.look) === JSON.stringify(PLAIN);
+  return { image: `/api/postcards/${shown.file}`, ...(plain ? {} : { look: shown.look }) };
+}
+
+/** The still each of Muse's cards shows (assignStills): its photos in the order they came, and the invitations it was sent. */
+function stillsOf(input: GardenInput): ReadonlyMap<string, Shown> {
+  const { s } = input;
+  const photos = assignStills(s.photos.map((p) => ({ id: p.id, key: stillKey(p), day: input.day(p.at) })), s.seed.id);
+  const sent = [...s.social.invitations.values()].filter((inv) => inv.guest === s.seed.id);
+  const invitations = assignStills(sent.map((inv) => ({ id: inv.id, key: 'invitation' as const, day: input.day(inv.sentAt) })), s.seed.id);
+  return new Map([...photos, ...invitations]);
 }
 
 /** Kai's card for a find: its own network's name, or an article site's own name, and the picture the server can show. */
@@ -260,7 +275,7 @@ function photoCard(input: GardenInput, p: PhotoSpec, index: LogIndex): Postcard 
   return {
     id: p.id,
     day: input.day(p.at),
-    image: postcardImage(p.id, p.subject, p.context),
+    ...shownAs(index.stills.get(p.id)),
     place: placeOf(input, p, index.moments.get(p.id)),
     with: p.companions[0],
     liked: input.s.likes.get(p.id)?.liked ?? false,
@@ -292,7 +307,7 @@ function friendsSince(s: MuseState, r: Relationship, index: LogIndex): Instant {
 }
 
 /** An invitation this Muse's owner received, as a postcard; null for any other invitation. */
-function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | null {
+function invitationCard(input: GardenInput, inv: MuseInvitation, index: LogIndex): Postcard | null {
   if (inv.guest !== input.s.seed.id || !RECEIVED.has(inv.state)) return null;
   const host = input.profile(inv.host);
   const name = host?.name ?? 'a friend';
@@ -306,7 +321,7 @@ function invitationCard(input: GardenInput, inv: MuseInvitation): Postcard | nul
     blurb: loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`,
     used: inv.state === 'used',
   };
-  return { id: inv.id, day: input.day(inv.sentAt), image: postcardImage(inv.id, 'invitation'), place: `From ${name}’s planet`, with: inv.host, invitation };
+  return { id: inv.id, day: input.day(inv.sentAt), ...shownAs(index.stills.get(inv.id)), place: `From ${name}’s planet`, with: inv.host, invitation };
 }
 
 function list(items: readonly string[]): string {
@@ -317,12 +332,12 @@ function list(items: readonly string[]): string {
 
 export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   const { s } = input;
-  const index = indexLog(input.log());
+  const index = indexLog(input);
   const delivered = s.baskets.map((b) => basketOf(input, b));
   const finds = delivered.flatMap(({ basket, finds }) => finds.map((d) => findOf(s, d, basket.id, index)));
   const postcards = [
     ...s.photos.map((p) => photoCard(input, p, index)),
-    ...[...s.social.invitations.values()].map((inv) => invitationCard(input, inv)).filter((p): p is Postcard => p !== null),
+    ...[...s.social.invitations.values()].map((inv) => invitationCard(input, inv, index)).filter((p): p is Postcard => p !== null),
   ];
   return {
     today: input.day(input.now.at),
@@ -386,7 +401,7 @@ const MOVES: ReadonlySet<MuseEvent['kind']> = new Set(['episode.started', 'episo
 export function gardenFrames(input: GardenInput, events: readonly StoredEvent[], withStatus: 'always' | 'if-moved'): GardenFrame[] {
   const { s } = input;
   let index: LogIndex | null = null;
-  const indexed = () => (index ??= indexLog(input.log()));
+  const indexed = () => (index ??= indexLog(input));
   const frames: GardenFrame[] = [];
   const frame = (id: number, event: GardenEvent) => frames.push({ id, event });
   const basketEvent = (b: DeliveredBasket): GardenEvent => {
@@ -415,7 +430,7 @@ export function gardenFrames(input: GardenInput, events: readonly StoredEvent[],
       for (const b of holding(finds)) frame(seq, basketEvent(b));
     } else if (e.kind === 'invitation') {
       const inv = s.social.invitations.get(e.id);
-      const postcard = inv ? invitationCard(input, inv) : null;
+      const postcard = inv ? invitationCard(input, inv, indexed()) : null;
       if (postcard) frame(seq, { type: 'postcard', postcard });
     }
   }
