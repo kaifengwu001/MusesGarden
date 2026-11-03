@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CanonicalUrl, MediaKind, Network, TopicKey } from '../../../src/muse/contract';
 import { loadCorpus, loadHeroChain, type Corpus, type CorpusPage } from './corpus';
 import {
+  carriedInstagram,
   LEANS,
   loadMediaRecording,
   MEDIA_ID,
@@ -133,6 +134,36 @@ describe('a recorded item', () => {
     const yt = parseMediaItem(item('video', ['Tea'], { image: 'https://i.example/v.jpg' }));
     expect(yt.candidate.media.image).toBe('https://i.example/v.jpg');
     expect(yt.imageSource).toBeUndefined();
+  });
+});
+
+describe('a recording made without the Instagram token', () => {
+  const ig = (id: string, topics: string[], over: Partial<MediaItemJson> = {}) =>
+    item('reel', topics, { id: `ig-${id}`, network: 'instagram', url: `https://www.instagram.com/reel/${id}/`, ...over });
+  const earlier = (items: readonly MediaItemJson[]) => ({ recordedAt: 'before', items, unseen: { botany: [], jazz: [], neutral: [] } });
+  const nothing = () => [];
+
+  it('keeps the earlier recording’s Instagram items, as they were, and nothing else of it', () => {
+    const kept = ig('a1', ['Matcha', 'Tea']);
+    const owl = ig('b1', ['Owl'], { area: 'birds', kind: 'post' });
+    const carried = carriedInstagram(earlier([kept, item('video', ['Tea']), owl]), map(), [], nothing);
+    expect(carried).toEqual([kept, owl]);
+  });
+
+  it('leaves out an area the topic map no longer has, and anything this recording already holds by id or link', () => {
+    const gone = ig('c1', ['Tea'], { area: 'sailing' });
+    const twice = ig('d1', ['Tea']);
+    const moved = ig('e1', ['Tea']);
+    const recorded = [twice, item('post', ['Tea'], { id: 'bsky-1', url: moved.url })];
+    expect(carriedInstagram(earlier([gone, twice, moved]), map(), recorded, nothing)).toEqual([]);
+  });
+
+  it('keeps the topics the map still names, and files one left with none again, or leaves it out', () => {
+    const partly = ig('f1', ['Matcha', 'Sencha']);
+    const orphan = ig('g1', ['Sencha']);
+    const lost = ig('h1', ['Gyokuro']);
+    const file = (x: MediaItemJson) => (x.id === orphan.id ? ['Tea'] : []);
+    expect(carriedInstagram(earlier([partly, orphan, lost]), map(), [], file)).toEqual([{ ...partly, topics: ['Matcha'] }, { ...orphan, topics: ['Tea'] }]);
   });
 });
 
