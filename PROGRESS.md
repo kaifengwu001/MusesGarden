@@ -49,9 +49,31 @@ Started from fbb25fd (the mist as brushed strokes in three layers). Kai (2026-11
 | 9 | (Kai, with a screenshot of the panel, reference/terraces/kai-preferred-fog-and-cloud-settings.png) "Here are the preferred parameters": Fog density 1, Fog range 3 m, Fog falloff 2.5 m, Cloud height 8 m, Cloud density 0.75 | Kai's settings are now the defaults. The Fog density slider goes up to 2 (its square the density, so 0.05 a m at Kai's 1, 0.2 at 2), since Kai's 1 was its top. |
 | 10 | "The clouds still more or less follow latitude lines: can the layer be twisted a bit more?" | The strokes' way is the wind's turned by a broad pattern over the globe (two octaves of noise, 220 m and 85 m), so they run off their latitude lines, curving across them. A new Cloud twist slider (0–1, 0.6 by default, about 70° either way at most; 1, about 110°) sets how far; the strokes are made again a moment after it stops. |
 | 11 | "Can the fog density exhibit some kind of noise pattern across the globe, and can you create sliders that control key params there?" | The fog's density varies across the globe by two octaves of noise, none at its thinnest to about twice at its thickest; along each view ray it is taken as the patches are at the point and half way to it. Two new sliders: Fog patchiness (0 even … 1 patchiest, 0.7 by default) and Fog patch size (10–300 m, 70 by default). |
-| 12 | "Add a lever for the number of stripes of clouds" | |
-| 13 | "Clouds should be on a full spherical surface. Then individual clouds are randomly offset up or down. Make the range controllable" | |
-| 14 | "Make fog slightly green / blue tinted. Make the tint controllable" | |
+| 12 | "Add a lever for the number of stripes of clouds" | A Cloud count slider (10–400, 120 by default) sets how many clouds are made, exactly. Each takes the first of up to 24 spots that neither piles on another by more than a fifth nor lies mostly under the ground (its straight run checked first, cheaply); once the sphere is crowded, the spot that piles on the others least, so more clouds overlap rather than fewer being made. 120 covers the planet as Kai's last look did (57,000 m² of strokes against 59,000; that look had 119 strokes and their branches). A cloud is a stroke with, now and then, a branch or a sibling: 188 strokes at 120. They are made again a moment after the slider stops, in about 0.15 s (from 0.38 s). The Clouds folder's Coverage no longer changes the terraces' clouds. |
+| 13 | "Clouds should be on a full spherical surface. Then individual clouds are randomly offset up or down. Make the range controllable" | The layer is a sphere at the Cloud height over the planet's radius, 3.5 m by default (Kai's 8 m over the land's form was 3.5 m over the radius on the whole), no longer lifting over the hills: they rise through it, and the clouds wind round them where they can. Each cloud is offset up or down from the sphere at random within a new Cloud height range slider (0–12 m, 3 by default), its branch and sibling with it. Each stroke is drawn as a ribbon at its cloud's height (no longer one shell). A cloud's strokes still merge where they fork or cross, and clouds at the same height merge as before (all of them at range 0); two clouds crossing at different heights are each drawn whole, one over the other. Strokes no longer start within 20 m of the wind's poles and end 10 m short of them: with the twist, the wind swirls into the poles and strokes there coiled into knots. They are thinner on the inside of their tightest bends, as the painting's are, so each ribbon holds all of its stroke. The water mirrors the clouds at the sphere's height. |
+| 14 | "Make fog slightly green / blue tinted. Make the tint controllable" | The height fog's colour is tinted toward a soft blue (#93B4D6) or a jade green (#94C9AE), kept as light as the haze so only its hue turns. Two new sliders: Fog tint (how much, 0–1, 0.25 by default; at 0.35 the far land read mint rather than slightly tinted) and Fog tint hue (0 blue … 1 green, 0.5 by default, between the two). |
+
+The count, the sphere and the tint: the meadow draws pixel-identical to 7d21e88 in all 27 views. `npm run check`, `npm test` (124), `npm run test:gpu` (12 passed, one skipped; the frame-budget test passes again) and `npm run shots` (15) pass. Checkpoints: docs/checkpoints/terraces-14/ (before and after from orbit, 70 m, 30 m, the vista and 12 m; Cloud count 40, 120 and 240; Cloud height range 0, 3 and 8 m; Fog tint off, the default, blue and green).
+
+Measured (this round, Chrome on this Mac):
+
+- Against the last commit (c9cf8cb), frozen frames at 2880×1800 on High, best / median, ms a frame. The machine was busy (load 7–9, Kai's Chrome and the Claude app drawing), so both builds run about 40 % slower than on a quiet machine. Two copies of the planet no longer load side by side in one browser, so each build ran alone, three times, alternating (two rounds each):
+
+  | View | c9cf8cb | now |
+  |---|---|---|
+  | Orbit | 9.59 / 17.57 | 8.71 / 18.20 |
+  | 70 m | 19.18 / 24.81 | 17.83 / 24.44 |
+  | 30 m, toward the horizon | 21.43 / 25.01 | 21.27 / 26.26 |
+  | Vista | 19.17 / 22.82 | 18.38 / 22.56 |
+  | 4.3 m | 14.84 / 18.08 | 12.80 / 15.14 |
+  | 1.6 m | 11.37 / 13.08 | 9.01 / 10.41 |
+
+  No dearer anywhere, and 2 ms cheaper near the ground: the old shell was painted over the whole sky above the camera, where the ribbons draw only where clouds are (55,000 triangles at 120 clouds).
+- Memory: the owners' cube map and its depth, 12.6 MB; the ribbons, 3 MB; the old shell gone.
+
+Trades: the strokes are thinner on the inside of their tightest bends than before, and none run near the wind's poles. A hill rising into a cloud fades it where they meet (as before), more often now that the layer no longer lifts over the hills, so clouds near hilltops look softer. The water mirrors each cloud at the sphere's height, not its own.
+
+Still open: the strokes are made on the main thread (a 0.15 s hitch a moment after a slider stops); the water mirrors only the sky and the clouds (at the sphere's height); the fog does not tint the sky (the meadow's shared shader).
 
 The panel's sliders (5041eed, 78851c4): the meadow draws pixel-identical to 7d21e88 in all 27 views. `npm test` (122) and `npm run shots` (15) pass. Of the GPU tests, "scrubbing growth in real time stays within the frame budget" fails just now at a 30 fps lock (p95 33.4 ms against 20). It fails the same at fbb25fd, where it passed earlier today, so the machine is pacing at 30 fps, not the change. Checkpoints: docs/checkpoints/terraces-12/ (the fog and cloud sliders at four settings), docs/checkpoints/terraces-13/ (the clouds' twist at 0 and 0.6 from orbit; the fog's patchiness and patch size from 140 m; Kai's settings from 70 m, 30 m, the vista and 12 m).
 

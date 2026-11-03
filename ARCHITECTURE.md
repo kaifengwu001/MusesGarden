@@ -804,42 +804,61 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
 - Kai's towers and houses (models.ts, model.*.glsl): instanced per model
   and level of detail where the build placed them, rigid, lit as the
   terraces are, full detail near (140 m a tower, 60 m a house).
-- The mist (mist.ts, mistStrokes.ts, mist*.glsl; Kai, 2026-11-02: the
-  paintings' meandering mist, low among the hills, branching and merging,
-  its meanders not mechanical, its widths growing and shrinking as the
-  blue-green landscape's; one layer, translucent by its breadth, no
-  shadows): one shell round the planet, 2 m over a form 60 % of the way
-  from the land's broadest (the hills' octaves from 200 m) to the hills'
-  (from 60 m). Its bands are strokes (mistStrokes.ts), made once a seed on
-  the CPU: each runs along the wind and meanders as a river does (a
+- The mist (mist.ts, mistStrokes.ts, mistRibbons.ts, mist*.glsl; Kai,
+  2026-11-02: the paintings' meandering mist, low among the hills,
+  branching and merging, its meanders not mechanical, its widths growing
+  and shrinking as the blue-green landscape's; one layer, translucent by
+  its breadth, no shadows; a lever for how many; on a full sphere, each
+  cloud offset up or down from it): a sphere at the Cloud height over the
+  radius, the hills rising through it. Its clouds are strokes
+  (mistStrokes.ts), as many as the panel's Cloud count, made once a seed
+  on the CPU: each runs along the wind and meanders as a river does (a
   sine-generated curve, Kinoshita's, mostly calm, now and then coiling),
   steered round the hills (toward the side it clears the ground more, 4 m
   ahead), its breadth swelling into long bodies and pinching to necks,
-  scalloped along one edge, pointed at its tail, now and then curled at its
-  end; some fork, some run with a stacked sibling; kept where the layer
-  clears the ground (the mist's own 96² ground raster) and where it
-  overlaps others by under a fifth. The panel's coverage shows a share of
-  them (the same first). Their segments are splatted into an RG16F cube
-  map as the distance from their edges and their half-breadth there
-  (mistStroke.*.glsl: a quad round each, max blending). The layer drifts
-  with the wind (its lookup turned about the wind's axis); the hills rise
-  through it and it thins where the ground comes up to it. Painted cream
-  with greyer edges and a fine outline, its opacity by its breadth (30 %
-  at its necks to 86 % in its bodies), a little denser seen aslant,
-  thinning round the camera. It casts no shadow. The paddies' water
-  mirrors it (`mistReflected`: where the reflected ray meets the layer).
+  scalloped along one edge, thinner on the inside of its tightest bends,
+  pointed at its tail, now and then curled at its end; some fork, some run
+  with a stacked sibling. Each takes the first of up to 24 spots that
+  neither piles on the others (by a fifth of it) nor lies mostly under the
+  ground (the mist's own 96² ground raster; a try's straight run checked
+  first), or, the sphere crowded, the spot that piles on them least; none
+  within 20 m of the wind's poles, where the twisted wind swirls in, and
+  each ends 10 m short of them. A stroke with its branch and its sibling
+  is a cloud, offset up or down at random within the Cloud height range.
+  Their segments are splatted into two cube maps: an RG16F one of the
+  distance from their edges and their half-breadth there (the shapes:
+  mistStroke.*.glsl, a quad round each, max blending), and an RGBA8 one of
+  which chunk (8 m of a stroke) reaches furthest in at each place and its
+  cloud's height (the owners: the same quads, by depth). Each stroke is
+  drawn as a ribbon at its cloud's height (mistRibbons.ts: its spine and
+  two sides a meter apart, out to its breadth and a 0.6 m rim, drawn in
+  short of tight bends' centres and never folded over), in two meshes, the
+  clouds above the camera highest first and then those below it lowest
+  first. Each place of the clouds at a height is painted once, by the
+  chunk that owns it (or the chunk beside it), from the shapes' map, so a
+  cloud's strokes merge where they fork or cross, and clouds at one height
+  merge as one; where a stroke at another height owns it, a ribbon paints
+  itself there by its own shape (each vertex's distance inside its edge),
+  so clouds crossing at different heights are each whole. The strokes'
+  space drifts with the wind (turned about the wind's axis); a cloud thins
+  where the ground comes up to it. Painted cream with greyer edges and a
+  fine outline, its opacity by its breadth (30 % at its necks to 86 % in
+  its bodies), a little denser seen aslant, thinning round the camera. It
+  casts no shadow. The paddies' water mirrors the shapes at the sphere's
+  height (`mistReflected`: where the reflected ray meets it).
 - The height fog (fog.glsl, `uHeightFog`, the panel's Fog density, range
   and falloff): its full density up to its range (a height over the
   radius), thinning above by e every falloff meters; its amount along each
   view ray its exact integral from the camera's height to the point's, the
-  sky's haze in colour; over the terraces, trees, towers, houses, rice and
-  mist (not the sky, which is shared). Its density varies across the
-  globe by two octaves of noise (the panel's Fog patchiness and patch
-  size), taken along each ray as it is at the point and half way to it.
-  The mist's height, density and twist are the panel's Cloud height,
-  density and twist; the twist turns the strokes' way off the wind's by a
-  broad pattern over the globe (220 m and 85 m), so they leave their
-  latitude lines.
+  sky's haze in colour, tinted toward a soft blue or a jade green as light
+  as the haze (the panel's Fog tint and tint hue); over the terraces,
+  trees, towers, houses, rice and mist (not the sky, which is shared). Its
+  density varies across the globe by two octaves of noise (the panel's Fog
+  patchiness and patch size), taken along each ray as it is at the point
+  and half way to it. The mist's count, height, range, density and twist
+  are the panel's Cloud count, height, height range, density and twist;
+  the twist turns the strokes' way off the wind's by a broad pattern over
+  the globe (220 m and 85 m), so they leave their latitude lines.
 - The paddies' water (terrace.frag.glsl, rice.glsl `paddyWater`): each
   floor shows as much water as its look says (all flooded, 45 % just
   planted, 20 % growing, 6 % grown, none deep), mirroring the sky a little
@@ -898,7 +917,7 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
         sky.ts/.glsl       backdrop and dome, sun glow
         post.ts/.glsl      HDR target, bloom chain, tone curve (a planet may do without it and the bloom), paper grain
         look.ts, glsl.ts   shared look uniforms; shader chunk registry
-      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker, kept in the browser), its paint, trees, rice, Kai's models (models.ts) and its mist (mist.ts, mistStrokes.ts, mist*.glsl: layers of brushed strokes)
+      terraces/            the second planet: its mathematics (build/field.ts: the hills, the plains), the paddy lab's construction on it (build/: the grid, bands and cuts, the plains' fields, the villages, the towers' places, the build in a worker, kept in the browser), its paint, trees, rice, Kai's models (models.ts) and its mist (mist.ts, mistStrokes.ts, mistRibbons.ts, mist*.glsl: brushed strokes, each cloud at its own height)
       view/                camera rig (Overview ↔ Wander), the vista search, input gestures, keys (W A S D, Q E, arrows), CPU picking
       ui/                  title and metadata line, hints, control bar, lil-gui panel, postcard
       dev/                 perf HUD, GPU timer, harness (window.__meadow), parity, Playwright and Vitest
