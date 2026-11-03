@@ -364,8 +364,11 @@ export interface Verdict {
   readonly kept: boolean;
 }
 
-/** Sent straight to the guest's owner. It never expires: the owner uses it once, or the host's owner withdraws it. */
-export type InvitationState = 'sent' | 'used' | 'withdrawn';
+/**
+ * Sent straight to the guest's owner. It never expires: the owner uses it once, or the host's owner withdraws it.
+ * Using it is a trip, the owner and their Muse together at the host's planet, which is returned from early or at 2 h.
+ */
+export type InvitationState = 'sent' | 'used' | 'returned' | 'withdrawn';
 export type RelationshipStatus = 'acquainted' | 'friends' | 'ended';
 export type RelationshipOrigin = 'introduced' | 'met-beyond' | 'known-on';
 /** Strangers meet beyond the planet; Muses whose owners know each other meet online, wherever they are. */
@@ -530,6 +533,8 @@ export interface Invitation {
   readonly sentAt: Instant;
   /** When the guest's owner travelled; null until then. */
   readonly usedAt: Instant | null;
+  /** When the trip ended, early or when the visit closed; null until then. */
+  readonly returnedAt: Instant | null;
 }
 
 export interface SocialState {
@@ -668,16 +673,20 @@ export interface SocialPolicy {
   /** A hangout ends: gifts, the photo together, rapport, maybe an ending or an invitation. */
   hangout(host: MuseState, guest: MuseState, now: Instant, draw: Draw): { readonly host: readonly MuseEventBody[]; readonly guest: readonly MuseEventBody[] };
   /**
-   * The guest's owner uses the invitation ("Travel now"), or the host's owner withdraws it. The event goes to both
-   * logs; null means nothing changes (using it again inside the visit, withdrawing it twice).
+   * The guest's owner uses the invitation ("Travel now") or returns from the trip, or the host's owner withdraws it.
+   * The event goes to both logs; null means nothing changes (using it again inside the visit, returning or withdrawing
+   * it twice).
    */
   invitationStep(
     inv: Invitation,
-    action: 'use' | 'withdraw',
+    action: 'use' | 'withdraw' | 'return',
     as: MuseId,
     now: Instant,
   ): { readonly ok: true; readonly event: MuseEventBody | null } | { readonly ok: false; readonly status: 403 | 409; readonly error: string };
-  /** When `requester`'s visit to the host's planet stops being readable: 2 h after the guest used it. Null for anyone else, or before use. */
+  /**
+   * When `requester`'s visit to the host's planet stops being readable, which is when the trip ends: when the guest
+   * returned, or 2 h after they used it. Null for anyone else, or before use.
+   */
   visitUntil(inv: Invitation | undefined, requester: MuseId): Instant | null;
   /** Photo slots left on today's delivery day. Every hangout brings a photo, so none starts without a slot. */
   photoSlotsLeft(s: MuseState, now: Instant): number;
