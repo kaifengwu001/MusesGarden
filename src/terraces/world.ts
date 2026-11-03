@@ -1,4 +1,4 @@
-import { Frustum, Matrix4, Scene, Vector2, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Frustum, Matrix4, Quaternion, Scene, Vector2, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from '../core/buildQueue';
 import type { FrameClock } from '../core/clock';
 import type { Globals } from '../core/globals';
@@ -60,6 +60,12 @@ const VIEW_HEIGHT = { above: 70.2, standing: 4.3 } as const;
 const FLATS_VIEW = { height: 30, tilt: 0.35 } as const;
 /** The vista: the camera's height (m), its tilt from straight down (rad), how much wider its view (degrees). */
 const VISTA = { height: 24, tilt: (52 * Math.PI) / 180, widen: 28 } as const;
+/**
+ * Kai's view over the terraces (2026-11-03, from his URL: the rig's frame and its zoom, 16 m up), on the planet of the
+ * seed he chose it on: the vista, and where a straight zoom in from the opening arrives (the opening's frame, its
+ * stands' too). Other seeds look for theirs (findStand).
+ */
+const KAI_VIEW = { seed: 412, frame: new Quaternion(-0.3076, -0.3408, -0.5001, -0.7343).normalize(), zoom: 0.6029 } as const;
 /** The rice's pool, in pages of 2048 blades (rice.ts). */
 const RICE_PAGES = 400;
 
@@ -194,8 +200,14 @@ export class TerraceWorld implements PlanetWorld {
   defaultPose(): void {
     const stand = this.findStand();
     this.rig.lookAlong(stand.focus, stand.forward);
-    this.openingStand = stand.focus.clone();
+    // (a stand looked for before the towers stood is looked for again if one fills it; Kai's is his)
+    this.openingStand = this.kaiView ? null : stand.focus.clone();
     this.posed = true;
+  }
+
+  /** Whether this is the planet Kai chose his view on (KAI_VIEW). */
+  private get kaiView(): boolean {
+    return this.store.values.world.seed === KAI_VIEW.seed;
   }
 
   cameraPreset(name: CameraPreset, immediate = true): void {
@@ -210,16 +222,34 @@ export class TerraceWorld implements PlanetWorld {
       this.posed = true;
       return;
     }
+    if (name === 'vista' && !this.kaiView) {
+      this.paintingVista(immediate);
+      return;
+    }
     const stand = this.findStand();
     this.rig.lookAlong(stand.focus, stand.forward, immediate);
     if (name === 'vista') {
-      // high over the terraces, looking down across them and out over the next hills: a wide portrait view
-      const zoom = this.rig.zoomForAltitude(VISTA.height);
-      this.rig.setZoom(zoom, immediate);
-      this.rig.lookUp(VISTA.tilt - this.rig.framing(zoom).tilt);
-      this.rig.widenFov(VISTA.widen, immediate);
+      // Kai's view: his stand at his height, the zoom's own tilt and field of view
+      this.rig.setZoom(KAI_VIEW.zoom, immediate);
+      this.rig.lookUp(0, immediate);
+      this.rig.widenFov(0, immediate);
     } else if (name === 'muse' || name === 'meadow') this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.standing), immediate);
     else this.rig.setZoom(this.rig.zoomForAltitude(VIEW_HEIGHT.above), immediate);
+    this.posed = true;
+  }
+
+  /**
+   * The vista as the painting composes it (the squint test's, npm run squint:terraces; the Vista button's on other
+   * seeds): high over the terraces from a stand found by search, looking down across them and out over the next
+   * hills, a wide portrait view.
+   */
+  paintingVista(immediate = true): void {
+    const stand = this.searchStand();
+    this.rig.lookAlong(stand.focus, stand.forward, immediate);
+    const zoom = this.rig.zoomForAltitude(VISTA.height);
+    this.rig.setZoom(zoom, immediate);
+    this.rig.lookUp(VISTA.tilt - this.rig.framing(zoom).tilt);
+    this.rig.widenFov(VISTA.widen, immediate);
     this.posed = true;
   }
 
@@ -255,10 +285,18 @@ export class TerraceWorld implements PlanetWorld {
   }
 
   /**
-   * The best stand from a spiral of candidates over the planet: on a terraced hillside (its smoothed slope
-   * between the flats' and the woods'), the ground falling away in front of it; facing downhill.
+   * Kai's stand on the planet he chose it on (KAI_VIEW); on others the stand searchStand finds.
    */
   private findStand(): { focus: Vector3; forward: Vector3 } {
+    if (this.kaiView) return { focus: new Vector3(0, 1, 0).applyQuaternion(KAI_VIEW.frame), forward: new Vector3(0, 0, -1).applyQuaternion(KAI_VIEW.frame) };
+    return this.searchStand();
+  }
+
+  /**
+   * The best stand from a spiral of candidates over the planet: on a terraced hillside (its smoothed slope between
+   * the flats' and the woods'), the ground falling away in front of it; facing downhill.
+   */
+  private searchStand(): { focus: Vector3; forward: Vector3 } {
     const f = this.field;
     const R = f.R;
     const golden = Math.PI * (3 - Math.sqrt(5));

@@ -3,8 +3,9 @@ import { expect, test } from '@playwright/test';
 import type {} from './harnessApi';
 
 // `npm run squint:terraces`: the terraces' squint test, as the meadow's
-// (squint.spec.ts). Renders the terraces' vista (its 'vista' preset, found
-// by search: terraces/vista.ts) at the painting's portrait aspect and
+// (squint.spec.ts). Renders the terraces' vista as the painting composes it
+// (TerraceWorld.paintingVista, found by search; the Vista button's is Kai's
+// own view since 2026-11-03) at the painting's portrait aspect and
 // compares it with the vista target the way you would by squinting: both
 // shrunk to a 27×48 grid and blurred, the colour difference (CIE ΔE76 in
 // Lab) measured per cell. The target is the green terraces painting (the
@@ -42,7 +43,11 @@ test("the terraces' vista matches the painting when you squint", async ({ page }
   await page.waitForFunction(() => window.__meadow?.isReady === true, undefined, { timeout: 60_000 });
   await page.addStyleTag({ content: '#ui, .lil-gui { display: none !important; }' });
   await page.evaluate(async () => {
-    window.__meadow?.preset('vista');
+    // (once the build is in and its towers stand: the stand is looked for clear of them)
+    const terraces = (window as unknown as { __terraces?: { paintingVista(): void; whenBuilt(): Promise<void> } }).__terraces;
+    await terraces?.whenBuilt();
+    await window.__meadow?.settle();
+    terraces?.paintingVista();
     await window.__meadow?.settle();
     await window.__meadow?.settle();
   });
