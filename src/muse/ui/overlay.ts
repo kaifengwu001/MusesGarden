@@ -6,6 +6,7 @@ import { MuseApi } from './api';
 import { Body } from './body';
 import { DevTools } from './dev';
 import { el, SimClock } from './dom';
+import { gardenMuse } from '../../garden/source';
 
 /** The engine's view of Muse is read this often (ms), and again after every dev tools command. */
 const REFRESH_MS = 30_000;
@@ -23,8 +24,8 @@ const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (
 export function engineMuse(search: string): MuseId | null {
   const params = new URLSearchParams(search);
   const garden = params.get('garden');
-  const id = garden ? /\/api\/muses\/([^/]+)\/?$/.exec(new URL(garden, 'http://garden').pathname)?.[1] : undefined;
-  if (id) return decodeURIComponent(id) as MuseId;
+  const id = garden ? gardenMuse(garden) : null;
+  if (id) return id as MuseId;
   return params.has('dev') ? HERO : null;
 }
 

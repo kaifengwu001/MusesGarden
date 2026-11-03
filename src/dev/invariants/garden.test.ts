@@ -2,7 +2,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BED_RADIUS, bedAt, layOut, type PlacementGround } from '../../garden/placement';
 import { dayBefore, placeholderSnapshot, placeholderSource } from '../../garden/placeholder';
-import { httpSource } from '../../garden/source';
+import { httpSource, ReactionError } from '../../garden/source';
 import { GardenState } from '../../garden/state';
 import type { Basket, Find, GardenSnapshot, Reach } from '../../garden/types';
 import { Pins, type PinSpec } from '../../life/pins';
@@ -224,7 +224,7 @@ describe('the garden’s state', () => {
     expect(state.toggleCardFavorite('pc-terrace')).toBe(true);
     expect([state.cardFavorite('pc-terrace'), state.cardLiked('pc-terrace')], 'a star is not a like').toEqual([true, false]);
     expect(state.invitations.map((p) => p.id)).toEqual(['inv-pip', 'inv-juniper']);
-    state.useInvitation('inv-pip');
+    await state.useInvitation('inv-pip');
     expect(state.invitations.map((p) => p.id)).toEqual(['inv-juniper']);
     state.setShared('noodles', true);
     expect(state.interest('noodles')?.shared).toBe(true);
@@ -275,8 +275,22 @@ describe('the post: from today, envelopes and tickets', () => {
     state.markRead('inv-pip');
     expect(ids(state.today)).toEqual(['pc-terrace']);
     expect(ids(state.tickets)).toEqual(['inv-pip', 'inv-juniper']);
-    state.useInvitation('inv-juniper');
+    await state.useInvitation('inv-juniper');
     expect(ids(state.tickets), 'a used ticket is gone').toEqual(['inv-pip']);
+  });
+
+  it('gives a ticket back when the backend turns it down, and says why', async () => {
+    const source = placeholderSource();
+    source.react = () => Promise.reject(new ReactionError(409, 'this invitation is returned'));
+    const state = new GardenState(source);
+    await state.start();
+    const changes: string[] = [];
+    state.subscribe((c) => changes.push(c));
+    const using = state.useInvitation('inv-juniper');
+    expect(ids(state.invitations), 'gone at once, as you board').toEqual(['inv-pip']);
+    await expect(using).rejects.toMatchObject({ status: 409, message: 'this invitation is returned' });
+    expect(ids(state.invitations), 'and back when it was turned down').toEqual(['inv-pip', 'inv-juniper']);
+    expect(changes).toEqual(['postcards', 'postcards']);
   });
 
   it('counts today by the source’s day, which turns when post of a later day arrives', async () => {
@@ -494,6 +508,18 @@ describe('the hook a backend fills', () => {
     expect(calls[0][0]).toBe('https://muse.example/api/garden');
     expect(calls[1][0]).toBe('https://muse.example/api/garden/reactions');
     expect(JSON.parse(calls[1][1]?.body as string)).toEqual({ type: 'like-find', id: 'x', liked: true });
+    vi.unstubAllGlobals();
+  });
+
+  it('turns a refused reaction into the backend’s status and reason, and no network into status 0', async () => {
+    const source = httpSource('https://muse.example/api/');
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({ error: 'this invitation is returned' }), { status: 409 })));
+    await expect(source.react({ type: 'use-invitation', id: 'inv' })).rejects.toMatchObject({ status: 409, message: 'this invitation is returned' });
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response('<html>', { status: 502 })));
+    await expect(source.react({ type: 'use-invitation', id: 'inv' })).rejects.toMatchObject({ status: 502 });
+    vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')));
+    await expect(source.react({ type: 'use-invitation', id: 'inv' })).rejects.toBeInstanceOf(ReactionError);
+    await expect(source.react({ type: 'use-invitation', id: 'inv' })).rejects.toMatchObject({ status: 0 });
     vi.unstubAllGlobals();
   });
 });

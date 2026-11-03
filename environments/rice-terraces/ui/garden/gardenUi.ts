@@ -599,7 +599,8 @@ export class GardenUi {
     const card = this.state.postcards.find((p) => p.id === invitationId);
     if (!card?.invitation) return;
     this.mail.close();
-    this.state.useInvitation(invitationId);
+    // (src's GardenState now answers whether the backend took the ticket; this world's stand-in visit goes regardless, as before)
+    this.state.useInvitation(invitationId).catch((error: unknown) => console.warn('garden: a reaction could not be sent', error));
     void this.visit.start(card.invitation, card.invitation.fromName);
   }
 

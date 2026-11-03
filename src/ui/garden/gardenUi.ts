@@ -40,7 +40,8 @@ import { Mail } from './mail';
 import { MuseSheet } from './musePage';
 import { PostBox } from './postbox';
 import { dayLabel } from './timeline';
-import { Visit } from './travel';
+import { boardingUrl, refusal, tripUrl } from './travel';
+import { Transit } from '../../visit/transit';
 
 // The garden's interface over the meadow: Muse's finds as patches of flowers
 // with their cards, the pins on the globe, the post box with Muse's postcards and
@@ -151,7 +152,9 @@ export class GardenUi {
   private readonly postbox: PostBox;
   private readonly mail: Mail;
   private readonly museSheet: MuseSheet;
-  private readonly visit: Visit;
+  /** The ticket's stamp as you set off, and the way back to a trip under way. */
+  private readonly transit: Transit;
+  private readonly tripPill: HTMLElement;
   private readonly rail: HTMLElement;
   private readonly portrait: HTMLButtonElement;
   private readonly status: HTMLElement;
@@ -254,18 +257,11 @@ export class GardenUi {
 
     // the post box
     this.postbox = new PostBox(this.root, () => this.openSheet(() => void this.mail.open()));
-    this.visit = new Visit(this.root, world, store, {
-      leaving: () => {
-        this.closeCard();
-        this.dispatch({ type: 'sheet' });
-      },
-      changed: (away) => {
-        this.root.classList.toggle('is-away', away);
-        document.body.classList.toggle('g-away', away);
-      },
-    });
+    this.transit = new Transit(this.root);
+    this.tripPill = el('div', 'g-visit g-trip');
+    this.root.append(this.tripPill);
     this.mail = new Mail(this.root, this.state, this.postbox, {
-      travel: (id) => this.board(id),
+      travel: (id) => void this.board(id),
     });
     this.museSheet = new MuseSheet(this.root, this.state, { muse: museFace, friend: friendFace });
 
@@ -323,6 +319,7 @@ export class GardenUi {
       setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', () => this.showBasket(fresh.id)), 1800);
     }
     if (change === 'postcards' || change === 'snapshot') this.mail.refresh();
+    if (change === 'status' || change === 'snapshot' || change === 'friends') this.refreshTrip();
     if ((change === 'baskets' || change === 'visited' || change === 'snapshot') && holdsPointer(this.basket.phase)) this.showDays();
     if (change === 'interests' || change === 'snapshot' || change === 'status' || change === 'friends') this.museSheet.render();
     if (change === 'snapshot' || change === 'baskets' || change === 'interests') this.refreshFavourites();
@@ -406,7 +403,7 @@ export class GardenUi {
   update(dt: number): void {
     this.flight.update(dt);
     this.cutaway.update(dt);
-    const muse = this.visit.away ? OUT_OF_SIGHT : this.cutaway.entering && this.placed ? this.inside() : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
+    const muse = this.cutaway.entering && this.placed ? this.inside() : this.driveMuse ? this.driveMuse(dt) : this.state.status.home ? AT_HOME : OUT_OF_SIGHT;
     if (muse) this.world.muse.direct(muse);
   }
 
@@ -495,7 +492,6 @@ export class GardenUi {
       this.relayoutAt = now + 500;
       this.relayout();
     }
-    const away = this.visit.away;
     // Muse's whereabouts as it goes about, and its pin where it is now while it is drawn on the planet
     this.refreshWhereabouts();
     if (!w.muse.away) this.pins.move('muse', w.muse.where.dir, w.muse.where.height);
@@ -504,8 +500,8 @@ export class GardenUi {
     // the basket first: a flower that lands this frame hands over to its patch before the patches' state goes up
     this.stage.frame(dt);
     if (holdsPointer(this.basket.phase)) this.overlay.place(this.stage.layout(), this.fan?.more ?? 0, this.basket.preview);
-    this.beds.update(w.rig.altitude, !away);
-    this.pins.update(dt, !away, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
+    this.beds.update(w.rig.altitude, true);
+    this.pins.update(dt, true, w.rig.zoom, w.rig.camera, w.warp, w.growth.radius);
     // the hut: its furniture fetched as you come near, the way out shown while in, its favourites' lights marked
     if (!this.hutFetched && this.nearHut()) {
       this.hutFetched = true;
@@ -624,7 +620,6 @@ export class GardenUi {
    */
   private findAt(x: number, y: number, width: number, height: number): { bed: Bed; depth: number } | null {
     const w = this.world;
-    if (this.visit.away) return null;
     if ((this.marks?.spheresShown() ?? 0) > 0.5) {
       const R = w.growth.radius;
       let best: Bed | null = null;
@@ -838,7 +833,6 @@ export class GardenUi {
    * from the camera the pointer's ray meets the door as drawn (m), or null when it is not on it.
    */
   private doorAt(x: number, y: number, width: number, height: number): number | null {
-    if (this.visit.away) return null;
     const corners: Array<{ x: number; y: number }> = [];
     for (const [cx, cy] of [
       [DOOR.x0, DOOR.y0],
@@ -1353,16 +1347,47 @@ export class GardenUi {
 
   // ---- travel ----------------------------------------------------------------------------------
 
-  private board(invitationId: string): void {
+  /**
+   * Board on a ticket: the backend is asked first, and only once it has taken the ticket does the stamp come down
+   * and the page go to the host's planet (src/visit/). Turned down, or out of reach, you stay home and are told why.
+   */
+  private async board(invitationId: string): Promise<void> {
     if (this.cutaway.active) {
-      this.leaveHut(() => this.board(invitationId));
+      this.leaveHut(() => void this.board(invitationId));
       return;
     }
     const card = this.state.postcards.find((p) => p.id === invitationId);
     if (!card?.invitation) return;
+    const to = boardingUrl(invitationId, card.invitation, location.search);
+    if (!to) {
+      this.toast('Other worlds open to visits once your garden is connected to Muse.');
+      return;
+    }
+    try {
+      await this.state.useInvitation(invitationId);
+    } catch (error) {
+      // (the post stays open, the ticket back in it)
+      this.toast(refusal(error));
+      return;
+    }
     this.mail.close();
-    this.state.useInvitation(invitationId);
-    void this.visit.start(card.invitation);
+    this.closeCard();
+    this.dispatch({ type: 'sheet' });
+    await this.transit.leave(card.invitation.worldName, card.invitation.fromName);
+    location.assign(to);
+  }
+
+  /** While a trip is under way (the backend's status says so), the way back to it. */
+  private refreshTrip(): void {
+    const trip = this.state.status.trip;
+    const to = trip ? tripUrl(trip, location.search) : null;
+    this.tripPill.classList.toggle('is-on', to !== null);
+    if (!trip || !to) return;
+    const host = this.state.snapshot?.friends.find((f) => f.id === trip.host)?.name ?? 'your friend';
+    this.tripPill.replaceChildren(
+      el('span', 'g-visit-where', `On a trip to ${host}’s planet`),
+      button('g-visit-home', `Back to ${host}’s planet`, `${ICONS.globe}<span>Back to ${host}’s planet</span>`, () => location.assign(to)),
+    );
   }
 
   // ---- toasts ----------------------------------------------------------------------------------

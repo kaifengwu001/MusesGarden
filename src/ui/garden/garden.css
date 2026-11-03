@@ -2966,6 +2966,26 @@ button.g-ticket:focus-visible .g-ticket-go {
   pointer-events: auto;
 }
 
+/* a trip under way: the way back to it, over the controls, clear of the toasts and the planet's name at the top */
+.g-trip {
+  top: auto;
+  bottom: calc(var(--gutter) * 0.8 + 64px);
+  transform: translate(-50%, 20px);
+}
+
+.g-trip.is-on {
+  transform: translate(-50%, 0);
+}
+
+/* (on a phone the controls stand several rows tall: under the planet's name and the toasts instead) */
+@media (max-width: 640px) {
+  .g-trip {
+    top: 124px;
+    bottom: auto;
+    transform: translate(-50%, -20px);
+  }
+}
+
 .g-visit-where {
   font-family: var(--font-serif);
   font-size: 18px;
@@ -2976,13 +2996,6 @@ button.g-ticket:focus-visible .g-ticket-go {
   font-style: italic;
   font-size: 13px;
   color: var(--ink-soft);
-}
-
-.garden.is-away .g-rail,
-.garden.is-away .g-postbox {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
 }
 
 @media (max-width: 640px) {
@@ -3085,10 +3098,9 @@ body.g-mail-open .hud {
   transition: opacity 0.3s ease;
 }
 
-/* a sheet covers the rail and the panel's corner; a visit is not Muse's garden */
+/* a sheet covers the rail and the panel's corner */
 body.g-sheet-open .lil-gui.meadow-panel,
-body.g-sheet-open .g-rail,
-body.g-away .masthead {
+body.g-sheet-open .g-rail {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity 0.25s ease;

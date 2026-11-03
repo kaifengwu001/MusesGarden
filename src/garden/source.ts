@@ -21,6 +21,16 @@ export interface GardenSource {
   react(reaction: Reaction): Promise<void>;
 }
 
+/** The backend turned a reaction down, with its status and its reason (status 0: it could not be reached). */
+export class ReactionError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 /** A backend over HTTP: the snapshot as JSON, events as server-sent events (each a GardenEvent in JSON), reactions posted as JSON. */
 export function httpSource(base: string): GardenSource {
   const root = base.replace(/\/+$/, '');
@@ -48,10 +58,20 @@ export function httpSource(base: string): GardenSource {
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(reaction),
-      });
-      if (!response.ok) throw new Error(`garden: ${response.status} from ${root}/garden/reactions`);
+      }).catch(() => null);
+      if (!response) throw new ReactionError(0, 'garden: the backend could not be reached');
+      if (response.ok) return;
+      // the API answers a refusal as {error}: its reason, for whoever shows it
+      const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+      throw new ReactionError(response.status, typeof body?.error === 'string' ? body.error : `garden: ${response.status} from ${root}/garden/reactions`);
     },
   };
+}
+
+/** The Muse whose garden a backend URL reads (`…/api/muses/<id>`), or null for a URL of any other shape. */
+export function gardenMuse(base: string): string | null {
+  const id = /\/api\/muses\/([^/]+)\/?$/.exec(new URL(base, 'http://garden').pathname)?.[1];
+  return id ? decodeURIComponent(id) : null;
 }
 
 /** The source this page reads: a backend named in the URL, or the placeholders. */

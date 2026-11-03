@@ -77,6 +77,37 @@ test('the sample visit on Lantern: both Muses together, every plant on dry groun
   expect(Math.abs((again.left ?? 0) - (s.left ?? 0)), 'the same visit, not a fresh 2 h').toBeLessThan(60_000);
 });
 
+/** The garden at home, its post open on the tickets. */
+async function post(page: Page): Promise<void> {
+  await page.goto('/?garden=/api/muses/hero');
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __meadow?: { isReady: boolean }; __garden?: unknown };
+    return w.__meadow?.isReady === true && w.__garden !== undefined;
+  }, undefined, { timeout: 90_000 });
+  await page.evaluate(() => (window as unknown as { __garden: { travel(): void } }).__garden.travel());
+}
+
+test('a ticket the backend turns down keeps the owner home, and says why', async ({ page }) => {
+  await page.route('**/api/muses/hero/garden/reactions', (route) =>
+    route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'this invitation is used' }) }),
+  );
+  await post(page);
+  await page.getByRole('button', { name: 'Travel to Lantern Reed Gardens' }).click();
+  await expect(page.locator('.g-toast')).toContainText('This ticket has been used already');
+  await page.waitForTimeout(1500);
+  expect(new URL(page.url()).pathname).toBe('/');
+  await expect(page.getByRole('button', { name: 'Travel to Lantern Reed Gardens' }), 'the ticket is back in the post').toBeVisible();
+});
+
+test('boarding the sample ticket in the garden goes to the host’s planet, on this visit', async ({ page }) => {
+  await post(page);
+  const used = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/muses/hero/garden/reactions'));
+  await page.getByRole('button', { name: 'Travel to Lantern Reed Gardens' }).click();
+  expect((await used).postDataJSON()).toEqual({ type: 'use-invitation', id: 'inv-wren-hero-1' });
+  await page.waitForURL(/\/environments\/lantern-reed-gardens\/\?visit=inv-wren-hero-1&as=hero&garden=%2Fapi%2Fmuses%2Fhero$/, { timeout: 30_000 });
+  expect((await arrive(page)).phase).toBe('visiting');
+});
+
 test('Return home ends the trip and goes to the guest’s own planet', async ({ page }) => {
   await page.goto(VISIT);
   await arrive(page);

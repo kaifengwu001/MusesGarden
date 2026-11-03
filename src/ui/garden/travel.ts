@@ -1,91 +1,41 @@
-import type { Invitation } from '../../garden/types';
-import type { ParamPath, ParamStore, ParamValue } from '../../params';
-import { ticket } from '../../visit/transit';
-import type { World } from '../../world';
-import { button, el, nextFrame, wait } from './dom';
-import { ICONS } from './icons';
+import { gardenMuse, ReactionError } from '../../garden/source';
+import type { Invitation, MuseStatus } from '../../garden/types';
+import { isPlanetId } from '../../muse/planets';
+import { visitUrl } from '../../visit/params';
 
-// Travel: a visit to a friend's world on a ticket from the post, good for one
-// visit (a guest at a friend's place, not a standing pass). Other
-// worlds are not built yet, so a visit is a stand-in: the meadow re-seeded
-// and re-planted (its own hills, wetter ground, white and blue flowers),
-// your finds and pins put away, Muse left at home, until you return.
+// Travel: a ticket from the post takes you, with Muse, to your friend's own planet, where the visit runtime
+// (src/visit/) shows it. Boarding asks the backend first: it may turn the ticket down (used up, withdrawn, not yours)
+// or not answer, and then you stay home and are told why. A trip under way can be gone back to while it lasts.
 
-/** The stand-in for a friend's world: what changes while you visit. */
-const AWAY: ReadonlyArray<readonly [ParamPath, ParamValue]> = [
-  ['terrain.wetlands', 0.68],
-  ['terrain.roll', 2.1],
-  ['flowers.pink', 0.04],
-  ['flowers.star', 0.6],
-  ['flowers.yellow', 0.1],
-  ['flowers.blue', 0.55],
-  ['clouds.coverage', 0.62],
-  ['grass.height', 0.55],
-];
-
-function seedFor(world: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < world.length; i++) h = Math.imul(h ^ world.charCodeAt(i), 16777619);
-  return 1000 + ((h >>> 0) % 8000);
+/** The garden's backend and its Muse, as this page's URL names them (`?garden=…/api/muses/<id>`); null without one. */
+function gardenOf(search: string): { readonly garden: string; readonly as: string } | null {
+  const garden = new URLSearchParams(search).get('garden');
+  const as = garden ? gardenMuse(garden) : null;
+  return garden && as ? { garden, as } : null;
 }
 
-export class Visit {
-  away = false;
-  private saved: Array<[ParamPath, ParamValue]> = [];
-  private readonly transit: HTMLElement;
-  private readonly banner: HTMLElement;
+/**
+ * The page a ticket takes you to: its host's planet, on this visit. Null when this garden can't travel: the
+ * placeholder garden (no backend to board with), or a ticket that names no planet.
+ */
+export function boardingUrl(ticketId: string, invitation: Invitation, search: string): string | null {
+  const at = gardenOf(search);
+  if (!at || !isPlanetId(invitation.world)) return null;
+  return visitUrl(invitation.world, { invitation: ticketId, as: at.as, garden: at.garden });
+}
 
-  constructor(
-    parent: HTMLElement,
-    private readonly world: World,
-    private readonly store: ParamStore,
-    private readonly hooks: { leaving(): void; changed(away: boolean): void },
-  ) {
-    this.transit = el('div', 'g-transit');
-    this.banner = el('div', 'g-visit');
-    parent.append(this.transit, this.banner);
-  }
+/** The way back to a trip under way: its visit's page. */
+export function tripUrl(trip: NonNullable<MuseStatus['trip']>, search: string): string | null {
+  const at = gardenOf(search);
+  if (!at || !isPlanetId(trip.planet)) return null;
+  return visitUrl(trip.planet, { invitation: trip.invitation, as: at.as, garden: at.garden });
+}
 
-  async start(invitation: Invitation): Promise<void> {
-    if (this.away) return;
-    const friend = invitation.fromName;
-    this.hooks.leaving();
-    this.transit.replaceChildren(ticket(invitation.worldName, friend));
-    this.transit.classList.add('is-on');
-    await nextFrame();
-    this.transit.classList.add('is-stamped');
-    await wait(900);
-    const paths: ParamPath[] = ['world.seed', ...AWAY.map(([p]) => p)];
-    this.saved = paths.map((p) => [p, this.store.get(p)]);
-    this.store.set('world.seed', seedFor(invitation.world));
-    for (const [p, v] of AWAY) this.store.set(p, v);
-    this.store.flush();
-    this.world.cameraPreset('vista', true);
-    this.away = true;
-    this.hooks.changed(true);
-    this.banner.replaceChildren(
-      el('span', 'g-visit-where', `Visiting ${invitation.worldName}`),
-      el('span', 'g-visit-who', `${friend}’s world · a stand-in until other worlds are built`),
-      button('g-visit-home', 'Return home', `${ICONS.house}<span>Return home</span>`, () => void this.end()),
-    );
-    await wait(500);
-    this.banner.classList.add('is-on');
-    this.transit.classList.remove('is-on', 'is-stamped');
-  }
-
-  async end(): Promise<void> {
-    if (!this.away) return;
-    this.banner.classList.remove('is-on');
-    this.transit.replaceChildren(ticket('Home', 'Muse'));
-    this.transit.classList.add('is-on', 'is-home');
-    await wait(450);
-    for (const [p, v] of this.saved) this.store.set(p, v);
-    this.store.flush();
-    this.world.cameraPreset('homestead', true);
-    this.away = false;
-    this.hooks.changed(false);
-    await wait(500);
-    this.transit.classList.remove('is-on', 'is-home');
-  }
-
+/** Why a ticket didn't take you anywhere, in a line. */
+export function refusal(error: unknown): string {
+  const status = error instanceof ReactionError ? error.status : 0;
+  if (status === 409) return 'This ticket has been used already, or taken back.';
+  if (status === 403) return 'This ticket is someone else’s.';
+  if (status === 404) return 'This ticket isn’t in the post any more.';
+  return 'The ticket couldn’t be used just now. Try again in a moment.';
 }
