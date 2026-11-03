@@ -18,6 +18,12 @@ function walked(h: HostAt, m: number): HostAt {
   return host(travel(h.dir, h.heading, m / R, new Vector3()), h.heading);
 }
 
+/** Where a guest stands from its host (m): along the host's heading (+ ahead), and to its side (+ its left). */
+function offset(h: HostAt, at: Vector3): { along: number; side: number } {
+  const d = at.clone().sub(h.dir).multiplyScalar(R);
+  return { along: d.dot(h.heading), side: d.dot(new Vector3().crossVectors(h.dir, h.heading)) };
+}
+
 function run(f: Follower, h: HostAt, seconds: number, dry: (dir: Vector3) => boolean = dryEverywhere) {
   let last = f.step(h, 0, R, dry);
   for (let t = 0; t < seconds; t += 1 / 60) last = f.step(h, 1 / 60, R, dry);
@@ -109,6 +115,49 @@ describe('the guest beside its host', () => {
     const g = f.step(far, 1 / 60, R, dryEverywhere);
     expect(meters(g.dir, far.dir)).toBeCloseTo(FOLLOW.side, 3);
     expect(g.walk).toBe(0);
+  });
+
+  it('walks beside a host that keeps walking, not behind it', () => {
+    const f = new Follower();
+    let h = host(new Vector3(0, 1, 0));
+    f.step(h, 1 / 60, R, dryEverywhere);
+    const pace = 0.5;
+    let worst = { along: 0, side: Infinity, apart: 0 };
+    for (let t = 0; t < 20; t += 1 / 60) {
+      h = walked(h, pace / 60);
+      const g = f.step(h, 1 / 60, R, dryEverywhere);
+      if (t < 3) continue;
+      const { along, side } = offset(h, g.dir);
+      worst = { along: Math.max(worst.along, Math.abs(along)), side: Math.min(worst.side, Math.abs(side)), apart: Math.max(worst.apart, meters(g.dir, h.dir)) };
+    }
+    // (a little ahead or behind as it keeps pace, never trailing: abreast, a step to the side)
+    expect(worst.along, 'how far ahead or behind the host it ever is').toBeLessThan(0.6);
+    expect(worst.side, 'never in the host’s path').toBeGreaterThan(0.8);
+    expect(worst.apart).toBeLessThan(2);
+  });
+
+  it('keeps up with a host pacing back and forth, as Violet Dunes’ Muse does between its stands', () => {
+    const f = new Follower();
+    let h = host(new Vector3(0, 1, 0));
+    f.step(h, 1 / 60, R, dryEverywhere);
+    const pace = 0.36;
+    let walkingWorst = 0;
+    let settledWorst = 0;
+    for (let lap = 0; lap < 4; lap++) {
+      // it walks 1.8 m, turns about on the spot, stands a while
+      for (let m = 0; m < 1.8; m += pace / 60) {
+        h = walked(h, pace / 60);
+        const g = f.step(h, 1 / 60, R, dryEverywhere);
+        if (lap > 0 || m > 1) walkingWorst = Math.max(walkingWorst, Math.abs(offset(h, g.dir).along));
+      }
+      h = host(h.dir, h.heading.clone().negate());
+      for (let t = 0; t < 4; t += 1 / 60) {
+        const g = f.step(h, 1 / 60, R, dryEverywhere);
+        if (t > 2) settledWorst = Math.max(settledWorst, Math.abs(meters(g.dir, h.dir) - FOLLOW.side));
+      }
+    }
+    expect(walkingWorst, 'while it walks: never more than a stride behind or ahead').toBeLessThan(0.9);
+    expect(settledWorst, 'once it stands: beside it again within two seconds').toBeLessThan(0.05);
   });
 
   it('starts over beside the host after a reset', () => {
