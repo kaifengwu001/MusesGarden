@@ -27,5 +27,9 @@ void main() {
   // plants' height, its floor, colour, stage: a floor's; none on the walls, dams, ridges or the woods
   Crop crop = cropFrom(aPaddy.x, aPaddy.y, aPaddy.z, aPaddy.w, aFloor.y);
   vData = aPart < 0.5 ? vec4(crop.height, aFloor.x, crop.variant, crop.maturity) : vec4(0.0);
-  gl_Position = vec4(xy, clamp(1.0 - (h + 20.0) / 200.0, 0.0, 1.0) * 2.0 - 1.0, 1.0);
+  // (only the ground round the focus, the rest past the far plane: the map's angle wraps round the planet, and the
+  // triangle over the focus's antipode, its corners every way round it, was spread over the whole map, so where it
+  // stood higher than the paddies under the focus their rice took its floor, floating meters up, or none grew)
+  float z = a < 2.0 * uMapCentre.w ? clamp(1.0 - (h + 20.0) / 200.0, 0.0, 1.0) * 2.0 - 1.0 : 2.0;
+  gl_Position = vec4(xy, z, 1.0);
 }
