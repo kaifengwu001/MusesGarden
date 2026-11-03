@@ -76,8 +76,8 @@ export function topicRgb(interest: Pick<Interest, 'species' | 'variant'> | undef
 
 function media(find: Find): HTMLElement {
   const m = find.media;
+  // every kind in the same 16:9 frame (garden.css .g-media), a tall reel cropped to it, so every card is one size
   const box = el('div', 'g-media');
-  box.style.aspectRatio = String(m.aspect ?? (m.kind === 'reel' ? 9 / 16 : m.kind === 'article' || m.kind === 'video' ? 16 / 9 : 1));
   if (m.image) {
     const img = el('img');
     img.src = m.image;
@@ -126,7 +126,8 @@ export function cardBody(find: Find, interest: Interest | undefined): HTMLElemen
     if (by) text.append(el('p', 'g-byline', by));
     body.append(text);
   } else {
-    body.append(head(find, colour), media(find));
+    // the picture first, as an article's or a video's, then who posted it
+    body.append(media(find), head(find, colour));
     if (m.text) body.append(el('p', 'g-caption', m.text));
   }
   if (find.note) body.append(el('p', 'g-note', `“${find.note}”`));
