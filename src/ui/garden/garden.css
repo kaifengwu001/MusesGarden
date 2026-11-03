@@ -2410,7 +2410,7 @@ body.garden-on .hud {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 54px 40px;
-  padding: 56px 46px 64px;
+  padding: 72px 64px 80px;
 }
 
 .g-album-slot {
@@ -3052,7 +3052,7 @@ button.g-ticket:focus-visible .g-ticket-go {
   .g-album-page {
     grid-template-columns: repeat(2, 1fr);
     gap: 40px 24px;
-    padding: 36px 24px 46px;
+    padding: 46px 34px 56px;
   }
   .g-visit {
     flex-wrap: wrap;
