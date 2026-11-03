@@ -18,6 +18,7 @@ import { shelf } from '../domain/shelf';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
 import { parseSoul, renderSoulSection } from '../domain/soul';
+import { planetStills } from '../fixtures/planetStills';
 import { emptyState, reduceCore } from '../domain/state';
 import { localDay } from '../domain/time';
 import { Engine, type EngineDeps } from './engine';
@@ -69,6 +70,7 @@ export const viewHelpers: ViewHelpers = {
   metrics,
   localDay,
   soulBody: (soulMd) => parseSoul(soulMd).body,
+  planetStills,
 };
 
 /** A mind that writes its postcards with `model` and thinks everything else with `rest`. */

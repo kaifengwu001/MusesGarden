@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignStills, PLAIN, STILLS, type PhotoToShow, type StillKey } from './stills';
+import { assignStills, PLAIN, poolFor, STILLS, type PhotoToShow, type PlanetStills, type StillKey } from './stills';
 
 const onDisk = new Set(Object.keys(import.meta.glob('./*.jpg', { query: '?url', import: 'default', eager: true })).map((p) => p.slice(2)));
 const keys = Object.keys(STILLS) as StillKey[];
@@ -64,5 +64,35 @@ describe('the postcard stills', () => {
   it('deals each Muse its own order', () => {
     const other = assignStills(photos, 'wren');
     expect(photos.filter((p) => other.get(p.id)!.file !== shown.get(p.id)!.file).length).toBeGreaterThan(photos.length / 2);
+  });
+});
+
+describe('a photo taken on another planet', () => {
+  const violet: PlanetStills = {
+    friend: ['violet-dunes/friend-1.jpg', 'violet-dunes/friend-2.jpg'],
+    scenery: ['violet-dunes/scenery-1.jpg', 'violet-dunes/scenery-2.jpg', 'violet-dunes/scenery-3.jpg'],
+  };
+  const planets = new Map([['violet-dunes', violet]]);
+
+  it('shows that planet: its stills of that kind, else its nearest kind; the meadow’s only where it has none near', () => {
+    expect(poolFor('friend', 'violet-dunes', planets).files).toBe(violet.friend);
+    expect(poolFor('selfie', 'violet-dunes', planets).files, 'a selfie, two Muses close: its friends').toBe(violet.friend);
+    expect(poolFor('home', 'violet-dunes', planets).files, 'its home, out of shots of it: its scenery').toBe(violet.scenery);
+    expect(poolFor('beyond', 'violet-dunes', planets).files, 'nothing near a view from beyond').toBe(STILLS.beyond);
+    expect(poolFor('friend', 'golden-rye', planets).files, 'a planet with no stills yet').toBe(STILLS.friend);
+    expect(poolFor('friend', undefined, planets).files).toBe(STILLS.friend);
+  });
+
+  it('is dealt from that planet, in rounds of its own, leaving the meadow’s rounds to the meadow’s photos', () => {
+    const away: PhotoToShow[] = Array.from({ length: 6 }, (_, i) => ({ id: `v${i}`, key: 'friend', day: `day-${i}`, planet: 'violet-dunes' }));
+    const both = assignStills([...photos, ...away], 'fern', planets);
+    for (const p of photos) expect(both.get(p.id), p.id).toEqual(shown.get(p.id));
+    const files = away.map((p) => both.get(p.id)!.file);
+    for (const f of files) expect(violet.friend).toContain(f);
+    // two stills, six photos: each round shows both before either comes again, and a still come round again looks its own
+    expect(new Set(files.slice(0, 2)).size).toBe(2);
+    const looks = away.map((p) => JSON.stringify(both.get(p.id)!.look));
+    expect(looks[0]).toBe(JSON.stringify(PLAIN));
+    expect(new Set(away.map((_, k) => `${files[k]}|${looks[k]}`)).size, 'no two photos the same picture').toBe(6);
   });
 });

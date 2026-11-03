@@ -35,6 +35,7 @@ export const ROUTES = {
   gardenReactions: { method: 'POST', pattern: '/api/muses/:id/garden/reactions' },
   media: { method: 'GET', pattern: '/api/media/:mid' },
   postcardImage: { method: 'GET', pattern: '/api/postcards/:name' },
+  planetPostcardImage: { method: 'GET', pattern: '/api/postcards/:planet/:name' },
 } as const satisfies Record<string, { readonly method: 'GET' | 'POST'; readonly pattern: string }>;
 
 export type RouteName = keyof typeof ROUTES;

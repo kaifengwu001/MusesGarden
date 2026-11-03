@@ -10,7 +10,10 @@ import { siteOf } from '../adapters/sources/media';
 import { run, seedCast } from '../cli/run';
 import { lifePolicy } from '../domain/policy/index';
 import { FIXTURES_DIR, loadCast, membersOf, readMemberDocs } from '../fixtures/cast';
-import { buildGarden, type Garden } from './compose';
+import { STILLS, type PlanetStills, type StillKey } from '../../src/assets/postcards/stills';
+import { socialPolicy } from '../domain/social/policy';
+import { buildGarden, viewHelpers, type Garden } from './compose';
+import { Views } from './views';
 import { soulLine } from './garden';
 
 const START = Date.parse('2026-11-02T08:00:00-08:00') as Instant;
@@ -131,8 +134,8 @@ describe('the garden snapshot on a seeded engine', () => {
       const cards = (JSON.parse(JSON.stringify(garden.views.garden(id, garden.engine.now()))) as GardenSnapshot).postcards;
       expect(cards.map((p) => p.id).sort()).toEqual([...s.photos.map((p) => p.id), ...received(id).map((inv) => inv.id)].sort());
       for (const p of cards) {
-        expect(p.image).toMatch(/^\/api\/postcards\/[a-z]+(-[a-z]+)*(-\d+)?\.jpg$/);
-        expect(existsSync(POSTCARDS + p.image.split('/').at(-1)), p.image).toBe(true);
+        expect(p.image).toMatch(/^\/api\/postcards\/([a-z]+(-[a-z]+)*\/)?[a-z]+(-[a-z]+)*(-\d+)?\.(jpg|jpeg|png)$/);
+        expect(existsSync(POSTCARDS + p.image.slice('/api/postcards/'.length)), p.image).toBe(true);
         expect(p.place.length).toBeGreaterThan(0);
       }
       if (id === HERO) expect(new Set(cards.map((p) => p.image)).size, 'the hero’s photos vary').toBeGreaterThan(8);
@@ -153,6 +156,28 @@ describe('the garden snapshot on a seeded engine', () => {
       const away = s.photos.find((p) => p.planetOf !== id);
       if (away) expect(cards.find((p) => p.id === away.id)?.place).toContain(garden.engine.state(away.planetOf)!.seed.name);
     }
+  });
+
+  it('shows a photo taken on a friend’s planet, and a ticket to it, with that planet’s own stills once it has them', () => {
+    // every planet given stills of its own (the files needn't be there for the dealing)
+    const ofPlanet = (planet: string): PlanetStills => Object.fromEntries((Object.keys(STILLS) as StillKey[]).map((k) => [k, [1, 2, 3].map((n) => `${planet}/${k}-${n}.jpg`)]));
+    const planets = new Map(Object.keys(PLANETS).filter((p) => p !== 'meadow').map((p) => [p, ofPlanet(p)]));
+    const views = new Views(garden.engine, socialPolicy, { ...viewHelpers, planetStills: () => planets }, membersOf(loadCast()));
+    const planetOf = (id: MuseId) => loadCast().members.find((m) => m.id === id)!.planet;
+    const s = garden.engine.state(HERO)!;
+    const cards = views.garden(HERO, garden.engine.now())!.postcards;
+    const away = s.photos.filter((p) => p.planetOf !== HERO && p.context !== 'beyond');
+    expect(away.length, 'the run took the hero’s Muse to a friend’s planet').toBeGreaterThan(0);
+    for (const photo of s.photos) {
+      const card = cards.find((p) => p.id === photo.id)!;
+      const planet = planetOf(photo.planetOf);
+      if (planet === 'meadow') expect(card.image, 'at home: the meadow’s stills').toMatch(/^\/api\/postcards\/[a-z-]+-\d+\.jpg$/);
+      else expect(card.image, `${photo.id}: ${planet}’s`).toMatch(new RegExp(`^/api/postcards/${planet}/`));
+    }
+    for (const card of cards.filter((p) => p.invitation)) expect(card.image).toMatch(new RegExp(`^/api/postcards/${card.invitation!.world}/`));
+    // and still no two cards look the same
+    const shown = cards.map((p) => `${p.image} ${JSON.stringify(p.look ?? null)}`);
+    expect(new Set(shown).size).toBe(shown.length);
   });
 
   it('describes Muse from SOUL.md in a line, on its own planet, with its friends', () => {

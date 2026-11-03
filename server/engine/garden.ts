@@ -1,6 +1,6 @@
 // The garden's interface (src/garden/types.ts) filled from the engine: one Muse's snapshot, and the events that
 // change it, read from its state and its log. Pure: Views gathers the input.
-import { assignStills, PLAIN, STILLS, type Shown, type StillKey } from '../../src/assets/postcards/stills';
+import { assignStills, PLAIN, STILLS, type PlanetStills, type Shown, type StillKey } from '../../src/assets/postcards/stills';
 import { hash32, salt, unit } from '../../src/core/hash';
 import { mediaOf } from '../../src/garden/media';
 import { PLANETS } from '../../src/muse/planets';
@@ -60,6 +60,8 @@ export interface GardenInput {
   readonly planetOf: (id: MuseId) => HostPlanet | null;
   /** The trip the owner is on now, if any. */
   readonly trip: Trip | null;
+  /** Each planet's own postcard stills; without them, every photo shows the meadow's. */
+  readonly stills?: ReadonlyMap<string, PlanetStills>;
 }
 
 export type Trip = NonNullable<MuseStatus['trip']>;
@@ -208,12 +210,24 @@ export function shownAs(shown: Shown | undefined): Pick<Postcard, 'image' | 'loo
   return { image: `/api/postcards/${shown.file}`, ...(plain ? {} : { look: shown.look }) };
 }
 
-/** The still each of Muse's cards shows (assignStills): its photos in the order they came, and the invitations it was sent. */
+/**
+ * The still each of Muse's cards shows (assignStills): its photos in the order they came, each of the planet it was
+ * taken on, and the invitations it was sent, each of its host's planet.
+ */
 function stillsOf(input: GardenInput): ReadonlyMap<string, Shown> {
   const { s } = input;
-  const photos = assignStills(s.photos.map((p) => ({ id: p.id, key: stillKey(p), day: input.day(p.at) })), s.seed.id);
+  const on = (id: MuseId) => input.planetOf(id)?.planet;
+  const photos = assignStills(
+    s.photos.map((p) => ({ id: p.id, key: stillKey(p), day: input.day(p.at), planet: on(p.planetOf) })),
+    s.seed.id,
+    input.stills,
+  );
   const sent = [...s.social.invitations.values()].filter((inv) => inv.guest === s.seed.id);
-  const invitations = assignStills(sent.map((inv) => ({ id: inv.id, key: 'invitation' as const, day: input.day(inv.sentAt) })), s.seed.id);
+  const invitations = assignStills(
+    sent.map((inv) => ({ id: inv.id, key: 'invitation' as const, day: input.day(inv.sentAt), planet: on(inv.host) })),
+    s.seed.id,
+    input.stills,
+  );
   return new Map([...photos, ...invitations]);
 }
 

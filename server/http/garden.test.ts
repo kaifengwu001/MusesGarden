@@ -327,4 +327,18 @@ describe('postcard images', () => {
       expect((await fetch(base + path)).status, path).toBe(404);
     }
   });
+
+  it('serves a planet’s own stills from its folder only, and nothing else', async () => {
+    const commands = fakeCommands();
+    await serve({ queries: fakeQueries(), commands, now: () => commands.clock().now, subscribe: () => () => undefined });
+    for (const path of [
+      '/api/postcards/violet-dunes/friend-99.jpg',
+      '/api/postcards/mossy-hollow/friend-1.jpg',
+      '/api/postcards/violet-dunes/..%2F..%2F..%2Fpackage.json',
+      '/api/postcards/..%2Fpostcards/friend-1.jpg',
+      '/api/postcards/violet-dunes/friend-1.gif',
+    ]) {
+      expect((await fetch(base + path)).status, path).toBe(404);
+    }
+  });
 });

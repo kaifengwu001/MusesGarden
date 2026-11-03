@@ -42,6 +42,7 @@ import type {
 } from '../../src/muse/contract';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { Engine } from './engine';
+import type { PlanetStills } from '../../src/assets/postcards/stills';
 import { flowerOf, gardenFrames, gardenSnapshot, topicLabel, type GardenInput, type Trip } from './garden';
 
 /** Domain functions the views need, injected so this file depends only on the contract. */
@@ -58,6 +59,8 @@ export interface ViewHelpers {
   readonly localDay: (at: Instant, timezone: string) => string;
   /** SOUL.md without its frontmatter. */
   readonly soulBody: (soulMd: string) => string;
+  /** Each planet's own postcard stills now (server/fixtures/planetStills.ts); without it, every photo shows the meadow's. */
+  readonly planetStills?: () => ReadonlyMap<string, PlanetStills>;
 }
 
 const SLEEP_MS = 90 * 60_000;
@@ -187,6 +190,7 @@ export class Views implements GardenQueries {
         return other ? { planet, seed: other.seed.worldSeed, g: this.helpers.growth(other), look } : null;
       },
       trip: this.trip(s, at),
+      stills: this.helpers.planetStills?.(),
     };
   }
 

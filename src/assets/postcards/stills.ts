@@ -25,11 +25,53 @@ export const STILLS: Readonly<Record<StillKey, readonly string[]>> = {
   invitation: ['invitation-1.jpg', 'invitation-2.jpg', 'invitation-3.jpg'],
 };
 
-/** A photo that needs a still: its key, and the day it arrived. */
+/**
+ * A planet's own stills, by what each shows: paths under this folder, `<planet>/<key>-<n>.jpg` (or .png), taken on
+ * that planet. A planet with none yet is shown with the meadow's (STILLS) until its own are in.
+ */
+export type PlanetStills = Readonly<Partial<Record<StillKey, readonly string[]>>>;
+
+/** No planet's stills but the meadow's. */
+const MEADOW_ONLY: ReadonlyMap<string, PlanetStills> = new Map();
+
+/** A photo that needs a still: its key, the day it arrived, and the planet it was taken on (the meadow's when not given). */
 export interface PhotoToShow {
   readonly id: string;
   readonly key: StillKey;
   readonly day: string;
+  readonly planet?: string;
+}
+
+/** What else a planet's still of each kind may show when that planet has none of that kind yet, nearest first. */
+const NEAREST: Readonly<Record<StillKey, readonly StillKey[]>> = {
+  scenery: ['sky'],
+  sky: ['scenery'],
+  closeup: ['find', 'scenery'],
+  creature: ['scenery'],
+  find: ['closeup', 'scenery'],
+  selfie: ['friend', 'scenery'],
+  work: ['home', 'scenery'],
+  home: ['scenery'],
+  friend: ['selfie', 'new-friend', 'scenery'],
+  'new-friend': ['friend', 'selfie', 'scenery'],
+  beyond: [],
+  invitation: ['scenery', 'friend'],
+};
+
+/**
+ * The stills a photo of this kind on this planet is dealt from, and the pool's name (its rounds are its own): the
+ * planet's own of that kind, else its nearest kind it has; on the meadow, or on a planet with nothing near, the
+ * meadow's of that kind.
+ */
+export function poolFor(key: StillKey, planet: string | undefined, planets: ReadonlyMap<string, PlanetStills>): { readonly pool: string; readonly files: readonly string[] } {
+  const own = planet === undefined ? undefined : planets.get(planet);
+  if (own) {
+    for (const k of [key, ...NEAREST[key]]) {
+      const files = own[k];
+      if (files && files.length > 0) return { pool: `${planet}/${k}`, files };
+    }
+  }
+  return { pool: key, files: STILLS[key] };
 }
 
 export interface Shown {
@@ -41,9 +83,9 @@ export const PLAIN: PhotoLook = { flip: false, zoom: 1, x: 0.5, y: 0.5, tone: 'n
 const TONES = ['warm', 'cool', 'dusk', 'mist', 'bright'] as const;
 
 /** A still's look on its `round`th time round: as rendered the first time; after that mirrored or not, cropped in on its own spot, toned for the round. */
-function lookFor(seed: string, key: StillKey, round: number, file: string): PhotoLook {
+function lookFor(seed: string, pool: string, round: number, file: string): PhotoLook {
   if (round === 0) return PLAIN;
-  const h = salt(`${seed}|${key}|${round}|${file}`);
+  const h = salt(`${seed}|${pool}|${round}|${file}`);
   return {
     flip: round % 2 === 1 ? true : (h & 1) === 1,
     zoom: Number((1.14 + 0.18 * unit(h)).toFixed(3)),
@@ -65,21 +107,24 @@ function round(stills: readonly string[], seed: string, after: string | null): s
 }
 
 /**
- * The still each photo shows, in the order Muse took them (`photos`, oldest first; `seed`, the Muse). A key's stills
- * are dealt in shuffled rounds, so none comes again before all the others have been shown, and a still shown already
- * that day is passed over for the next. A still that comes round again has a look of its own (lookFor). Taking more
- * photos never changes what the earlier ones show.
+ * The still each photo shows, in the order Muse took them (`photos`, oldest first; `seed`, the Muse), each from the
+ * planet it was taken on (poolFor: `planets`, the planets' own stills). A pool's stills are dealt in shuffled rounds,
+ * so none comes again before all the others have been shown, and a still shown already that day is passed over for
+ * the next. A still that comes round again has a look of its own (lookFor). Taking more photos never changes what the
+ * earlier ones show; a planet's first stills of its own deal its photos afresh (and, out of the meadow's rounds, the
+ * meadow's photos too).
  */
-export function assignStills(photos: readonly PhotoToShow[], seed: string): Map<string, Shown> {
+export function assignStills(photos: readonly PhotoToShow[], seed: string, planets: ReadonlyMap<string, PlanetStills> = MEADOW_ONLY): Map<string, Shown> {
   const out = new Map<string, Shown>();
-  const rounds = new Map<StillKey, { n: number; order: string[]; next: number }>();
+  const rounds = new Map<string, { n: number; order: string[]; next: number }>();
   const shownOn = new Map<string, Set<string>>();
   for (const p of photos) {
-    let r = rounds.get(p.key);
+    const { pool, files } = poolFor(p.key, p.planet, planets);
+    let r = rounds.get(pool);
     if (!r || r.next >= r.order.length) {
       const n = r ? r.n + 1 : 0;
-      r = { n, order: round(STILLS[p.key], `${seed}|${p.key}|${n}`, r ? r.order[r.order.length - 1] : null), next: 0 };
-      rounds.set(p.key, r);
+      r = { n, order: round(files, `${seed}|${pool}|${n}`, r ? r.order[r.order.length - 1] : null), next: 0 };
+      rounds.set(pool, r);
     }
     const day = shownOn.get(p.day) ?? new Set<string>();
     shownOn.set(p.day, day);
@@ -87,7 +132,7 @@ export function assignStills(photos: readonly PhotoToShow[], seed: string): Map<
     if (fresh > r.next) [r.order[r.next], r.order[fresh]] = [r.order[fresh], r.order[r.next]];
     const file = r.order[r.next++];
     day.add(file);
-    out.set(p.id, { file, look: lookFor(seed, p.key, r.n, file) });
+    out.set(p.id, { file, look: lookFor(seed, pool, r.n, file) });
   }
   return out;
 }

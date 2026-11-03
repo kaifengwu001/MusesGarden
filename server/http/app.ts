@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http';
 import type {
   BasketId,
@@ -13,7 +14,9 @@ import type {
   PhotoId,
 } from '../../src/muse/contract';
 import type { MediaImages } from './media';
+import { isPlanetId } from '../../src/muse/planets';
 import { ROUTES, type RouteName } from '../../src/muse/routes';
+import { PLANET_STILL, POSTCARDS_DIR } from '../fixtures/planetStills';
 import { requestingOwner } from './owner';
 import {
   HttpError,
@@ -113,6 +116,15 @@ async function postcard(name: string): Promise<Reply> {
   return { status: 200, type: 'image/jpeg', headers: { 'cache-control': 'public, max-age=86400' }, body };
 }
 
+/** One of a planet's own postcard stills, src/assets/postcards/<planet>/ (server/fixtures/planetStills.ts). */
+async function planetPostcard(planet: string, name: string): Promise<Reply> {
+  if (!isPlanetId(planet) || !PLANET_STILL.test(name)) throw new HttpError(404, 'no such postcard');
+  const body = await readFile(join(POSTCARDS_DIR, planet, name)).catch(() => null);
+  if (body === null) throw new HttpError(404, 'no such postcard');
+  // (a still may be taken again under its name: kept a little only)
+  return { status: 200, type: name.endsWith('.png') ? 'image/png' : 'image/jpeg', headers: { 'cache-control': 'public, max-age=300' }, body };
+}
+
 function routesFor({ queries, commands, now, media, subscribe }: Garden): readonly Route[] {
   const muse = (raw: string): MuseId => {
     const museId = id<MuseId>(raw, 'id');
@@ -203,6 +215,7 @@ function routesFor({ queries, commands, now, media, subscribe }: Garden): readon
       return { status: 200, type: image.type, body: image.body };
     },
     postcardImage: ({ params }) => postcard(params.name),
+    planetPostcardImage: ({ params }) => planetPostcard(params.planet, params.name),
   };
 
   return (Object.keys(ROUTES) as RouteName[]).map((name) => ({
