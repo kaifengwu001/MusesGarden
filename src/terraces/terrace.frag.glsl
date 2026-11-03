@@ -45,7 +45,9 @@ void main() {
     // a paddy, or a field on the flats: its look now (vPaddy: its own variant, its place in the season), and its water
     albedo = paddyLook(vPaddy.y, vPaddy.x);
     water = paddyWater(vPaddy.y);
-  } else if (part == 1) {
+  } else if (part == 1 || part == 3) {
+    // a dam's sides: the riser down to the paddy below, and its slope in to its own paddy's water (Kai: the sides of
+    // the dams a darker green, their tops the cream)
     albedo = pal(TR_EARTH, 1);
   } else if (part == 4) {
     albedo = pal(TR_EARTH, 2);
@@ -60,8 +62,11 @@ void main() {
     // a village's ground: packed earth worn pale round its houses, grass in patches a few meters across
     float grass = smoothstep(-0.25, 0.35, gnoise(dir * uRadius / 4.0, uTerrainSeed + 941u) + 0.4 * gnoise(dir * uRadius / 1.3, uTerrainSeed + 942u));
     albedo = mix(pal(TR_EARTH, 3), mix(pal(TR_RICE, 2), pal(TR_RICE, 3), 0.35), grass) * (0.95 + 0.07 * gnoise(dir * uRadius * 2.3, uTerrainSeed + 936u));
+  } else if (part == 5) {
+    // a ridge along a cut: its top the dams' cream, its sides their green
+    albedo = mix(pal(TR_EARTH, 1), pal(TR_EARTH, 0), smoothstep(0.84, 0.94, dot(n, up)));
   } else {
-    // a dam's top and sides, a ridge along a cut
+    // a dam's top
     albedo = pal(TR_EARTH, 0);
   }
   vec3 col = labLight(albedo, n, up);

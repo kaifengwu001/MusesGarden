@@ -24,8 +24,9 @@ export const TERRACE_ROWS: Rows = {
   // flooded paddies silver grey, its young ones yellow-green, its grown ones greyer and bluer): flooded (the water's
   // own grey, half of what it mirrors), flooded and shallow, just planted (lime), growing, grown, grown deep
   [TROW.RICE]: ['#A2A89E', '#BDBCB0', '#919A0F', '#56752D', '#3D563D', '#2D4B2E'],
-  // a dam (cream), a riser (olive), earth (the woods' edge, the flats' bunds), a track (packed earth, pale)
-  [TROW.EARTH]: ['#CCD1A3', '#788F57', '#5C5C3D', '#CFC6AE'],
+  // a dam's top (cream), its sides (a dark green: the riser down to the paddy below and its slope in to its own water,
+  // Kai), earth (the woods' edge, the flats' bunds), a track (packed earth, pale)
+  [TROW.EARTH]: ['#CCD1A3', '#5E7745', '#5C5C3D', '#CFC6AE'],
   // the trees: canopy light, mid, shade, deep, rim, trunk, floor, far, olive light (graded to the planet painting's
   // trees, 2026-11-02: a dark teal, lit #617571, mid #3C5455, shade #283B41 as it reads on screen); the woods'
   // ground under them (the lab's, two greens a noise mixes)

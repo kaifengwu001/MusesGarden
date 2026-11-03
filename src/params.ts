@@ -143,7 +143,7 @@ export const schema = {
     // back by e every falloff past it). Kai's settings, 2026-11-02 (the density's slider up to 3, Kai's 2 its top)
     fogDensity: num('tfd', 'Fog density', 2, 0, 3, 0.01, 'live'),
     fogRange: num('tfr', 'Fog range', 0.5, -24, 12, 0.5, 'live', { unit: 'm' }),
-    fogFalloff: num('tff', 'Fog falloff', 7, 0.5, 30, 0.5, 'live', { unit: 'm' }),
+    fogFalloff: num('tff', 'Fog falloff', 4.5, 0.5, 30, 0.5, 'live', { unit: 'm' }),
     fogPatchiness: num('tfp', 'Fog patchiness', 1, 0, 1, 0.01, 'live'),
     fogPatchSize: num('tfs', 'Fog patch size', 50, 10, 300, 1, 'live', { unit: 'm' }),
     fogTint: num('tft', 'Fog tint', 0.22, 0, 1, 0.01, 'live'),
@@ -158,7 +158,7 @@ export const schema = {
     // and how far each is offset up or down from it; how dense they are, how far their way twists off the wind's
     // across the globe (Kai's settings, 2026-11-02)
     cloudCount: int('tcn', 'Cloud count', 40, 10, 400, 'live'),
-    cloudHeight: num('tch', 'Cloud height', 9, -10, 20, 0.5, 'live', { unit: 'm' }),
+    cloudHeight: num('tch', 'Cloud height', 3.5, -10, 20, 0.5, 'live', { unit: 'm' }),
     cloudRange: num('tcr', 'Cloud height range', 3, 0, 12, 0.25, 'live', { unit: 'm' }),
     cloudDensity: num('tcd', 'Cloud density', 1.2, 0, 2, 0.05, 'live'),
     cloudTwist: num('tct', 'Cloud twist', 0.71, 0, 1, 0.01, 'live'),
