@@ -310,7 +310,7 @@ export class GardenUi {
     if (change === 'snapshot' || change === 'baskets') this.relayout(true);
     if (change === 'snapshot' || change === 'likes' || change === 'status') this.refreshPins();
     const unread = s.unread.length;
-    this.postbox.setMail(unread, s.invitations.filter((p) => !s.isRead(p.id)).length, s.today.length);
+    this.postbox.setMail(unread, s.today.length);
     this.basketDot.classList.toggle('is-on', s.freshBasket !== undefined);
     this.whereabouts = '';
     this.refreshWhereabouts();

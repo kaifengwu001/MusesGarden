@@ -97,7 +97,6 @@ export class PostboxIllustration {
   readonly el: SVGSVGElement;
   readonly mouth = anchor([0, 0.25, FRONT + 0.08]);
   readonly countAt = anchor([-0.61, 0.88, FRONT]);
-  readonly sealAt = anchor([0.21, 0.4, FRONT + 0.025]);
   private readonly drawing: SVGGElement;
   private readonly door: SVGGElement;
   private readonly latch: SVGGElement;

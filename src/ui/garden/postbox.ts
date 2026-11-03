@@ -14,7 +14,6 @@ export class PostBox {
   private readonly visual: HTMLElement;
   private readonly hit: HTMLButtonElement;
   private readonly count: HTMLElement;
-  private readonly seal: HTMLElement;
   private readonly illustration = new PostboxIllustration();
   private readonly state: Motion = { latch: 0, door: 0, flag: 0, cards: 0, wiggle: 0 };
   private readonly tweens = new Map<keyof Motion, Tween>();
@@ -24,7 +23,6 @@ export class PostBox {
   private flagUp = false;
   private nextWaggle = 0;
   private total = 0;
-  private invitations = 0;
   private handedOff = false;
   private opened = false;
 
@@ -40,9 +38,7 @@ export class PostBox {
     this.hit.addEventListener('click', onOpen);
     this.hit.addEventListener('pointerenter', () => this.wiggle());
     this.count = el('span', 'g-postbox-count');
-    this.seal = el('span', 'g-seal');
-    this.seal.title = 'An invitation';
-    this.el.append(this.visual, this.hit, this.count, this.seal);
+    this.el.append(this.visual, this.hit, this.count);
     parent.append(this.el);
     this.kick();
     window.addEventListener('resize', () => this.kick());
@@ -57,9 +53,9 @@ export class PostBox {
     });
   }
 
-  setMail(unread: number, invitations: number, total = unread): void {
+  /** What waits in the box: `unread`, every card not yet read, tickets among them (the number on the box), of `total`. */
+  setMail(unread: number, total = unread): void {
     this.total = total;
-    this.invitations = invitations;
     const up = unread > 0;
     if (up !== this.flagUp) {
       this.flagUp = up;
@@ -68,7 +64,6 @@ export class PostBox {
     }
     this.count.textContent = unread > 0 ? String(unread) : '';
     this.count.classList.toggle('is-on', up);
-    this.seal.classList.toggle('is-on', invitations > 0 && !this.opened);
     this.el.classList.toggle('has-mail', up);
     this.hit.setAttribute('aria-label', unread > 0 ? `Post box, ${unread} unread` : 'Post box');
     this.kick();
@@ -86,7 +81,6 @@ export class PostBox {
     this.state.cards = 0;
     this.hit.setAttribute('aria-expanded', 'true');
     this.el.classList.add('is-open');
-    this.seal.style.visibility = 'hidden';
     this.tween('latch', 1, LATCH_LIFT_MS, easeInOut);
     if (!reducedMotion()) await wait(LATCH_LIFT_MS + LATCH_HOLD_MS);
     if (operation !== this.operation) return this.mouth();
@@ -115,8 +109,6 @@ export class PostBox {
     this.state.cards = 0;
     this.hit.setAttribute('aria-expanded', 'false');
     this.el.classList.remove('is-open');
-    this.seal.style.visibility = '';
-    this.seal.classList.toggle('is-on', this.invitations > 0);
     const doorMoving = this.state.door > 0.001;
     this.tween('door', 0, doorMoving ? 420 : 0, easeInOut);
     void (async () => {
@@ -167,7 +159,6 @@ export class PostBox {
     const hasCards = this.total > 0 && !this.handedOff;
     this.illustration.render(s, hasCards);
     this.pin(this.count, this.illustration.countAt);
-    this.pin(this.seal, this.illustration.sealAt);
     this.el.dataset.door = s.door > 0.99 ? 'open' : s.door < 0.01 ? 'closed' : 'moving';
     this.el.dataset.latch = s.latch > 0.99 ? 'released' : s.latch < 0.01 ? 'latched' : 'moving';
     clearTimeout(this.wake);
