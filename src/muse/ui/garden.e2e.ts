@@ -700,8 +700,9 @@ test('a ticket takes the hero and Muse to the host’s own planet: both Muses th
   await page.waitForURL((url) => url.pathname === '/' && url.searchParams.get('garden') === `/api/muses/${HERO}`, { timeout: 30_000 });
   const cards = await get<InvitationCard[]>(api, `/muses/${HERO}/invitations`);
   expect(cards.find((c) => c.id === card.id)).toMatchObject({ state: 'returned', canVisitNow: false });
+  // the owner is home and off the trip; Muse goes on with its life, which may be a visit of its own to the same friend
   const now = await get<NowView>(api, `/muses/${HERO}/now`);
-  expect(now.away?.kind === 'planet' && now.away.of === invitation.from, `the hero is home again: ${now.label}`).toBe(false);
+  expect(now.away?.kind === 'planet' && (now.away.withOwner || now.away.invitation === card.id), `the trip is over: ${now.label}`).toBe(false);
 
   const again = await api.post(`${API}/muses/${HERO}/garden/reactions`, { data: { type: 'use-invitation', id: card.id } });
   expect(again.status(), 'the ticket again, once the trip is over').toBe(409);
