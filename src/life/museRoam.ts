@@ -451,6 +451,17 @@ export class MuseRoam {
     return this.terrain.sample(dir, ground).height;
   }
 
+  /**
+   * Whether a Muse could stand at a place: on the deck where it is free (clear of its edges, the house, the bench and
+   * the chair), off it anywhere but against the house's walls. For a friend's Muse standing by this one (src/visit/).
+   */
+  standable(dir: Vector3): boolean {
+    const c = this.terrain.cottageLocal(dir, localTmp);
+    if (Math.abs(c.x) >= 14 || Math.abs(c.z) >= 14) return true;
+    if (this.deckAt(c.x, c.z) !== null) return this.deckFree(c.x, c.z);
+    return !(Math.abs(c.x) < SIDE + GIRTH && c.z > -OUTER.z - GIRTH && c.z < OUTER.z + GIRTH);
+  }
+
   /** A unit tangent at a spot toward a direction. */
   private toward(at: Spot, dir: Vector3): Vector3 {
     return tangentToward(at.dir, dir, new Vector3());
@@ -1485,16 +1496,26 @@ export class MuseRoam {
     return this.day.map((s, k) => ({ name: s.name, start: this.starts[k] }));
   }
 
-  tap(now: number): void {
-    this.you.tap(now, this.living.cues.sleep !== null);
+  /** Your doings (world s). `awake`: it is up and about whatever its own day says (a life given to it: muse.ts). */
+  tap(now: number, awake = false): void {
+    this.you.tap(now, !awake && this.living.cues.sleep !== null);
   }
 
-  hold(now: number, side: number): void {
-    this.you.hold(now, side, this.living.cues.sleep !== null);
+  hold(now: number, side: number, awake = false): void {
+    this.you.hold(now, side, !awake && this.living.cues.sleep !== null);
   }
 
-  letGo(now: number): void {
-    this.you.letGo(now, this.living.cues.sleep !== null);
+  letGo(now: number, awake = false): void {
+    this.you.letGo(now, !awake && this.living.cues.sleep !== null);
+  }
+
+  /**
+   * Its answers to you over a life given to it rather than its own (the engine's out on the planet, a visit's beside
+   * its friend: muse.ts): the wave or the bounce for a tap, the petting while you hold it. Nothing while you haven't.
+   */
+  answerOver(now: number, out: Roaming): void {
+    this.you.settle(now);
+    this.you.apply(now, out.action, out.cues);
   }
 
   /** Muse at a time: where it stands, its heading and action, what it looks at, the props' cues. camera: planet space, for turning to you and looking at you. */

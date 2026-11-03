@@ -77,6 +77,78 @@ test('the sample visit on Lantern: both Muses together, every plant on dry groun
   expect(Math.abs((again.left ?? 0) - (s.left ?? 0)), 'the same visit, not a fresh 2 h').toBeLessThan(60_000);
 });
 
+test('a visit to Momo’s meadow: sent there from another planet’s page, the host at home, the guest beside it, every plant on dry ground', async ({ page }) => {
+  // (the sample visit is to Lantern Reed Gardens: here its host's planet is given as the meadow)
+  await page.route('**/api/visits/inv-wren-hero-1/world?as=hero', async (route) => {
+    const response = await route.fetch();
+    const view = (await response.json()) as { host: object };
+    await route.fulfill({ response, json: { ...view, planet: 'meadow', host: { ...view.host, planet: 'meadow' } } });
+  });
+  await page.goto(VISIT);
+  await page.waitForURL(/\/\?visit=inv-wren-hero-1&as=hero&garden=%2Fapi%2Fmuses%2Fhero$/, { timeout: 60_000 });
+  expect(new URL(page.url()).pathname).toBe('/');
+  const s = await arrive(page);
+  expect(s).toMatchObject({ phase: 'visiting', planet: 'meadow', together: true, host: { museId: 'wren', look: 'muse8' }, guest: { museId: 'hero', shown: true } });
+  expect(s.banner).toMatch(/^Visiting Wren’s planet 1 h \d\d left Return home$/);
+  expect(s.guest?.apart).toBeGreaterThan(0.3);
+  expect(s.guest?.apart).toBeLessThan(3);
+  for (const p of s.plants) expect([p.id, p.placed, (p.water ?? -1) > 0]).toEqual([p.id, true, true]);
+  await expect(page.locator('.g-rail'), 'Momo’s own garden stays shut').toHaveCount(0);
+  await expect(page.locator('.controlbar')).toBeHidden();
+
+  // a tap on the guest says hello, as one on the host does: it waves
+  await page.waitForFunction(() => !(window as unknown as { __visit: VisitProbe }).__visit.flying(), undefined, { timeout: 30_000 });
+  const at = await page.evaluate(() => {
+    const w = (window as unknown as { __world: { visitors: unknown[]; pickMuse(x: number, y: number): { muse: unknown } | null } }).__world;
+    for (let j = 0; j < 60; j++) {
+      for (let i = 0; i < 96; i++) {
+        const x = -1 + (2 * (i + 0.5)) / 96;
+        const y = -1 + (2 * (j + 0.5)) / 60;
+        if (w.pickMuse(x, y)?.muse === w.visitors[0]) return { x: ((x + 1) / 2) * innerWidth, y: ((1 - y) / 2) * innerHeight };
+      }
+    }
+    return null;
+  });
+  expect(at, 'the guest is on screen, and a press finds it').not.toBeNull();
+  await page.mouse.click(at!.x, at!.y);
+  await page.waitForFunction(
+    () => ((window as unknown as { __world: { visitors: { living: { action: { wave: number } } | null }[] } }).__world.visitors[0].living?.action.wave ?? -1) >= 0,
+    undefined,
+    { timeout: 5_000 },
+  );
+});
+
+/** The garden at home, its post open on the tickets. */
+async function post(page: Page): Promise<void> {
+  await page.goto('/?garden=/api/muses/hero');
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __meadow?: { isReady: boolean }; __garden?: unknown };
+    return w.__meadow?.isReady === true && w.__garden !== undefined;
+  }, undefined, { timeout: 90_000 });
+  await page.evaluate(() => (window as unknown as { __garden: { travel(): void } }).__garden.travel());
+}
+
+test('a ticket the backend turns down keeps the owner home, and says why', async ({ page }) => {
+  await page.route('**/api/muses/hero/garden/reactions', (route) =>
+    route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'this invitation is used' }) }),
+  );
+  await post(page);
+  await page.getByRole('button', { name: 'Travel to Lantern Reed Gardens' }).click();
+  await expect(page.locator('.g-toast')).toContainText('This ticket has been used already');
+  await page.waitForTimeout(1500);
+  expect(new URL(page.url()).pathname).toBe('/');
+  await expect(page.getByRole('button', { name: 'Travel to Lantern Reed Gardens' }), 'the ticket is back in the post').toBeVisible();
+});
+
+test('boarding the sample ticket in the garden goes to the host’s planet, on this visit', async ({ page }) => {
+  await post(page);
+  const used = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/muses/hero/garden/reactions'));
+  await page.getByRole('button', { name: 'Travel to Lantern Reed Gardens' }).click();
+  expect((await used).postDataJSON()).toEqual({ type: 'use-invitation', id: 'inv-wren-hero-1' });
+  await page.waitForURL(/\/environments\/lantern-reed-gardens\/\?visit=inv-wren-hero-1&as=hero&garden=%2Fapi%2Fmuses%2Fhero$/, { timeout: 30_000 });
+  expect((await arrive(page)).phase).toBe('visiting');
+});
+
 test('Return home ends the trip and goes to the guest’s own planet', async ({ page }) => {
   await page.goto(VISIT);
   await arrive(page);

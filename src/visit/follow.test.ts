@@ -47,6 +47,18 @@ describe('the guest beside its host', () => {
     expect(g.toward.equals(shifted.dir)).toBe(true);
   });
 
+  it('steps aside when the host comes right up to it, rather than standing in its way', () => {
+    const f = new Follower();
+    const h = host(new Vector3(0, 1, 0));
+    const first = f.step(h, 1 / 60, R, dryEverywhere).dir.clone();
+    // the host comes half a meter toward the guest: within the leash, but too close
+    const toward = tangentToward(h.dir, first.clone(), new Vector3());
+    const closer = host(travel(h.dir, toward, (FOLLOW.side - 0.5) / R, new Vector3()), h.heading);
+    expect(meters(first, closer.dir)).toBeLessThan(FOLLOW.near);
+    const g = run(f, closer, 6);
+    expect(meters(g.dir, closer.dir)).toBeCloseTo(FOLLOW.side, 2);
+  });
+
   it('walks after a host that wandered off, no faster than its pace, and arrives beside it', () => {
     const f = new Follower();
     const h = host(new Vector3(0, 1, 0));

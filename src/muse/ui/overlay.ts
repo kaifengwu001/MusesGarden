@@ -6,6 +6,7 @@ import { MuseApi } from './api';
 import { Body } from './body';
 import { DevTools } from './dev';
 import { el, SimClock } from './dom';
+import { gardenMuse } from '../../garden/source';
 
 /** The engine's view of Muse is read this often (ms), and again after every dev tools command. */
 const REFRESH_MS = 30_000;
@@ -23,17 +24,23 @@ const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (
 export function engineMuse(search: string): MuseId | null {
   const params = new URLSearchParams(search);
   const garden = params.get('garden');
-  const id = garden ? /\/api\/muses\/([^/]+)\/?$/.exec(new URL(garden, 'http://garden').pathname)?.[1] : undefined;
-  if (id) return decodeURIComponent(id) as MuseId;
+  const id = garden ? gardenMuse(garden) : null;
+  if (id) return id as MuseId;
   return params.has('dev') ? HERO : null;
 }
 
 /**
  * Connects the page to the Muse engine when the URL names one (engineMuse). The function returned gives the 3D Muse's
- * direction each frame from the engine's view (null until the engine has answered). `?dev` also shows the dev tools,
- * top left, under the title; B toggles them. Null when the page follows no engine.
+ * direction each frame from the engine's view (null until the engine has answered); `onView` hears each view as it
+ * comes (a friend visiting: src/visit/companions.ts). `?dev` also shows the dev tools, top left, under the title; B
+ * toggles them. Null when the page follows no engine.
  */
-export function connectEngine(root: HTMLElement, world: World, search = location.search): ((dt: number) => MuseDirection | null) | null {
+export function connectEngine(
+  root: HTMLElement,
+  world: World,
+  onView: ((view: NowView) => void) | null = null,
+  search = location.search,
+): ((dt: number) => MuseDirection | null) | null {
   const id = engineMuse(search);
   if (!id) return null;
   const api = new MuseApi(id);
@@ -53,6 +60,7 @@ export function connectEngine(root: HTMLElement, world: World, search = location
     const now = api.now().then((v) => {
       view = v;
       clock.sync(v.at);
+      onView?.(v);
     });
     refreshing = Promise.allSettled([now, dev?.visible ? dev.refresh() : null]).then(() => {
       refreshing = null;

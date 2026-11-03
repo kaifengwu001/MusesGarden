@@ -157,10 +157,6 @@ export class GardenState {
     }
   }
 
-  private react(reaction: Reaction): void {
-    this.source.react(reaction).catch((error: unknown) => console.warn('garden: a reaction could not be sent', error));
-  }
-
   // ---- switches the source keeps: likes, and what other Muses may see -----------
 
   /** The value the source last sent for a switch; undefined when it keeps no such thing (the placeholders keep no likes). */
@@ -402,10 +398,23 @@ export class GardenState {
     return favorite;
   }
 
-  useInvitation(id: string): void {
+  /**
+   * Board on a ticket: marked used at once, and resolved once the backend has taken it; if the backend turns it down
+   * (or can't be reached), the mark comes off again and this rejects with why (a ReactionError, from source.ts).
+   */
+  async useInvitation(id: string): Promise<void> {
+    const marked = !this.usedInvitations.has(id);
     this.usedInvitations.add(id);
-    this.react({ type: 'use-invitation', id });
     this.emit('postcards');
+    try {
+      await this.source.react({ type: 'use-invitation', id });
+    } catch (error) {
+      if (marked) {
+        this.usedInvitations.delete(id);
+        this.emit('postcards');
+      }
+      throw error;
+    }
   }
 
   // ---- Muse ---------------------------------------------------------------------

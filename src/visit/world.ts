@@ -75,4 +75,6 @@ export interface VisitWorld {
   shape(): object;
   /** The two Muses' framing here, where the usual one (visitUi.ts MUSES_VIEW) would be down among what grows: the camera's distance and height (m), and where it looks (m). */
   readonly musesView?: { readonly distance: number; readonly height: number; readonly aim: number };
+  /** Where a Muse may stand beyond dry ground (off the walls of a house, on a deck's free part), if the world knows. */
+  standable?(dir: Vector3): boolean;
 }

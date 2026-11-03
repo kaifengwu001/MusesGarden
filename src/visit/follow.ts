@@ -10,12 +10,16 @@ export const FOLLOW = {
   side: 1.3,
   /** How far the host may wander from where the guest last chose its spot before the guest moves (m). */
   leash: 0.6,
+  /** Nearer than this to the guest's spot (m), the host is in its way: the guest steps aside to a new spot. */
+  near: 0.9,
   /** The guest's walking pace (m/s): a little brisker than the host's, so it keeps up. */
   pace: 0.75,
   /** Farther than this from its spot (m), the guest is simply there: the visit began, or the host was carried off. */
   jump: 12,
   /** A spot nearer than this (m) is where the guest already stands: it doesn't set off for it. */
   arrive: 0.02,
+  /** Ground this far from the shore (m) is dry enough to stand on. */
+  dry: 0.3,
 } as const;
 
 /** Bearings round the host to try for a spot (rad from its left, by turns): its left, its right, behind, then between. */
@@ -47,7 +51,8 @@ export class Follower {
    * enough to stand on.
    */
   step(host: HostAt, dt: number, radius: number, dry: (dir: Vector3) => boolean): Following {
-    if (!this.spot || !this.anchor || angleBetween(this.anchor, host.dir) * radius > FOLLOW.leash) {
+    const wandered = !this.spot || !this.anchor || angleBetween(this.anchor, host.dir) * radius > FOLLOW.leash;
+    if (wandered || !this.spot || angleBetween(this.spot, host.dir) * radius < FOLLOW.near) {
       this.spot = spotBeside(host, radius, dry, this.at);
       this.anchor = host.dir.clone();
     }
