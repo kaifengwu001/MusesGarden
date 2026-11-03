@@ -22,7 +22,7 @@ const OVERVIEW_ALTITUDE = 4.2; // × R
 const MAX_TILT = (82 * Math.PI) / 180;
 /** Heights (m) at the zoom of a planet of R 128, the reference Kai's views were chosen on. */
 const REF_TOP = OVERVIEW_ALTITUDE * 128;
-const refHeight = (z: number): number => REF_TOP * Math.pow(EYE_HEIGHT / REF_TOP, z);
+export const refHeight = (z: number): number => REF_TOP * Math.pow(EYE_HEIGHT / REF_TOP, z);
 /**
  * The heights (m) between which the camera tilts from looking straight down
  * to the horizon, log-spaced (zoom 0.15 to 0.9 at R 128): early, so a
@@ -97,7 +97,7 @@ export class CameraRig {
   }
 
   /** The camera's tilt from straight down (rad) at a height (m): by height, so the same on every planet (and straight down in orbit). */
-  private tiltAt(altitude: number, z: number): number {
+  protected tiltAt(altitude: number, z: number): number {
     const [hi, lo] = TILT_HEIGHTS;
     const u = (Math.log(hi) - Math.log(Math.max(altitude, 1e-3))) / (Math.log(hi) - Math.log(lo));
     return MAX_TILT * smoothstep(0, 1, u) * smoothstep(0, 0.08, z);

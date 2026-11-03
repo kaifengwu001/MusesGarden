@@ -3,8 +3,10 @@ import { Bands } from '../../terraces/build/bands';
 import { BUILD, buildTerraces, PART } from '../../terraces/build/construct';
 import { FIELD, PlanetField, type Plains } from '../../terraces/build/field';
 import { SphereGrid, type Field } from '../../terraces/build/sphere';
+import { TerraceRig } from '../../terraces/camera';
 import { ribbonMesh } from '../../terraces/mistRibbons';
 import { makeStrokes } from '../../terraces/mistStrokes';
+import { CameraRig } from '../../view/camera';
 
 // The terraces' planet is mathematics (build/field.ts) and its terraces the
 // paddy lab's construction on it (build/): the field's gradient is its own
@@ -245,5 +247,29 @@ describe("the terraces' mist strokes", () => {
     expect(Array.from(m.descending).sort((a, b) => a - b)).toEqual(Array.from(m.ascending).sort((a, b) => a - b));
     const last = m.ascending.length - m.counts[m.counts.length - 1];
     expect(Array.from(m.descending.subarray(0, m.counts[m.counts.length - 1]))).toEqual(Array.from(m.ascending.subarray(last)));
+  });
+});
+
+describe("the terraces' camera", () => {
+  it("tilts up further round the bird's-eye height, as the shared rig's elsewhere, and only ever up on the way in", () => {
+    const shared = new CameraRig();
+    const rig = new TerraceRig();
+    let last = 0;
+    for (let i = 0; i <= 200; i++) {
+      const z = i / 200;
+      const a = shared.framing(z);
+      const b = rig.framing(z);
+      expect(b.altitude).toBe(a.altitude);
+      expect(b.fov).toBe(a.fov);
+      if (z <= 0.1 || z >= 0.65) expect(b.tilt).toBeCloseTo(a.tilt, 9);
+      else expect(b.tilt).toBeGreaterThanOrEqual(a.tilt - 1e-12);
+      expect(b.tilt).toBeGreaterThanOrEqual(last - 1e-12);
+      last = b.tilt;
+    }
+    // (the bird's-eye stop, 70 m up: 38.5° from straight down, from 14.4°)
+    const z = rig.zoomForAltitude(70.2);
+    expect((rig.framing(z).tilt * 180) / Math.PI).toBeCloseTo(38.5, 0);
+    expect((shared.framing(z).tilt * 180) / Math.PI).toBeCloseTo(14.4, 0);
+    expect(rig.lift(z)).toBeCloseTo(rig.framing(z).tilt - shared.framing(z).tilt, 12);
   });
 });

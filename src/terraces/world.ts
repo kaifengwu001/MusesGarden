@@ -17,11 +17,11 @@ import { Palette, ROW, sunAt } from '../render/palette';
 import { Sky } from '../render/sky';
 import { localSun } from '../render/sun';
 import { warpForZoom } from '../render/warp';
-import { CameraRig } from '../view/camera';
 import { pickSurface, type Pick } from '../view/picking';
 import { TerraceBuild } from './build/builder';
 import { FIELD, PlanetField } from './build/field';
 import { tangentFrame } from './build/sphere';
+import { TerraceRig } from './camera';
 import { ModelSet, type Placement } from './models';
 import { PaddyMap } from './paddyMap';
 import { TERRACE_ROWS } from './palette';
@@ -82,7 +82,7 @@ export class TerraceWorld implements PlanetWorld {
   /** The paddy lab's grade: none (the lab draws straight to the canvas), so the colours measured from Kai's aerial reach the screen as measured: no tone curve, bloom, contrast or dimming; the paper grain stays. */
   readonly grade = { curve: false, bloom: false, contrast: 1, brightness: 1 } as const;
   readonly scene = new Scene();
-  readonly rig = new CameraRig();
+  readonly rig = new TerraceRig();
   readonly palette = new Palette(TERRACE_ROWS);
   readonly look = createLookUniforms();
   readonly band = new GrowthBand();
@@ -203,8 +203,10 @@ export class TerraceWorld implements PlanetWorld {
       // the flats: the planet's widest flat ground, from a little above it, looking across its fields
       const flats = this.findFlats();
       this.rig.lookAlong(flats.focus, flats.forward, immediate);
-      this.rig.setZoom(this.rig.zoomForAltitude(FLATS_VIEW.height), immediate);
-      this.rig.lookUp(FLATS_VIEW.tilt, immediate);
+      const zoom = this.rig.zoomForAltitude(FLATS_VIEW.height);
+      this.rig.setZoom(zoom, immediate);
+      // (as far up from the shared rig's tilt as it always looked: the terraces' own runs ahead of it there, camera.ts)
+      this.rig.lookUp(FLATS_VIEW.tilt - this.rig.lift(zoom), immediate);
       this.posed = true;
       return;
     }
