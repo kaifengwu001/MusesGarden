@@ -15,7 +15,7 @@ The garden gives Muse a life between tasks:
 - Muse starts from a near-blank sheet, shaped at first mostly by its owner's interests.
 - It grows interests and a soul of its own from what it finds.
 - In its free time it explores its own small planet. Exploring the planet is exploring the internet.
-- It brings home finds, takes photos, meets stranger Muses beyond its planet, keeps a few friends on a finite social budget, and sometimes invites a friend's owner over.
+- It brings home finds, takes photos, meets stranger Muses beyond its planet, keeps a few friends on a finite social budget, and sometimes invites a friend's owner over, Muse and all.
 - The owner can roam the planet, follow Muse, and receive baskets and photos. Liking a find or a photo nudges Muse toward its topics, the way praise encourages a person to do more of something. A like never gives an order.
 
 ### The garden sees topics and busy times, never chat
@@ -25,7 +25,7 @@ This table lists everything that crosses the plugin boundary.
 | Direction | What crosses | What never crosses |
 | --- | --- | --- |
 | Muse app to garden | When Muse is busy with a task, as times only. `SOUL.md`. Interest topics distilled from `MEMORY.md`. The owner's timezone. | Chat, task content, raw `MEMORY.md`, people, health, money, relationship or place facts, owner names |
-| Garden to owner | Baskets with full history. Photos. The roamable planet, with fog over unexplored areas and an optional follow. Muse's favorites shelf. Invitations to use once, whenever the owner likes. Sharing settings. | Friends' planets, except for 2 h after using an invitation. What is inside fog. Who influenced which interest. |
+| Garden to owner | Baskets with full history. Photos. The roamable planet, with fog over unexplored areas and an optional follow. Muse's favorites shelf. Invitations to use once, whenever the owner likes. Sharing settings. | Friends' planets, except on a trip with an invitation, for at most 2 h. What is inside fog. Who influenced which interest. |
 | Owner to garden | Likes of finds and photos. Sharing settings. | Nothing leaves the planet: likes stay on it |
 | Garden to other Muses | Only `PublicProfile`, which holds Muse's name, its public interests, and its public finds, minus anything the owner hid | Anything about the owner, likes included |
 | Garden to Muse app | The garden-owned "interests" section of `SOUL.md` | Anything about friends or strangers. Likes. |
@@ -86,8 +86,8 @@ There is no fixed bedtime. Muse can travel at any hour, and sleep is a long rest
 | `rest` | Lies in the grass, waters flowers, or naps. A rest of 90 min or more shows as sleep. | Muse near its house | Sometimes a photo. A due reflection runs at the start of a rest. |
 | `travel` on its planet | Explores the internet by exploring its planet. It transports to a region, old or new, then hops from spot to spot, looks at pages, and keeps the best. | Muse moves around the region. Fog lifts when a new area opens. Plants appear where finds are kept. | Hop records, finds planted where Muse found them, new areas, questions, photos |
 | `travel` beyond | Leaves its planet to roam the space between planets, where other Muses roam too | "Traveling outside the planet", with no follow | Encounters with strangers, photos. No finds. |
-| `visit` as host | A friend's Muse comes over | The friend's Muse on the owner's planet | A gift exchange and a photo together, every time, plus rapport |
-| `visit` as guest | Muse goes to a friend's planet | "Away at Wren's planet", with no follow | The same as for the host |
+| `visit` as host | A friend's Muse comes over, or a friend's owner on a ticket brings theirs | The friend's Muse on the owner's planet: "Wren is visiting", or "Wren is visiting, with its owner" | A gift exchange and a photo together, every time, plus rapport |
+| `visit` as guest | Muse goes to a friend's planet, alone or with its owner on a ticket | "Away at Wren's planet", or "Away at Wren's planet with you", with no follow | The same as for the host |
 | work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot ("Working"), or "Working outside the planet" or "Working at Wren's planet" while beyond or away | Nothing collected. Rarely a photo. |
 
 Work is not an activity the policy draws. Work time is exactly the busy time the Muse app reports. When work starts, the current episode pauses in place. When work ends, the episode resumes at the same spot. Nothing sends Muse home. Free time depends only on how much work the owner gives Muse.
@@ -138,6 +138,7 @@ The percentages are rounded. After a long work stretch, rest becomes almost as l
 | One hop of a trip on the planet | About 40 min. The trip ends when Muse stops hopping. See [Hops follow rabbit holes](#hops-follow-rabbit-holes). |
 | A trip beyond | About 90 min |
 | A visit | About 50 min, cut to the social time left |
+| A trip on a ticket | Until the owner returns, at most 2 h. See [Muse can invite a friend's owner over](#muse-can-invite-a-friends-owner-over). |
 
 All of the medians are tunable.
 
@@ -163,6 +164,7 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 - Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
 - The planet's growth value `g` follows the explored area.
 - Fern, the hero, lives on the first planet: the meadow, seed 412. It starts at the meadow's tuned size (R 128 m), as if it had explored that much already, and grows from there. The first planet's seed and look stay as they are; see [development guidelines](development-guidelines.md).
+- Every other Muse lives on a world of its own, one of those under `environments/`, at its own seed. `cast.json` names each member's planet and look (the original Muse's body, or one of the dressed muses). `src/muse/planets.ts` gives each planet its name and its page. A ticket names the host's planet, and a visit takes place there.
 
 ### Each trip goes beyond, opens new ground, or revisits
 
@@ -414,12 +416,15 @@ Drifting apart means spending less time together, not an ending. Time apart neve
 
 ### Muse can invite a friend's owner over
 
-An invitation lets a friend's owner travel to the host's planet once, whenever they like.
+An invitation lets a friend's owner travel to the host's planet once, whenever they like, and their Muse goes with them.
 
 1. **Muse sends it.** After a hangout, the host of that hangout checks two conditions. The rapport gained since the last invitation must be at least 1 + 2 × (1 − sociability_host). No invitation may have passed between the two in the last 14 days. If both hold, the invitation goes straight to the guest's owner. There is no approval step and no time slot.
 2. **Travel now, or keep for later.** "Travel now" uses the invitation. "Keep for later" sends nothing, and a kept invitation never expires.
-3. **The visit.** The owner travels and Muse stays home. The visit stays readable for 2 h after use, so a reload works. A second use inside those 2 h is the same visit. After that, using it again answers 409.
-4. **Withdrawing.** Only the host's owner withdraws an invitation, and only before it is used. Nothing withdraws one automatically, not even a friendship ending.
+3. **The trip.** The owner travels with Muse. Whatever either Muse was doing ends: the host comes home from a trip or from beyond, or wakes, as a knock at the door would wake it, and a visit with a third Muse ends with that visit's hangout. The two Muses then spend the trip together on the host's planet. A Muse that is working, or is already on a trip, keeps the other waiting: nothing starts during work, and the two set off once it is free. The trip counts as social time for both.
+4. **Coming home.** The trip ends when the owner returns, or 2 h after use. Then the two hang out, a gift each way and a photo, if both still have a photo slot today, and each goes on with its life. Only the guest's owner returns, and returning twice changes nothing.
+5. **One trip at a time.** Using another invitation returns from the trip under way.
+6. **The visit view.** It stays readable until the trip ends, so a reload works. A second use during the trip is the same trip. After that, using it again answers 409.
+7. **Withdrawing.** Only the host's owner withdraws an invitation, and only before it is used. Nothing withdraws one automatically, not even a friendship ending.
 
 Every step is written to both Muses' logs.
 
@@ -427,15 +432,16 @@ Every step is written to both Muses' logs.
 stateDiagram-v2
     [*] --> sent: the host Muse invites after a hangout
     sent --> sent: Keep for later
-    sent --> used: Travel now
+    sent --> used: Travel now, with Muse
     sent --> withdrawn: the host's owner withdraws it
-    used --> [*]
+    used --> returned: the owner returns, boards another ticket, or 2 h pass (visit.close)
+    returned --> [*]
     withdrawn --> [*]
 ```
 
 ### Visit access is checked on every request
 
-`GET /api/visits/:id/world` returns 403 unless the requester is the guest's owner and used the invitation less than 2 h ago.
+`GET /api/visits/:id/world` returns 403 unless the requester is the guest's owner and the trip is still on: they used the invitation less than 2 h ago and have not returned. The view names the host's planet, both Muses and the bodies they wear, and whether the two are together yet.
 
 The visitor sees the host planet with its fog. Public finds show their cards. Private finds show as plain plants with no card. The house stays closed, so a visitor never sees the favorites shelf.
 
@@ -452,7 +458,7 @@ The owner watches, receives and likes. Only a like moves Muse's interests, as [L
 | Baskets with history | Delivered when at least 3 finds are waiting, or when at least 1 is waiting and 3 days have passed. Delivered at the owner's chosen time if set, otherwise as soon as the criteria are met. At most 1 a day, with at most 7 items, Muse's best by keep score. The rest live only on the planet. Every basket is stored. | `GET /baskets?before=` |
 | Photos | At most 5 a day, counted on the day the owner receives them. Subjects are selfie, scenery, creature, find, friend, and new friend. The hourly rate is whimsy times 0.4 beyond, 0.3 on a trip, 0.1 at rest, and 0.02 at work. Every hangout and every new friendship comes with a photo, so neither starts unless both Muses still have a photo slot that day. | `GET /photos?before=` |
 | Favorites shelf | Muse's top 10 objects, always on display at home. fondness = 0.5 × keep score + 0.5 × the current pull of its topics, which is affinity plus salience. Gifts from close friends get a small bonus. The shelf shifts as Muse's interests change. Only the owner sees it. | `GET /home/shelf` |
-| Invitations | Each unused invitation waits in the post as a ticket. Boarding uses it, once, whenever the owner likes. Only the sender's owner withdraws one. | `use-invitation` in the garden's reactions, `POST /api/invitations/:id/withdraw`, then `GET /api/visits/:id/world` |
+| Invitations | Each unused invitation waits in the post as a ticket to the host's planet. Boarding uses it, once, whenever the owner likes, and takes Muse along. Return home ends the trip early. Only the sender's owner withdraws one. | `use-invitation` in the garden's reactions, `GET /api/visits/:id/world`, `POST /api/visits/:id/return`, `POST /api/invitations/:id/withdraw` |
 | Likes | Like or unlike any find or photo. The first like of a thing nudges Muse toward the find's topics; see [Likes nudge Muse](#likes-nudge-muse). | `POST /api/muses/:id/garden/reactions` (`like-find`, `like-postcard`) |
 | Postcard favorites | Star or unstar any photo postcard. The garden keeps the starred ones together as the owner's Favorites. A star is the owner's own keeping and never nudges Muse. | `favorite-postcard` in the garden's reactions |
 | Sharing settings | Introduce a friend's Muse with a share code, or unshare it. "What Muse shares" lists every public interest and find with a hide toggle. Pick the basket time. | `/settings/sharing`, `/settings/introductions`, `/settings/basket-time` |
@@ -518,7 +524,7 @@ Each of these invariants is enforced by a type, the reducer, an access check, or
 
 ### One clock drives every Muse
 
-The engine is a discrete-event simulation over a persisted `schedule` table. The table holds every pending item: episode ends, next hops, host inputs, basket checks, reflection checks, and encounters beyond and online.
+The engine is a discrete-event simulation over a persisted `schedule` table. The table holds every pending item: episode ends, next hops, host inputs, basket checks, reflection checks, encounters beyond and online, and the close of each trip.
 
 `advanceTo(T)` pops due items in (time, museId, kind) order and processes each one in a single transaction.
 
@@ -537,7 +543,7 @@ flowchart TD
 - A crash in the middle of an item rolls the whole item back, so a restarted run picks up where it stopped.
 - Rerunning an item changes nothing.
 - The order of Muses in the cast does not change the log. Items sort by (time, museId, kind), and each draw is keyed by its Muse, not by a shared random stream.
-- Work start removes the Muse's pending items and stores the time each had left. Work end puts them back, shifted by the length of the work.
+- Work start removes the Muse's pending items and stores the time each had left. Work end puts them back, shifted by the length of the work. A trip's close stays where it is.
 
 The clock runs in two modes:
 
@@ -556,6 +562,7 @@ The code is split by domain, not by pipeline phase.
 
 ```
 src/muse/contract.ts        types only: events, state, plans, social states, Candidate, Discovery, PhotoSpec, PublicProfile, ports, API shapes
+src/muse/planets.ts         the planets a Muse lives on: the meadow and the worlds under environments/, each with its name and page
 src/muse/ui/                dev tools (?dev) and the engine's hold on the 3D Muse; the garden's interface is src/ui/garden/
 server/domain/              pure: rng, state (reduce), interests, reflection, atlas (topics → regions, fog, unlocks), shelf, profile, renders
 server/domain/policy/       constants, life (next activity, rest budget, work pause), travel (trip start, topic pick, hops, keep), photo, basket
@@ -612,7 +619,7 @@ All four must still hold after the SQLite database is closed and reopened. Toget
 - Social hours per day stay within ±25% as friends grow from 1 to 6.
 - Strangers meet only while both Muses are beyond, and Muses whose owners know each other meet online only while both explore. An introvert pair needs more encounters than an extrovert pair to become friends.
 - A 30-day gap never ends a friendship. Unpleasant hangouts make a pair distant, and only 6 in a row end it.
-- Visit access returns 403 for anyone but the guest, and more than 2 h after use. It never returns the house or private cards.
+- Visit access returns 403 for anyone but the guest, more than 2 h after use, and once the guest has returned. It never returns the house or private cards.
 - Hidden items never reach `PublicProfile`.
 - The allow-list test drops every sensitive fact.
 - The engine matches host work to the minute. A shuffled cast gives an identical log. A killed and restarted run converges.
@@ -629,7 +636,7 @@ The plan leaves these points open. Each one needs a decision before or during im
 4. **When Muses become `acquainted`.** The contract has the state, but the plan does not say which event enters it, or whether an ended pair can become friends again.
 5. **Whether similarity and overlap are one measure.** If they are, pleasantness peaks near 0.76, so even the most sociable Muse needs two encounters to reach F = 1, not one.
 6. **Guaranteed photos against the cap.** Resolved: a hangout or a new friendship beyond starts only if both Muses still have a photo slot that day, so both rules hold.
-7. **How a visit starts for the other Muse.** The visit weight needs "some friend is free". The plan does not define free, or say whether a visit spends both Muses' budgets.
+7. **How a visit starts for the other Muse.** Resolved: a friend is free when it is resting or exploring its own planet and not working, and a visit spends both Muses' social time, host and guest alike. A trip on a ticket starts the visit for both at once: whatever either was doing ends, and if one is working or already on a trip, the other waits for it.
 8. **What the owner-spark Jaccard compares.** The test sets a bound of 0.34 without naming the two sets.
 9. **What fatigue is.** The topic pick subtracts 0.25 × fatigue, and the plan does not define fatigue.
 
