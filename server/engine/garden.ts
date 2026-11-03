@@ -1,6 +1,7 @@
 // The garden's interface (src/garden/types.ts) filled from the engine: one Muse's snapshot, and the events that
 // change it, read from its state and its log. Pure: Views gathers the input.
 import { hash32, salt, unit } from '../../src/core/hash';
+import { mediaOf } from '../../src/garden/media';
 import { PLANETS } from '../../src/muse/planets';
 import type {
   Basket,
@@ -9,7 +10,6 @@ import type {
   GardenSnapshot,
   Interest,
   Invitation,
-  Media,
   MuseFriend,
   MuseStatus,
   Postcard,
@@ -28,7 +28,6 @@ import type {
   MuseId,
   MuseLook,
   MuseState,
-  Network,
   NowView,
   PhotoId,
   PhotoSpec,
@@ -78,15 +77,6 @@ const TOP_INTERESTS = 12;
 /** A friend's card names this many interests the two share, the ones Muse cares for most. */
 const SHARED_SHOWN = 3;
 const COATS = ['#f2c4a0', '#c3d6b8', '#c4d0e6', '#efe6c8', '#e8c6d0', '#d4c8e6', '#c8e2dc', '#ead0b0'] as const;
-const NETWORKS: Readonly<Record<Exclude<Network, 'web'>, string>> = {
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  youtube: 'YouTube',
-  vimeo: 'Vimeo',
-  tiktok: 'TikTok',
-  flickr: 'Flickr',
-  bluesky: 'Bluesky',
-};
 /** Stand-ins in src/assets/postcards/ until a photo is rendered from its pose. */
 const POSTCARD_IMAGES: Readonly<Record<PhotoSubject | 'invitation', string>> = {
   selfie: 'close',
@@ -212,24 +202,6 @@ export function postcardImage(subject: PhotoSubject | 'invitation'): string {
   return `/api/postcards/${POSTCARD_IMAGES[subject]}.jpg`;
 }
 
-/** Kai's card for a find: its own network's name, or an article site's own name, and the picture the server can show. */
-function mediaOf(d: Discovery): Media {
-  const info = d.media;
-  const titled = info.kind === 'article' || info.kind === 'video';
-  return {
-    kind: info.kind,
-    url: d.url,
-    source: info.site ?? (info.network === 'web' ? new URL(d.url).hostname.replace(/^www\./, '') : NETWORKS[info.network]),
-    author: info.author,
-    title: titled ? d.title : undefined,
-    text: titled ? d.summary : d.summary || d.title,
-    image: info.image,
-    aspect: info.aspect,
-    duration: info.duration,
-    minutes: info.minutes,
-    published: info.published,
-  };
-}
 
 function findTopic(d: Discovery, index: LogIndex): TopicKey {
   return d.pursuing ?? index.tripTopic.get(d.id) ?? d.topics[0] ?? (d.title as TopicKey);
