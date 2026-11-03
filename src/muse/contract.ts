@@ -335,7 +335,7 @@ export type PostcardBack = { [K in PostcardBackKind]: { readonly kind: K } & Rea
 export interface PostcardAsk {
   readonly plan: PostcardPlan;
   readonly subject: PhotoSubject;
-  /** As the card's front says it: "Out exploring Botany", "On Wren’s planet". */
+  /** Where it was, in a few words: "on my planet", "on Wren’s planet", "outside the planet". */
   readonly place: string;
   /** What Muse was doing when it took the photo. */
   readonly doing: Activity | 'work' | 'hangout';
@@ -681,6 +681,8 @@ export interface LifePolicy {
   continueTrip(s: MuseState, k: number, bestScore: number, draw: Draw): boolean;
   /** Photos taken while doing `activity` (or working) over [from, to), within the daily cap. Social photos come from SocialPolicy. */
   photosDuring(s: MuseState, activity: Activity | 'work', from: Instant, to: Instant, draw: Draw): readonly PhotoSpec[];
+  /** What kind of back a photo's postcard gets, and what that kind needs settled; the mind writes its words. */
+  postcardPlan(s: MuseState, photo: PhotoSpec, draw: Draw): PostcardPlan;
   /** A basket to deliver now, or null. */
   basket(s: MuseState, now: Instant): Basket | null;
   /** When to next check for a basket: the owner's chosen time, or null to check after each new find. */

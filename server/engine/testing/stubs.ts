@@ -146,6 +146,7 @@ export const life: LifePolicy = {
   keep: (js) => [...js].filter((j) => j.score >= 0.75).sort((a, b) => b.score - a.score).slice(0, 2),
   continueTrip: (_s, k) => k < 2,
   photosDuring: () => [],
+  postcardPlan: () => ({ kind: 'line' }),
   basket: () => null,
   nextBasketCheck: () => null,
   reflectionDue: () => false,

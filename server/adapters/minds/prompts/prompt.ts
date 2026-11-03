@@ -14,6 +14,7 @@ export type JsonSchema = Readonly<Record<string, unknown>>;
 
 export const string: JsonSchema = { type: 'string' };
 export const number: JsonSchema = { type: 'number' };
+export const boolean: JsonSchema = { type: 'boolean' };
 
 export function array(items: JsonSchema): JsonSchema {
   return { type: 'array', items };

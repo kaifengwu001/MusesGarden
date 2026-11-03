@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { Instant, MuseId, MuseSeed, Reach, StoredEvent } from '../../src/muse/contract';
+import type { Instant, MuseId, MuseSeed, MuseState, PhotoId, PhotoSpec, Reach, StoredEvent } from '../../src/muse/contract';
 import { openSqliteStore } from '../adapters/store/sqlite';
 import { socialPolicy } from '../domain/social/policy';
 import { reduceSocial } from '../domain/social/state';
@@ -257,5 +257,43 @@ describe('the friend group', () => {
     const widenedAt = engine.now();
     await engine.advanceTo(at(16 * 24));
     expect(encounters(engine, 'moss').filter((e) => e.event.at >= widenedAt).length).toBeGreaterThan(0);
+  });
+});
+
+describe('postcards', () => {
+  it('get their back in the same commit as the photo, in each Muse’s own log', async () => {
+    const store = memoryStore();
+    const deps = stubDeps(store);
+    const sky = (s: MuseState, to: number): PhotoSpec => ({
+      id: `p:${s.seed.id}:${to}` as PhotoId,
+      at: to as Instant,
+      subject: 'sky',
+      context: 'planet',
+      planetOf: s.seed.id,
+      dir: [0, 1, 0],
+      forward: [1, 0, 0],
+      zoom: 0.3,
+      companions: [],
+    });
+    const engine = new Engine({ ...deps, life: { ...deps.life, photosDuring: (s, _c, _from, to) => [sky(s, to)] } }, T0);
+    for (const id of ['a', 'b']) await engine.addMuse(seed(id), `I am ${id}.`, '', T0);
+    await engine.introduce('a' as MuseId, 'b' as MuseId, T0);
+    const committed: StoredEvent[][] = [];
+    const commit = store.commit.bind(store);
+    store.commit = (batch) => {
+      committed.push([...batch.events]);
+      commit(batch);
+    };
+    await engine.advanceTo(at(96));
+    const taken = committed.flatMap((events) => events.filter((e) => e.event.kind === 'photo.taken'));
+    expect(taken.length).toBeGreaterThan(0);
+    for (const events of committed) {
+      for (const e of events) {
+        if (e.event.kind !== 'photo.taken') continue;
+        const id = e.event.photo.id;
+        const back = events.find((w) => w.museId === e.museId && w.event.kind === 'photo.written' && w.event.photo === id);
+        expect(back, `${e.museId} ${id}`).toBeDefined();
+      }
+    }
   });
 });

@@ -2,8 +2,14 @@
 // shows, so the same photo always reads the same.
 import { salt } from '../../../src/core/hash';
 import type { Doodle, MindContext, PhotoSubject, PostcardAsk, PostcardWords } from '../../../src/muse/contract';
+import { BACK_LIMITS } from './prompts/postcard';
 
 const pick = <T>(options: readonly T[], key: string): T => options[salt(key) % options.length];
+
+/** A topic or a find's title can be long: cut at a word, so the words still fit the card. */
+function clip(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…`;
+}
 
 type Say = (a: PostcardAsk) => string;
 
@@ -123,7 +129,37 @@ const POEMS: readonly Say[][] = [
 ];
 
 /** The template words for `ask`, keyed by the photo's place, subject and topic so the same photo reads the same. */
-export function templateWords(_ctx: MindContext, ask: PostcardAsk): PostcardWords {
+export function templateWords(ctx: MindContext, ask: PostcardAsk): PostcardWords {
+  return fit(words(ctx, ask));
+}
+
+function fit(w: PostcardWords): PostcardWords {
+  const L = BACK_LIMITS;
+  switch (w.kind) {
+    case 'line':
+      return { ...w, text: clip(w.text, L.text) };
+    case 'doodle':
+    case 'game':
+      return { ...w, caption: clip(w.caption, L.short) };
+    case 'map':
+    case 'pressed':
+      return { ...w, label: clip(w.label, L.short) };
+    case 'ticket':
+      return { ...w, note: clip(w.note, L.short) };
+    case 'note':
+      return { ...w, title: clip(w.title, L.title), lines: w.lines.map((l) => clip(l, L.item)) };
+    case 'list':
+      return { ...w, title: clip(w.title, L.title), items: w.items.map((i) => ({ ...i, text: clip(i.text, L.item) })) };
+    case 'riddle':
+      return { ...w, question: clip(w.question, L.question), answer: clip(w.answer, L.short) };
+    case 'tally':
+      return { ...w, what: clip(w.what, L.short) };
+    case 'poem':
+      return { ...w, lines: w.lines.map((l) => clip(l, L.item)) };
+  }
+}
+
+function words(_ctx: MindContext, ask: PostcardAsk): PostcardWords {
   const key = `${ask.plan.kind}|${ask.subject}|${ask.place}|${ask.topic ?? ''}|${ask.friend ?? ''}|${ask.find ?? ''}`;
   const plan = ask.plan;
   switch (plan.kind) {

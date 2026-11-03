@@ -8,6 +8,7 @@ import { basket, nextBasketCheck } from './basket';
 import { beyondUntil, next, restUntil } from './life';
 import { hopMedia } from './media';
 import { photosDuring } from './photo';
+import { postcardPlan } from './postcard';
 import { continueTrip, hopMs, keep, serendipityRegion, startTrip } from './travel';
 
 export const lifePolicy: LifePolicy = {
@@ -23,6 +24,7 @@ export const lifePolicy: LifePolicy = {
   keep,
   continueTrip,
   photosDuring,
+  postcardPlan,
   basket,
   nextBasketCheck,
   reflectionDue,

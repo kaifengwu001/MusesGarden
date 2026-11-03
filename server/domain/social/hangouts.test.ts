@@ -28,14 +28,15 @@ describe('every hangout', () => {
     discoveries: [find('Lichen in jazz', ['Lichen', 'Jazz']), find('Bebop', ['Jazz'])],
   };
 
-  it('exchanges a gift each way and takes one photo of the two on the host planet, in both logs', () => {
+  it('exchanges a gift each way and takes one photo together on the host planet, in both logs', () => {
     const [a, b] = introduce(host, muse('bo', guestSpec));
     const now = at(T0 + 5 * HOUR);
     const out = policy.hangout(a, b, now, draws(1));
 
     const [hostPhoto] = ofKind(out.host, 'photo.taken');
     const [guestPhoto] = ofKind(out.guest, 'photo.taken');
-    expect(hostPhoto.photo).toMatchObject({ subject: 'friend', context: 'planet', planetOf: a.seed.id, companions: [b.seed.id], at: now });
+    expect(hostPhoto.photo).toMatchObject({ context: 'planet', planetOf: a.seed.id, companions: [b.seed.id], at: now });
+    expect(['friend', 'scenery', 'sky', 'closeup', 'creature', 'home']).toContain(hostPhoto.photo.subject);
     expect(guestPhoto.photo).toEqual({ ...hostPhoto.photo, companions: [a.seed.id] });
 
     const [hostSide] = ofKind(out.host, 'hangout');

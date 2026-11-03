@@ -23,6 +23,9 @@ import type {
   MuseState,
   PhotoId,
   PhotoSpec,
+  PostcardAsk,
+  PostcardBack,
+  PostcardPlan,
   QuestionId,
   ReduceCore,
   ReduceSocial,
@@ -259,7 +262,7 @@ export class Engine {
       const photo = 'photo' in target ? s.photos.find((p) => p.id === target.photo) : undefined;
       if ('find' in target ? !s.discoveries.has(target.find) : !photo) return false;
       if ((s.likes.get('find' in target ? target.find : target.photo)?.liked ?? false) === liked) return true;
-      const friend = photo && (photo.subject === 'friend' || photo.subject === 'new-friend') ? photo.companions.at(0) : undefined;
+      const friend = photo?.companions.at(0);
       const tx = this.tx(this.clockAt);
       tx.emit(museId, { kind: 'owner.liked', target, liked, ...(friend ? { friend } : {}) });
       this.commit(tx);
@@ -363,7 +366,31 @@ export class Engine {
         this.onEncounter(tx, item.museId, item.payload as unknown as EncounterPayload);
         break;
     }
+    await this.writeBacks(tx);
     this.commit(tx);
+  }
+
+  /** Each photo this item took gets its back in the same commit: the policy picks the kind, Muse's mind writes the words. */
+  private async writeBacks(tx: Tx): Promise<void> {
+    const taken = tx.emitted().flatMap((e) => (e.event.kind === 'photo.taken' ? [{ m: e.museId, photo: e.event.photo }] : []));
+    for (const { m, photo } of taken) {
+      const s = tx.state(m);
+      const plan = this.deps.life.postcardPlan(s, photo, this.deps.drawFor(m, 0));
+      const words = await this.deps.mindFor(m).writePostcard(this.mindContext(s, null), this.postcardAsk(tx, s, photo, plan));
+      tx.emit(m, { kind: 'photo.written', photo: photo.id, back: { ...plan, ...words, kind: plan.kind } as PostcardBack });
+    }
+  }
+
+  private postcardAsk(tx: Tx, s: MuseState, photo: PhotoSpec, plan: PostcardPlan): PostcardAsk {
+    const friendId = photo.companions.at(0);
+    const friend = friendId ? tx.state(friendId).seed.name : null;
+    const host = photo.planetOf === s.seed.id ? null : tx.state(photo.planetOf).seed.name;
+    const place = photo.context === 'beyond' ? 'outside the planet' : host ? `on ${host}’s planet` : 'on my planet';
+    const doing = friendId ? 'hangout' : s.working ? 'work' : (s.episode?.plan.activity ?? 'rest');
+    const episode = s.episode?.plan;
+    const topic = episode?.activity === 'travel' && 'topic' in episode.trip ? episode.trip.topic : null;
+    const find = photo.discoveryId ? (s.discoveries.get(photo.discoveryId)?.title ?? null) : null;
+    return { plan, subject: photo.subject, place, doing, topic, friend, find };
   }
 
   private async onEpisodeEnd(tx: Tx, m: MuseId, n: number): Promise<void> {
@@ -500,6 +527,8 @@ export class Engine {
       return;
     }
     if (!s.working) return;
+    // What Muse photographed while it worked, now the block is over.
+    if (s.workSince !== null) this.emitPhotos(tx, m, this.deps.life.photosDuring(s, 'work', s.workSince, tx.now, this.deps.drawFor(m, 0)));
     tx.emit(m, { kind: 'host.work', state: 'ended' });
     const ep = tx.state(m).episode;
     if (!ep) {
