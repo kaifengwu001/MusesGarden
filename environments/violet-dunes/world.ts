@@ -1,4 +1,4 @@
-import { Color, Frustum, Matrix4, PerspectiveCamera, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Color, Frustum, Matrix4, PerspectiveCamera, Ray, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from '../../src/core/buildQueue';
 import type { FrameClock } from '../../src/core/clock';
 import type { Globals } from '../../src/core/globals';
@@ -678,6 +678,18 @@ export class World {
 
   pick(ndcX: number, ndcY: number): Pick | null {
     return pickSurface(this.rig.camera, ndcX, ndcY, this.warp, this.terrain);
+  }
+
+  /** The Muse under a point of the screen, if any: this world's own, or a visiting one, the nearest the ray meets. */
+  pickMuse(ndcX: number, ndcY: number): { side: number; muse: Muse } | null {
+    const cam = this.rig.camera;
+    const ray = new Ray(cam.position.clone(), new Vector3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize());
+    let best: { side: number; muse: Muse; distance: number } | null = null;
+    for (const muse of [this.muse, ...this.visitors]) {
+      const hit = muse.pick(ray, this.warp);
+      if (hit && (!best || hit.distance < best.distance)) best = { ...hit, muse };
+    }
+    return best && { side: best.side, muse: best.muse };
   }
 
   /** A gust ring bursting out from a point on the meadow. */

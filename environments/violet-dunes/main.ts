@@ -182,6 +182,12 @@ async function boot(): Promise<void> {
       userPosed = true;
     },
     tap: (x, y) => {
+      // a tap on a Muse (this world's, or a friend's visiting) is its: it waves
+      const tapped = world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+      if (tapped) {
+        tapped.muse.tap(clock.time);
+        return;
+      }
       if (visiting?.tap(x, y, canvas.clientWidth, canvas.clientHeight)) return;
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
       if (hit) world.gust(hit.dir, clock.time);

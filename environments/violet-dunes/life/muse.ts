@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform, type Texture } from 'three';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform, type Ray, type Texture } from 'three';
 import { smoothstep } from '../../../src/core/math';
 import type { Terrain } from '../planet/terrain';
 import { warpPoint, type WarpFrame } from '../../../src/render/warp';
@@ -163,6 +163,8 @@ export class Muse {
   readonly where = { dir: new Vector3(0, 1, 0), height: 0, heading: new Vector3(1, 0, 0) };
   /** What a visit has it doing (its own day until one says otherwise). */
   private direction: MuseDirection = { kind: 'home', busy: false };
+  /** When you last tapped it (world s): it waves to you (its rig plays a wave and nothing else of yours). */
+  private tappedAt = -Infinity;
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -368,6 +370,9 @@ export class Muse {
     a.lookPitch = idlePitch + (pitch - idlePitch) * near;
     a.look = a.walk > 0.5 ? 0.4 : 1;
     a.time = time;
+    // (tapped, it waves to you, whatever its day or a visit has it doing)
+    const waved = time - this.tappedAt;
+    if (waved >= 0 && waved < WAVE_LENGTH) a.wave = waved;
     this.rig.pose(a);
     // the eyes blink; it smiles more when you are close and in front, most while it waves
     this.uniforms.uMuseFace.value.set(this.rig.eyes, Math.min(1, this.rig.smile + 0.35 * near), 0, 0);
@@ -456,6 +461,33 @@ export class Muse {
   /** A visit's say over Muse (src/visit/): its own day, out on the planet, or out of sight. */
   direct(direction: MuseDirection): void {
     this.direction = direction;
+  }
+
+  /**
+   * Where a ray from the camera (view space: as drawn, warped) meets Muse's body, if it does and Muse is drawn: which
+   * of its sides (+1 its own left) and how far off (m). One sphere about its middle: this world's Muse has no spheres
+   * of its own.
+   */
+  pick(ray: Ray, warp: WarpFrame): { side: number; distance: number } | null {
+    if (!this.mesh.visible) return null;
+    const pos = this.uniforms.uMusePos.value;
+    bounds.center.copy(this.up).multiplyScalar(0.5 * MUSE_HEIGHT).add(pos);
+    warpPoint(warp, bounds.center, bounds.center);
+    bounds.radius = 0.42 * MUSE_HEIGHT;
+    const hit = ray.intersectSphere(bounds, tmp2);
+    if (!hit) return null;
+    return { side: hit.sub(bounds.center).dot(this.left) >= 0 ? 1 : -1, distance: hit.distanceTo(ray.origin) };
+  }
+
+  /** You tapped it (world s): it waves to you, unless it is waving already. */
+  tap(time: number): void {
+    const waved = time - this.tappedAt;
+    if (!(waved >= 0 && waved < WAVE_LENGTH)) this.tappedAt = time;
+  }
+
+  /** Its pose's action as it is now (for checks). */
+  get living(): { readonly action: MuseAction } {
+    return { action: this.action };
   }
 
   /** Where Muse stands now (cottage-local m) and its heading (rad): for the camera's named view. */

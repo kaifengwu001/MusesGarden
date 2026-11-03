@@ -102,8 +102,8 @@ for (const world of WORLDS) {
       return { host: w.muse.drawn, hostDressed: dressed(w.muse), guests: w.visitors.map((v) => ({ drawn: v.drawn, dressed: dressed(v), footed: footing(v) })) };
     });
     expect(drawn).toEqual({ host: true, hostDressed: true, guests: [{ drawn: true, dressed: true, footed: true }] });
-    // a tap on the guest says hello, as one on the host does: it waves (Violet Dunes' Muse, of an older rig, answers no taps)
-    if (world.planet !== 'violet-dunes') {
+    // a tap on the guest says hello, as one on the host does: it waves
+    {
       const at = await page.evaluate(() => {
         type Hit = { muse?: unknown; visitor?: unknown } | null;
         const w = (window as unknown as { __world: { visitors: unknown[]; pickMuse(x: number, y: number): Hit } }).__world;
