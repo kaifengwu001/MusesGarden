@@ -25,7 +25,7 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from '../../src/view/input';
-import { prepareVisit, VisitUi } from '../../src/visit/visitUi';
+import { prepareStudio, prepareVisit, VisitUi } from '../../src/visit/visitUi';
 import { scarletVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
@@ -95,6 +95,8 @@ async function boot(): Promise<void> {
 
   // A visit on a ticket (`?visit=`): the host's planet, its seed and growth set before the world is made.
   const visit = await prepareVisit(store, 'scarlet-sail-canyon');
+  // Or the photo studio (`?studio`): the planet set for photos taken by hand, with no server (src/visit/studio.ts).
+  const studio = visit ? null : await prepareStudio(store, 'scarlet-sail-canyon');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -153,10 +155,10 @@ async function boot(): Promise<void> {
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
-  // On a visit, the visit's interface in its place: no engine of our own, no canyon or cloud panel.
-  const garden = visit ? new VisitUi(uiRoot, scarletVisit(world), visit) : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
-  const canyon = visit ? null : new CanyonUi(uiRoot, world, () => clock.time, () => { garden.interrupt(); userPosed = true; });
-  const cloudColours = visit ? null : new CloudColours(uiRoot, world.palette); // temporary: the clouds' colours, tuned live
+  // On a visit, the visit's interface in its place (in the photo studio, the studio's): no engine of our own, no canyon or cloud panel.
+  const garden = studio ? studio.open(scarletVisit(world), clock) : visit ? new VisitUi(uiRoot, scarletVisit(world), visit) : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
+  const canyon = visit || studio ? null : new CanyonUi(uiRoot, world, () => clock.time, () => { garden.interrupt(); userPosed = true; });
+  const cloudColours = visit || studio ? null : new CloudColours(uiRoot, world.palette); // temporary: the clouds' colours, tuned live
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else

@@ -21,7 +21,7 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from '../../src/view/input';
-import { prepareVisit, VisitUi } from '../../src/visit/visitUi';
+import { prepareStudio, prepareVisit, VisitUi } from '../../src/visit/visitUi';
 import { violetVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
@@ -91,6 +91,8 @@ async function boot(): Promise<void> {
 
   // A visit on a ticket (`?visit=`): the host's planet, its seed and growth set before the world is made.
   const visit = await prepareVisit(store, 'violet-dunes');
+  // Or the photo studio (`?studio`): the planet set for photos taken by hand, with no server (src/visit/studio.ts).
+  const studio = visit ? null : await prepareStudio(store, 'violet-dunes');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -167,8 +169,9 @@ async function boot(): Promise<void> {
   // (on a visit, only the visit's banner: no places of this world's own to fly to)
   if (!visit) uiRoot.append(places);
 
-  // A visit on a ticket: its banner, the host's finds and their cards, the two Muses (this world has no garden of its own).
-  const visiting = visit ? new VisitUi(uiRoot, violetVisit(world), visit) : null;
+  // A visit on a ticket: its banner, the host's finds and their cards, the two Muses (this world has no garden of its own);
+  // or the photo studio's panel and the two Muses.
+  const visiting = studio ? studio.open(violetVisit(world), clock) : visit ? new VisitUi(uiRoot, violetVisit(world), visit) : null;
 
   attachInput(canvas, {
     drag: (dx, dy) => {

@@ -26,7 +26,7 @@ import { attachInput } from './view/input';
 import { AHEAD } from './life/scatter';
 import { Keys } from './view/keys';
 import { Companions } from './visit/companions';
-import { prepareVisit } from './visit/visitUi';
+import { prepareStudio, prepareVisit } from './visit/visitUi';
 import { meadowCompanions, MeadowVisitUi, meadowVisit } from './meadowVisit';
 import type { Muse } from './life/muse';
 import { World } from './world';
@@ -95,6 +95,8 @@ async function boot(): Promise<void> {
 
   // A visit on a ticket (`?visit=`): another owner's Muse comes to Momo's meadow, its seed and growth set before the world is made.
   const visit = await prepareVisit(store, 'meadow');
+  // Or the photo studio (`?studio`): Momo, and a friend beside it, for photos taken by hand, with no server (visit/studio.ts).
+  const studio = visit ? null : await prepareStudio(store, 'meadow');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -153,12 +155,14 @@ async function boot(): Promise<void> {
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
-  // On a visit, the visit's interface in its place, with no engine of our own. Otherwise a friend's Muse visiting Momo
-  // (the engine's view names it) is drawn beside it (visit/companions.ts).
-  const companions = visit ? null : new Companions(meadowCompanions(world));
-  const garden = visit
-    ? new MeadowVisitUi(uiRoot, meadowVisit(world), visit)
-    : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world, (view) => companions?.view(view)));
+  // On a visit, the visit's interface in its place, with no engine of our own (in the photo studio, the studio's).
+  // Otherwise a friend's Muse visiting Momo (the engine's view names it) is drawn beside it (visit/companions.ts).
+  const companions = visit || studio ? null : new Companions(meadowCompanions(world));
+  const garden = studio
+    ? studio.open(meadowVisit(world), clock)
+    : visit
+      ? new MeadowVisitUi(uiRoot, meadowVisit(world), visit)
+      : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world, (view) => companions?.view(view)));
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; one on a find or a
   // pin is the garden's: a tap, a double-click or a hold there opens its card. The meadow's own click, double-click
