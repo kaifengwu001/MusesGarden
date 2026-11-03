@@ -3,8 +3,10 @@ import { angleBetween, slerpUnit, tangentToward, travel } from '../planet/geo';
 
 // The guest's Muse on a visit keeps its friend company: it stands a step to one side of the host, on dry ground, and
 // faces it; when the host has wandered off more than a little, it picks a new spot beside it and walks there. While
-// the host keeps walking, the guest walks abreast of it, on the side it is on: its spot goes with the host, a step to
-// that side and a touch ahead of where the host is, and it walks a little brisker than the host until it is there.
+// the host keeps walking, the guest walks abreast of it, on the side it was on when the host set off: its spot goes
+// with the host, a step to that side and a touch ahead of where the host is, and it walks a little brisker than the
+// host until it is there; with no room beside the host (a narrow pier, a porch by its wall), it walks in single file
+// behind it, on ground the host has just walked, never crossing over through it.
 // Pure: it reads only what it is given and keeps only where the guest stands, where it is going, and how the host has
 // been moving.
 
@@ -38,6 +40,9 @@ export const FOLLOW = {
 const AROUND = [0, Math.PI, Math.PI / 2, Math.PI / 4, (3 * Math.PI) / 4, -Math.PI / 4, (-3 * Math.PI) / 4, -Math.PI / 2];
 /** The rings to try them on (× FOLLOW.side): a step away, then a little nearer, then farther out (a host on a narrow pier). */
 const RINGS = [1, 0.75, 1.3, 1.7, 2.2];
+/** Beside a host that walks (× FOLLOW.side), then behind it in single file. */
+const ABREAST = [1, 0.75, 1.3];
+const BEHIND = [1, 1.3, 1.7, 2.2];
 
 export interface HostAt {
   /** Where the host stands: a unit direction. */
@@ -67,6 +72,8 @@ export class Follower {
   private last: Vector3 | null = null;
   private readonly motion = new Vector3();
   private readonly toward = new Vector3();
+  /** The side the guest walks on while the host walks (+1 its left, −1 its right; 0 while the host stands). */
+  private sideSign: 0 | 1 | -1 = 0;
 
   /**
    * One frame, `dt` seconds on: the host as it stands now, the planet's radius (m), and whether a place is dry
@@ -76,11 +83,14 @@ export class Follower {
     const speed = this.read(host, dt, radius);
     const moving = speed > FOLLOW.walking;
     if (moving && this.at) {
-      // walking with it: a step to the side it is on, a touch ahead of where the host is now
-      travel(host.dir, going.copy(this.motion).divideScalar(speed), Math.min(speed * FOLLOW.lead, FOLLOW.side) / radius, ahead);
-      this.spot = spotBeside(host, radius, dry, this.at, ahead);
+      // walking with it: a step to the side it was on when the host set off, a touch ahead of where the host is now
+      going.copy(this.motion).divideScalar(speed);
+      if (this.sideSign === 0) this.sideSign = this.at.clone().sub(host.dir).dot(new Vector3().crossVectors(host.dir, going)) < 0 ? -1 : 1;
+      travel(host.dir, going, Math.min(speed * FOLLOW.lead, FOLLOW.side) / radius, ahead);
+      this.spot = spotAbreast(host.dir, going, ahead, this.sideSign, radius, dry);
       this.anchor = host.dir.clone();
     } else {
+      this.sideSign = 0;
       const wandered = !this.spot || !this.anchor || angleBetween(this.anchor, host.dir) * radius > FOLLOW.leash;
       if (wandered || !this.spot || angleBetween(this.spot, host.dir) * radius < FOLLOW.near) {
         this.spot = spotBeside(host, radius, dry, this.at);
@@ -130,28 +140,55 @@ export class Follower {
   reset(): void {
     this.at = this.spot = this.anchor = this.last = null;
     this.motion.set(0, 0, 0);
+    this.sideSign = 0;
     this.walking = false;
   }
 }
 
 /**
- * A spot FOLLOW.side beside the host where it can stand, to its left or right as it faces: on the side the guest
- * stands now (so it doesn't cross over), else the other, else behind or between, else its left; a little nearer or
- * farther when none a step away is (a host on a narrow pier). Beside `at` when given (a place a touch ahead of the
- * host, for a guest walking along with it), else beside the host itself. With nowhere to stand, its left.
+ * A spot FOLLOW.side beside the host where it can stand: of the bearings round it, the good one nearest where the
+ * guest stands now (so it doesn't cross over), else its left; a little nearer or farther when none a step away is
+ * (a host on a narrow pier). With nowhere to stand, its left. For a host standing still.
  */
-export function spotBeside(host: HostAt, radius: number, dry: (dir: Vector3) => boolean, near: Vector3 | null, at: Vector3 = host.dir): Vector3 {
-  const forward = tangentToward(at, host.heading.clone().add(at), new Vector3());
-  const leftOf = new Vector3().crossVectors(at, forward).normalize();
-  // (the side the guest is on: its right when it stands to the host's right)
-  if (near && near.clone().sub(host.dir).dot(leftOf) < 0) leftOf.negate();
+export function spotBeside(host: HostAt, radius: number, dry: (dir: Vector3) => boolean, near: Vector3 | null): Vector3 {
+  const forward = tangentToward(host.dir, host.heading.clone().add(host.dir), new Vector3());
+  const leftOf = new Vector3().crossVectors(host.dir, forward).normalize();
   const t = new Vector3();
   for (const ring of RINGS) {
+    let best: Vector3 | null = null;
+    let bestD = Infinity;
     for (const bearing of AROUND) {
-      t.copy(leftOf).applyAxisAngle(at, bearing);
-      const spot = travel(at, t, (ring * FOLLOW.side) / radius, new Vector3());
-      if (dry(spot)) return spot;
+      t.copy(leftOf).applyAxisAngle(host.dir, bearing);
+      const spot = travel(host.dir, t, (ring * FOLLOW.side) / radius, new Vector3());
+      if (!dry(spot)) continue;
+      if (!near) return spot;
+      const d = angleBetween(spot, near);
+      if (d < bestD) {
+        bestD = d;
+        best = spot;
+      }
     }
+    if (best) return best;
   }
-  return travel(at, leftOf, FOLLOW.side / radius, new Vector3());
+  return travel(host.dir, leftOf, FOLLOW.side / radius, new Vector3());
+}
+
+/**
+ * A spot abreast of a host that walks the way `going` (a unit tangent at `host`): FOLLOW.side to the given side of
+ * `at` (a place a touch ahead of it), or a little nearer or farther; with no room beside it, behind it on the way it
+ * came (ground it has just walked), in single file. Never on its other side: crossing over, the guest would walk
+ * through it.
+ */
+export function spotAbreast(host: Vector3, going: Vector3, at: Vector3, sign: 1 | -1, radius: number, dry: (dir: Vector3) => boolean): Vector3 {
+  const side = new Vector3().crossVectors(host, going).normalize().multiplyScalar(sign);
+  for (const ring of ABREAST) {
+    const spot = travel(at, side, (ring * FOLLOW.side) / radius, new Vector3());
+    if (dry(spot)) return spot;
+  }
+  const behind = going.clone().negate();
+  for (const ring of BEHIND) {
+    const spot = travel(host, behind, (ring * FOLLOW.side) / radius, new Vector3());
+    if (dry(spot)) return spot;
+  }
+  return travel(host, behind, FOLLOW.side / radius, new Vector3());
 }

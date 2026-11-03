@@ -169,6 +169,25 @@ describe('the guest beside its host', () => {
     expect(settledWorst, 'once it stands: beside it again within two seconds').toBeLessThan(0.05);
   });
 
+  it('walking with a host along a narrow pier, keeps to the pier rather than stepping off it', () => {
+    const f = new Follower();
+    let h = host(new Vector3(0, 1, 0));
+    // the pier: a strip 0.6 m wide along the host's way
+    const left = new Vector3().crossVectors(h.dir, h.heading);
+    const start = h.dir.clone();
+    const onPier = (dir: Vector3) => Math.abs(dir.clone().sub(start).dot(left) * R) < 0.3;
+    f.step(h, 1 / 60, R, onPier);
+    let nearest = Infinity;
+    for (let t = 0; t < 8; t += 1 / 60) {
+      h = walked(h, 0.4 / 60);
+      const g = f.step(h, 1 / 60, R, onPier);
+      if (t > 2) expect(onPier(g.dir), `on the pier at ${t.toFixed(2)} s`).toBe(true);
+      if (t > 2) nearest = Math.min(nearest, meters(g.dir, h.dir));
+    }
+    // (in single file behind it, never through it)
+    expect(nearest, 'never walks into the host').toBeGreaterThan(0.8);
+  });
+
   it('starts over beside the host after a reset', () => {
     const f = new Follower();
     f.step(host(new Vector3(0, 1, 0)), 1 / 60, R, dryEverywhere);

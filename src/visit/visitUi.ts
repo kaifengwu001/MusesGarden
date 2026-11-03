@@ -398,9 +398,8 @@ export class VisitUi {
 
   /**
    * To the two Muses (on arriving, and whenever asked again): side on to them, both in the view, from the side with
-   * open sight to them. Where neither side has (the two tucked in by the home's walls) and the world has its own view
-   * of its Muse, which knows its home, that one; with no guest beside the host, the world's own view too, else from in
-   * front of the host.
+   * open sight to them, never in toward the house. With no guest beside the host, the world's own view of its Muse
+   * where it has one (it knows its home's walls), else from in front of the host.
    */
   frameMuses(): void {
     const framing = this.musesFraming();
@@ -423,8 +422,7 @@ export class VisitUi {
    * the view with room to spare (the world's own musesView, or MUSES_VIEW, at least; higher in step, so it looks down
    * as steeply; and higher by as much as the camera's own ground rises above theirs, so it never stands down in what
    * grows on a slope), from the side with more open ground between the camera and the two (no rise of the ground,
-   * wall or house in the way) and toward the side the host faces. Null with no guest beside the host, or when neither
-   * side has half its way open.
+   * wall in the way, never in toward the house) and toward the side the host faces. Null with no guest beside the host.
    */
   private musesFraming(): Framing | null {
     const base = this.world.musesView ?? MUSES_VIEW;
@@ -444,9 +442,12 @@ export class VisitUi {
     const scale = distance / base.distance;
     const framing = { dir: middle, ground: (host.height + guest.height) / 2, distance, height: base.height * scale, aim: base.aim };
     const sides = [across, across.clone().negate()];
-    const open = sides.map((side) => this.openness(framing, side));
-    if (Math.max(...open) < SIGHT_SAMPLES / 2) return null;
-    const scores = sides.map((side, k) => open[k] + FACING * side.dot(host.heading));
+    // (a side whose way runs in toward the house, through it or to a camera in it, is no side: of two opposite ways
+    // from the two, at most one runs in toward it)
+    const scores = sides.map((side) => {
+      const open = this.openness(framing, side);
+      return open < 0 ? -Infinity : open + FACING * side.dot(host.heading);
+    });
     const from = scores[1] > scores[0] ? sides[1] : sides[0];
     const camera = travel(middle, from, distance / R, new Vector3());
     const rise = Math.max(0, this.world.ground(camera).height - framing.ground);
@@ -455,8 +456,9 @@ export class VisitUi {
 
   /**
    * How open the way is from a framing's camera, on one side, to the two Muses: of the places along it, how many have
-   * nothing in the line of sight (the ground below it, no wall where a Muse may not stand, and not in toward the house:
-   * within HOUSE_REACH of it and nearer it than the two stand, who may well be on its own deck or terrace).
+   * nothing in the line of sight (the ground below it, no wall where a Muse may not stand); -1 when the way runs in
+   * toward the house (a place on it within HOUSE_REACH of the house and nearer it than the two stand, who may well be
+   * on its own deck or terrace), so the camera neither looks through it nor stands in it.
    */
   private openness(f: Omit<Framing, 'from'>, side: Vector3): number {
     const R = this.world.scene.growth.radius;
@@ -469,13 +471,13 @@ export class VisitUi {
     for (let k = 1; k <= SIGHT_SAMPLES; k++) {
       const u = k / SIGHT_SAMPLES;
       travel(f.dir, side, (f.distance * u) / R, p);
+      if (house) {
+        const d = angleBetween(p, house) * R;
+        if (d < HOUSE_REACH && d < theirs) return -1;
+      }
       const sight = f.ground + f.aim + (f.height - f.aim) * u;
       if (this.world.ground(p).height > sight - 0.25) continue;
       if (this.world.standable && !this.world.standable(p)) continue;
-      if (house) {
-        const d = angleBetween(p, house) * R;
-        if (d < HOUSE_REACH && d < theirs) continue;
-      }
       open++;
     }
     return open;
