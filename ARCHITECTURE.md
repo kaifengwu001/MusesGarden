@@ -916,13 +916,16 @@ houses, and mist in their place of the clouds). Its code is in `src/terraces/`.
   terrace.vert.glsl and by the rice's pass); rocks half buried on the
   knoll, trees on it; the build's trees and the village houses kept off
   its footing (the houses by their reach).
-- **The trees near the camera** (treesNear.ts, off by default: Tree detail
-  near): within the reach each tree drawn in full, its crown the far
-  tree's five lumps heaped of leafy clumps from one template (placed per
-  tree in treeNear.vert.glsl from its seed, in right-handed frames so the
-  template's triangles keep facing out), a trunk and branches, fading
-  into the far tree over the reach's last 4 m on complementary dithered
-  pixels (tree.vert.glsl leaves the card out within the reach).
+- **The trees near the camera** (treesNear.ts, within 26 m by default:
+  Tree detail near): within the reach each tree drawn in full, its crown
+  the far tree's five lumps heaped of leafy clumps from one template
+  (placed per tree in treeNear.vert.glsl from its seed, in right-handed
+  frames so the template's triangles keep facing out), a trunk and
+  branches, fading into the far tree over the reach's last 4 m on
+  complementary dithered pixels (tree.vert.glsl leaves the card out
+  within the reach). A lump the camera is in is left out, its clumps,
+  core and branch with it (dithered out from 1.35 of its radius to 1.1),
+  as the far tree's trace leaves out a lump seen from inside.
 - **The houses' models**: Kai's second five drawn as they came (models.ts
   loads a model with no levels of detail as its one mesh, a unit tall);
   the villages laid out by the first five's plots (construct.ts
