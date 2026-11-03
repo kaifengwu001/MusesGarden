@@ -1,14 +1,15 @@
-// The terraces' mist (mist.ts): one layer of strokes (mistStrokes.ts) at its height over the land's form, drawn into
-// a cube map as the distance from their edges and their breadth there (mistStroke.*.glsl), drifting with the wind.
-// Read by the mist itself (mist.frag.glsl) and by the paddies' water for its reflection (`mistReflected`).
+// The terraces' mist (mist.ts): one layer of strokes (mistStrokes.ts) round a sphere at its height over the radius,
+// their clouds each up or down from it, their shapes drawn into a cube map as the distance from their edges and their
+// breadth there (mistStroke.*.glsl), drifting with the wind. Read by the mist itself (mist.frag.glsl) and by the
+// paddies' water for its reflection (`mistReflected`).
 // Requires: uRadius; the terraces' palette (terraces_common).
 uniform samplerCube uMistBands; // the distance from the nearest stroke's edge (m, at an offset), its half-breadth there (m)
 uniform mat3 uMistDrift;        // planet direction → the strokes, as far as the wind has carried them
-uniform vec4 uMistLayer;        // its height (m over its form), how far its form follows the hills, the distances' offset, its density (× its own: the panel's slider)
-uniform sampler2D uMistGround;  // the ground's height, the land's broadest form, the hills' form (m over the radius): a raster a cube face, the six stacked
+uniform vec4 uMistLayer;        // its sphere's height (m over the radius), -, the distances' offset, its density (× its own: the panel's slider)
+uniform sampler2D uMistGround;  // the ground's height (m over the radius): a raster a cube face, the six stacked
 
-// The ground's height, the land's broadest form and the hills' form under it (m over the radius) at a direction.
-vec3 mistGround(vec3 d) {
+// The ground's height under a direction (m over the radius).
+float mistGround(vec3 d) {
   vec3 a = abs(d);
   float face;
   vec2 uv;
@@ -24,13 +25,7 @@ vec3 mistGround(vec3 d) {
   }
   float n = float(textureSize(uMistGround, 0).x);
   vec2 st = clamp(uv * 0.5 + 0.5, 0.5 / n, 1.0 - 0.5 / n);
-  return textureLod(uMistGround, vec2(st.x, (face + st.y) / 6.0), 0.0).rgb;
-}
-
-// The layer's height over the radius at a direction (m), and the ground's there.
-vec2 mistHeight(vec3 d) {
-  vec3 g = mistGround(d);
-  return vec2(uMistLayer.x + mix(g.y, g.z, uMistLayer.y), g.x);
+  return textureLod(uMistGround, vec2(st.x, (face + st.y) / 6.0), 0.0).r;
 }
 
 // The nearest stroke at a direction: how far inside its edge (m: < 0 outside it), and its half-breadth there (m).
@@ -59,14 +54,14 @@ vec3 mistColour(float edge, float fray) {
 }
 
 // The mist the paddies' water mirrors at a point of it (planet space, m) along its reflected ray r (unit): where the
-// ray meets the layer over that point (none where the point is over the layer), premultiplied colour and coverage.
+// ray meets the layer's sphere (none where the point is over it; its clouds' own heights let be), premultiplied
+// colour and coverage.
 vec4 mistReflected(vec3 p, vec3 r) {
-  vec2 h = mistHeight(normalize(p));
-  float rr = uRadius + h.x;
+  float rr = uRadius + uMistLayer.x;
   float c = dot(p, p) - rr * rr;
   if (c > 0.0) return vec4(0.0);
   float b = dot(p, r);
   vec2 s = mistStroke(normalize(p + r * (-b + sqrt(b * b - c))));
-  float a = mistBody(s.x, 0.0) * mistOpacity(s.y) * smoothstep(0.0, 0.8, h.x - h.y);
+  float a = mistBody(s.x, 0.0) * mistOpacity(s.y) * smoothstep(0.0, 0.8, uMistLayer.x - mistGround(normalize(p)));
   return vec4(mistColour(s.x, 0.0) * a, a);
 }

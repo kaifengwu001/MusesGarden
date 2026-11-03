@@ -3,6 +3,7 @@ import { Bands } from '../../terraces/build/bands';
 import { BUILD, buildTerraces, PART } from '../../terraces/build/construct';
 import { FIELD, PlanetField, type Plains } from '../../terraces/build/field';
 import { SphereGrid, type Field } from '../../terraces/build/sphere';
+import { ribbonMesh } from '../../terraces/mistRibbons';
 import { makeStrokes } from '../../terraces/mistStrokes';
 
 // The terraces' planet is mathematics (build/field.ts) and its terraces the
@@ -166,27 +167,30 @@ describe("the terraces' mathematics", () => {
   });
 });
 
-// The terraces' mist is strokes (terraces/mistStrokes.ts): the same strokes for a seed, the ones shown at a smaller
-// coverage the first of those at a larger, none where the layer never clears the ground, and every segment on the
-// sphere with a breadth of its own, broad bodies and thin necks both.
+// The terraces' mist is strokes (terraces/mistStrokes.ts): the same strokes for a seed, the fewer the first of the
+// more, none where no cloud's height ever clears the ground, and every segment on the sphere with a breadth of its
+// own, broad bodies and thin necks both; each cloud at its own height within the range, its strokes with it. Drawn as
+// ribbons (terraces/mistRibbons.ts): on the sphere, never folded over, every chunk of the strokes' shapes among them,
+// the clouds in order of height both ways.
 describe("the terraces' mist strokes", () => {
-  const P = { strokes: 24, half: 2.4, length: [30, 80] as const, wavelength: [24, 40] as const, sinuosity: [0.35, 1.4] as const, curl: 0.4, branch: 0.35, stack: 0.3, lobe: 2.8, steer: 0.04, twist: 0.6 };
+  const P = { strokes: 24, range: 3, half: 2.4, length: [30, 80] as const, wavelength: [24, 40] as const, sinuosity: [0.35, 1.4] as const, curl: 0.4, branch: 0.35, stack: 0.3, lobe: 2.8, steer: 0.04, twist: 0.6 };
   const axis: [number, number, number] = [0.9, 0, -0.44];
   const open = (): number => 5;
-  it('makes the same strokes for a seed, the fewer shown the first of the more', () => {
-    const a = makeStrokes(P, 7, 128, axis, open, 1);
-    const b = makeStrokes(P, 7, 128, axis, open, 1);
-    const c = makeStrokes(P, 7, 128, axis, open, 0.5);
+  it('makes the same strokes for a seed, the fewer the first of the more', () => {
+    const a = makeStrokes(P, 7, 128, axis, open);
+    const b = makeStrokes(P, 7, 128, axis, open);
+    const c = makeStrokes({ ...P, strokes: 12 }, 7, 128, axis, open);
     expect(a.count).toBeGreaterThan(0);
     expect(Array.from(b.data)).toEqual(Array.from(a.data));
     expect(c.count).toBeLessThan(a.count);
     expect(Array.from(c.data)).toEqual(Array.from(a.data.subarray(0, c.data.length)));
   });
-  it('keeps no stroke where its layer never clears the ground', () => {
-    expect(makeStrokes(P, 7, 128, axis, () => -1, 1).count).toBe(0);
+  it('keeps no stroke where no cloud would clear the ground', () => {
+    // (the layer's sphere under the ground by more than any cloud is raised from it)
+    expect(makeStrokes(P, 7, 128, axis, () => -P.range - 1).count).toBe(0);
   });
   it('lays every segment on the sphere, its breadth swelling and pinching', () => {
-    const s = makeStrokes(P, 11, 128, axis, open, 1);
+    const s = makeStrokes(P, 11, 128, axis, open);
     let thin = 0;
     let broad = 0;
     for (let i = 0; i < s.count; i++) {
@@ -201,5 +205,45 @@ describe("the terraces' mist strokes", () => {
     }
     expect(thin).toBeGreaterThan(0.05 * s.count);
     expect(broad).toBeGreaterThan(0.05 * s.count);
+  });
+  it('makes as many clouds as asked for, each at its own height within the range, its strokes with it', () => {
+    const s = makeStrokes(P, 11, 128, axis, open);
+    expect(s.clouds).toBe(P.strokes);
+    const heights = new Map<number, number>();
+    for (const r of s.ribbons) {
+      expect(Math.abs(r.offset)).toBeLessThanOrEqual(P.range);
+      if (heights.has(r.cloud)) expect(r.offset).toBe(heights.get(r.cloud));
+      heights.set(r.cloud, r.offset);
+    }
+    expect(heights.size).toBe(P.strokes);
+    expect(new Set(heights.values()).size).toBe(P.strokes);
+  });
+  it('draws each stroke as a ribbon on the sphere, never folded, its chunks those of its shapes, the clouds in order', () => {
+    const R = 128;
+    const s = makeStrokes(P, 11, R, axis, open);
+    const m = ribbonMesh(s, R, 0.6);
+    const n = m.position.length / 3;
+    for (let i = 0; i < n; i++) expect(Math.abs(Math.hypot(m.position[3 * i], m.position[3 * i + 1], m.position[3 * i + 2]) - 1)).toBeLessThan(1e-5);
+    // (every triangle turned the same way against the sphere: none folded back over its ribbon)
+    let flipped = 0;
+    const V = (i: number): number[] => [m.position[3 * i], m.position[3 * i + 1], m.position[3 * i + 2]];
+    for (let t = 0; t < m.ascending.length; t += 3) {
+      const [a, b, c] = [V(m.ascending[t]), V(m.ascending[t + 1]), V(m.ascending[t + 2])];
+      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      if ((u[1] * v[2] - u[2] * v[1]) * a[0] + (u[2] * v[0] - u[0] * v[2]) * a[1] + (u[0] * v[1] - u[1] * v[0]) * a[2] >= 0) flipped++;
+    }
+    expect(flipped).toBe(0);
+    // (each segment's chunk and height among the ribbons' vertices)
+    const owners = new Set<string>();
+    for (let i = 0; i < n; i++) owners.add(`${m.owner[2 * i]}/${m.owner[2 * i + 1]}`);
+    expect(m.segments.length).toBe(2 * s.count);
+    for (let i = 0; i < s.count; i++) expect(owners.has(`${m.segments[2 * i]}/${m.segments[2 * i + 1]}`)).toBe(true);
+    // (the clouds lowest first one way, highest first the other, the same triangles in each)
+    for (let i = 1; i < m.heights.length; i++) expect(m.heights[i]).toBeGreaterThanOrEqual(m.heights[i - 1]);
+    expect(m.counts.reduce((a, b) => a + b, 0)).toBe(m.ascending.length);
+    expect(Array.from(m.descending).sort((a, b) => a - b)).toEqual(Array.from(m.ascending).sort((a, b) => a - b));
+    const last = m.ascending.length - m.counts[m.counts.length - 1];
+    expect(Array.from(m.descending.subarray(0, m.counts[m.counts.length - 1]))).toEqual(Array.from(m.ascending.subarray(last)));
   });
 });

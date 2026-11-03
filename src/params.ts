@@ -137,15 +137,21 @@ export const schema = {
     forest: num('tf', 'Woods', 0.1, 0, 0.9, 0.01, 'terrain', { hidden: true }),
     fog: num('tfg', 'Valley fog', 0.55, 0, 1, 0.01, 'live', { hidden: true }),
     // the height fog (terraces/fog.glsl): how thick it is, the height it fills the valleys to, and how far over that
-    // it thins away; how patchy it is across the globe and how large its patches (Kai's settings, 2026-11-02)
+    // it thins away; how patchy it is across the globe and how large its patches (Kai's settings, 2026-11-02); how far
+    // it is tinted, and toward blue (0) or green (1)
     fogDensity: num('tfd', 'Fog density', 1, 0, 2, 0.01, 'live'),
     fogRange: num('tfr', 'Fog range', 3, -24, 12, 0.5, 'live', { unit: 'm' }),
     fogFalloff: num('tff', 'Fog falloff', 2.5, 0.5, 30, 0.5, 'live', { unit: 'm' }),
     fogPatchiness: num('tfp', 'Fog patchiness', 0.7, 0, 1, 0.01, 'live'),
     fogPatchSize: num('tfs', 'Fog patch size', 70, 10, 300, 1, 'live', { unit: 'm' }),
-    // the mist (terraces/mist.ts): its height over the land's form, how dense it is, how far its strokes' way twists
-    // off the wind's across the globe (Kai's height and density)
-    cloudHeight: num('tch', 'Cloud height', 8, -8, 14, 0.5, 'live', { unit: 'm' }),
+    fogTint: num('tft', 'Fog tint', 0.25, 0, 1, 0.01, 'live'),
+    fogTintHue: num('tfh', 'Fog tint hue', 0.5, 0, 1, 0.01, 'live'),
+    // the mist (terraces/mist.ts): how many stripes; the sphere they float on (its height over the planet's radius:
+    // Kai's 8 m over the land's form was 3.5 m over the radius on the whole) and how far each is offset up or down
+    // from it; how dense they are, how far their way twists off the wind's across the globe
+    cloudCount: int('tcn', 'Cloud count', 120, 10, 400, 'live'),
+    cloudHeight: num('tch', 'Cloud height', 3.5, -10, 20, 0.5, 'live', { unit: 'm' }),
+    cloudRange: num('tcr', 'Cloud height range', 3, 0, 12, 0.25, 'live', { unit: 'm' }),
     cloudDensity: num('tcd', 'Cloud density', 0.75, 0, 2, 0.05, 'live'),
     cloudTwist: num('tct', 'Cloud twist', 0.6, 0, 1, 0.01, 'live'),
   },

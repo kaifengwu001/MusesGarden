@@ -1,6 +1,7 @@
 // A segment of a mist layer's strokes (mist.ts, mistStrokes.ts) splatted into one face of its cube map: a quad round
 // it on the layer's shell, out to its breadth and a margin past it, projected from the planet's centre onto the face
-// (perspective-correct, so the splat keeps its shape). The fragments work out the distance from its edge.
+// (perspective-correct, so the splat keeps its shape). The fragments work out the distance from its edge (OWNERS:
+// and carry its chunk and its height's key).
 uniform mat3 uCubeFace; // this face's axes as columns: across, up, out (the GL cube-map convention)
 uniform float uShell;   // the layer's radius (m)
 uniform float uMargin;  // how far past the edge the distance is drawn (m)
@@ -8,6 +9,10 @@ uniform float uMargin;  // how far past the edge the distance is drawn (m)
 attribute vec3 aA;
 attribute vec3 aB;
 attribute vec2 aH; // the half-breadth at each end (m)
+#ifdef OWNERS
+attribute vec2 aIds; // its chunk, its height's key
+flat varying vec2 vIds;
+#endif
 
 varying vec3 vDir;
 flat varying vec3 vA;
@@ -25,6 +30,9 @@ void main() {
   vA = aA;
   vB = aB;
   vH = aH;
+#ifdef OWNERS
+  vIds = aIds;
+#endif
   vec3 f = d * uCubeFace;
   gl_Position = vec4(f.xy, 0.0, f.z);
 }

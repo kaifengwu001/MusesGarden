@@ -1,4 +1,4 @@
-import { Frustum, Matrix4, Scene, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
+import { Frustum, Matrix4, Scene, Vector2, Vector3, Vector4, type IUniform, type WebGLRenderer } from 'three';
 import { BuildQueue } from '../core/buildQueue';
 import type { FrameClock } from '../core/clock';
 import type { Globals } from '../core/globals';
@@ -116,6 +116,7 @@ export class TerraceWorld implements PlanetWorld {
     uHeightFog: { value: new Vector4(0, 3, 2.5, 0) },
     uHeightFogPatches: { value: new Vector4(0.7, 70, 0, 0) },
     uHeightFogEye: { value: new Vector3(0, 1, 0) },
+    uHeightFogTint: { value: new Vector2(0.25, 0.5) },
   };
   private posed = false;
   private noiseSeed = -1;
@@ -153,7 +154,7 @@ export class TerraceWorld implements PlanetWorld {
     this.objects = new TerraceBuild(this.shared);
     this.towers = new ModelSet('towers', MODEL_URLS('mountain'), this.shared, 32, 140);
     this.houses = new ModelSet('houses', MODEL_URLS('house'), this.shared, 96, 60);
-    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist.mesh);
+    this.scene.add(this.sky.mesh, this.objects.group, this.rice.mesh, this.trees.mesh, this.towers.group, this.houses.group, this.mist.group);
     // (dev: `only=` in the URL shows the planet's parts named, the rest hidden, to judge each alone: terraces, rice, trees)
     const only = new URLSearchParams(location.hash.slice(1)).get('only');
     if (only !== null) {
@@ -349,15 +350,17 @@ export class TerraceWorld implements PlanetWorld {
     this.nearFieldDrawn = riceNear > 0.5;
     this.rice.update(this.renderer, { seed: p.world.seed, radius: R, radiusHi: this.band.radiusHi, focus: rig.up, frustum: this.frustum, warp: this.warp, queue: this.queue, near: riceNear }, riceNear, p.wind.sheen * 1.2);
     this.own.uRiceNear.value.set(rig.up.x, rig.up.y, rig.up.z, riceNear);
-    // the mist: its layers drifting with the wind, by the panel's coverage, speed and shadow
-    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.coverage, p.clouds.speed, this.windAxis, p.terraces.cloudHeight, p.terraces.cloudDensity, p.terraces.cloudTwist);
+    // the mist: its clouds drifting with the wind, by the panel's sliders (how many, their height and its range, their
+    // density, their twist) and the wind's speed
+    const t = p.terraces;
+    this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.speed, this.windAxis, rig.altitude, t.cloudCount, t.cloudRange, t.cloudHeight, t.cloudDensity, t.cloudTwist);
     // the height fog (fog.glsl), by the panel's sliders: its density (the slider's square, so the low end is fine:
     // 0.05 a m at Kai's 1, 0.2 at its fullest), the height it fills the valleys to, how far over that it thins; how
-    // patchy it is across the globe and how large its patches
-    const t = p.terraces;
+    // patchy it is across the globe and how large its patches; its tint
     this.own.uHeightFog.value.set(0.05 * t.fogDensity * t.fogDensity, t.fogRange, Math.max(t.fogFalloff, 0.5), rig.altitude);
     this.own.uHeightFogPatches.value.set(t.fogPatchiness, t.fogPatchSize, 0, 0);
     this.own.uHeightFogEye.value.copy(rig.up);
+    this.own.uHeightFogTint.value.set(t.fogTint, t.fogTintHue);
     this.sky.update(cam, this.palette, rig.up, this.sunDir, rig.tilt);
     this.look.uPixelAngle.value = (2 * Math.tan((cam.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
   }

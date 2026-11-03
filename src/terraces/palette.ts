@@ -31,8 +31,9 @@ export const TERRACE_ROWS: Rows = {
   // the towers' stone: lit, far, pale, deep, lit pale, moss (valley: lit #59718D, far #6881A1; planet: #485B6E, top #384E5E)
   [TROW.PEAK]: ['#59718D', '#6881A1', '#97A7C4', '#384E5E', '#A6B4C8', '#4D6650'],
   // the mist: lit, in shade, deep, warm paper (valley mist #B7BFCF; the cloud sea #94A1B7); the blue-green landscape's
-  // ribbons of cloud (clouds-ribbons-blue-green.webp, regions): their core cream, their edge greyer, their outline
-  [TROW.FOG]: ['#E9ECF1', '#BEC6D4', '#94A1B7', '#F2F1EC', '#EEEADB', '#D6D4C6', '#C2C5BE'],
+  // ribbons of cloud (clouds-ribbons-blue-green.webp, regions): their core cream, their edge greyer, their outline;
+  // the height fog's tints (fog.glsl): a soft blue, a jade green (Kai: "slightly green / blue tinted")
+  [TROW.FOG]: ['#E9ECF1', '#BEC6D4', '#94A1B7', '#F2F1EC', '#EEEADB', '#D6D4C6', '#C2C5BE', '#93B4D6', '#94C9AE'],
   // zenith, horizon, haze, sun glow, mid sky, haze over the far land: the paintings' overcast grey-blue (#AAB7CB)
   [ROW.SKY]: ['#9AAAC2', '#CBD3DE', '#D6DCE4', '#F4F1EA', '#B2BED0', '#A7B4C7'],
   // the white birds read the cloud row: lit, shadowed, mid, rim, base
