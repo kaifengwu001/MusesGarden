@@ -6,6 +6,7 @@ import './visit.css';
 import { mediaOf } from '../garden/media';
 import type { Basket, Find, Interest } from '../garden/types';
 import type { PlanetId, VisitPlant, VisitWorldView } from '../muse/contract';
+import { salt, unit } from '../core/hash';
 import { angleBetween, slerpUnit, tangentToward, travel } from '../planet/geo';
 import { warpPoint } from '../render/warp';
 import { button, el, wait } from '../ui/garden/dom';
@@ -48,6 +49,10 @@ const HOUSE_REACH = 6;
 const FACING = 3;
 /** The host's house as the camera comes to it, where the world has no view of its own (visitUi.goToHostHome). */
 const HOME_VIEW = { distance: 16, height: 6, aim: 1.5 } as const;
+/** A friend's garden round its home on its own planet (visitUi.gardenPlaces): its nearest find this far from the house's middle (m), past its walls, and each next one farther by this times the square root of its place (m). */
+const GARDEN_FROM = 9;
+const GARDEN_STEP = 3;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 /** Where the card stands over its bed (m), and above which height (m) it is put away. */
 const CARD_AT = 1.9;
 const CARD_UNDER = 30;
@@ -313,14 +318,15 @@ export class VisitUi {
     }
   }
 
-  /** Lay the host's finds out on this planet: the world's own layout, then off the water, then as beds. */
+  /** Lay the host's finds out on this planet: round its home, the world's own layout, then off the water, then as beds. */
   private relayout(): void {
     const view = this.view;
     if (!view) return;
     const radius = this.world.scene.growth.radius;
     this.laidFor = { radius, shape: this.world.shape() };
     const basket: Basket = { id: 'visit', day: '', finds: view.plants.map((p) => p.id) };
-    this.laidOut = this.world.layOut([basket], view.plants.map((p) => this.findOf(p)));
+    const at = this.gardenPlaces(view, radius);
+    this.laidOut = this.world.layOut([basket], view.plants.map((p) => this.findOf(p, at.get(p.id as string))));
     this.placed = snapBeds(this.laidOut, radius, (dir) => this.world.ground(dir));
     // (one public find has nowhere to step to)
     this.root.classList.toggle('is-single', this.publicIds.length < 2);
@@ -427,10 +433,35 @@ export class VisitUi {
     this.current = null;
   }
 
-  /** A plant as the garden's cards and the world's layout take a find: a public one as its card shows it. */
-  private findOf(plant: VisitPlant): Find {
+  /**
+   * Where the host's finds grow here. On the meadow, where they were found (its places are the meadow's own). On any
+   * other planet a find's place is the meadow's, nowhere in particular there, so the host's garden is laid round its
+   * home instead: a spiral out from GARDEN_FROM m, past its walls, one find a turn of the golden angle, each a little
+   * farther, so the two Muses at the house have it all about them and it is in view from the house.
+   */
+  private gardenPlaces(view: VisitWorldView, radius: number): ReadonlyMap<string, Vector3> {
+    const out = new Map<string, Vector3>();
+    if (this.world.planet === 'meadow') return out;
+    const layout = this.world.shape() as { readonly cottage?: unknown };
+    const home = layout.cottage instanceof Vector3 ? layout.cottage.clone().normalize() : this.world.host.where.dir.clone();
+    const north = tangentToward(home, new Vector3(0, 1, 0), new Vector3());
+    const east = new Vector3().crossVectors(home, north).normalize();
+    const turn = unit(salt(`garden|${view.host.museId}`)) * Math.PI * 2;
+    // public finds nearest the house, then in a fixed order
+    const order = [...view.plants].sort((a, b) => Number(b.card !== null) - Number(a.card !== null) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const t = new Vector3();
+    order.forEach((plant, k) => {
+      const a = turn + k * GOLDEN_ANGLE;
+      t.copy(north).multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
+      out.set(plant.id as string, travel(home, t, (GARDEN_FROM + GARDEN_STEP * Math.sqrt(k)) / radius, new Vector3()));
+    });
+    return out;
+  }
+
+  /** A plant as the garden's cards and the world's layout take a find (at `place`, else where it was found): a public one as its card shows it. */
+  private findOf(plant: VisitPlant, place?: Vector3): Find {
     const card = plant.card;
-    const base = { id: plant.id, basket: 'visit', topic: this.topicOf(plant), place: plant.dir, shared: card !== null };
+    const base = { id: plant.id, basket: 'visit', topic: this.topicOf(plant), place: place ? ([place.x, place.y, place.z] as const) : plant.dir, shared: card !== null };
     if (!card) return { ...base, media: { kind: 'post', url: '', source: '' } };
     return { ...base, media: mediaOf(card), note: card.reason };
   }
