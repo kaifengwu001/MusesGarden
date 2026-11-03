@@ -86,9 +86,9 @@ There is no fixed bedtime. Muse can travel at any hour, and sleep is a long rest
 | `rest` | Lies in the grass, waters flowers, or naps. A rest of 90 min or more shows as sleep. | Muse near its house | Sometimes a photo. A due reflection runs at the start of a rest. |
 | `travel` on its planet | Explores the internet by exploring its planet. It transports to a region, old or new, then hops from spot to spot, looks at pages, and keeps the best. | Muse moves around the region. Fog lifts when a new area opens. Plants appear where finds are kept. | Hop records, finds planted where Muse found them, new areas, questions, photos |
 | `travel` beyond | Leaves its planet to roam the space between planets, where other Muses roam too | "Traveling outside the planet", with no follow | Encounters with strangers, photos. No finds. |
-| `visit` as host | A friend's Muse comes over, or a friend's owner on a ticket brings theirs | The friend's Muse on the owner's planet: "Wren is visiting", or "Wren is visiting, with its owner" | A gift exchange and a photo together, every time, plus rapport |
-| `visit` as guest | Muse goes to a friend's planet, alone or with its owner on a ticket | "Away at Wren's planet", or "Away at Wren's planet with you", with no follow | The same as for the host |
-| work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot ("Working"), or "Working outside the planet" or "Working at Wren's planet" while beyond or away | Nothing collected. Rarely a photo. |
+| `visit` as host | A friend's Muse comes over, or a friend's owner on a ticket brings theirs | The friend's Muse on the owner's planet: "Moss is visiting", or "Moss is visiting, with its owner" | A gift exchange and a photo together, every time, plus rapport |
+| `visit` as guest | Muse goes to a friend's planet, alone or with its owner on a ticket | "Away at Moss's planet", or "Away at Moss's planet with you", with no follow | The same as for the host |
+| work, an overlay | Takes out its laptop where it stands | Muse with its laptop at that spot ("Working"), or "Working outside the planet" or "Working at Moss's planet" while beyond or away | Nothing collected. Rarely a photo. |
 
 Work is not an activity the policy draws. Work time is exactly the busy time the Muse app reports. When work starts, the current episode pauses in place. When work ends, the episode resumes at the same spot. Nothing sends Muse home. Free time depends only on how much work the owner gives Muse.
 
@@ -163,8 +163,9 @@ Muse's planet starts almost empty and fills in as Muse explores. Where things si
 - Muse transports between regions, so the explored pockets need not connect.
 - Fog covers unexplored regions. The owner can walk into fog but cannot see what is inside, and the API withholds those contents.
 - The planet's growth value `g` follows the explored area.
-- Fern, the hero, lives on the first planet: the meadow, seed 412. It starts at the meadow's tuned size (R 128 m), as if it had explored that much already, and grows from there. The first planet's seed and look stay as they are; see [development guidelines](development-guidelines.md).
-- Every other Muse lives on a world of its own, one of those under `environments/`, at its own seed. `cast.json` names each member's planet and look (the original Muse's body, or one of the dressed muses). `src/muse/planets.ts` gives each planet its name and its page. A ticket names the host's planet, and a visit takes place there.
+- Momo, the hero, lives on the first planet: the meadow, seed 412. It starts at the meadow's tuned size (R 128 m), as if it had explored that much already, and grows from there. The first planet's seed and look stay as they are; see [development guidelines](development-guidelines.md).
+- Every other Muse lives on a world of its own, one of those under `environments/`, at its own seed. `cast.json` names each member's planet and look (the original Muse's body, or one of the dressed muses). `src/muse/planets.ts` gives each planet its name, its page, and whether a visit can go there yet: Nemo's Rice Terraces is a standalone viewer with no engine link, and Pina's Ukiyo-e Pine Hamlet is only in an open pull request. A ticket names the host's planet, and a visit takes place there.
+- The cast is Kai's, chosen Muse first on the cast sheet of 2026-11-02: each Muse's look, then who it is, then its interests, then its home planet. `server/fixtures/cast/README.md` has the table.
 
 ### Each trip goes beyond, opens new ground, or revisits
 
@@ -213,7 +214,7 @@ A trip on the planet is a chain of hops. Each hop moves Muse to a new spot.
 Every find is a real reel, post, article or video someone put on the internet.
 
 - `npm run record:media` reads the sources in `server/fixtures/media-sources.json` and writes `server/fixtures/media.json`, keeping two items of each kind per area (`--per-kind` changes that) and at least three for each pool topic. The sim and the tests replay that recording offline.
-- The sources are listed for each of the topic map's 14 areas: magazine and blog feeds, YouTube channels (videos, and Shorts as reels), Vimeo channels, Flickr tags and Bluesky accounts. A topic the sources leave with fewer than 3 items is filled from Bluesky posts that name it.
+- The sources are listed for each of the topic map's 37 areas: magazine and blog feeds, YouTube channels (videos, and Shorts as reels), Vimeo channels, Flickr tags and Bluesky accounts. A topic the sources leave with fewer than 3 items is filled from Bluesky posts that name it.
 - The recorder keeps an item only if its link answered. It files each item under the topics its title, caption and tags name, the item's own area first. An item that names none goes under its area's main topic.
 - Instagram joins once `META_IG_TOKEN` holds the owner's token. The recorder then reads the public business and creator accounts listed for each area through Business Discovery. Pictures from Instagram, Facebook and TikTok expire, so the server keeps them under `.muse/media/` and serves them from `/api/media/<id>`.
 - Chance picks each hop's kind. A Muse whose traits are all 0.5 looks for reels 25%, posts 25%, videos 15% and articles 35% of the time. Focus and curiosity tilt the mix toward articles and videos. Whimsy and novelty tilt it toward reels and posts. The weights are `MEDIUM_BASE` and `MEDIUM_TILT` in `server/domain/policy/constants.ts`.
@@ -224,7 +225,7 @@ Every find is a real reel, post, article or video someone put on the internet.
 
 A test walks this chain through real pages from the fixtures. The steps show how such a chain plays out. The trait values and scores are illustrative.
 
-1. The owner's `MEMORY.md` mentions botanical illustration. The allow-list extracts the topic `Botanical illustration`, and it becomes one of Muse's first `hypothesis` interests, seeded by the owner.
+1. An owner's `MEMORY.md` mentions botanical illustration. The allow-list extracts the topic `Botanical illustration`, and it becomes one of Muse's first `hypothesis` interests, seeded by the owner.
 2. A trip draws a new area and picks that unvisited owner-seeded topic. Its region opens near home.
 3. Hop 1 searches `Botanical illustration`. The Mind keeps a page that scores above 0.75, and Muse plants it where it stands.
 4. With focus 0.7 and a best score of 0.9, Muse continues with P = 0.63.
