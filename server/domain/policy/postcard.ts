@@ -60,8 +60,17 @@ const LINES = [
   [2, 4, 6],
 ] as const;
 
-function won(cells: readonly string[]): boolean {
-  return LINES.some(([a, b, c]) => cells[a] !== '.' && cells[a] === cells[b] && cells[b] === cells[c]);
+function winner(cells: readonly string[]): string | null {
+  const line = LINES.find(([a, b, c]) => cells[a] !== '.' && cells[a] === cells[b] && cells[b] === cells[c]);
+  return line ? cells[line[0]] : null;
+}
+
+const won = (cells: readonly string[]): boolean => winner(cells) !== null;
+
+/** How a board ended for Muse, who plays 'x'. */
+export function gameOutcome(board: string): 'won' | 'lost' | 'draw' {
+  const w = winner([...board]);
+  return w === 'x' ? 'won' : w === 'o' ? 'lost' : 'draw';
 }
 
 /** The back of `photo`: its kind by the photo and Muse's temperament, and what the kind needs settled. */

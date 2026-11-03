@@ -344,6 +344,8 @@ export interface PostcardAsk {
   readonly friend: string | null;
   /** The find's title, for a photo of one. */
   readonly find: string | null;
+  /** How a game on the back ended, for Muse ('x'): won, lost, or a draw. */
+  readonly outcome: 'won' | 'lost' | 'draw' | null;
 }
 
 export interface Basket {

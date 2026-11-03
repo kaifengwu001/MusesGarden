@@ -34,6 +34,7 @@ const ask = (plan: PostcardPlan, subject: PhotoSubject, k = 0): PostcardAsk => (
   topic: k % 2 ? 'Watercolor painting' : null,
   friend: k % 3 ? 'Wren' : null,
   find: subject === 'find' ? 'A pressed fern from 1890' : null,
+  outcome: plan.kind === 'game' ? (['won', 'lost', 'draw'] as const)[k % 3] : null,
 });
 
 /** Every piece of text on a back, to hold against the card's room. */
@@ -78,6 +79,16 @@ describe("the words on a postcard's back", () => {
       question: 'What has roots nobody sees?',
       answer: 'A mountain',
     });
+  });
+
+  it('say who won a game the way its board shows', () => {
+    const game: PostcardPlan = { kind: 'game', friend: 'wren' as MuseId, board: 'xox.x.o.x' };
+    const captions = (k: number) => new Set(Array.from({ length: 12 }, (_, j) => templateWords(ctx, { ...ask(game, 'friend', k), place: `p${j}` })).map((w) => (w.kind === 'game' ? w.caption : '')));
+    const won = captions(0);
+    const lost = captions(1);
+    for (const c of won) expect(lost.has(c), c).toBe(false);
+    expect(postcardPrompt(ctx, ask(game, 'friend', 0)).user).toContain('you won');
+    expect(postcardPrompt(ctx, ask(game, 'friend', 1)).user).toContain('they won');
   });
 
   it('are asked for with the photo, the kind and a schema of the same shape', () => {

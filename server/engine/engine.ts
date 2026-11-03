@@ -38,6 +38,7 @@ import type {
   TopicKey,
   Verdict,
 } from '../../src/muse/contract';
+import { gameOutcome } from '../domain/policy/postcard';
 import { Tx, type Fold } from './tx';
 
 export interface EngineDeps {
@@ -390,7 +391,8 @@ export class Engine {
     const episode = s.episode?.plan;
     const topic = episode?.activity === 'travel' && 'topic' in episode.trip ? episode.trip.topic : null;
     const find = photo.discoveryId ? (s.discoveries.get(photo.discoveryId)?.title ?? null) : null;
-    return { plan, subject: photo.subject, place, doing, topic, friend, find };
+    const outcome = plan.kind === 'game' ? gameOutcome(plan.board) : null;
+    return { plan, subject: photo.subject, place, doing, topic, friend, find, outcome };
   }
 
   private async onEpisodeEnd(tx: Tx, m: MuseId, n: number): Promise<void> {

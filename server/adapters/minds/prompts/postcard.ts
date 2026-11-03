@@ -51,7 +51,7 @@ const KINDS: Readonly<Record<PostcardBackKind, (a: PostcardAsk) => { readonly as
     schema: object({ note: string }),
   }),
   game: (a) => ({
-    ask: `You played noughts and crosses with ${a.friend ?? 'your friend'}. Write a caption about the game, at most 7 words.`,
+    ask: `You played noughts and crosses with ${a.friend ?? 'your friend'} and ${a.outcome === 'won' ? 'you won' : a.outcome === 'lost' ? 'they won' : 'nobody won'}. Write a caption about the game, at most 7 words.`,
     schema: object({ caption: string }),
   }),
   riddle: () => ({

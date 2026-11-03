@@ -3,7 +3,7 @@ import type { DiscoveryId, PhotoId, PhotoSpec, PostcardBackKind, PostcardPlan, T
 import { instant, museId } from '../ids';
 import { drawFor } from '../rng';
 import { Life, MOSS, TEMPERAMENTS } from '../testing';
-import { gameBoard, postcardPlan } from './postcard';
+import { gameBoard, gameOutcome, postcardPlan } from './postcard';
 
 const WREN = museId('wren');
 
@@ -87,6 +87,7 @@ describe('noughts and crosses', () => {
       const winners = lines.filter(([a, b, c]) => board[a] !== '.' && board[a] === board[b] && board[b] === board[c]).map(([a]) => board[a]);
       expect(new Set(winners).size).toBeLessThanOrEqual(1);
       if (xs + os < 9) expect(winners.length).toBeGreaterThan(0);
+      expect(gameOutcome(board)).toBe(winners[0] === 'x' ? 'won' : winners[0] === 'o' ? 'lost' : 'draw');
     }
   });
 });

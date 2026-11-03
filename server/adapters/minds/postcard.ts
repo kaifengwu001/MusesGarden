@@ -113,7 +113,11 @@ const LISTS: readonly ((a: PostcardAsk) => { title: string; items: { text: strin
 ];
 
 const TICKET_NOTES = ['window seat', 'one way, for now', 'back for supper'];
-const GAME_CAPTIONS: readonly Say[] = [(a) => `${a.friend ?? 'It'} won. Again.`, () => 'We called it a draw.', () => 'I let it win (I did not).'];
+const GAME_CAPTIONS: Readonly<Record<'won' | 'lost' | 'draw', readonly Say[]>> = {
+  won: [() => 'I won! Just this once.', (a) => `Beat ${a.friend ?? 'my friend'}. It wants a rematch.`],
+  lost: [(a) => `${a.friend ?? 'It'} won. Again.`, () => 'I let it win (I did not).'],
+  draw: [() => 'We called it a draw.', () => 'Nobody won. Everybody had tea.'],
+};
 
 const RIDDLES: readonly (readonly [string, string])[] = [
   ['What has roots nobody sees and is taller than trees?', 'A mountain'],
@@ -178,7 +182,7 @@ function words(_ctx: MindContext, ask: PostcardAsk): PostcardWords {
     case 'ticket':
       return { kind: 'ticket', note: pick(TICKET_NOTES, key) };
     case 'game':
-      return { kind: 'game', caption: pick(GAME_CAPTIONS, key)(ask) };
+      return { kind: 'game', caption: pick(GAME_CAPTIONS[ask.outcome ?? 'draw'], key)(ask) };
     case 'riddle': {
       const [question, answer] = pick(RIDDLES, key);
       return { kind: 'riddle', question, answer };
