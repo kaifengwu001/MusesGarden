@@ -2118,6 +2118,472 @@ body.garden-on .hud {
   border-bottom: 1px solid rgba(62, 58, 54, 0.25);
 }
 
+/* a back Muse wrote or drew on (postcardBack.ts): the message side a little wider for it, the stamp and postmark as
+   on any card, and the place and day in a small line under what it wrote, beside the mitten print */
+.g-pc-back.is-written {
+  grid-template-columns: 1.2fr auto 1fr;
+}
+
+.g-pc-back.is-written .g-pc-left {
+  justify-content: stretch;
+  gap: calc(var(--w) * 0.01);
+  padding-bottom: 0;
+}
+
+.g-pc-back.is-written .g-stamp {
+  width: calc(var(--w) * 0.107);
+}
+
+.g-pc-back.is-written .g-postmark {
+  right: calc(var(--w) * 0.05);
+  width: calc(var(--w) * 0.256);
+}
+
+.g-pc-sign {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--w) * 0.016);
+}
+
+.g-pc-where {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: max(9.5px, calc(var(--w) * 0.021));
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.g-pc-back.is-written .g-pc-mitten {
+  position: static;
+  flex: none;
+  width: calc(var(--w) * 0.05);
+}
+
+/* the message: one box, everything in it sized by its width (cqw) */
+.g-pcb {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  color: var(--pen);
+}
+
+.g-pcb-in {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4cqw;
+  transform: rotate(var(--tilt));
+}
+
+.g-pcb p {
+  margin: 0;
+}
+
+.g-pcb svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.g-pcb-doodle,
+.g-pcb-map,
+.g-pcb-grid,
+.g-pcb-tally,
+.g-pcb-flourish,
+.g-pcb-ask,
+.g-pcb-sprig,
+.g-pcb-underline,
+.g-pcb-box,
+.g-pcb-specimen,
+.g-pcb-ring {
+  display: block;
+  flex: none;
+}
+
+.g-pcb-hand {
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: var(--size);
+  line-height: 1.12;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+}
+
+.g-pcb-caption {
+  text-align: center;
+  transform: rotate(-2deg);
+}
+
+/* a line: large, and a little crayon mark after it */
+.g-pcb.is-line .g-pcb-in {
+  align-items: stretch;
+  gap: 2cqw;
+}
+
+.g-pcb-line {
+  padding: 0 2cqw;
+}
+
+.g-pcb-flourish {
+  align-self: flex-end;
+  width: 17cqw;
+  margin-right: 8cqw;
+  transform: rotate(-8deg);
+}
+
+.g-pcb-flourish.is-swoosh {
+  width: 30cqw;
+}
+
+/* a doodle */
+.g-pcb-doodle {
+  width: var(--wide);
+  transform: rotate(var(--turn));
+}
+
+/* the planet drawn small */
+.g-pcb-map {
+  width: 90cqw;
+}
+
+/* a note on lined paper, taped on: its rules run under every line, wrapped ones too */
+.g-pcb-note {
+  --lh: calc(var(--size) * 1.42);
+  position: relative;
+  width: 96cqw;
+  box-sizing: border-box;
+  padding: calc(var(--lh) * 0.8) 5cqw calc(var(--lh) * 0.45) 12cqw;
+  background:
+    linear-gradient(90deg, transparent 8.5cqw, rgba(214, 90, 90, 0.5) 8.5cqw calc(8.5cqw + 1px), transparent 0),
+    repeating-linear-gradient(transparent 0 calc(var(--lh) - 1px), rgba(90, 130, 200, 0.34) calc(var(--lh) - 1px) var(--lh)) 0 calc(var(--lh) * 0.8 + 0.1em),
+    var(--grain),
+    var(--paper);
+  box-shadow:
+    0 1px 1.5px rgba(40, 30, 20, 0.16),
+    0 5px 12px -5px rgba(40, 30, 20, 0.3);
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: var(--size);
+  line-height: var(--lh);
+  overflow-wrap: break-word;
+  transform: rotate(var(--turn));
+}
+
+.g-pcb-note .g-tape {
+  width: 34cqw;
+  height: 9cqw;
+}
+
+.g-pcb-title {
+  font-weight: 700;
+}
+
+/* a list: tick boxes, a crayon line under its title */
+.g-pcb-list {
+  width: 94cqw;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: var(--size);
+  line-height: 1.16;
+  overflow-wrap: break-word;
+}
+
+.g-pcb-list .g-pcb-title {
+  font-size: 1.14em;
+}
+
+.g-pcb-underline {
+  width: 62%;
+  margin: 0 0 3.5cqw;
+}
+
+.g-pcb-list ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2.8cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.g-pcb-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 2.6cqw;
+}
+
+.g-pcb-list li span {
+  min-width: 0;
+}
+
+.g-pcb-box {
+  width: 1.05em;
+  margin-top: 0.06em;
+}
+
+/* a find pressed flat, taped down, with a museum label */
+.g-pcb.is-pressed .g-pcb-in {
+  gap: 3cqw;
+}
+
+.g-pcb-sheet {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 84cqw;
+}
+
+.g-pcb-specimen {
+  position: relative;
+  height: 76cqw;
+  aspect-ratio: var(--aspect);
+  transform: rotate(var(--turn));
+}
+
+.g-pcb-flower {
+  display: block;
+  height: 100%;
+  opacity: 0.94;
+  filter: saturate(0.62) sepia(0.2) contrast(0.93) brightness(1.03) hue-rotate(var(--hue));
+  mix-blend-mode: multiply;
+}
+
+.g-pcb-flower svg {
+  height: 100%;
+}
+
+/* (over the flower, not multiplied into it: its stem shows paler through the tape) */
+.g-pcb-specimen .g-tape {
+  width: 22cqw;
+  height: 6.4cqw;
+  opacity: 0.66;
+  mix-blend-mode: normal;
+  transform: translate(-50%, -50%) rotate(var(--turn));
+}
+
+.g-pcb-museum {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqw;
+  width: 86cqw;
+  box-sizing: border-box;
+  padding: 2.4cqw 3.6cqw 2.6cqw;
+  border: 1px solid rgba(62, 58, 54, 0.5);
+  outline: 1px solid rgba(62, 58, 54, 0.22);
+  outline-offset: 0.9cqw;
+  background: #fffdf7;
+  font-family: var(--font-serif);
+  font-size: var(--size);
+  line-height: 1.22;
+  color: #3e3a36;
+  overflow-wrap: break-word;
+  transform: rotate(-0.6deg);
+}
+
+.g-pcb-museum-no,
+.g-pcb-museum-by {
+  font-size: 0.7em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.g-pcb-museum-name {
+  font-style: italic;
+}
+
+/* a travel stub: notched where it tears, a dashed line to tear along, printed in its colour */
+.g-pcb-ticket {
+  width: 94cqw;
+  filter: drop-shadow(0 1px 1px rgba(40, 30, 20, 0.22)) drop-shadow(0 4px 6px rgba(40, 30, 20, 0.14));
+  transform: rotate(var(--turn));
+}
+
+.g-pcb-ticket-paper {
+  display: grid;
+  grid-template-columns: 22cqw 1fr;
+  min-height: 44cqw;
+  border-radius: 2cqw;
+  background: var(--grain), var(--paper);
+  color: var(--print);
+  -webkit-mask:
+    radial-gradient(circle at 22cqw 0, transparent 3cqw, #000 calc(3cqw + 0.5px)) top / 100% 51% no-repeat,
+    radial-gradient(circle at 22cqw 100%, transparent 3cqw, #000 calc(3cqw + 0.5px)) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle at 22cqw 0, transparent 3cqw, #000 calc(3cqw + 0.5px)) top / 100% 51% no-repeat,
+    radial-gradient(circle at 22cqw 100%, transparent 3cqw, #000 calc(3cqw + 0.5px)) bottom / 100% 51% no-repeat;
+}
+
+.g-pcb-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4.5cqw 0;
+  border-right: 0.7cqw dashed color-mix(in srgb, var(--print) 45%, transparent);
+  font-family: var(--font-serif);
+}
+
+.g-pcb-admit {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 5.2cqw;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.g-pcb-serial {
+  font-size: 3.4cqw;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.g-pcb-trip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 3.5cqw 4.5cqw 3.5cqw 5cqw;
+  font-family: var(--font-serif);
+  overflow-wrap: break-word;
+}
+
+.g-pcb-word {
+  font-size: 4.2cqw;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.g-pcb-stop {
+  margin-bottom: 1.6cqw;
+  font-size: var(--size);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: 0.02em;
+}
+
+.g-pcb-stop:last-child {
+  margin-bottom: 0;
+}
+
+.g-pcb-ticketnote {
+  transform: rotate(-3deg);
+}
+
+/* noughts and crosses */
+.g-pcb-grid {
+  width: 76cqw;
+}
+
+.g-pcb-legend {
+  font-size: 9cqw;
+  line-height: 1;
+}
+
+.g-pcb-legend b {
+  font-weight: 700;
+}
+
+/* a riddle: the question, and the answer upside down at the foot */
+.g-pcb.is-riddle .g-pcb-in {
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 2cqw;
+  padding: 1cqw 0 2cqw;
+}
+
+.g-pcb-ask {
+  width: 19cqw;
+  margin-left: 2cqw;
+  transform: rotate(-10deg);
+}
+
+.g-pcb-question {
+  padding: 0 2cqw;
+}
+
+.g-pcb-answer {
+  align-self: flex-end;
+  max-width: 86cqw;
+  padding-top: 1.4cqw;
+  border-top: 1px solid rgba(62, 58, 54, 0.3);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--size);
+  line-height: 1.25;
+  color: #4b4640;
+  overflow-wrap: break-word;
+  transform: rotate(180deg);
+}
+
+.g-pcb-answer-word {
+  font-style: normal;
+  font-size: 0.78em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* a tally: what was counted, the marks in fives, the count ringed */
+.g-pcb-what {
+  text-align: center;
+}
+
+.g-pcb-tally {
+  width: 90cqw;
+}
+
+.g-pcb-total {
+  position: relative;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 14cqw;
+  line-height: 1;
+}
+
+.g-pcb-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2.6em;
+  transform: translate(-50%, -50%) rotate(-6deg);
+}
+
+/* a poem: three short lines, each set in a little further */
+.g-pcb-poem {
+  align-self: stretch;
+  padding: 0 2cqw;
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: var(--size);
+  line-height: 1.24;
+  overflow-wrap: break-word;
+}
+
+.g-pcb-poem p + p {
+  margin-top: 2.6cqw;
+}
+
+.g-pcb-poem p:nth-child(2) {
+  padding-left: 7cqw;
+}
+
+.g-pcb-poem p:nth-child(n + 3) {
+  padding-left: 14cqw;
+}
+
+.g-pcb-sprig {
+  width: 46cqw;
+}
+
 /* an invitation: an envelope with a wax seal; its ticket slides out when it opens */
 .g-env {
   --pc-h: 0.6667;
