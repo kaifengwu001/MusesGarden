@@ -67,6 +67,7 @@ Started from fbb25fd (the mist as brushed strokes in three layers). Kai (2026-11
 | 27 | "Default fog falloff to 4.5, default cloud height to 3.5" | |
 | 28 | "Turn the sides of the paddy dams to a darker green" | |
 | 29 | (Kai, with five models in ~/Downloads/new houses/) "A batch of better regular house models have also been included: please swap them out. They are sufficiently low poly and clean topo already that we don't need to decimate / generate LODs anymore" | |
+| 30 | (Kai, mid-round) "Why did the layout of the village change?" Also: "if you have to add a base to the Muse house, make sure you add stairs / a winding path leading from the front door to the main path so that all of this makes sense. Make the base more natural by adding rocks, trees around it: a huge rectangular block looks ugly" | |
 
 The rice and the camera: the meadow draws pixel-identical to 7d21e88 in all 27 views (the shared camera rig's tilt only made protected and its reference heights exported). `npm run check`, `npm test` (125, one new: the terraces' horizon only ever moving down the frame, once in it, to the standing view, the tilt the shared one's in orbit and from there) and `npm run shots` (15) pass. Of the GPU tests, 11 pass, one is skipped, and the frame-budget one fails at a 30 fps lock (p95 33.3 ms against 20), three times running; it fails the same at 3f8c732, before this round, so it is the machine pacing at 30 fps, not the change.
 
