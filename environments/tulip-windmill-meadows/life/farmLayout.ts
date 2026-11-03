@@ -1,6 +1,14 @@
 import { Matrix4, Vector3 } from 'three';
 import { hash32, unit } from '../../../src/core/hash';
 import type { Layout } from '../planet/terrain';
+import { TRACK, bedOf, fieldCoordinates, fieldPhase, fieldRegion, type FieldRegion } from './fieldGrid';
+
+/**
+ * A farm's lawn is a cell of the field grid: whole beds (stripes i0–i1)
+ * between two short soil tracks across them, at field z zl and zh, in its
+ * region's coordinates. The beds run on as tulips past both tracks.
+ */
+export interface FarmLot { i0:number; i1:number; zl:number; zh:number; region:FieldRegion; }
 
 export interface FarmSite {
   direction: Vector3;
@@ -9,34 +17,45 @@ export interface FarmSite {
   scale: number;
   kind: 'mill'|'cottage';
   variant: number;
-  gate: number;
+  /** Where the front walk meets the lawn's front track (local units along). */
+  walk: number;
+  lot: FarmLot;
   minDot:number;
 }
 export const FARM_LIMIT=20;
-export const PLOT_HALF_X=5.8;
-export const PLOT_HALF_Z=6.4;
+/** The fenced yard every building stands in (local units): fences at ±5.55, borders, apron. */
+const YARD={halfX:5.8,back:-6.6,front:5.4} as const;
+/** The front walk leaves the door here, at this offset across. */
+const DOOR={x:0.9,z:3.95} as const;
 
-export function fieldCoordinates(d:Vector3,layout:Layout):[number,number]{
-  const right=new Vector3().crossVectors(layout.cottage,layout.homeBearing);
-  return [Math.atan2(d.dot(right),d.dot(layout.cottage))*128,Math.asin(Math.max(-1,Math.min(1,d.dot(layout.homeBearing))))*128];
-}
 function directionAt(x:number,z:number,layout:Layout):Vector3{
   const right=new Vector3().crossVectors(layout.cottage,layout.homeBearing);
   return layout.cottage.clone().multiplyScalar(Math.cos(z/128)*Math.cos(x/128))
     .addScaledVector(right,Math.cos(z/128)*Math.sin(x/128)).addScaledVector(layout.homeBearing,Math.sin(z/128)).normalize();
 }
-export function fieldPhase(x:number,z:number):number{return (x+z*0.18+3*Math.sin(z/27)+24)/9;}
 
-/** Ridge lines follow the local derivative of the cultivated ribbon, on either hemisphere. */
+/** Ridge lines run along the local ribbon, where the field phase holds still, in the band or a cap. */
 export function farmFrame(direction:Vector3,layout:Layout):{across:Vector3;along:Vector3}{
-  const [x,z]=fieldCoordinates(direction,layout),slope=-0.18-Math.cos(z/27)/9;
-  const along=directionAt(x+slope*0.05,z+0.05,layout).sub(directionAt(x-slope*0.05,z-0.05,layout)).normalize();
+  const t1=new Vector3().crossVectors(direction,Math.abs(direction.y)<0.9?new Vector3(0,1,0):new Vector3(1,0,0)).normalize();
+  const t2=new Vector3().crossVectors(direction,t1),region=fieldRegion(direction,layout);
+  const step=1e-4,at=(a:number,b:number):[number,number]=>fieldCoordinates(direction.clone().addScaledVector(t1,a).addScaledVector(t2,b).normalize(),layout,region);
+  const phase=(a:number,b:number):number=>fieldPhase(...at(a,b));
+  const g1=phase(step,0)-phase(-step,0),g2=phase(0,step)-phase(0,-step);
+  const along=t1.clone().multiplyScalar(-g2).addScaledVector(t2,g1).normalize();
+  // Same sense as before: toward rising z, the long way up the ribbon.
+  const z1=at(along.dot(t1)*step,along.dot(t2)*step)[1],z0=at(-along.dot(t1)*step,-along.dot(t2)*step)[1];
+  if(z1<z0)along.negate();
   const across=new Vector3().crossVectors(direction,along).normalize();
   along.crossVectors(across,direction).normalize();return {across,along};
 }
 export function farmMatrix(site:FarmSite):Matrix4{return new Matrix4().makeBasis(site.across,site.direction,site.along);}
 
-/** Same small garden at every farm. Its short gate path meets a real row gap. */
+/** A point given in a farm's local units (across, along). */
+function localPoint(direction:Vector3,frame:{across:Vector3;along:Vector3},x:number,z:number,scale:number,radius:number):Vector3{
+  return direction.clone().addScaledVector(frame.across,x*scale/radius).addScaledVector(frame.along,z*scale/radius).normalize();
+}
+
+/** The same small garden at every farm, in a lawn of whole beds whose front track its walk runs straight to. */
 export function farmSites(layout:Layout,radius:number):FarmSite[]{
   const home=layout.cottage,right=new Vector3().crossVectors(home,layout.homeBearing);
   const source:{direction:Vector3;scale:number;kind:'mill'|'cottage';variant:number}[]=[];
@@ -52,26 +71,57 @@ export function farmSites(layout:Layout,radius:number):FarmSite[]{
     source.push({direction:directionAt(x,z,layout),scale:0.88+(i%3)*0.07,kind:'cottage',variant:i%3});
   }
   return source.map(s=>{
-    const frame=farmFrame(s.direction,layout);
-    const phaseAt=(x:number):number=>{const d=s.direction.clone().addScaledVector(frame.across,x*s.scale/radius).addScaledVector(frame.along,8*s.scale/radius).normalize();return fieldPhase(...fieldCoordinates(d,layout));};
-    // Solve in local metres for the nearest planted-row gap (fract .97).
-    const p=phaseAt(0),target=Math.round(p-0.97)+0.97;
-    let gate=0;
-    for(let i=0;i<3;i++){const f=phaseAt(gate);gate+=(target-f)/((phaseAt(gate+0.05)-f)/0.05);}
-    return {...s,...frame,gate,minDot:Math.cos(Math.max(12,Math.hypot(gate,8)+1)*s.scale/radius)};
+    keepOffFarMeridian(s,layout,radius);
+    const frame=farmFrame(s.direction,layout),region=fieldRegion(s.direction,layout);
+    const field=(x:number,z:number):[number,number]=>fieldCoordinates(localPoint(s.direction,frame,x,z,s.scale,radius),layout,region);
+    // Every bed the yard touches, widened to whole double beds, from just
+    // behind the yard to just in front of it.
+    let i0=Infinity,i1=-Infinity,zl=Infinity,zh=-Infinity;
+    for(let a=0;a<=12;a++)for(let b=0;b<=12;b++){
+      const [x,z]=field(-YARD.halfX+a*YARD.halfX/6,YARD.back+b*(YARD.front-YARD.back)/12),i=Math.floor(fieldPhase(x,z));
+      i0=Math.min(i0,i);i1=Math.max(i1,i);zl=Math.min(zl,z);zh=Math.max(zh,z);
+    }
+    i0=bedOf(i0);if(bedOf(i1+1)===i1)i1++;
+    // The walk runs straight from the door, along the ribbon, to the middle of the front track.
+    const target=zh+TRACK/2;
+    let near:number=DOOR.z,far=DOOR.z+(target-field(DOOR.x,DOOR.z)[1])*radius/128/s.scale*1.5+2;
+    for(let k=0;k<40;k++){const mid=(near+far)/2;if(field(DOOR.x,mid)[1]<target)near=mid;else far=mid;}
+    const walk=(near+far)/2;
+    // Angular reach of the whole lot, for cheap rejection: two stripes past the yard and its end tracks.
+    const stripe=9*1.2*radius/128/s.scale,reach=Math.hypot(YARD.halfX+2*stripe,Math.max(walk,-YARD.back)+TRACK*1.2*radius/128/s.scale+1);
+    return {...s,...frame,walk,lot:{i0,i1,zl,zh,region},minDot:Math.cos(reach*s.scale/radius)};
   });
 }
 
-export function inFarmPlot(d:Vector3,site:FarmSite,radius:number):boolean{
-  // Cheap angular rejection before the oriented rectangle.
-  if(d.dot(site.direction)<site.minDot)return false;
-  const factor=radius/site.scale/d.dot(site.direction);
+/**
+ * Longitude restarts on the meridian opposite the home, so a lawn there would
+ * span every bed between. A farm close to it moves along its circle of
+ * latitude to keep its lawn clear.
+ */
+function keepOffFarMeridian(s:{direction:Vector3;scale:number},layout:Layout,radius:number):void{
+  if(fieldRegion(s.direction,layout)!==0)return;
+  const right=new Vector3().crossVectors(layout.cottage,layout.homeBearing);
+  const lon=Math.atan2(s.direction.dot(right),s.direction.dot(layout.cottage));
+  const margin=(Math.hypot(YARD.halfX,YARD.back)*1.2*s.scale+2*9*1.2*radius/128)/radius/Math.max(0.5,Math.cos(Math.asin(s.direction.dot(layout.homeBearing))));
+  const limit=Math.PI-margin;
+  if(Math.abs(lon)<=limit)return;
+  // Turning by +θ about the home's bearing lowers longitude by θ.
+  s.direction.applyAxisAngle(layout.homeBearing,lon-Math.sign(lon)*limit).normalize();
+}
+
+/** What a direction is to a farm: on its lawn, on its walk or lawn tracks (soil), or neither. */
+export function farmGround(d:Vector3,site:FarmSite,radius:number,layout:Layout):'lawn'|'soil'|null{
+  // Cheap angular rejection before the lot.
+  const facing=d.dot(site.direction);
+  if(facing<site.minDot)return null;
+  const factor=radius/site.scale/facing;
   const x=d.dot(site.across)*factor,z=d.dot(site.along)*factor;
-  const t=Math.max(0,Math.min(1,(z-3.95)/4.05));
-  const pathX=0.9+(site.gate-0.9)*t*t*(3-2*t);
-  const halfWidth=0.45+(0.25*radius/128/site.scale-0.45)*t;
-  const slope=(site.gate-0.9)*6*t*(1-t)/4.05;
-  const distancePath=Math.hypot((x-pathX)/Math.sqrt(1+slope*slope),z-Math.max(3.95,Math.min(8,z)));
-  return (Math.abs(x)<PLOT_HALF_X+0.2&&Math.abs(z)<PLOT_HALF_Z+0.2)
-    ||distancePath<halfWidth+0.22;
+  const walk=Math.abs(x-DOOR.x)<0.45&&z>DOOR.z-0.2&&z<site.walk;
+  const apron=Math.abs(x-DOOR.x)<2.35+0.15&&Math.abs(z-4.2)<0.45+0.15;
+  if(walk||apron)return 'soil';
+  const L=site.lot,[fx,fz]=fieldCoordinates(d,layout,L.region),p=fieldPhase(fx,fz),i=Math.floor(p);
+  if(i<L.i0||i>L.i1)return null;
+  if(fz>=L.zl&&fz<=L.zh)return i===L.i1&&p-i>0.925?'soil':'lawn';
+  if(fz>L.zh&&fz<=L.zh+TRACK||fz<L.zl&&fz>=L.zl-TRACK)return 'soil';
+  return null;
 }

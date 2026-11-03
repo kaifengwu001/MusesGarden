@@ -1,6 +1,6 @@
 import { Color, DoubleSide, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, Vector3, Vector4, type IUniform } from 'three';
 import type { Terrain } from '../planet/terrain';
-import { fieldCoordinates } from './farmLayout';
+import { latitudeLongitude } from './fieldGrid';
 import { TULIP_COLOURS,tulipGeometry } from './tulipGeometry';
 import vertex from './tulipScenery.vert.glsl?raw';
 import fragment from './tulipScenery.frag.glsl?raw';
@@ -27,7 +27,7 @@ export class DenseTulips {
     this.mesh.visible=altitude<50;
     if(!this.mesh.visible)return;
     this.focus.copy(focus).addScaledVector(forward,14/terrain.radius).normalize();
-    const [x,z]=fieldCoordinates(this.focus,terrain.layout);
+    const [x,z]=latitudeLongitude(this.focus,terrain.layout);
     const row=Math.floor(z/128*terrain.radius/DENSE_SPACING)-DENSE_GRID/2;
     const fade=1-Math.max(0,Math.min(1,(altitude-18)/32));
     this.grid.value.set(row,x/128,DENSE_SPACING,fade);
