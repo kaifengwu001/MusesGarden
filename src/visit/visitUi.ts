@@ -1,9 +1,10 @@
-import type { Vector3 } from 'three';
+import { Vector3 } from 'three';
 import '../ui/garden/garden.css';
 import './visit.css';
 import { mediaOf } from '../garden/media';
 import type { Basket, Find, Interest } from '../garden/types';
 import type { PlanetId, VisitPlant, VisitWorldView } from '../muse/contract';
+import { angleBetween, slerpUnit, tangentToward, travel } from '../planet/geo';
 import { warpPoint } from '../render/warp';
 import { button, el, wait } from '../ui/garden/dom';
 import { FindCard } from '../ui/garden/findCard';
@@ -29,8 +30,18 @@ const POLL_MS = 30_000;
 const ENDED_MS = 4_000;
 /** A find's framing (as the garden's): the camera's distance and height over the bed, and where it looks (m). */
 const FIND_VIEW = { distance: 7.2, height: 3.1, aim: 1.15 } as const;
-/** The two Muses' framing, from in front of the host, the guest at its side. */
+/**
+ * The two Muses' framing, side on to the pair (visitUi.frameMuses): the camera at least this far off and this high
+ * (m), farther and higher in step where it needs the room for both, looking this high over their ground (m).
+ */
 const MUSES_VIEW = { distance: 6.2, height: 1.9, aim: 0.8 } as const;
+/** Room left across the view on each side of the two Muses (m). */
+const MUSES_ROOM = 1.1;
+/** How many places on the way from the camera to the two are looked at for what stands in it, and how near a house's middle (m) is in its walls. */
+const SIGHT_SAMPLES = 8;
+const HOUSE_REACH = 6;
+/** How much the side the host faces counts toward the camera's side, against open places (of SIGHT_SAMPLES): its face over a little more room. */
+const FACING = 3;
 /** Where the card stands over its bed (m), and above which height (m) it is put away. */
 const CARD_AT = 1.9;
 const CARD_UNDER = 30;
@@ -385,11 +396,64 @@ export class VisitUi {
 
   // ---- the camera ----------------------------------------------------------------------------------
 
-  /** Fly to the two Muses: from in front of the host, the guest at its side. */
+  /** Fly to the two Muses (on arriving, and whenever asked again): side on to them, both in the view. */
   frameMuses(): void {
-    const where = this.world.host.where;
-    const framing: Framing = { dir: where.dir.clone(), ground: where.height, ...(this.world.musesView ?? MUSES_VIEW), from: where.heading.clone() };
-    this.flight.to(framing, this.world.scene.growth.radius, this.ground);
+    this.flight.to(this.musesFraming(), this.world.scene.growth.radius, this.ground);
+  }
+
+  /**
+   * The two Muses side on: from across the line between them, at their middle, far enough back that both fit across
+   * the view with room to spare (the world's own musesView, or MUSES_VIEW, at least; higher in step, so it looks down
+   * as steeply; and higher by as much as the camera's own ground rises above theirs, so it never stands down in what
+   * grows on a slope), from the side with more open ground between the camera and the two (no rise of the ground,
+   * wall or house in the way) and toward the side the host faces. With the guest not there, from in front of the host.
+   */
+  private musesFraming(): Framing {
+    const base = this.world.musesView ?? MUSES_VIEW;
+    const R = this.world.scene.growth.radius;
+    const host = this.world.host.where;
+    const guest = this.guest && this.guestShown ? this.guest.where : null;
+    const apart = guest ? angleBetween(host.dir, guest.dir) * R : 0;
+    if (!guest || apart < 0.3) return { dir: host.dir.clone(), ground: host.height, ...base, from: host.heading.clone() };
+    const middle = slerpUnit(host.dir, guest.dir, 0.5, new Vector3());
+    const along = tangentToward(middle, guest.dir, new Vector3());
+    const across = new Vector3().crossVectors(middle, along).normalize();
+    // (the view's half width at the height it comes down to, as the rig opens its lens there)
+    const rig = this.world.scene.rig;
+    const fov = (rig.framing(rig.zoomForAltitude(base.height)).fov * Math.PI) / 180;
+    const halfWidth = Math.atan(Math.tan(fov / 2) * rig.camera.aspect);
+    const distance = Math.max(base.distance, (apart / 2 + MUSES_ROOM) / Math.tan(halfWidth));
+    const scale = distance / base.distance;
+    const framing = { dir: middle, ground: (host.height + guest.height) / 2, distance, height: base.height * scale, aim: base.aim };
+    const sides = [across, across.clone().negate()];
+    const scores = sides.map((side) => this.openness(framing, side) + FACING * side.dot(host.heading));
+    const from = scores[1] > scores[0] ? sides[1] : sides[0];
+    const camera = travel(middle, from, distance / R, new Vector3());
+    const rise = Math.max(0, this.world.ground(camera).height - framing.ground);
+    return { ...framing, height: framing.height + rise, from };
+  }
+
+  /**
+   * How open the way is from a framing's camera, on one side, to the two Muses: of the places along it, how many have
+   * nothing in the line of sight (the ground below it, no wall where a Muse may not stand, clear of the house).
+   */
+  private openness(f: Omit<Framing, 'from'>, side: Vector3): number {
+    const R = this.world.scene.growth.radius;
+    // (every world's layout names its cottage: its house stands about it)
+    const cottage = (this.world.shape() as { readonly cottage?: unknown }).cottage;
+    const house = cottage instanceof Vector3 ? cottage : null;
+    const p = new Vector3();
+    let open = 0;
+    for (let k = 1; k <= SIGHT_SAMPLES; k++) {
+      const u = k / SIGHT_SAMPLES;
+      travel(f.dir, side, (f.distance * u) / R, p);
+      const sight = f.ground + f.aim + (f.height - f.aim) * u;
+      if (this.world.ground(p).height > sight - 0.25) continue;
+      if (this.world.standable && !this.world.standable(p)) continue;
+      if (house && angleBetween(p, house) * R < HOUSE_REACH) continue;
+      open++;
+    }
+    return open;
   }
 
   // ---- the dev harness -------------------------------------------------------------------------------
