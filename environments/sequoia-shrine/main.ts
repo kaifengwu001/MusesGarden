@@ -28,6 +28,7 @@ import { prepareVisit, VisitUi } from '../../src/visit/visitUi';
 import { sequoiaVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
+import type { Muse } from './life/muse';
 import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
@@ -175,8 +176,9 @@ async function boot(): Promise<void> {
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
-  const onMuse = (x: number, y: number): { side: number } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
-  let pettingMuse = false;
+  // (its Muse, or a friend's Muse visiting: whichever the press lands on)
+  const onMuse = (x: number, y: number): { side: number; muse: Muse } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+  let pettingMuse: Muse | null = null;
   attachInput(canvas, {
     drag: (dx, dy) => {
       garden?.interrupt();
@@ -189,8 +191,9 @@ async function boot(): Promise<void> {
       userPosed = true;
     },
     tap: (x, y) => {
-      if (onMuse(x, y)) {
-        world.muse.tap(clock.time);
+      const tapped = onMuse(x, y);
+      if (tapped) {
+        tapped.muse.tap(clock.time);
         return;
       }
       if (garden?.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
@@ -203,8 +206,9 @@ async function boot(): Promise<void> {
       else world.gust(hit.dir, clock.time);
     },
     doubleTap: (x, y) => {
-      if (onMuse(x, y)) {
-        world.muse.tap(clock.time);
+      const tapped = onMuse(x, y);
+      if (tapped) {
+        tapped.muse.tap(clock.time);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -217,8 +221,8 @@ async function boot(): Promise<void> {
     holdStart: (x, y) => {
       const touch = onMuse(x, y);
       if (touch) {
-        pettingMuse = true;
-        world.muse.hold(clock.time, touch.side);
+        pettingMuse = touch.muse;
+        touch.muse.hold(clock.time, touch.side);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -227,8 +231,8 @@ async function boot(): Promise<void> {
     holdMove: () => undefined,
     holdEnd: () => {
       if (pettingMuse) {
-        pettingMuse = false;
-        world.muse.letGo(clock.time);
+        pettingMuse.letGo(clock.time);
+        pettingMuse = null;
         return;
       }
       world.bloomEnd();

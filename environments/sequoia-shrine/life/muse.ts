@@ -367,6 +367,9 @@ export class Muse {
     a.stride = 1;
     a.gait = time * OUT_GAIT;
     r.home = false;
+    // (tapped or held out here, it answers you as at home)
+    r.cues.petted = -1;
+    roam.answerOver(time, r);
     return r;
   }
 
@@ -394,7 +397,7 @@ export class Muse {
    * body, if it does and Muse is drawn: and which of its sides it is on (+1
    * its own left), for which way its head tilts as you pet it.
    */
-  pick(ray: Ray, warp: WarpFrame): { side: number } | null {
+  pick(ray: Ray, warp: WarpFrame): { side: number; distance: number } | null {
     if (!this.drawn) return null;
     let best = Infinity;
     let side = 1;
@@ -410,20 +413,20 @@ export class Muse {
         side = tmp2.sub(tmp).dot(this.left) >= 0 ? 1 : -1;
       }
     }
-    return best < Infinity ? { side } : null;
+    return best < Infinity ? { side, distance: best } : null;
   }
 
-  /** Your doings (world time, s): a tap, a hold on one side, letting go. */
+  /** Your doings (world time, s): a tap, a hold on one side, letting go. Out where it is directed, it is awake to them. */
   tap(time: number): void {
-    this.roam?.tap(time);
+    this.roam?.tap(time, this.direction.kind === 'out');
   }
 
   hold(time: number, side: number): void {
-    this.roam?.hold(time, side);
+    this.roam?.hold(time, side, this.direction.kind === 'out');
   }
 
   letGo(time: number): void {
-    this.roam?.letGo(time);
+    this.roam?.letGo(time, this.direction.kind === 'out');
   }
 
   /** Its life (dev: seeking it, reading its parts). */
