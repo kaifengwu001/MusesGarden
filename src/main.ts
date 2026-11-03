@@ -26,7 +26,8 @@ import { attachInput } from './view/input';
 import { AHEAD } from './life/scatter';
 import { Keys } from './view/keys';
 import { Companions } from './visit/companions';
-import { meadowCompanions } from './meadowVisit';
+import { prepareVisit } from './visit/visitUi';
+import { meadowCompanions, MeadowVisitUi, meadowVisit } from './meadowVisit';
 import { World } from './world';
 
 function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
@@ -91,6 +92,8 @@ async function boot(): Promise<void> {
   };
   chooseTier(store.values.quality.tier);
 
+  // A visit on a ticket (`?visit=`): another owner's Muse comes to Momo's meadow, its seed and growth set before the world is made.
+  const visit = await prepareVisit(store, 'meadow');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -149,9 +152,12 @@ async function boot(): Promise<void> {
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
-  // A friend's Muse visiting Momo (the engine's view names it) is drawn beside it (visit/companions.ts).
-  const companions = new Companions(meadowCompanions(world));
-  const garden = new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world, (view) => companions.view(view)));
+  // On a visit, the visit's interface in its place, with no engine of our own. Otherwise a friend's Muse visiting Momo
+  // (the engine's view names it) is drawn beside it (visit/companions.ts).
+  const companions = visit ? null : new Companions(meadowCompanions(world));
+  const garden = visit
+    ? new MeadowVisitUi(uiRoot, meadowVisit(world), visit)
+    : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world, (view) => companions?.view(view)));
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; one on a find or a
   // pin is the garden's: a tap, a double-click or a hold there opens its card. The meadow's own click, double-click
@@ -287,7 +293,8 @@ async function boot(): Promise<void> {
     applyUi();
   });
   // (and so does a URL that names the unfolding but not the size; the hash was applied before this listened)
-  if (!parseHash(location.hash).has('g')) store.set('world.growth', unfoldGrowth(store.values.world.unfold));
+  // (not on a visit: the host's own growth stands)
+  if (!visit && !parseHash(location.hash).has('g')) store.set('world.growth', unfoldGrowth(store.values.world.unfold));
 
   const keys = new Keys();
   const update = (): void => {
@@ -296,7 +303,7 @@ async function boot(): Promise<void> {
       garden.interrupt();
     }
     garden.update(clock.realDt);
-    companions.update(clock.realDt);
+    companions?.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     garden.frame(clock.realDt);
     if (world.rig.mode !== store.values.view.mode) {
