@@ -1,13 +1,13 @@
 import { AdditiveBlending, BufferAttribute, DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, type Vector3, type IUniform } from 'three';
 import { makeCherryGeometry } from './cherryGeometry';
-import { cherrySites, type CherrySite } from './cherryDistribution';
+import { cherrySites, MAX_TREES, type CherrySite } from './cherryDistribution';
 import type { Terrain } from '../planet/terrain';
 import vertexShader from './cherry.vert.glsl?raw';
 import fragmentShader from './cherry.frag.glsl?raw';
 import shadowVertex from './cherryShadow.vert.glsl?raw';
 import shadowFragment from './cherryShadow.frag.glsl?raw';
 
-const CAPACITY = 1800;
+const CAPACITY = MAX_TREES;
 interface Batch { mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>; anchor: InstancedBufferAttribute; style: InstancedBufferAttribute; }
 
 /** Meter-sized tree anatomy placed at verified dry roots; camera changes only detail. */

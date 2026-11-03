@@ -126,7 +126,7 @@ export const schema = {
   },
   clouds: {
     coverage: num('cc', 'Coverage', 0.12, 0, 1, 0.01, 'life'),
-    altitude: num('ca', 'Altitude', 32, 1, 40, 0.5, 'live', { unit: 'm' }),
+    altitude: num('ca', 'Altitude', 24, 1, 40, 0.5, 'live', { unit: 'm' }),
     speed: num('cs', 'Speed', 0.4, 0, 1, 0.01, 'live'),
     shadow: num('csh', 'Shadow', 0.55, 0, 1, 0.01, 'live'),
   },

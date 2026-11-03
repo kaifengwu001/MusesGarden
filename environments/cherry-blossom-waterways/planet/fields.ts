@@ -3,7 +3,8 @@ import { hash32, unit } from '../../../src/core/hash';
 import { clamp, smoothstep } from '../../../src/core/math';
 import { gnoise } from '../../../src/planet/noise';
 
-// Cherry garden fields in rest space. The terrain bake (bake.frag.glsl) evaluates
+// Cherry garden fields in rest space: the meadow's own land and water, so a
+// seed lays out the same lakes here as in the meadow. The terrain bake (bake.frag.glsl) evaluates
 // them on the GPU into two cube maps; `Fields` evaluates the same math on the
 // CPU (picking, placement, flower assignment, tests). Change both together.
 //
@@ -17,11 +18,16 @@ import { gnoise } from '../../../src/planet/noise';
 //              the meadow keeps a constant spectrum as R grows (hills rise and
 //              subside in place, never slide); compressed along a grain axis
 //              so hills, islands and inlets run long, like a glaciated plain
-//   wetness    proximity to two unequal meandering canals. Their widths vary
-//              along each loop; their crossings widen into open blue reaches.
-//   height     1.75m turf shoulders and submerged beds across a smooth canal
-//              profile, with restrained relief only inside the garden islands.
-//              Canal identity lives in direction space and survives growth.
+//   wetness    a macro field in direction space (domain warped): where the
+//              meadow sinks toward the water table. The threshold is read off
+//              the field's own distribution, so `coverage` is what you get
+//   height     relief + lift − (lift + sink)·wetness − water level (m). The
+//              water table is h = 0: lakes are wherever the ground dips under
+//              it, so every shore follows a contour of the hills. The sink is
+//              small and hummocks grow in the wetlands, so a wetland is lace:
+//              islands, spits and inlets rather than open water. In the
+//              wetlands the ground also flattens toward a plateau a little
+//              above the water, so islands are flat turf with a short bank
 //   patterns   lushness, colour variant and richness: meter-sized noise,
 //              sampled at the two direction-space octaves that bracket their
 //              size (seeded by octave, so a pattern never jumps as R grows)
@@ -155,7 +161,7 @@ export interface FieldParams {
   /** Rolling hills amplitude (m) and hummocks (m). */
   roll: number;
   hummocks: number;
-  /** Canal width control, 0..1; continuous water survives at the narrow end. */
+  /** Share of the planet that is wetland, 0..1. */
   wetlands: number;
   /** Water table offset (m): raising it floods the hollows. */
   waterLevel: number;
@@ -171,26 +177,25 @@ export interface FieldParams {
   weights: readonly [number, number, number, number];
 }
 
-/**
- * Two unequal, winding waterways after the spherical twirl. Their varying
- * widths leave broad garden islands between clear continuous blue channels.
- * Signed direction-space distance: negative in a canal, positive on its bank.
- * This is an ecological field, not a metric signed-distance function.
- * GPU mirror: cherryWaterwayDistance() in fields.glsl.
- */
-export function cherryWaterwayDistance(dir: Readonly<{ x: number; y: number; z: number }>, seed: number, width = 1): number {
-  const phase = ((seed >>> 0) % 997) * 0.0063026934;
-  const a = dir.y + 0.22 * Math.sin(3.2 * dir.x + phase) + 0.10 * Math.sin(5.1 * dir.z - phase);
-  const b = dir.z + 0.23 * Math.sin(3.7 * dir.x - phase) - 0.14;
-  const wa = (0.130 + 0.035 * Math.sin(4.2 * dir.x + 2.0 * dir.z + phase)) * width;
-  const wb = (0.100 + 0.028 * Math.sin(5.0 * dir.y - 1.6 * dir.x - phase)) * width;
-  return Math.min(Math.abs(a) - wa, Math.abs(b) - wb);
-}
+const wetSamples = new Map<number, Float32Array>();
 
-/** Low turf shoulders and a smooth submerged bed; no high enclosing hills. */
-export function cherryIslandHeight(distance: number, relief: number, waterLevel: number): number {
-  const land = smoothstep(0, 0.10, distance);
-  return 1.75 * Math.tanh(distance / 0.045) + 0.30 * relief * land - waterLevel;
+/** Sorted wetness-noise values over a fixed spherical design: its quantiles turn coverage into a threshold. */
+function wetDistribution(seed: number, fields: Fields): Float32Array {
+  let sorted = wetSamples.get(seed);
+  if (sorted) return sorted;
+  const n = 4096;
+  sorted = new Float32Array(n);
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const d = new Vector3();
+  for (let i = 0; i < n; i++) {
+    const z = 1 - (2 * (i + 0.5)) / n;
+    const r = Math.sqrt(1 - z * z);
+    d.set(r * Math.cos(golden * i), r * Math.sin(golden * i), z);
+    sorted[i] = fields.wetNoise(d);
+  }
+  sorted.sort();
+  wetSamples.set(seed, sorted);
+  return sorted;
 }
 
 /** Uniforms read by the bake (bake.frag.glsl, fields.glsl). */
@@ -203,7 +208,7 @@ export interface FieldUniforms {
   uGrain: { value: Vector4 };
   /** Wetness threshold, softness, lift (m), drop (m) = lift + sink. */
   uWet: { value: Vector4 };
-  /** Water level (m), canal width multiplier, -, -. */
+  /** Water level (m), -, -, -. */
   uLevel: { value: Vector4 };
   /** Octave pairs (level, t): lush, variant. */
   uPatternA: { value: Vector4 };
@@ -254,15 +259,14 @@ export class Fields {
   radius = 128;
   readonly relief = new Float32Array(RELIEF_OCTAVES);
   readonly hummock = new Float32Array(RELIEF_OCTAVES);
-  /** Spread (m) of relief + hummocks, used for conservative terrain bounds. */
+  /** Spread (m) of relief + hummocks; lift and sink are multiples of it. */
   reliefStd = 0;
   wetThreshold = 0;
-  /** Legacy field-uniform contract; canals use their own continuous shoulder. */
+  /** Half-width of the wetland margin in noise units: wide, so hills interlace with water across it. */
   wetSoftness = 0.2;
   lift = 0;
   drop = 0;
   level = 0;
-  waterwayWidth = 1;
   grainK = 0;
   readonly lushPair: OctavePair = { level: 0, t: 0 };
   readonly variantPair: OctavePair = { level: 0, t: 0 };
@@ -302,10 +306,13 @@ export class Fields {
     }
     this.reliefStd = NOISE_STD * Math.sqrt(var2);
     this.grainK = GRAIN_MAX * p.grain;
-    this.waterwayWidth = 0.42 + 1.25 * p.wetlands;
-    // Keep the public height bound conservative for camera/culling/reflection.
-    this.lift = 1.75;
-    this.drop = 3.5;
+    const sorted = wetDistribution(this.seed, this);
+    this.wetThreshold = sorted[Math.min(sorted.length - 1, Math.floor(clamp(1 - p.wetlands, 0, 1) * sorted.length))];
+    if (p.wetlands <= 0) this.wetThreshold = 9;
+    // uplands stand clear of the water (a kettle pond in the deepest hollows);
+    // in a wetland the table sits near the middle of the relief: half land, half water
+    this.lift = 1.9 * this.reliefStd + 0.05;
+    this.drop = this.lift + 0.1 * this.reliefStd + 0.05;
     this.level = p.waterLevel;
     octavePair(radius, PATTERN.lush, this.lushPair);
     octavePair(radius, PATTERN.variant, this.variantPair);
@@ -361,18 +368,20 @@ export class Fields {
     return h;
   }
 
-  /** Canal affinity: positive inside water, negative inland. */
+  /** The raw macro wetness noise (direction space, twirled and domain warped). */
   wetNoise(dir: Vector3): number {
     return this.wetTwirled(twirl(this.twirls, dir, this.td));
   }
 
   private wetTwirled(dir: Vector3): number {
-    return -cherryWaterwayDistance(dir, this.seed, this.waterwayWidth);
-  }
-
-  /** Canal/bank classifier in the world's original rest-space direction. */
-  waterwayDistance(dir: Vector3): number {
-    return -this.wetTwirled(twirl(this.twirls, dir, this.td));
+    const s = this.seed;
+    const wx = gnoise(dir.x * 2.4, dir.y * 2.4, dir.z * 2.4, (s + SEED.warp) >>> 0);
+    const wy = gnoise(dir.x * 2.4, dir.y * 2.4, dir.z * 2.4, (s + SEED.warp + 1) >>> 0);
+    const wz = gnoise(dir.x * 2.4, dir.y * 2.4, dir.z * 2.4, (s + SEED.warp + 2) >>> 0);
+    const qx = dir.x * 1.7 + wx * 0.55;
+    const qy = dir.y * 1.7 + wy * 0.55;
+    const qz = dir.z * 1.7 + wz * 0.55;
+    return 0.72 * gnoise(qx, qy, qz, (s + SEED.wet) >>> 0) + 0.28 * gnoise(qx * 2.2, qy * 2.2, qz * 2.2, (s + SEED.wet + 1) >>> 0);
   }
 
   /** 0 on dry upland, 1 deep in a wetland. */
@@ -381,14 +390,15 @@ export class Fields {
   }
 
   private wetnessTwirled(dir: Vector3): number {
-    return 1 - smoothstep(-0.035, 0.11, -this.wetTwirled(dir));
+    return smoothstep(this.wetThreshold - this.wetSoftness, this.wetThreshold + this.wetSoftness, this.wetTwirled(dir));
   }
 
   /** Ground height above the water table before the homestead and the banks (m). */
   natural(dir: Vector3): number {
     const t = twirl(this.twirls, dir, this.td);
-    const distance = cherryWaterwayDistance(t, this.seed, this.waterwayWidth);
-    return cherryIslandHeight(distance, this.reliefTwirled(t, 0), this.level);
+    const wet = this.wetnessTwirled(t);
+    const h = this.reliefTwirled(t, wet) + this.lift - this.drop * wet - this.level;
+    return plateau(h, wet);
   }
 
   lush(dir: Vector3): number {
@@ -431,7 +441,7 @@ export class Fields {
     u.uHummock.value.set(this.hummock);
     u.uGrain.value.set(this.grain.x, this.grain.y, this.grain.z, this.grainK);
     u.uWet.value.set(this.wetThreshold, this.wetSoftness, this.lift, this.drop);
-    u.uLevel.value.set(this.level, this.waterwayWidth, 0, 0);
+    u.uLevel.value.set(this.level, 0, 0, 0);
     u.uPatternA.value.set(this.lushPair.level, this.lushPair.t, this.variantPair.level, this.variantPair.t);
     u.uPatternB.value.set(this.richPair.level, this.richPair.t, 0, this.patchiness);
     u.uDrift.value.set(this.driftPair.level, this.driftPair.t, this.driftThreshold, 0);

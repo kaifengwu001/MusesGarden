@@ -12,6 +12,9 @@ attribute vec4 aStyle;
 attribute float aKind;
 attribute float aTint;
 attribute vec4 aFlex;
+attribute float aShade;
+varying float vShade;
+varying float vScale;
 varying vec3 vNormal;
 varying vec3 vPlanet;
 varying vec3 vLocal;
@@ -49,6 +52,8 @@ void main() {
   vLocal = position;
   vKind = aKind;
   vTint = aTint;
+  vShade = aShade;
+  vScale = aStyle.x;
   vWorld = warpPosition(world);
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld,1.0);
 }

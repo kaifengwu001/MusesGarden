@@ -18,6 +18,8 @@ class PlantMesh {
   readonly uvs: number[] = [];
   readonly kinds: number[] = [];
   readonly tints: number[] = [];
+  /** How deep a blossom-cloud surface lies in its crown: 0 open, 1 tucked between lobes. */
+  readonly shades: number[] = [];
   readonly branchTips: number[][] = [];
   readonly branchSpans: Array<{ first: number; count: number; parent: number; start: number[]; points: number[][] }> = [];
   readonly flex: number[] = [];
@@ -29,14 +31,16 @@ class PlantMesh {
   private leaves = 0;
   constructor(readonly detail: 'full' | 'far') {}
 
-  tri(a: Vector3, b: Vector3, c: Vector3, kind: number, tint: number): void {
+  tri(a: Vector3, b: Vector3, c: Vector3, kind: number, tint: number, normals?: readonly Vector3[], shades?: readonly number[]): void {
     this.normal.crossVectors(this.edge.subVectors(b, a), new Vector3().subVectors(c, a)).normalize();
     for (const [i, p] of [a, b, c].entries()) {
+      const n = normals ? normals[i] : this.normal;
       this.positions.push(p.x, p.y, p.z);
-      this.normals.push(this.normal.x, this.normal.y, this.normal.z);
+      this.normals.push(n.x, n.y, n.z);
       this.uvs.push(i === 1 ? 1 : 0, i === 2 ? 1 : 0);
       this.kinds.push(kind);
       this.tints.push(tint);
+      this.shades.push(shades ? shades[i] : 0);
       const reach = this.bendLength > 0 ? Math.max(0, Math.min(1, (this.bendOrigin.y - p.y) / this.bendLength)) : 0;
       this.flex.push(this.bendOrigin.x, this.bendOrigin.y, this.bendOrigin.z, reach * reach);
     }
@@ -46,7 +50,9 @@ class PlantMesh {
   branch(points: Vector3[], radius: number, tint: number, end = 0.018, sides = 7, flowing = false, parent = -1): number {
     if (this.detail === 'far') {
       if (radius < 0.095) return -1;
-      points = points[0].y < 0.8 && radius < 0.2 ? [points[0], points[points.length - 1]] : [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]];
+      // Roots, and cherry limbs whose bends hide in their blossom clouds, need only one straight span.
+      const straight = (points[0].y < 0.8 && radius < 0.2) || (!flowing && radius < 0.25);
+      points = straight ? [points[0], points[points.length - 1]] : [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]];
       sides = 4;
     } else if (radius < 0.095 && !flowing) {
       // At twig width, extra cylinder faces do not contribute to the silhouette.
@@ -92,8 +98,18 @@ class PlantMesh {
     for (let i = 1; i < edges - 1; i++) this.tri(rim[0], rim[i + 1], rim[i], kind, tint);
   }
 
+  /** A hanging curtain of blossom seen from far off: one narrow sheet from `top` to `bottom`, facing `out`. */
+  streak(top: Vector3, bottom: Vector3, out: Vector3, width: number, kind: number, tint: number): void {
+    const side = new Vector3().crossVectors(new Vector3().subVectors(bottom, top), out).normalize().multiplyScalar(width / 2);
+    const a = top.clone().add(side), b = top.clone().sub(side), c = bottom.clone().sub(side), d = bottom.clone().add(side);
+    this.tri(a, b, c, kind, tint);
+    this.tri(a, c, d, kind, tint);
+  }
+
   /** A folded lanceolate willow leaf. */
   leaf(p: Vector3, length: number, direction: Vector3, width: number, tint: number, kind = 4): void {
+    // A cherry's spring leaves sit in its blossom clouds, out of sight far off.
+    if (this.detail === 'far' && kind === 3) return;
     if (this.detail === 'far') {
       if (this.leaves++ % 4 !== 0) return;
       length *= 1.8;
@@ -140,6 +156,37 @@ class PlantMesh {
     this.tri(mid, left2, tip, 4, tint); this.tri(mid, tip, right2, 4, tint);
   }
 
+  /**
+   * The crown's blossom clouds: lumpy lobes with flatter undersides, merged
+   * by overlap. Faces buried inside a neighbouring lobe are left out; each
+   * vertex records how far it lies tucked between lobes (aShade).
+   */
+  cloud(all: readonly Lobe[]): void {
+    // Far off, the outer and crown lobes alone carry the silhouette.
+    const lobes = this.detail === 'far' ? all.filter(lobe => !lobe.inner) : all;
+    const sphere = icosphere(this.detail === 'far' ? 1 : 2);
+    for (const [index, lobe] of lobes.entries()) {
+      const points = sphere.vertices.map(v => lobeSurface(lobe, v, new Vector3()));
+      const normals = points.map(() => new Vector3());
+      const face = new Vector3(), e1 = new Vector3(), e2 = new Vector3();
+      for (const [a, b, c] of sphere.faces) {
+        face.crossVectors(e1.subVectors(points[b], points[a]), e2.subVectors(points[c], points[a]));
+        normals[a].add(face); normals[b].add(face); normals[c].add(face);
+      }
+      normals.forEach(n => n.normalize());
+      const shades = points.map(p => {
+        let tucked = 0;
+        for (const [j, other] of lobes.entries()) if (j !== index) tucked += 1 - smoothstep(other.radius * 0.95, other.radius * 1.75, p.distanceTo(other.centre));
+        return Math.min(1, tucked * 0.55);
+      });
+      const hidden = points.map(p => lobes.some((other, j) => j !== index && insideLobe(other, p)));
+      for (const [a, b, c] of sphere.faces) {
+        if (hidden[a] && hidden[b] && hidden[c]) continue;
+        this.tri(points[a], points[b], points[c], 5, lobe.tint, [normals[a], normals[b], normals[c]], [shades[a], shades[b], shades[c]]);
+      }
+    }
+  }
+
   finish(variant: number): BufferGeometry {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new Float32BufferAttribute(this.positions, 3));
@@ -147,6 +194,7 @@ class PlantMesh {
     geometry.setAttribute('uv', new Float32BufferAttribute(this.uvs, 2));
     geometry.setAttribute('aKind', new Float32BufferAttribute(this.kinds, 1));
     geometry.setAttribute('aTint', new Float32BufferAttribute(this.tints, 1));
+    geometry.setAttribute('aShade', new Float32BufferAttribute(this.shades, 1));
     geometry.setAttribute('aFlex', new Float32BufferAttribute(this.flex, 4));
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
@@ -157,6 +205,76 @@ class PlantMesh {
     return geometry;
   }
 }
+
+/** One blossom cloud lobe: centre, radius (m), its upper and lower half heights (× radius), lump waves and pigment. */
+interface Lobe {
+  centre: Vector3;
+  radius: number;
+  top: number;
+  bottom: number;
+  lumps: Array<{ axis: Vector3; phase: number; amplitude: number }>;
+  tint: number;
+  /** An inner lobe, mostly hidden under the others: drawn only near. */
+  inner: boolean;
+}
+
+function smoothstep(a: number, b: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+function makeLobe(random: Rand, centre: Vector3, radius: number, inner = false): Lobe {
+  // Three broad billows, then four small ones that crinkle the outline.
+  const lumps = Array.from({ length: 7 }, (_, k) => ({
+    axis: new Vector3(random.range(-1, 1), random.range(-0.4, 1), random.range(-1, 1)).normalize().multiplyScalar(k < 3 ? random.range(2.2, 3.6) : random.range(6.5, 9.5)),
+    phase: random.range(0, Math.PI * 2),
+    amplitude: k < 3 ? 0.075 : 0.028,
+  }));
+  return { centre, radius, top: random.range(0.74, 0.86), bottom: random.range(0.5, 0.6), lumps, tint: random.next(), inner };
+}
+
+/** The lobe's surface along unit direction `v`: a billowing top, a flatter underside. */
+function lobeSurface(lobe: Lobe, v: Vector3, out: Vector3): Vector3 {
+  let lump = 0;
+  for (const w of lobe.lumps) lump += w.amplitude * Math.sin(w.axis.dot(v) + w.phase);
+  const r = lobe.radius * (1 + lump);
+  return out.set(v.x * r, v.y * r * (v.y > 0 ? lobe.top : lobe.bottom), v.z * r).add(lobe.centre);
+}
+
+/** Whether `p` lies well inside the lobe (inside its smallest lumps). */
+function insideLobe(lobe: Lobe, p: Vector3): boolean {
+  const x = p.x - lobe.centre.x, y = p.y - lobe.centre.y, z = p.z - lobe.centre.z;
+  const yy = y / (y > 0 ? lobe.top : lobe.bottom);
+  return x * x + yy * yy + z * z < (lobe.radius * 0.76) ** 2;
+}
+
+const icospheres = new Map<number, { vertices: Vector3[]; faces: number[][] }>();
+/** Unit icosphere, `level` times subdivided (20 × 4^level faces). */
+function icosphere(level: number): { vertices: Vector3[]; faces: number[][] } {
+  const cached = icospheres.get(level);
+  if (cached) return cached;
+  const t = (1 + Math.sqrt(5)) / 2;
+  const vertices = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]]
+    .map(([x, y, z]) => new Vector3(x, y, z).normalize());
+  let faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  for (let k = 0; k < level; k++) {
+    const middle = new Map<string, number>();
+    const mid = (a: number, b: number): number => {
+      const key = a < b ? `${a},${b}` : `${b},${a}`;
+      let i = middle.get(key);
+      if (i === undefined) { i = vertices.length; vertices.push(vertices[a].clone().add(vertices[b]).normalize()); middle.set(key, i); }
+      return i;
+    };
+    faces = faces.flatMap(([a, b, c]) => { const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); return [[a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]]; });
+  }
+  const sphere = { vertices, faces };
+  icospheres.set(level, sphere);
+  return sphere;
+}
+
+/** A blossom dab waiting for the crown's clouds, to settle on their surface. */
+interface Dab { p: Vector3; size: number; normal: Vector3; turn: number; kind: number; tint: number; keep: boolean }
 
 function curved(a: Vector3, b: Vector3, c: Vector3, count = 6): Vector3[] {
   return Array.from({ length: count }, (_, i) => {
@@ -246,10 +364,12 @@ function willowCrown(mesh: PlantMesh, random: Rand, trunk: Vector3[]): void {
   }
 }
 
-/** Unequal overlapping sprays preserve gaps through which the calligraphic branches show. */
-function blossomSpray(mesh: PlantMesh, random: Rand, anchor: Vector3, reach: number, tilt: number, richness: number, ivoryBias: number): void {
+/**
+ * Unequal overlapping sprays around a twig end. Their dabs wait in `dabs` and
+ * settle on the crown's blossom clouds once every lobe is known.
+ */
+function blossomSpray(random: Rand, dabs: Dab[], anchor: Vector3, reach: number, tilt: number, richness: number, ivoryBias: number): void {
   const count = Math.round(10 + richness * 10);
-  // A broad layered volume, never an enclosing ball: each blossom owns a different position and tilt.
   for (let i = 0; i < count; i++) {
     const angle = random.range(0, Math.PI * 2);
     const radius = Math.sqrt(random.next()) * reach;
@@ -258,19 +378,40 @@ function blossomSpray(mesh: PlantMesh, random: Rand, anchor: Vector3, reach: num
     const kind = random.next() < ivoryBias ? 2 : 1;
     const size = random.range(0.22, 0.38) * (0.8 + richness * 0.2);
     const turn = random.range(0, 6.28), tint = random.next();
-    // Consume exactly the same stream for both levels, preserving every branch and spray anchor.
-    if (mesh.detail === 'full') mesh.blossom(p, size, normal, turn, kind, tint);
-    else if (i < (richness < 0.5 ? 1 : 2)) {
-      const farP = anchor.clone().lerp(p, 0.45);
-      mesh.blossom(farP, reach * 1.0, normal, turn, kind, tint);
+    // Every dab consumes the same stream at both levels; the near crown keeps one in three as its petal fringe.
+    dabs.push({ p, size, normal, turn, kind, tint, keep: i % 3 === 0 });
+  }
+}
+
+/** Dabs settle on the nearest lobe's surface, standing a little proud of it as a fringe of loose petals. */
+function settleDabs(mesh: PlantMesh, random: Rand, dabs: readonly Dab[], lobes: readonly Lobe[]): void {
+  const direction = new Vector3(), surface = new Vector3();
+  for (const dab of dabs) {
+    const lift = random.range(-0.04, 0.22), lean = random.range(0.35, 0.75);
+    if (mesh.detail === 'far' || !dab.keep || lobes.length === 0) continue;
+    let best = lobes[0], bestDistance = Infinity;
+    for (const lobe of lobes) {
+      const d = dab.p.distanceTo(lobe.centre) / lobe.radius;
+      if (d < bestDistance) { bestDistance = d; best = lobe; }
     }
+    direction.subVectors(dab.p, best.centre);
+    if (direction.lengthSq() < 1e-6) direction.set(0, 1, 0);
+    direction.normalize();
+    lobeSurface(best, direction, surface).addScaledVector(direction, lift);
+    if (lobes.some(lobe => lobe !== best && insideLobe(lobe, surface))) continue;
+    mesh.blossom(surface, dab.size * 0.7, dab.normal.clone().lerp(direction, lean).normalize(), dab.turn, dab.kind, dab.tint);
   }
 }
 
 /**
  * Source geometry stays in meters and local Y-up. All instances may use the same shader and
  * spherical support transform. aKind: 0 bark, 1 pink blossom, 2 ivory blossom, 3 young leaf,
- * 4 willow leaf. aTint is a stable 0..1 pigment variation, constant across each whole dab.
+ * 4 willow leaf, 5 blossom cloud. aTint is a stable 0..1 pigment variation, constant across
+ * each whole dab or lobe; aShade is a blossom cloud's depth in its crown.
+ *
+ * A cherry's blossom is massed into clouds, after the reference of pink clouds
+ * over a meadow: each limb carries an outer and an inner lobe, the crown three
+ * more over the trunk, and the spray dabs settle on them as loose petals.
  */
 export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'full'): BufferGeometry {
   const v = ((Math.floor(variant) % CHERRY_VARIANTS) + CHERRY_VARIANTS) % CHERRY_VARIANTS;
@@ -297,6 +438,7 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
     return mesh.finish(v);
   }
 
+  const dabs: Dab[] = [], lobes: Lobe[] = [];
   const limbs = young ? 6 : 8;
   for (let i = 0; i < limbs; i++) {
     const angle = i * 2.39996 + random.range(-0.43, 0.43);
@@ -311,6 +453,7 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
     const mainId=mesh.branch(main, young ? 0.14 : 0.21 - i * 0.008, random.range(0.15, 0.72), 0.025, 6,false,0);
 
     const sprays = young ? 4 : 5;
+    const ends: Vector3[] = [];
     for (let j = 0; j < sprays; j++) {
       const t = 0.48 + j * 0.115;
       const base = onBranch(main,t);
@@ -319,9 +462,10 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
       end.y += random.range(0.25, 1.0);
       const bend = base.clone().lerp(end, 0.55).add(new Vector3(0, 0.40, 0));
       const twigId=mesh.branch(curved(base, bend, end, 4), 0.065, random.next(), 0.012, 4,false,mainId);
+      ends.push(end);
       if (!willow) {
-        blossomSpray(mesh, random, end, young ? 0.72 : 0.94, random.range(-0.32, 0.32), young || weeping ? 0.3 : 1, v === 0 ? 0.29 : v === 1 ? 0.45 : 0.20);
-        if (j < 2 && !young && !weeping) blossomSpray(mesh, random, base.clone().add(new Vector3(0, 0.35, 0)), 0.72, 0.1, 0.45, 0.3);
+        blossomSpray(random, dabs, end, young ? 0.72 : 0.94, random.range(-0.32, 0.32), young || weeping ? 0.3 : 1, v === 0 ? 0.29 : v === 1 ? 0.45 : 0.20);
+        if (j < 2 && !young && !weeping) blossomSpray(random, dabs, base.clone().add(new Vector3(0, 0.35, 0)), 0.72, 0.1, 0.45, 0.3);
       }
       if (weeping || willow) {
         const length = random.range(willow ? 2.6 : 1.8, willow ? 5.0 : 3.6);
@@ -329,7 +473,7 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
         const bow = end.clone().addScaledVector(radial, 0.72).add(new Vector3(0, -length * 0.25, 0));
         const hanging = curved(end, bow, bottom, 6);
         mesh.branch(hanging, 0.028, 0.35, 0.006, 4,false,twigId);
-        const count = willow ? 22 : 13;
+        const count = willow ? 22 : 10;
         for (let k = 0; k < count; k++) {
           const u = (k + 0.4) / count;
           const p = end.clone().multiplyScalar((1 - u) ** 2).addScaledVector(bow, 2 * u * (1 - u)).addScaledVector(bottom, u * u);
@@ -338,8 +482,10 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
             mesh.leaf(p, random.range(0.36, 0.72), d, random.range(0.055, 0.1), random.next());
           } else {
             p.add(new Vector3(random.range(-0.13, 0.13), 0, random.range(-0.13, 0.13)));
-            const size = random.range(0.18, 0.30), turn = random.range(0, 6.28), kind = random.next() < 0.42 ? 2 : 1, tint = random.next();
-            if (detail === 'full' || k === 0 || k === Math.floor(count * 0.65)) mesh.blossom(p, size * (detail === 'far' ? 2.8 : 1), new Vector3(radial.x, 0.3, radial.z).normalize(), turn, kind, tint);
+            const size = random.range(0.2, 0.33), turn = random.range(0, 6.28), kind = random.next() < 0.42 ? 2 : 1, tint = random.next();
+            if (detail === 'full') mesh.blossom(p, size, new Vector3(radial.x, 0.3, radial.z).normalize(), turn, kind, tint);
+            // Far off, every other curtain is one narrow sheet of blossom.
+            else if (k === 0 && j % 2 === 0) mesh.streak(onBranch(hanging, 0.12), onBranch(hanging, 0.92), radial, 0.55, kind, tint);
           }
         }
       }
@@ -348,6 +494,11 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
         mesh.leaf(end.clone().add(new Vector3(random.range(-0.4, 0.4), random.range(0.1, 0.4), random.range(-0.4, 0.4))), random.range(0.27, 0.46), new Vector3(random.range(-0.7, 0.7), 0.2, random.range(-0.7, 0.7)).normalize(), 0.095, random.next(), 3);
       }
     }
+    // Each limb's blossom masses into an outer cloud over its last twigs and a smaller inner one.
+    const mean = (points: Vector3[]): Vector3 => points.reduce((sum, p) => sum.add(p), new Vector3()).multiplyScalar(1 / points.length);
+    const outer = (young ? 1.35 : weeping ? 1.7 : 1.9) * random.range(0.85, 1.15) * (i > 5 ? 0.85 : 1);
+    lobes.push(makeLobe(random, mean(ends.slice(2)).add(new Vector3(0, 0.35, 0)), outer));
+    lobes.push(makeLobe(random, mean(ends.slice(0, 2)).add(new Vector3(0, 0.3, 0)), outer * random.range(0.72, 0.88), true));
   }
   if (!willow && !young) {
     // The reference's crowns join above the crooked trunk; tip-only blossom
@@ -356,8 +507,14 @@ export function makeCherryGeometry(variant: number, detail: 'full' | 'far' = 'fu
       const a = i * 2.1 + 0.4;
       const top = new Vector3(Math.cos(a) * 0.95, height - 1.65 + i * 0.18, Math.sin(a) * 0.95);
       mesh.branch(curved(trunk[trunk.length - 1], top.clone().add(new Vector3(-0.18, -0.6, 0.15)), top, 4), 0.07, 0.42, 0.012, 3,false,0);
-      blossomSpray(mesh, random, top, 1.35, -0.05, 0.75, weeping ? 0.42 : 0.28);
+      blossomSpray(random, dabs, top, 1.35, -0.05, 0.75, weeping ? 0.42 : 0.28);
+      lobes.push(makeLobe(random, top.clone().add(new Vector3(0, 0.2, 0)), (weeping ? 1.9 : 2.2) * random.range(0.9, 1.1)));
     }
+  } else {
+    // The young tree's crown closes over its short trunk in one more small cloud.
+    lobes.push(makeLobe(random, trunkAt(renderedTrunk, height - 1.6).add(new Vector3(0, 0.3, 0)), 1.45));
   }
+  mesh.cloud(lobes);
+  settleDabs(mesh, random, dabs, lobes);
   return mesh.finish(v);
 }

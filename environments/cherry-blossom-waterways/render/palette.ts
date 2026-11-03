@@ -43,8 +43,8 @@ const NOON: Rows = {
   [ROW.SCATTER]: ['#F2D45C', '#D7AE3A', '#6E8FD8', '#4E6BB3', '#E05A4F', '#B6433B', '#F2A03C', '#C77A24', '#9B7BD8', '#6E55AE', '#F8EA8C'],
   // zenith, horizon, haze, sun glow, mid sky, haze over the far meadow
   [ROW.SKY]: ['#8DBDE2', '#D4E5EE', '#E6EDE9', '#FFF4DB', '#ABD0E8', '#C7DDD5'],
-  // lit, shadowed, mid, rim, base (the meadow's green through it)
-  [ROW.CLOUD]: ['#FFFDF5', '#DBDDE8', '#F0EDF2', '#FFFFFF', '#CADBD1'],
+  // lit, shadowed, mid, rim, base: white with a faint blossom-pink blush (Kai)
+  [ROW.CLOUD]: ['#FFF2F5', '#E6D6E2', '#F8E8EE', '#FFFAFC', '#DDD2D9'],
   // rock, shadow, light, lilac shade
   [ROW.ROCK]: ['#8C9D9A', '#657A80', '#BDC7BB', '#9396AC'],
   // snow, blue-lilac shade, mid, highlight

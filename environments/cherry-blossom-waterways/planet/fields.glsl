@@ -16,7 +16,7 @@ uniform float uRelief[RELIEF_OCTAVES];
 uniform float uHummock[RELIEF_OCTAVES];
 uniform vec4 uGrain;           // grain axis xyz, compression
 uniform vec4 uWet;             // wetness threshold, softness, lift (m), drop (m)
-uniform vec4 uLevel;           // water level (m), canal width multiplier
+uniform vec4 uLevel;           // water level (m)
 uniform vec4 uPatternA;        // octave pairs (level, t): lushness, variant
 uniform vec4 uPatternB;        // octave pair (level, t): richness; -; patchiness
 uniform vec4 uDrift;           // octave pair (level, t): drifts; drift threshold; -
@@ -73,25 +73,15 @@ float reliefAt(vec3 dir, float wet) {
   return h;
 }
 
-// CPU mirror: cherryWaterwayDistance() in fields.ts. Direction is already
-// twirled, so these unequal meanders continue cleanly around the sphere.
-float cherryWaterwayDistance(vec3 dir) {
-  float phase = float(uFieldSeed % 997u) * 0.0063026934;
-  float a = dir.y + 0.22 * sin(3.2 * dir.x + phase) + 0.10 * sin(5.1 * dir.z - phase);
-  float b = dir.z + 0.23 * sin(3.7 * dir.x - phase) - 0.14;
-  float wa = (0.130 + 0.035 * sin(4.2 * dir.x + 2.0 * dir.z + phase)) * uLevel.y;
-  float wb = (0.100 + 0.028 * sin(5.0 * dir.y - 1.6 * dir.x - phase)) * uLevel.y;
-  return min(abs(a) - wa, abs(b) - wb);
+float wetNoise(vec3 dir) {
+  vec3 p = dir * 2.4;
+  vec3 w = vec3(gnoise(p, uFieldSeed + 31u), gnoise(p, uFieldSeed + 32u), gnoise(p, uFieldSeed + 33u));
+  vec3 q = dir * 1.7 + w * 0.55;
+  return 0.72 * gnoise(q, uFieldSeed + 34u) + 0.28 * gnoise(q * 2.2, uFieldSeed + 35u);
 }
 
 float wetnessAt(vec3 dir) {
-  return 1.0 - smoothstep(-0.035, 0.11, cherryWaterwayDistance(dir));
-}
-
-float cherryIslandHeight(vec3 dir) {
-  float distance = cherryWaterwayDistance(dir);
-  float land = smoothstep(0.0, 0.10, distance);
-  return 1.75 * tanh(distance / 0.045) + 0.30 * reliefAt(dir, 0.0) * land - uLevel.x;
+  return smoothstep(uWet.x - uWet.y, uWet.x + uWet.y, wetNoise(dir));
 }
 
 float lushAt(vec3 dir) {

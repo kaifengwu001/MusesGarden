@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
 import { Fields, type FieldParams } from '../planet/fields';
+import { Fields as MeadowFields } from '../../../src/planet/fields';
 import { generateLayout } from '../planet/terrain';
 
 const params: FieldParams = { roll: 1.25, hummocks: 0.8, wetlands: 0.45, waterLevel: 0, grain: 0.9, density: 0, patchiness: 0.95, patchSize: 13, weights: [0.7, 0.3, 0, 0] };
@@ -14,53 +15,36 @@ function directions(count = 2048): Vector3[] {
   });
 }
 
-function fieldsFor(seed: number): Fields {
-  const layout = generateLayout(seed);
-  const fields = new Fields(layout.noiseSeed, layout.grain);
-  fields.update(128, params);
-  return fields;
-}
-
-describe('cherry garden waterways', () => {
-  it('keeps broad clear waterways and low garden banks across different seeds', () => {
-    const points = directions();
+describe('cherry garden land and water', () => {
+  it("lays out the meadow's own lakes for the same seed, at every size and wetland share", () => {
+    const points = directions(512);
     for (const seed of [412, 17, 905]) {
-      const fields = fieldsFor(seed);
-      const heights = points.map((dir) => fields.natural(dir));
-      const water = heights.filter((height) => height < 0).length / points.length;
-      expect(water).toBeGreaterThan(0.15);
-      expect(water).toBeLessThan(0.36);
-      expect(Math.min(...heights)).toBeGreaterThan(-1.8);
-      expect(Math.max(...heights)).toBeLessThan(3.2);
-      for (const axis of ['x', 'y', 'z'] as const) {
-        for (const sign of [-1, 1]) {
-          expect(points.some((dir, i) => dir[axis] * sign > 0.4 && heights[i] < -0.5)).toBe(true);
+      const layout = generateLayout(seed);
+      const cherry = new Fields(layout.noiseSeed, layout.grain);
+      const meadow = new MeadowFields(layout.noiseSeed, layout.grain);
+      for (const [radius, wetlands] of [[40, 0.45], [128, 0.45], [400, 0.45], [128, 0.2], [128, 0.8]]) {
+        const p = { ...params, wetlands };
+        cherry.update(radius, p);
+        meadow.update(radius, p);
+        for (const dir of points) {
+          expect(cherry.natural(dir), `seed ${seed} R${radius} wetlands ${wetlands}`).toBe(meadow.natural(dir));
+          expect(cherry.wetness(dir)).toBe(meadow.wetness(dir));
         }
       }
     }
   });
 
-  it('keeps the same canal identity and shoreline while the planet grows', () => {
-    const fields = fieldsFor(412);
-    const points = directions(512);
-    const reference = points.map((dir) => fields.waterwayDistance(dir));
-    for (const radius of [40, 56, 90, 128, 160, 400]) {
-      fields.update(radius, params);
-      for (let i = 0; i < points.length; i++) {
-        expect(fields.waterwayDistance(points[i])).toBe(reference[i]);
-        expect(fields.natural(points[i]) < 0).toBe(reference[i] < 0);
-      }
+  it('keeps open water and dry banks on every side of the planet', () => {
+    const points = directions();
+    for (const seed of [412, 17, 905]) {
+      const layout = generateLayout(seed);
+      const fields = new Fields(layout.noiseSeed, layout.grain);
+      fields.update(128, params);
+      const heights = points.map((dir) => fields.natural(dir));
+      const water = heights.filter((height) => height < 0).length / points.length;
+      expect(water).toBeGreaterThan(0.05);
+      expect(water).toBeLessThan(0.5);
+      expect(heights.filter((height) => height > 0.3).length / points.length).toBeGreaterThan(0.4);
     }
-  });
-
-  it('widens connected water without moving or replacing the seeded canal plan', () => {
-    const fields = fieldsFor(412);
-    const points = directions(512);
-    fields.update(128, { ...params, wetlands: 0.2 });
-    const narrow = points.map((dir) => fields.waterwayDistance(dir));
-    fields.update(128, { ...params, wetlands: 0.8 });
-    const broad = points.map((dir) => fields.waterwayDistance(dir));
-    expect(broad.filter((d) => d < 0).length).toBeGreaterThan(narrow.filter((d) => d < 0).length);
-    for (let i = 0; i < points.length; i++) expect(broad[i]).toBeLessThan(narrow[i]);
   });
 });

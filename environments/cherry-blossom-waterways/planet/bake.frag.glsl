@@ -25,7 +25,9 @@ void main() {
   vec3 t = twirl(dir);
   if (uPass == 0) {
     float wet = wetnessAt(t);
-    float h = cherryIslandHeight(t);
+    float h = reliefAt(t, wet) + uWet.z - uWet.w * wet - uLevel.x;
+    // wetlands flatten toward a plateau just above the water (plateau() in fields.ts)
+    h += (WET_PLATEAU * tanh(h / WET_PLATEAU) + WET_PLATEAU_KEEP * h - h) * wet;
     gl_FragColor = vec4(h, lushAt(t), wet, variantAt(t));
   } else {
     gl_FragColor = floraAt(t, textureLod(uBakedTerrain, dir, 0.0).b);
