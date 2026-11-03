@@ -6,13 +6,10 @@ uniform float uTulipBloom;
 uniform float uTulipWind;
 #include <meadow_terrain>
 #ifdef DENSE_FIELD
+#include <tulip_rows>
 attribute vec2 aCell;
 uniform vec4 uDenseGrid;
 uniform vec3 uDenseColours[6];
-uniform int uFarmCount;
-uniform vec4 uFarmUp[20];
-uniform vec4 uFarmAcross[20];
-uniform vec4 uFarmAlong[20];
 #else
 attribute vec4 aPlant;
 attribute vec4 aTint;
@@ -36,28 +33,17 @@ void main(){
  float longitude=(column+0.5+jitter*0.18)/rings*(2.0*MEADOW_PI)-MEADOW_PI;
  vec3 right=normalize(cross(uCottage.xyz,uCottageB.xyz));
  vec3 U=normalize(uCottage.xyz*cos(latitude)*cos(longitude)+right*cos(latitude)*sin(longitude)+uCottageB.xyz*sin(latitude));
- float x=longitude*128.0,z=latitude*128.0;
- float field=(x+z*0.18+3.0*sin(z/27.0)+24.0)/9.0;
- float band=mod(floor(field)+floor((z+26.0)/52.0),6.0);
+ TulipCell cell=tulipCell(tulipField(U));
  float scale=(0.9+0.28*random)*uDenseGrid.w;
- // True paths and cottage plots stay open at every view and planet size.
- if(abs(latitude)>MEADOW_PI*0.5||abs(aCell.x)>=rings*0.5||fract(field)>0.925||fract((z+26.0)/52.0)>0.965)scale=0.0;
- float parcel=mod(floor((x+32.0)/64.0)*7.0+floor((z+26.0)/52.0)*3.0,11.0);
- if(parcel<2.0&&dot(U,uCottage.xyz)<cos(0.55))scale=0.0;
- for(int i=0;i<20;i++){
-   if(i>=uFarmCount)break;
-   float facing=dot(U,uFarmUp[i].xyz);if(facing<uFarmAlong[i].w)continue;
-   vec2 c=vec2(dot(U,uFarmAcross[i].xyz),dot(U,uFarmAlong[i].xyz))*uRadius/(uFarmUp[i].w*facing);
-   float t=clamp((c.y-3.95)/4.05,0.0,1.0),gate=uFarmAcross[i].w;
-   float pathX=mix(0.9,gate,t*t*(3.0-2.0*t)),width=mix(0.45,0.25*uRadius/128.0/uFarmUp[i].w,t);
-   float slope=(gate-0.9)*6.0*t*(1.0-t)/4.05;
-   float distancePath=length(vec2((c.x-pathX)/sqrt(1.0+slope*slope),c.y-clamp(c.y,3.95,8.0)));
-   if((abs(c.x)<6.0&&abs(c.y)<6.6)||distancePath<width+0.22)scale=0.0;
- }
+ // True paths, resting fields and farm lawns stay open at every view and planet size.
+ if(abs(latitude)>MEADOW_PI*0.5||abs(aCell.x)>=rings*0.5||(cell.rowGap&&cell.across>0.925)||(cell.runEnd&&cell.along>0.965))scale=0.0;
+ if(cell.fallow&&dot(U,uCottage.xyz)<cos(0.55))scale=0.0;
+ vec2 farm=tulipFarmGround(U);
+ if(farm.x>0.0||farm.y>0.0)scale=0.0;
  scale*=1.0-smoothstep(102.0,112.0,max(abs(aCell.x),abs(aCell.y-111.5)));
  if(scale<=0.001){gl_Position=vec4(2,2,2,1);return;}
  float yaw=random*2.0*MEADOW_PI;
- vec3 tint=uDenseColours[int(band)];
+ vec3 tint=uDenseColours[int(cell.colour)];
 #else
  vec3 U=normalize(aPlant.xyz);
  float scale=aPlant.w,yaw=aTint.w;

@@ -1,5 +1,19 @@
 # Validation — Tulipwind Meadows
 
+## Lawns in the grid, longer and varied beds — 2 November 2026
+
+- 37 focused CPU tests pass across four files. New: run lengths of exactly one to four blocks (single-block runs fewer than longer ones), 40–80 double beds in 200 pairs, all six colours, resting share 8–30% of the band, continuous cap rings, and the thirteen home beds unchanged (colour, single blocks, gaps). Farm lawns at R40, R128 and R400: whole beds on both sides, every point of the fenced yard lawn or soil, the walk ending inside the front track, and no distant tulip on any lawn, walk or track.
+- Eight local browser checks pass: world.spec (error-free frozen rendering, windmill/Bloom/time return, dense-field walking and buffer reuse), three determinism checks, and both CPU/GPU agreement checks. GPU/CPU agreement of the new grid rule itself is checked by eye only (distant tulip colours sit on matching painted beds); no automated parity test covers it.
+- Scoped TypeScript/ESLint and the standalone build pass.
+- Visual review: globe, four farm and field views from 70 m, a standing view along staggered runs and the home. Headless Chromium / ANGLE Metal / Apple M1 Pro, 1280x800, DPR1, frozen time 12, no captured console errors.
+
+## Polar caps and lower clouds — 2 November 2026
+
+- 36 focused CPU tests pass across four files. The new ribbon-width check samples 4,000 directions over the globe and requires every ribbon to stay within 0.8–1.1× of its home width (8.6 m): measured 7.3–9.0 m. The same check fails on the previous layout, whose ribbons narrowed to 0.13 m at the poles. Row alignment and gate-to-track connectivity still pass at R40, R128 and R400.
+- Eight local browser checks pass: three in world.spec (error-free frozen rendering, windmill/Bloom/time return, dense-field walking and buffer reuse), three determinism checks, and both CPU/GPU agreement checks (terrain/warp parity, picking). The real-time growth frame-budget check fails at p95 50–99 ms. Untouched HEAD fails it on the same machine at 33–67 ms, alternating runs, so the budget was not relaxed and no performance claim is made.
+- Scoped TypeScript/ESLint and the standalone build pass; the existing large-chunk warning remains.
+- Visual review: north and south poles from orbit and bird's-eye height, a standing view at the polar mill, the cap edge, the far meridian, a side view and the home. Headless Chromium / ANGLE Metal / Apple M1 Pro, 1280x800, DPR1, frozen time 12, no captured console errors. The "before" captures used 28 m clouds and the pole captures 20 m; the home capture uses the final 5 m default.
+
 ## Mainline integration — 2 November 2026
 
 The complete environment and density/cottage revisions are committed from source 7ea2f22. Integration starts from remote main 37c8206 and incorporates the newer shared asset naming in 335104a. The original find-state table, card/postbox/pins, garden styling and Muse/grass shader contracts are retained locally in this environment to preserve the reviewed appearance against changed mainline interfaces. The model loader uses the current shared sculpt names. Shared source, server and lockfile have no Tulipwind changes. Root additions are the environment index and three scoped npm commands.

@@ -11,6 +11,7 @@ import meadow from '../planet/meadow.glsl?raw';
 import noise from '../../../src/planet/noise.glsl?raw';
 import rest from '../../../src/planet/rest.glsl?raw';
 import terrain from '../planet/terrain.glsl?raw';
+import tulipRows from '../planet/tulipRows.glsl?raw';
 import water from '../planet/water.glsl?raw';
 import common from '../../../src/render/common.glsl?raw';
 import fog from '../../../src/render/fog.glsl?raw';
@@ -27,6 +28,7 @@ const chunks: Record<string, string> = {
   meadow_warp: warp,
   meadow_rest: rest,
   meadow_terrain: terrain,
+  tulip_rows: tulipRows,
   meadow_fields: fields,
   meadow_toon: toon,
   meadow_fog: fog,

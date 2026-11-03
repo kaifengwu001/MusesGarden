@@ -1,5 +1,17 @@
 # References
 
+## Lawns in the grid, longer and varied beds
+
+- [Globe](grid-review/globe.png), [cottage lawn](grid-review/cottage-lawn.png), [long runs](grid-review/long-runs.png), [staggered ends](grid-review/staggered-ends.png), [home](grid-review/home.png).
+
+Same capture setup as the polar review below.
+
+## Polar caps and lower clouds
+
+- North pole [before](polar-review/before-north.png) and [after](polar-review/after-north.png); [south pole](polar-review/after-south.png); [north cap, bird's-eye](polar-review/after-north-bird.png); [home with 5 m clouds](polar-review/after-home-clouds.png).
+
+Headless Chromium / ANGLE Metal / Apple M1 Pro, 1280x800, DPR1, frozen time 12, seed 412, R128. The development performance panel is visible in these captures.
+
 ## Mainline compatibility review
 
 - [Cottage and mill](mainline-review/mainline-home.png), [dense flower fields](mainline-review/mainline-fields.png), [globe](mainline-review/mainline-globe.png).

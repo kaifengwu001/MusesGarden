@@ -320,8 +320,9 @@ export class Terrain {
     u.uFarmCount.value=this.farms.length;
     for(const [i,s] of this.farms.entries()){
       u.uFarmUp.value[i].set(s.direction.x,s.direction.y,s.direction.z,s.scale);
-      u.uFarmAcross.value[i].set(s.across.x,s.across.y,s.across.z,s.gate);
+      u.uFarmAcross.value[i].set(s.across.x,s.across.y,s.across.z,s.walk);
       u.uFarmAlong.value[i].set(s.along.x,s.along.y,s.along.z,s.minDot);
+      u.uFarmLot.value[i].set(s.lot.i0,s.lot.i1,s.lot.zl,s.lot.zh);
     }
     u.uTerrainSeed.value = L.noiseSeed;
     u.uBank.value.set(BANK.height, BANK.width, this.gradStep, BANK.minSlope);
@@ -345,6 +346,7 @@ export interface TerrainUniforms {
   uFarmUp:{value:Vector4[]};
   uFarmAcross:{value:Vector4[]};
   uFarmAlong:{value:Vector4[]};
+  uFarmLot:{value:Vector4[]};
   uTerrainSeed: { value: number };
   /** Natural height (m), lushness, wetness, colour variant (bake.ts). */
   uTerrainBake: { value: Texture | null };
@@ -372,6 +374,7 @@ export function createTerrainUniforms(): TerrainUniforms {
     uFarmUp:{value:Array.from({length:FARM_LIMIT},()=>new Vector4())},
     uFarmAcross:{value:Array.from({length:FARM_LIMIT},()=>new Vector4())},
     uFarmAlong:{value:Array.from({length:FARM_LIMIT},()=>new Vector4())},
+    uFarmLot:{value:Array.from({length:FARM_LIMIT},()=>new Vector4())},
     uTerrainSeed: { value: 0 },
     uTerrainBake: { value: null },
     uFloraBake: { value: null },

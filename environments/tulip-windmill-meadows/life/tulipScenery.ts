@@ -2,21 +2,14 @@ import { Color, DoubleSide, Group, InstancedBufferAttribute, InstancedBufferGeom
 import { hash32, unit } from '../../../src/core/hash';
 import type { Terrain } from '../planet/terrain';
 import { TULIP_COLOURS, cottageGeometry, tulipGeometry, windmillGeometry, windmillSailsGeometry } from './tulipGeometry';
-import { farmSites, farmMatrix, inFarmPlot, type FarmSite } from './farmLayout';
+import { farmGround, farmSites, farmMatrix, type FarmSite } from './farmLayout';
+import { fieldCell, fieldCoordinates } from './fieldGrid';
 import { DenseTulips } from './denseTulips';
 import tulipVertex from './tulipScenery.vert.glsl?raw';
 import millVertex from './windmill.vert.glsl?raw';
 import fragment from './tulipScenery.frag.glsl?raw';
 
 export interface TulipSite { direction:Vector3; scale:number; colour:number; turn:number; }
-
-export function fieldColour(x:number,z:number):number {
-  return ((Math.floor((x+z*0.18+3*Math.sin(z/27)+24)/9)+Math.floor((z+26)/52))%6+6)%6;
-}
-
-export function pastureAt(x:number,z:number):boolean {
-  return ((Math.floor((x+32)/64)*7+Math.floor((z+26)/52)*3)%11+11)%11<2;
-}
 
 export function millSites(terrain:Pick<Terrain,'layout'|'radius'>):{direction:Vector3;scale:number}[]{
   return farmSites(terrain.layout,terrain.radius).filter(s=>s.kind==='mill');
@@ -26,8 +19,7 @@ export function millSites(terrain:Pick<Terrain,'layout'|'radius'>):{direction:Ve
 export function tulipSites(terrain:Pick<Terrain,'layout'|'radius'>):TulipSite[]{
   let state=hash32(terrain.layout.seed^0x74756c69);
   const rand=():number=>unit(state=hash32((state+0x9e3779b9)>>>0));
-  const home=terrain.layout.cottage,forward=terrain.layout.homeBearing;
-  const right=new Vector3().crossVectors(home,forward).normalize();
+  const home=terrain.layout.cottage;
   const farms=farmSites(terrain.layout,terrain.radius);
   const sites:TulipSite[]=[];
   // Low-detail flowers cover the whole globe. DenseTulips supplies the close
@@ -36,14 +28,12 @@ export function tulipSites(terrain:Pick<Terrain,'layout'|'radius'>):TulipSite[]{
   for(let i=0;i<count;i++){
     const y=2*rand()-1,a=rand()*Math.PI*2;
     const d=new Vector3(Math.cos(a)*Math.sqrt(1-y*y),y,Math.sin(a)*Math.sqrt(1-y*y));
-    const localX=Math.atan2(d.dot(right),d.dot(home))*128;
-    const localZ=Math.asin(d.dot(forward))*128;
-    if(pastureAt(localX,localZ)&&d.dot(home)<Math.cos(0.55))continue;
-    if(farms.some(m=>inFarmPlot(d,m,terrain.radius)))continue;
-    if((localZ+26)/52-Math.floor((localZ+26)/52)>0.975)continue;
-    const band=(localX+localZ*0.18+3*Math.sin(localZ/27)+24)/9;
-    if(band-Math.floor(band)>0.94)continue;
-    sites.push({direction:d,scale:0.85+rand()*0.5,colour:fieldColour(localX,localZ),turn:rand()*Math.PI*2});
+    const cell=fieldCell(...fieldCoordinates(d,terrain.layout));
+    if(cell.fallow&&d.dot(home)<Math.cos(0.55))continue;
+    if(farms.some(m=>farmGround(d,m,terrain.radius,terrain.layout)!==null))continue;
+    if(cell.runEnd&&cell.along>0.975)continue;
+    if(cell.rowGap&&cell.across>0.94)continue;
+    sites.push({direction:d,scale:0.85+rand()*0.5,colour:cell.colour,turn:rand()*Math.PI*2});
   }
   return sites;
 }
@@ -105,7 +95,7 @@ export class TulipScenery {
       for(const [i,s] of this.sites.entries()){
         dir.copy(s.direction);
         let scale=s.scale;
-        for(const m of farms)if(inFarmPlot(dir,m,this.radius)){scale=0;break;}
+        for(const m of farms)if(farmGround(dir,m,this.radius,terrain.layout)!==null){scale=0;break;}
         data.setXYZW(i,dir.x,dir.y,dir.z,scale);
       }
       data.needsUpdate=true;
