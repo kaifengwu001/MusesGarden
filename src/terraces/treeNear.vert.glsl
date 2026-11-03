@@ -60,6 +60,14 @@ void main() {
   vec3 T1 = S1 * cos(turn) + S2 * sin(turn);
   vec3 T2 = cross(T1, U);
   int kind = int(aPuff.x + 0.5);
+  // (a lump the camera is in left out, its clumps, core and branch, as the far tree leaves out a lump it is traced
+  // from inside: seen from within, its clumps filled the frame with their facets; it goes on the dithered pixels as
+  // the camera comes up to its outermost clumps, 1.1 of its radius out)
+  if (kind != 2) fade = max(fade, 1.0 - smoothstep(1.1 * r, 1.35 * r, length(cameraPosition - c)));
+  if (fade >= 0.999) {
+    gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
+    return;
+  }
   vec3 p;
   vec3 n;
   if (kind <= 1) {
