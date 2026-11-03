@@ -1,12 +1,16 @@
 import { BufferAttribute, BufferGeometry, CustomBlending, DynamicDrawUsage, Mesh, OneFactor, OneMinusSrcAlphaFactor, ShaderMaterial, Texture } from 'three';
 import blueClusterLeaves from '../../assets/garden/flowers/blue-cluster-leaves-v2.png';
 import blueCluster from '../../assets/garden/flowers/blue-cluster-v1.png';
+import blueClusterGlow from '../../assets/garden/flowers/blue-cluster-v4.png';
 import pinkCupLeaves from '../../assets/garden/flowers/pink-cup-leaves-v2.png';
 import pinkCup from '../../assets/garden/flowers/pink-cup-v1.png';
+import pinkCupGlow from '../../assets/garden/flowers/pink-cup-v4.png';
 import whiteStarLeaves from '../../assets/garden/flowers/white-star-leaves-v2.png';
 import whiteStar from '../../assets/garden/flowers/white-star-v1.png';
+import whiteStarGlow from '../../assets/garden/flowers/white-star-v4.png';
 import yellowButtonLeaves from '../../assets/garden/flowers/yellow-button-leaves-v2.png';
 import yellowButton from '../../assets/garden/flowers/yellow-button-v1.png';
+import yellowButtonGlow from '../../assets/garden/flowers/yellow-button-v4.png';
 import { el } from './dom';
 
 // The finds' flowers as the basket shows them: each species' hand-drawn picture, flat, drawn as the basket's own
@@ -42,10 +46,18 @@ export const FLOWER_SETS = {
     { src: yellowButtonLeaves, box: [322, 215, 950, 1148], foot: [697.5, 1123], neck: 991, bloom: [653.5, 335.3], head: 145.6 },
     { src: blueClusterLeaves, box: [340, 68, 988, 1225], foot: [648.5, 1203], neck: 1025, bloom: [657, 367.3], head: 289.9 },
   ],
+  // Kai's cel flowers with leaves and a soft glow (v4). Their box takes in the glow (alpha 8 and over); the foot, neck,
+  // bloom and head come from the drawn flower alone (alpha 235 and over), so the glow never moves the stem or the head.
+  glow: [
+    { src: pinkCupGlow, box: [267, 213, 732, 1453], foot: [430.3, 1443], neck: 1116, bloom: [538.8, 377.1], head: 153.1 },
+    { src: whiteStarGlow, box: [277, 151, 712, 1445], foot: [435.8, 1433], neck: 1037, bloom: [504.3, 349.8], head: 170.3 },
+    { src: yellowButtonGlow, box: [305, 222, 710, 1381], foot: [506, 1369], neck: 998, bloom: [472.2, 343], head: 121 },
+    { src: blueClusterGlow, box: [57, 178, 936, 1472], foot: [458.5, 1462], neck: 1119, bloom: [526.6, 387.1], head: 271.1 },
+  ],
 } as const satisfies Record<string, readonly FlowerPicture[]>;
 
 /** The set the basket draws. */
-export const FLOWER_PICTURES: readonly FlowerPicture[] = FLOWER_SETS.leaves;
+export const FLOWER_PICTURES: readonly FlowerPicture[] = FLOWER_SETS.glow;
 
 /** A picture's head is drawn this much of the size its stem's length would give it. */
 export const HEAD_SCALE = 0.7;
