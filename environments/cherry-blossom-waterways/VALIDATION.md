@@ -56,6 +56,12 @@ Passed on the integrated checkout: **49 CPU tests in ten files, seven focused na
 
 The first comparison harness used an ambiguous dialog locator after its four exact frame comparisons; it was narrowed to the named Baskets dialog and the complete review reran successfully. This was a harness issue, not a scene failure. Current evidence includes [integrated willow](reference/mainline-5277-willow.png), [water view](reference/mainline-5277-user-water-joints.png), [globe](reference/mainline-5277-globe.png), [remote ducks](reference/mainline-5277-canal-ducks-1.png), and [paired hashes, renderer and current source hashes](reference/mainline-review.json).
 
+## Bigger groves, blossom clouds and the meadow's lakes · 3 November 2026
+
+Mac checkout `cherry-fix` from `4fe29c7`, preview on port 5289. **Passed:** 48 CPU tests in ten files, scoped TypeScript/ESLint (`npm run check:cherry`) and the production build (`npm run build:cherry`, with the existing chunk-size warning). The canal tests are replaced by a comparison with the meadow's own fields. Two grove checks changed with the slope rule: the trunk centre may sit up to `ROOT_SPREAD` + 0.07 m below the ground at its centre (was 0.1 m), and an uphill toe up to `ROOT_SPREAD` + 0.07 + 0.13 × scale m into it (was 0.45 m); the floating-toe limit (0.06 m) is unchanged. Geometry budgets are unchanged and met.
+
+Actual app captures at 1280×800, DPR 1, high tier, frozen time 12, seed 412, R 128 on ANGLE Metal (Apple M1 Pro): homestead, a view over the home pond, the globe, Vista and Muse, with no page or console errors. 1,360 trees. No browser suite was run: this checkout has no Playwright project for Cherry, and no frame-rate benchmark was taken.
+
 ## Known scope and limits
 
 - This is a reference-inspired 3D interpretation, with visible polygonal geometry at close range; the images remain the art direction and user visual acceptance is pending.
@@ -63,3 +69,4 @@ The first comparison harness used an ambiguous dialog locator after its four exa
 - Pavilion roof and canopy shadows are approximations; they are attached to planet-space anchors. The open pavilion keeps the inherited support/navigation dimensions.
 - Decorative boats and ducks have deterministic ambient motion; they are not interactive residents.
 - Full growth-performance and cross-platform renderer benchmarking are separate from the scoped correctness and visual checks.
+- The Vista preset does not avoid tree crowns, and birds fly at hilltop height, through the tallest canopies.

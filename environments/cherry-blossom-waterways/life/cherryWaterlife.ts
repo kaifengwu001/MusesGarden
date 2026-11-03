@@ -175,12 +175,15 @@ export interface RemoteDuckFlock {
 
 const REMOTE_CAPACITY=54;
 
-/** Unequal flocks on the native canals, excluding the authored home pond. */
+/** Unequal flocks out on the lakes and inlets, excluding the authored home pond. */
 export function remoteDuckSites(terrain:Terrain):{sites:RemoteDuckSite[];flocks:RemoteDuckFlock[]} {
   const R=terrain.radius,L=terrain.layout,sites:RemoteDuckSite[]=[],flocks:RemoteDuckFlock[]=[];
   let state=hash32(L.seed^0x85e4d21);
   const rand=():number=>unit(state=hash32(state+0x9e3779b9));
   const sample=createGroundSample(),probe=new Vector3(),axis=new Vector3(),side=new Vector3(),along=new Vector3();
+  const shoreSample=createGroundSample();
+  /** Signed distance to the shore (m, negative on the water). */
+  const shore=(dir:Vector3):number=>{terrain.sample(dir,shoreSample);return shoreSample.water;};
   const east=new Vector3().crossVectors(L.cottage,L.homeBearing).normalize();
   const homePond=L.cottage.clone().multiplyScalar(Math.sqrt(Math.max(0.001,1-(POND_SHIFT**2+terrain.pondCentre**2)/(R*R))))
     .addScaledVector(east,-POND_SHIFT/R).addScaledVector(L.homeBearing,terrain.pondCentre/R).normalize();
@@ -209,14 +212,14 @@ export function remoteDuckSites(terrain:Terrain):{sites:RemoteDuckSite[];flocks:
       const dir=new Vector3(r*Math.cos(az)*(octant&1?1:-1),y*(octant&2?1:-1),r*Math.sin(az)*(octant&4?1:-1));
       if(dir.distanceTo(homePond)*R<terrain.pondRadius+9)continue;
       if(flocks.some(f=>f.dir.dot(dir)>Math.cos(minAngle)))continue;
-      if(terrain.fields.waterwayDistance(dir)>-0.025)continue;
+      if(shore(dir)>-3.2)continue;
       terrain.sample(dir,sample);
       if(sample.depth<0.8)continue;
       const a=new Vector3().crossVectors(dir,Math.abs(dir.y)<0.9?new Vector3(0,1,0):new Vector3(1,0,0)).normalize();
       const b=new Vector3().crossVectors(dir,a);
-      // Follow the canal's contour, so flock members lie along the water.
-      const da=terrain.fields.waterwayDistance(travel(dir,a,0.7/R,probe))-terrain.fields.waterwayDistance(travel(dir,a,-0.7/R,probe));
-      const db=terrain.fields.waterwayDistance(travel(dir,b,0.7/R,probe))-terrain.fields.waterwayDistance(travel(dir,b,-0.7/R,probe));
+      // Follow the shore's contour, so flock members lie along the water.
+      const da=shore(travel(dir,a,0.7/R,probe))-shore(travel(dir,a,-0.7/R,probe));
+      const db=shore(travel(dir,b,0.7/R,probe))-shore(travel(dir,b,-0.7/R,probe));
       const tangent=a.clone().multiplyScalar(db).addScaledVector(b,-da);
       if(tangent.lengthSq()<1e-12)tangent.copy(a);
       tangent.normalize();
@@ -299,7 +302,7 @@ export class CherryWaterlife {
   update(terrain:Terrain,time:number):void {
     const L=terrain.layout,R=terrain.radius;
     this.across.crossVectors(L.cottage,L.homeBearing).normalize();
-    const key=L.seed+'/'+R+'/'+terrain.pondRadius+'/'+terrain.pondCentre+'/'+terrain.fields.level+'/'+terrain.fields.waterwayWidth;
+    const key=L.seed+'/'+R+'/'+terrain.pondRadius+'/'+terrain.pondCentre+'/'+terrain.fields.level+'/'+terrain.fields.wetThreshold;
     if(key!==this.key) {
       this.key=key;
       for(const item of this.items) {

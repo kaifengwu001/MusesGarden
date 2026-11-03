@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { cherrySites, type CherrySite } from '../life/cherryDistribution';
+import { cherrySites, MAX_TREES, ROOT_SPREAD, type CherrySite } from '../life/cherryDistribution';
 import { makeCherryGeometry } from '../life/cherryGeometry';
 import { schema } from '../params';
 import type { FieldParams } from '../planet/fields';
@@ -56,13 +56,14 @@ describe('cherry grove distribution', () => {
     for (const radius of [40, 128, 400]) {
       const terrain = world(radius), sites = cherrySites(terrain), sample = createGroundSample();
       expect(sites.length, `R${radius} grove population`).toBeGreaterThan(12);
-      expect(sites.length).toBeLessThanOrEqual(1800);
+      expect(sites.length).toBeLessThanOrEqual(MAX_TREES);
       for (const site of sites) {
         terrain.sample(site.dir, sample);
         expect(sample.depth, `R${radius} site${site.id} submerged trunk`).toBe(0);
         expect(sample.height).toBeGreaterThan(0.2);
         expect(site.height).toBeLessThan(sample.height);
-        expect(sample.height - site.height).toBeLessThan(0.1);
+        // On a gentle slope the trunk stands at its lowest root probe: its centre sinks by at most the footprint's rise.
+        expect(sample.height - site.height).toBeLessThan(ROOT_SPREAD + 0.07);
         if (site.dir.distanceTo(terrain.layout.cottage) * radius < 45) {
           const p = { x: 0, z: 0 };
           terrain.cottageLocal(site.dir, p);
@@ -85,7 +86,8 @@ describe('cherry grove distribution', () => {
           terrain.sample(point.normalize(), sample);
           expect(sample.depth).toBe(0);
           expect(height - sample.height, `R${radius} site${site.id} floating root toe`).toBeLessThan(0.06);
-          expect(height - sample.height).toBeGreaterThan(-0.45);
+          // Uphill toes run into a slope by up to the footprint's rise, besides their own scaled depth.
+          expect(height - sample.height).toBeGreaterThan(-(ROOT_SPREAD + 0.07 + 0.13 * site.scale));
         }
       }
     }

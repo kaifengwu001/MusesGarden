@@ -1,12 +1,12 @@
 import { BufferAttribute, DoubleSide, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, ShaderMaterial, type IUniform } from 'three';
-import type { CherrySite } from './cherryDistribution';
+import { MAX_TREES, type CherrySite } from './cherryDistribution';
 import vertexShader from './blossomPetal.vert.glsl?raw';
 
 /** Petals fall from actual cherry canopies; position is a pure function of tree, petal and time. */
 export class BlossomPetals {
   readonly mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
-  private anchors = new InstancedBufferAttribute(new Float32Array(1800 * 5 * 4),4);
-  private styles = new InstancedBufferAttribute(new Float32Array(1800 * 5 * 4),4);
+  private anchors = new InstancedBufferAttribute(new Float32Array(MAX_TREES * 5 * 4),4);
+  private styles = new InstancedBufferAttribute(new Float32Array(MAX_TREES * 5 * 4),4);
   private source: CherrySite[] | null = null;
   constructor(shared: Record<string,IUniform>) {
     const g = new InstancedBufferGeometry();

@@ -33,6 +33,7 @@ import { localSun } from '../../src/render/sun';
 import { warpForZoom, type WarpFrame } from '../../src/render/warp';
 import { CameraRig } from '../../src/view/camera';
 import { findVista, type Vista } from './view/vista';
+import { HOMESTEAD_VIEW } from './view/homestead';
 
 const DEBUG_VIEWS = { off: 0, chunks: 1, morph: 2, normals: 3 } as const;
 const NOON_SUN = new Palette().get(ROW.LIGHT, 0);
@@ -57,12 +58,6 @@ const FIELD_PATHS: ReadonlySet<string> = new Set([
 
 export type CameraPreset = 'homestead' | 'lakes' | 'meadow' | 'vista' | 'muse';
 
-/**
- * The homestead view, after the painting: the camera's height (m) and
- * distance (m) from the point it looks at (cottage-local x, y, z, m), its
- * bearing from the front toward the right end (rad).
- */
-const HOMESTEAD_VIEW = { height: 16, distance: 38, azimuth: 0.92, at: [-1.8, 3.0, 3.4] } as const;
 /** Muse's view: the camera's height over the ground Muse stands on (m), its distance (m), its bearing round from in front of Muse (rad, + to its left; at home, from straight out in front of the terrace), and the height it looks at (× Muse's). */
 const MUSE_VIEW = { height: 1.23 * MUSE_HEIGHT, distance: 4 * MUSE_HEIGHT, azimuth: 0.3, at: 0.55 } as const;
 
