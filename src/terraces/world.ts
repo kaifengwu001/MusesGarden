@@ -114,13 +114,13 @@ export class TerraceWorld implements PlanetWorld {
     uTerrainSeed: { value: 0 },
     uPaddy: { value: new Vector4(0, 0.55, 0, 0) },
     uRiceNear: { value: new Vector4(0, 1, 0, 0) },
-    uHeightFog: { value: new Vector4(0, 3.5, 9, 0) },
+    uHeightFog: { value: new Vector4(0, 0.5, 9.5, 0) },
     uHeightFogPatches: { value: new Vector4(1, 50, 0, 0) },
     uHeightFogEye: { value: new Vector3(0, 1, 0) },
     uHeightFogTint: { value: new Vector2(0.22, 0.26) },
     uHeightFogPeaks: { value: peakMap() },
-    uHeightFogPeak: { value: new Vector3(0.7, 43, 20) },
-    uHeightFogNear: { value: new Vector3(0.6, 128, 30) },
+    uHeightFogPeak: { value: new Vector3(1, 82, 3) },
+    uHeightFogNear: { value: new Vector3(0.96, 60, 77) },
   };
   private posed = false;
   private noiseSeed = -1;
@@ -360,7 +360,7 @@ export class TerraceWorld implements PlanetWorld {
     const t = p.terraces;
     this.mist.update(this.renderer, this.noiseSeed, this.field, R, clock.time, p.clouds.speed, this.windAxis, rig.altitude, t.cloudCount, t.cloudRange, t.cloudHeight, t.cloudDensity, t.cloudTwist);
     // the height fog (fog.glsl), by the panel's sliders: its density (the slider's square, so the low end is fine:
-    // 0.05 a m at Kai's 1, 0.2 at its fullest), the height it fills the valleys to, how far over that it thins; how
+    // 0.2 a m at Kai's 2, 0.45 at its fullest), the height it fills the valleys to, how far over that it thins; how
     // patchy it is across the globe and how large its patches; its tint; how it thins away from the spiky mountains
     // and near the camera's place on the planet
     this.own.uHeightFog.value.set(0.05 * t.fogDensity * t.fogDensity, t.fogRange, Math.max(t.fogFalloff, 0.5), rig.altitude);
