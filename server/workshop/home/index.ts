@@ -72,6 +72,24 @@ const data = (job: JobRecord): HomeData => job.data;
 export const forkFor = (repo: string, museId: string): string => join(repo, 'environments', `muse-${museId}`);
 const isWorld = (dir: string): boolean => existsSync(join(dir, 'world.ts'));
 
+/**
+ * A home finished before its Muse had a planet waits in its job's folder (home/home.json and its models). Once the
+ * planet is forked, this puts every such home in it, the latest last; true if one went in.
+ */
+export function furnishWaitingHomes(repo: string, museId: string, jobDirs: readonly string[]): boolean {
+  const fork = forkFor(repo, museId);
+  if (!isWorld(fork)) return false;
+  let put = false;
+  for (const dir of jobDirs) {
+    const kit = join(dir, 'home');
+    const file = join(kit, 'home.json');
+    if (!existsSync(file)) continue;
+    furnishFork(fork, JSON.parse(readFileSync(file, 'utf8')) as Home, kit);
+    put = true;
+  }
+  return put;
+}
+
 /** The things Muse named (3–6 asked for), as given. */
 function thingsOf(brief: Brief): string[] {
   return (brief.things ?? []).map((t) => t.trim()).filter((t) => t.length > 0).slice(0, 6);

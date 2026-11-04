@@ -17,7 +17,8 @@ import { startLiveClock } from './http/clock';
 import { fakeCommands, fakeQueries } from './http/fake';
 import { mediaCache } from './http/media';
 import { fakeClients } from './workshop/clients';
-import { clientsFromEnv, createWorkshop, workshopFiles } from './workshop/index';
+import { furnishWaitingHomes } from './workshop/home/index';
+import { clientsFromEnv, createWorkshop, jobDir, workshopFiles } from './workshop/index';
 import { loadGeneratedPlanets } from './workshop/planet/index';
 import { museCodeBuilder } from './workshop/planet/builder';
 import { PIPELINES } from './workshop/pipelines';
@@ -92,6 +93,11 @@ async function buildBackend(): Promise<Backend> {
           ? await garden.agent.applyPlanet(job.museId, result.planet.id, result.planet.worldSeed, result.planet.name)
           : null;
       if (done && !done.ok) throw new Error(done.error);
+      // A home Muse finished before it had a planet goes into the planet now.
+      if (result.planet) {
+        const homes = workshop.jobs(job.museId).filter((j) => j.kind === 'home' && j.state === 'done');
+        furnishWaitingHomes(process.cwd(), job.museId, homes.map((j) => jobDir(dir, j.id)));
+      }
     },
   });
   const agent = createAgentHandler({
