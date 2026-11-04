@@ -1,13 +1,17 @@
-import { Vector3, type BufferGeometry, type Mesh, type MeshStandardMaterial, type Texture } from 'three';
+import { Matrix4, Vector3, type BufferGeometry, type Mesh, type MeshStandardMaterial, type Texture } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import type { DressedKind, MuseMesh, SculptKind } from './museMesh';
+import type { GeneratedLook } from '../muse/contract';
+import { generatedUrl, isGeneratedLook } from '../muse/looks';
+import { DRESSED, generatedSculpt, SCULPTS, type BodyKind, type DressedKind, type MuseMesh, type Sculpt, type SculptKind } from './museMesh';
 import SculptWorker from './museSculpt.worker?worker&inline';
 
 // The imported sculpts of Muse (src/assets/muse/: each one GLB, unrigged, its
 // 2K base colour inside it), loaded and rigged on Muse's skeleton
 // (museMesh.ts, in a worker), their colours read off their paint. Imported
 // only when asked for, so the loader stays out of the app until then; the
-// build carries the files as assets, fetched only when asked for.
+// build carries the files as assets, fetched only when asked for. A body the
+// workshop made (gen-<muse>-<n>) is no asset: the engine serves it
+// (/api/looks/<id>.glb, and its rig's own knobs, if any, at <id>.json).
 
 /** The sculpts: the first sculpt (arms hanging, grown into the sides), and its T-poses (arms straight out). */
 export const SCULPT_URLS: Record<SculptKind, string> = {
@@ -52,9 +56,38 @@ export interface Loaded {
   paint: Texture | null;
 }
 
-export async function loadSculpt(kind: SculptKind | DressedKind = 'sculpt'): Promise<Loaded> {
-  const dressed = kind in DRESSED_URLS;
-  const url = dressed ? DRESSED_URLS[kind as DressedKind] : SCULPT_URLS[kind as SculptKind];
+/** Where a body's model is, and how it is rigged (a made one's own knobs fetched with it). */
+async function sourceOf(kind: BodyKind): Promise<{ url: string; sculpt: Sculpt }> {
+  if (isGeneratedLook(kind)) return { url: generatedUrl(kind, 'glb'), sculpt: await knobsOf(kind) };
+  if (kind in DRESSED) return { url: DRESSED_URLS[kind as DressedKind], sculpt: DRESSED[kind as DressedKind] };
+  if (kind in SCULPTS) return { url: SCULPT_URLS[kind as SculptKind], sculpt: SCULPTS[kind as SculptKind] };
+  throw new Error(`${kind} is not a body a Muse can wear`);
+}
+
+/** How long a made body's knobs are waited for before it is rigged without them (ms). */
+const KNOBS_WAIT = 8000;
+
+/**
+ * A made body rigged as every new muse in clothes starts (museMesh.ts GENERATED), with its own knobs where the
+ * engine has them (<id>.json: none is a 404). Knobs that can't be read, or that the rig doesn't take, are
+ * passed over with a warning: the body is rigged all the same.
+ */
+async function knobsOf(look: GeneratedLook): Promise<Sculpt> {
+  let overrides: unknown;
+  try {
+    const response = await fetch(generatedUrl(look, 'json'), { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(KNOBS_WAIT) });
+    if (response.ok) overrides = await response.json();
+    else if (response.status !== 404) console.warn(`Muse: ${look}'s knobs answered ${response.status}; rigging it without them`);
+  } catch (error) {
+    console.warn(`Muse: ${look}'s knobs could not be read; rigging it without them`, error);
+  }
+  const { sculpt, ignored } = generatedSculpt(overrides);
+  if (ignored.length > 0) console.warn(`Muse: ${look}'s knobs passed over (unknown, or out of range): ${ignored.join(', ')}`);
+  return sculpt;
+}
+
+export async function loadSculpt(kind: BodyKind = 'sculpt'): Promise<Loaded> {
+  const { url, sculpt } = await sourceOf(kind);
   const gltf = await new GLTFLoader().loadAsync(url);
   let found: Mesh<BufferGeometry, MeshStandardMaterial> | null = null;
   gltf.scene.traverse((o) => {
@@ -62,13 +95,13 @@ export async function loadSculpt(kind: SculptKind | DressedKind = 'sculpt'): Pro
   });
   const raw = found as Mesh<BufferGeometry, MeshStandardMaterial> | null;
   if (!raw) throw new Error(`${url} holds no mesh`);
-  const g = raw.geometry;
+  const g = isGeneratedLook(kind) ? placed(raw) : raw.geometry;
   if (!g.index || !g.attributes.uv || !g.attributes.normal) throw new Error(`${url}: expected an indexed mesh with normals and texture coordinates`);
   const map = raw.material.map;
   // (the paint's pixels go with it: read at texture coordinates, glTF's, v down from the top)
   const paint = map ? pixels(map, 1024) : null;
   const job = {
-    kind,
+    sculpt,
     position: Float32Array.from(g.attributes.position.array),
     normal: Float32Array.from(g.attributes.normal.array),
     uv: Float32Array.from(g.attributes.uv.array),
@@ -87,11 +120,12 @@ export async function loadSculpt(kind: SculptKind | DressedKind = 'sculpt'): Pro
     };
     worker.postMessage(job, [job.position.buffer, job.normal.buffer, job.uv.buffer, ...(job.paint ? [job.paint.data.buffer] : [])]);
   });
-  return { body, grade: map && !dressed ? gradeFor(map) : new Vector3(1, 1, 1), raw, paint: map };
+  // (a body in clothes keeps its own paint's colours)
+  return { body, grade: map && !sculpt.dress ? gradeFor(map) : new Vector3(1, 1, 1), raw, paint: map };
 }
 
-/** Each sculpt as loaded and rigged once for the page. */
-const loaded = new Map<SculptKind | DressedKind, Promise<Loaded>>();
+/** Each sculpt as loaded and rigged once for the page (a made one by its id). */
+const loaded = new Map<BodyKind, Promise<Loaded>>();
 
 /**
  * A sculpt, loaded and rigged the first time any Muse asks for it: the Muses
@@ -99,7 +133,7 @@ const loaded = new Map<SculptKind | DressedKind, Promise<Loaded>>();
  * poses it on a skeleton of its own. One that could not be loaded is tried
  * again the next time it is asked for.
  */
-export function sculptFor(kind: SculptKind | DressedKind): Promise<Loaded> {
+export function sculptFor(kind: BodyKind): Promise<Loaded> {
   let job = loaded.get(kind);
   if (!job) {
     job = loadSculpt(kind).catch((error: unknown) => {
@@ -110,6 +144,13 @@ export function sculptFor(kind: SculptKind | DressedKind): Promise<Loaded> {
   }
   return job;
 }
+
+/** A made body's geometry as its scene places it: an exporter's turn or scale on its node baked into its arrays. */
+function placed(mesh: Mesh): BufferGeometry {
+  mesh.updateWorldMatrix(true, false);
+  return mesh.matrixWorld.equals(IDENTITY) ? mesh.geometry : mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+}
+const IDENTITY = new Matrix4();
 
 /** A texture's image drawn at most `size` square, read back. */
 function pixels(map: Texture, size: number): ImageData {

@@ -29,11 +29,12 @@ import { smoothstep } from '../core/math';
 import { FUR_LENGTH, MUSE_HEIGHT, SHELLS } from '../life/muse';
 import { buildMuseBody, FIELD_FIT, PARENT, type MuseBody, type MuseFit } from '../life/museBody';
 import { dressMuse, fitOf } from '../life/museDress';
-import { DRESSED, SCULPTS, type DressedKind, type MuseMesh, type SculptKind } from '../life/museMesh';
+import { DRESSED, SCULPTS, type BodyKind, type MuseMesh } from '../life/museMesh';
 import { loadSculpt } from '../life/museSculptLoader';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
 import { BOUNCE_LENGTH, FISH, FLUFF_LENGTH, GARDEN, COOK, HOP, LIE_BACK, MuseRig, PET, PLOP, RISE, WAKE, WAVE_LENGTH, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
+import { isGeneratedLook } from '../muse/looks';
 import { registerShaderChunks } from '../render/glsl';
 
 // The Muse lab (dev only, served at /src/dev/museLab.html): Muse alone on
@@ -44,6 +45,7 @@ import { registerShaderChunks } from '../render/glsl';
 // and the moment:
 //   model=procedural|sculpt|tpose|tpose2|tpose5|tpose6 (src/assets/muse/sculpt*.glb, rigged on the skeleton by museMesh.ts)
 //         muse0 … muse12 (the muses in clothes, src/assets/muse/muses/: museMesh.ts DRESSED)
+//         gen-<muse>-<n> (a body the workshop made, from the engine: /api/looks/<id>.glb, its knobs at <id>.json)
 //   lineup=1: the muses in clothes in a row, each idling, each answering a tap or a hold (museLineup.ts)
 //   look=muse|raw|weights|clay|facet|stretch|rough|kind   (Muse's shaders; the file as exported; each vertex coloured by its joints;
 //                           the bare skin in clay; the clay shaded by the triangles as drawn, not the skinned normals;
@@ -98,7 +100,7 @@ registerShaderChunks();
 const scene = new Scene();
 
 // (hang=z,x and wave=z,fore try other arm angles on the body's fit, rad)
-const sculpt = model in SCULPTS || model in DRESSED ? (model as SculptKind | DressedKind) : null;
+const sculpt = model in SCULPTS || model in DRESSED || isGeneratedLook(model) ? (model as BodyKind) : null;
 const angles = (key: string): number[] | null => params.get(key)?.split(',').map(Number) ?? null;
 const hang = angles('hang');
 const waveAt = angles('wave');

@@ -1,4 +1,3 @@
-import { knownLook } from './muse/looks';
 import { bedAt, layOut } from './garden/placement';
 import { FindBeds } from './life/findBeds';
 import type { Muse } from './life/muse';
@@ -10,7 +9,8 @@ import type { World } from './world';
 
 // The meadow as other Muses come to it: a destination for a friend's owner on a ticket (src/visit/), and, on Momo's
 // own garden, a friend's Muse visiting Momo drawn beside it (src/visit/companions.ts). The meadow is a world like the
-// others, but it lives in src/, so its adapter lives here beside main.ts.
+// others, but it lives in src/, so its adapter lives here beside main.ts. Its Muses wear any look, a body the
+// workshop made too (src/life/muse.ts loads it, and wears the original Muse where it can't be had).
 
 /** The meadow as a visit's destination: Momo is the host, the guest a visiting Muse beside it, the finds its beds. */
 export function meadowVisit(world: World): VisitWorld {
@@ -21,8 +21,8 @@ export function meadowVisit(world: World): VisitWorld {
     planet: 'meadow',
     scene: world,
     host: world.muse,
-    dressHost: (look) => world.muse.useModel(knownLook(look)),
-    makeGuest: (look) => world.addVisitor(knownLook(look)),
+    dressHost: (look) => world.muse.useModel(look),
+    makeGuest: (look) => world.addVisitor(look),
     // (the meadow has no residents of its own)
     hideOthers: () => undefined,
     marks: {
@@ -66,8 +66,8 @@ export function meadowCompanions(world: World): CompanionWorld<Muse> {
   return {
     host: world.muse,
     growth: world.growth,
-    makeGuest: (look) => world.addVisitor(knownLook(look)),
-    dress: (guest, look) => guest.useModel(knownLook(look)),
+    makeGuest: (look) => world.addVisitor(look),
+    dress: (guest, look) => guest.useModel(look),
     ground: (dir) => world.terrain.sample(dir, sample),
     standable: (dir) => world.muse.life?.standable(dir) ?? true,
   };

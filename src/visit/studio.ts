@@ -5,6 +5,7 @@ import type { FrameClock } from '../core/clock';
 import { parseHash } from '../core/hashSync';
 import { FLUFF_LENGTH, WAKE, YAWN_LENGTH, type Expression, type HeldLook, type Move } from '../life/museRig';
 import type { MuseLook, PlanetId } from '../muse/contract';
+import { isLook } from '../muse/looks';
 import { Flight, type Framing } from '../view/flight';
 import { FOLLOW, Follower } from './follow';
 import { headOf, homeFraming, hostFraming, musesFraming, selfieFraming } from './framing';
@@ -23,7 +24,7 @@ import type { VisitBody, VisitDirection, VisitWorld } from './world';
 // as it would a VisitUi.
 //
 //   ?studio                       the planet's own friend in its look, and Momo
-//   &host=museN, &guest=museN     another look for either (tpose6, muse0 … muse12)
+//   &host=museN, &guest=museN     another look for either (tpose6, muse0 … muse12, or a made body gen-<muse>-<n>)
 //   /?studio&with=museN           the meadow: Momo, and a friend in that look beside it
 
 /** Whose planet the page is, and who is drawn on it: its own Muse (Momo on the meadow) and a second beside it, if any. */
@@ -47,9 +48,6 @@ interface Member extends StudioMember {
   readonly planet: string;
   readonly worldSeed: number;
 }
-
-const LOOK = /^(tpose6|muse([0-9]|1[0-2]))$/;
-const isLook = (v: unknown): v is MuseLook => typeof v === 'string' && LOOK.test(v);
 
 /** The cast's members (server/fixtures/cast.json), as far as the studio reads them. */
 export function castMembers(text: string = castFile): Member[] {

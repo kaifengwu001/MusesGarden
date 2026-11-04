@@ -1,12 +1,14 @@
-import { DRESSED, rigSculpt, SCULPTS, type ColourAt, type DressedKind, type SculptKind } from './museMesh';
+import { rigSculpt, type ColourAt, type Sculpt } from './museMesh';
 
 // A sculpt rigged on Muse's skeleton (museMesh.ts) off the main thread:
 // refining, cutting and weighing it takes a moment, so no frame waits on it.
-// In: the sculpt's positions, normals, texture coordinates and triangles, and
-// its paint's pixels (sRGB, RGBA); out: the rigged body's arrays.
+// In: how it is rigged (its entry in SCULPTS or DRESSED, or a made body's,
+// museMesh.ts GENERATED with its own knobs), the sculpt's positions, normals,
+// texture coordinates and triangles, and its paint's pixels (sRGB, RGBA);
+// out: the rigged body's arrays.
 
 interface Job {
-  kind: SculptKind | DressedKind;
+  sculpt: Sculpt;
   position: Float32Array;
   normal: Float32Array;
   uv: Float32Array;
@@ -15,7 +17,7 @@ interface Job {
 }
 
 onmessage = (event: MessageEvent<Job>) => {
-  const { kind, position, normal, uv, index, paint } = event.data;
+  const { sculpt, position, normal, uv, index, paint } = event.data;
   let colourAt: ColourAt | undefined;
   if (paint) {
     const linear = (c: number): number => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
@@ -28,7 +30,7 @@ onmessage = (event: MessageEvent<Job>) => {
       out[2] = linear(paint.data[k + 2] / 255);
     };
   }
-  const body = rigSculpt(position, normal, uv, index, colourAt, kind in SCULPTS ? SCULPTS[kind as SculptKind] : DRESSED[kind as DressedKind]);
+  const body = rigSculpt(position, normal, uv, index, colourAt, sculpt);
   postMessage(body, {
     transfer: [
       ...[body.position, body.normal, body.index, body.skinIndex, body.skinWeight, body.fur, body.open, body.colour].map((a) => a.buffer),
