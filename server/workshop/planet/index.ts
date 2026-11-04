@@ -16,10 +16,12 @@ import {
   BUILDER_TIMEOUT_MS,
   agentsMd,
   changesOutside,
+  newErrors,
   restoreFork,
   revertOutside,
   snapshotFork,
   typecheckFork,
+  type TypeCheck,
 } from './builder';
 import { ensureFork, forkDir, planetIdFor, readRecipe, recordPlanet, retitle, scaffoldFork, worldSeedFor, writeRecipe, type ForkFn } from './fork';
 import {
@@ -85,7 +87,7 @@ export interface PlanetDeps {
   /** Takes the stills; null for the real one on the repo's look.mjs. */
   readonly renderer: Renderer | null;
   /** Checks a fork after the builder edited it. */
-  readonly typecheck: (repo: string, dir: string) => Promise<{ readonly ok: boolean; readonly log: string }>;
+  readonly typecheck: (repo: string, dir: string) => Promise<TypeCheck>;
 }
 
 const dataOf = (job: JobRecord): PlanetData => job.data;
@@ -365,6 +367,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
   async function build(io: StageIO, dir: string, contract: Contract, notes: readonly string[], draft: number, title: string): Promise<{ ok: true } | { ok: false; why: string }> {
     const snapshot = join(io.dir, `fork-before-${draft + 1}`);
     snapshotFork(dir, snapshot);
+    const typesBefore = await typecheck(io.repo, dir);
     const before = await changesOutside(io.repo);
     const result = await io.clients.builder.run({
       workspace: dir,
@@ -379,10 +382,10 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
     if (reverted.length) why = `Muse Code changed files outside the planet (${reverted.slice(0, 5).join(', ')}), so its work was undone`;
     else if (!result.ok) why = 'Muse Code stopped before it finished, so its work was undone';
     else {
-      const checked = await typecheck(io.repo, dir);
-      if (!checked.ok) {
-        writeFileSync(join(io.dir, `typecheck-${draft}.log`), checked.log);
-        why = 'Muse Code’s changes didn’t type-check, so they were undone';
+      const added = newErrors(typesBefore, await typecheck(io.repo, dir));
+      if (added.length) {
+        writeFileSync(join(io.dir, `typecheck-${draft}.log`), added.join('\n'));
+        why = `Muse Code’s changes didn’t type-check (${added.length} new error${added.length === 1 ? '' : 's'}), so they were undone`;
       }
     }
     if (why) {
@@ -493,7 +496,10 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
       let chosen: { view: View; hours: number | null } | null = null;
       try {
         const answer = await io.clients.judge.json<ViewAnswer>({ name: 'planet.view', ...viewRequest(words), schema: VIEW_SCHEMA, signal: io.signal });
-        if (answer.possible === false) return { ok: false, error: `That can’t be shown from this planet’s views: ${trimLine(String(answer.why ?? ''), 200) || 'none of them frames it'}.` };
+        if (answer.possible === false) {
+          const why = trimLine(typeof answer.why === 'string' ? answer.why : '', 200).replace(/[.!\s]+$/, '');
+          return { ok: false, error: `That can’t be shown from this planet’s views: ${why || 'none of them frames it'}.` };
+        }
         const view = VIEWS.find((v) => v.name === answer.view);
         if (view) chosen = { view, hours: answer.hours >= 5.5 && answer.hours <= 19 ? answer.hours : null };
       } catch (e) {

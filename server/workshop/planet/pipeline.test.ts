@@ -129,7 +129,7 @@ function setup(name: string, opts: { builder?: Builder; judged?: Record<string, 
     createdAt: 0 as Instant,
     updatedAt: 0 as Instant,
   };
-  return { pipeline: createPlanetPipeline({ fork: fakeFork, renderer: stubRenderer(renders), typecheck: () => Promise.resolve({ ok: true, log: '' }) }), io, job, renders, generated };
+  return { pipeline: createPlanetPipeline({ fork: fakeFork, renderer: stubRenderer(renders), typecheck: (_repo, dir) => Promise.resolve({ errors: existsSync(join(dir, 'broken.ts')) ? ['broken.ts: error TS2322: no'] : ['main.ts: error TS2345: the scaffold’s own'], log: '' }) }), io, job, renders, generated };
 }
 
 /** Steps on as the runner does, until a round is ready (or the job ends). */
@@ -357,6 +357,23 @@ describe('notes answered by the builder', { timeout: 30_000 }, () => {
     expect(runs[0]).toContain('Edit only files in this folder');
     expect(runs[0]).toContain('1. tide pools along the shore');
     expect(runs[0]).toContain('- A pale, quiet sky');
+  });
+
+  it('undoes a run that adds type errors to the planet', async () => {
+    const builder: Builder = {
+      available: () => Promise.resolve(true),
+      run: ({ workspace }) => {
+        writeFileSync(join(workspace, 'broken.ts'), 'export const X: number = "no";\n');
+        return Promise.resolve({ ok: true, log: '' });
+      },
+    };
+    const run = setup('builder-types', { builder, repo });
+    await toFirstDraft(run);
+    answer(run, { notes: [{ text: 'paler' }] });
+    await runOn(run);
+    expect(existsSync(join(repo, 'environments/muse-test/broken.ts'))).toBe(false);
+    expect(run.job.packet?.text).toContain('Muse Code’s changes didn’t type-check (1 new error), so they were undone; instead, The sky is paler');
+    expect(readFileSync(join(run.io.dir, 'typecheck-1.log'), 'utf8')).toBe('broken.ts: error TS2322: no');
   });
 
   it('undoes a run that strays outside the planet, and retunes the recipe instead', async () => {

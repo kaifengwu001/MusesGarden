@@ -80,13 +80,34 @@ export const FORK_TSCONFIG = `${JSON.stringify(
   2,
 )}\n`;
 
-/** Type-checks a fork with the repo's tsc (about a minute). */
-export async function typecheckFork(repo: string, dir: string): Promise<{ readonly ok: boolean; readonly log: string }> {
+export interface TypeCheck {
+  /** Each error once, without its line and column (edits move them): "file: error TSxxxx: message". */
+  readonly errors: readonly string[];
+  readonly log: string;
+}
+
+/**
+ * Type-checks a fork with the repo's tsc (a few seconds). A fork of today's meadow already has errors of its own (the
+ * scaffold's module list lags the meadow), so a builder's run is judged by the errors it adds (newErrors).
+ */
+export async function typecheckFork(repo: string, dir: string): Promise<TypeCheck> {
   const config = join(dir, 'tsconfig.json');
   if (!existsSync(config)) writeFileSync(config, FORK_TSCONFIG);
   const tsc = join(repo, 'node_modules/.bin/tsc');
-  const r = await run(tsc, ['-p', config, '--noEmit'], { cwd: repo, timeoutMs: 5 * 60_000 });
-  return { ok: r.ok, log: r.out.trim().split('\n').slice(0, 30).join('\n') };
+  const r = await run(tsc, ['-p', config, '--noEmit', '--pretty', 'false'], { cwd: repo, timeoutMs: 5 * 60_000 });
+  if (r.missing) throw new Error(`no tsc at ${tsc}`);
+  const errors = [...new Set(r.out.split('\n').flatMap((line) => {
+    const m = /^(.+?)\(\d+,\d+\): (error TS\d+: .*)$/.exec(line.trim());
+    return m ? [`${m[1]}: ${m[2]}`] : [];
+  }))];
+  if (!r.ok && errors.length === 0) errors.push(`tsc failed: ${r.out.trim().split('\n')[0] ?? ''}`);
+  return { errors, log: r.out.trim().split('\n').slice(0, 40).join('\n') };
+}
+
+/** The errors in `after` that `before` didn't have. */
+export function newErrors(before: TypeCheck, after: TypeCheck): string[] {
+  const had = new Set(before.errors);
+  return after.errors.filter((e) => !had.has(e));
 }
 
 /** What git sees as changed outside ignored paths: each path with its status and the hash of its contents. */
