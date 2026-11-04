@@ -18,6 +18,7 @@ import {
   OrthographicCamera,
   PCFShadowMap,
   PerspectiveCamera,
+  Plane,
   PlaneGeometry,
   Quaternion,
   Scene,
@@ -42,66 +43,81 @@ import vertexShader from '../life/muse.vert.glsl?raw';
 import { registerShaderChunks } from '../render/glsl';
 
 // The making of Muse (museLab.html#making=1), a shot for the demo film: the
-// original Muse (Momo, tpose6) as it was made, pass by pass, on the lab's
-// white. First the mesh as generated (the sculpt's file, untextured, in its
-// own T-pose) comes into being from its feet up behind a ragged, glowing
-// blue front (the hut's furniture's, hut.frag.glsl FILM); then each of the
-// lab's looks sweeps up it behind a thinner blue line, the passes its making
-// went through: its triangles, then the clay (the skin as rigged takes over
-// from the file), the rough heat map, the weights; then its bones show and it
-// starts walking, its arms coming down from the T-pose; then its colour, its
-// bones going and its fur growing; and the camera, which has drifted round
-// its left while it was made, comes back round to its front as it stops and
-// looks at you. Everything is in meters, Muse one tall, standing at the
-// middle facing +z.
+// original Muse (Momo, tpose6) as it was made, on the lab's white, every
+// change sweeping up it behind a glowing blue front (the hut's furniture's,
+// hut.frag.glsl FILM). First its bare mesh as generated (the sculpt's file,
+// untextured, in its own T-pose, its triangles flat with its wire on them)
+// comes into being from its feet up; then the clay sweeps up it (the skin as
+// rigged taking over from the file); then its weights; then its bones, and
+// it starts walking, its arms coming down out of the T-pose; then one last
+// front: its colour, its fur growing up behind it, its bones gone as it
+// passes them. The camera goes once round it meanwhile (from its right,
+// behind it and round its left), lingering in front at both ends. It ends on
+// the muses' parade's first frame (museParade.ts, at its defaults), so the
+// one cuts to the other on the match (Kai): the camera at rest in front as
+// the parade's opens, Momo walking at its pace, turned to you, its clock
+// running up to the parade's zero. Everything is in meters, Muse one tall,
+// standing at the middle facing +z.
 //
 // Every frame is a function of time only, so the film is rendered offline
 // frame by frame (muse-look's making.mjs): window.museMaking.frame(t,
 // samples, shutter) draws the moment t, averaging `samples` renders over the
 // shutter (s) for motion blur, each with the shadow's light moved a little
 // and the view a fraction of a pixel. The hash:
-//   beats=gen,tris,clay,rough,weights,bones,walk,colour,fur,front,stop,end   the beats (s; the defaults in BEATS)
+//   beats=gen,clay,weights,bones,walk,colour,end   the beats (s; the defaults in BEATS)
+//   ease=<p>               how hard the camera eases off and onto its front (default 3; 5 is the parade's; 1 goes round evenly)
 //   live=1                 play it (space pauses, ← → step)
 //   t=<s>, samples=<n>     the moment drawn on load (not live), and its renders
 //   cam=<round°>,<up°>,<distance>   the camera held there (round from its front, + to its left), for checking
 
 const params = new URLSearchParams(location.hash.slice(1));
 /**
- * The beats (s): the mesh generated from `gen`; the passes from `tris`, `clay`, `rough`, `weights` (each sweeping up
- * it in PASS s); its bones showing from `bones`; walking from `walk`; its colour from `colour`; its fur growing and its
- * bones going from `fur`; the camera turning back to its front from `front`; stopping, turned to you, from `stop`.
+ * The beats (s), each a front sweeping up it: its bare mesh generated from `gen`, the clay from `clay`, its weights
+ * from `weights`, its bones from `bones`, and its colour and fur (its bones going) from `colour`; walking from `walk`
+ * on to the end, where the parade takes over.
  */
 const BEATS = (() => {
-  const b = { gen: 0.2, tris: 2.8, clay: 3.8, rough: 4.8, weights: 5.8, bones: 6.75, walk: 7.5, colour: 8.9, fur: 9.5, front: 9.9, stop: 11.2, end: 12.3 };
+  const b = { gen: 0.25, clay: 2.85, weights: 3.75, bones: 4.65, walk: 5.45, colour: 7.2, end: 9.8 };
   const given = params.get('beats')?.split(',').map(Number);
   const keys = Object.keys(b) as (keyof typeof b)[];
   if (given && given.length === keys.length && given.every(Number.isFinite)) keys.forEach((k, i) => (b[k] = given[i]));
   return b;
 })();
-/** How long the generation's front takes to come up the mesh, and each pass's (s). */
-const SWEEP = { gen: 2.3, pass: 0.6 } as const;
+/** How far behind the last front its fur has grown to its full length (H). */
+const FUR_RISE = 0.3;
 /**
- * The fronts, each making a stage: where it starts (s), how long it takes (s), how ragged it is (H, either way), its
- * edge's core width and its glow's reach behind it (H), how bright, and how far the glow cools the colours into blue.
- * The generation's is the hut's furniture's own (hut.ts FILM_LOOK); the passes', a thinner line.
+ * The fronts, in order: where each starts (s), how long it takes (s), how ragged it is (H, either way), its edge's core
+ * width and its glow's reach (H), how bright, how far the glow cools the colours into blue, and how far behind it
+ * something still grows (H: the fur). The generation's is the hut's furniture's own (hut.ts FILM_LOOK); the others',
+ * a thinner line; the last, which does the most, a little slower.
  */
+const LINE = { ragged: 0.025, core: 0.005, reach: 0.035, edge: 0.75, cool: 0.55, rise: 0 } as const;
 const FRONTS = [
-  { at: BEATS.gen, take: SWEEP.gen, ragged: 0.12, core: 0.006, reach: 0.06, edge: 1, cool: 1 },
-  ...[BEATS.tris, BEATS.clay, BEATS.rough, BEATS.weights, BEATS.colour].map((at) => ({ at, take: SWEEP.pass, ragged: 0.025, core: 0.005, reach: 0.035, edge: 0.75, cool: 0.55 })),
+  { at: BEATS.gen, take: 2.3, ragged: 0.12, core: 0.006, reach: 0.06, edge: 1, cool: 1, rise: 0 },
+  { ...LINE, at: BEATS.clay, take: 0.6 },
+  { ...LINE, at: BEATS.weights, take: 0.6 },
+  { ...LINE, at: BEATS.bones, take: 0.6 },
+  { ...LINE, at: BEATS.colour, take: 1.0, rise: FUR_RISE },
 ];
-/** The stages the fronts make (one more than the fronts passed): 1 the mesh as generated, 2 its triangles, 3 clay, 4 rough, 5 weights, 6 its colour. */
-const STAGE = { generated: 1, triangles: 2, clay: 3, rough: 4, weights: 5, colour: 6 } as const;
+const FRONT = { gen: 0, clay: 1, weights: 2, bones: 3, colour: 4 } as const;
+/** The stages the fronts make (how many have passed a point): 1 the bare mesh, 2 clay, 3 its weights, 4 its weights with its bones in, 5 its colour and fur. */
+const STAGE = { bare: 1, clay: 2, weights: 3, bones: 4, colour: 5 } as const;
 /** The top the fronts must pass (H): the generated mesh's crown. */
 const TOP = 1.0;
-/** Its walk's pace (cycles of two steps a second: the lab's). */
-const GAIT = 1.1;
-/** How long its arms take to come down out of the T-pose as it starts to walk, and its bones to show and to go (s). */
+/** Its walk's pace (cycles of two steps a second): the parade's at its defaults (a step a muse, 0.5 s a muse), its phase 0 at the end as the parade's is at its start. */
+const GAIT = 1.0;
+/** How long its arms take to come down out of the T-pose as it starts to walk (s). */
 const ALIVE = 0.9;
-const BONES = { show: 0.6, go: 0.45 } as const;
-/** How long its fur takes to grow (s). */
-const FUR_GROWS = 1.0;
-/** The camera: how far round its left it drifts while it is made (°, from its front: three-quarter views, where its bones read), how far from what it looks at (m), how far above it (°), that point's height (m), the lens (° high). */
-const LENS = { from: 30, to: 62, distance: [3.3, 3.05], up: [13, 6], at: 0.52, fov: 30 } as const;
+/**
+ * How hard the camera eases off and onto its front (the parade's curve, u^p / (u^p + (1 − u)^p): Kai, more time in
+ * front). Gentler than the parade's 5, which would whip round behind it just as its bones come in.
+ */
+const EASE = Number(params.get('ease') ?? 3);
+/**
+ * The camera: how far from what it looks at (m) and how far above it (°), and that point's height (m), at the start
+ * (back far enough for the T-pose's arms) and at the end (the parade's opening view, museParade.ts LENS); the lens (° high).
+ */
+const LENS = { distance: [3.25, 2.95], up: [12, 6], at: [0.52, 0.56], fov: 30 } as const;
 /** Toward the light it is shaded by (the lab's key: from the front, on its left, a little above), and the floor's shadow's (higher, from the same side). */
 const SUN = new Vector3(0.25, 0.45, 1).normalize();
 const SHADOW_SUN = new Vector3(0.3, 1.25, 0.95).normalize();
@@ -118,6 +134,8 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = PCFShadowMap;
+// (its bones are cut by the fronts as they come and go)
+renderer.localClippingEnabled = true;
 renderer.autoClear = false;
 registerShaderChunks();
 const scene = new Scene();
@@ -170,7 +188,7 @@ scene.add(shadowLight, shadowLight.target);
 
 // ---- the fronts, in every material that takes part: which stage a point is in, the edge at the front sweeping now ----
 
-/** Where each front is now (H, as filmAt counts), and how ragged; the stages a material draws; the front sweeping now (its index, or −1), its edge's brightness, core and reach; how far its glow cools the colours. */
+/** Where each front is now (H, as filmAt counts), and how ragged; the front sweeping now (its index, or −1), its edge's brightness, core and reach; how far its glow cools the colours. */
 const film: Record<string, IUniform> = {
   uFronts: { value: FRONTS.map(() => -1) },
   uRagged: { value: FRONTS.map((f) => f.ragged) },
@@ -215,6 +233,10 @@ float filmBehind(vec3 p) {
   int a = int(uEdge.x + 0.5);
   return uFronts[a] - filmAt(p, a);
 }
+// how far its fur has grown at a point (0 ... 1): from nothing at the last front to full a little behind it
+float filmGrow(vec3 p) {
+  return smoothstep(0.0, ${FUR_RISE.toFixed(3)}, uFronts[${FRONT.colour}] - filmAt(p, ${FRONT.colour}));
+}
 // the edge: a hairline core burning white-blue, a blue glow either side, the colours behind cooling in from blue;
 // seen from inside (a back face, through the cut), one flat glowing blue, so the cut reads as a solid cross-section
 // (on the lab's white an empty inside would show the white through it; shaded, it read as a bowl)
@@ -231,7 +253,7 @@ vec3 filmEdge(vec3 col, float behind, float width, bool front) {
 }
 `;
 
-// ---- the mesh as generated: the sculpt's file, untextured, in its own T-pose, scaled to Muse's height ----
+// ---- its bare mesh as generated: the sculpt's file, untextured, in its own T-pose, scaled to Muse's height ----
 
 const loaded = await loadSculpt('tpose6');
 const raw = loaded.raw.geometry;
@@ -249,10 +271,10 @@ const RAW_VERTEX = /* glsl */ `
     vN = normalize(mat3(modelMatrix) * normal);
     gl_Position = projectionMatrix * viewMatrix * w;
   }`;
-/** The file in the lab's rawclay (a grey under a sky, a fill and the key), or its triangles as made, or its wire. */
+/** The file's triangles as made, each flat, in the lab's rawclay grey (a sky, a fill and the key), or its wire. */
 function rawMaterial(wire: boolean): ShaderMaterial {
   const m = new ShaderMaterial({
-    uniforms: { ...film, uStages: { value: wire ? [STAGE.triangles, STAGE.triangles] : [STAGE.generated, STAGE.triangles] }, uKey: { value: SUN } },
+    uniforms: { ...film, uStages: { value: [STAGE.bare, STAGE.bare] }, uKey: { value: SUN } },
     vertexShader: RAW_VERTEX,
     fragmentShader: /* glsl */ `
       ${FILM_GLSL}
@@ -272,12 +294,8 @@ function rawMaterial(wire: boolean): ShaderMaterial {
 #ifdef WIRE
         vec3 col = vec3(0.1, 0.105, 0.125);
 #else
-        vec3 n = normalize(vN);
-        if (!gl_FrontFacing) n = -n;
-        // (its triangles as made: each face flat)
-        if (stage > ${STAGE.generated}.5) n = facet;
-        float key = max(dot(n, uKey), 0.0);
-        vec3 sky = mix(vec3(0.686, 0.631, 0.527), vec3(1.0), 0.5 + 0.5 * n.y);
+        float key = max(dot(facet, uKey), 0.0);
+        vec3 sky = mix(vec3(0.686, 0.631, 0.527), vec3(1.0), 0.5 + 0.5 * facet.y);
         vec3 col = vec3(0.325, 0.31, 0.3) * (sky * 1.6 + 0.4 + 1.8 * key) / 3.14159;
 #endif
         col = filmEdge(col, behind, width, gl_FrontFacing);
@@ -321,19 +339,17 @@ rawMesh.customDepthMaterial = new ShaderMaterial({
   side: DoubleSide,
 });
 
-// ---- Muse as rigged: its skin in the lab's looks, each drawing its own stage ----
+// ---- Muse as rigged: its skin in the lab's looks, each drawing its own stages ----
 
 const body = loaded.body;
 const rig = new MuseRig(fitOf('tpose6', body));
 /** The skin matrices drawn (the rig's, or blended from the T-pose toward them), and its correctives' shares. */
 const skin = Array.from({ length: JOINTS }, () => new Matrix4());
 const raise = new Vector4(0, 0, 0, 0);
-const furSize = new Vector4(1, 0, SHELLS, 0);
+const furSize = new Vector4(1, FUR_LENGTH / MUSE_HEIGHT, SHELLS, 0);
 const face = new Vector4(1, 0, 0, 0);
 const mood = new Vector4();
 const time: IUniform = { value: 0 };
-/** How far its fur has grown (0 … 1). */
-const grown: IUniform = { value: 0 };
 const n = body.position.length / 3;
 
 /** Each vertex's blend of its joints' colours (the lab's weights). */
@@ -348,40 +364,6 @@ function weightColours(): Float32Array {
       c[i * 3 + 1] += col.g * w;
       c[i * 3 + 2] += col.b * w;
     }
-  }
-  return c;
-}
-/** How far each vertex's normal turns from its neighbours' (the lab's rough: white none … red 25° and more), at rest. */
-function roughColours(): Float32Array {
-  const c = new Float32Array(n * 3);
-  const p = body.position;
-  const normal = new Float64Array(n * 3);
-  const near: number[][] = Array.from({ length: n }, () => []);
-  for (let t = 0; t < body.index.length; t += 3) {
-    const [i0, i1, i2] = [body.index[t], body.index[t + 1], body.index[t + 2]];
-    const ux = p[i1 * 3] - p[i0 * 3];
-    const uy = p[i1 * 3 + 1] - p[i0 * 3 + 1];
-    const uz = p[i1 * 3 + 2] - p[i0 * 3 + 2];
-    const wx = p[i2 * 3] - p[i0 * 3];
-    const wy = p[i2 * 3 + 1] - p[i0 * 3 + 1];
-    const wz = p[i2 * 3 + 2] - p[i0 * 3 + 2];
-    const m = [uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx];
-    for (const i of [i0, i1, i2]) for (let a = 0; a < 3; a++) normal[i * 3 + a] += m[a];
-    near[i0].push(i1, i2);
-    near[i1].push(i0, i2);
-    near[i2].push(i0, i1);
-  }
-  for (let i = 0; i < n; i++) {
-    const l = Math.hypot(normal[i * 3], normal[i * 3 + 1], normal[i * 3 + 2]) || 1;
-    for (let a = 0; a < 3; a++) normal[i * 3 + a] /= l;
-  }
-  for (let i = 0; i < n; i++) {
-    const mean = [0, 0, 0];
-    for (const j of near[i]) for (let a = 0; a < 3; a++) mean[a] += normal[j * 3 + a];
-    const l = Math.hypot(mean[0], mean[1], mean[2]) || 1;
-    const cos = (normal[i * 3] * mean[0] + normal[i * 3 + 1] * mean[1] + normal[i * 3 + 2] * mean[2]) / l;
-    const s = Math.min(1, (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI / 25);
-    c.set([1, 1 - s, 1 - s], i * 3);
   }
   return c;
 }
@@ -410,29 +392,38 @@ function skinGeometry(colours?: Float32Array): InstancedBufferGeometry {
   g.instanceCount = 1;
   return g;
 }
-/** Muse's shaders in a look (its defines), drawing only its stage of the making, the front's edge over it. */
-function skinMaterial(stage: number, look: Record<string, number>): ShaderMaterial {
+/** A piece of a shader's source replaced, where it must be found exactly once. */
+function once(source: string, find: string, put: string): string {
+  if (source.split(find).length !== 2) throw new Error(`a Muse shader: expected one "${find}"`);
+  return source.replace(find, put);
+}
+// Muse's shaders with the fronts in: each look draws only its stages, the front's edge over it, and its fur grows up
+// behind the last front, its tips lightening as it grows (just sprouted, its shells are the bare skin's colour)
+let filmVertex = once(vertexShader, 'void main() {', `${FILM_GLSL}\nvoid main() {`);
+filmVertex = once(filmVertex, 'float len = uMuseSize.y * aFur * (1.0 + fluff * (0.45 + 0.3 * tuft));', 'float len = uMuseSize.y * aFur * (1.0 + fluff * (0.45 + 0.3 * tuft)) * filmGrow(position);');
+let filmFragment = once(
+  fragmentShader,
+  'void main() {',
+  `${FILM_GLSL}\nvoid main() {\n  float filmB = filmBehind(vRest);\n  float filmW = fwidth(filmB);\n  float filmS = filmStage(vRest);\n  float filmG = filmGrow(vRest);\n  if (filmS < uStages.x - 0.5 || filmS > uStages.y + 0.5) discard;\n  if (vShell > 0.0 && filmG < 0.01) discard;`,
+);
+filmFragment = once(filmFragment, 'float depth = skin ? 0.0 : smoothstep(0.0, 0.7, shell);', 'float depth = skin ? 0.0 : smoothstep(0.0, 0.7, shell) * filmG;');
+// (as a face, always: its skin is whole, and the fur's shells' back faces, drawn as the parade draws them, are fur, not a cut)
+filmFragment = once(filmFragment, 'gl_FragColor = vec4(col, 1.0);', 'col = filmEdge(col, filmB, filmW, true);\n  gl_FragColor = vec4(col, 1.0);');
+filmFragment = filmFragment.replace(/}\s*$/, '  #include <colorspace_fragment>\n}\n');
+/** Muse's shaders in a look (its defines), drawing only its stages of the making (or `plain`: as the parade draws it, untouched). */
+function skinMaterial(stages: [number, number], look: Record<string, number>, plain = false): ShaderMaterial {
   const defines: Record<string, number> = { MUSE_STUDIO: 1, ...look };
   if (body.colour) defines.MUSE_COLOURED = 1;
   if (body.raise && body.raiseNormal && body.raiseOpen) defines.MUSE_RAISE = 1;
   if (body.hang && body.hangNormal) defines.MUSE_HANG = 1;
   if (body.comb) defines.MUSE_COMB = 1;
-  const once = (source: string, find: string, put: string): string => {
-    if (source.split(find).length !== 2) throw new Error(`muse.frag.glsl: expected one "${find}"`);
-    return source.replace(find, put);
-  };
-  let frag = once(fragmentShader, 'void main() {', `${FILM_GLSL}\nuniform float uFurGrown;\nvoid main() {\n  float filmB = filmBehind(vRest);\n  float filmW = fwidth(filmB);\n  float filmS = filmStage(vRest);\n  if (filmS < uStages.x - 0.5 || filmS > uStages.y + 0.5) discard;`);
-  // (the fur's tips lighten as it grows: just sprouted, its shells are the bare skin's colour, so it doesn't flash on)
-  frag = once(frag, 'float depth = skin ? 0.0 : smoothstep(0.0, 0.7, shell);', 'float depth = skin ? 0.0 : smoothstep(0.0, 0.7, shell) * uFurGrown;');
-  frag = once(frag, 'gl_FragColor = vec4(col, 1.0);', 'col = filmEdge(col, filmB, filmW, gl_FrontFacing);\n  gl_FragColor = vec4(col, 1.0);');
-  frag = frag.replace(/}\s*$/, '  #include <colorspace_fragment>\n}\n');
   return new ShaderMaterial({
-    vertexShader,
-    fragmentShader: frag,
+    vertexShader: plain ? vertexShader : filmVertex,
+    fragmentShader: plain ? fragmentShader.replace(/}\s*$/, '  #include <colorspace_fragment>\n}\n') : filmFragment,
     defines,
     uniforms: {
       ...film,
-      uStages: { value: [stage, stage] },
+      uStages: { value: stages },
       uBones: { value: skin },
       uBoneDQ: { value: rig.dual },
       uMusePos: { value: new Vector3() },
@@ -454,30 +445,37 @@ function skinMaterial(stage: number, look: Record<string, number>): ShaderMateri
       uWarpK: { value: 0 },
       uTime: time,
       uRadius: { value: 128 },
-      uFurGrown: grown,
     },
   });
 }
 const looks = {
-  clay: new Mesh(skinGeometry(), skinMaterial(STAGE.clay, { MUSE_CLAY: 1 })),
-  rough: new Mesh(skinGeometry(roughColours()), skinMaterial(STAGE.rough, { MUSE_WEIGHTS: 1 })),
-  weights: new Mesh(skinGeometry(weightColours()), skinMaterial(STAGE.weights, { MUSE_WEIGHTS: 1 })),
-  colour: new Mesh(skinGeometry(), skinMaterial(STAGE.colour, {})),
+  clay: new Mesh(skinGeometry(), skinMaterial([STAGE.clay, STAGE.clay], { MUSE_CLAY: 1 })),
+  // (the same look with its bones in: the bones' front only sweeps its line up it)
+  weights: new Mesh(skinGeometry(weightColours()), skinMaterial([STAGE.weights, STAGE.bones], { MUSE_WEIGHTS: 1 })),
+  colour: new Mesh(skinGeometry(), skinMaterial([STAGE.colour, STAGE.colour], {})),
 };
+looks.colour.geometry.instanceCount = SHELLS + 1;
+/** Once the last front is done: Muse in its shaders as the parade has them (the same program, so the cut is bit for bit), both sides, as the parade (the lineup's way). */
+const colourFilm = looks.colour.material;
+const colourPlain = skinMaterial([STAGE.colour, STAGE.colour], {}, true);
+for (const m of [colourFilm, colourPlain]) m.side = DoubleSide;
 for (const m of Object.values(looks)) {
   m.frustumCulled = false;
   scene.add(m);
 }
-// its shadow: its skin alone, skinned as it is drawn and a little out into its fur, into the light's map (not drawn)
+// its shadow: its skin alone, skinned as it is drawn and a little out into its fur, into the light's map (not drawn;
+// the parade's caster word for word, so the shadow at the cut is the parade's own)
 const caster = (() => {
   const s = skinGeometry();
   const mesh = new Mesh(s, new MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   mesh.customDepthMaterial = new ShaderMaterial({
-    uniforms: { uBones: { value: skin }, uMuseSize: { value: furSize } },
+    uniforms: { uBones: { value: skin }, uMusePos: { value: new Vector3() }, uMuseFrame: { value: new Matrix3() }, uMuseSize: { value: furSize } },
     vertexShader: /* glsl */ `
       uniform mat4 uBones[13];
+      uniform vec3 uMusePos;
+      uniform mat3 uMuseFrame;
       uniform vec4 uMuseSize;
       attribute vec4 skinIndex;
       attribute vec4 skinWeight;
@@ -486,7 +484,8 @@ const caster = (() => {
         mat4 skin = uBones[int(skinIndex.x)] * skinWeight.x + uBones[int(skinIndex.y)] * skinWeight.y + uBones[int(skinIndex.z)] * skinWeight.z + uBones[int(skinIndex.w)] * skinWeight.w;
         vec3 p = (skin * vec4(position, 1.0)).xyz;
         vec3 n = normalize(mat3(skin) * normal);
-        gl_Position = projectionMatrix * viewMatrix * vec4(p + n * uMuseSize.y * aFur * 0.6, 1.0);
+        vec3 world = uMusePos + uMuseFrame * (p * uMuseSize.x + n * uMuseSize.y * aFur * 0.6);
+        gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
       }`,
     fragmentShader: /* glsl */ `void main() { gl_FragColor = vec4(1.0); }`,
   });
@@ -494,20 +493,20 @@ const caster = (() => {
   return mesh;
 })();
 
-// ---- its bones: a ball at each joint, a rod to its parent, drawn over it ----
+// ---- its bones: a ball at each joint, a rod to its parent, drawn over it, cut by the fronts as they come and go ----
 
-const boneMaterial = new MeshBasicMaterial({ color: 0xd02060, depthTest: false, depthWrite: false, transparent: true, opacity: 0 });
-const boneRim = new MeshBasicMaterial({ color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity: 0 });
-/** How deep each joint is in the skeleton (the root 0): they show from the root out. */
-const DEPTH = PARENT.map((_, j) => {
-  let d = 0;
-  for (let p = PARENT[j]; p >= 0; p = PARENT[p]) d++;
-  return d;
-});
-const DEEPEST = Math.max(...DEPTH);
+/** Kept where the bones' front has passed, and where the last one has not yet. */
+const boneIn = new Plane(new Vector3(0, -1, 0), -1);
+const boneOut = new Plane(new Vector3(0, 1, 0), 1);
+const MAGENTA = new Color(0xd02060);
+/** A joint lit as a front passes it: the edge's core colour. */
+const FLASH = new Color(0.6, 0.88, 1.0);
+const bonesLook = { depthTest: false, depthWrite: false, transparent: true, clippingPlanes: [boneIn, boneOut] };
+const rodMaterial = new MeshBasicMaterial({ color: MAGENTA, opacity: 0.95, ...bonesLook });
+const rimMaterial = new MeshBasicMaterial({ color: 0xffffff, opacity: 0.85, ...bonesLook });
 const balls = PARENT.map(() => {
-  const rim = new Mesh(new SphereGeometry(0.024, 20, 14), boneRim);
-  const ball = new Mesh(new SphereGeometry(0.017, 20, 14), boneMaterial);
+  const rim = new Mesh(new SphereGeometry(0.024, 20, 14), rimMaterial);
+  const ball = new Mesh(new SphereGeometry(0.017, 20, 14), new MeshBasicMaterial({ color: MAGENTA, opacity: 0.95, ...bonesLook }));
   rim.renderOrder = 10;
   ball.renderOrder = 11;
   rim.frustumCulled = ball.frustumCulled = false;
@@ -516,7 +515,7 @@ const balls = PARENT.map(() => {
 });
 const rods = PARENT.map((p) => {
   if (p < 0) return null;
-  const rod = new Mesh(new CylinderGeometry(0.0065, 0.0065, 1, 10), boneMaterial);
+  const rod = new Mesh(new CylinderGeometry(0.0065, 0.0065, 1, 10), rodMaterial);
   rod.renderOrder = 11;
   rod.frustumCulled = false;
   scene.add(rod);
@@ -564,54 +563,57 @@ function blend(k: number): void {
   }
 }
 
-// ---- the camera: drifting round its left while it is made, then back round to its front ----
+// ---- the camera: once round it, from its right, behind it, round its left, eased off and onto its front ----
 
 const camera = new PerspectiveCamera(LENS.fov, innerWidth / innerHeight, 0.05, 40);
 const held = params.get('cam')?.split(',').map(Number);
-/** An ease that lingers at both ends (the parade's: u^p / (u^p + (1 − u)^p)). */
-const ease = (a: number, b: number, t: number, p: number): number => {
-  const u = Math.max(0, Math.min(1, (t - a) / (b - a)));
-  const x = u ** p;
-  return x / (x + (1 - u) ** p);
-};
-/** How far back round to its front the camera has come (0 … 1). */
-const backAt = (t: number): number => ease(BEATS.front, BEATS.stop + 0.7, t, 3);
-/** How far round its front the camera is at a time (rad, + to its left). */
+/** How far round it the camera has gone (0 … 1): lingering at its front at both ends, and still for the last tenth of a second before the cut, as the parade's is still as it opens. */
+function aroundAt(t: number): number {
+  const u = Math.max(0, Math.min(1, t / (BEATS.end - 0.1)));
+  const a = u ** EASE;
+  return a / (a + (1 - u) ** EASE);
+}
+/** How far round its front the camera is at a time (rad, + to its left): all the way round its right first (and, all the way round, exactly at its front, where the parade starts). */
 function roundAt(t: number): number {
   if (held && held.length >= 1) return (held[0] * Math.PI) / 180;
-  const drift = LENS.from + (LENS.to - LENS.from) * smoothstep(0.3, BEATS.front + 0.8, t);
-  return ((drift * (1 - backAt(t))) * Math.PI) / 180;
+  const k = aroundAt(t);
+  return k >= 1 ? 0 : -2 * Math.PI * k;
 }
+/** From a to b by k, landing on b itself at the end (the parade's own numbers, not a rounding off them). */
+const mix = (a: number, b: number, k: number): number => (k >= 1 ? b : a + (b - a) * k);
 function aim(t: number): void {
   const r = roundAt(t);
-  const k = backAt(t);
-  const e = ((held?.[1] ?? LENS.up[0] + (LENS.up[1] - LENS.up[0]) * (0.35 * smoothstep(0, BEATS.front, t) + 0.65 * k)) * Math.PI) / 180;
-  const d = held?.[2] ?? LENS.distance[0] + (LENS.distance[1] - LENS.distance[0]) * k;
-  camera.position.set(d * Math.cos(e) * Math.sin(r), LENS.at + d * Math.sin(e), d * Math.cos(e) * Math.cos(r));
-  camera.lookAt(0, LENS.at, 0);
+  const k = aroundAt(t);
+  const e = ((held?.[1] ?? mix(LENS.up[0], LENS.up[1], k)) * Math.PI) / 180;
+  const d = held?.[2] ?? mix(LENS.distance[0], LENS.distance[1], k);
+  const y = mix(LENS.at[0], LENS.at[1], k);
+  camera.position.set(d * Math.cos(e) * Math.sin(r), y + d * Math.sin(e), d * Math.cos(e) * Math.cos(r));
+  camera.lookAt(0, y, 0);
 }
 
 // ---- a moment ----
 
-/** Each front's height at a time (H): below its feet before it starts, over its crown once it is done. */
+/** Each front's height at a time (H): below its feet before it starts, over its crown (and what grows behind it) once it is done. */
 function frontAt(i: number, t: number): number {
   const f = FRONTS[i];
   const from = -f.ragged - 0.02;
-  const to = TOP + f.ragged + 6 * f.reach + 0.02;
+  const to = TOP + f.ragged + Math.max(6 * f.reach, f.rise) + 0.02;
   const u = Math.max(0, Math.min(1, (t - f.at) / f.take));
-  // (the generation's comes up steadily, easing in and out a little; a pass's sweeps)
-  const k = i === 0 ? 0.5 * u + 0.5 * smoothstep(0, 1, u) : smoothstep(0, 1, u);
+  // (the generation's comes up steadily, easing in and out a little; the others sweep)
+  const k = i === FRONT.gen ? 0.5 * u + 0.5 * smoothstep(0, 1, u) : smoothstep(0, 1, u);
   return from + (to - from) * k;
 }
 /** Whether a stage is anywhere on it at a time: its front has started, the next one not yet passed it all. */
 function shows(stage: number, t: number): boolean {
   const made = FRONTS[stage - 1];
-  const next = FRONTS[stage];
+  const next = FRONTS[stage] as (typeof FRONTS)[number] | undefined;
   return t >= made.at && (!next || t < next.at + next.take);
 }
 const tmp = new Vector3();
+const from = new Vector3();
+const along = new Vector3();
 const up = new Vector3(0, 1, 0);
-/** Everything at time t: the fronts, which looks draw, its pose and face, its bones and its fur. */
+/** Everything at time t: the fronts, which looks draw, its pose and face, its bones. */
 function pose(t: number): void {
   const fronts = film.uFronts.value as number[];
   FRONTS.forEach((_, i) => (fronts[i] = frontAt(i, t)));
@@ -619,64 +621,54 @@ function pose(t: number): void {
   const f = FRONTS[sweeping] ?? FRONTS[0];
   (film.uEdge.value as Vector4).set(sweeping, f.edge, f.core, f.reach);
   film.uCool.value = f.cool;
-  rawMesh.visible = shows(STAGE.generated, t) || shows(STAGE.triangles, t);
-  rawWire.visible = shows(STAGE.triangles, t);
+  rawMesh.visible = rawWire.visible = shows(STAGE.bare, t);
   looks.clay.visible = shows(STAGE.clay, t);
-  looks.rough.visible = shows(STAGE.rough, t);
-  looks.weights.visible = shows(STAGE.weights, t);
+  looks.weights.visible = shows(STAGE.weights, t) || shows(STAGE.bones, t);
   looks.colour.visible = shows(STAGE.colour, t);
-  caster.visible = t >= FRONTS[STAGE.clay - 1].at;
+  looks.colour.material = t >= FRONTS[FRONT.colour].at + FRONTS[FRONT.colour].take ? colourPlain : colourFilm;
+  caster.visible = t >= FRONTS[FRONT.clay].at;
   // (its shade on the floor as its feet come)
-  contactMaterial.opacity = smoothstep(0, 0.25, fronts[0]);
-  // alive from `walk`: its arms down out of the T-pose as it starts to walk, stopping at `stop`, turned to you as the camera comes round
+  contactMaterial.opacity = smoothstep(0, 0.25, fronts[FRONT.gen]);
+  // alive from `walk`: its arms down out of the T-pose as it starts to walk, on into the parade, turned to you while
+  // the camera is in front (as the parade has it); its clock the parade's, running up to its zero at the end
   const alive = smoothstep(BEATS.walk, BEATS.walk + ALIVE, t);
-  const walk = alive * (1 - smoothstep(BEATS.stop, BEATS.stop + 0.6, t));
+  const clock = t - BEATS.end;
   const r = roundAt(t);
   const yaw = Math.atan2(Math.sin(r), Math.cos(r));
-  const glance = (1 - smoothstep(0.45, 1.2, Math.abs(yaw))) * smoothstep(BEATS.front, BEATS.front + 0.8, t);
+  const glance = 1 - smoothstep(0.45, 1.2, Math.abs(yaw));
   const pitch = Math.atan2(camera.position.y - 0.78, Math.hypot(camera.position.x, camera.position.z));
-  rig.pose({ time: t, walk, stride: 1, gait: Math.max(0, t - BEATS.walk) * GAIT, wave: -1, lookYaw: yaw / 0.9, lookPitch: pitch, look: glance * alive, moves: [] });
-  if (alive >= 1) for (let j = 0; j < JOINTS; j++) skin[j].copy(rig.skin[j]);
-  else blend(alive);
-  if (alive >= 1) for (let j = 0; j < JOINTS; j++) rig.frameOf(j, frames[j]);
+  rig.pose({ time: clock, walk: alive, stride: 1, gait: clock * GAIT, wave: -1, lookYaw: yaw / 0.9, lookPitch: pitch, look: glance * alive, moves: [] });
+  if (alive >= 1) {
+    for (let j = 0; j < JOINTS; j++) {
+      skin[j].copy(rig.skin[j]);
+      rig.frameOf(j, frames[j]);
+    }
+  } else blend(alive);
   // (the correctives the rig's pose calls for, as far as it has come out of the T-pose: none in it)
   raise.set(rig.raised * alive, rig.raisedRight * alive, rig.hung * alive, rig.hungRight * alive);
-  // happy eyes (∩) once it has stopped, turned to you
-  const happy = glance * smoothstep(BEATS.stop, BEATS.stop + 0.6, t);
-  face.set(rig.eyes, rig.smile, rig.squint + (1 - rig.squint) * happy, rig.squeeze);
-  mood.set(rig.blush + (0.35 - rig.blush) * happy, 0, 0, 0);
-  time.value = t;
-  // its fur growing from `fur`
-  const fur = smoothstep(BEATS.fur, BEATS.fur + FUR_GROWS, t);
-  furSize.y = (FUR_LENGTH / MUSE_HEIGHT) * fur;
-  grown.value = fur;
-  looks.colour.geometry.instanceCount = fur > 0.002 ? SHELLS + 1 : 1;
-  // its bones: each joint popping in from the root out at `bones`, each rod growing out from its parent; gone from `fur`
-  const go = 1 - smoothstep(BEATS.fur, BEATS.fur + BONES.go, t);
-  boneMaterial.opacity = 0.95 * go;
-  boneRim.opacity = 0.85 * go;
+  face.set(rig.eyes, rig.smile, rig.squint, rig.squeeze);
+  mood.set(rig.blush, 0, 0, 0);
+  time.value = clock;
+  // its bones: drawn where the bones' front has passed and the last one not yet, each joint flashing as one passes it
+  boneIn.constant = fronts[FRONT.bones];
+  boneOut.constant = -fronts[FRONT.colour];
+  const passing = sweeping === FRONT.bones || sweeping === FRONT.colour ? fronts[sweeping] : null;
   for (let j = 0; j < JOINTS; j++) {
-    const s = BEATS.bones + (DEPTH[j] / DEEPEST) * BONES.show * 0.7;
-    const pop = smoothstep(s, s + 0.18, t);
-    const size = go > 0 ? pop * (1 + 0.35 * Math.sin(Math.PI * smoothstep(s, s + 0.26, t))) : 0;
     const at = tmp.setFromMatrixPosition(frames[j]);
     balls[j].ball.position.copy(at);
     balls[j].rim.position.copy(at);
-    balls[j].ball.scale.setScalar(Math.max(1e-4, size));
-    balls[j].rim.scale.setScalar(Math.max(1e-4, size));
-    balls[j].ball.visible = balls[j].rim.visible = size > 0.001;
+    const flash = passing === null ? 0 : Math.exp(-Math.abs(at.y - passing) / 0.05);
+    balls[j].ball.material.color.copy(MAGENTA).lerp(FLASH, flash);
     const rod = rods[j];
     if (!rod) continue;
-    const p = PARENT[j];
-    const from = new Vector3().setFromMatrixPosition(frames[p]);
-    const grow = smoothstep(s - 0.05, s + 0.22, t);
-    const to = from.clone().lerp(at, grow);
-    const d = to.clone().sub(from);
-    rod.visible = go > 0 && d.length() > 1e-4;
+    from.setFromMatrixPosition(frames[PARENT[j]]);
+    along.subVectors(at, from);
+    const length = along.length();
+    rod.visible = length > 1e-4;
     if (!rod.visible) continue;
-    rod.position.copy(from).addScaledVector(d, 0.5);
-    rod.quaternion.setFromUnitVectors(up, d.clone().normalize());
-    rod.scale.set(1, d.length(), 1);
+    rod.position.copy(from).addScaledVector(along, 0.5);
+    rod.quaternion.setFromUnitVectors(up, along.normalize());
+    rod.scale.set(1, length, 1);
   }
 }
 
@@ -798,7 +790,7 @@ const api = {
   length: BEATS.end,
   beats: BEATS,
   frame,
-  /** The stage under each joint now, and how far round the camera is (°): for checking. */
+  /** How far round the camera is (°) and each front's height (H) at a time: for checking. */
   at: (t: number) => ({ round: (roundAt(t) * 180) / Math.PI, fronts: FRONTS.map((_, i) => frontAt(i, t)) }),
   rig,
   joints: JOINT,

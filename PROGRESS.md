@@ -32,43 +32,61 @@ as the latest alone (a fix between iterations).
 
 ## The making of Muse: a shot for the demo film (2026-11-04, in the lab)
 
-Kai asked for a clip of the original Muse alone, showing how it was made. Its untextured mesh is generated in, in its
-own T-pose, with the blue wave from the hut-interior film. Then triangles, clay, rough, weights, and the bones (it walks
-now). Then colour, the bones taken off and the fur added, and the camera turning back to the front. It is
-`src/dev/museLab.html#making=1` (`src/dev/museMaking.ts`), 12.3 s on the lab's white.
+Kai asked for a clip of the original Muse alone, showing how it was made, with the blue wave from the hut-interior
+film. `src/dev/museLab.html#making=1` (`src/dev/museMaking.ts`), 9.8 s on the lab's white. It ends on the parade's
+first frame, so the two cut together on the match (Kai: this clip cuts to the parade).
 
-- **The stages:** each is made by a front sweeping up the body in rest space, so a pass stays on the skin once Muse
-  walks. A point's stage is how many fronts have passed it, and each look draws only its own stage.
-  - **Generated (0.2–2.5 s):** the sculpt's file as exported, untextured: Tripo's mesh with its sculpted eyes, scaled
-    to 1 m as the rig fits it, in the lab's rawclay grey. The front is the hut film's (hut.frag.glsl FILM in that
-    session's worktree): ragged ±0.12 m, a 6 mm white-blue core, 6 cm of blue glow cooling into the grey. On the
-    lab's white the hollow inside showed the background through the cut, and shaded it read as a bowl. So the inside
-    is one flat glowing blue, and the cut reads as a solid cross-section.
-  - **Triangles (from 2.8 s):** the same file with flat faces and its wire.
-  - **Clay (3.8 s):** the skin as rigged takes over from the file: refined, its coat inset, the face plate smooth.
-  - **Rough (4.8 s), weights (5.8 s):** the lab's looks, computed at rest.
-  - **Colour (8.9 s):** Muse's own shaders, the bare skin first.
+- **Kai's second notes (the first take had triangles, rough and a camera drifting to a three-quarter view and back):**
+  - It must be a whole 360° orbit, since the drift there and back read as unresolved.
+  - The blue front looked sleek, so every change now comes in behind one, the fur included.
+  - The bare mesh comes first, then the clay, and the rough heat map is left out.
+  - I read "bare mesh" as the mesh's triangles: the generation brings in the wired mesh, with no plain grey stage
+    before it.
+- **The stages:** each one is made by a front sweeping up the body in rest space, so a pass stays on the skin once
+  Muse walks. A point's stage is how many fronts have passed it, and each look draws only its own stages.
+  - **Bare mesh (0.25–2.55 s):** the sculpt's file as exported, untextured: Tripo's mesh with its sculpted eyes, its
+    triangles flat and its wire on them, scaled to 1 m as the rig fits it, in the lab's rawclay grey.
+    - The front is the hut film's (hut.frag.glsl FILM in that session's worktree): ragged ±0.12 m, a 6 mm
+      white-blue core, 6 cm of blue glow cooling into the grey.
+    - On the lab's white the hollow inside showed the background through the cut, and shaded it read as a bowl. So
+      the inside is one flat glowing blue, and the cut reads as a solid cross-section.
+  - **Clay (2.85 s):** the skin as rigged takes over from the file: refined, its coat inset, the face plate smooth.
+  - **Weights (3.75 s):** the lab's look.
+  - **Bones (4.65 s):** a ball at each joint and a rod to its parent, drawn over the body in the lab's magenta. They are
+    cut by the front as it comes up (clipping planes), and each joint flashes the edge's blue-white as it passes.
+  - **Colour and fur (7.2 s, 1 s long):** Muse's own shaders. The fur grows in behind the front, from nothing at the
+    line to full length 0.3 m behind it, and its tips lighten as it grows (otherwise it flashes on). The bones are cut
+    away below the line as it climbs.
   - The passes' line is thinner than the generation's: ±0.025 m, 3.5 cm of glow.
-- **Bones (from 6.75 s):** a ball at each joint and a rod to its parent, drawn over the body in the lab's magenta. They
-  pop in from the pelvis out, and fade from 9.5 s.
-- **It walks (from 7.5 s):** it comes out of the T-pose over 0.9 s as its legs start stepping. Each joint's turn from its
+- **It walks (from 5.45 s):** it comes out of the T-pose over 0.9 s as its legs start stepping. Each joint's turn from its
   parent is slerped from rest and chained down the skeleton, so the arms come down in arcs. At full strength the blend
-  matches the rig's own pose to 1e-16. It stops at 11.2 s, turned to you, with happy eyes (∩) and a blush.
-- **The fur (9.5–10.5 s):** it grows to full length. Its tips lighten as it grows, because shells drawn with full-length
-  tips made the whole body brighten in a single frame.
-- **The camera:** it drifts round Muse's left from 30° to 62° while Muse is made, and comes back to the front from
-  9.9 s (power-3 ease). At first it went on to the profile, but there the bones overlapped.
-- **The hash:** `beats=gen,tris,clay,rough,weights,bones,walk,colour,fur,front,stop,end`, `cam=round,up,distance`,
-  `live=1`.
+  matches the rig's own pose to 1e-16. It walks on into the parade.
+- **The camera:** once round, from Muse's right, behind it, round its left, using the parade's curve u^p / (u^p + (1 − u)^p).
+  - The power is 3 (`ease=`), not the parade's 5, which would whip round behind just as the bones come in.
+  - The bare mesh is seen from the front, the clay from its right, the weights and the bones from behind, the walk
+    from its left, and the colour and fur from the front.
+  - The camera lands in front 0.1 s before the end and holds still.
+- **The match to the parade:** the clip ends on the parade's opening at its defaults.
+  - The view matches: 2.95 m out, 6° up, looking at 0.56 m. So do the walk's pace (1 cycle a second) and phase, the
+    look at you, the light and the floor.
+  - Muse's clock runs up to the parade's zero. Once the last front is done, Muse is drawn with the parade's own
+    unmodified shaders, and its shadow with the parade's caster.
+  - A single render of the clip at 9.8 s is pixel-identical to the parade's at 0. With 16 jittered samples the two
+    differ in 0.016 % of the pixels, single fur tips. The parade against itself differs in 22 pixels across two page
+    loads, so this is the same noise.
+  - Across the join (`shots/making/making-then-parade-1080p.mp4`), the change between frames is 0.410: its neighbours
+    are 0.399 and 0.409, and a real cut (the parade's own Momo to muse0) is 10.65.
+- **The hash:** `beats=gen,clay,weights,bones,walk,colour,end`, `ease=`, `cam=round,up,distance`, `live=1`.
 - **Muse's shaders are unchanged.** The film adds its code to their source inside the scene, and each piece it hooks
   onto is checked to occur exactly once. So the meadow and the lab draw as before.
-- **Rendering:** `node tools/workflows/muse-look/scripts/making.mjs out.mp4 1920 1080 30 16` takes about 40 s.
-  `lib.mjs filmLab` now films both lab scenes, so `parade.mjs` is a one-liner on it with its command unchanged.
+- **Rendering:** `node tools/workflows/muse-look/scripts/making.mjs out.mp4 1920 1080 30 16` takes about 30 s.
+  `lib.mjs filmLab` films both lab scenes, so `parade.mjs` is a one-liner on it with its command unchanged.
 - **Checked:**
-  - The film is 369 frames at 1080p, in `shots/making/` (gitignored).
-  - A scan of the change between frames finds no pop. The only one, at the fur's start, is fixed.
-  - Contact sheets were read through every stage, plus full-size frames of the generation, the triangles, the
-    colour pass and the end.
+  - The film is 294 frames at 1080p, in `shots/making/` (gitignored), with the first take beside it as `-take1`.
+  - A scan of the change between frames finds no pop.
+  - Contact sheets were read through every stage, plus full-size frames of the bones' and the colour's sweeps.
+  - Blue specks on the fur's outline during the colour sweep are fixed. They were the fur shells' back faces, painted
+    as a cut's inside.
 
 ## The muses' parade: a shot for the demo film (2026-11-04, in the lab)
 
