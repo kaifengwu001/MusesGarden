@@ -148,7 +148,9 @@ export function createWorkshop(deps: WorkshopDeps): WorkshopRuntime {
     } catch {
       // keep the default
     }
-    return (deps.now() + Math.max(0, ms)) as Instant;
+    // (counted from when its stage began, so it doesn't drift as it's asked again; a stage running long is nearly
+    // done, so never sooner than a minute from now)
+    return Math.max(deps.now() + 60_000, job.updatedAt + Math.max(0, ms)) as Instant;
   };
 
   /**

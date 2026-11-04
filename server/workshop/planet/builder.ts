@@ -2,8 +2,9 @@
 // own folder, headless:
 //   muse exec --api-key-stdin --model muse-spark-1.3 --reasoning-effort low --workspace <folder> --prompt-file <file> --json
 // A headless workspace is untrusted, so Muse Code doesn't read the folder's AGENTS.md: every instruction goes in the
-// prompt file, and AGENTS.md is written beside the planet only for the record. Around a run: what changed outside the
-// folder is put back (and the run counts as failed), and the fork is type-checked.
+// prompt file, and AGENTS.md is written beside the planet only for the record. Its sandbox writes only inside that
+// folder; around a run, what changed outside it is noted (never undone: it is someone else's) and the fork is
+// type-checked.
 import { execFile, spawn, type ExecFileException } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';

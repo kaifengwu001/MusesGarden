@@ -376,13 +376,14 @@ describe('notes answered by the builder', { timeout: 30_000 }, () => {
     expect(readFileSync(join(run.io.dir, 'typecheck-1.log'), 'utf8')).toBe('broken.ts: error TS2322: no');
   });
 
-  it('undoes a run that strays outside the planet, and retunes the recipe instead', async () => {
+  it('keeps the planet’s work when files outside it change during a run, and leaves those alone', async () => {
+    // (someone else's work in progress: Muse Code's sandbox writes only in its folder)
     const builder: Builder = {
       available: () => Promise.resolve(true),
       run: ({ workspace }) => {
         writeFileSync(join(workspace, 'shore.ts'), 'export const SHORE = 1;\n');
         writeFileSync(join(repo, 'README.md'), 'changed\n');
-        writeFileSync(join(repo, 'stray.ts'), 'oops\n');
+        writeFileSync(join(repo, 'stray.ts'), 'mine\n');
         return Promise.resolve({ ok: true, log: '' });
       },
     };
@@ -390,11 +391,9 @@ describe('notes answered by the builder', { timeout: 30_000 }, () => {
     await toFirstDraft(run);
     answer(run, { notes: [{ text: 'paler' }] });
     await runOn(run);
-    expect(readFileSync(join(repo, 'README.md'), 'utf8')).toBe('hello\n');
-    expect(existsSync(join(repo, 'stray.ts'))).toBe(false);
-    expect(existsSync(join(run.io.dir, 'outside-1/stray.ts'))).toBe(true);
-    expect(existsSync(join(repo, 'environments/muse-test/shore.ts'))).toBe(false);
-    expect(run.job.packet?.text).toMatch(/changed files outside the planet \((README\.md, stray\.ts|stray\.ts, README\.md)\), so its work was undone; instead, The sky is paler/);
-    expect(JSON.parse(readFileSync(join(repo, 'environments/muse-test/recipe.json'), 'utf8'))).toMatchObject({ params: { grass: { height: 0.2 } } });
+    expect(readFileSync(join(repo, 'README.md'), 'utf8')).toBe('changed\n');
+    expect(readFileSync(join(repo, 'stray.ts'), 'utf8')).toBe('mine\n');
+    expect(readFileSync(join(repo, 'environments/muse-test/shore.ts'), 'utf8')).toBe('export const SHORE = 1;\n');
+    expect(run.job.packet?.text).not.toMatch(/undone/);
   });
 });

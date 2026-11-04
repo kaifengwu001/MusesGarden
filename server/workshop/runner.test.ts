@@ -75,7 +75,7 @@ function twoStage(kind: JobKind, trace: Trace, extra: Partial<Pipeline> = {}): P
       if (verdict.notes?.length) return { ok: true, stage: 'draft', data: { ...job.data, notes: verdict.notes } };
       return { ok: false, error: 'Approve it, or send notes.' };
     },
-    estimateMs: (stage) => (stage === 'draft' ? 30_000 : 1_000),
+    estimateMs: (stage) => (stage === 'draft' ? 90_000 : 1_000),
     ...extra,
   };
 }
@@ -149,7 +149,7 @@ describe('the workshop runner', () => {
     const { workshop } = setup({ trace: { steps: [], gate: gate.promise, gated: ['draft'] } });
     const job = await started(workshop);
     await new Promise((r) => setTimeout(r, 20));
-    expect(workshop.job(PIP, job.id)).toMatchObject({ state: 'working', stage: 'draft', nextRoundAt: T0 + 30_000 });
+    expect(workshop.job(PIP, job.id)).toMatchObject({ state: 'working', stage: 'draft', nextRoundAt: T0 + 90_000 });
     gate.resolve();
     await workshop.idle();
   });
@@ -283,7 +283,8 @@ describe('the workshop runner', () => {
     const gate = deferred();
     const { workshop } = setup({ trace: { steps: [], gate: gate.promise, gated: ['sketch'] } });
     const job = await started(workshop);
-    expect(await workshop.review(PIP, job.id, { approve: true })).toMatchObject({ ok: false, status: 409, retryAfter: T0 + 1_000 });
+    // (a stage's estimate counts from when it began, and is never sooner than a minute away)
+    expect(await workshop.review(PIP, job.id, { approve: true })).toMatchObject({ ok: false, status: 409, retryAfter: T0 + 60_000 });
     gate.resolve();
     await workshop.idle();
     expect(await workshop.review(MOSS, job.id, { approve: true })).toMatchObject({ ok: false, status: 404 });

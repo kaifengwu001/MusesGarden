@@ -18,7 +18,6 @@ import {
   changesOutside,
   newErrors,
   restoreFork,
-  revertOutside,
   snapshotFork,
   typecheckFork,
   type TypeCheck,
@@ -363,7 +362,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
     };
   }
 
-  /** Muse Code on the fork, undone when it strays outside it, stops short, or leaves the fork not type-checking. */
+  /** Muse Code on the fork, undone when it stops short or leaves the fork not type-checking. */
   async function build(io: StageIO, dir: string, contract: Contract, notes: readonly string[], draft: number, title: string): Promise<{ ok: true } | { ok: false; why: string }> {
     const snapshot = join(io.dir, `fork-before-${draft + 1}`);
     snapshotFork(dir, snapshot);
@@ -376,11 +375,14 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
       timeoutMs: BUILDER_TIMEOUT_MS,
     });
     writeFileSync(join(io.dir, `builder-${draft}.log`), result.log);
+    // Muse Code's sandbox writes only inside its workspace (the fork), so a file outside it that changed while it ran
+    // is someone else's work in progress: noted and left alone. (Undoing it once threw away both that work and the
+    // planet's answer to Blu's notes.)
     const after = await changesOutside(io.repo);
-    const { reverted } = await revertOutside(io.repo, before, after, join(io.dir, `outside-${draft}`));
+    const outside = [...after].filter(([path, now]) => before.get(path) !== now).map(([path]) => path);
+    if (outside.length) io.log(`files outside the planet changed while Muse Code ran, left alone: ${outside.slice(0, 5).join(', ')}`);
     let why = '';
-    if (reverted.length) why = `Muse Code changed files outside the planet (${reverted.slice(0, 5).join(', ')}), so its work was undone`;
-    else if (!result.ok) why = 'Muse Code stopped before it finished, so its work was undone';
+    if (!result.ok) why = 'Muse Code stopped before it finished, so its work was undone';
     else {
       const added = newErrors(typesBefore, await typecheck(io.repo, dir));
       if (added.length) {
@@ -533,7 +535,8 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
         case 'render':
           return 240_000;
         case 'revise':
-          return 300_000;
+          // (Muse Code answering notes, then the draft's stills: Blu's first round took 35 minutes)
+          return 2_220_000;
         default:
           return 10_000;
       }
