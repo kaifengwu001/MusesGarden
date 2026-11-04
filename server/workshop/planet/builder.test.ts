@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { agentsMd, museCodeBuilder } from './builder';
+import { agentsMd, museCodeBuilder, museSummary } from './builder';
 
 const tmp = mkdtempSync(join(tmpdir(), 'planet-builder-test-'));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -68,4 +68,15 @@ describe('Muse Code as the builder', () => {
     expect(out.ok).toBe(false);
     expect(out.log).toMatch(/^stopped after/);
   }, 20_000);
+});
+
+describe('museSummary', () => {
+  it('takes the builder’s last “For the Muse:” line, in plain words', () => {
+    const log = [
+      JSON.stringify({ type: 'item', text: 'Looking at terrain.ts' }),
+      JSON.stringify({ type: 'item', item: { text: 'Done.\n\nFor the Muse: The long lakes are gone; one **round pond** sits beside your cottage.\nA knoll rises past its far side.\n\nVerification: tsc clean.' } }),
+    ].join('\n');
+    expect(museSummary(log)).toBe('The long lakes are gone; one round pond sits beside your cottage. A knoll rises past its far side.');
+    expect(museSummary(JSON.stringify({ text: 'no summary' }))).toBeNull();
+  });
 });

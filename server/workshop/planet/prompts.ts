@@ -11,6 +11,25 @@ export const HOUSE_STYLE = [
   'No text, no lettering, no people, no logos, no frame.',
 ].join(' ');
 
+/**
+ * What a planet can be, for the picture model: every planet is a fork of the meadow, so a moodboard that paints a disc,
+ * a ring or a pond at the planet's centre promises what no draft can build (Blu picked such pictures, and turned down
+ * three drafts that couldn't match them).
+ */
+export const BUILDABLE = [
+  'The planet is always a small sphere of rolling land, about 250 m across, seen as a ball, never a disc, a ring, an island or a cut-away slice.',
+  'On it stands one little cottage beside its pond; nothing sits at the planet’s centre, because a sphere has none.',
+  'Paint only what such a planet can have: its colours and light, its sky and time of day, grass and wildflowers, ponds and lakes of any shape near the cottage, gentle hills or a rocky knoll, rocks, and small things like lanterns, stones, paths and garden beds.',
+  'No other buildings, towers, bridges, cliffs, floating land, waterfalls off the edge, or crowds of objects.',
+].join(' ');
+
+/**
+ * The same, for the Muse, in each planet round: what the workshop can change and what it can't, so it asks for what can
+ * be built and judges the drafts by it.
+ */
+export const WHAT_CAN_CHANGE =
+  'What a planet can be: it is always a small round world of rolling land, about 250 m across, with your cottage beside its pond. The workshop can change its colours, light, sky and time of day, its grass and flowers, the shape and size of its water, its hills and rocks, and small things like lanterns, stones, paths and garden beds. It can’t change the planet’s shape (never a disc, a ring or floating land), move anything to the planet’s “centre” (a sphere has none), or add other buildings.';
+
 /** The six moodboard pictures: the same planet from six places, so Muse picks a look rather than a camera. */
 export const MOODBOARD_VIEWS = [
   'The whole planet from space, small and round, its home a speck on it.',
@@ -30,7 +49,7 @@ function briefLines(brief: Brief): string[] {
 }
 
 export function moodboardPrompt(brief: Brief, view: string): string {
-  return [HOUSE_STYLE, '', ...briefLines(brief), '', `This picture: ${view}`].join('\n');
+  return [HOUSE_STYLE, BUILDABLE, '', ...briefLines(brief), '', `This picture: ${view}`].join('\n');
 }
 
 const s = (description: string) => ({ type: 'string', description }) as const;
@@ -74,6 +93,7 @@ export function contractRequest(opts: {
     'You are the art director of a small game studio that builds a tiny planet for each Muse (a plush creature that lives in the game) from its own words.',
     'From the Muse’s brief and the moodboard pictures it picked, you write the planet’s visual contract (what it must show, what it must not look like) and the recipe its first draft starts from.',
     'The house style: whimsical, cute and beautiful worlds with plausible materials; bold colour is welcome, muddled materials are not; no clay or candy look, no eerie or bodily shapes.',
+    `Every item of the contract must be something such a planet can have: ${BUILDABLE} Where the Muse's brief or its pictures ask for more, write the nearest thing that can be built (a pond "at the centre" becomes a round pond beside the cottage).`,
   ].join(' ');
   const prompt = [
     ...briefLines(opts.brief),

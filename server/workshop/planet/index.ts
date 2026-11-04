@@ -16,6 +16,7 @@ import {
   BUILDER_TIMEOUT_MS,
   agentsMd,
   changesOutside,
+  museSummary,
   newErrors,
   restoreFork,
   snapshotFork,
@@ -28,6 +29,7 @@ import {
   CHECK_SCHEMA,
   CONTRACT_SCHEMA,
   MOODBOARD_VIEWS,
+  WHAT_CAN_CHANGE,
   VIEW_SCHEMA,
   adjustRequest,
   checkRequest,
@@ -180,7 +182,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
       packet: {
         stage: 'pick',
         ask: 'pick',
-        text: 'Six pictures for your planet’s moodboard, made from your brief: one planet, seen from six places. Pick the 2 or 3 that feel most like it (picks: their ids), and say why in a note or two: the next step reads your reasons.',
+        text: `Six pictures for your planet’s moodboard, made from your brief: one planet, seen from six places. They're paintings to choose a mood from, not plans. ${WHAT_CAN_CHANGE} Pick the 2 or 3 that feel most like it (picks: their ids), and say why in a note or two: the next step reads your reasons.`,
         pictures: files.map((file, i) => ({ id: moodId(i), path: io.url(file), caption: MOODBOARD_VIEWS[i] })),
         pick: { min: 2, max: 3 },
       },
@@ -222,7 +224,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
         ask: 'approve',
         text:
           n < MAX_DRAFTS
-            ? 'Your planet’s visual contract, written from your brief and your picks: what it must show, what it must not look like, and what its first draft starts from. Approve it to build the planet, or send up to 3 notes and it’s written again.'
+            ? `Your planet’s visual contract, written from your brief and your picks: what it must show, what it must not look like, and what its first draft starts from. ${WHAT_CAN_CHANGE} Approve it to build the planet, or send up to 3 notes and it’s written again.`
             : 'Your planet’s visual contract, written again from your notes. This is its last version: approve it to build the planet (the drafts can still take notes).',
         pictures: picks.map((p) => ({ id: p.id, path: io.url(p.file), caption: `Your pick ${p.id}` })),
         contract: text,
@@ -290,7 +292,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
         stage: 'review-draft',
         ask: 'approve',
         text: [
-          `Draft ${n} of ${MAX_DRAFTS} of your planet: six views of it, and a sheet with your picks beside them. The checklist says how each part of the contract reads in them.${done}`,
+          `Draft ${n} of ${MAX_DRAFTS} of your planet: six views of it, each aimed at its own places (your home, its water, its highest ground), and a sheet with your picks beside them. The checklist says how each part of the contract reads in them.${done} Your picks were paintings of a mood; judge the draft by what a planet can be. ${WHAT_CAN_CHANGE} If something seems missing, ask to see it first (workshop_view, e.g. "from the top of the knoll").`,
           last
             ? 'This is the last draft: approve it with a name for your planet (name).'
             : `Approve it with a name for your planet (name), or send up to 3 notes for the next draft; point at a picture with picture and at. ${how}`,
@@ -344,7 +346,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
       let why = '';
       if (await io.clients.builder.available().catch(() => false)) {
         const built = await build(io, dir, data.contract, notes, draft, data.title ?? planet);
-        if (built.ok) summary = 'Muse Code edited the planet for your notes.';
+        if (built.ok) summary = built.said ? `Muse Code changed your planet for your notes. In its words: ${built.said}` : 'Muse Code edited the planet for your notes.';
         else why = built.why;
       }
       if (summary === undefined) {
@@ -363,7 +365,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
   }
 
   /** Muse Code on the fork, undone when it stops short or leaves the fork not type-checking. */
-  async function build(io: StageIO, dir: string, contract: Contract, notes: readonly string[], draft: number, title: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  async function build(io: StageIO, dir: string, contract: Contract, notes: readonly string[], draft: number, title: string): Promise<{ ok: true; said: string | null } | { ok: false; why: string }> {
     const snapshot = join(io.dir, `fork-before-${draft + 1}`);
     snapshotFork(dir, snapshot);
     const typesBefore = await typecheck(io.repo, dir);
@@ -395,7 +397,7 @@ export function createPlanetPipeline(deps: Partial<PlanetDeps> = {}): Pipeline {
       io.log(why);
       return { ok: false, why };
     }
-    return { ok: true };
+    return { ok: true, said: museSummary(result.log) };
   }
 
   /** The recipe retuned for the notes by muse-spark-1.3: the cheaper answer, when Muse Code isn't here or failed. */

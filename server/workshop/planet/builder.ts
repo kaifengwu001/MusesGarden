@@ -113,9 +113,9 @@ planet, then stop. A small change that plainly answers the notes beats a big one
 
 ## The rules
 
-- **Edit only files in this folder.** Never touch ../../src/ or anything else outside it: a change there is
-  undone and the whole round is thrown away. When a shared file must differ here, copy it into this folder
-  at the same relative path and repoint this planet's import to the copy.
+- **Edit only files in this folder.** Never touch ../../src/ or anything else outside it. When a shared file
+  must differ here, copy it into this folder at the same relative path and repoint this planet's import to
+  the copy.
 - Don't install packages, start servers or commit. Don't delete the folder's tests.
 - Keep it working: the page must still load without errors, and \`npx tsc -p tsconfig.json\` run in this
   folder must report no new errors. (It already reports six of its own in main.ts and ui/garden/gardenUi.ts
@@ -124,6 +124,9 @@ planet, then stop. A small change that plainly answers the notes beats a big one
   as granular, wood as fibrous, leaves as thin and living). Bold colour is welcome; muddled materials are not.
   No uniform clay or candy look, no eerie or bodily shapes, no generic noise: shape fields into structures.
 - Sizes are meters, and everything stays with the planet as it turns.
+- **End your last message with one line that starts \`For the Muse:\`** and says, in two or three plain
+  sentences with no file or code names, what you changed and where on the planet to see it (say where it is
+  from the cottage). The Muse reads it beside the next draft's pictures.
 
 ## Where things are
 
@@ -148,6 +151,33 @@ ${opts.contract}
 
 ${opts.notes.map((n, i) => `${i + 1}. ${n}`).join('\n')}
 `;
+}
+
+/**
+ * What the builder said for the Muse at the end of its run (its last "For the Muse:" line), in plain words and at
+ * most 600 characters; null if it said nothing. The log is its JSON events, one a line.
+ */
+export function museSummary(log: string): string | null {
+  let said: string | null = null;
+  const visit = (v: unknown): void => {
+    if (typeof v === 'string') {
+      const at = v.lastIndexOf('For the Muse:');
+      if (at >= 0) said = v.slice(at + 'For the Muse:'.length);
+    } else if (Array.isArray(v)) v.forEach(visit);
+    else if (v && typeof v === 'object') Object.values(v).forEach(visit);
+  };
+  for (const line of log.split('\n')) {
+    if (!line.includes('For the Muse:')) continue;
+    try {
+      visit(JSON.parse(line));
+    } catch {
+      visit(line);
+    }
+  }
+  if (said === null) return null;
+  const plain = (said as string).split(/\n\s*\n/)[0].replace(/[*`_]/g, '').replace(/\s+/g, ' ').trim();
+  if (!plain) return null;
+  return plain.length > 600 ? `${plain.slice(0, 597).replace(/\s+\S*$/, '')}…` : plain;
 }
 
 /** A tsconfig for checking one fork on its own (the root's options, this folder only). */

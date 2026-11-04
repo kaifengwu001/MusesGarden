@@ -298,7 +298,7 @@ describe('the planet pipeline under fakes', { timeout: 30_000 }, () => {
     expect(run.renders.at(-1)?.shots).toEqual(['home']);
     expect(run.renders.at(-1)?.hash).toBe(`seed=${String(run.job.data.worldSeed)}&tod=18.6`);
     const second = await view(run.job, 'the whole planet from orbit', run.io);
-    expect(second).toMatchObject({ ok: true, picture: { id: 'v2', caption: 'The whole planet from orbit' } });
+    expect(second).toMatchObject({ ok: true, picture: { id: 'v2', caption: 'The whole planet from orbit, your home in the middle' } });
     expect(await view(run.job, 'the inside of the teapot', run.io)).toMatchObject({ ok: false });
   });
 

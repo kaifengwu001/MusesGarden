@@ -6,7 +6,10 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 
-/** One shot, as look.mjs takes it: a preset or a pose, with the tilt, field of view and turn pinned. */
+/**
+ * One shot, as look.mjs takes it: a preset or a pose, with the tilt, field of view and turn pinned; `js` runs in the
+ * page after that and before the picture is taken (here: aiming the camera at the planet's own places).
+ */
 export interface Shot {
   readonly name: string;
   readonly hash?: string;
@@ -15,6 +18,50 @@ export interface Shot {
   readonly tilt?: number;
   readonly fov?: number;
   readonly turn?: number;
+  readonly js?: string;
+}
+
+/**
+ * Page code (window.__world, on the dev server) that aims the camera at this planet's own places, found on its land:
+ * its home, the highest ground within 90 m of it (a hill or knoll a Muse asked for) and the lowest (where its water
+ * gathers). The fixed poses framed the same spot of every planet, which on Blu's showed neither its pond nor its
+ * knoll, so a Muse took them for missing. Without a world the shot keeps its pose.
+ */
+function aim(at: 'orbit' | 'overview' | 'high' | 'water'): string {
+  return `(() => {
+  const w = window.__world;
+  if (!w || !w.rig || !w.terrain || !w.terrain.layout) return 'kept its pose: no world on the page';
+  const L = w.terrain.layout, R = (w.growth && w.growth.radius) || 128, rig = w.rig;
+  const home = L.cottage.clone().normalize();
+  const tangent = (p, q) => q.clone().addScaledVector(p, -q.dot(p)).normalize();
+  const travel = (p, t, a) => p.clone().multiplyScalar(Math.cos(a)).addScaledVector(t, Math.sin(a)).normalize();
+  const north = tangent(home, L.homeBearing);
+  const east = north.clone().cross(home).normalize();
+  let hi = home, hiH = -Infinity, lo = home, loH = Infinity;
+  for (let k = 0; k < 48; k++) {
+    const a = (k / 48) * Math.PI * 2;
+    const t = north.clone().multiplyScalar(Math.cos(a)).addScaledVector(east, Math.sin(a));
+    for (let d = 15; d <= 90; d += 5) {
+      const p = travel(home, t, d / R);
+      const h = w.terrain.height(p);
+      if (h > hiH) { hiH = h; hi = p; }
+      if (h < loH) { loH = h; lo = p; }
+    }
+  }
+  const at = ${JSON.stringify(at)};
+  if (at === 'orbit') { rig.lookAlong(home, tangent(home, hi), true); rig.setZoom(0, true); }
+  if (at === 'overview') { const back = travel(home, tangent(home, hi), -30 / R); rig.lookAlong(back, tangent(back, hi), true); rig.setZoom(rig.zoomForAltitude(45), true); }
+  if (at === 'high') { rig.lookAlong(hi, tangent(hi, home), true); rig.setZoom(rig.zoomForAltitude(4), true); }
+  if (at === 'water') {
+    // (on the shore away from the home, looking back across the water at it)
+    const away = tangent(lo, home).negate();
+    let shore = lo;
+    for (let d = 2; d <= 40; d += 2) { shore = travel(lo, away, d / R); if (w.terrain.height(shore) > loH + 1.5) break; }
+    rig.lookAlong(shore, tangent(shore, home), true); rig.setZoom(rig.zoomForAltitude(1.6), true);
+  }
+  if (w.markPosed) w.markPosed();
+  return 'aimed: high ground ' + (hiH - w.terrain.height(home)).toFixed(1) + ' m over the home, water ' + (loH - w.terrain.height(home)).toFixed(1) + ' m';
+})()`;
 }
 
 export interface View extends Shot {
@@ -25,16 +72,17 @@ export interface View extends Shot {
 }
 
 /**
- * The six views of a draft. The poses are the meadow's standard views (drive-app views/meadow.json), which frame the
- * same spots of any seed's planet; the vista and the home are presets, which find them on the planet's own layout.
+ * The six views of a draft, every one on this planet's own places: the orbit, the bird's-eye view, the high ground
+ * and the water's edge are aimed by `aim` (the poses are the meadow's standard views, kept for a page without a world);
+ * the vista and the home are presets, which find them on the planet's own layout.
  */
 export const VIEWS: readonly View[] = [
-  { name: 'orbit', caption: 'The whole planet from orbit', pose: '-0.426,0.3515,0.2406,0.7982,0', tilt: 0, fov: 35, cards: ['beyond'] },
-  { name: 'birds-eye', caption: 'A bird’s-eye view, 70 m up', pose: '-0.426,0.3515,0.2406,0.7982,0.35', tilt: 14, fov: 35.3, cards: ['scenery'] },
-  { name: 'standing', caption: 'Standing on a rise, 4 m up', pose: '-0.426,0.3515,0.2406,0.7982,0.8301', tilt: 80, fov: 52, cards: ['scenery'] },
+  { name: 'orbit', caption: 'The whole planet from orbit, your home in the middle', pose: '-0.426,0.3515,0.2406,0.7982,0', tilt: 0, fov: 35, js: aim('orbit'), cards: ['beyond'] },
+  { name: 'birds-eye', caption: 'From the air behind your home, looking over it toward the high ground', pose: '-0.426,0.3515,0.2406,0.7982,0.35', tilt: 55, fov: 45, js: aim('overview'), cards: ['scenery'] },
+  { name: 'standing', caption: 'On the highest ground near your home, looking back at it', pose: '-0.426,0.3515,0.2406,0.7982,0.8301', tilt: 80, fov: 52, js: aim('high'), cards: ['scenery'] },
   { name: 'vista', caption: 'The vista across the land', preset: 'vista', cards: ['scenery', 'invitation'] },
   { name: 'home', caption: 'Your home', preset: 'homestead', cards: ['home'] },
-  { name: 'eye-level', caption: 'At eye level, 1.6 m', pose: '-0.2406,0.7982,-0.426,-0.3515,1', tilt: 82, fov: 55, cards: ['closeup'] },
+  { name: 'eye-level', caption: 'At eye level across the water, looking back at your home', pose: '-0.2406,0.7982,-0.426,-0.3515,1', tilt: 82, fov: 55, js: aim('water'), cards: ['closeup'] },
 ];
 
 export interface StillsRequest {
@@ -176,9 +224,10 @@ const VIEW_WORDS: readonly { readonly words: RegExp; readonly view: string }[] =
   { words: /\b(porch|home|house|hut|cottage|door|garden gate|doorstep)\b/, view: 'home' },
   { words: /\b(orbit|space|whole planet|globe|from afar|all of it)\b/, view: 'orbit' },
   { words: /\b(bird|birds-eye|bird's-eye|overhead|from above|aerial|map)\b/, view: 'birds-eye' },
-  { words: /\b(vista|horizon|across|far|distance|view out|panorama|lookout|high|hill|top)\b/, view: 'vista' },
-  { words: /\b(eye level|ground|grass|flowers?|plants?|walk|close|closer|pools?|shore|water)\b/, view: 'eye-level' },
-  { words: /\b(standing|rise|stand)\b/, view: 'standing' },
+  { words: /\b(knoll|hill|hilltop|high ground|highest|summit|peak|mound|rocks?|stargazing|top|rise|standing|stand)\b/, view: 'standing' },
+  { words: /\b(pond|pools?|lake|shore|water|water's edge|eye level)\b/, view: 'eye-level' },
+  { words: /\b(vista|horizon|across|far|distance|view out|panorama|lookout)\b/, view: 'vista' },
+  { words: /\b(ground|grass|flowers?|plants?|walk|close|closer)\b/, view: 'eye-level' },
 ];
 
 /** A view and a time of day from Muse's words, by keywords; null when no view is named. */

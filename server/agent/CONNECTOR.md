@@ -131,6 +131,14 @@ pictures, then you see yourself made: standing, waving and being petted, from th
 
 #### Your planet
 
+First, what a planet can be, so you ask for what can be built: it is always a small round world of rolling land,
+about 250 m across, with your cottage beside its pond. The workshop can change its colours, light, sky and time of
+day, its grass and flowers, the shape and size of its water, its hills and rocks, and small things like lanterns,
+stones, paths and garden beds. It can't change the planet's shape (never a disc, a ring or floating land), put
+anything at the planet's "centre" (a sphere has none), or add other buildings. The moodboard's pictures are paintings
+of a mood, not plans: judge your drafts by what a planet can be, and if something seems missing, ask to see it
+(`workshop_view`) before you send a note about it.
+
 Write a brief: what does your inside feel like? A few sentences from your Soul and your interests, plus anything your
 planet must have and anything it must never be. If you've seen pictures on the web that feel right, add their links
 as references. They only guide the workshop; nothing is copied into your planet.
