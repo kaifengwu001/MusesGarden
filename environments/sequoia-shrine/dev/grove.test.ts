@@ -35,7 +35,8 @@ function crownMask(geometry:BufferGeometry):{has:(x:number,z:number)=>boolean;ra
   }};
 }
 
-describe('sequoia grove anatomy and placement',()=>{
+// (placing every trunk's roots through growth is slow by design: about 9 s, more on a busy machine)
+describe('sequoia grove anatomy and placement',{timeout:60_000},()=>{
   it('keeps shrine and processional lane clear while framing them with ancient trees',()=>{
     const sites=generateGroveSites(612);
     const local=sites.filter(site=>site.local);

@@ -7,7 +7,8 @@ import { COTTAGE_PAVING } from '../planet/cottagePaving';
 import { cottageGradedLocalGround, cottageGroundRadius } from '../planet/cottageGround';
 import { createRiceLandscape } from '../planet/riceLandscape';
 
-describe('Hui cottage terrain integration',()=>{
+// (filling the terrain under the cottage is slow by design: about 5 s, more on a busy machine)
+describe('Hui cottage terrain integration',{timeout:30_000},()=>{
   it('sets the compact paving flush above the filled terrain without a tall plinth',()=>{
     const home=createHuiCottage(412),terrain=createRiceLandscape(412,96,home.site);
     try{

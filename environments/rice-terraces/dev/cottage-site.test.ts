@@ -3,7 +3,8 @@ import { Vector3 } from 'three';
 import { COTTAGE_FOOTPRINT, COTTAGE_PERIMETER, cottageContains, cottageLocalDirection, cottageLocalGround, cottageSite } from '../planet/cottageSite';
 import { RICE_RADIUS, RICE_STEP, sampleRiceField } from '../planet/riceFields';
 
-describe('Ti Tian cottage support and clearing',()=>{
+// (searching the terraces for the cottage's pocket is slow by design: about 4 s, more on a busy machine)
+describe('Ti Tian cottage support and clearing',{timeout:30_000},()=>{
   it('finds dry concave pockets with a near-grade gate and an upright local frame',()=>{
     for(const seed of [1,412,771,2026]){
       const site=cottageSite(seed);

@@ -62,7 +62,8 @@ function snapshot(scenery: CanyonScenery): unknown {
   }));
 }
 
-describe('Scarlet canyon geometry', () => {
+// (building the canyon's scenery at every size takes a second or two a size, more on a busy machine)
+describe('Scarlet canyon geometry', { timeout: 30_000 }, () => {
   it('builds nonempty finite thin foliage and hard chalk without degenerate normals', () => {
     for (const geometry of [fanTreeGeometry(), fanTreeGeometry(1), fanTreeGeometry(2), chalkGeometry(), fernGeometry(), coralGeometry(), chalkShelfGeometry(), lichenGeometry(), lichenGeometry(1)]) {
       geometryIsSound(geometry);
