@@ -9,7 +9,7 @@ import type { Instant, MuseId } from '../../../src/muse/contract';
 import { fakeClients, type Box, type Segmenter, type WorkshopClients } from '../clients';
 import type { Brief, JobRecord, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
 import { createBodyPipeline, GEN_SCULPT, reserveLook, type BodyDeps } from '.';
-import { cleanGlb, readGlb, tagged } from './glb';
+import { cleanGlb, readGlb, tagged, turnGlb } from './glb';
 import { comparePose, type Seen } from './pose';
 import { conceptPrompt } from './prompt';
 import type { Renderer } from './render';
@@ -204,6 +204,22 @@ describe('the body pipeline', () => {
     expect(h.answer({ approve: true })).toMatchObject({ ok: true, stage: 'finish' });
     const done = await h.run();
     expect(done).toMatchObject({ kind: 'done', result: { look: 'gen-pooh-1' } });
+  }, 120_000);
+
+  it('turns a body made facing sideways to face the front, and keeps it turned', async () => {
+    // (Tripo's P2 gave Blu's body facing +x: its eyes weren't found until it was turned a quarter)
+    const sideways = turnGlb(MUSE6, 3);
+    const { clients, calls } = counted({ ...fakeClients(), mesher: { fromImage: () => Promise.resolve(sideways) } });
+    const h = await harness(clients);
+    await h.run();
+    expect(h.answer({ picks: ['c1-1'] })).toMatchObject({ ok: true, stage: 'mesh' });
+    const shown = await h.run();
+    if (shown.kind !== 'wait') throw new Error(`expected the approval, got ${shown.kind}: ${shown.kind === 'failed' ? shown.message : ''}`);
+    expect(shown.stage).toBe('approve');
+    expect(calls.mesh).toBe(1);
+    const served = readGlb(readFileSync(join(h.root, 'workshop', 'looks', 'gen-pooh-1.glb')));
+    expect([...served.position]).toEqual([...readGlb(MUSE6).position]);
+    expect([...served.normal]).toEqual([...readGlb(MUSE6).normal]);
   }, 120_000);
 
   it('runs each stage again without redoing its work', async () => {

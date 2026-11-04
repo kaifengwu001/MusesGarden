@@ -14,7 +14,7 @@ interface Gltf {
   materials?: { name?: unknown; pbrMetallicRoughness?: { baseColorTexture?: { index: number } } }[];
   images?: { name?: unknown; bufferView?: number; uri?: string; mimeType?: string }[];
   textures?: { source?: number }[];
-  accessors?: { bufferView?: number; byteOffset?: number; componentType: number; count: number; type: string; normalized?: boolean }[];
+  accessors?: { bufferView?: number; byteOffset?: number; componentType: number; count: number; type: string; normalized?: boolean; min?: number[]; max?: number[] }[];
   bufferViews?: { buffer: number; byteOffset?: number; byteLength: number; byteStride?: number }[];
   extensionsRequired?: string[];
 }
@@ -47,6 +47,53 @@ export function cleanGlb(glb: Buffer): Buffer {
       if (typeof item.name === 'string' && item.name.startsWith('tripo_')) item.name = `model_${item.name.slice('tripo_'.length)}`;
     }
   }
+  return withJson(json, version, rest);
+}
+
+/**
+ * The GLB turned about its upright a quarter turn `quarters` times ((x, z) → (−z, x) each), its positions and
+ * normals alike and its bounds with them: a body made facing sideways or away turned to face the front (+z), as the
+ * sculpts do. Only float positions and normals are turned; anything else is refused.
+ */
+export function turnGlb(glb: Buffer, quarters: number): Buffer {
+  const q = ((quarters % 4) + 4) % 4;
+  if (!q) return glb;
+  const { json, version } = split(glb);
+  const jsonLength = glb.readUInt32LE(12);
+  const rest = Buffer.from(glb.subarray(20 + jsonLength));
+  const turn = (x: number, z: number): [number, number] => (q === 1 ? [-z, x] : q === 2 ? [-x, -z] : [z, -x]);
+  const done = new Set<number>();
+  for (const mesh of json.meshes ?? []) {
+    for (const prim of mesh.primitives) {
+      for (const key of ['POSITION', 'NORMAL'] as const) {
+        const i = prim.attributes[key];
+        if (i === undefined || done.has(i)) continue;
+        done.add(i);
+        const a = json.accessors?.[i];
+        const view = a?.bufferView === undefined ? undefined : json.bufferViews?.[a.bufferView];
+        if (!a || !view || a.componentType !== 5126 || a.type !== 'VEC3') throw new Error(`the GLB's ${key.toLowerCase()}s aren't stored as floats, so it can't be turned`);
+        // (the binary chunk's own 8-byte header first)
+        const start = 8 + (view.byteOffset ?? 0) + (a.byteOffset ?? 0);
+        const stride = view.byteStride || 12;
+        const lo = [Infinity, Infinity, Infinity];
+        const hi = [-Infinity, -Infinity, -Infinity];
+        for (let e = 0; e < a.count; e++) {
+          const p = start + e * stride;
+          const [x, z] = turn(rest.readFloatLE(p), rest.readFloatLE(p + 8));
+          rest.writeFloatLE(x, p);
+          rest.writeFloatLE(z, p + 8);
+          const v = [x, rest.readFloatLE(p + 4), z];
+          for (let c = 0; c < 3; c++) [lo[c], hi[c]] = [Math.min(lo[c], v[c]), Math.max(hi[c], v[c])];
+        }
+        if (key === 'POSITION') [a.min, a.max] = [lo, hi];
+      }
+    }
+  }
+  return withJson(json, version, rest);
+}
+
+/** A GLB of this JSON before the rest of `glb` (its binary chunk, header and all). */
+function withJson(json: Gltf, version: number, rest: Buffer): Buffer {
   let text = Buffer.from(JSON.stringify(json), 'utf8');
   const pad = (4 - (text.length % 4)) % 4;
   if (pad) text = Buffer.concat([text, Buffer.alloc(pad, 0x20)]);

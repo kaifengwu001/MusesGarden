@@ -15,7 +15,7 @@ import sharp from 'sharp';
 import type { GeneratedLook } from '../../../src/muse/contract';
 import type { Box, Segmenter } from '../clients';
 import type { JobRecord, Packet, PacketPicture, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
-import { cleanGlb } from './glb';
+import { cleanGlb, turnGlb } from './glb';
 import { comparePose, describe, reframe, reframeFor, see, type PoseCheck, type Reframe, type Seen } from './pose';
 import { avatarPicture, contactSheet, fitTo, portrait } from './pictures';
 import { conceptPrompt, designFromBrief, designPrompt, DESIGN_SCHEMA, DESIGN_SYSTEM, noteLines, refinePrompt, tidyDesign, type Design } from './prompt';
@@ -341,7 +341,23 @@ async function mesh(job: JobRecord, io: StageIO, d: BodyData): Promise<StepOutco
 async function rig(_job: JobRecord, io: StageIO, d: BodyData, check: RigCheck): Promise<StepOutcome> {
   if (!d.look || !d.pick) return { kind: 'failed', message: 'There is no made body to rig.' };
   const file = join(io.dir, `rig-${d.look}.json`);
-  const result = readJson<Awaited<ReturnType<RigCheck>>>(file) ?? (await check(readFileSync(join(looksDir(io), `${d.look}.glb`))));
+  const cached = readJson<Awaited<ReturnType<RigCheck>>>(file);
+  let result: Awaited<ReturnType<RigCheck>> | null = cached?.ok ? cached : null;
+  if (!result) {
+    const glbFile = join(looksDir(io), `${d.look}.glb`);
+    const made = readFileSync(glbFile);
+    result = await check(made);
+    // (a body made facing sideways or away is turned to face the front, as the sculpts do, and kept turned: only
+    // facing the front are its eyes found)
+    for (let q = 1; !result.ok && q < 4; q++) {
+      const turned = turnGlb(made, q);
+      const r = await check(turned);
+      if (!r.ok) continue;
+      writeFileSync(glbFile, turned);
+      io.log(`body: ${d.look} was made facing away; turned ${q * 90}° about its upright to face the front`);
+      result = r;
+    }
+  }
   writeFileSync(file, JSON.stringify(result, null, 2));
   if (result.ok) {
     io.log(`body: ${d.look} rigs (${result.report.ms} ms, ${result.report.vertices} vertices, cloth ${(100 * result.report.cloth).toFixed(0)}%)`);
