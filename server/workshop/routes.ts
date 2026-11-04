@@ -1,7 +1,7 @@
 // The workshop's files over HTTP, with no key: GET /w/<job>/<file> serves what a job made (the 32-hex job id is the
 // secret), and GET /api/looks/<id>.(glb|jpg|json) serves the bodies it finished. Mount it before the app's routes:
 // it answers (and returns true) only for those two prefixes.
-import { createReadStream, realpathSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, realpathSync, statSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join, sep } from 'node:path';
 import { isJobId, jobDir, looksDir } from './store';
@@ -126,8 +126,13 @@ export function workshopFiles(opts: { readonly dataDir: string }): FileHandler {
     const file = look?.[1] ?? '';
     const ext = extname(file).toLowerCase();
     const id = file.slice(0, file.length - ext.length);
+    const lookFile = join(looksDir(opts.dataDir), `${id}${ext}`);
     if (!LOOK_TYPES.includes(ext) || !LOOK_ID.test(id)) deny(res, 404, 'not found');
-    else send(req, res, looksDir(opts.dataDir), join(looksDir(opts.dataDir), `${id}${ext}`));
+    // A body with no knobs of its own: an empty set, not a 404 the browser logs as an error on every load.
+    else if (ext === '.json' && !existsSync(lookFile)) {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' });
+      res.end(req.method === 'HEAD' ? undefined : '{}');
+    } else send(req, res, looksDir(opts.dataDir), lookFile);
     return true;
   };
 }
