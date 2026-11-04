@@ -3,7 +3,7 @@
 # dev server (the workshop renders through it). Prints what to give the Muse's app.
 #
 #   scripts/real-muse.sh            start everything (Ctrl-C stops all three)
-#   MUSE_DATA=.muse-real            the garden's folder (default), kept apart from the demo's .muse
+#   MUSE_DATA=.muse-real            the garden's folder (default), kept apart from the local garden's .muse
 #   TRIPO_LIVE=0 scripts/real-muse.sh   keep Tripo off (bodies and furniture then stop at the 3D step)
 #
 # The tunnel is Cloudflare's quick tunnel: no account, but its address changes each time it starts, and the Muse's
