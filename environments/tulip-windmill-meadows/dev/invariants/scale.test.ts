@@ -38,30 +38,27 @@ function sphereDesign(n: number): Vector3[] {
 }
 
 describe('constant scale', () => {
-  it('keeps the homestead pond at the landing in meters, at every size', () => {
+  // Tulipwind's ground is low and dry (CONSTRUCTION.md): the meadow's pond excavation is gone from the homestead and
+  // the relief is lifted clear of the water table, so the mill stands in its fields with no pond and no lakes.
+  it('keeps the homestead dry where the meadow had its pond, at every size', () => {
     const s = createGroundSample();
     for (const radius of [40, 90, 128, 250, 400]) {
       const t = terrainAt(radius);
-      // just past the pond's near edge (in front and to the left, under the pier) is water, just inside the house front is dry land
+      // where the meadow's pond began (in front and to the left of the house) is dry land, as is just inside the house front
       const across = new Vector3().crossVectors(layout.cottage, layout.homeBearing).normalize();
       const pondSide = travel(travel(layout.cottage, across, -POND_SHIFT / radius, new Vector3()), layout.homeBearing, (COTTAGE_TO_POND + 1.2) / radius, new Vector3());
       const houseSide = travel(layout.cottage, layout.homeBearing, 1.5 / radius, new Vector3());
-      expect(t.sample(pondSide, s).water, `R ${radius} pond`).toBeLessThan(0);
+      expect(t.sample(pondSide, s).water, `R ${radius} where the pond was`).toBeGreaterThan(0.5);
       expect(t.sample(houseSide, s).water, `R ${radius} house`).toBeGreaterThan(0.5);
     }
   });
 
-  it('keeps about the same share of the planet under water as it grows', () => {
+  it('keeps the whole planet dry as it grows: no lakes in its hollows', () => {
     const dirs = sphereDesign(3000);
-    const shares = [40, 128, 400].map((radius) => {
+    for (const radius of [40, 128, 400]) {
       const t = terrainAt(radius);
-      return dirs.filter((d) => t.fields.natural(d) < 0).length / dirs.length;
-    });
-    for (const share of shares) {
-      expect(share).toBeGreaterThan(0.12);
-      expect(share).toBeLessThan(0.4);
+      expect(dirs.filter((d) => t.fields.natural(d) < 0).length, `R ${radius}`).toBe(0);
     }
-    expect(Math.max(...shares) - Math.min(...shares)).toBeLessThan(0.12);
   });
 
   it('keeps the wetlands where they are as the planet grows (they live in rest space)', () => {
