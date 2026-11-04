@@ -8,6 +8,8 @@ import { ANCHORS, FloorView, free, keepClear, keepsakeSpot, place, proportionalR
 
 const VIEW = { azimuth: 0.68, elevation: 1.2, fov: 15, size: 7.2, at: [-0.8, ROOM.floor + 0.5, 1.2] } as const;
 const SIZE = { width: 1405, height: 860 } as const;
+/** How a piece out on the floor stands: facing the view (0.68 rad to the nearest 15°). */
+const TURN = Math.PI / 4;
 
 type V3 = [number, number, number];
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -49,20 +51,21 @@ function room(): RoomInfo {
   return { samples, anchors: ANCHORS, showpiece: proportionalRoom().showpiece };
 }
 
-/** The box (pixels) a w × h × d block standing at (x, z) shows in the picture. */
-function boxOf(x: number, z: number, w: number, h: number, d: number): [number, number, number, number] {
+/** The box (pixels) a w × h × d block standing at (x, z), turned (rad: as a piece out on the floor faces the view), shows in the picture. */
+function boxOf(x: number, z: number, w: number, h: number, d: number, turn = TURN): [number, number, number, number] {
   const see = camera();
   const us: number[] = [];
   const vs: number[] = [];
   for (let k = 0; k < 8; k++) {
-    const [u, v] = see([x + (k & 1 ? w / 2 : -w / 2), ROOM.floor + (k & 2 ? h : 0), z + (k & 4 ? d / 2 : -d / 2)]);
+    const [a, b] = [k & 1 ? w / 2 : -w / 2, k & 4 ? d / 2 : -d / 2];
+    const [u, v] = see([x + a * Math.cos(turn) + b * Math.sin(turn), ROOM.floor + (k & 2 ? h : 0), z - a * Math.sin(turn) + b * Math.cos(turn)]);
     us.push(u * SIZE.width);
     vs.push(v * SIZE.height);
   }
   return [Math.min(...us), Math.min(...vs), Math.max(...us), Math.max(...vs)];
 }
 
-const block = (name: string, x: number, z: number, w: number, h: number, d: number): Found => ({ name, box: boxOf(x, z, w, h, d), ...SIZE, model: { x: w, y: h, z: d } });
+const block = (name: string, x: number, z: number, w: number, h: number, d: number, turn = TURN): Found => ({ name, box: boxOf(x, z, w, h, d, turn), ...SIZE, model: { x: w, y: h, z: d } });
 
 describe('the floor through the cutaway’s camera', () => {
   it('maps the floor to the picture and back exactly (a homography from the samples)', () => {
@@ -125,7 +128,7 @@ describe('the floor through the cutaway’s camera', () => {
   });
 
   it('turns a piece by a wall away from it, one out on the floor toward the view', () => {
-    const [byWall, out] = place([block('by the front wall', -2.4, 2.0, 0.6, 1, 0.4), block('out', -2.0, 0.6, 0.4, 0.8, 0.4)], room());
+    const [byWall, out] = place([block('by the front wall', -2.4, 2.0, 0.6, 1, 0.4, Math.PI), block('out', -2.0, 0.6, 0.4, 0.8, 0.4)], room());
     expect(byWall!.turn).toBeCloseTo(Math.PI, 3);
     // (the view's bearing, 0.68 rad, to the nearest 15°)
     expect(out!.turn).toBeCloseTo((45 * Math.PI) / 180, 3);

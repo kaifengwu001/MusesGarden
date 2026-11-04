@@ -30,6 +30,8 @@ const VERSIONS = 3;
 const PAD = { share: 0.12, min: 16 } as const;
 /** The keepsake's height on the shelf (m). */
 const KEEPSAKE_HEIGHT = 0.28;
+/** A home piece's model at most this many faces (the meadow's stand-ins run about 64k each; the cutaway sees them small). */
+const PIECE_FACES = 10_000;
 /** A picture Muse linked to, fetched for a keepsake: how long and how big at most. */
 const FETCH = { ms: 8000, bytes: 4 * 1024 * 1024 } as const;
 
@@ -107,7 +109,7 @@ function isolatePrompt(thing: string): string {
     `Isolate the ${thing} from this image. Reproduce it exactly as shown -- same colors, materials, and proportions.`,
     'White background, centered, tight crop, studio lighting. No other objects, no scene, no people, no text, no shadows on the ground.',
     'Isolate the object and remove all clustered, adjacent, overlapping, or items resting on the target object.',
-    'Show the whole object, seen a little from above and in front. Create a clean render of that one single object that is true to the source image.',
+    'Show the whole object from the front and a little to one side, at about eye level, as a product photo, nothing cut off. Create a clean render of that one single object that is true to the source image.',
   ].join(' ');
 }
 
@@ -298,7 +300,7 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
             const picture = read(io, p.clean);
             const cached = join(cache, `${TripoBudget.hash(picture)}.glb`);
             if (!existsSync(cached)) {
-              const model = await io.clients.mesher.fromImage(picture, { purpose: `home piece ${p.thing} for ${job.museId}` }, io.signal);
+              const model = await io.clients.mesher.fromImage(picture, { faceLimit: PIECE_FACES, purpose: `home piece ${p.thing} for ${job.museId}` }, io.signal);
               mkdirSync(cache, { recursive: true });
               writeFileSync(cached, await shrinkTextures(model));
             }

@@ -85,7 +85,7 @@ describe('the home job', () => {
     const clients: WorkshopClients = {
       ...base,
       segmenter: segmenter(found),
-      mesher: { fromImage: (image, opts, signal) => (meshed.push(opts.purpose), base.mesher.fromImage(image, opts, signal)) },
+      mesher: { fromImage: (image, opts, signal) => (meshed.push(`${opts.purpose} (${opts.faceLimit} faces)`), base.mesher.fromImage(image, opts, signal)) },
     };
     const at = io(root, clients);
     const pipeline = makeHomePipeline({ renderer: () => stubRenderer() });
@@ -107,7 +107,7 @@ describe('the home job', () => {
     expect(r.stages).toEqual(['pieces', 'mesh', 'place', 'show']);
     expect(found).toEqual(['green armchair', 'floor lamp', 'stack of books']);
     expect(meshed).toHaveLength(3);
-    expect(meshed[0]).toBe('home piece a green armchair by the window for test');
+    expect(meshed[0]).toBe('home piece a green armchair by the window for test (10000 faces)');
     if (r.outcome.kind !== 'wait') throw new Error(r.outcome.kind);
     expect(r.outcome.packet.ask).toBe('approve');
     expect(r.outcome.packet.pictures[0].id).toBe('home-1');

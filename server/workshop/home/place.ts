@@ -152,15 +152,13 @@ function invert(m: Mat3): Mat3 {
   return [A / det, -(b * i - c * h) / det, (b * f - c * e) / det, B / det, (a * i - c * g) / det, -(a * f - c * d) / det, C / det, -(a * h - b * g) / det, (a * e - b * d) / det];
 }
 
-/** The floor and the plane a metre over it, as the picture sees them. */
+/** The floor as the picture sees it. */
 export class FloorView {
   private readonly floor: Mat3;
   private readonly back: Mat3;
-  private readonly up: Mat3;
 
   constructor(samples: readonly Sample[]) {
     this.floor = homography(samples.filter((s) => s.y === 0));
-    this.up = homography(samples.filter((s) => s.y === 1));
     this.back = invert(this.floor);
   }
 
@@ -169,9 +167,9 @@ export class FloorView {
     return apply(this.back, u, v);
   }
 
-  /** Where a point of the floor (local m), `y` metres over it (0 or 1), lands in the picture. */
-  toPicture(x: number, z: number, y: 0 | 1 = 0): [number, number] {
-    return apply(y === 0 ? this.floor : this.up, x, z);
+  /** Where a point of the floor (local m) lands in the picture. */
+  toPicture(x: number, z: number): [number, number] {
+    return apply(this.floor, x, z);
   }
 }
 
@@ -231,39 +229,41 @@ export function free(rect: Rect, zones: readonly Rect[], placed: readonly Rect[]
 
 /**
  * Stand each found piece in the room: its foot under its box's bottom middle (moved back by half its depth, the box's
- * bottom being its front), its height from its box against the camera's scale there, turned away from a wall it
- * stands by or else to face the view; then moved to the nearest free floor (on a 10 cm grid). A piece with no free
- * floor within reach is left out (null).
+ * bottom being its front), turned away from a wall it stands by or else to face the view; its size from its box's
+ * width against the camera's scale there and its model's own proportions as it is turned (seen from 69° above, a
+ * box's height is mostly floor going back, too unsteady to read a height from); then moved to the nearest free floor
+ * (on a 10 cm grid). A piece with no free floor within reach is left out (null).
  */
 export function place(found: readonly Found[], room: RoomInfo): Array<Placement | null> {
   const view = new FloorView(room.samples);
   const zones = keepClear(room.anchors);
   const placed: Rect[] = [];
   return found.map((f) => {
-    const [x1, y1, x2, y2] = f.box;
+    const [x1, , x2, y2] = f.box;
     const u = (x1 + x2) / 2 / f.width;
     const v = y2 / f.height;
     const [fx, fz] = view.toFloor(u, v);
-    // the camera's scale at the foot: metres of floor per pixel across, and going back (straight up the picture)
+    // the camera's scale at the foot: metres of floor per pixel across, and the way back (straight up the picture)
     const du = 0.01;
     const [ax, az] = view.toFloor(u + du, v);
     const [bx, bz] = view.toFloor(u, v - du);
     const across = Math.hypot(ax - fx, az - fz) / (du * f.width);
     const backLength = Math.hypot(bx - fx, bz - fz);
-    const backPerPx = backLength / (du * f.height);
     const away: [number, number] = backLength > 1e-9 ? [(bx - fx) / backLength, (bz - fz) / backLength] : [0, -1];
-    const [pu, pv] = view.toPicture(fx, fz, 0);
-    const [qu, qv] = view.toPicture(fx, fz, 1);
-    const upPx = Math.hypot((qu - pu) * f.width, (qv - pv) * f.height);
     const wide = (x2 - x1) * across;
-    // the model's proportions give its depth from its width; what the box shows over that depth is its height
-    const depth = wide * (Math.min(f.model.x, f.model.z) / Math.max(f.model.x, f.model.z, 1e-6));
-    const tall = upPx > 1e-6 ? ((y2 - y1) - depth / Math.max(backPerPx, 1e-9)) / upPx : NaN;
-    const byShape = wide * (f.model.y / Math.max(f.model.x, f.model.z, 1e-6));
-    const height = clamp(Number.isFinite(tall) && tall >= HEIGHT[0] && tall <= HEIGHT[1] ? tall : byShape, HEIGHT[0], HEIGHT[1]);
-    const cx = fx + away[0] * (depth / 2);
-    const cz = fz + away[1] * (depth / 2);
+    // turned as it will stand, the model shows this much of its width and depth across the view, and this much going back
+    const turned = (turn: number): { scale: number; back: number } => {
+      const t = turn - VIEW_AZIMUTH;
+      const [c, n] = [Math.abs(Math.cos(t)), Math.abs(Math.sin(t))];
+      const scale = wide / Math.max(c * f.model.x + n * f.model.z, 1e-6);
+      const s = clamp(scale * f.model.y, HEIGHT[0], HEIGHT[1]) / Math.max(f.model.y, 1e-6);
+      return { scale: s, back: s * (n * f.model.x + c * f.model.z) };
+    };
+    const first = turned(facing(fx, fz));
+    const cx = fx + away[0] * (first.back / 2);
+    const cz = fz + away[1] * (first.back / 2);
     const turn = facing(cx, cz);
+    const height = turned(turn).scale * f.model.y;
     const spot = nearestFree(f, cx, cz, turn, height, zones, placed);
     if (!spot) return null;
     placed.push(spot.rect);
