@@ -46,11 +46,15 @@ function befriendOnline(a: MuseState, b: MuseState, draw: Draw): PairOutcome | n
   return familiarity >= SOCIAL.knownFamiliarity && draw('befriend', 0) < chance ? befriended(a, b, 'known-on') : null;
 }
 
+/**
+ * A meeting, and maybe a friendship. A real Muse (agent.joined) chooses its own friends, so no draw says yes for it:
+ * it meets others and grows familiar, but only its owner's introductions make it friends.
+ */
 export function encounter(a: MuseState, b: MuseState, where: EncounterPlace, now: Instant, draw: Draw): PairOutcome {
   const { similarity, pleasantness } = chemistry(a, b);
   const met = (other: MuseState): MuseEventBody => ({ kind: 'encounter', other: other.seed.id, pleasantness, similarity, where });
   const outcome = { self: [met(b)], other: [met(a)] };
-  if (!canMeet(a, b)) return outcome;
+  if (!canMeet(a, b) || a.agent || b.agent) return outcome;
   const made = where === 'beyond' ? befriendBeyond(a, b, similarity, now, draw) : befriendOnline(a, b, draw);
   return made ? { self: [...outcome.self, ...made.self], other: [...outcome.other, ...made.other] } : outcome;
 }

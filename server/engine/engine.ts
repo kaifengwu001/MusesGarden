@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import type {
+  Actor,
+  AgentResult,
   Candidate,
+  CanonicalUrl,
   CommandResult,
   Discovery,
   DiscoveryId,
@@ -19,10 +22,12 @@ import type {
   MindContext,
   MuseEventBody,
   MuseId,
+  MuseLook,
   MuseSeed,
   MuseState,
   PhotoId,
   PhotoSpec,
+  PlanetId,
   PostcardAsk,
   PostcardBack,
   PostcardPlan,
@@ -30,6 +35,7 @@ import type {
   ReduceCore,
   ReduceSocial,
   RelationshipOrigin,
+  ReportedStop,
   ScheduleItem,
   SocialPolicy,
   Source,
@@ -39,6 +45,7 @@ import type {
   TopicKey,
   Verdict,
 } from '../../src/muse/contract';
+import { composedBasket, REPORTED_HOP_MS, reportedTrip, reportedTripStart, waitingBasket, type Refusal } from '../domain/agent';
 import { gameOutcome } from '../domain/policy/postcard';
 import { localDay } from '../domain/time';
 import { Tx, type Fold } from './tx';
@@ -54,7 +61,12 @@ export interface EngineDeps {
   readonly salienceAt: (interest: Interest, now: Instant) => number;
   readonly source: Source;
   readonly mindFor: (museId: MuseId) => Mind;
+  /** The mind the rules see in a real Muse (agent.joined): it decides nothing (server/adapters/minds/agent.ts). */
+  readonly agentMind?: Mind;
 }
+
+/** What a real Muse's command checks against its state as committed, inside the queue; the log is read only if asked. */
+export type AgentCheck = (s: MuseState, log: () => readonly StoredEvent[]) => Refusal | null;
 
 const CANDIDATES_PER_HOP = 8;
 const MAX_HOPS = 4;
@@ -67,6 +79,9 @@ interface HopPayload {
   readonly from: Candidate | null;
   /** The trip's topic once a serendipity trip has found one. */
   readonly pursuing?: TopicKey;
+  /** A trip a real Muse reported: the stop this hop plants, and how many stops the trip has. */
+  readonly stop?: ReportedStop;
+  readonly of?: number;
 }
 
 /** An encounter holds only while both Muses are still in the episodes it was drawn in. */
@@ -320,6 +335,215 @@ export class Engine {
     return undefined;
   }
 
+  // ─── A real Muse, through its connector (server/engine/agent.ts checks what it sends) ───
+
+  /** The mind the rules consult for `s`: a real Muse's decides nothing. */
+  private mind(s: MuseState): Mind {
+    return s.agent && this.deps.agentMind ? this.deps.agentMind : this.deps.mindFor(s.seed.id);
+  }
+
+  /** The seeded draw of `m`'s episode `n`, the one the policy's decisions in it use. */
+  draw(m: MuseId, n: number): Draw {
+    return this.deps.drawFor(m, n);
+  }
+
+  /** What a topic label resolves to in the topic map, or null. Read-only, outside the queue. */
+  resolveTopic(label: string): Promise<TopicKey | null> {
+    return this.deps.source.resolveTopic(label);
+  }
+
+  /**
+   * Makes `seed.id` a real Muse from now on (agent.joined, its owner's act), adding it first when the garden doesn't
+   * have it: a Muse with `soulText`, wearing `made.look` on `made.planet`, its first episode due at once (a new one
+   * needs `made`). A Muse that is a real one already is left as it is.
+   */
+  addAgent(seed: MuseSeed, made: { readonly look: MuseLook; readonly planet: PlanetId; readonly planetName: string } | null, soulText: string): Promise<{ readonly added: boolean }> {
+    return this.exclusive(async () => {
+      const known = this.states.get(seed.id);
+      if (known?.agent) return { added: false };
+      if (!known && !made) throw new Error(`a new real Muse needs its look and planet (${seed.id})`);
+      if (!known) {
+        this.deps.store.addMuse(seed);
+        this.states.set(seed.id, this.deps.emptyState(seed));
+      }
+      const at = this.clockAt;
+      const tx = this.tx(at);
+      tx.emit(seed.id, { kind: 'agent.joined', name: tx.state(seed.id).seed.name }, 'owner');
+      if (!known && made) {
+        tx.emit(seed.id, { kind: 'look.changed', look: made.look }, 'garden');
+        tx.emit(seed.id, { kind: 'planet.changed', planet: made.planet, worldSeed: seed.worldSeed, name: made.planetName }, 'garden');
+        await this.applySoul(tx, seed.id, soulText, 'garden');
+        this.scheduleBasketCheck(tx, seed.id);
+        this.scheduleEnd(tx, seed.id, 0, at);
+      }
+      this.commit(tx);
+      return { added: !known };
+    });
+  }
+
+  /** A real Muse's soul: its SOUL.md text, and the topics it picked out, folded in as Memory's are (memory.updated). */
+  agentSoul(m: MuseId, soulText: string, topics: readonly TopicKey[], labelsHash: string, check: AgentCheck): Promise<AgentResult<{ readonly at: Instant }>> {
+    return this.agentWrite(m, check, async (tx) => {
+      await this.applySoul(tx, m, soulText, 'muse');
+      tx.emit(m, { kind: 'memory.updated', textHash: labelsHash, topics }, 'muse');
+    });
+  }
+
+  /**
+   * A trip Muse made in its own browser, its links already checked: it sets off now on its own planet, back to where
+   * its first find's topic lives or to a new area, and each stop's finds are planted a hop apart (REPORTED_HOP_MS). The
+   * rules' episode it was in ends. While its owner works the trip waits, paused, as any trip would.
+   */
+  reportTrip(
+    m: MuseId,
+    trip: { readonly thread: string; readonly path: readonly string[]; readonly stops: readonly ReportedStop[]; readonly question: string | null },
+    check: AgentCheck,
+  ): Promise<AgentResult<{ readonly trip: number; readonly doneAt: Instant }>> {
+    return this.exclusive((): AgentResult<{ readonly trip: number; readonly doneAt: Instant }> => {
+      const s0 = this.states.get(m);
+      if (!s0) return { ok: false, status: 404, error: 'no such Muse' };
+      const refused = check(s0, () => this.deps.store.events(m));
+      if (refused) return refused;
+      const first = trip.stops[0]?.kept[0]?.candidate;
+      if (!first) return { ok: false, status: 422, error: 'nothing kept could be planted' };
+      const tx = this.tx(this.clockAt);
+      this.endEpisode(tx, m);
+      const s = tx.state(m);
+      const n = s.episodes + 1;
+      const draw = this.deps.drawFor(m, n);
+      const start = reportedTripStart(s, first, draw);
+      tx.emit(m, { kind: 'trip.reported', n, thread: trip.thread, path: trip.path, stops: trip.stops, question: trip.question }, 'muse');
+      tx.emit(m, { kind: 'episode.started', n, plan: { activity: 'travel', trip: start } }, 'muse');
+      if (trip.question) {
+        tx.emit(m, { kind: 'question.opened', question: { id: `q:${m}:${n}` as QuestionId, topic: start.topic, text: trip.question, openedAt: tx.now } }, 'muse');
+      }
+      if (tx.state(m).working) tx.emit(m, { kind: 'episode.paused', n, remainingMs: REPORTED_HOP_MS });
+      else {
+        this.scheduleStops(tx, m, n, trip.stops, 0, tx.now + REPORTED_HOP_MS);
+        this.scheduleEncounters(tx, m, 'online', draw);
+      }
+      this.commit(tx);
+      return { ok: true, value: { trip: n, doneAt: (tx.now + trip.stops.length * REPORTED_HOP_MS) as Instant } };
+    });
+  }
+
+  /** The back Muse wrote for one of its photos, in its own words. */
+  writeBack(m: MuseId, photo: PhotoId, back: PostcardBack, check: AgentCheck): Promise<AgentResult<{ readonly at: Instant }>> {
+    return this.agentWrite(m, check, (tx) => {
+      tx.emit(m, { kind: 'photo.written', photo, back }, 'muse');
+    });
+  }
+
+  /** The basket Muse chose for its owner: it goes out at the owner's basket time, or at once without one. */
+  composeBasket(m: MuseId, finds: readonly DiscoveryId[], note: string, check: AgentCheck): Promise<AgentResult<{ readonly at: Instant }>> {
+    return this.agentWrite(m, check, (tx) => {
+      tx.emit(m, { kind: 'basket.composed', finds, note }, 'muse');
+      if (tx.state(m).basketTime === null) this.deliverBasket(tx, m);
+    });
+  }
+
+  /** One event for a real Muse, as `by` (a checkout, or the workshop carrying out what Muse approved). */
+  agentEvent(m: MuseId, body: MuseEventBody, by: Actor, check: AgentCheck): Promise<AgentResult<{ readonly at: Instant }>> {
+    return this.agentWrite(m, check, (tx) => {
+      tx.emit(m, body, by);
+    });
+  }
+
+  /** One commit for a real Muse, at the clock's now, once `check` passes against its state inside the queue. */
+  private agentWrite(m: MuseId, check: AgentCheck, write: (tx: Tx) => void | Promise<void>): Promise<AgentResult<{ readonly at: Instant }>> {
+    return this.exclusive(async (): Promise<AgentResult<{ readonly at: Instant }>> => {
+      const s = this.states.get(m);
+      if (!s) return { ok: false, status: 404, error: 'no such Muse' };
+      const refused = check(s, () => this.deps.store.events(m));
+      if (refused) return refused;
+      const tx = this.tx(this.clockAt);
+      await write(tx);
+      this.commit(tx);
+      return { ok: true, value: { at: tx.now } };
+    });
+  }
+
+  /** The log as `tx` sees it: the store's, then what the tx has emitted for `m` so far. */
+  private logOf(tx: Tx, m: MuseId): readonly StoredEvent[] {
+    const mine = tx.emitted().filter((e) => e.museId === m);
+    const stored = this.deps.store.events(m);
+    return mine.length === 0 ? stored : [...stored, ...mine];
+  }
+
+  /** Stops `from` on of a reported trip, the first at `first` and the rest a hop apart. */
+  private scheduleStops(tx: Tx, m: MuseId, n: number, stops: readonly ReportedStop[], from: number, first: number): void {
+    for (let k = from; k < stops.length; k++) {
+      const at = first + (k - from) * REPORTED_HOP_MS;
+      this.scheduleHop(tx, m, { n, k, since: k === from ? tx.now : at - REPORTED_HOP_MS, from: null, stop: stops[k], of: stops.length }, at);
+    }
+  }
+
+  /** A stop of a reported trip: its finds planted, the photos of the walk there, and home after the last. */
+  private async onReportedHop(tx: Tx, m: MuseId, p: HopPayload, stop: ReportedStop): Promise<void> {
+    const planted = this.plantStop(tx, m, p.n, p.k, stop);
+    this.emitPhotos(tx, m, this.deps.life.photosDuring(tx.state(m), 'travel', p.since as Instant, tx.now, this.deps.drawFor(m, p.n)));
+    if (planted > 0 && tx.state(m).basketTime === null) this.deliverBasket(tx, m);
+    if (p.k + 1 >= (p.of ?? 0)) {
+      tx.emit(m, { kind: 'episode.ended', n: p.n });
+      await this.startNext(tx, m);
+    }
+  }
+
+  /**
+   * Stop `k` of the reported trip of episode `n`: the hop, where Muse stood in the trip's region (its fog lifting at
+   * the first), and each find it kept there that it doesn't keep already, with its why, as a find of its own.
+   * Returns how many it planted.
+   */
+  private plantStop(tx: Tx, m: MuseId, n: number, k: number, stop: ReportedStop): number {
+    const s = tx.state(m);
+    const ep = s.episode;
+    if (!ep || ep.n !== n || ep.plan.activity !== 'travel' || ep.plan.trip.kind === 'serendipity') return 0;
+    const trip = ep.plan.trip;
+    const seen = new Set<CanonicalUrl>();
+    const fresh = stop.kept.filter(({ candidate: c }) => {
+      const known = s.collected.has(c.canonicalUrl) || seen.has(c.canonicalUrl);
+      seen.add(c.canonicalUrl);
+      return !known;
+    });
+    if (k === 0 && trip.kind !== 'revisit' && !s.regions.has(trip.region)) {
+      tx.emit(m, { kind: 'region.revealed', region: trip.region, topic: trip.topic }, 'muse');
+    }
+    const place = this.deps.life.hopPlace(s, trip.region, k, this.deps.drawFor(m, n));
+    const ids = fresh.map((_, i) => `d:${m}:${n}:${k}:${i}` as DiscoveryId);
+    const looked: Verdict[] = fresh.map(({ candidate: c, why }) => ({ canonicalUrl: c.canonicalUrl, title: c.title, topics: c.topics, score: 1, reason: why, kept: true }));
+    const topic = fresh[0]?.candidate.topics[0] ?? trip.topic;
+    const hopRef = tx.emit(m, { kind: 'trip.hop', n, k, topic, place, looked, kept: ids }, 'muse');
+    fresh.forEach(({ candidate: c, why }, i) => {
+      const discovery: Discovery = {
+        id: ids[i],
+        url: c.url,
+        canonicalUrl: c.canonicalUrl,
+        title: c.title,
+        summary: c.summary,
+        topics: c.topics,
+        because: [hopRef],
+        reason: why,
+        keepScore: 1,
+        provenance: 'own',
+        place: this.deps.life.findPlace(s, place, i),
+        at: tx.now,
+        media: c.media,
+        pursuing: trip.topic,
+      };
+      tx.emit(m, { kind: 'discovery.collected', discovery }, 'muse');
+    });
+    return fresh.length;
+  }
+
+  /** A real Muse's reported trip cut short (its owner boarded a ticket): what it had still to plant is planted now. */
+  private plantRest(tx: Tx, m: MuseId): void {
+    const ep = tx.state(m).episode;
+    if (!tx.state(m).agent || ep?.plan.activity !== 'travel') return;
+    const reported = reportedTrip(this.logOf(tx, m), ep.n);
+    if (!reported) return;
+    for (let k = ep.hops; k < reported.stops.length; k++) this.plantStop(tx, m, ep.n, k, reported.stops[k]);
+  }
+
   // ─── Processing ─────────────────────────────────────────────────────────
 
   private replay(seed: MuseSeed): MuseState {
@@ -438,6 +662,8 @@ export class Engine {
     const taken = tx.emitted().flatMap((e) => (e.event.kind === 'photo.taken' ? [{ m: e.museId, photo: e.event.photo }] : []));
     for (const { m, photo } of taken) {
       const s = tx.state(m);
+      // A real Muse writes its own backs (agentPostcardBack): the photo waits for its words.
+      if (s.agent) continue;
       const plan = this.deps.life.postcardPlan(s, photo, this.deps.drawFor(m, 0));
       const words = await this.deps.mindFor(m).writePostcard(this.mindContext(s, null), this.postcardAsk(tx, s, photo, plan));
       tx.emit(m, { kind: 'photo.written', photo: photo.id, back: { ...plan, ...words, kind: plan.kind } as PostcardBack });
@@ -500,10 +726,11 @@ export class Engine {
     return ended;
   }
 
-  /** Ends whatever `m` is doing, unscheduling its next hop or its end. */
+  /** Ends whatever `m` is doing, unscheduling its next hop or its end. A trip a real Muse reported plants the rest first. */
   private endEpisode(tx: Tx, m: MuseId): void {
     const ep = tx.state(m).episode;
     if (!ep) return;
+    this.plantRest(tx, m);
     for (const i of this.deps.store.pending(m)) if (i.kind === 'episode.end' || i.kind === 'trip.hop') tx.remove(i.id);
     tx.emit(m, { kind: 'episode.ended', n: ep.n });
   }
@@ -591,6 +818,10 @@ export class Engine {
     const s = tx.state(m);
     const ep = s.episode;
     if (!ep || ep.n !== p.n || ep.pausedAt !== null || ep.plan.activity !== 'travel') return;
+    if (p.stop) {
+      await this.onReportedHop(tx, m, p, p.stop);
+      return;
+    }
     const trip = ep.plan.trip;
     const draw = this.deps.drawFor(m, p.n);
     const exclude = s.collected;
@@ -612,12 +843,13 @@ export class Engine {
       await this.startNext(tx, m);
       return;
     }
-    if (p.k === 0 && trip.kind !== 'revisit' && !s.regions.has(trip.region)) {
+    // The rules' trips only move a real Muse's body: its fog lifts where it explores itself.
+    if (p.k === 0 && trip.kind !== 'revisit' && !s.regions.has(trip.region) && !s.agent) {
       tx.emit(m, { kind: 'region.revealed', region: trip.region, topic });
     }
     const question = trip.kind === 'serendipity' ? null : trip.question;
     const ctx = this.mindContext(tx.state(m), question);
-    const mind = this.deps.mindFor(m);
+    const mind = this.mind(s);
     const judgments = await mind.judge(ctx, candidates);
     const kept = this.deps.life.keep(judgments);
     const place = this.deps.life.hopPlace(s, trip.region, p.k, draw);
@@ -706,7 +938,10 @@ export class Engine {
     if (ep.pausedAt === null) return;
     tx.emit(m, { kind: 'episode.resumed', n: ep.n });
     const at = (tx.now + (ep.remainingMs ?? 0)) as Instant;
-    if (ep.plan.activity === 'travel') {
+    const reported = ep.plan.activity === 'travel' && tx.state(m).agent ? reportedTrip(this.logOf(tx, m), ep.n) : null;
+    if (reported) {
+      this.scheduleStops(tx, m, ep.n, reported.stops, ep.hops, at);
+    } else if (ep.plan.activity === 'travel') {
       const last = ep.lastKept ? tx.state(m).discoveries.get(ep.lastKept) : undefined;
       const from = last ? candidateOf(last) : null;
       this.scheduleHop(tx, m, { n: ep.n, k: ep.hops, since: tx.now, from, ...(last?.pursuing ? { pursuing: last.pursuing } : {}) }, at);
@@ -758,8 +993,9 @@ export class Engine {
     const draw = this.deps.drawFor(m, n);
     const { life, social } = this.deps;
     const free = this.freeFriends(tx, s).map((state) => ({ state }));
-    let choice = life.next(s, tx.now, draw, social.visitOffer(s, free, tx.now));
-    if (choice === 'visit') {
+    // A real Muse chooses its own visits (not yet), so the rules never offer it one; friends still come to it.
+    let choice = life.next(s, tx.now, draw, s.agent ? 'none' : social.visitOffer(s, free, tx.now));
+    if (choice === 'visit' && !s.agent) {
       const v = social.chooseVisit(s, free, tx.now, draw);
       if (v) {
         this.startVisit(tx, m, v.other, v.role, v.until);
@@ -809,7 +1045,8 @@ export class Engine {
       const os = this.states.has(r.other) ? tx.state(r.other) : undefined;
       if (!os || os.working || !os.episode || os.episode.pausedAt !== null) continue;
       const a = os.episode.plan.activity;
-      if (a === 'rest' || a === 'travel') out.push(os);
+      // A real Muse out on a trip may be planting what it reported: it is visited at home.
+      if (a === 'rest' || (a === 'travel' && !os.agent)) out.push(os);
     }
     return out;
   }
@@ -826,12 +1063,14 @@ export class Engine {
     const s = tx.state(m);
     const log = [...this.deps.store.events(m), ...tx.emitted().filter((e) => e.museId === m)];
     const experiences = this.deps.life.experiences(s, log);
-    const proposal = await this.deps.mindFor(m).reflect(this.mindContext(s, null), experiences);
+    const proposal = await this.mind(s).reflect(this.mindContext(s, null), experiences);
     tx.emit(m, this.deps.life.validateReflection(s, log, proposal, tx.now));
   }
 
+  /** The basket due now, if any: the policy's pick of Muse's best, or for a real Muse the one it composed itself. */
   private deliverBasket(tx: Tx, m: MuseId): void {
-    const basket = this.deps.life.basket(tx.state(m), tx.now);
+    const s = tx.state(m);
+    const basket = s.agent ? composedBasket(s, waitingBasket(this.logOf(tx, m)), tx.now) : this.deps.life.basket(s, tx.now);
     if (basket) tx.emit(m, { kind: 'basket.delivered', basket });
   }
 
@@ -854,9 +1093,9 @@ export class Engine {
     tx.schedule({ id: `hop:${m}:${p.n}:${p.k}`, at: Math.floor(at) as Instant, museId: m, kind: 'trip.hop', payload: { ...p } });
   }
 
-  private async applySoul(tx: Tx, m: MuseId, text: string): Promise<void> {
+  private async applySoul(tx: Tx, m: MuseId, text: string, by?: Actor): Promise<void> {
     const { life, source } = this.deps;
-    const mind = this.deps.mindFor(m);
+    const mind = this.mind(tx.state(m));
     const parsed = life.parseSoul(text);
     const known = parsed.temperament;
     const missing = (['curiosity', 'focus', 'sociability', 'whimsy', 'novelty'] as const).some((k) => known[k] === undefined);
@@ -871,12 +1110,12 @@ export class Engine {
     const labels = life.privacyFilter(await mind.extractInterests(parsed.body, 'soul'), parsed.body);
     const topics = await resolveAll(source, labels);
     this.deps.store.setSoulText(m, text);
-    tx.emit(m, { kind: 'soul.updated', version: tx.state(m).soulVersion + 1, topics, temperament });
+    tx.emit(m, { kind: 'soul.updated', version: tx.state(m).soulVersion + 1, topics, temperament }, by);
   }
 
   /** The raw text stops here: only allow-listed, resolvable topics and a hash go into the log. */
   private async applyMemory(tx: Tx, m: MuseId, text: string): Promise<void> {
-    const labels = this.deps.life.privacyFilter(await this.deps.mindFor(m).extractInterests(text, 'memory'), text);
+    const labels = this.deps.life.privacyFilter(await this.mind(tx.state(m)).extractInterests(text, 'memory'), text);
     const topics = await resolveAll(this.deps.source, labels);
     const textHash = createHash('sha256').update(text).digest('hex');
     tx.emit(m, { kind: 'memory.updated', textHash, topics });

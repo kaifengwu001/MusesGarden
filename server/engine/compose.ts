@@ -1,7 +1,9 @@
 // The composition root: the one place that picks concrete stores, sources and minds and wires the domain lanes
 // into the engine. Everything else depends only on the contract.
-import type { Instant, MemberInfo, Mind, MuseId, MuseState, Source, Store } from '../../src/muse/contract';
+import type { Instant, Intake, MemberInfo, Mind, MuseId, MuseState, Source, Store } from '../../src/muse/contract';
+import { isGeneratedPlanet } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
+import { AgentMind } from '../adapters/minds/agent';
 import { HeuristicMind } from '../adapters/minds/heuristic';
 import { MetaMind } from '../adapters/minds/meta';
 import { loadCorpus } from '../adapters/sources/corpus';
@@ -21,8 +23,9 @@ import { parseSoul, renderSoulSection } from '../domain/soul';
 import { planetStills } from '../fixtures/planetStills';
 import { emptyState, reduceCore } from '../domain/state';
 import { localDay } from '../domain/time';
+import { AgentApi, refuseEveryLink } from './agent';
 import { Engine, type EngineDeps } from './engine';
-import { Commands, Views, type ViewHelpers } from './views';
+import { Commands, Views, worldSeedOf, type ViewHelpers } from './views';
 
 export interface GardenOptions {
   /** A SQLite file, or null for memory only. */
@@ -38,6 +41,8 @@ export interface GardenOptions {
   readonly members?: ReadonlyMap<MuseId, MemberInfo>;
   /** The run's seed for every draw (0, the default, is every earlier run). */
   readonly seed?: number;
+  /** What opens a real Muse's kept links (server/agent/intake.ts); without it, every link is refused. */
+  readonly intake?: Intake;
 }
 
 export interface Garden {
@@ -48,14 +53,18 @@ export interface Garden {
   readonly heroMind: Mind;
   /** The recorded reels, posts, articles and videos every find comes from. */
   readonly recording: MediaRecording;
+  /** A real Muse's commands and queries (AgentCommands and AgentQueries), for its connector (server/agent). */
+  readonly agent: AgentApi;
 }
 
 /**
  * Explored area drives the planet's growth slider: home alone is small, about forty regions is full size. A Muse on
- * the first planet (Momo, on the meadow) has explored the meadow's tuned size already, and grows from there.
+ * the first planet (Momo, on the meadow) has explored the meadow's tuned size already, and grows from there; a planet
+ * the workshop built (planet.changed) starts small, whatever its seed.
  */
 export function growth(s: MuseState): number {
-  const start = s.seed.worldSeed === FIRST_PLANET.seed ? FIRST_PLANET.growth : 0.05;
+  const built = s.planet !== undefined && isGeneratedPlanet(s.planet.id);
+  const start = !built && worldSeedOf(s) === FIRST_PLANET.seed ? FIRST_PLANET.growth : 0.05;
   return Math.min(1, start + (0.95 * Math.max(0, s.regions.size - 1)) / 40);
 }
 
@@ -104,9 +113,12 @@ export function buildGarden(opts: GardenOptions): Garden {
     salienceAt,
     source,
     mindFor: (id) => (id === opts.hero ? heroMind : heuristic),
+    // A real Muse (agent.joined) gets this mind whoever it is: its choices and words come through its connector.
+    agentMind: new AgentMind(),
   };
   const engine = new Engine(deps, opts.start);
   const views = new Views(engine, socialPolicy, { ...viewHelpers, grownHere: (topics, limit, exclude) => media.recordedFor(topics, limit, exclude) }, opts.members ?? new Map());
   const commands = new Commands(engine, opts.clock);
-  return { engine, views, commands, store, heroMind, recording };
+  const agent = new AgentApi(engine, views, socialPolicy, { intake: opts.intake ?? refuseEveryLink, salienceAt });
+  return { engine, views, commands, store, heroMind, recording, agent };
 }

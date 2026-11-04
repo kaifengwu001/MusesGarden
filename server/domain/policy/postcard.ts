@@ -78,6 +78,18 @@ export function postcardPlan(s: MuseState, photo: PhotoSpec, draw: Draw): Postca
   const key = `back:${photo.id}`;
   const weights = KINDS.map((k) => PULL[k](s.temperament, photo));
   const kind = KINDS[Math.max(0, categorical(draw(key, 0), weights))];
+  return planOf(kind, s, photo, draw);
+}
+
+/** The kinds of back `photo` can carry: a map needs Muse alone on a planet, a pressed find a find, a game a friend. */
+export function kindsFor(photo: PhotoSpec): readonly PostcardBackKind[] {
+  const anyone: Temperament = { curiosity: 0.5, focus: 0.5, sociability: 0.5, whimsy: 0.5, novelty: 0.5 };
+  return KINDS.filter((k) => PULL[k](anyone, photo) > 0);
+}
+
+/** What a back of `kind` needs settled for `photo`; a kind the photo can't carry falls back to a line. */
+export function planOf(kind: PostcardBackKind, s: MuseState, photo: PhotoSpec, draw: Draw): PostcardPlan {
+  const key = `back:${photo.id}`;
   switch (kind) {
     case 'doodle':
       return { kind, doodle: pickOf(photo.context === 'beyond' ? BEYOND_DOODLES : DOODLES[photo.subject], draw(key, 1)) };

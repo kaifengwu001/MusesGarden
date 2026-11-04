@@ -118,8 +118,9 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   if (!areFriends(host, guest)) return { host: [], guest: [] };
   const hostProfile = publicProfile(host);
   const guestProfile = publicProfile(guest);
-  const fromHost = chooseGift(hostProfile, guest, guestProfile);
-  const fromGuest = chooseGift(guestProfile, host, hostProfile);
+  // A real Muse chooses its own gifts (not yet), so it brings none; it still receives what the other brings.
+  const fromHost = host.agent ? null : chooseGift(hostProfile, guest, guestProfile);
+  const fromGuest = guest.agent ? null : chooseGift(guestProfile, host, hostProfile);
   const { pleasantness } = chemistry(host, guest);
 
   const where = { context: 'planet', planetOf: host.seed.id, dir: whereIs(host), zoom: SOCIAL.hangoutZoom } as const;
@@ -137,6 +138,7 @@ export function hangout(host: MuseState, guest: MuseState, now: Instant, draw: D
   const sinceInvite = (rel?.rapportSinceInvite ?? 0) + pleasantness;
   const needed = SOCIAL.inviteRapportBase + SOCIAL.inviteRapportSpan * (1 - host.temperament.sociability);
   const cooled = rel?.lastInviteAt == null || now - rel.lastInviteAt >= SOCIAL.inviteCooldownMs;
-  const invitation = sinceInvite >= needed && cooled ? invite(host, guest, now) : null;
+  // Inviting a friend's owner over is the host's own choice, so a real Muse's rules never make it.
+  const invitation = sinceInvite >= needed && cooled && !host.agent ? invite(host, guest, now) : null;
   return invitation ? { host: [...hostLog, invitation], guest: [...guestLog, invitation] } : { host: hostLog, guest: guestLog };
 }

@@ -53,6 +53,10 @@ function sentence(e: MuseEvent): string | null {
       return e.narrative ? `Thought things over. ${e.narrative}` : 'Thought things over.';
     case 'host.work':
       return e.state === 'started' ? 'Laptop out for work.' : 'Work done.';
+    case 'trip.reported':
+      return `Went browsing: ${e.thread.replace(/[.!?…]+$/, '')}.`;
+    case 'muse.checkedOut':
+      return `Checked out, ${e.mood.replace(/[.!?…]+$/, '')}.${e.plan ? ` ${e.plan}` : ''}`;
     default:
       return null;
   }

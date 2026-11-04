@@ -157,3 +157,38 @@ export function privacyFilterIn(labels: readonly string[], text: string): readon
     return st.length > 0 && !flagged.some((line) => st.every((x) => line.has(x)));
   });
 }
+
+// ─── Muse's own sentences ───────────────────────────────────────────────────
+// A real Muse writes whys, questions and postcards itself (server/agent). They stay about the finds and the garden:
+// a sentence that tells someone's private life is refused, and Muse says it again without it. The labels' rules
+// above would refuse every artist and city a find is about, so sentences get their own, narrower ones.
+
+/** Someone close, but only as somebody's: "my mum", "her husband", "your owner's boss". "The Wright brothers" passes. */
+const RELATIVE =
+  /\b(?:my|our|your|his|her|their|owner['’]s)\s+(?:\w+\s+){0,2}?(?:wife|husband|spouse|partner|boyfriend|girlfriend|fianc[eé]e?|ex|mum|mom|mommy|mother|dad|daddy|father|parents?|sons?|daughters?|kids?|child|children|baby|sisters?|brothers?|siblings?|cousins?|niece|nephew|aunt|auntie|uncle|grandma|grandpa|granny|nana|grandmother|grandfather|grandson|granddaughter|in-laws?|roommates?|boss|coworkers?|colleagues?|doctor|therapist)\b/i;
+const RELATIONSHIP = /\b(?:divorced?|divorcing|breakup|broke up with|having an affair|engaged to|married to)\b/i;
+const ILLNESS =
+  /\b(?:diagnos\w*|cancer|tumou?rs?|diabet\w*|adhd|autis\w*|pregnan\w*|miscarr\w*|ivf|infertil\w*|psychiatr\w*|medications?|prescri(?:bed|ption)s?|chemo\w*|bipolar|schizophren\w*|ptsd|ocd|epilep\w*|seizures?|rehab|addiction|dementia|alzheimer\w*|hiv|insulin|migraines?|illness|depressed|hospitali[sz]ed|surgery)\b/i;
+/** DRUG's endings on a word long enough to be a medicine's name, so "April" passes. */
+const MEDICINE = /\b\w{3,}(?:formin|statin|pril|olol|sartan|azole|cillin|mycin|oxetine|azepam|zolam|profen|tidine|lukast|triptan|xaban|gliptin|glutide)\b/i;
+const FINANCES =
+  /\b(?:salary|salaries|paycheck|payroll|mortgage|debts?|student loans?|income|bank account|savings account|credit card|inheritance|alimony|net worth|tax return)\b/i;
+const CONTACT = /[\w.+-]+@[\w-]+\.[\w.-]+|\b\d{1,5}\s+(?:[A-Za-z]+\s+){1,3}(?:street|st|avenue|ave|road|rd|lane|ln|drive|dr|boulevard|blvd|court|ct)\b|\b(?:apt|apartment|suite)\s*#?\d/i;
+/** Runs of digits, spaces and dashes; a phone number is one with nine digits or more (a span of years has eight). */
+const DIGIT_RUN = /\+?\d[\d\s().-]{6,}\d/g;
+const phoneLike = (text: string): boolean => (text.match(DIGIT_RUN) ?? []).some((run) => run.replace(/\D/g, '').length >= 9);
+/** Where a person lives, not where a frog does. */
+const WHEREABOUTS = /\b(?:(?:my|your) owner|owner|she|he|they|my \w+)\s+(?:lives?|moved)\s+(?:in|at|on|near|to)\b|\b(?:home|street) address\b/i;
+
+/**
+ * What in one of Muse's sentences tells someone's private life (a relative, a relationship, health, money, an address
+ * or a contact, where someone lives), in a few words; or null when it reads as being about the finds.
+ */
+export function personalFact(text: string): string | null {
+  if (RELATIVE.test(text) || RELATIONSHIP.test(text)) return 'it is about someone’s family or relationships';
+  if (ILLNESS.test(text) || MEDICINE.test(text)) return 'it is about someone’s health';
+  if (FINANCES.test(text)) return 'it is about someone’s money';
+  if (CONTACT.test(text) || phoneLike(text)) return 'it carries an address, a phone number or an email';
+  if (WHEREABOUTS.test(text)) return 'it says where someone lives';
+  return null;
+}

@@ -71,6 +71,8 @@ export interface HostPlanet {
   readonly seed: number;
   readonly g: number;
   readonly look: MuseLook;
+  /** The name its Muse gave a planet the workshop built (planet.changed); absent for the cast's planets. */
+  readonly name?: string;
 }
 
 export const topicLabel = (t: TopicKey): string => t.replace(/_/g, ' ');
@@ -323,7 +325,7 @@ function invitationCard(input: GardenInput, inv: MuseInvitation, index: LogIndex
     fromName: name,
     coat: coatOf(inv.host),
     world: home.planet,
-    worldName: planetOf(home.planet).title,
+    worldName: home.name ?? planetOf(home.planet).title,
     blurb: `${name}’s planet · ${loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`}`,
     seed: home.seed,
     g: home.g,
@@ -350,7 +352,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   ];
   return {
     today: input.day(input.now.at),
-    world: { seed: s.seed.worldSeed, g: input.g },
+    world: { seed: s.planet?.worldSeed ?? s.seed.worldSeed, g: input.g },
     muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now, input.trip), reach: s.reach },
     interests: interests(input, finds, index),
     friends: friends(input, index),
@@ -358,6 +360,25 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
     finds,
     postcards,
   };
+}
+
+/** A postcard whose back Muse hasn't written yet: a real Muse's waits for its own words (agentPostcardBack). */
+export interface WaitingPostcard {
+  readonly id: PhotoId;
+  readonly taken: Instant;
+  /** The front as the garden shows it, a path such as /api/postcards/<file>. */
+  readonly picture: string;
+  readonly subject: PhotoSpec['subject'];
+  readonly place: string;
+}
+
+/** Muse's photos with no back yet, newest first, each with its picture and place as the garden shows them. */
+export function waitingPostcards(input: GardenInput): WaitingPostcard[] {
+  const index = indexLog(input);
+  return input.s.photos
+    .filter((p) => !index.backs.has(p.id))
+    .reverse()
+    .map((p) => ({ id: p.id, taken: p.at, picture: shownAs(index.stills.get(p.id)).image, subject: p.subject, place: placeOf(input, p, index.moments.get(p.id)) }));
 }
 
 /** Muse's top interests, then every other one a delivered find grows as. */
