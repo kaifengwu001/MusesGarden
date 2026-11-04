@@ -8,10 +8,10 @@ import { expect, test, type Page } from '@playwright/test';
 
 /** Each page, its host, and the face it is given (Violet Dunes' Muse draws only the eyes and the smile). */
 const PAGES: readonly { readonly path: string; readonly planet: string; readonly host: string; readonly guest: string; readonly face: string; readonly shows: Record<string, number> }[] = [
-  ...(['golden-rye', 'cherry-blossom-waterways', 'sequoia-shrine', 'tulip-windmill-meadows', 'scarlet-sail-canyon', 'cobalt-windfields', 'lantern-reed-gardens'] as const).map((planet) => ({
+  ...(['golden-rye', 'cherry-blossom-waterways', 'sequoia-shrine', 'tulip-windmill-meadows', 'scarlet-sail-canyon', 'cobalt-windfields', 'lantern-reed-gardens', 'ukiyoe-pine-hamlet'] as const).map((planet) => ({
     path: `/environments/${planet}/?studio`,
     planet,
-    host: { 'golden-rye': 'Kiki', 'cherry-blossom-waterways': 'Hoji', 'sequoia-shrine': 'Fife', 'tulip-windmill-meadows': 'Van', 'scarlet-sail-canyon': 'Potato', 'cobalt-windfields': 'Dorie', 'lantern-reed-gardens': 'Pooh' }[planet],
+    host: { 'golden-rye': 'Kiki', 'cherry-blossom-waterways': 'Hoji', 'sequoia-shrine': 'Fife', 'tulip-windmill-meadows': 'Van', 'scarlet-sail-canyon': 'Potato', 'cobalt-windfields': 'Dorie', 'lantern-reed-gardens': 'Pooh', 'ukiyoe-pine-hamlet': 'Pina' }[planet],
     guest: 'Momo',
     face: 'happy squint ∩',
     shows: { eyes: 1, smile: 1, squint: 1, squeeze: 0 },

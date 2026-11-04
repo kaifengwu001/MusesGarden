@@ -25,6 +25,7 @@ const WORLDS: readonly { readonly planet: PlanetId; readonly host: string; reado
   { planet: 'cherry-blossom-waterways', host: 'juniper', name: 'Juniper', seed: 7703 },
   { planet: 'sequoia-shrine', host: 'bramble', name: 'Bramble', seed: 6624 },
   { planet: 'violet-dunes', host: 'wren', name: 'Wren', seed: 4271 },
+  { planet: 'ukiyoe-pine-hamlet', host: 'pina', name: 'Pina', seed: 6624 },
 ];
 
 interface VisitState {

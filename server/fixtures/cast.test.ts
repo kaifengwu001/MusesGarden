@@ -81,10 +81,9 @@ describe('cast.json', () => {
   it('can visit every planet whose world is on this branch with an engine, and none of the others yet', () => {
     const page = (id: string) => existsSync(fileURLToPath(new URL(`../../environments/${id}/index.html`, import.meta.url)));
     const visitable = PLANET_IDS.filter((id) => planetOf(id).visitable);
-    expect(PLANET_IDS.filter((id) => !planetOf(id).visitable).sort()).toEqual(['rice-terraces', 'ukiyoe-pine-hamlet']);
+    expect(PLANET_IDS.filter((id) => !planetOf(id).visitable).sort()).toEqual(['rice-terraces']);
     for (const id of visitable) if (id !== 'meadow') expect(page(id), id).toBe(true);
     expect(page('rice-terraces'), 'a standalone viewer with no engine link').toBe(true);
-    expect(page('ukiyoe-pine-hamlet'), 'a standalone viewer with no engine link yet: make it visitable once its page hosts visits').toBe(true);
   });
 
   it('dresses every Muse in a body the renderer has: the original Muse or one of the dressed muses', () => {

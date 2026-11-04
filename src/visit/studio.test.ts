@@ -11,7 +11,7 @@ describe('the photo studio', () => {
 
   it('draws each world’s own friend in its look, on its seed, with Momo beside it', () => {
     const cast = castMembers();
-    const worlds = ['golden-rye', 'cherry-blossom-waterways', 'sequoia-shrine', 'violet-dunes', 'tulip-windmill-meadows', 'scarlet-sail-canyon', 'cobalt-windfields', 'lantern-reed-gardens'] as const;
+    const worlds = ['golden-rye', 'cherry-blossom-waterways', 'sequoia-shrine', 'violet-dunes', 'tulip-windmill-meadows', 'scarlet-sail-canyon', 'cobalt-windfields', 'lantern-reed-gardens', 'ukiyoe-pine-hamlet'] as const;
     for (const planet of worlds) {
       const own = cast.find((m) => m.planet === planet);
       expect(own, planet).toBeDefined();

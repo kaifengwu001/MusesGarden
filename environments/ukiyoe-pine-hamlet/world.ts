@@ -100,6 +100,8 @@ export class World {
   readonly birds: Birds;
   readonly butterflies: Butterflies;
   readonly muse: Muse;
+  /** Muses visiting on a ticket (src/visit/): drawn, kept up to date and culled as the host is. */
+  readonly visitors: Muse[] = [];
   readonly residents: Residents;
   readonly scenery: HamletScenery;
   readonly weather: HamletWeather;
@@ -210,6 +212,13 @@ export class World {
     this.scene.add(this.sky.mesh, this.surface.mesh, this.homestead.group, this.muse.mesh, this.muse.props.group, this.grass.mesh, ...this.flowers.meshes, this.petals.mesh, this.birds.mesh, this.butterflies.mesh, this.clouds.mesh);
     this.scene.add(this.scenery.group, this.weather.group, ...this.neighbourHomes.map(home => home.group), ...this.residents.members.flatMap(resident => [resident.muse.mesh, resident.muse.props.group]));
     this.applyTier(tier);
+  }
+
+  /** A visiting Muse joins the scene: its body, its props and its shadow. */
+  addVisitor(muse: Muse): void {
+    this.visitors.push(muse);
+    this.scene.add(muse.mesh, muse.props.group);
+    this.clouds.addShadowCaster(muse.shadowMesh);
   }
 
   applyTier(tier: Tier): void {
@@ -399,6 +408,7 @@ export class World {
     // Winter has birds and falling snow, without the meadow's warm-season insects.
     this.butterflies.mesh.visible &&= this.season !== 'snow';
     this.muse.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
+    for (const visitor of this.visitors) visitor.update(clock.time, this.terrain, rig.camera.position, this.look.uWindVec.value, this.look.uPixelAngle.value, p.muse.show);
     const seen = this.groundInSight();
     this.clouds.update(this.renderer, L.seed, R, clock.time, p.clouds, this.windAxis, this.sunDir, rig.camera, this.warp, rig.up, seen);
     this.cloudCover.update(this.renderer, rig.up, seen, p.clouds.snow);
@@ -406,6 +416,7 @@ export class World {
     const cam = rig.camera;
     this.frustum.setFromProjectionMatrix(this.projView.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     this.muse.cull(this.frustum, this.warp);
+    for (const visitor of this.visitors) visitor.cull(this.frustum, this.warp);
     this.residents.cull(this.frustum, this.warp);
     this.scenery.cull(this.frustum, this.warp, cam.position);
     const sweep = this.terrainUniforms.uCottageSun.value;
@@ -652,18 +663,34 @@ export class World {
   }
 
   /** Closest body hit, including both local neighbours. */
-  pickMuse(ndcX: number, ndcY: number): { side: number; resident?: string } | null {
+  pickMuse(ndcX: number, ndcY: number): { side: number; resident?: string; visitor?: Muse } | null {
     const cam = this.rig.camera;
     const ray = new Ray(cam.position.clone(), new Vector3(ndcX, ndcY, 0.5).unproject(cam).sub(cam.position).normalize());
-    const host = this.muse.pick(ray, this.warp);
+    let host: { side: number; distance: number; visitor?: Muse } | null = this.muse.pick(ray, this.warp);
+    // (a visiting Muse, tapped, says hello as the host does: the nearest the ray meets)
+    for (const visitor of this.visitors) {
+      const hit = visitor.pick(ray, this.warp);
+      if (hit && (!host || hit.distance < host.distance)) host = { ...hit, visitor };
+    }
     const neighbour = this.residents.pick(ray, this.warp);
     if (neighbour && (!host || neighbour.distance < host.distance)) return { side: neighbour.side, resident: neighbour.resident.id };
-    return host;
+    return host && (host.visitor ? { side: host.side, visitor: host.visitor } : { side: host.side });
   }
 
-  tapMuse(time: number, resident?: string): void { if (resident) this.residents.tap(resident, time); else this.muse.tap(time); }
-  holdMuse(time: number, side: number, resident?: string): void { if (resident) this.residents.hold(resident, time, side); else this.muse.hold(time, side); }
-  releaseMuse(time: number, resident?: string): void { if (resident) this.residents.letGo(resident, time); else this.muse.letGo(time); }
+  tapMuse(time: number, hit: { resident?: string; visitor?: Muse }): void {
+    if (hit.resident) this.residents.tap(hit.resident, time);
+    else (hit.visitor ?? this.muse).tap(time);
+  }
+
+  holdMuse(time: number, hit: { side: number; resident?: string; visitor?: Muse }): void {
+    if (hit.resident) this.residents.hold(hit.resident, time, hit.side);
+    else (hit.visitor ?? this.muse).hold(time, hit.side);
+  }
+
+  releaseMuse(time: number, hit: { resident?: string; visitor?: Muse }): void {
+    if (hit.resident) this.residents.letGo(hit.resident, time);
+    else (hit.visitor ?? this.muse).letGo(time);
+  }
 
   /** A gust ring bursting out from a point on the meadow. */
   gust(dir: Vector3, time: number): void {

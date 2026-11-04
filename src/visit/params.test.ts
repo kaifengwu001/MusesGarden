@@ -56,7 +56,7 @@ describe('a planet open to visits', () => {
     expect(visitable('')).toBe(false);
     expect(visitable('golden-rye')).toBe(true);
     expect(visitable('rice-terraces')).toBe(false);
-    expect(visitable('ukiyoe-pine-hamlet')).toBe(false);
+    expect(visitable('ukiyoe-pine-hamlet')).toBe(true);
   });
 
   it('is the only kind a guest goes home to: from a planet with no garden page yet, the meadow’s', () => {

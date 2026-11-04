@@ -26,7 +26,7 @@ export const PLANETS: Readonly<Record<KnownPlanet, Planet>> = {
   'sequoia-shrine': { title: 'Sequoia Shrine', path: '/environments/sequoia-shrine/', visitable: true },
   'violet-dunes': { title: 'Violet Dunes', path: '/environments/violet-dunes/', visitable: true },
   'rice-terraces': { title: 'Rice Terraces', path: '/environments/rice-terraces/', visitable: false },
-  'ukiyoe-pine-hamlet': { title: 'Ukiyo-e Pine Hamlet', path: '/environments/ukiyoe-pine-hamlet/', visitable: false },
+  'ukiyoe-pine-hamlet': { title: 'Ukiyo-e Pine Hamlet', path: '/environments/ukiyoe-pine-hamlet/', visitable: true },
 };
 
 export const PLANET_IDS = Object.keys(PLANETS) as readonly KnownPlanet[];

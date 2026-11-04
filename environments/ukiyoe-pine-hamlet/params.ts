@@ -1,3 +1,4 @@
+import { DRESSED, type DressedKind } from '../../src/life/museMesh';
 import { areaOfRadius, growthForArea } from '../../src/planet/growth';
 
 // One typed parameter schema. Every tunable lives here with its default,
@@ -138,7 +139,8 @@ export const schema = {
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
-    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'sculpt', 'field'], 'tpose6', 'live'),
+    // (the original Muse, its other bodies, then the muses in clothes: src/life/museMesh.ts DRESSED)
+    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'sculpt', 'field', ...(Object.keys(DRESSED) as DressedKind[])], 'tpose6', 'live'),
   },
   light: {
     // one light for now (late morning); dawn and golden hour are kept in the palette for later

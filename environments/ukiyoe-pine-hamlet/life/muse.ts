@@ -1,9 +1,10 @@
 import type { Ray } from 'three';
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform } from 'three';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, InstancedBufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Sphere, Vector3, Vector4, type Frustum, type IUniform, type Texture } from 'three';
 import type { Terrain } from '../planet/terrain';
 import { warpPoint, type WarpFrame } from '../../../src/render/warp';
 import { FIELD_FIT, JOINT, type MuseBody, type MuseFit } from '../../../src/life/museBody';
-import { SCULPTS, type SculptKind } from '../../../src/life/museMesh';
+import { dressMuse, fitOf } from '../../../src/life/museDress';
+import type { DressedKind, MuseMesh, SculptKind } from '../../../src/life/museMesh';
 import type { Loaded } from '../../../src/life/museSculptLoader';
 import BodyWorker from '../../../src/life/museBody.worker?worker&inline';
 import fragmentShader from './muse.frag.glsl?raw';
@@ -66,7 +67,8 @@ const BODY: readonly [number, number, number][] = [
 ];
 export const PRESSES = BODY.length;
 
-export type MuseModel = 'field' | SculptKind;
+/** Muse's body: the field's own, a sculpt of it, or one of the muses in clothes (src/life/museMesh.ts DRESSED). */
+export type MuseModel = 'field' | SculptKind | DressedKind;
 
 // Each inhabitant has its own skeleton and GPU uniforms; expensive meshing and
 // sculpt loading happen once for this page, including the host Muse.
@@ -91,7 +93,7 @@ function fieldBody(): Promise<MuseBody> {
   });
   return fieldJob;
 }
-function sculptBody(kind: SculptKind): Promise<Loaded> {
+function sculptBody(kind: SculptKind | DressedKind): Promise<Loaded> {
   return import('../../../src/life/museSculptLoader').then(({ sculptFor }) => sculptFor(kind));
 }
 
@@ -192,7 +194,7 @@ export class Muse {
     this.loading = fieldBody().then((body) => {
       if (this.disposed) return;
       this.fieldBody = body;
-      this.take(body, FIELD_FIT, null);
+      this.take(body, FIELD_FIT, null, null);
     });
   }
 
@@ -216,20 +218,20 @@ export class Muse {
     this.loading = this.loading.then(async () => {
       if (this.disposed || this.model !== model) return;
       if (model === 'field') {
-        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null);
+        if (this.fieldBody) this.take(this.fieldBody, FIELD_FIT, null, null);
         return;
       }
       try {
         const sculpt = await sculptBody(model);
-        if (!this.disposed && this.model === model) this.take(sculpt.body, SCULPTS[model].fit, sculpt.grade);
+        if (!this.disposed && this.model === model) this.take(sculpt.body, fitOf(model, sculpt.body), sculpt.grade, sculpt.paint);
       } catch (error) {
         console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
       }
     });
   }
 
-  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit and its paint. */
-  private take(body: MuseBody & { colour?: Float32Array; raise?: Float32Array; raiseNormal?: Float32Array; raiseOpen?: Float32Array; hang?: Float32Array; hangNormal?: Float32Array; comb?: Float32Array }, fit: MuseFit, grade: Vector3 | null): void {
+  /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit, its paint, and its clothes' (src/life/museDress.ts). */
+  private take(body: MuseBody & Partial<MuseMesh>, fit: MuseFit, grade: Vector3 | null, paint: Texture | null): void {
     const index = new BufferAttribute(body.index, 1);
     const position = new BufferAttribute(body.position, 3);
     const skinIndex = new BufferAttribute(body.skinIndex, 4);
@@ -274,6 +276,7 @@ export class Muse {
       else delete material.defines[define];
       material.needsUpdate = true;
     }
+    dressMuse(g, material, body, paint);
     const s = new BufferGeometry();
     s.setIndex(index);
     s.setAttribute('position', position);
@@ -293,7 +296,7 @@ export class Muse {
     if (this.disposed) return;
     if (!this.suppliedLife && !this.roam?.fits(terrain)) this.roam = new MuseRoam(terrain, MUSE_HEIGHT);
     const R = terrain.radius;
-    const l = this.suppliedLife ?? this.lifeAt(time, terrain, camera, this.roam!);
+    const l = this.suppliedLife ?? this.lifeAt(time, camera, this.roam!);
     this.living = l;
     this.where.dir.copy(l.dir);
     this.where.height = l.height;
@@ -373,7 +376,7 @@ export class Muse {
   }
 
   /** Its life at a time, unless the engine has it out on the planet or working at home. */
-  private lifeAt(time: number, terrain: Terrain, camera: Vector3, roam: MuseRoam): Roaming {
+  private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
     const d = this.direction;
     const life = roam.at(time, camera);
     if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;
@@ -400,7 +403,8 @@ export class Muse {
     }
     // out on the planet: on the ground at its spot, facing the way it goes
     r.dir.copy(d.dir).normalize();
-    r.height = terrain.height(r.dir);
+    // (on what its life would stand on there: a deck or a porch where the home has one, else the planet's ground)
+    r.height = roam.groundAt(r.dir);
     if (d.toward) r.heading.subVectors(d.toward, r.dir);
     r.heading.addScaledVector(r.dir, -r.heading.dot(r.dir));
     if (r.heading.lengthSq() < 1e-10) r.heading.set(r.dir.y, -r.dir.x, 0);
@@ -410,6 +414,9 @@ export class Muse {
     a.stride = 1;
     a.gait = time * OUT_GAIT;
     r.home = false;
+    // (tapped or held out here, it answers you as at home)
+    r.cues.petted = -1;
+    roam.answerOver(time, r);
     return r;
   }
 
@@ -456,17 +463,17 @@ export class Muse {
     return best < Infinity ? { side, distance: best } : null;
   }
 
-  /** Your doings (world time, s): a tap, a hold on one side, letting go. */
+  /** Your doings (world time, s): a tap, a hold on one side, letting go. Out where it is directed, it is awake to them. */
   tap(time: number): void {
-    this.roam?.tap(time);
+    this.roam?.tap(time, this.direction.kind === 'out');
   }
 
   hold(time: number, side: number): void {
-    this.roam?.hold(time, side);
+    this.roam?.hold(time, side, this.direction.kind === 'out');
   }
 
   letGo(time: number): void {
-    this.roam?.letGo(time);
+    this.roam?.letGo(time, this.direction.kind === 'out');
   }
 
   /** Its life (dev: seeking it, reading its parts). */

@@ -24,6 +24,8 @@ import { createPanel } from './ui/panel';
 import { Postcard } from './ui/postcard';
 import { Ui } from './ui/ui';
 import { attachInput } from '../../src/view/input';
+import { prepareStudio, prepareVisit, VisitUi } from '../../src/visit/visitUi';
+import { ukiyoeVisit } from './visit';
 import { AHEAD } from '../../src/life/scatter';
 import { Keys } from '../../src/view/keys';
 import { World } from './world';
@@ -90,6 +92,10 @@ async function boot(): Promise<void> {
   };
   chooseTier(store.values.quality.tier);
 
+  // A visit on a ticket (`?visit=`): the host's planet, its seed and growth set before the world is made.
+  const visit = await prepareVisit(store, 'ukiyoe-pine-hamlet');
+  // Or the photo studio (`?studio`): the planet set for photos taken by hand, with no server (src/visit/studio.ts).
+  const studio = visit ? null : await prepareStudio(store, 'ukiyoe-pine-hamlet');
   const globals = createGlobals();
   const world = new World(renderer, globals, store, quality.tier);
   // (a probe build, VITE_PROBE=1 vite build, exposes it too: timings of the production build)
@@ -146,8 +152,9 @@ async function boot(): Promise<void> {
   // Muse's garden over the meadow: its finds, pins, post, baskets and Muse (ui/garden). A press on Muse itself is
   // Muse's; the garden sees every other tap before the meadow does. When the URL names the Muse engine
   // (`?garden=/api/muses/<id>`, or `?dev`), the engine moves the 3D Muse; `?dev` also shows its dev tools (muse/ui).
-  const garden = new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
-  const hamlet = new HamletUi(uiRoot, {
+  // On a visit, the visit's interface in its place (in the photo studio, the studio's): no engine of our own, no hamlet panel.
+  const garden = studio ? studio.open(ukiyoeVisit(world), clock) : visit ? new VisitUi(uiRoot, ukiyoeVisit(world), visit) : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world));
+  const hamlet = visit || studio ? null : new HamletUi(uiRoot, {
     residents: world.residents,
     getSeason: () => world.season,
     setSeason: season => world.setSeason(season),
@@ -167,8 +174,8 @@ async function boot(): Promise<void> {
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; the meadow's own
   // click, double-click and hold go on everywhere else
-  const onMuse = (x: number, y: number): { side: number; resident?: string } | null => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
-  let pettingMuse: { resident?: string } | null = null;
+  const onMuse = (x: number, y: number): ReturnType<World['pickMuse']> => world.pickMuse((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
+  let pettingMuse: NonNullable<ReturnType<World['pickMuse']>> | null = null;
   attachInput(canvas, {
     drag: (dx, dy) => {
       garden.interrupt();
@@ -183,8 +190,8 @@ async function boot(): Promise<void> {
     tap: (x, y) => {
       const touch = onMuse(x, y);
       if (touch) {
-        world.tapMuse(clock.time, touch.resident);
-        if (touch.resident) hamlet.select(touch.resident);
+        world.tapMuse(clock.time, touch);
+        if (touch.resident) hamlet?.select(touch.resident);
         return;
       }
       if (garden.tap(x, y, canvas.clientWidth, canvas.clientHeight)) {
@@ -199,8 +206,8 @@ async function boot(): Promise<void> {
     doubleTap: (x, y) => {
       const touch = onMuse(x, y);
       if (touch) {
-        world.tapMuse(clock.time, touch.resident);
-        if (touch.resident) hamlet.select(touch.resident);
+        world.tapMuse(clock.time, touch);
+        if (touch.resident) hamlet?.select(touch.resident);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -214,8 +221,8 @@ async function boot(): Promise<void> {
       const touch = onMuse(x, y);
       if (touch) {
         pettingMuse = touch;
-        world.holdMuse(clock.time, touch.side, touch.resident);
-        if (touch.resident) hamlet.select(touch.resident);
+        world.holdMuse(clock.time, touch);
+        if (touch.resident) hamlet?.select(touch.resident);
         return;
       }
       const hit = world.pick((x / canvas.clientWidth) * 2 - 1, 1 - (y / canvas.clientHeight) * 2);
@@ -224,7 +231,7 @@ async function boot(): Promise<void> {
     holdMove: () => undefined,
     holdEnd: () => {
       if (pettingMuse) {
-        world.releaseMuse(clock.time, pettingMuse.resident);
+        world.releaseMuse(clock.time, pettingMuse);
         pettingMuse = null;
         return;
       }
@@ -293,7 +300,7 @@ async function boot(): Promise<void> {
     garden.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     garden.frame(clock.realDt);
-    hamlet.update();
+    hamlet?.update();
     if (world.rig.mode !== store.values.view.mode) {
       syncingMode = true;
       store.set('view.mode', world.rig.mode);
