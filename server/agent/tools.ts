@@ -99,19 +99,18 @@ function workshopNews(jobs: readonly JobView[]) {
  */
 export function ownerLine(jobs: readonly JobView[], now: number): string | null {
   const named = (list: readonly JobView[]): string => {
-    const names = [...new Set(list.map((j) => `my ${j.kind}`))];
-    return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+    const kinds = [...new Set(list.map((j) => j.kind))];
+    return `my ${kinds.length > 1 ? `${kinds.slice(0, -1).join(', ')} and ${kinds[kinds.length - 1]}` : kinds[0]}`;
   };
   const waiting = jobs.filter((j) => j.state === 'waiting');
   const working = jobs.filter((j) => j.state === 'working');
-  const say = 'Just say "check your garden" and we’ll look at them together; otherwise I’ll look on my next visit.';
+  const say = 'Say "check your garden" to see them with me.';
   if (working.length) {
     const minutes = Math.round((Math.min(...working.map((j) => j.nextRoundAt ?? now)) - now) / 60_000);
     const when = minutes <= 2 ? 'in a few minutes' : `in about ${minutes} minutes`;
-    const also = waiting.length ? ` (${named(waiting)} already ${waiting.length > 1 ? 'have' : 'has'} some waiting)` : '';
-    return `New pictures of ${named(working)} will be ready ${when}${also}. ${say}`;
+    return `New pictures of ${named(working)} ${when}. ${say}`;
   }
-  if (waiting.length) return `There are new pictures of ${named(waiting)} to look at. ${say}`;
+  if (waiting.length) return `New pictures of ${named(waiting)} are ready. ${say}`;
   return null;
 }
 
