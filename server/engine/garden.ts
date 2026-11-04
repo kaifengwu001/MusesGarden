@@ -353,7 +353,7 @@ export function gardenSnapshot(input: GardenInput): GardenSnapshot {
   return {
     today: input.day(input.now.at),
     world: { seed: s.planet?.worldSeed ?? s.seed.worldSeed, g: input.g },
-    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now, input.trip), reach: s.reach },
+    muse: { name: s.seed.name, soul: soulLine(input.soul), status: museStatus(input.now, input.trip), reach: s.reach, ...(s.look ? { look: s.look } : {}) },
     interests: interests(input, finds, index),
     friends: friends(input, index),
     baskets: delivered.map(({ basket }) => basket),

@@ -16,6 +16,7 @@ import { POT } from '../../life/museRig';
 import type { Indoors, Room } from '../../life/museRoam';
 import { Pins, type PinSpec } from '../../life/pins';
 import { FLOOR, FRONT, OUTER } from '../../life/props';
+import { isLook } from '../../muse/looks';
 import type { ParamStore } from '../../params';
 import { angleBetween, tangentToward, travel } from '../../planet/geo';
 import { createGroundSample, type Layout } from '../../planet/terrain';
@@ -335,6 +336,9 @@ export class GardenUi {
 
   /** Muse's own planet, when the source names one: the finds were found on it. */
   private applyWorld(): void {
+    // A real Muse's own body, as the workshop made it, unless the address chose one (mm=); the cast have none.
+    const look = this.state.snapshot?.muse.look;
+    if (look !== undefined && isLook(look) && this.store.values.muse.model === 'tpose6') this.store.set('muse.model', look);
     const world = this.state.snapshot?.world;
     if (!world) return;
     this.store.set('world.seed', world.seed);

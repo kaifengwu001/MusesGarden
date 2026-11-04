@@ -195,6 +195,8 @@ export interface MuseProfile {
   soul: string;
   status: MuseStatus;
   reach: Reach;
+  /** A real Muse's body, once the workshop made it (src/muse/looks.ts); absent for every other Muse. */
+  look?: string;
 }
 
 /** Everything the garden shows, as of now. */
