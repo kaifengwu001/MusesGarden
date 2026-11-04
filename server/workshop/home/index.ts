@@ -392,17 +392,17 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
       };
     },
 
-    finish(job) {
+    finish(job, io) {
       const d = data(job);
-      const where = d.installed!;
+      const where = { ...d.installed!, path: relative(io.repo, d.installed!.path) || '.' };
       const n = d.home?.pieces.length ?? 0;
       return Promise.resolve({
         kind: 'done',
         data: d,
         result: {},
         message: where.fork
-          ? `Muse’s home is furnished: ${n} piece${n === 1 ? '' : 's'} in ${where.path} (home.json, assets/home/).`
-          : `Muse’s home is ready (${n} piece${n === 1 ? '' : 's'}) and waits in ${where.path} for its planet: furnishFork puts it in.`,
+          ? `Muse’s home is furnished: ${n} piece${n === 1 ? '' : 's'} in ${where.path}/ (home.json, assets/home/).`
+          : `Muse’s home is ready (${n} piece${n === 1 ? '' : 's'}) and waits in ${where.path}/ for its planet: furnishFork puts it in.`,
       });
     },
   };

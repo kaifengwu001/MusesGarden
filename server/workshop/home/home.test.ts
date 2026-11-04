@@ -157,7 +157,7 @@ describe('the home job', () => {
     expect(r.outcome.kind).toBe('done');
     if (r.outcome.kind !== 'done') return;
     expect(r.outcome.result).toEqual({});
-    expect(r.outcome.message).toContain(fork);
+    expect(r.outcome.message).toContain('in environments/muse-test/ (home.json, assets/home/)');
   });
 
   it('the fork’s own hut loads the pieces from home.json: the kept ones, then the made ones', async () => {
@@ -207,7 +207,7 @@ describe('the home job', () => {
     expect(r.outcome.packet.text).toContain('planet isn’t made yet');
     r = await run(pipeline, answer(pipeline, r.job, { approve: true }), at);
     if (r.outcome.kind !== 'done') throw new Error(r.outcome.kind);
-    expect(r.outcome.message).toContain(join(at.dir, 'home'));
+    expect(r.outcome.message).toContain(`waits in ${relative(root, join(at.dir, 'home'))}/`);
   });
 
   it('asks for something to furnish with, and caps the drafts', async () => {
