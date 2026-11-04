@@ -49,7 +49,8 @@ async function reachable(url: string, signal: AbortSignal): Promise<boolean> {
 export const labRenderer: Renderer = async ({ look, out, devServer, repo, signal }) => {
   const base = devServer.replace(/\/$/, '');
   if (!(await reachable(`${base}/src/dev/museLab.html`, signal))) return { ok: false, reason: `the page's dev server isn't running at ${base}` };
-  if (!(await reachable(`${base}/api/looks/${look}.glb`, signal))) return { ok: false, reason: `the dev server at ${base} doesn't serve /api/looks/${look}.glb` };
+  // (a made body is served from /api/looks; the lab's own models are its assets)
+  if (look.startsWith('gen-') && !(await reachable(`${base}/api/looks/${look}.glb`, signal))) return { ok: false, reason: `the dev server at ${base} doesn't serve /api/looks/${look}.glb` };
   const stills = POSES.flatMap(([pose, s]) => VIEWS.map((view) => ({ pose, view, s, file: stillFile(look, pose, s, view) })));
   const missing = stills.filter((st) => !existsSync(join(out, st.file)));
   if (missing.length) {
