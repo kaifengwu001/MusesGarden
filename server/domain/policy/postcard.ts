@@ -1,6 +1,6 @@
 // What Muse puts on the back of a postcard: the kind of back and its drawing, from what the photo shows and Muse's
 // temperament. The mind writes the words (Mind.writePostcard); nothing here reads them back.
-import type { Doodle, Draw, MuseState, PhotoSpec, PhotoSubject, PostcardBackKind, PostcardPlan, Temperament } from '../../../src/muse/contract';
+import type { DiscoveryId, Doodle, Draw, MuseId, MuseState, PhotoSpec, PhotoSubject, PostcardBackKind, PostcardPlan, Temperament } from '../../../src/muse/contract';
 import { categorical } from '../rng';
 
 /** Each kind's pull for a Muse of this temperament, or 0 when the photo can't carry it. */
@@ -19,6 +19,8 @@ const PULL: Readonly<Record<PostcardBackKind, (t: Temperament, p: PhotoSpec) => 
 };
 
 const KINDS = Object.keys(PULL) as PostcardBackKind[];
+/** Every kind of back there is. */
+export const BACK_KINDS: readonly PostcardBackKind[] = KINDS;
 
 /** The drawings that fit each subject; a photo from beyond the planet draws the planet or the stars. */
 const DOODLES: Readonly<Record<PhotoSubject, readonly Doodle[]>> = {
@@ -106,4 +108,23 @@ export function planOf(kind: PostcardBackKind, s: MuseState, photo: PhotoSpec, d
     default:
       return { kind };
   }
+}
+
+/**
+ * A back of `kind` for a real Muse, which may pick any kind for any photo: planOf's plan, except that a photo with no
+ * find to press presses the one Muse names (`find`, if it keeps it) or its newest, and a game with nobody in the photo
+ * is played with its closest friend. With neither, the page draws the pressed label as a line, the friend as "my friend".
+ */
+export function anyPlan(kind: PostcardBackKind, s: MuseState, photo: PhotoSpec, draw: Draw, find?: DiscoveryId): PostcardPlan {
+  if (kind === 'pressed') {
+    const named = find !== undefined && s.discoveries.has(find) ? find : undefined;
+    const newest = [...s.discoveries.values()].reduce<{ id: DiscoveryId; at: number } | null>((a, d) => (!a || d.at > a.at ? d : a), null);
+    return { kind, find: named ?? photo.discoveryId ?? newest?.id ?? ('' as DiscoveryId) };
+  }
+  if (kind === 'game' && photo.companions.length === 0) {
+    let closest: { other: MuseId; rapport: number } | null = null;
+    for (const r of s.social.relationships.values()) if (r.status === 'friends' && (!closest || r.rapport > closest.rapport)) closest = r;
+    return { kind, friend: closest?.other ?? ('' as MuseId), board: gameBoard((k) => draw(`back:${photo.id}`, 10 + k)) };
+  }
+  return planOf(kind, s, photo, draw);
 }
