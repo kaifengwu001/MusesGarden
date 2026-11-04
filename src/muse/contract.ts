@@ -1245,6 +1245,8 @@ export interface Letterbox {
     readonly picture: string;
     readonly subject: string;
     readonly place: string;
+    /** Kinds of back that suit this photo, the one the garden would choose first. Only a hint: any kind is taken. */
+    readonly kinds?: readonly PostcardBackKind[];
   }[];
   readonly allowances: { readonly findsLeft: number; readonly photosLeft: number; readonly basketSentToday: boolean };
   readonly lastCheckout: { readonly at: Instant; readonly mood: string; readonly plan: string } | null;
