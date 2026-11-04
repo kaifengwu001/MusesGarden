@@ -317,7 +317,9 @@ export class GardenUi {
     this.refreshWhereabouts();
     if (change === 'snapshot' && s.freshBasket) {
       const fresh = s.freshBasket;
-      setTimeout(() => this.toast(`Muse brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', () => this.showBasket(fresh.id)), 1800);
+      // (an owner's view of a real Muse's garden calls it by its name, as the page's title does)
+      const who = document.body.classList.contains('owner-view') ? (s.snapshot?.muse.name ?? 'Muse') : 'Muse';
+      setTimeout(() => this.toast(`${who} brought you a basket${fresh.title ? `: ${fresh.title}` : ''}`, 'Go and see', () => this.showBasket(fresh.id)), 1800);
     }
     if (change === 'postcards' || change === 'snapshot') this.mail.refresh();
     if (change === 'status' || change === 'snapshot' || change === 'friends') this.refreshTrip();
