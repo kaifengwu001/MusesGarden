@@ -13,6 +13,7 @@ import type { AgentCommands, AgentQueries, Instant } from '../../src/muse/contra
 import type { Workshop } from '../workshop/types';
 import { AdminKeyRequest, bearer, forwarded, mintAgentKey, museOfRequest, rateLimit, sameToken, writeAdminToken } from './auth';
 import { serveDoorbell } from './doorbell';
+import { serveStudio } from './studio';
 import { rpcError, serveMcp } from './mcp';
 import { CORS, failureJson, readBody, retryHeader, sendJson, serveRest } from './rest';
 import { openAgentStore } from './store';
@@ -69,7 +70,10 @@ export function createAgentHandler(deps: AgentDeps): AgentHandler {
   mkdirSync(dataDir, { recursive: true });
   const store = openAgentStore(join(dataDir, 'agent.db'));
   const adminToken = writeAdminToken(dataDir);
-  const tools = connectorTools({ doorbell: (museId) => store.doorbellOf(museId), ...(deps.roundWaitMs === undefined ? {} : { roundWaitMs: deps.roundWaitMs }) });
+  const tools = connectorTools({
+    doorbell: (museId) => store.doorbellOf(museId),
+    ...(deps.roundWaitMs === undefined ? {} : { roundWaitMs: deps.roundWaitMs }),
+  });
   const callTool = toolCaller({ store, wall, ...(deps.toolTimeoutMs === undefined ? {} : { timeoutMs: deps.toolTimeoutMs }) });
   const limit = rateLimit();
   const configured = trimSlash(deps.origin ?? process.env.MUSE_PUBLIC_ORIGIN);
@@ -157,6 +161,11 @@ export function createAgentHandler(deps: AgentDeps): AgentHandler {
     const ring = /^\/d\/([^/]+)$/.exec(path);
     if (ring !== null) {
       serveDoorbell(res, req.method, ring[1], store, workshop);
+      return true;
+    }
+    const studio = /^\/s\/([^/.]+)(\.json)?$/.exec(path);
+    if (studio !== null) {
+      serveStudio(res, req.method, studio[1], studio[2] !== undefined, { store, workshop, queries, dataDir, now });
       return true;
     }
     if (path === '/garden.md' && (req.method === 'GET' || req.method === 'HEAD')) {

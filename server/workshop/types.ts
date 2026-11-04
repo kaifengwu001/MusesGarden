@@ -30,6 +30,15 @@ export interface PacketPicture {
 }
 
 /** One round waiting for Muse: what it is, the pictures, and what Muse is asked to do. */
+/** An answered round, as kept in the job's history.json: what Muse was shown and what it said. */
+export interface RoundRecord {
+  readonly round: number;
+  readonly text: string;
+  readonly pictures: readonly { readonly path: string; readonly caption: string }[];
+  readonly verdict: { readonly approve?: boolean; readonly name?: string; readonly picks?: readonly string[]; readonly notes: readonly string[] };
+  readonly at: number;
+}
+
 export interface Packet {
   readonly job: JobId;
   readonly kind: JobKind;

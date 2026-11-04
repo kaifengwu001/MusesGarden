@@ -132,7 +132,7 @@ const port = Number(process.env.MUSE_PORT ?? 8787);
  * and the pictures it downloads). The garden's own routes trust `?as=`, and the host simulator and dev tools have no
  * key, so from outside they stay hidden; the owner's page reaches them from this laptop as before.
  */
-const PUBLIC_PATHS = [/^\/mcp\/?$/, /^\/api\/v1\//, /^\/d\//, /^\/garden\.md$/, /^\/w\//, /^\/api\/looks\//, /^\/api\/postcards\//, /^\/api\/media\//];
+const PUBLIC_PATHS = [/^\/mcp\/?$/, /^\/api\/v1\//, /^\/d\//, /^\/s\//, /^\/garden\.md$/, /^\/w\//, /^\/api\/looks\//, /^\/api\/postcards\//, /^\/api\/media\//];
 const app = createApp(backend, backend.agent);
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0] ?? '/';

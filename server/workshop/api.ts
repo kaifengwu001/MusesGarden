@@ -1,14 +1,14 @@
 // The workshop Muse talks to (workshop_start, workshop_round, workshop_review, workshop_view): checks each brief
 // and verdict, keeps the jobs in <dataDir>/workshop.db and lets the runner step them.
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { AgentResult, AgentStatus, Instant, MuseId } from '../../src/muse/contract';
 import type { WorkshopClients } from './clients';
 import type { Runner } from './runner';
 import { createRunner, isDraft, plain } from './runner';
 import type { JobStore, StoredJob } from './store';
 import { isJobId, jobDir, newJobId, openJobStore } from './store';
-import type { JobId, JobKind, JobRecord, JobResult, JobView, Packet, Pipeline, Verdict, Workshop } from './types';
+import type { JobId, JobKind, JobRecord, JobResult, JobView, Packet, Pipeline, RoundRecord, Verdict, Workshop } from './types';
 
 /** Drafts per job ('approve' rounds without a contract): notes on the last one are refused (approve it, or stop). */
 export const MAX_DRAFTS = 3;
@@ -190,6 +190,26 @@ export function createWorkshop(deps: WorkshopDeps): WorkshopRuntime {
     return next;
   };
 
+  /** Each answered round, kept beside the job's files (history.json): what was shown and what Muse said of it. */
+  const recordRound = (job: StoredJob, packet: Packet, verdict: Verdict): void => {
+    const file = join(jobDir(deps.dataDir, job.id), 'history.json');
+    const kept = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as RoundRecord[]) : [];
+    const said: RoundRecord = {
+      round: job.round,
+      text: packet.text,
+      pictures: packet.pictures.map(({ path, caption }) => ({ path, caption })),
+      verdict: {
+        ...(verdict.approve === undefined ? {} : { approve: verdict.approve }),
+        ...(verdict.name === undefined ? {} : { name: verdict.name }),
+        ...(verdict.picks?.length ? { picks: verdict.picks } : {}),
+        notes: (verdict.notes ?? []).map((n) => n.text),
+      },
+      at: deps.now(),
+    };
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify([...kept, said], null, 2));
+  };
+
   function review(museId: MuseId, id: JobId, verdict: Verdict): AgentResult<JobView> {
     const job = mine(museId, id);
     if (!job) return refuse(404, 'There’s no such job of yours.');
@@ -222,6 +242,7 @@ export function createWorkshop(deps: WorkshopDeps): WorkshopRuntime {
       return refuse(422, `That answer couldn’t be used: ${plain(e)}`);
     }
     if (!answer.ok) return refuse(422, answer.error);
+    recordRound(job, packet, verdict);
     const next = save(job, { state: 'working', stage: answer.stage, data: answer.data, packet: null, views: 0, message: 'Working on your answer.' });
     runner.kick(job.id);
     return { ok: true, value: toView(next) };

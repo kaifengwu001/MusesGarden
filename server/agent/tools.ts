@@ -106,8 +106,9 @@ export function ownerLine(jobs: readonly JobView[], now: number): string | null 
   const working = jobs.filter((j) => j.state === 'working');
   const say = 'Say "check your garden" to see them with me.';
   if (working.length) {
-    const minutes = Math.round((Math.min(...working.map((j) => j.nextRoundAt ?? now)) - now) / 60_000);
-    const when = minutes <= 2 ? 'in a few minutes' : `in about ${minutes} minutes`;
+    const ms = Math.min(...working.map((j) => j.nextRoundAt ?? now)) - now;
+    const minutes = Math.round(ms / 60_000);
+    const when = ms <= 90_000 ? 'in about a minute' : minutes <= 2 ? 'in a few minutes' : `in about ${minutes} minutes`;
     return `New pictures of ${named(working)} ${when}. ${say}`;
   }
   if (waiting.length) return `New pictures of ${named(waiting)} are ready. ${say}`;
@@ -147,6 +148,11 @@ async function untilReady(ctx: ToolContext, job: string | undefined, ms: number)
 
 /** The twelve tools, in the order tools/list shows them: reads first. */
 export function connectorTools({ doorbell, roundWaitMs = 30_000 }: ToolsDeps): readonly ToolDef[] {
+  /** Where its owner can watch the workshop with it: its workshop page. */
+  const links = (ctx: ToolContext) => {
+    const code = doorbell(ctx.museId);
+    return code === null ? {} : { workshopPage: `/s/${code}` };
+  };
   return [
     tool({
       name: 'letterbox',
@@ -157,7 +163,7 @@ export function connectorTools({ doorbell, roundWaitMs = 30_000 }: ToolsDeps): r
       run: (ctx) => {
         const box = ctx.queries.letterbox(ctx.museId, ctx.now());
         if (box === null) return done(refuse(404, 'This Muse isn’t in the garden.'));
-        return done(ok({ ...box, ...workshopNews(ctx.workshop.jobs(ctx.museId)) }));
+        return done(ok({ ...box, ...workshopNews(ctx.workshop.jobs(ctx.museId)), ...links(ctx) }));
       },
     }),
     tool({
@@ -183,7 +189,7 @@ export function connectorTools({ doorbell, roundWaitMs = 30_000 }: ToolsDeps): r
       }),
       run: async (ctx, { job, wait }) => {
         if (wait) await untilReady(ctx, job, roundWaitMs);
-        if (job === undefined) return ok({ jobs: ctx.workshop.jobs(ctx.museId) });
+        if (job === undefined) return ok({ jobs: ctx.workshop.jobs(ctx.museId), ...links(ctx) });
         const view = ctx.workshop.job(ctx.museId, job);
         return view === null ? refuse(404, 'No such job of yours.') : ok(view);
       },
@@ -278,7 +284,10 @@ export function connectorTools({ doorbell, roundWaitMs = 30_000 }: ToolsDeps): r
         avatar: z.object({ image: AVATAR_IMAGE.optional(), description: words(1000).optional() }).optional().describe('The body only: your app avatar.'),
         things: z.array(words(200)).max(8).optional().describe('The body: what you would wear and carry. The home: what you want in it.'),
       }),
-      run: (ctx, { request_id: _, ...brief }) => withOwnerLine(ctx, ctx.workshop.start(ctx.museId, brief satisfies Brief)),
+      run: async (ctx, { request_id: _, ...brief }) => {
+        const r = await withOwnerLine(ctx, ctx.workshop.start(ctx.museId, brief satisfies Brief));
+        return r.ok ? { ok: true, value: { ...(r.value as object), ...links(ctx) } } : r;
+      },
     }),
     tool({
       name: 'workshop_review',
@@ -301,7 +310,7 @@ export function connectorTools({ doorbell, roundWaitMs = 30_000 }: ToolsDeps): r
 // ─── Running a call ─────────────────────────────────────────────────────────
 
 /** Paths on the garden's own server: they go out as absolute links on its origin. */
-const LOCAL = /^\/(w|api|d)\//;
+const LOCAL = /^\/(w|api|d|s)\//;
 /** Fields that hold an Instant in the agent's results: they go out as ISO times, which Muse reads at a glance. */
 const INSTANT_KEYS = new Set(['at', 'since', 'taken', 'doneAt', 'sendAfter', 'nextRoundAt', 'createdAt', 'updatedAt']);
 

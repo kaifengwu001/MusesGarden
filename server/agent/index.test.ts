@@ -503,6 +503,21 @@ describe('the doorbell, the guide and keys', () => {
   beforeEach(() => start());
   afterEach(() => stop());
 
+  it('shows the Muse’s workshop page by its doorbell code, its rounds as JSON, and nothing for a code it doesn’t know', async () => {
+    const page = await fetch(`${base}/s/${doorbell}`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-type')).toMatch(/^text\/html/);
+    const html = await page.text();
+    expect(html).toContain("<title>Pooh's workshop</title>");
+    // (its script survives the template it's written in: no control characters where a regex escape was meant)
+    expect(html).toContain('const ASKS = /^(send|approve');
+    expect([...html].some((c) => c.charCodeAt(0) < 9)).toBe(false);
+    const data = (await (await fetch(`${base}/s/${doorbell}.json`)).json()) as { name: string; jobs: { kind: string; state: string; waiting: { text: string } | null }[] };
+    expect(data.name).toBe('Pooh');
+    expect(data.jobs[0]).toMatchObject({ kind: 'planet', state: 'waiting' });
+    expect((await fetch(`${base}/s/${'x'.repeat(32)}`)).status).toBe(404);
+  });
+
   it('rings with the workshop’s pending count, needs no key, and says 0 for a code it doesn’t know', async () => {
     expect(doorbell.length).toBeGreaterThanOrEqual(24);
     const res = await fetch(`${base}/d/${doorbell}`);
@@ -581,7 +596,8 @@ describe('the line for Muse’s owner', () => {
     expect(ownerLine([], 0)).toBeNull();
     expect(ownerLine([job('planet', 'done')], 0)).toBeNull();
     expect(ownerLine([job('body', 'working', 5 * 60_000), job('planet', 'working', 9 * 60_000)], 0)).toBe(`New pictures of my body and planet in about 5 minutes. ${SAY}`);
-    expect(ownerLine([job('body', 'working', 60_000), job('planet', 'waiting')], 0)).toBe(`New pictures of my body in a few minutes. ${SAY}`);
+    expect(ownerLine([job('body', 'working', 60_000), job('planet', 'waiting')], 0)).toBe(`New pictures of my body in about a minute. ${SAY}`);
+    expect(ownerLine([job('home', 'working', 2 * 60_000)], 0)).toBe(`New pictures of my home in a few minutes. ${SAY}`);
     expect(ownerLine([job('home', 'waiting')], 0)).toBe(`New pictures of my home are ready. ${SAY}`);
   });
 });
