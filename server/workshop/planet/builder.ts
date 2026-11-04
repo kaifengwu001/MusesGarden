@@ -1,14 +1,20 @@
 // Muse Code, Meta's coding agent, as the planet's builder: it answers Muse's notes on a draft by editing the planet's
-// own folder, headless (`muse exec "<prompt>" --workspace <folder>`), with its instructions in that folder's AGENTS.md.
-// Around a run: what changed outside the folder is put back (and the run counts as failed), and the fork is checked.
-import { execFile, type ExecFileException } from 'node:child_process';
+// own folder, headless:
+//   muse exec --api-key-stdin --model muse-spark-1.3 --reasoning-effort low --workspace <folder> --prompt-file <file> --json
+// A headless workspace is untrusted, so Muse Code doesn't read the folder's AGENTS.md: every instruction goes in the
+// prompt file, and AGENTS.md is written beside the planet only for the record. Around a run: what changed outside the
+// folder is put back (and the run counts as failed), and the fork is type-checked.
+import { execFile, spawn, type ExecFileException } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Builder } from '../clients';
 
 /** How long Muse Code may work on one round of notes. */
 export const BUILDER_TIMEOUT_MS = 40 * 60_000;
+/** The most a run's log keeps (its tail). */
+const MAX_LOG = 200_000;
 
 function run(bin: string, args: readonly string[], opts: { cwd?: string; timeoutMs: number; env?: NodeJS.ProcessEnv }): Promise<{ ok: boolean; out: string; missing: boolean }> {
   return new Promise((resolve) => {
@@ -19,45 +25,119 @@ function run(bin: string, args: readonly string[], opts: { cwd?: string; timeout
   });
 }
 
-/** The real builder: `muse` on PATH (MUSE_CODE_BIN to point elsewhere). */
-export function museCodeBuilder(bin = process.env.MUSE_CODE_BIN || 'muse'): Builder {
+/** Runs a command with `input` on its stdin, killed at `timeoutMs`: its exit, whether it timed out, and its output's tail. */
+function runWithInput(bin: string, args: readonly string[], input: string, opts: { cwd: string; timeoutMs: number }): Promise<{ code: number | null; timedOut: boolean; out: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, { cwd: opts.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    const keep = (chunk: Buffer): void => {
+      out += chunk.toString('utf8');
+      if (out.length > MAX_LOG * 2) out = out.slice(-MAX_LOG);
+    };
+    child.stdout.on('data', keep);
+    child.stderr.on('data', keep);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
+    }, opts.timeoutMs);
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      resolve({ code: null, timedOut, out: `${out}\n${e.message}` });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code, timedOut, out: out.slice(-MAX_LOG) });
+    });
+    child.stdin.end(input);
+  });
+}
+
+export interface MuseCodeOptions {
+  /** The command: this, else env MUSE_CODE_BIN, else `muse` on PATH, else ~/.local/bin/muse. */
+  readonly bin?: string;
+  /** The provider key, read on stdin: env MODEL_API_KEY by default. */
+  readonly apiKey?: () => string;
+  readonly model?: string;
+  readonly effort?: string;
+}
+
+/** The real builder: Muse Code headless, rooted at the planet's folder. Available when it's installed and a key is set. */
+export function museCodeBuilder(opts: MuseCodeOptions = {}): Builder {
+  const key = opts.apiKey ?? ((): string => process.env.MODEL_API_KEY ?? '');
+  let found: Promise<string | null> | null = null;
+  const bin = (): Promise<string | null> =>
+    (found ??= (async () => {
+      const named = opts.bin ?? process.env.MUSE_CODE_BIN;
+      const candidates = named ? [named] : ['muse', join(homedir(), '.local/bin/muse')];
+      for (const b of candidates) {
+        const r = await run(b, ['--version'], { timeoutMs: 10_000 });
+        if (r.ok) return b;
+      }
+      return null;
+    })());
   return {
     async available() {
-      const r = await run(bin, ['--version'], { timeoutMs: 10_000 });
-      return !r.missing && r.ok;
+      return (await bin()) !== null && key() !== '';
     },
     async run({ workspace, instructions, prompt, timeoutMs }) {
+      const muse = await bin();
+      if (!muse) return { ok: false, log: 'Muse Code (muse) isn’t installed here' };
+      if (!key()) return { ok: false, log: 'MODEL_API_KEY isn’t set, so Muse Code has no key' };
       writeFileSync(join(workspace, 'AGENTS.md'), instructions);
-      const r = await run(bin, ['exec', prompt, '--workspace', workspace], { cwd: workspace, timeoutMs });
-      const log = r.out.length > 20_000 ? `…${r.out.slice(-20_000)}` : r.out;
-      return { ok: r.ok, log };
+      const dir = mkdtempSync(join(tmpdir(), 'planet-builder-'));
+      const file = join(dir, 'prompt.md');
+      writeFileSync(file, `${instructions}\n## What to do now\n\n${prompt}\n`);
+      try {
+        const args = ['exec', '--api-key-stdin', '--model', opts.model ?? 'muse-spark-1.3', '--reasoning-effort', opts.effort ?? 'low', '--workspace', workspace, '--prompt-file', file, '--json'];
+        const r = await runWithInput(muse, args, key(), { cwd: workspace, timeoutMs });
+        const head = r.timedOut ? `stopped after ${Math.round(timeoutMs / 60_000)} min\n` : r.code === 0 ? '' : `exited with ${String(r.code)}\n`;
+        return { ok: r.code === 0 && !r.timedOut, log: `${head}${r.out}` };
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     },
   };
 }
 
-/** The AGENTS.md a planet's builder reads: what the planet must be, Muse's notes, and the house rules. */
+/** What a planet's builder is told (its prompt, and AGENTS.md for the record): the contract, Muse's notes, the rules. */
 export function agentsMd(opts: { readonly title: string; readonly contract: string; readonly notes: readonly string[]; readonly draft: number }): string {
   return `# ${opts.title}: notes on draft ${opts.draft}
 
-This folder is one planet of Muse's Garden: a tiny round world drawn in three.js, forked from the meadow
-(the main world in ../../src/). A Muse asked for it in its own words. Answer the Muse's notes below by
-editing this planet, then stop.
+This folder is one planet of Muse's Garden: a tiny round world drawn with three.js, forked from the meadow
+(the main world, in ../../src/). A Muse (a plush creature who lives in the game) asked for it in its own
+words and approved the visual contract below. Answer the Muse's notes on draft ${opts.draft} by editing this
+planet, then stop. A small change that plainly answers the notes beats a big one that might break the world.
 
 ## The rules
 
-- **Edit only files in this folder.** Never touch ../../src/ or anything else outside it; a change there is
-  undone and the round fails. When a shared file must differ here, copy it into this folder at the same
-  relative path and repoint this planet's import to the copy.
-- recipe.json holds this planet's palette rows and settings (read by recipe.ts). Change colours and settings
-  there first; change code when the notes ask for shapes, plants, water or light the recipe can't give.
-- Keep it working: the page must still load, with no errors in the console, and \`npx tsc -p tsconfig.json\`
-  in this folder must still pass.
+- **Edit only files in this folder.** Never touch ../../src/ or anything else outside it: a change there is
+  undone and the whole round is thrown away. When a shared file must differ here, copy it into this folder
+  at the same relative path and repoint this planet's import to the copy.
+- Don't install packages, start servers or commit. Don't delete the folder's tests.
+- Keep it working: the page must still load without errors, and \`npx tsc -p tsconfig.json\` run in this
+  folder must report no new errors. (It already reports six of its own in main.ts and ui/garden/gardenUi.ts
+  before you start; leave those.)
 - The look: whimsical, cute and beautiful, with plausible materials (rock reads as fractured mineral, sand
   as granular, wood as fibrous, leaves as thin and living). Bold colour is welcome; muddled materials are not.
-  No uniform clay or candy look, no eerie or bodily shapes, no generic noise.
+  No uniform clay or candy look, no eerie or bodily shapes, no generic noise: shape fields into structures.
 - Sizes are meters, and everything stays with the planet as it turns.
-- The views: \`npm run dev\` at the repository's root, then /environments/<this folder>/; the URL hash holds
-  the view (t=12 freezes time).
+
+## Where things are
+
+- recipe.json: this planet's palette rows (by name, column by column) and setting defaults, laid over
+  render/palette.ts and params.ts by recipe.ts at load. Colours and settings change here first.
+- render/palette.ts: every colour of the world, as rows of a 16 × 16 palette (the comments say what each
+  column is). params.ts: every setting, its default and its range.
+- planet/fields.ts with planet/fields.glsl and planet/bake.frag.glsl: the land's recipe (relief, wetness,
+  height, patterns, where plants grow). The CPU (.ts) and GPU (.glsl) copies must agree exactly.
+- planet/terrain.ts (generateLayout) and planet/terrain.glsl: the layout from the seed, the home's clearing,
+  its pond. The water table is at height 0 everywhere (planet/water.glsl paints it as a mirror of the sky).
+- planet/meadow.glsl: the painted ground. life/grass.ts: the grass blades. life/flowers.ts and
+  life/flowerMeshes.ts: the four flower species (four at most: one channel each).
+- life/props.ts: the home (a cottage with a terrace and a pier); its sizes are also in planet/terrain.glsl,
+  planet/water.glsl and life/muse.ts, and must change together. render/sky.ts: the sky and clouds' colour.
 
 ## What the planet must be (the visual contract the Muse approved)
 
