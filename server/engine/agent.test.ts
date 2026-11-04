@@ -1,4 +1,7 @@
 // A real Muse through its connector: what each command writes, and that the rules stop choosing for it.
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type {
   Candidate,
@@ -210,6 +213,30 @@ describe('a trip it reports', () => {
     expect(capped).toMatchObject({ ok: false, status: 409, retryAfter: Date.parse('2026-11-03T00:00:00-08:00') });
     expect(await g.agent.agentTrip(POOH, trip(five.slice(0, 4)))).toMatchObject({ ok: true, value: { planted: 4 } });
     expect(g.agent.letterbox(POOH, g.engine.now())?.allowances.findsLeft).toBe(0);
+  });
+});
+
+describe('a restart', () => {
+  it('keeps a real Muse a real one, and its reported trip goes on planting from the saved schedule', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agent-'));
+    const db = join(dir, 'garden.db');
+    try {
+      const { intake } = fakeIntake();
+      const first = buildGarden({ db, mind: 'heuristic', hero: null, start: T0, clock: 'fast-forward', intake });
+      await first.agent.addAgentMuse(POOH, { name: 'Pooh', planet: 'muse-pooh', look: 'gen-pooh-1', worldSeed: 5068, timezone: TZ });
+      await first.agent.agentTrip(POOH, trip([{ url: page('Jazz', 'one') }, { url: page('Jazz', 'two') }]));
+      await first.engine.advanceTo((T0 + 10 * MIN) as Instant);
+      first.store.close();
+
+      const again = buildGarden({ db, mind: 'heuristic', hero: null, start: T0, clock: 'fast-forward', intake });
+      expect(again.agent.isAgent(POOH)).toBe(true);
+      expect(again.engine.state(POOH)?.discoveries.size).toBe(1);
+      await again.engine.advanceTo((T0 + 20 * MIN) as Instant);
+      expect([...(again.engine.state(POOH)?.discoveries.values() ?? [])].map((d) => d.title)).toEqual(['one', 'two']);
+      again.store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

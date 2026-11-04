@@ -192,9 +192,9 @@ export class AgentApi implements AgentCommands, AgentQueries {
     museId: MuseId,
     opts: { readonly name: string; readonly planet: PlanetId; readonly look: MuseLook; readonly worldSeed: number; readonly timezone: string },
   ): Promise<AgentResult<{ readonly added: boolean }>> {
-    if (typeof museId !== 'string' || !MUSE_ID.test(museId)) return refuse(400, 'a Muse id is lowercase letters, digits and hyphens, at most 40');
     const known = this.engine.state(museId);
     if (!known) {
+      if (typeof museId !== 'string' || !MUSE_ID.test(museId)) return refuse(400, 'a Muse id is lowercase letters, digits and hyphens, at most 40');
       const name = museLine(opts.name, 'name', AGENT_LIMITS.name);
       if (!name.ok) return name;
       if (!isPlanetId(opts.planet)) return refuse(400, `no such planet: ${String(opts.planet)}`);
@@ -206,8 +206,8 @@ export class AgentApi implements AgentCommands, AgentQueries {
       const value = await this.engine.addAgent(seed, made, agentSoulText(name.text, NEUTRAL, []));
       return { ok: true, value };
     }
-    const value = await this.engine.addAgent(known.seed, { look: opts.look, planet: opts.planet, planetName: planetOf(opts.planet).title }, '');
-    return { ok: true, value };
+    // A Muse already here keeps its seed, soul, look and planet; it only becomes a real one.
+    return { ok: true, value: await this.engine.addAgent(known.seed, null, '') };
   }
 
   async agentSoul(museId: MuseId, soul: AgentSoul): Promise<AgentResult<{ readonly topics: readonly string[]; readonly dropped: readonly string[] }>> {
@@ -282,8 +282,9 @@ export class AgentApi implements AgentCommands, AgentQueries {
     const ep = s.episode;
     const planting = ep?.plan.activity === 'travel' ? reportedTrip(log, ep.n) : null;
     if (ep && planting) {
-      const until = ep.pausedAt === null ? ((ep.start + planting.stops.length * REPORTED_HOP_MS) as Instant) : undefined;
-      return refuse(409, 'your last trip is still being planted; report this one when it is done', until);
+      // Its last stop plants this long after it set off, unless work paused it (then nobody knows when).
+      const until = ep.start + planting.stops.length * REPORTED_HOP_MS;
+      return refuse(409, 'your last trip is still being planted; report this one when it is done', ep.pausedAt === null && until > now ? (until as Instant) : undefined);
     }
     return null;
   }

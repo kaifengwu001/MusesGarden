@@ -354,13 +354,14 @@ export class Engine {
 
   /**
    * Makes `seed.id` a real Muse from now on (agent.joined, its owner's act), adding it first when the garden doesn't
-   * have it: a Muse with `soulText`, wearing `made.look` on `made.planet`, its first episode due at once. A Muse that is
-   * a real one already is left as it is.
+   * have it: a Muse with `soulText`, wearing `made.look` on `made.planet`, its first episode due at once (a new one
+   * needs `made`). A Muse that is a real one already is left as it is.
    */
-  addAgent(seed: MuseSeed, made: { readonly look: MuseLook; readonly planet: PlanetId; readonly planetName: string }, soulText: string): Promise<{ readonly added: boolean }> {
+  addAgent(seed: MuseSeed, made: { readonly look: MuseLook; readonly planet: PlanetId; readonly planetName: string } | null, soulText: string): Promise<{ readonly added: boolean }> {
     return this.exclusive(async () => {
       const known = this.states.get(seed.id);
       if (known?.agent) return { added: false };
+      if (!known && !made) throw new Error(`a new real Muse needs its look and planet (${seed.id})`);
       if (!known) {
         this.deps.store.addMuse(seed);
         this.states.set(seed.id, this.deps.emptyState(seed));
@@ -368,7 +369,7 @@ export class Engine {
       const at = this.clockAt;
       const tx = this.tx(at);
       tx.emit(seed.id, { kind: 'agent.joined', name: tx.state(seed.id).seed.name }, 'owner');
-      if (!known) {
+      if (!known && made) {
         tx.emit(seed.id, { kind: 'look.changed', look: made.look }, 'garden');
         tx.emit(seed.id, { kind: 'planet.changed', planet: made.planet, worldSeed: seed.worldSeed, name: made.planetName }, 'garden');
         await this.applySoul(tx, seed.id, soulText, 'garden');
