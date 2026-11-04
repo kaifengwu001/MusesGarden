@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { generatedUrl, isGeneratedLook, isLook, knownLook } from '../muse/looks';
+import { coerce, schema } from '../params';
+import { faceOf } from '../ui/garden/faces';
+import { readStudio } from '../visit/studio';
 import { FIELD_FIT } from './museBody';
 import { fitOf } from './museDress';
 import { DRESSED, GENERATED, generatedSculpt } from './museMesh';
 
 // A body the workshop made (gen-<muse>-<n>), wherever a muse in clothes is drawn: how it is rigged (museMesh.ts
-// GENERATED, with its own knobs) and where its files are.
+// GENERATED, with its own knobs), where its files are, its face, and the Body parameter that picks it.
 
 describe('a made body’s rig (museMesh.ts GENERATED)', () => {
   it('starts as every new muse in clothes does (muse-rig): DRESSED_CUT(0.45), ramp 0.07, refine 2 and 2, no corrective, fur [9, 16], tpose6’s fit', () => {
@@ -73,14 +76,37 @@ describe('a made body’s look (src/muse/looks.ts)', () => {
     expect(isLook(7)).toBe(false);
   });
 
-  it('is served by the engine: its model and its knobs', () => {
+  it('is served by the engine: its model, its knobs, its portrait', () => {
     expect(generatedUrl('gen-pooh-1', 'glb')).toBe('/api/looks/gen-pooh-1.glb');
     expect(generatedUrl('gen-pooh-1', 'json')).toBe('/api/looks/gen-pooh-1.json');
+    expect(faceOf('gen-pooh-1')).toBe('/api/looks/gen-pooh-1.jpg');
+    expect(faceOf('gen-../x')).toBeNull();
   });
 
   it('is the original Muse on a world that can’t draw it', () => {
     expect(knownLook('gen-pooh-1')).toBe('tpose6');
     expect(knownLook('muse5')).toBe('muse5');
     expect(knownLook('tpose6')).toBe('tpose6');
+  });
+});
+
+describe('in the photo studio (visit/studio.ts)', () => {
+  it('draws a made body as the friend beside Momo, or as either Muse on a world', () => {
+    expect(readStudio('meadow', '?studio&with=gen-pooh-1')).toMatchObject({ guest: { look: 'gen-pooh-1' } });
+    expect(readStudio('golden-rye', '?studio&host=gen-pooh-1&guest=gen-test-2')).toMatchObject({ host: { look: 'gen-pooh-1' }, guest: { look: 'gen-test-2' } });
+    expect(readStudio('meadow', '?studio&with=gen-../x')).toMatchObject({ guest: null });
+  });
+});
+
+describe('choosing one on the meadow (params.ts Body)', () => {
+  const body = schema.muse.model;
+
+  it('takes a made body from the URL without offering it in the panel', () => {
+    expect(coerce(body, 'gen-pooh-1')).toBe('gen-pooh-1');
+    expect(coerce(body, 'muse5')).toBe('muse5');
+    expect(coerce(body, 'gen-../x')).toBeUndefined();
+    expect(coerce(body, 'muse99')).toBeUndefined();
+    expect(body.options.some((o) => o.startsWith('gen-'))).toBe(false);
+    expect(body.def).toBe('tpose6');
   });
 });

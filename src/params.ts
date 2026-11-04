@@ -1,4 +1,6 @@
 import { DRESSED, type DressedKind } from './life/museMesh';
+import type { GeneratedLook } from './muse/contract';
+import { isGeneratedLook } from './muse/looks';
 import { areaOfRadius, growthForArea } from './planet/growth';
 import { UNVEILED } from './planet/unfold';
 
@@ -39,6 +41,8 @@ export interface ChoiceField<T extends string = string> extends FieldBase {
   readonly kind: 'choice';
   readonly def: T;
   readonly options: readonly T[];
+  /** Values taken besides the options, not offered in the panel (the Body: a look the workshop made, gen-*). */
+  readonly also?: (raw: string) => boolean;
 }
 
 export interface BoolField extends FieldBase {
@@ -77,6 +81,9 @@ const AREA_MAX = Math.round(areaOfRadius(RADIUS_MAX)); // 2,010,619 m²
 
 /** Growth that puts the default world at R ≈ 128 m, A ≈ 206,000 m². */
 export const DEFAULT_GROWTH = Math.round(growthForArea(areaOfRadius(RADIUS_DEFAULT), AREA_MIN, AREA_MAX) * 1e4) / 1e4;
+
+/** Muse's bodies the panel offers: the original Muse, its other bodies, then the muses in clothes (museMesh.ts DRESSED). */
+const BODIES = ['tpose6', 'tpose5', 'tpose2', 'tpose', 'sculpt', 'field', ...(Object.keys(DRESSED) as DressedKind[])] as const;
 
 export const schema = {
   world: {
@@ -135,8 +142,8 @@ export const schema = {
   },
   muse: {
     show: bool('mu', 'Show Muse', true, 'live'),
-    // (the original Muse, its other bodies, then the muses in clothes: museMesh.ts DRESSED)
-    model: choice('mm', 'Body', ['tpose6', 'tpose5', 'tpose2', 'tpose', 'sculpt', 'field', ...(Object.keys(DRESSED) as DressedKind[])], 'tpose6', 'live'),
+    // (BODIES, and from the URL a body the workshop made)
+    model: { ...choice<(typeof BODIES)[number] | GeneratedLook>('mm', 'Body', BODIES, 'tpose6', 'live'), also: isGeneratedLook },
   },
   light: {
     // one light for now (late morning); dawn and golden hour are kept in the palette for later
@@ -214,7 +221,7 @@ export function coerce(field: Field, raw: unknown): ParamValue | undefined {
       return field.int ? Math.round(c) : c;
     }
     case 'choice':
-      return typeof raw === 'string' && field.options.includes(raw) ? raw : undefined;
+      return typeof raw === 'string' && (field.options.includes(raw) || field.also?.(raw) === true) ? raw : undefined;
     case 'bool':
       if (typeof raw === 'boolean') return raw;
       if (raw === '1' || raw === 'true') return true;
