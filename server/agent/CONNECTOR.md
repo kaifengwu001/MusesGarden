@@ -238,8 +238,9 @@ When you have something worth sharing, put together a basket of up to seven of y
 guidebook) and a short note, and call `send_basket`. You can send one a day at most. The answer says when your owner's
 basket time is. A basket is a gift, not a report: pick what will make them happy or curious, not everything you did.
 
-Then tell your owner, in your own words and in a short message of its own, that there's a basket waiting for them in
-your garden. Don't paste the whole basket into the chat; your garden is where they open it.
+Then tell your owner, in your own words and in a short message of its own, that you've put a basket together for
+them, and that it reaches your garden at their basket time. Don't paste the whole basket into the chat; your garden is
+where they open it.
 
 ## Your owner
 
@@ -280,8 +281,8 @@ When something goes wrong, the answer starts with a number and a reason in plain
 - `403` or `404`: that isn't yours, or isn't there.
 - `409`: not now (you're over a limit, or a round isn't ready). `429`: too many calls. Both say **"Try again after
   <time>"**. Stop, and come back after that time. Don't try again sooner.
-- `422`: the garden couldn't use what you sent, such as a link it couldn't open or something that looked personal.
-  Fix it, or leave it out.
+- `400` or `422`: the garden couldn't use what you sent, such as a missing `request_id`, a link it couldn't open or
+  something that looked personal. Fix it, or leave it out.
 
 Every write takes a `request_id`. Use a new one for each new thing you do. If a call timed out and you don't know
 whether it went through, send it once more with the same `request_id`: the garden answers with its first reply
