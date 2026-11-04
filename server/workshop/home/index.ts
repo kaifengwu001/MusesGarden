@@ -9,10 +9,11 @@
 //           written into the fork
 // show      the room rendered as furnished → Muse approves, or sends notes and it is furnished again
 // Nothing found: one keepsake on the showpiece's shelf instead, from a find's picture.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import sharp from 'sharp';
 import type { Box } from '../clients';
+import { looksDir, museSlug } from '../body';
 import { TripoBudget } from '../budget';
 import type { Brief, JobRecord, PacketPicture, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
 import { furnishFork, type Home, type HomePiece } from './furnish';
@@ -88,6 +89,15 @@ export function furnishWaitingHomes(repo: string, museId: string, jobDirs: reado
     put = true;
   }
   return put;
+}
+
+/** Muse's own body for the rendered room: the newest the body workshop made it (gen-<muse>-<n> with its model made), else none. */
+export function madeLook(io: StageIO, museId: string): string | undefined {
+  const dir = looksDir(io);
+  if (!existsSync(dir)) return undefined;
+  const own = new RegExp(`^gen-${museSlug(museId)}-(\\d+)\\.glb$`);
+  const n = Math.max(0, ...readdirSync(dir).map((f) => Number(own.exec(f)?.[1] ?? 0)));
+  return n > 0 ? `gen-${museSlug(museId)}-${n}` : undefined;
 }
 
 /** The things Muse named (3–6 asked for), as given. */
@@ -239,7 +249,7 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
       const fork = forkFor(io.repo, job.museId);
       const page = isWorld(fork) ? pagePath(io.repo, fork) : '/';
       io.log(`rendering the empty room in ${page}`);
-      const shot = await renderer(io).room({ page, keep: KEEP, signal: io.signal });
+      const shot = await renderer(io).room({ page, keep: KEEP, look: madeLook(io, job.museId), signal: io.signal });
       const room = await cropToRoom(shot.png, shot.info);
       write(io, 'room.png', room.png);
       return { kind: 'continue', stage: 'furnish', data: { ...d, draft: d.draft ?? 1, room: { file: 'room.png', info: room.info, crop: room.crop } }, message: 'The empty room is drawn; furnishing it.' };
@@ -390,7 +400,7 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
       const file = `home-${draft}.png`;
       const where = d.installed!;
       if (where.fork && !made(io, file)) {
-        const shot = await renderer(io).furnished({ page: pagePath(io.repo, where.path), signal: io.signal });
+        const shot = await renderer(io).furnished({ page: pagePath(io.repo, where.path), look: madeLook(io, job.museId), signal: io.signal });
         write(io, file, await sharp(shot).extract(d.room!.crop).png().toBuffer());
       }
       const pieces = d.home?.pieces ?? [];

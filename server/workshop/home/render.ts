@@ -11,10 +11,10 @@ export interface RoomShot {
 }
 
 export interface HomeRenderer {
-  /** The room seen through the cutaway with only `keep` standing (and the rug): its picture, the camera's view of the floor and what stands. `page` is a world's page path ('/', '/environments/muse-pooh/'). */
-  room(req: { readonly page: string; readonly keep: readonly string[]; readonly signal: AbortSignal }): Promise<RoomShot>;
+  /** The room seen through the cutaway with only `keep` standing (and the rug): its picture, the camera's view of the floor and what stands. `page` is a world's page path ('/', '/environments/muse-pooh/'); `look`, the body Muse sleeps in (a made one, gen-<muse>-<n>), else the page's own. */
+  room(req: { readonly page: string; readonly keep: readonly string[]; readonly look?: string; readonly signal: AbortSignal }): Promise<RoomShot>;
   /** The room as its world furnishes it (home.json in the fork). */
-  furnished(req: { readonly page: string; readonly signal: AbortSignal }): Promise<Buffer>;
+  furnished(req: { readonly page: string; readonly look?: string; readonly signal: AbortSignal }): Promise<Buffer>;
 }
 
 /** The view's size (CSS px, at 1×): the cutaway's own framing in hut.mjs. */
@@ -72,7 +72,7 @@ const IN_PAGE = `async ({ keep, room }) => {
 
 /** The renderer that drives the page on the dev server (npm run dev) in headless Chromium on the GPU. */
 export function browserRenderer(devServer: string): HomeRenderer {
-  const shoot = async (page: string, keep: readonly string[] | null, signal: AbortSignal): Promise<{ png: Buffer; info: RoomInfo | null }> => {
+  const shoot = async (page: string, keep: readonly string[] | null, look: string | undefined, signal: AbortSignal): Promise<{ png: Buffer; info: RoomInfo | null }> => {
     const { chromium } = await import('@playwright/test');
     const browser = await chromium.launch({ args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
     const stop = (): void => void browser.close();
@@ -83,7 +83,8 @@ export function browserRenderer(devServer: string): HomeRenderer {
       const tab = await ctx.newPage();
       const errors: string[] = [];
       tab.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
-      await tab.goto(`${devServer.replace(/\/+$/, '')}${page}#t=40&q=high&hud=0`);
+      // (mm= dresses the page's Muse in its body; settle() waits for it)
+      await tab.goto(`${devServer.replace(/\/+$/, '')}${page}#t=40&q=high&hud=0${look ? `&mm=${encodeURIComponent(look)}` : ''}`);
       await tab.waitForFunction('window.__meadow?.isReady === true', undefined, { timeout: 120_000 });
       const out = await tab.evaluate<RoomInfo & { state: { open: boolean; loaded: boolean } }>(`(${IN_PAGE})(${JSON.stringify({ keep, room: ROOM })})`);
       if (!out.state.open || !out.state.loaded) throw new Error(`the hut didn't open (${errors.join('; ') || 'no page errors'})`);
@@ -96,11 +97,11 @@ export function browserRenderer(devServer: string): HomeRenderer {
     }
   };
   return {
-    room: async ({ page, keep, signal }) => {
-      const { png, info } = await shoot(page, keep, signal);
+    room: async ({ page, keep, look, signal }) => {
+      const { png, info } = await shoot(page, keep, look, signal);
       return { png, info: info ?? proportionalRoom() };
     },
-    furnished: async ({ page, signal }) => (await shoot(page, null, signal)).png,
+    furnished: async ({ page, look, signal }) => (await shoot(page, null, look, signal)).png,
   };
 }
 

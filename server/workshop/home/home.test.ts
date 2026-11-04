@@ -210,6 +210,27 @@ describe('the home job', () => {
     expect(r.outcome.message).toContain(`waits in ${relative(root, join(at.dir, 'home'))}/`);
   });
 
+  it('renders the room with Muse asleep in the newest body the workshop made it', async () => {
+    const root = repo(true);
+    const looks: Array<string | undefined> = [];
+    const stub = stubRenderer();
+    const pipeline = makeHomePipeline({ renderer: () => ({ room: (req) => (looks.push(req.look), stub.room(req)), furnished: (req) => (looks.push(req.look), stub.furnished(req)) }) });
+    const at = io(root, { ...fakeClients(), segmenter: segmenter([]) });
+    // (none made yet: the page's own body)
+    expect((await pipeline.step(record('room'), at)).kind).toBe('continue');
+    expect(looks).toEqual([undefined]);
+    // (gen-test-3 only reserved, its model not made yet; another Muse's not this one's)
+    const dir = join(root, '.muse', 'workshop', 'looks');
+    mkdirSync(dir, { recursive: true });
+    for (const f of ['gen-test-1.glb', 'gen-test-2.glb', 'gen-test-2.json', 'gen-test-3.json', 'gen-other-9.glb']) writeFileSync(join(dir, f), '');
+    rmSync(join(at.dir, 'room.png'));
+    let r = await run(pipeline, record('room'), at);
+    if (r.outcome.kind !== 'wait') throw new Error(r.outcome.kind);
+    r = await run(pipeline, answer(pipeline, r.job, { picks: ['furnish-1-1'] }), at);
+    expect(r.outcome.kind).toBe('wait');
+    expect(looks).toEqual([undefined, 'gen-test-2', 'gen-test-2']);
+  });
+
   it('asks for something to furnish with, and caps the drafts', async () => {
     const pipeline = makeHomePipeline({ renderer: () => stubRenderer() });
     const at = io(repo(false), fakeClients());
