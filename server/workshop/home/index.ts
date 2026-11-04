@@ -106,6 +106,19 @@ export function nounPhrase(thing: string): string {
   return words.slice(-4).join(' ') || thing.trim();
 }
 
+/** A thing as Muse reads it back: its own words up to what it stands by or comes with, what it stands on kept ("a record player with a small stack of jazz records" → "a record player", "a kettle on a little stove" as it is). */
+export function shortName(thing: string): string {
+  const name = thing
+    .trim()
+    .replace(/[\s.,;:!?]+$/, '')
+    .split(/\s+(?:by|in|near|next|with|for|under|beside|against|from|at|that|which|where)\s+/i)[0]
+    .replace(/^(?:A|An|The|Some|My)\b/, (w) => w.toLowerCase());
+  return name || thing.trim();
+}
+
+/** "a, b and c". */
+const listed = (items: readonly string[]): string => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+
 function furnishPrompt(brief: Brief, things: readonly string[], notes: readonly string[]): string {
   const lines = [
     'Furnish this room seen from above through a cutaway, the home of Muse, a small round plush creature.',
@@ -381,12 +394,17 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
         write(io, file, await sharp(shot).extract(d.room!.crop).png().toBuffer());
       }
       const pieces = d.home?.pieces ?? [];
+      // (each piece by the thing Muse named, not its file's name, which is cut short)
+      const nameOf = (p: HomePiece): string => {
+        const thing = d.pieces?.find((q) => q.glb === p.file)?.thing;
+        return thing ? shortName(thing) : p.name.replace(/^home-/, '').replace(/-/g, ' ');
+      };
       const pictures: PacketPicture[] = [
         ...(where.fork ? [{ id: `home-${draft}`, path: io.url(file), caption: 'Your room as it stands now' }] : [{ id: d.picked!.replace(/\.png$/, ''), path: io.url(d.picked!), caption: 'The room you picked' }]),
         ...(d.pieces ?? []).map((p) => ({ id: p.clean.replace(/\.png$/, ''), path: io.url(p.clean), caption: p.thing })),
       ];
       const checklist = [
-        ...pieces.map((p) => ({ item: p.name, ok: true, note: p.rests === false ? 'on the showpiece’s shelf' : `stands ${p.height} m tall` })),
+        ...pieces.map((p) => ({ item: nameOf(p), ok: true, note: p.rests === false ? 'on the showpiece’s shelf' : `stands ${p.height} m tall` })),
         ...(d.unmade ?? []).map((u) => ({ item: u.split(':')[0], ok: false, note: `couldn’t be made: ${u.slice(u.indexOf(':') + 1).trim()}` })),
       ];
       const lastDraft = draft >= MAX_DRAFTS;
@@ -398,7 +416,7 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
           stage: 'approve',
           ask: 'approve',
           text: [
-            d.keepsake ? 'None of your things could be found in the picture, so here is a keepsake for your showpiece’s shelf.' : `Your home, with ${pieces.map((p) => p.name.replace(/^home-/, '').replace(/-/g, ' ')).join(', ')} stood in it.`,
+            d.keepsake ? 'None of your things could be found in the picture, so here is a keepsake for your showpiece’s shelf.' : `Your home, with ${listed(pieces.map(nameOf))} stood in it.`,
             where.fork ? '' : 'Your planet isn’t made yet, so the room can’t be drawn; it goes in as soon as it is.',
             lastDraft ? 'This is the last draft: approve it to keep it.' : 'Approve it, or send up to 3 notes and the room is furnished again.',
           ]

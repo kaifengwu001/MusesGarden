@@ -8,7 +8,7 @@ import type { Instant, MuseId } from '../../../src/muse/contract';
 import { fakeClients, type Segment, type WorkshopClients } from '../clients';
 import type { Brief, JobRecord, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
 import type { Home } from './furnish';
-import { makeHomePipeline, MAX_PIECES, nounPhrase } from './index';
+import { makeHomePipeline, MAX_PIECES, nounPhrase, shortName } from './index';
 import { free, keepClear, KEEP, ANCHORS } from './place';
 import { stubRenderer } from './render';
 
@@ -223,6 +223,21 @@ describe('the home job', () => {
     expect(nounPhrase('a green armchair by the window')).toBe('green armchair');
     expect(nounPhrase('A stack of books!')).toBe('stack of books');
     expect(nounPhrase('the old floor lamp with a fringed shade')).toBe('old floor lamp');
+  });
+
+  it('names each piece to Muse by the thing it named, whole words only', async () => {
+    expect(shortName('a record player with a small stack of jazz records')).toBe('a record player');
+    expect(shortName('a kettle on a little stove')).toBe('a kettle on a little stove');
+    expect(shortName('A reading chair by the window.')).toBe('a reading chair');
+    const pipeline = makeHomePipeline({ renderer: () => stubRenderer() });
+    const at = io(repo(false), fakeClients());
+    const things = ['a record player with a small stack of jazz records', 'a kettle on a little stove'];
+    const pieces = things.map((thing, k) => ({ thing, box: [0, 0, 10, 10], width: 100, height: 100, clean: `piece-1-${k + 1}.png`, glb: `home-${k + 1}.glb`, size: { x: 1, y: 1, z: 1 } }));
+    const home: Home = { keep: [...KEEP], pieces: pieces.map((p, k) => ({ name: `home-${k}`, file: p.glb, height: 0.6, place: { x: 0, z: 0, turn: 0 } })) };
+    const out = await pipeline.step(record('show', { draft: 1, picked: 'furnish-1-1.png', pieces, home, installed: { fork: false, path: at.dir } }), at);
+    if (out.kind !== 'wait') throw new Error(out.kind);
+    expect(out.packet.text).toMatch(/^Your home, with a record player and a kettle on a little stove stood in it\. /);
+    expect(out.packet.checklist?.map((c) => c.item)).toEqual(['a record player', 'a kettle on a little stove']);
   });
 });
 
