@@ -3,7 +3,8 @@
 // room      the hut's cutaway rendered with only the pieces a home keeps (the hearth, the bed, the showpiece), in
 //           Muse's planet (its fork of the meadow) or, before there is one, in the meadow
 // furnish   muse-image-1.0 draws Muse's things into it, three versions → Muse picks one
-// pieces    sam-3.1 finds up to three of the things Muse named, each cropped and drawn again on its own on white
+// pieces    sam-3.1 finds up to three of the things Muse named (one on something, with what it stands on), each
+//           cropped and drawn again on its own on white
 // mesh      each piece made into a model (Tripo, through the Mesher), one by one, cached by picture
 // place     each stood where the picture has it, through the cutaway's camera, clear of what Muse needs; home.json
 //           written into the fork
@@ -12,7 +13,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import sharp from 'sharp';
-import type { Box } from '../clients';
+import type { Box, Segment } from '../clients';
 import { looksDir, museSlug } from '../body';
 import { TripoBudget } from '../budget';
 import type { Brief, JobRecord, PacketPicture, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
@@ -105,15 +106,25 @@ function thingsOf(brief: Brief): string[] {
   return (brief.things ?? []).map((t) => t.trim()).filter((t) => t.length > 0).slice(0, 6);
 }
 
+/** The word that ends a thing's name and starts what it stands by, on or with. */
+const QUALIFIER = /\s+(by|on|upon|atop|in|near|next|with|for|under|beside|against|from|at|that|which|where)\s+/;
+const plainWords = (thing: string): string => thing.toLowerCase().replace(/[^\p{L}\p{N}\s'-]/gu, ' ');
+
 /** A thing as sam-3.1 takes it: a short noun phrase ("a big green armchair by the fire" → "big green armchair"). */
 export function nounPhrase(thing: string): string {
-  const words = thing
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
-    .split(/\s+(?:by|on|in|near|next|with|for|under|beside|against|from|at|that|which|where)\s+/)[0]
+  const words = plainWords(thing)
+    .split(QUALIFIER)[0]
     .split(/\s+/)
     .filter((w) => w && !['a', 'an', 'the', 'some', 'my', 'its', 'his', 'her', 'their', 'our'].includes(w));
   return words.slice(-4).join(' ') || thing.trim();
+}
+
+/** What a thing stands on, as sam-3.1 takes it, when its name is followed by it ("a kettle on a little stove" → "little stove"); else null. */
+export function standsOn(thing: string): string | null {
+  const text = plainWords(thing);
+  const q = QUALIFIER.exec(text);
+  if (!q || !['on', 'upon', 'atop'].includes(q[1])) return null;
+  return nounPhrase(text.slice(q.index + q[0].length).replace(/^\s*top\s+of\s+/, ''));
 }
 
 /** A thing as Muse reads it back: its own words up to what it stands by or comes with, what it stands on kept ("a record player with a small stack of jazz records" → "a record player", "a kettle on a little stove" as it is). */
@@ -197,6 +208,21 @@ function padded(box: Box, width: number, height: number): { left: number; top: n
   const left = Math.max(0, Math.floor(x1 - px));
   const top = Math.max(0, Math.floor(y1 - py));
   return { left, top, width: Math.max(1, Math.min(width, Math.ceil(x2 + px)) - left), height: Math.max(1, Math.min(height, Math.ceil(y2 + py)) - top) };
+}
+
+/**
+ * What a found thing stands on, taken in with it: the support's box under it (across at least half the thing's width,
+ * reaching up to its foot and lower down), no bigger than a third of the picture either way (a wall or the floor is
+ * passed over), the most certain if several. The thing's box grown to cover both, else null.
+ */
+function withSupport(box: Box, supports: readonly Segment[], width: number, height: number): Box | null {
+  const [x1, y1, x2, y2] = box;
+  const under = supports
+    .filter(({ box: [s1, t1, s2, t2] }) => Math.min(x2, s2) - Math.max(x1, s1) >= (x2 - x1) / 2 && t2 > y2 && t1 <= y2 + PAD.min && s2 - s1 <= width / 3 && t2 - t1 <= height / 3)
+    .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
+  if (!under) return null;
+  const [s1, t1, s2, t2] = under.box;
+  return [Math.min(x1, s1), Math.min(y1, t1), Math.max(x2, s2), Math.max(y2, t2)];
 }
 
 function overlap(a: Box, b: Box): number {
@@ -288,28 +314,38 @@ export function makeHomePipeline(opts: HomeOptions = {}): Pipeline {
       const draft = d.draft ?? 1;
       const picked = read(io, d.picked!);
       const { width = 1, height = 1 } = await sharp(picked).metadata();
+      // (what sam-3.1 found, its boxes kept within the picture)
+      const within = (found: readonly Segment[]): Segment[] => found.map((s) => ({ ...s, box: [Math.max(0, s.box[0]), Math.max(0, s.box[1]), Math.min(width - 1, s.box[2]), Math.min(height - 1, s.box[3])] as const }));
       const pieces: Piece[] = [];
       for (const thing of thingsOf(job.brief)) {
         if (pieces.length >= MAX_PIECES) break;
-        const found = await io.clients.segmenter.find(picked, nounPhrase(thing), io.signal);
-        const best = [...found]
-          .map((s) => ({ ...s, box: [Math.max(0, s.box[0]), Math.max(0, s.box[1]), Math.min(width - 1, s.box[2]), Math.min(height - 1, s.box[3])] as const }))
+        const best = within(await io.clients.segmenter.find(picked, nounPhrase(thing), io.signal))
           .filter((s) => s.box[2] - s.box[0] >= 8 && s.box[3] - s.box[1] >= 8 && pieces.every((p) => !p.box || overlap(p.box, s.box) < 0.6))
           .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
         if (!best) {
           io.log(`no ${nounPhrase(thing)} found in the picked room`);
           continue;
         }
+        // (a thing on something is made with it, "a kettle on a little stove" whole: so it is cut out, sized and stood whole too)
+        let box = best.box;
+        const support = standsOn(thing);
+        if (support) {
+          const whole = withSupport(box, within(await io.clients.segmenter.find(picked, support, io.signal)), width, height);
+          if (whole) {
+            io.log(`${nounPhrase(thing)} taken with the ${support} it stands on`);
+            box = whole;
+          }
+        }
         const n = pieces.length + 1;
         const crop = `crop-${draft}-${n}.png`;
         const clean = `piece-${draft}-${n}.png`;
-        if (!made(io, crop)) write(io, crop, await sharp(picked).extract(padded(best.box, width, height)).png().toBuffer());
+        if (!made(io, crop)) write(io, crop, await sharp(picked).extract(padded(box, width, height)).png().toBuffer());
         if (!made(io, clean)) {
           const [out] = await io.clients.images.edit({ prompt: isolatePrompt(thing), images: [read(io, crop)], n: 1, signal: io.signal });
           if (!out) continue;
           write(io, clean, await sharp(out).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).png().toBuffer());
         }
-        pieces.push({ thing, box: best.box, width, height, clean });
+        pieces.push({ thing, box, width, height, clean });
       }
       if (pieces.length === 0) return { kind: 'continue', stage: 'keepsake', data: { ...d, pieces: [] }, message: 'None of your things could be found in the picture; making a keepsake instead.' };
       return { kind: 'continue', stage: 'mesh', data: { ...d, pieces, keepsake: false }, message: `Found ${pieces.map((p) => p.thing).join(', ')}; making them real one by one.` };

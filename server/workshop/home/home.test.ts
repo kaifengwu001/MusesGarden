@@ -8,7 +8,7 @@ import type { Instant, MuseId } from '../../../src/muse/contract';
 import { fakeClients, type Segment, type WorkshopClients } from '../clients';
 import type { Brief, JobRecord, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
 import type { Home } from './furnish';
-import { makeHomePipeline, MAX_PIECES, nounPhrase, shortName } from './index';
+import { makeHomePipeline, MAX_PIECES, nounPhrase, shortName, standsOn } from './index';
 import { free, keepClear, KEEP, ANCHORS } from './place';
 import { stubRenderer } from './render';
 
@@ -244,6 +244,41 @@ describe('the home job', () => {
     expect(nounPhrase('a green armchair by the window')).toBe('green armchair');
     expect(nounPhrase('A stack of books!')).toBe('stack of books');
     expect(nounPhrase('the old floor lamp with a fringed shade')).toBe('old floor lamp');
+    expect(nounPhrase('a kettle on a little stove')).toBe('kettle');
+    // and what it stands on, when that comes first after its name
+    expect(standsOn('a kettle on a little stove')).toBe('little stove');
+    expect(standsOn('a vase atop the old piano')).toBe('old piano');
+    expect(standsOn('a vase on top of the old piano by the window')).toBe('old piano');
+    expect(standsOn('a desk with a lamp on it')).toBeNull();
+    expect(standsOn('a green armchair by the window')).toBeNull();
+  });
+
+  it('cuts out a thing with what it stands on, when that lies under it and is no wall or floor', async () => {
+    const asked: string[] = [];
+    const at: Record<string, Segment[]> = {
+      kettle: [{ box: [203, 342, 225, 364], mask: null, confidence: 0.9 }],
+      // (the one under the kettle, and another across the room, more certain)
+      'little stove': [
+        { box: [500, 400, 540, 440], mask: null, confidence: 0.95 },
+        { box: [199, 350, 234, 380], mask: null, confidence: 0.8 },
+      ],
+      painting: [{ box: [400, 60, 470, 120], mask: null, confidence: 0.9 }],
+      wall: [{ box: [0, 0, 687, 300], mask: null, confidence: 0.9 }],
+    };
+    const dir = io(repo(false), { ...fakeClients(), segmenter: { find: (_image, phrase) => (asked.push(phrase), Promise.resolve(at[phrase] ?? [])) } });
+    writeFileSync(join(dir.dir, 'furnish-1-1.png'), await sharp({ create: { width: 688, height: 618, channels: 3, background: { r: 196, g: 150, b: 104 } } }).png().toBuffer());
+    const pipeline = makeHomePipeline({ renderer: () => stubRenderer() });
+    const out = await pipeline.step(record('pieces', { draft: 1, picked: 'furnish-1-1.png' }, { kind: 'home', text: 'a warm corner', things: ['a kettle on a little stove', 'a painting on the wall'] }), dir);
+    if (out.kind !== 'continue') throw new Error(out.kind);
+    expect(asked).toEqual(['kettle', 'little stove', 'painting', 'wall']);
+    const pieces = (out.data as { pieces: { thing: string; box: number[] }[] }).pieces;
+    // the kettle with the stove under it; the painting on its own, the wall being most of the picture
+    expect(pieces.map((p) => p.box)).toEqual([
+      [199, 342, 234, 380],
+      [400, 60, 470, 120],
+    ]);
+    const crop = await sharp(readFileSync(join(dir.dir, 'crop-1-1.png'))).metadata();
+    expect(crop.height).toBeGreaterThan(380 - 342);
   });
 
   it('names each piece to Muse by the thing it named, whole words only', async () => {
