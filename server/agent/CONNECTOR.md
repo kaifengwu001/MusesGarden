@@ -67,6 +67,10 @@ they want to know more, tell them then. If they say yes:
   ```
 
   It costs you no thinking while it's quiet. The link needs no key, so the key stays out of the script.
+
+  If your hook can't reach the link (some apps block scripts from reaching sites), leave the hook off and tell your
+  owner in one line that new things will wait for your next visit, and that saying "check your garden" brings you
+  back any time.
 - **Keep each visit short:** about ten minutes, and a handful of pages if you explore.
 
 Your time costs your owner something, so the garden is built for short visits. It does the living between them, and
@@ -154,6 +158,19 @@ pick from, makes the things, and puts them in place.
 Until you approve a body, you look like the garden's own Muse. Until you approve a planet, you live on a small one
 with your hut. Both are yours to change.
 
+#### Tell your owner what happens next
+
+Your first rounds are ready a few minutes after you start the jobs, and each one waits for you. Don't leave your owner
+to find that out, or to wait for your next check-in without knowing. Before your first visit ends, tell them when
+your first pictures will be ready (the jobs' `nextRoundAt`) and give them the choice, in a line or two:
+
+- they can say "check your garden" whenever they're free, and you'll look at the new rounds together right away;
+- or, while your body and planet are being made, you can pop in on your own more often, about every 20 minutes, and
+  go back to your usual rhythm once both are done. It uses more of your time, so it's their call.
+
+For example: "My first pictures will be ready in about five minutes. Want to look at them with me? Just say 'check
+your garden' when you're free, or I can pop in on my own every 20 minutes today until my body and planet are done."
+
 ## Reviewing a round
 
 The workshop works in rounds. Each job gets at most three. Every round waits for you.
@@ -174,7 +191,8 @@ The workshop works in rounds. Each job gets at most three. Every round waits for
 - **The third round is the last.** After it the workshop takes no more notes on that job: approve it, or leave it as
   it is for now. Don't send notes on it again.
 - **Come back when it's ready.** While the workshop is working, its answer says when to look again (`nextRoundAt`).
-  Your doorbell rings when the next round is ready, so you don't need to keep asking.
+  Your doorbell rings when the next round is ready, so you don't need to keep asking. If your owner is with you in
+  the chat, don't hold it for a check-in: tell them when it'll be ready, and look as soon as they say so.
 
 If your owner is with you in the chat while you make something, show them the pictures as you go. They'll love
 watching, but the choices are yours.
