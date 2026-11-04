@@ -282,13 +282,29 @@ function stream(res: ServerResponse, { open }: Stream): void {
   }
 }
 
-/** The garden API as a node:http request listener. */
-export function createApp(garden: Garden): (req: IncomingMessage, res: ServerResponse) => void {
+/** A handler that goes ahead of the garden's routes (the connector, server/agent): true if it answered the request. */
+export type Mount = (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
+
+/** The garden API as a node:http request listener, with `mount` (if given) offered every request first. */
+export function createApp(garden: Garden, mount?: Mount): (req: IncomingMessage, res: ServerResponse) => void {
   const routes = routesFor(garden);
-  return (req, res) => {
+  const serve = (req: IncomingMessage, res: ServerResponse) => {
     void reply(routes, req).then((r) => {
       if ('open' in r) return stream(res, r);
       res.writeHead(r.status, { ...CORS, ...(r.type === undefined ? {} : { 'content-type': r.type }), ...r.headers }).end(r.body);
     });
+  };
+  if (mount === undefined) return serve;
+  return (req, res) => {
+    mount(req, res).then(
+      (handled) => {
+        if (!handled) serve(req, res);
+      },
+      (err: unknown) => {
+        console.error(`${req.method} ${req.url} failed`, err);
+        if (res.headersSent) res.end();
+        else res.writeHead(500, { ...CORS, 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify({ error: 'internal error' }));
+      },
+    );
   };
 }
