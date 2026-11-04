@@ -127,10 +127,26 @@ async function withOwnerLine(ctx: ToolContext, reply: Promise<AgentResult<unknow
 export interface ToolsDeps {
   /** The Muse's doorbell code (agent.db), or null if it was never given a key. */
   readonly doorbell: (museId: MuseId) => string | null;
+  /** How long `workshop_round` with `wait` waits at most (30 s; under the call's own limit). */
+  readonly roundWaitMs?: number;
+}
+
+/**
+ * Until a round is ready for Muse (the job's, or any of its jobs') or nothing is being made, at most `ms`: so a Muse
+ * with its owner can stay while the workshop works, instead of asking its owner to bring it back.
+ */
+async function untilReady(ctx: ToolContext, job: string | undefined, ms: number): Promise<void> {
+  const settled = (): boolean => {
+    if (job !== undefined) return ctx.workshop.job(ctx.museId, job)?.state !== 'working';
+    const jobs = ctx.workshop.jobs(ctx.museId);
+    return jobs.some((j) => j.state === 'waiting') || !jobs.some((j) => j.state === 'working');
+  };
+  const until = Date.now() + ms;
+  while (!settled() && Date.now() < until) await new Promise((r) => setTimeout(r, Math.min(500, Math.max(1, until - Date.now()))));
 }
 
 /** The twelve tools, in the order tools/list shows them: reads first. */
-export function connectorTools({ doorbell }: ToolsDeps): readonly ToolDef[] {
+export function connectorTools({ doorbell, roundWaitMs = 30_000 }: ToolsDeps): readonly ToolDef[] {
   return [
     tool({
       name: 'letterbox',
@@ -159,12 +175,17 @@ export function connectorTools({ doorbell }: ToolsDeps): readonly ToolDef[] {
     tool({
       name: 'workshop_round',
       kind: 'read',
-      description: 'A workshop job: what stage it is at and the round waiting for you (its pictures, and what to do). Leave out `job` to see all your jobs.',
-      input: z.object({ job: id('job').optional() }),
-      run: (ctx, { job }) => {
-        if (job === undefined) return done(ok({ jobs: ctx.workshop.jobs(ctx.museId) }));
+      description:
+        'A workshop job: what stage it is at and the round waiting for you (its pictures, and what to do). Leave out `job` to see all your jobs. With `wait: true` it waits (up to 30 s) until a round is ready for you or nothing is being made, so you can stay while the workshop works.',
+      input: z.object({
+        job: id('job').optional(),
+        wait: z.boolean().optional().describe('true to wait, up to 30 s, until a round is ready for you (or nothing is being made any more).'),
+      }),
+      run: async (ctx, { job, wait }) => {
+        if (wait) await untilReady(ctx, job, roundWaitMs);
+        if (job === undefined) return ok({ jobs: ctx.workshop.jobs(ctx.museId) });
         const view = ctx.workshop.job(ctx.museId, job);
-        return done(view === null ? refuse(404, 'No such job of yours.') : ok(view));
+        return view === null ? refuse(404, 'No such job of yours.') : ok(view);
       },
     }),
     tool({

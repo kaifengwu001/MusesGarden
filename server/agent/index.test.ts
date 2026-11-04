@@ -104,7 +104,7 @@ let doorbell: string;
 let wallMs: number;
 const clients: Client[] = [];
 
-async function start(opts: { origin?: string; toolTimeoutMs?: number; guide?: string } = {}) {
+async function start(opts: { origin?: string; toolTimeoutMs?: number; guide?: string; roundWaitMs?: number } = {}) {
   stub = stubs();
   dataDir = mkdtempSync(join(tmpdir(), 'muse-agent-'));
   wallMs = Date.parse('2026-11-03T09:00:00Z');
@@ -115,6 +115,7 @@ async function start(opts: { origin?: string; toolTimeoutMs?: number; guide?: st
     origin: opts.origin ?? ORIGIN,
     wall: () => wallMs,
     ...(opts.toolTimeoutMs === undefined ? {} : { toolTimeoutMs: opts.toolTimeoutMs }),
+    ...(opts.roundWaitMs === undefined ? {} : { roundWaitMs: opts.roundWaitMs }),
     guide: opts.guide ?? join(dataDir, 'no-such-guide.md'),
   });
   const fake = fakeCommands();
@@ -287,6 +288,30 @@ describe('the connector over MCP', () => {
 
     await call('workshop_view', { request_id: 'v1', job: JOB, ask: 'from my porch at dusk' });
     expect(stub.workshop.view).toHaveBeenCalledWith(POOH, JOB, 'from my porch at dusk');
+  });
+
+  it('waits with the workshop when asked (wait: true), until a round is ready', async () => {
+    const { client } = await connect();
+    const working: JobView = { ...JOB_VIEW, state: 'working', packet: null };
+    let asked = 0;
+    stub.workshop.jobs.mockImplementation(() => (++asked < 3 ? [working] : [JOB_VIEW]));
+    const t0 = Date.now();
+    const box = value(await client.callTool({ name: 'workshop_round', arguments: { wait: true } }));
+    expect((box.jobs as JobView[])[0].state).toBe('waiting');
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(400);
+  });
+
+  it('gives up waiting after its limit, and answers with what is there', async () => {
+    await stop();
+    await start({ roundWaitMs: 300 });
+    const { client } = await connect();
+    const working: JobView = { ...JOB_VIEW, state: 'working', packet: null };
+    stub.workshop.job.mockImplementation(() => working);
+    const t0 = Date.now();
+    const job = value(await client.callTool({ name: 'workshop_round', arguments: { job: JOB, wait: true } }));
+    expect(job.state).toBe('working');
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(250);
+    expect(Date.now() - t0).toBeLessThan(5000);
   });
 
   it('adds a line for Muse to pass on to its owner: when to look, and what to say', async () => {

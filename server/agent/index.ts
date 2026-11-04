@@ -40,6 +40,8 @@ export interface AgentDeps {
   readonly toolTimeoutMs?: number;
   /** The guide served at /garden.md (default server/agent/CONNECTOR.md). */
   readonly guide?: URL | string;
+  /** How long `workshop_round` with `wait` waits at most (30 s). */
+  readonly roundWaitMs?: number;
 }
 
 export interface AgentHandler {
@@ -67,7 +69,7 @@ export function createAgentHandler(deps: AgentDeps): AgentHandler {
   mkdirSync(dataDir, { recursive: true });
   const store = openAgentStore(join(dataDir, 'agent.db'));
   const adminToken = writeAdminToken(dataDir);
-  const tools = connectorTools({ doorbell: (museId) => store.doorbellOf(museId) });
+  const tools = connectorTools({ doorbell: (museId) => store.doorbellOf(museId), ...(deps.roundWaitMs === undefined ? {} : { roundWaitMs: deps.roundWaitMs }) });
   const callTool = toolCaller({ store, wall, ...(deps.toolTimeoutMs === undefined ? {} : { timeoutMs: deps.toolTimeoutMs }) });
   const limit = rateLimit();
   const configured = trimSlash(deps.origin ?? process.env.MUSE_PUBLIC_ORIGIN);
