@@ -14,11 +14,12 @@ Muse is a closed-form character. Every pose is a pure function of time and a see
 
 | File | What it holds |
 |---|---|
-| `src/life/museRig.ts` | The rig. `pose(action)` rests, then adds layers: idle, walk, wave, then each `Move` in `action.moves` (`MoveKind`: bounce, pet, fluff, yawn, hopUp, perch, hopDown, plop, sit, rise, lieBack, sleep, wake, fish, water, stir, pocket), then arm reaches and correctives. |
+| `src/life/museRig.ts` | The rig. `pose(action)` rests, then adds layers: idle, walk, wave, then each `Move` in `action.moves` (`MoveKind`: bounce, pet, fluff, yawn, idea, love, hopUp, perch, hopDown, plop, sit, rise, lieBack, sleep, wake, fish, water, stir, pocket, and the desk's type, lid, phones, unwind), then arm reaches and correctives. |
 | `src/life/museLife.ts` | The lab's ~4-minute day on its stage (lab only). |
 | `src/dev/museStage.ts`, `src/dev/museLab.ts` | The lab's stage, with its props and `window.museStage` (seek, frame, tap, hold, letGo). Also the lab page, with its `MOVES` table for looping a move on the spot. |
 | `src/life/museRoam.ts` | Its life on the planet: outings written as segments by builders (stand, turn, go, walkPath, hop, pour, shuffle, stroll, can), places, durations, routes, `RoamCues` for the props, and `Answers` for taps and holds. |
 | `src/life/museProps.ts` | The meadow's props: stove, can, rod with line, float and fish, ladle, and the motes atlas (Z, ♥, ♪, puff, drop, bubble). They're driven by the cues and by the rig's beat functions. |
+| `src/life/museEmotes.ts` | The icon over its head that a move sets on the rig (`rig.emote`): the light bulb of `idea` (unlit, lit, its rays and glow) and the heart of `love`. Drawn from a sheet of its own, so the motes atlas is untouched: on a planet by every world's museProps.ts (`MuseEmotes`, the motes' shaders), in the lab by `SpriteEmotes` (turntable and stage). It draws nothing unless such a move plays. |
 | `src/life/muse.ts`, `src/world.ts`, `src/main.ts` | Size (`MUSE_HEIGHT` 1.65 m), drawn/where/home/away, pick, `frameMuse`, and taps and holds (Muse first, only while it is drawn). |
 | `src/life/musePress.glsl` | Grass and flowers pressed down where it lies. |
 | `src/life/museMesh.ts` `DRESSED`, `src/dev/museLineup.ts` | The muses in clothes: rigged as the sculpts are (fur told from cloth by the paint, joints measured off each, their arms' turns solved to hang and wave as tpose6's), and lined up in the lab, each idling with a habit of its own and answering taps and holds (`Answers`). A move added to the rig plays on them too. `src/life/museDress.ts` dresses Muse's material for one (paint, face, both sides, fit), in the lab, the lineup and on a planet (`Muse.useModel('muse5')`). Rigging a model, or fixing its mesh: muse-rig. |
@@ -28,6 +29,7 @@ Rig building blocks (`museRig.ts`):
 - `addTurn`, `addShift` and `addSwell` add to a joint.
 - `stretch` squashes (−) or stretches (+) the whole body about its feet, keeping volume.
 - `express(k, {eyes, smile, squint, squeeze, blush})` sets the face.
+- `emote` holds the icon over its head (a bulb, a heart: how much, its size and turn), set by the move like the face, reset every pose; museEmotes.ts draws it wherever Muse is drawn.
 - `fluff` makes the fur stand up in a wave.
 - `reachFor(side, x, y, z, joint, amount)` sends a mitten to a point, carried by a joint. The arm is then solved by damped least squares (`solveArm`).
 - `posed(joint, …)` gives a point on a joint, for props to follow.

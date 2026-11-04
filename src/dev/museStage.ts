@@ -48,6 +48,7 @@ import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { smoothstep } from '../core/math';
 import { JOINT } from '../life/museBody';
+import { SpriteEmotes } from '../life/museEmotes';
 import { BED, BENCH, CAST, FIRE, MuseLife, POND, flowerAt, type Living } from '../life/museLife';
 import { COOK, FISH, POT, STIR, cookBeats, fishBeats, gardenBeats, sleepBeats, type MuseRig } from '../life/museRig';
 
@@ -682,6 +683,9 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
   const noteMaterial = new SpriteMaterial({ map: glyph('♪', '#8a6fd0'), transparent: true, depthWrite: false });
   const notes = Array.from({ length: 3 }, () => riser(noteMaterial, 0.14));
   for (const s of [...zs, ...hearts, ...notes]) scene.add(s);
+  // the icon over its head: a light bulb as an idea comes to it, a heart as it adores you (museEmotes.ts)
+  const emotes = new SpriteEmotes();
+  scene.add(emotes.group);
 
   // still props' shadows: the bench's seat, the bed, the pot
   const still: Vector4[] = [
@@ -817,6 +821,7 @@ export function buildStage(scene: Scene, camera: PerspectiveCamera, canvas: HTML
     living = l;
     rig.pose(l.action);
     placeMuse(l);
+    emotes.update(rig, place);
     const face = u.uMuseFace.value as Vector4;
     face.set(rig.eyes, rig.smile, rig.squint, rig.squeeze);
     (u.uMuseMood.value as Vector4).set(rig.blush, 0, 0, 0);

@@ -7,7 +7,9 @@ import {
   FLUFF,
   GARDEN,
   HOP,
+  IDEA_LENGTH,
   LIE_BACK,
+  LOVE_LENGTH,
   PET,
   PLOP,
   POCKET,
@@ -28,10 +30,11 @@ import {
 // Muse's life on a little stage of its own (the lab's, museStage.ts, for
 // now): where it goes and what it does there, a day of beats in closed form
 // (as muse.ts's day on the terrace is), so a time always finds it in one
-// place doing one thing. It looks about, waters its flowers one by one,
+// place doing one thing. It looks about (and an idea comes to it: a light
+// bulb over its head, its arms thrown up), waters its flowers one by one,
 // hops up onto the bench and swings its legs, fishes at the pond, cooks at
-// the fire, yawns and naps on its back in the grass, and waddles between
-// them. Over whatever it is doing go its answers to you: tap it and it waves
+// the fire, yawns and naps on its back in the grass, and comes home to you
+// (adoring you, a heart over its head), waddling between them. Over whatever it is doing go its answers to you: tap it and it waves
 // (the first time in a while) or bounces for joy; hold it and it leans into
 // your hand, and held longer its fur stands up in a wave and it shakes it
 // out when you let go; asleep, a tap only stirs it.
@@ -289,6 +292,11 @@ function buildDay(): Segment[] {
   // a little wander
   go(AROUND, 0.6);
   stand('look about', 2.5, 0.6);
+  // an idea comes to it (a light bulb over its head, its arms up): the flowers!
+  stand('idea', IDEA_LENGTH + 0.2, 0.6, (s, out) => {
+    out.action.moves.push({ kind: 'idea', time: s, amount: 1 });
+    out.lookAt = null;
+  });
   // the flowers, one after another (the can out of its pocket first, back in after)
   go(bedAt(0), 0, 'to the flowers');
   const water = GARDEN.period * BED.count;
@@ -368,8 +376,11 @@ function buildDay(): Segment[] {
     out.cues.sleep = s < 0.4 ? { time: nap + s, roused: s } : null;
   });
   play('rise', 'rise', RISE, -Math.PI / 2);
-  // home, and a bounce for the day
+  // home, adoring you (its head tilted, a heart over it), and a bounce for the day
   go(HOME, 'you', 'home again');
+  stand('love', LOVE_LENGTH + 0.2, 'you', (s, out) => {
+    out.action.moves.push({ kind: 'love', time: s, amount: 1, side: 1 });
+  });
   stand('happy', 3, 'you', (s, out) => {
     out.action.moves.push({ kind: 'bounce', time: s - 0.3, amount: s > 0.3 ? 1 : 0 });
   });

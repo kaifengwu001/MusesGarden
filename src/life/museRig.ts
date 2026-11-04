@@ -137,6 +137,20 @@ export const PHONES_LENGTH = PHONES.rest;
 export const UNWIND = { back: [0, 0.8], up: [0.3, 1.05], hold: 2.35, down: [2.35, 3.0], sigh: [2.8, 4.4] } as const;
 export const UNWIND_LENGTH = UNWIND.sigh[1];
 
+/**
+ * An idea coming to it (s): it dawns (a little dip, its eyes wide, its head lifting) as a light bulb comes over its
+ * head, unlit; the bulb flickers on and it throws its arms up in a V, springing up tall and beaming (\(∩ ∩)/), the
+ * bulb's rays flashing out; held, swaying with delight; its arms down, the bulb gone.
+ */
+export const IDEA = { dawn: [0, 0.34], bulb: [0.06, 0.36], on: 0.4, up: [0.42, 0.8], hold: 2.0, down: [2.0, 2.55], gone: [2.2, 2.6] } as const;
+export const IDEA_LENGTH = 2.8;
+/**
+ * Adoring you (s): its head tilting to one side, its paws drawn in a little, its eyes in happy arcs (∩ ∩) and a deep
+ * blush, a heart popping up over its head and beating (each beat a lub-dub) as it sways a little; then back.
+ */
+export const LOVE = { tilt: [0, 0.6], heart: [0.22, 0.56], beats: [0.85, 1.75, 2.65], back: [2.6, 3.25], gone: [2.8, 3.25] } as const;
+export const LOVE_LENGTH = 3.45;
+
 /** Which mitten strikes the nth key (1 its left, −1 its right): in turn, now and then the same one twice. */
 function striker(n: number): number {
   const turn = n % 2 === 0 ? 1 : -1;
@@ -282,14 +296,16 @@ export type MoveKind =
   | 'type'
   | 'lid'
   | 'phones'
-  | 'unwind';
+  | 'unwind'
+  | 'idea'
+  | 'love';
 
 /** Something Muse is doing besides (museLife.ts): which, how far into it (s), how much of it shows (0 … 1). */
 export interface Move {
   kind: MoveKind;
   time: number;
   amount: number;
-  /** Petting: the side its head tilts toward (+1 its left), and how long since it was let go (s; < 0 while still held). */
+  /** Petting and adoring you: the side its head tilts toward (+1 its left); petting: how long since it was let go (s; < 0 while still held). */
   side?: number;
   release?: number;
   /** A pastime's own motions over its posture (0 … 1): eased in as it starts and out before it ends, the posture (sitting, lying) held throughout. */
@@ -561,6 +577,14 @@ export class MuseRig {
   /** The fur standing up: how far up the body the wave has come (H, at rest), how much stands behind it, the crest's extra at its front, the front's width (H). */
   readonly fluff = new Vector4(0, 0, 0, 0.12);
   /**
+   * The icon over its head, as its moves set it (museEmotes.ts draws it, in step with the pose): a light bulb as an
+   * idea comes to it, a heart as it adores you. For each, how much of it shows (0 … 1: its opacity) and its size (× its
+   * own, popping in with an overshoot, beating); the bulb's light (0 unlit … 1 lit) and its rays (how much, their size,
+   * their turn, rad) and its glow (0 … 1, a burst more as it lights); how far the icon rides up over its head (H), and its
+   * turn (rad, + anticlockwise as it faces you). All 0 but in those moves.
+   */
+  readonly emote = { bulb: 0, bulbSize: 0, lit: 0, glow: 0, rays: 0, raySize: 0, rayTurn: 0, heart: 0, heartSize: 0, rise: 0, spin: 0 };
+  /**
    * How much of each shoulder's correctives (museMesh.ts) the arm's pose
    * calls for: raised, the wave's (0 at the sculpt's own pose … 1 at the top
    * of a wave), and hung, the hanging arm's (1 hanging … 0 at the sculpt's
@@ -744,6 +768,8 @@ export class MuseRig {
     this.ripples = 2;
     this.ripplePhase = 0;
     this.lying = 0;
+    const em = this.emote;
+    em.bulb = em.bulbSize = em.lit = em.glow = em.rays = em.raySize = em.rayTurn = em.heart = em.heartSize = em.rise = em.spin = 0;
     this.reach();
     this.idle(a.time, a.walk);
     if (a.walk > 0) this.walkPose(a.gait, a.walk, a.stride);
@@ -808,6 +834,10 @@ export class MuseRig {
         return this.phones(t, k, e);
       case 'unwind':
         return this.unwind(t, k, e);
+      case 'idea':
+        return this.idea(t, e);
+      case 'love':
+        return this.love(t, e, mv.side ?? 1);
     }
   }
 
@@ -1050,6 +1080,91 @@ export class MuseRig {
     this.addTurn(J.chest, -0.07 * up, 0, 0.03 * Math.sin(TAU * 7 * t) * up * hump(Y.up, Y.up + Y.hold, t) * 0.3);
     const open = during(Y.up * 0.5, Y.up + 0.25, Y.up + Y.hold - 0.3, Y.up + Y.hold + 0.25, t);
     this.express(open * k, { squint: -1, smile: 0.3 });
+  }
+
+  /**
+   * An idea coming to it (IDEA): it dawns on it (a little dip, its eyes wide, its head lifting toward the bulb that
+   * comes over its head, unlit); the bulb lights up with a burst of glow and it throws its arms up in a V (a wave's
+   * raise on each side, opened out and straightened) as it springs up tall, beaming and blushing, the bulb's rays
+   * flashing out; it holds them up, swaying with delight (its arms carried by the sway, not waved), then brings them
+   * down as the bulb goes.
+   */
+  private idea(t: number, e: number): void {
+    const J = JOINT;
+    const I = IDEA;
+    // dawning: a little dip, the head lifting toward the bulb, the eyes wide
+    const dip = hump(I.dawn[0], I.dawn[1], t);
+    const lift = during(I.dawn[0], I.dawn[1], I.up[1], I.hold, t);
+    // the arms thrown up (overshooting a little), held, brought down
+    const r = (t - I.up[0]) / (I.up[1] - I.up[0]);
+    const up = (r <= 0 ? 0 : r < 1 ? easeOutBack(r) : 1) * (1 - smoothstep(I.down[0], I.down[1], t));
+    // swaying with delight while they are up
+    const held = during(I.up[1] - 0.15, I.up[1] + 0.2, I.hold - 0.3, I.hold + 0.05, t);
+    const sway = Math.sin(TAU * 1.4 * (t - I.up[1])) * held;
+    for (const side of [1, -1]) {
+      this.waveArm(side, up * e, 0);
+      this.armBy(side, 0.05 * up * e, 0, (-0.3 * up + 0.04 * side * sway) * e, -0.4 * up * e);
+    }
+    // springing up as they go up (onto its toes and down again), drawn up tall while they are up, a little bob with the
+    // sway, settling as they come down
+    const spring = hump(I.up[0] - 0.02, I.up[1] + 0.1, t);
+    this.stretch += (-0.05 * dip + 0.05 * up + 0.025 * spring - 0.02 * hump(I.down[0] + 0.15, I.down[1] + 0.2, t)) * e;
+    this.addShift(J.root, 0, (0.028 * spring + 0.003 * held * (1 - Math.cos(TAU * 2.8 * (t - I.up[1])))) * e, 0);
+    this.addTurn(J.pelvis, 0, 0, 0.05 * sway * e);
+    this.addTurn(J.chest, -0.05 * up * e, 0, -0.02 * sway * e);
+    this.addTurn(J.head, (-0.15 * lift - 0.04 * up) * e, 0, -0.035 * sway * e);
+    // the face: wide-eyed as it dawns, then beaming (∩ ∩) with a blush
+    this.express(lift * (1 - Math.min(1, up)) * e, { eyes: 1, smile: 0.45 });
+    this.express(Math.min(1, up) * e, { eyes: 1, squint: 1, smile: 1, blush: 0.5 });
+    // the bulb: popping in unlit, lighting up with a burst of glow, its rays flashing out and turning slowly; it rises
+    // a little and goes as the arms come down
+    const b = (t - I.bulb[0]) / (I.bulb[1] - I.bulb[0]);
+    const gone = smoothstep(I.gone[0], I.gone[1], t);
+    const shows = Math.min(1, Math.max(0, 3 * b)) * (1 - gone) * e;
+    if (shows <= 0) return;
+    const em = this.emote;
+    const f = t - I.on;
+    em.bulb = Math.max(em.bulb, shows);
+    em.bulbSize = Math.max(em.bulbSize, (b >= 1 ? 1 : easeOutBack(Math.max(0, b))) * (1 + 0.1 * hump(I.on, I.on + 0.3, t)) * (1 - 0.35 * gone));
+    em.lit = Math.max(em.lit, smoothstep(I.on, I.on + 0.12, t));
+    em.glow = Math.max(em.glow, smoothstep(I.on, I.on + 0.12, t) * (0.75 + 0.5 * hump(I.on, I.on + 0.45, t) + 0.08 * Math.sin(TAU * 1.7 * f)));
+    em.rays = Math.max(em.rays, smoothstep(I.on, I.on + 0.15, t) * (1 - smoothstep(I.down[0], I.gone[0] + 0.1, t)) * (0.85 + 0.15 * Math.cos(TAU * 2.2 * f)) * e);
+    em.raySize = Math.max(em.raySize, 0.65 + 0.35 * easeOutBack(Math.min(1, Math.max(0, f / 0.3))));
+    em.rayTurn = 0.3 * f;
+    em.rise = Math.max(em.rise, 0.025 * smoothstep(I.bulb[0], I.up[1], t) + 0.1 * gone);
+    em.spin = 0.06 * sway;
+  }
+
+  /**
+   * Adoring you (LOVE): its head tilting (toward side, as petting's) and a little down, its body leaning after it, its
+   * paws drawn in a little before it, its eyes in happy arcs (∩ ∩) and a deep blush, swaying a little; a heart pops up
+   * over its head and beats (a lub-dub at each of LOVE.beats), tipped as its head is, floating up and away as it comes
+   * back upright.
+   */
+  private love(t: number, e: number, side: number): void {
+    const J = JOINT;
+    const L = LOVE;
+    const on = during(L.tilt[0], L.tilt[1], L.back[0], L.back[1], t) * e;
+    const sway = Math.sin(TAU * 0.5 * (t - L.tilt[1]));
+    if (on > 0) {
+      this.addTurn(J.head, 0.08 * on, 0.06 * side * on, (0.3 * side + 0.04 * sway) * on);
+      this.addTurn(J.chest, 0, 0, (0.05 * side + 0.015 * sway) * on);
+      this.addTurn(J.pelvis, 0, 0, 0.02 * sway * on);
+      for (const s of [1, -1]) this.armBy(s, -0.36 * on, 0, 0.14 * on, 0.62 * on);
+      this.express(on, { squint: 1, smile: 0.9, blush: 0.95 });
+    }
+    // the heart
+    const h = (t - L.heart[0]) / (L.heart[1] - L.heart[0]);
+    const gone = smoothstep(L.gone[0], L.gone[1], t);
+    const shows = Math.min(1, Math.max(0, 3 * h)) * (1 - gone) * e;
+    if (shows <= 0) return;
+    let beat = 0;
+    for (const b of L.beats) beat += 0.16 * hump(b, b + 0.13, t) + 0.09 * hump(b + 0.2, b + 0.31, t);
+    const em = this.emote;
+    em.heart = Math.max(em.heart, shows);
+    em.heartSize = Math.max(em.heartSize, (h >= 1 ? 1 : easeOutBack(Math.max(0, h))) * (1 + beat) * (1 - 0.25 * gone));
+    em.rise = Math.max(em.rise, 0.035 * smoothstep(L.heart[0], L.gone[0], t) + 0.14 * gone);
+    em.spin = (0.12 * side + 0.05 * sway) * on;
   }
 
   // ---- sitting, lying, and getting there ----

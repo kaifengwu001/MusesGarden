@@ -2,7 +2,9 @@
 // a move at a time into it, from a view, in a look.
 //   node poses.mjs <out-dir> '[["pet",2],["sit",3,"persp:60"],["wave",1.2,"back"]]' [model] [look] [default-view]
 // Poses: idle, walk, wave, day, hang (arms hung, nothing else moving: to compare the two arms), and the
-// moves in museLab.ts's MOVES: bounce pet fluff yawn hopup perch hopdown plop sit rise lie sleep wake fish water stir.
+// moves in museLab.ts's MOVES: bounce pet fluff yawn idea love hopup perch hopdown plop sit rise lie sleep wake fish water
+// stir (idea and love show their icon over its head, a bulb and a heart: it rides above the front, left and back frames,
+// so look at them in a persp: view).
 // Views: front, left, right, back, turn:<deg>, persp:<deg> (a perspective camera round by deg; persp:35 is three-quarter).
 // Looks: muse (default), clay, facet, rough (normal deviation heat: finds bumps), stretch, weights, raw, rawclay.
 // env: BASE, EXTRA (more hash: e.g. "&wire=1", "&size=120" for the face as if far off, "&skin=dqs", "&raise=0").

@@ -94,6 +94,8 @@ export interface MuseFit {
   shoulder?: number;
   /** The left mitten's middle as made (H): where it holds things (museRig.ts), and where the arm reaches from. */
   hand?: readonly [number, number, number];
+  /** How high its top stands (H, rest), a hat's included: an icon floats over it (museEmotes.ts). Not given, tpose6's: 1. */
+  crown?: number;
 }
 
 /** One leg (H, Muse's left): centre x and z, radius, top (inside the belly) and the rounding of the sole's edge. */

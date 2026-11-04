@@ -30,6 +30,144 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Two new moves: an idea and adoring you (2026-11-04)
+
+Kai asked for two more animations for Momo: "delighted, raises its arms up, and a light bulb icon appears over its
+head", and "tilting its head, eyes squint, and a love sign above head". Both are rig moves (`museRig.ts`), so they play
+on Momo and on every muse in clothes, on the meadow and every world but Violet Dunes (its own rig), in the lab and in
+the director's mode.
+
+- **`idea` (2.8 s, `IDEA`):** it dawns on it: a little dip, its eyes wide, its head lifting, as an unlit bulb pops in
+  over its head (0.06–0.36 s). The bulb lights at 0.4 s with a burst of glow and its rays flash out. Then it throws its
+  arms up in a V (a wave's raise on each side, opened out and straightened, as the desk's stretch), springing up onto
+  its toes and drawn up tall, beaming (∩ ∩) with a blush. It holds them up, swaying with delight: the arms are carried
+  by the sway, not waved. Its arms come down from 2.0 s and the bulb rises a little and goes by 2.6 s. I made the bulb
+  light up smoothly (0.12 s) rather than flicker on, so it can't read as a dropped frame.
+- **`love` (3.45 s, `LOVE`):** its head tilts to one side (`side`, as petting's) and a little down, the body leaning
+  after it, its paws drawn in a little, eyes in happy arcs and a deep blush, swaying slowly. A heart pops up over its
+  head at 0.22 s, beats a lub-dub three times (0.85, 1.75, 2.65 s), tipped as its head is, and floats up and away as it
+  comes back upright. The face is eyes only, as Kai's rule has it: no mouth shapes.
+- **The icon** is set on the rig as the face is (`rig.emote`, reset every pose, closed form) and drawn by
+  `src/life/museEmotes.ts` over the head as posed: on a planet as the motes are (`MuseEmotes`: camera-facing squares
+  with the motes' shaders, warped with the planet), from a sheet of its own (glow, rays, the bulb unlit and lit, the
+  heart), so the motes atlas is unchanged; in the lab as sprites (`SpriteEmotes`). Every world's `museProps.ts` draws
+  it (six lines each). It draws nothing unless one of the two moves plays.
+  - A muse in clothes is scaled by its eyes, so a hat stands above tpose6's top (up to 1.2). Its fit now records how
+    high its top stands (`MuseFit.crown`, measured off it with its joints), and the icon rides up by as much as that
+    stands over 1: Kiki's beret, Van's straw hat and Pooh's nightcap had reached into it. tpose6 rigs byte for byte as
+    before (the muse-rig hash, 7417347f).
+- **Where they are:**
+  - The lab: `museLab.html#model=tpose6&pose=idea` and `pose=love` loop them on the spot (live=1 to play them; the icon
+    rides above the front reference's frame, so look in a `persp:` view). In the lab's day on the stage, an idea comes
+    to it after it looks about (and off it goes to water its flowers), and it adores you when it comes home, before the
+    closing bounce.
+  - The photo studio (`?studio`): two more postures for the guest, "an idea (a light bulb)" and "adoring (a heart)".
+  - The director's mode (branch `director`): two more gestures in its library, "An idea" and "Adoring".
+  - Muse's own days on the planets are unchanged: it does neither there yet.
+- **Checked:** stills from the front, three-quarter, side and back in clay (the raised arms are as smooth as the
+  stretch's), frame-by-frame films of both on the turntable (no jumps: the biggest frame change is the bulb lighting
+  up, over four frames), the stage, the meadow and Golden Rye. Three new invariants in `museLife.test.ts`. Without the
+  moves the meadow draws pixel-identical frames to main (6f99010) in all nine views.
+
+## The making of Muse: a shot for the demo film (2026-11-04, in the lab)
+
+Kai asked for a clip of the original Muse alone, showing how it was made, with the blue wave from the hut-interior
+film. `src/dev/museLab.html#making=1` (`src/dev/museMaking.ts`), 9.8 s on the lab's white. It ends on the parade's
+first frame, so the two cut together on the match (Kai: this clip cuts to the parade).
+
+- **Kai's second notes (the first take had triangles, rough and a camera drifting to a three-quarter view and back):**
+  - It must be a whole 360° orbit, since the drift there and back read as unresolved.
+  - The blue front looked sleek, so every change now comes in behind one, the fur included.
+  - The bare mesh comes first, then the clay, and the rough heat map is left out.
+  - I read "bare mesh" as the mesh's triangles: the generation brings in the wired mesh, with no plain grey stage
+    before it.
+- **The stages:** each one is made by a front sweeping up the body in rest space, so a pass stays on the skin once
+  Muse walks. A point's stage is how many fronts have passed it, and each look draws only its own stages.
+  - **Bare mesh (0.25–2.55 s):** the sculpt's file as exported, untextured: Tripo's mesh with its sculpted eyes, its
+    triangles flat and its wire on them, scaled to 1 m as the rig fits it, in the lab's rawclay grey.
+    - The front is the hut film's (hut.frag.glsl FILM in that session's worktree): ragged ±0.12 m, a 6 mm
+      white-blue core, 6 cm of blue glow cooling into the grey.
+    - On the lab's white the hollow inside showed the background through the cut, and shaded it read as a bowl. So
+      the inside is one flat glowing blue, and the cut reads as a solid cross-section.
+  - **Clay (2.85 s):** the skin as rigged takes over from the file: refined, its coat inset, the face plate smooth.
+  - **Weights (3.75 s):** the lab's look.
+  - **Bones (4.65 s):** a ball at each joint and a rod to its parent, drawn over the body in the lab's magenta. They are
+    cut by the front as it comes up (clipping planes), and each joint flashes the edge's blue-white as it passes.
+  - **Colour and fur (7.2 s, 1 s long):** Muse's own shaders. The fur grows in behind the front, from nothing at the
+    line to full length 0.3 m behind it, and its tips lighten as it grows (otherwise it flashes on). The bones are cut
+    away below the line as it climbs.
+  - The passes' line is thinner than the generation's: ±0.025 m, 3.5 cm of glow.
+- **It walks (from 5.45 s):** it comes out of the T-pose over 0.9 s as its legs start stepping. Each joint's turn from its
+  parent is slerped from rest and chained down the skeleton, so the arms come down in arcs. At full strength the blend
+  matches the rig's own pose to 1e-16. It walks on into the parade.
+- **The camera:** once round, from Muse's right, behind it, round its left, using the parade's curve u^p / (u^p + (1 − u)^p).
+  - The power is 3 (`ease=`), not the parade's 5, which would whip round behind just as the bones come in.
+  - The bare mesh is seen from the front, the clay from its right, the weights and the bones from behind, the walk
+    from its left, and the colour and fur from the front.
+  - The camera lands in front 0.1 s before the end and holds still.
+- **The match to the parade:** the clip ends on the parade's opening at its defaults.
+  - The view matches: 2.95 m out, 6° up, looking at 0.56 m. So do the walk's pace (1 cycle a second) and phase, the
+    look at you, the light and the floor.
+  - Muse's clock runs up to the parade's zero. Once the last front is done, Muse is drawn with the parade's own
+    unmodified shaders, and its shadow with the parade's caster.
+  - A single render of the clip at 9.8 s is pixel-identical to the parade's at 0. With 16 jittered samples the two
+    differ in 0.016 % of the pixels, single fur tips. The parade against itself differs in 22 pixels across two page
+    loads, so this is the same noise.
+  - Across the join (`shots/making/making-then-parade-1080p.mp4`), the change between frames is 0.410: its neighbours
+    are 0.399 and 0.409, and a real cut (the parade's own Momo to muse0) is 10.65.
+- **The hash:** `beats=gen,clay,weights,bones,walk,colour,end`, `ease=`, `cam=round,up,distance`, `live=1`.
+- **Muse's shaders are unchanged.** The film adds its code to their source inside the scene, and each piece it hooks
+  onto is checked to occur exactly once. So the meadow and the lab draw as before.
+- **Rendering:** `node tools/workflows/muse-look/scripts/making.mjs out.mp4 1920 1080 30 16` takes about 30 s.
+  `lib.mjs filmLab` films both lab scenes, so `parade.mjs` is a one-liner on it with its command unchanged.
+- **Checked:**
+  - The film is 294 frames at 1080p, in `shots/making/` (gitignored), with the first take beside it as `-take1`.
+  - A scan of the change between frames finds no pop.
+  - Contact sheets were read through every stage, plus full-size frames of the bones' and the colour's sweeps.
+  - Blue specks on the fur's outline during the colour sweep are fixed. They were the fur shells' back faces, painted
+    as a cut's inside.
+
+## The muses' parade: a shot for the demo film (2026-11-04, in the lab)
+
+Kai asked for a 7-second shot in the lab: the walking animation, then the wave, swapping through all the muses on
+match cuts, with the camera orbiting 360° and starting and stopping in front of the muse. It is
+`src/dev/museLab.html#parade=1` (`src/dev/museParade.ts`). The original Muse (Momo, tpose6) and the muses in clothes
+0–12 stand on the lab's white one after another, each on for 0.5 s. Each takes over from the last in the same pose at
+the same moment, so it reads as one Muse whose clothes change at every cut.
+
+- **The walk (0–3.5 s):** the lab's walk on the spot, at one step per muse (gait 1.0 cycle a second), so every cut
+  falls on a footfall. The last step, muse5's, brings it to a stop.
+- **The wave (3.5–6.85 s):** the rig's wave as it is (3.35 s), thrown up on the cut to muse6. In the last 0.15 s
+  muse12 stands with its arm down.
+- **The camera:** once round at 2.95 m, 6° above the point it looks at (0.56 m up), with a 30° lens. It goes round
+  Muse's right while it walks, is behind it as the wave goes up, and comes round its left, the waving arm's side.
+  - Kai asked for a very exaggerated acceleration and deceleration, so that more of the shot is in front of the
+    muses. The share of the way round is u⁵ / (u⁵ + (1 − u)⁵), so the camera is at rest at both ends.
+  - It holds within 10° of the front for the first and last 2.3 s: Momo and muses 0–3 walking toward you, muses 8–12
+    waving to you.
+  - It swings the other 340° in the 2.4 s between, passing behind at five times the even pace (257°/s). muse4 and
+    muse7 are seen from about 40° off the front, muse5 and muse6 as it whips round behind.
+  - `ease=` sets the power (1 goes round evenly). The first take's sine ease, round = −180°·(1 − cos πu), was close to
+    a power of 2.
+- **Turning to you:** while the camera is near its front, at either end, Muse turns its head to the camera (the
+  rig's look): fully within 25° of its front, fading out by 70°. From about 4.4 s, once the camera has come round,
+  it looks at you with happy eyes (∩) and a blush as it waves. `look=0` leaves both out.
+- **The hash:** `order=` (the muses in turn), `length=` (each muse is on for length / their number, and the gait
+  keeps a whole number of steps per muse), `wave=` (when the walk ends and the wave begins), `ease=` (the camera's
+  curve), `cam=round,up,distance` (holds the camera, for checking), `live=1` (plays it in the browser).
+- **Rendering:** `node tools/workflows/muse-look/scripts/parade.mjs out.mp4 1920 1080 30 16`, about 25 s once the 14
+  muses are rigged. It works as the desk film's renderer does: each frame averages 16 renders over half a frame's
+  shutter, moving the shadow light over a small disc and the view by a fraction of a pixel. The muse whose turn it
+  is at a frame stays on for its whole shutter, so no frame mixes two. The floor is the white going on for ever. It
+  shows only a soft shade under the feet and the shadow of Muse's skin (a depth-only copy, skinned as drawn), cast
+  by a higher light than the one Muse is shaded by. `STILLS=<dir>` writes the frames as pngs instead.
+- **Checked:** the film is 210 frames at 1080p (`shots/parade/muses-parade-1080p.mp4`, gitignored, with the first
+  take beside it as `-gentle-ease`). A scan of the change between frames finds no pop away from the 13 cuts. Contact
+  sheets were read through the cuts, the stop, the wave's raise, the whip round behind and the end.
+- **Known:** with the first take's gentler curve, muse3 was seen from behind its right side as it walked. Its face
+  plate showed edge on there, with the eye at its rim. That is the model at that angle, not a fault in the film. With
+  the exaggerated curve muse3 is seen from the front.
+
 ## Momo at its desk: the demo film (2026-11-03, in the lab)
 
 For the demo video's voiceover ("Say hi to Momo… advanced personal agent stuff. But what does Muse do when it's… not

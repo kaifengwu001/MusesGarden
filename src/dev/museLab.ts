@@ -33,7 +33,8 @@ import { DRESSED, SCULPTS, type DressedKind, type MuseMesh, type SculptKind } fr
 import { loadSculpt } from '../life/museSculptLoader';
 import fragmentShader from '../life/muse.frag.glsl?raw';
 import vertexShader from '../life/muse.vert.glsl?raw';
-import { BOUNCE_LENGTH, FISH, FLUFF_LENGTH, GARDEN, COOK, HOP, LIE_BACK, MuseRig, PET, PLOP, RISE, WAKE, WAVE_LENGTH, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
+import { SpriteEmotes } from '../life/museEmotes';
+import { BOUNCE_LENGTH, FISH, FLUFF_LENGTH, GARDEN, COOK, HOP, IDEA_LENGTH, LIE_BACK, LOVE_LENGTH, MuseRig, PET, PLOP, RISE, WAKE, WAVE_LENGTH, YAWN_LENGTH, type Move, type MoveKind } from '../life/museRig';
 import { registerShaderChunks } from '../render/glsl';
 
 // The Muse lab (dev only, served at /src/dev/museLab.html): Muse alone on
@@ -52,7 +53,9 @@ import { registerShaderChunks } from '../render/glsl';
 //                           a dressed muse's fur (cream), cloth (blue) and face (pink))
 //   wire=1 (the triangles over it)
 //   view=front|left|back|turn:<deg>|persp:<deg>   pose=idle|walk|wave|hang|<move>   t=<s>   gait=<cycles>   fur=0|1   bones=0|1
-//   (a move, on the spot: bounce|pet|fluff|yawn|hopup|perch|hopdown|plop|sit|rise|lie|sleep|wake|fish|water|stir; pet is held 3.5 s, then let go)
+//   (a move, on the spot: bounce|pet|fluff|yawn|idea|love|hopup|perch|hopdown|plop|sit|rise|lie|sleep|wake|fish|water|stir; pet is held
+//   3.5 s, then let go; idea and love show their icon over its head, a light bulb and a heart: museEmotes.ts. The icon
+//   rides above the front reference's frame: see it in a persp: or cam: view)
 //   size=<px> (Muse this many pixels tall, as if seen from further off)
 //   skin=lbs|dqs (the joints blended as matrices, as Muse is drawn, or as dual quaternions)   raise=0 (without the correctives)
 //   hang=<z>,<x>  wave=<z>,<fore>[,<x>,<y>] (other arm angles on the body's fit, rad)   reach=<H> (arms drawn longer)   comb=0 (the fur standing straight)
@@ -110,6 +113,8 @@ const MOVES: Record<string, { kind: MoveKind; length: number }> = {
   pet: { kind: 'pet', length: PET_HOLD + PET.out + 2 },
   fluff: { kind: 'fluff', length: FLUFF_LENGTH + 0.8 },
   yawn: { kind: 'yawn', length: YAWN_LENGTH + 0.8 },
+  idea: { kind: 'idea', length: IDEA_LENGTH + 0.8 },
+  love: { kind: 'love', length: LOVE_LENGTH + 0.8 },
   hopup: { kind: 'hopUp', length: HOP.up + 0.8 },
   perch: { kind: 'perch', length: 15 },
   hopdown: { kind: 'hopDown', length: HOP.down + 0.8 },
@@ -153,6 +158,8 @@ function act(t: number): void {
   rig.pose({ time: t, walk, stride: 1, gait, wave, lookYaw: 0, lookPitch: 0, look: 0, moves });
   // (the arms hung and nothing else moving, to compare the two arms)
   if (pose === 'hang') rig.hang();
+  // (the icon over its head, a move's: museEmotes.ts)
+  emotes.update(rig);
 }
 async function body(): Promise<{ body: MuseBody & Partial<MuseMesh>; grade: Vector3; raw: Mesh | null; paint: Texture | null }> {
   if (!sculpt) return { body: buildMuseBody(), grade: new Vector3(1, 1, 1), raw: null, paint: null };
@@ -163,6 +170,9 @@ async function body(): Promise<{ body: MuseBody & Partial<MuseMesh>; grade: Vect
 const { body: b, grade, raw, paint: texture } = await body();
 // its skeleton's fit: a dressed muse's measured off it (museMesh.ts measureFit)
 const baseFit: MuseFit = sculpt ? fitOf(sculpt, b) : FIELD_FIT;
+/** The icon over its head (a light bulb, a heart) as a move has it, here and on the stage. */
+const emotes = new SpriteEmotes();
+scene.add(emotes.group);
 const rig = new MuseRig({
   ...baseFit,
   hang: hang ? { ...baseFit.hang, z: hang[0], x: hang[1] ?? baseFit.hang.x } : baseFit.hang,
