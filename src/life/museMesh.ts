@@ -536,6 +536,12 @@ export function rigSculpt(position: ArrayLike<number>, normal: ArrayLike<number>
   // (a dressed muse's joints measured off it, its arms' turns solved; and the pieces no seed of the cut is on, a sleeve's
   // cuff or a strap, which take their weights from the skin under them)
   const measured = dress ? measureFit(P, bodyTriangles, cuts, sculpt.fit, dress.hangOut, dress.sleeves) : null;
+  // (and how high its top stands, a hat's included, which reaches above tpose6's: an icon floats over it, museEmotes.ts)
+  if (measured) {
+    let top = -Infinity;
+    for (let i = 1; i < P.length; i += 3) top = Math.max(top, P[i]);
+    measured.fit.crown = top;
+  }
   const fit = measured?.fit ?? sculpt.fit;
   // (and the pieces wholly an arm's: its own, or a paw out of a sleeve, whose weight rises from where it comes out)
   const own = dress ? armPieces(bodyTriangles, cuts, find) : null;

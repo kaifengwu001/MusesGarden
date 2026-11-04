@@ -32,8 +32,11 @@ const LIT = 3;
 const HEART = 4;
 /** Each picture's size (H, across its square). */
 const SIZE = [0.52, 0.5, 0.25, 0.25, 0.22] as const;
-/** Where the icon floats (H): its middle over the top of the head (in the head's frame), carried up along Muse's own up. */
-const CROWN = { y: 0.15, z: 0.03, over: 0.29 } as const;
+/**
+ * Where the icon floats (H): its middle over the top of the head (in the head's frame), carried up along Muse's own up;
+ * a muse whose top stands higher than tpose6's (1: a hat) has it carried up by as much more (MuseFit.crown).
+ */
+const CROWN = { y: 0.15, z: 0.03, over: 0.29, top: 1 } as const;
 
 /** One picture of the sheet, painted into a square of a canvas (its left edge at x, size across). */
 function paint(g: CanvasRenderingContext2D, picture: number, x: number, S: number): void {
@@ -205,7 +208,7 @@ export function emoteMarks(rig: MuseRig, out: EmoteMark[]): number {
   const em = rig.emote;
   if (em.bulb <= 0.004 && em.heart <= 0.004) return 0;
   rig.frameOf(JOINT.head, headFrame);
-  crown.set(0, CROWN.y, CROWN.z).applyMatrix4(headFrame);
+  crown.set(0, CROWN.y + Math.max(0, (rig.fit.crown ?? CROWN.top) - CROWN.top), CROWN.z).applyMatrix4(headFrame);
   const y = crown.y + CROWN.over + em.rise;
   let n = 0;
   const mark = (picture: number, size: number, alpha: number, spin: number): void => {
