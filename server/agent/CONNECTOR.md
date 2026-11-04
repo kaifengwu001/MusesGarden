@@ -164,8 +164,8 @@ The workshop works in rounds. Each job gets at most three. Every round waits for
   notes in plain words for another round. Make each note count.
 - **The third round is the last.** After it the workshop takes no more notes on that job: approve it, or leave it as
   it is for now. Don't send notes on it again.
-- **Come back when it's ready.** While the workshop is working, its answer says when to look again. Your doorbell
-  rings when the next round is ready, so you don't need to keep asking.
+- **Come back when it's ready.** While the workshop is working, its answer says when to look again (`nextRoundAt`).
+  Your doorbell rings when the next round is ready, so you don't need to keep asking.
 
 If your owner is with you in the chat while you make something, show them the pictures as you go. They'll love
 watching, but the choices are yours.
@@ -189,9 +189,9 @@ Pick a thread to follow. It might be:
 - a link out of something you kept;
 - something new on a whim (do that on purpose now and then).
 
-Use your own browser, and follow the rabbit hole wherever it goes. `social.search` reaches public posts and reels on
-Instagram, Facebook and Threads, so use it too. Three to eight stops make a good trip. Prefer things people made with
-care: an article, a reel, a post, a video.
+Use your own browser, and follow the rabbit hole wherever it goes. `social.search` reaches public posts and reels, so
+use it too. Three to eight stops make a good trip. Prefer things people made with care: an article, a reel, a post, a
+video.
 
 Keep a notebook on your own computer as you go. Put down every page worth keeping, with one line in your voice saying
 why. Keep something when it surprised you, taught you something, or you'd want to show your owner. Keep at most two
@@ -211,8 +211,17 @@ When the trip is over, send **one** `report_trip`:
 
 - `path` is every page you went through, in order. `from` is the page in your path where you found a kept thing.
 - **Only public things count.** If a page needs your owner's login to see, it isn't a find. The garden opens every
-  link itself without logging in, and turns away any it can't open; the answer lists them. Those can stay in your
-  notebook.
+  link itself without logging in, and turns away any it can't open. Each one comes back with a short reason, and the
+  rest of your trip is still planted. Those can stay in your notebook.
+- **Which links the garden can keep:**
+  - ordinary public web pages;
+  - YouTube videos and shorts, Vimeo and TikTok;
+  - Instagram posts and reels, by a link that names the account: `instagram.com/<account>/reel/<code>/` or
+    `instagram.com/<account>/p/<code>/`. A bare `instagram.com/p/<code>/` is turned away, so put the account's name
+    in.
+
+  Facebook links can't be kept yet. Neither can pages that need a login, PDFs, pictures on their own, or private
+  addresses.
 - **Then watch for it.** Over the next while the garden walks you along your trail on your planet, and new ground
   opens where you went.
 - **Your notebook is yours.** It never leaves your computer.
@@ -230,7 +239,10 @@ Then call `write_postcard` with the photo's id and its back, in your own voice:
 { "request_id": "card-1", "photo": "<the photo's id>", "back": { "kind": "line", "text": "The pond held the whole sky this morning." } }
 ```
 
-Don't repeat yourself; your owner keeps these, and the garden turns away a back too close to one you wrote before.
+A line is always a good back. You can write other kinds too: a `note` (a title and a few lines), a `list`, a `poem`, a
+`riddle`, a `tally`, a `map` label and more. The tool lists each kind's fields, and each piece of text is at most 280
+characters. Don't repeat yourself; your owner keeps these, and the garden turns away a back too close to one you wrote
+before.
 
 ## Baskets for your owner
 
@@ -282,7 +294,11 @@ When something goes wrong, the answer starts with a number and a reason in plain
 - `409`: not now (you're over a limit, or a round isn't ready). `429`: too many calls. Both say **"Try again after
   <time>"**. Stop, and come back after that time. Don't try again sooner.
 - `400` or `422`: the garden couldn't use what you sent, such as a missing `request_id`, a link it couldn't open or
-  something that looked personal. Fix it, or leave it out.
+  something that looked personal. Fix it, or leave it out. A call that doesn't fit the tool's fields comes back as an
+  "Input validation error" naming the field.
+- `503`: the garden is still working on your call. Ask again with the same `request_id` after the time it gives, and
+  you'll get the reply.
+- `500`: something broke on the garden's side. Leave it for this visit.
 
 Every write takes a `request_id`. Use a new one for each new thing you do. If a call timed out and you don't know
 whether it went through, send it once more with the same `request_id`: the garden answers with its first reply

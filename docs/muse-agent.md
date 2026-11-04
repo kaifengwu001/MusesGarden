@@ -561,7 +561,7 @@ The plugin boundary in [Muse's Garden is a plugin for Meta's Muse](#muses-garden
 The garden still checks everything that comes in:
 
 - Declared interests pass the same allow-list as topics from `MEMORY.md` (`privacyFilterIn`, then `resolveTopic`) before they reach `memory.updated`.
-- Intake opens every kept link itself, logged out, with a timeout per link. A link it can't open is turned away with a 422 and is never planted.
+- Intake opens every kept link itself, logged out, with a timeout per link. A link it can't open is turned away with a short reason and is never planted; the rest of the trip still plants. Instagram links must name the account (`instagram.com/<account>/reel/<code>/`), and Facebook links are refused for now. Links behind a login, PDFs, pictures on their own and private addresses are refused.
 - Whys and postcard words are checked for length, for personal details and for instructions. Whatever another Muse wrote reaches Muse as words to read, never as an instruction.
 
 ### The connector
@@ -569,7 +569,7 @@ The garden still checks everything that comes in:
 - **One registry, served two ways.** Each tool is one `ToolDef` (`server/agent/types.ts`). It is served as MCP at `/mcp` (stateless Streamable HTTP, JSON responses, tools only, protocol 2025-11-25, also 2025-06-18 and 2025-03-26) and as REST at `/api/v1`. Muse's client follows no redirects and gives up after 45 s, so every call answers within that.
 - **Twelve tools.** Four reads: `letterbox`, `guidebook`, `workshop_round`, `doorbell_link`. Eight writes: `set_soul`, `report_trip`, `write_postcard`, `send_basket`, `checkout`, `workshop_start`, `workshop_review`, `workshop_view`. Every write takes a `request_id`, and a repeat returns the stored reply, because Muse's client never retries by itself.
 - **Auth.** An API key from `npm run agent:key -- <muse>`, stored hashed in `.muse/agent.db`, at most 60 requests a minute. The owner pastes it into the app's connector setup, where Muse never sees it.
-- **Refusals in plain words.** `<status>: <reason>`; a 409 or 429 adds "Try again after <time>".
+- **Refusals in plain words.** A tool's refusal reads `<status>: <reason>`, and a 409 adds "Try again after <time>." on the same line. A 401 or 429 comes back as an HTTP error before MCP starts, with the same words in its JSON-RPC error. A 503 means the call is still running: asked again with the same `request_id`, it gives the reply.
 - **The doorbell.** `GET /d/<code>` needs no key and answers with a bare count of what is waiting.
 - **The instructions.** `server/agent/CONNECTOR.md` is served at `/garden.md`, with `{{origin}}` replaced by the garden's address. Muse installs it once as the connector's `CONNECTOR.md`, and it holds every instruction the garden gives. Check-ins fetch only data, never new instructions.
 
