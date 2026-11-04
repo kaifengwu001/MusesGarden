@@ -27,6 +27,7 @@ import {
   type WebGLRenderer,
 } from 'three';
 import { gpuMemory } from '../core/gpuMemory';
+import type { GeneratedLook } from '../muse/contract';
 import type { Terrain } from '../planet/terrain';
 import { localSun } from '../render/sun';
 import { warpPoint, type WarpFrame } from '../render/warp';
@@ -104,8 +105,8 @@ const BODY: readonly [number, number, number][] = [
 ];
 export const PRESSES = BODY.length;
 
-/** Muse's body: the field's own, a sculpt of it, or one of the muses in clothes (museMesh.ts DRESSED). */
-export type MuseModel = 'field' | SculptKind | DressedKind;
+/** Muse's body: the field's own, a sculpt of it, one of the muses in clothes (museMesh.ts DRESSED), or one the workshop made (gen-*, served by the engine). */
+export type MuseModel = 'field' | SculptKind | DressedKind | GeneratedLook;
 
 /** The field's body, meshed once for the page however many Muses are drawn (each poses it on a skeleton of its own). */
 let fieldJob: Promise<MuseBody> | null = null;
@@ -282,9 +283,11 @@ export class Muse {
    * Switch Muse's body: the field's own, or a source model sculpt on the same
    * skeleton (the first sculpt, made with its arms hanging, or its T-pose; its
    * own paint, the same fur and light), or a muse in clothes (its clothes and
-   * face painted, its skeleton measured off it: museDress.ts). The sculpt is
-   * loaded the first time any Muse asks for it; where it cannot be had, Muse
-   * keeps the field's.
+   * face painted, its skeleton measured off it: museDress.ts), or one the
+   * workshop made, rigged as a muse in clothes. The sculpt is loaded the
+   * first time any Muse asks for it; where it cannot be had, Muse keeps the
+   * field's, and where a made body cannot be had it wears the original
+   * Muse's (tpose6) instead.
    */
   useModel(model: MuseModel): void {
     if (model === this.model) return;
@@ -300,9 +303,23 @@ export class Muse {
         const sculpt = await sculptFor(model);
         if (this.model === model) this.take(sculpt.body, fitOf(model, sculpt.body), sculpt.grade, sculpt.paint);
       } catch (error) {
-        console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
+        // (a made body's id as the type has it, even one the loader turns down)
+        if (model.startsWith('gen-')) await this.instead(model as GeneratedLook, error);
+        else console.warn('Muse: the imported sculpt could not be loaded; keeping the field body', error);
       }
     });
+  }
+
+  /** A made body that could not be had: the original Muse in its place (still asked for, so it isn't fetched again each time it is asked; the next page tries again). */
+  private async instead(model: GeneratedLook, error: unknown): Promise<void> {
+    console.warn(`Muse: ${model} could not be loaded; wearing the original Muse (tpose6) instead`, error);
+    try {
+      const { sculptFor } = await import('./museSculptLoader');
+      const sculpt = await sculptFor('tpose6');
+      if (this.model === model) this.take(sculpt.body, fitOf('tpose6', sculpt.body), sculpt.grade, sculpt.paint);
+    } catch (fallback) {
+      console.warn('Muse: the original Muse could not be loaded either; keeping the field body', fallback);
+    }
   }
 
   /** Put a body in place: one geometry for the skin and its shells, the skin alone for the shadow; its skeleton's fit, its paint, and its clothes' (museDress.ts). */

@@ -1,6 +1,7 @@
 import { BufferAttribute, DoubleSide, FrontSide, Vector3, Vector4, type BufferGeometry, type ShaderMaterial, type Texture } from 'three';
+import { isGeneratedLook } from '../muse/looks';
 import type { MuseFit } from './museBody';
-import { DRESSED, SCULPTS, type DressedKind, type MuseMesh, type SculptKind } from './museMesh';
+import { DRESSED, GENERATED, SCULPTS, type BodyKind, type DressedKind, type MuseMesh } from './museMesh';
 
 // A muse in clothes (museMesh.ts DRESSED) in Muse's shaders, wherever one is
 // drawn: on a planet (muse.ts), in the lab and in its lineup. Its clothes are
@@ -8,9 +9,10 @@ import { DRESSED, SCULPTS, type DressedKind, type MuseMesh, type SculptKind } fr
 // each vertex is cloth, its texture coordinates, the paint), its face drawn
 // where it was measured off its sculpt (MUSE_FEATURES), both sides of its
 // cloth drawn (a garment is often a single sheet: an apron, a collar), and its
-// skeleton fitted as measured off it. A body without clothes (the original
-// Muse, tpose6; the field's) is given none of it: its geometry, defines,
-// uniforms and side stay as they were, so it draws as it always has.
+// skeleton fitted as measured off it; a body the workshop made (gen-*) is
+// dressed the same way. A body without clothes (the original Muse, tpose6;
+// the field's) is given none of it: its geometry, defines, uniforms and side
+// stay as they were, so it draws as it always has.
 
 /** What a body wears, if anything: a dressed muse's cloth, texture coordinates and face (museMesh.ts MuseMesh). */
 export type Clothes = Pick<Partial<MuseMesh>, 'cloth' | 'uv' | 'features'>;
@@ -23,9 +25,9 @@ export function isDressed(kind: string): kind is DressedKind {
   return kind in DRESSED;
 }
 
-/** A body's skeleton: a dressed muse's as measured off it (museMesh.ts measureFit), else its sculpt's. */
-export function fitOf(kind: SculptKind | DressedKind, body: { fit?: MuseFit }): MuseFit {
-  return body.fit ?? (isDressed(kind) ? DRESSED[kind].fit : SCULPTS[kind].fit);
+/** A body's skeleton: a dressed or made muse's as measured off it (museMesh.ts measureFit), else its sculpt's. */
+export function fitOf(kind: BodyKind, body: { fit?: MuseFit }): MuseFit {
+  return body.fit ?? (isDressed(kind) ? DRESSED[kind].fit : isGeneratedLook(kind) ? GENERATED.fit : SCULPTS[kind].fit);
 }
 
 /** A define on or off, the program rebuilt only when it changes. */

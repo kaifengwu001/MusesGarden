@@ -1,4 +1,5 @@
 import { Matrix4, Vector3 } from 'three';
+import type { GeneratedLook } from '../muse/contract';
 import { FACE, JOINT, JOINTS, openness, packWeights, SKIN_INSET, smooth01, smoothWeights, type MuseBody, type MuseFit } from './museBody';
 import { MeshField, type Box } from './meshField';
 import { MuseRig } from './museRig';
@@ -305,6 +306,73 @@ export const DRESSED = {
   muse12: { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16], sleeves: 0.25 } },
 } as const satisfies Record<string, Sculpt>;
 export type DressedKind = keyof typeof DRESSED;
+
+/**
+ * A body the workshop made (a look gen-<muse>-<n>: a Tripo sculpt dressed on the base T-pose Muse, served by the
+ * engine), rigged as every new muse in clothes starts (muse-rig, "Adding a muse in clothes"): its fit measured off
+ * it, its fur told from its clothes by the paint. Its own knobs, if it has any, come with it (generatedSculpt).
+ */
+export const GENERATED = { fit: SCULPTS.tpose6.fit, cut: DRESSED_CUT(0.45), ramp: 0.07, refine: { body: 2, face: 2 }, corrective: false, dress: { fur: [9, 16] } } as const satisfies Sculpt;
+
+/** Every body that rigs as a sculpt: the original Muse's and its forerunners, the muses in clothes, and the ones the workshop made. */
+export type BodyKind = SculptKind | DressedKind | GeneratedLook;
+
+/** A value a made body's knob takes: a number within a range (an integer, for `whole`), or a pair of them, rising. */
+const within = (lo: number, hi: number) => (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+const whole = (lo: number, hi: number) => (v: unknown) => within(lo, hi)(v) && Number.isInteger(v);
+const rising = (lo: number, hi: number) => (v: unknown) => Array.isArray(v) && v.length === 2 && within(lo, hi)(v[0]) && within(lo, hi)(v[1]) && v[0] < v[1];
+
+/** The knobs a made body may set, by their paths in Sculpt and Dress (H, rad, ΔE as there), and the values each takes. */
+const KNOBS: Readonly<Record<string, (v: unknown) => boolean>> = {
+  'cut.arm.x': within(0.1, 0.66),
+  'cut.arm.y': rising(0, 1.26),
+  'cut.body.x': within(0, 0.5),
+  'cut.body.y': rising(0, 1.26),
+  'cut.body.z': rising(-0.48, 0.48),
+  ramp: within(0.01, 0.3),
+  'refine.body': whole(1, 3),
+  'refine.face': whole(1, 3),
+  'dress.fur': rising(0, 100),
+  'dress.hem': within(0, 1.26),
+  'dress.sleeve': within(0, 0.66),
+  'dress.hangOut': within(0, 0.6),
+  'dress.sleeves': within(0, 0.66),
+  'dress.whole': within(0.5, 1),
+};
+/** The objects a made body's knobs sit in. */
+const BRANCHES = new Set(['cut', 'cut.arm', 'cut.body', 'refine', 'dress']);
+
+/**
+ * GENERATED with a made body's own knobs (its /api/looks/<id>.json: any of KNOBS, by Sculpt's and Dress's names,
+ * e.g. `{ "cut": { "arm": { "x": 0.4 } }, "dress": { "hem": 0.6 } }`). A knob of the wrong kind or out of its range
+ * stays as GENERATED has it, and is named in `ignored` with every key it doesn't know: its fit is always measured
+ * off it, and `corrective` and `mirrorArm` are for the base sculpts only.
+ */
+export function generatedSculpt(overrides: unknown): { sculpt: Sculpt; ignored: string[] } {
+  const s = {
+    fit: GENERATED.fit,
+    cut: { arm: { ...GENERATED.cut.arm }, body: { ...GENERATED.cut.body } },
+    ramp: GENERATED.ramp,
+    refine: { ...GENERATED.refine },
+    corrective: GENERATED.corrective,
+    dress: { ...GENERATED.dress },
+  };
+  const ignored: string[] = [];
+  const walk = (o: unknown, at: string, into: Record<string, unknown>): void => {
+    if (typeof o !== 'object' || o === null || Array.isArray(o)) {
+      ignored.push(at || '(not an object)');
+      return;
+    }
+    for (const [key, v] of Object.entries(o)) {
+      const path = at ? `${at}.${key}` : key;
+      if (BRANCHES.has(path)) walk(v, path, into[key] as Record<string, unknown>);
+      else if (Object.hasOwn(KNOBS, path) && KNOBS[path](v)) into[key] = Array.isArray(v) ? [v[0], v[1]] : v;
+      else ignored.push(path);
+    }
+  };
+  if (overrides !== undefined && overrides !== null) walk(overrides, '', s);
+  return { sculpt: s, ignored };
+}
 
 /** How deep the coat is over a sculpt's skin (H): the sculpt is the coat's outside, as the references' silhouettes are, and the shells (muse.vert.glsl: FUR_LENGTH, lying over) carry it back out. */
 const COAT = 0.026;
