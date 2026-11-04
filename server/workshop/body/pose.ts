@@ -135,6 +135,45 @@ export function comparePose(base: Seen, concept: Seen): PoseCheck {
   return { ok: reasons.length === 0, cover, arms, feet, top, face, reasons };
 }
 
+/** How a concept is set back in the base's frame: scaled by `scale` about the top left, then moved by dx, dy (px). */
+export interface Reframe {
+  readonly scale: number;
+  readonly dx: number;
+  readonly dy: number;
+}
+
+/** The furthest the image model's zoom is undone; past it a concept is checked as it came. */
+export const REFRAME_LIMIT = 0.2;
+
+/**
+ * The scale and shift that put the concept's face plate on the base's (the image model often zooms the whole
+ * plush a few percent), or null when there is nothing to undo, no plate to go by, or it would take more than
+ * REFRAME_LIMIT. Only zoom and position change, so the check that follows still measures pose and proportions.
+ */
+export function reframeFor(base: Seen, concept: Seen): Reframe | null {
+  const f = base.face;
+  const g = concept.face;
+  if (!f || !g) return null;
+  const scale = ((f[2] - f[0]) / (g[2] - g[0]) + (f[3] - f[1]) / (g[3] - g[1])) / 2;
+  if (!Number.isFinite(scale) || Math.abs(scale - 1) > REFRAME_LIMIT) return null;
+  const dx = Math.round((f[0] + f[2]) / 2 - ((g[0] + g[2]) / 2) * scale);
+  const dy = Math.round((f[1] + f[3]) / 2 - ((g[1] + g[3]) / 2) * scale);
+  if (Math.abs(scale - 1) < 0.005 && Math.abs(dx) <= 2 && Math.abs(dy) <= 2) return null;
+  return { scale, dx, dy };
+}
+
+/** The picture set back in the frame by `r`, the same size, on white, as PNG. */
+export async function reframe(image: Buffer, r: Reframe): Promise<Buffer> {
+  const meta = await sharp(image).metadata();
+  const W = meta.width ?? 0;
+  const H = meta.height ?? 0;
+  const scaled = await sharp(image).resize(Math.max(1, Math.round(W * r.scale)), Math.max(1, Math.round(H * r.scale)), { fit: 'fill' }).png().toBuffer();
+  const pad = Math.max(W, H);
+  const white = { r: 255, g: 255, b: 255, alpha: 1 };
+  const padded = await sharp(scaled).extend({ top: pad, bottom: pad, left: pad, right: pad, background: white }).png().toBuffer();
+  return sharp(padded).extract({ left: pad - r.dx, top: pad - r.dy, width: W, height: H }).flatten({ background: white }).png().toBuffer();
+}
+
 /** One line for Muse's checklist: what the check measured. */
 export function describe(check: PoseCheck): string {
   if (!check.ok) return check.reasons.join('; ');

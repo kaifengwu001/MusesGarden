@@ -16,7 +16,7 @@ import type { GeneratedLook } from '../../../src/muse/contract';
 import type { Box, Segmenter } from '../clients';
 import type { JobRecord, Packet, PacketPicture, Pipeline, StageIO, StepOutcome, Verdict } from '../types';
 import { cleanGlb } from './glb';
-import { comparePose, describe, see, type PoseCheck, type Seen } from './pose';
+import { comparePose, describe, reframe, reframeFor, see, type PoseCheck, type Reframe, type Seen } from './pose';
 import { avatarPicture, contactSheet, fitTo, portrait } from './pictures';
 import { conceptPrompt, designFromBrief, designPrompt, DESIGN_SCHEMA, DESIGN_SYSTEM, noteLines, refinePrompt, tidyDesign, type Design } from './prompt';
 import { labRenderer, type Renderer, type Still } from './render';
@@ -169,13 +169,23 @@ async function designFor(job: JobRecord, io: StageIO, d: BodyData, avatar: Buffe
   return design;
 }
 
-/** A picture's pose check, kept beside it (<file>.check.json) so it's run once. */
-async function checked(io: StageIO, file: string): Promise<{ check: PoseCheck; face: Box | null }> {
+/**
+ * A picture's pose check, kept beside it (<file>.check.json) so it's run once. The picture is first set back in
+ * the base's frame by its face plate (the image model zooms a few percent), and checked as it now is.
+ */
+async function checked(io: StageIO, file: string): Promise<{ check: PoseCheck; face: Box | null; reframed: Reframe | null }> {
   const sidecar = join(io.dir, `${file}.check.json`);
-  const kept = readJson<{ check: PoseCheck; face: Box | null }>(sidecar);
+  const kept = readJson<{ check: PoseCheck; face: Box | null; reframed: Reframe | null }>(sidecar);
   if (kept) return kept;
-  const [b, c] = await Promise.all([seeBase(io.clients.segmenter, io.signal), see(readFileSync(join(io.dir, file)), io.clients.segmenter, io.signal)]);
-  const result = { check: comparePose(b, c), face: c.face };
+  const path = join(io.dir, file);
+  const b = await seeBase(io.clients.segmenter, io.signal);
+  let c = await see(readFileSync(path), io.clients.segmenter, io.signal);
+  const r = reframeFor(b, c);
+  if (r) {
+    writeFileSync(path, await reframe(readFileSync(path), r));
+    c = await see(readFileSync(path), io.clients.segmenter, io.signal);
+  }
+  const result = { check: comparePose(b, c), face: c.face, reframed: r };
   writeFileSync(sidecar, JSON.stringify(result));
   return result;
 }
@@ -248,7 +258,7 @@ async function concepts(job: JobRecord, io: StageIO, d: BodyData): Promise<StepO
   if (!passed.size) {
     return { kind: 'failed', message: `None of the ${SLOTS} concepts kept the base Muse's pose after ${TRIES} tries each (${reasons.join(' | ')}).` };
   }
-  const list: Concept[] = [...passed].map(([s, p]) => ({
+  const list: Concept[] = [...passed].sort(([a], [b]) => a - b).map(([s, p]) => ({
     id: `c${d.attempt}-${s}`,
     file: p.file,
     caption: `Concept ${s}: ${summary(design)}`,

@@ -111,34 +111,51 @@ function counted(base: WorkshopClients) {
   return { clients, calls };
 }
 
-/** A segmenter that sees what's drawn: the box round every pixel darker than near-white, and a face in its top middle. */
+/** The box round every pixel darker than `below` (grey), or null. */
+async function inkBox(image: Buffer, below: number): Promise<Box | null> {
+  const { data, info } = await sharp(image).greyscale().raw().toBuffer({ resolveWithObject: true });
+  let [x1, y1, x2, y2] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * info.channels] >= below) continue;
+      x1 = Math.min(x1, x);
+      y1 = Math.min(y1, y);
+      x2 = Math.max(x2, x);
+      y2 = Math.max(y2, y);
+    }
+  }
+  return Number.isFinite(x1) ? [x1, y1, x2, y2] : null;
+}
+
+/** A segmenter that sees what's drawn: the plush is everything darker than near-white, its face round its black eyes and smile. */
 const inkSegmenter: Segmenter = {
   async find(image, phrase) {
-    const { data, info } = await sharp(image).greyscale().raw().toBuffer({ resolveWithObject: true });
-    let [x1, y1, x2, y2] = [Infinity, Infinity, -Infinity, -Infinity];
-    for (let y = 0; y < info.height; y++) {
-      for (let x = 0; x < info.width; x++) {
-        if (data[(y * info.width + x) * info.channels] >= 235) continue;
-        x1 = Math.min(x1, x);
-        y1 = Math.min(y1, y);
-        x2 = Math.max(x2, x);
-        y2 = Math.max(y2, y);
-      }
-    }
-    if (!Number.isFinite(x1)) return [];
-    const plush: Box = [x1, y1, x2, y2];
-    const w = x2 - x1;
-    const h = y2 - y1;
-    const face: Box = [x1 + 0.35 * w, y1 + 0.1 * h, x1 + 0.65 * w, y1 + 0.35 * h];
-    return [{ box: phrase === 'face' ? face : plush, mask: null }];
+    const box = await inkBox(image, phrase === 'face' ? 60 : 235);
+    if (!box) return [];
+    // (the plate reaches past the eyes and smile all round)
+    const pad = phrase === 'face' ? 0.4 * (box[2] - box[0]) : 0;
+    return [{ box: [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad], mask: null }];
   },
 };
 
-/** The base moved `dx` pixels to the right, the same size. */
-async function shifted(dx: number): Promise<Buffer> {
+const WHITE = { r: 255, g: 255, b: 255 } as const;
+
+/** The base with its arms' ends cut off (whited out past `x` pixels from each side). */
+async function armsCut(x: number): Promise<Buffer> {
   const meta = await sharp(BASE).metadata();
-  const wider = await sharp(BASE).extend({ left: dx, background: { r: 255, g: 255, b: 255 } }).png().toBuffer();
-  return sharp(wider).extract({ left: 0, top: 0, width: meta.width ?? 0, height: meta.height ?? 0 }).png().toBuffer();
+  const W = meta.width ?? 0;
+  const H = meta.height ?? 0;
+  const bar = await sharp({ create: { width: x, height: H, channels: 3, background: WHITE } }).png().toBuffer();
+  return sharp(BASE).composite([{ input: bar, left: 0, top: 0 }, { input: bar, left: W - x, top: 0 }]).png().toBuffer();
+}
+
+/** The base zoomed by `k` about its middle, the same size (as the image model often zooms). */
+async function zoomed(k: number): Promise<Buffer> {
+  const meta = await sharp(BASE).metadata();
+  const W = meta.width ?? 0;
+  const H = meta.height ?? 0;
+  const big = await sharp(BASE).resize(Math.round(W * k), Math.round(H * k)).png().toBuffer();
+  return sharp(big).extract({ left: Math.round((W * k - W) / 2), top: Math.round((H * k - H) / 2), width: W, height: H }).png().toBuffer();
 }
 
 describe('the body pipeline', () => {
@@ -228,7 +245,7 @@ describe('the body pipeline', () => {
   }, 60_000);
 
   it('turns away concepts that lose the pose, and keeps those that hold it on a later try', async () => {
-    const moved = await shifted(120);
+    const moved = await armsCut(250);
     let edits = 0;
     const base = fakeClients();
     const clients: WorkshopClients = {
@@ -247,7 +264,7 @@ describe('the body pipeline', () => {
   }, 60_000);
 
   it('fails plainly when no concept keeps the pose in three tries', async () => {
-    const moved = await shifted(120);
+    const moved = await armsCut(250);
     const base = fakeClients();
     let edits = 0;
     const clients: WorkshopClients = {
@@ -260,6 +277,21 @@ describe('the body pipeline', () => {
     expect(o.kind).toBe('failed');
     if (o.kind === 'failed') expect(o.message).toMatch(/None of the 4 concepts kept the base Muse's pose after 3 tries/);
     expect(edits).toBe(3);
+  }, 60_000);
+
+  it("sets a zoomed concept back in the base's frame by its face plate, then checks it", async () => {
+    const base = fakeClients();
+    const zoom = await zoomed(1.08);
+    const clients: WorkshopClients = { ...base, segmenter: inkSegmenter, images: { ...base.images, edit: ({ n }) => Promise.resolve(Array.from({ length: n }, () => zoom)) } };
+    const h = await harness(clients);
+    const o = await h.run();
+    if (o.kind !== 'wait') throw new Error(`expected a pick, got ${o.kind}`);
+    expect(o.packet.pictures.length).toBe(4);
+    const kept = JSON.parse(readFileSync(join(h.io.dir, 'concept-1-1-1.png.check.json'), 'utf8')) as { reframed: { scale: number } | null };
+    expect(kept.reframed?.scale).toBeCloseTo(1 / 1.08, 1);
+    const [b, c] = await Promise.all([inkBox(BASE, 235), inkBox(readFileSync(join(h.io.dir, 'concept-1-1-1.png')), 235)]);
+    if (!b || !c) throw new Error('no plush');
+    for (let i = 0; i < 4; i++) expect(Math.abs(c[i] - b[i])).toBeLessThan(0.01 * 1186);
   }, 60_000);
 
   it("rejects a concept whose box moved, by the fake segmenter's word", async () => {
