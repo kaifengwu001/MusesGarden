@@ -79,6 +79,11 @@ const SLEEP_MS = 90 * 60_000;
 /** A Muse cast.json doesn't name: a stranger in the original body, on the meadow at its own seed. */
 const UNLISTED: MemberInfo = { role: 'stranger', planet: 'meadow', look: 'tpose6' };
 
+/** The seed of the world a Muse's planet is drawn from: the one the workshop built it on, else its own. */
+export function worldSeedOf(s: MuseState): number {
+  return s.planet?.worldSeed ?? s.seed.worldSeed;
+}
+
 export function shareCode(s: MuseState): string {
   const h = createHash('sha256').update(`share:${s.seed.id}`).digest('hex').slice(0, 4).toUpperCase();
   return `${s.seed.name.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6)}-${h}`;
@@ -142,8 +147,15 @@ export class Views implements GardenQueries {
     return this.engine.state(id)?.seed.name ?? 'a friend';
   }
 
-  private member(id: MuseId): MemberInfo {
-    return this.members.get(id) ?? UNLISTED;
+  /**
+   * Who a Muse is to the hero, where it lives and how it looks: its cast row, with the planet and the body the
+   * workshop made for a real Muse (planet.changed, look.changed) in place of the cast's.
+   */
+  member(id: MuseId): MemberInfo {
+    const row = this.members.get(id) ?? UNLISTED;
+    const s = this.s(id);
+    if (!s?.planet && !s?.look) return row;
+    return { ...row, planet: s.planet?.id ?? row.planet, look: s.look ?? row.look };
   }
 
   private visitMuse(museId: MuseId): VisitMuse {
@@ -161,6 +173,11 @@ export class Views implements GardenQueries {
 
   muses(): ReturnType<GardenQueries['muses']> {
     return this.engine.museIds().map((museId) => ({ museId, name: this.name(museId), ...this.member(museId) }));
+  }
+
+  /** The growth slider for a Muse's planet. */
+  growth(s: MuseState): number {
+    return this.helpers.growth(s);
   }
 
   garden(museId: MuseId, at: Instant): GardenSnapshot | null {
@@ -181,7 +198,8 @@ export class Views implements GardenQueries {
     });
   }
 
-  private gardenInput(museId: MuseId, at: Instant): GardenInput | null {
+  /** Everything the garden reads of one Muse at `at`, or null for a Muse it doesn't know. */
+  gardenInput(museId: MuseId, at: Instant): GardenInput | null {
     const s = this.s(museId);
     const now = this.now(museId, at);
     if (!s || !now) return null;
@@ -199,7 +217,7 @@ export class Views implements GardenQueries {
       planetOf: (id) => {
         const other = this.s(id);
         const { planet, look } = this.member(id);
-        return other ? { planet, seed: other.seed.worldSeed, g: this.helpers.growth(other), look } : null;
+        return other ? { planet, seed: worldSeedOf(other), g: this.helpers.growth(other), look, ...(other.planet ? { name: other.planet.name } : {}) } : null;
       },
       trip: this.trip(s, at),
       stills: this.helpers.planetStills?.(),
@@ -269,7 +287,7 @@ export class Views implements GardenQueries {
     const s = this.s(museId);
     if (!s) return null;
     const sent = sentIds(s);
-    return { museId, worldSeed: s.seed.worldSeed, g: this.helpers.growth(s), regions: this.regionViews(s), plants: [...s.discoveries.values()].map((d) => pin(d, sent)) };
+    return { museId, worldSeed: worldSeedOf(s), g: this.helpers.growth(s), regions: this.regionViews(s), plants: [...s.discoveries.values()].map((d) => pin(d, sent)) };
   }
 
   private regionViews(s: MuseState): RegionView[] {
@@ -300,7 +318,7 @@ export class Views implements GardenQueries {
     if (!s) return { items: [], next: null };
     const views: PhotoView[] = [...s.photos].reverse().map((p) => {
       const planet = this.s(p.planetOf) ?? s;
-      return { ...p, worldSeed: planet.seed.worldSeed, g: this.helpers.growth(planet), companionNames: p.companions.map((c) => this.name(c)) };
+      return { ...p, worldSeed: worldSeedOf(planet), g: this.helpers.growth(planet), companionNames: p.companions.map((c) => this.name(c)) };
     });
     return page(views, before, limit);
   }
@@ -344,7 +362,7 @@ export class Views implements GardenQueries {
       planet: this.member(inv.host).planet,
       host: this.visitMuse(inv.host),
       guest: this.visitMuse(inv.guest),
-      worldSeed: host.seed.worldSeed,
+      worldSeed: worldSeedOf(host),
       g: this.helpers.growth(host),
       regions: this.regionViews(host),
       together: host.episode?.plan.activity === 'visit' && host.episode.plan.invitation === invitation,
