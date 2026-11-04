@@ -1,0 +1,5703 @@
+{
+  "subject": "Stair surface ownership, rounded snow edges, both conifers, cottage materials, calm water and cultivated barley beds",
+  "capturedAt": "2026-11-02T05:17:56.202286+00:00",
+  "baseCommit": "5726e9c725fe98008afd69fdb559fb85b6d0a7a4",
+  "workingTree": true,
+  "sourceSha256": {
+    "dev/ecology.spec.ts": "ceda19a95e14d6715b3d72af985beb0b02515a6c42b419eaf7c9a4950ea861be",
+    "dev/flicker.spec.ts": "0f8ecf260866b03391158a78f4ab89a9dbd1967bfafbc6cc0b7bca4f3be98981",
+    "life/hamletGeometry.test.ts": "0c92522528fe79fc8d1f99af64535ea7914b587bd95ccfadcf86277208889aa0",
+    "life/hamletGeometry.ts": "56ec2c6389d9ba4cbe8ea23d9e947bee5de39b496167d87f454df2b3e6dd3058",
+    "life/hamletScenery.frag.glsl": "165d3334ed3c32cd55651d74fc71f727ba479279444d5f474fc345875f29fc9e",
+    "life/hamletScenery.ts": "3da80cf5b08a52c4fd644a4fe8ee1c6c8e2455ae88e152f0a4020ae8acdeb85a",
+    "life/hamletScenery.vert.glsl": "c28f166fccc5bdcda880d25826e45097aca7e7a120352d8117164b8bc27c929a",
+    "life/houseGeometry.test.ts": "09ad72ae24c4e80318f45a1c3aa31b78b18755b98db41c0cf763c0d1a5f7a387",
+    "life/props.frag.glsl": "ea3e8758bfa4399d05c9578ed8daa1d941822755361120cd8410abe077a1b5c6",
+    "life/props.ts": "42068b01ecaaa165de0d264a08e02506f50e5801ec6b39cb2cfa0f94060c7a68",
+    "planet/meadow.glsl": "55e12cb74d0c9b3158e6561844b4ddb686ef423e663d7a1d171802943b0d4bd9",
+    "planet/surface.frag.glsl": "5a82c329d21f1d9ba6d8918ce8e1c01d04b18337c71f4c44fb256ec4c0344f8e",
+    "planet/water.glsl": "e598e3256eed5a15db8d1d830329a964e5fb3348e0655866f535f911210e1d7e",
+    "render/palette.ts": "96c02c6fb074de073bd4626fa609293f63efe12fe10a458244f0d4ddbf1df4ef",
+    "render/snow.glsl": "f4f79d18107d0e49056113f3687650dcbe837593485bd66dd22873f4d861d199",
+    "dev/detailViews.ts": "358371bfe8523efc6ee319a01737db1429f210ee96e613ea27a94bf25ff89db4",
+    "life/hamletDistribution.test.ts": "d0d67eb7bbbf1ab53c91943de42b7ffa6568dd01a1018c7fe160a5a76f68719e"
+  },
+  "testCommand": "MEADOW_PORT=5237 npx playwright test --project=ukiyoe-pine-hamlet:ecology --project=ukiyoe-pine-hamlet:flicker",
+  "results": {
+    "browserPassed": 5,
+    "cpuPassed": 80,
+    "typescriptLint": "pass",
+    "productionBuild": "pass (existing large-chunk advisory)",
+    "residentBrowserPassed": 7,
+    "determinismTerrainPickingDrawBudgetPassed": 6,
+    "totalTargetedBrowserPassed": 18
+  },
+  "summary": {
+    "cases": 36,
+    "referenceComparisons": 108,
+    "sweepComparisons": 324,
+    "maxFrozenChangedPixels": 0,
+    "maxFlashShare": 0.0051736111111111115,
+    "maxAdjacentMeanDelta": 6.764247402985891
+  },
+  "limits": [
+    "Finite views and exact frozen readbacks do not prove absence of every possible depth conflict.",
+    "Earlier tests missed the exactly coplanar lowest stair tread. The actual geometric clearance now has an independent regression.",
+    "New close-detail yaw steps scale to view distance; original cameras and all thresholds are unchanged. Initial wide close-plum failure preserved in close-plum-wide-sweep.json.",
+    "Full scene-object reflection and camera-driven scenery LOD are not implemented."
+  ],
+  "cases": [
+    {
+      "width": 960,
+      "height": 600,
+      "view": "bridge",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0104,-0.1239,0.619,0.7755,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.81221734062831,
+          "deviation": 31.065941944706534,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0113,-0.1227,0.619,0.7756,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.83961039757729,
+          "deviation": 31.089286120574663,
+          "adjacentMeanDelta": 3.5215056666003335,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0122,-0.1215,0.619,0.7758,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.86695019192166,
+          "deviation": 31.10050899542987,
+          "adjacentMeanDelta": 3.505071208768421,
+          "flashShare": 0.0023888888888888887
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0132,-0.1204,0.619,0.776,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.89613624069426,
+          "deviation": 31.11484956006338,
+          "adjacentMeanDelta": 3.4952661102082994,
+          "flashShare": 0.0022430555555555554
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0141,-0.1192,0.619,0.7762,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.91891206489669,
+          "deviation": 31.134956337896828,
+          "adjacentMeanDelta": 3.491524743318558,
+          "flashShare": 0.0022916666666666667
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.015,-0.118,0.6189,0.7764,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.9408518151972,
+          "deviation": 31.14376129559146,
+          "adjacentMeanDelta": 3.505529437912835,
+          "flashShare": 0.0023888888888888887
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.016,-0.1169,0.6189,0.7765,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.9651288980378,
+          "deviation": 31.154530625252058,
+          "adjacentMeanDelta": 3.497488839228948,
+          "flashShare": 0.002416666666666667
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.0169,-0.1157,0.6189,0.7767,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.98531452096833,
+          "deviation": 31.178433248555713,
+          "adjacentMeanDelta": 3.49788695496983,
+          "flashShare": 0.002479166666666667
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.0178,-0.1146,0.6189,0.7769,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 121.0040296128326,
+          "deviation": 31.206240614535787,
+          "adjacentMeanDelta": 3.497504293547736,
+          "flashShare": 0.002395833333333333
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "cedar",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009692307692307693,
+          "pose": "-0.1543,0.0913,0.5271,0.8307,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.49752749029795,
+          "deviation": 36.2698663198367,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007269230769230769,
+          "pose": "-0.1549,0.0923,0.5269,0.8306,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.48762314465311,
+          "deviation": 36.28635453599398,
+          "adjacentMeanDelta": 3.297973839097553,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004846153846153846,
+          "pose": "-0.1555,0.0933,0.5267,0.8305,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.48875060621897,
+          "deviation": 36.29483322501773,
+          "adjacentMeanDelta": 3.310088304758072,
+          "flashShare": 0.0016319444444444445
+        },
+        {
+          "index": 3,
+          "yaw": -0.002423076923076923,
+          "pose": "-0.1562,0.0943,0.5265,0.8304,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.48962106903394,
+          "deviation": 36.29333474984964,
+          "adjacentMeanDelta": 3.290879541423586,
+          "flashShare": 0.0016736111111111112
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.1568,0.0953,0.5263,0.8303,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.50062931071388,
+          "deviation": 36.30278356806351,
+          "adjacentMeanDelta": 3.2835862407419416,
+          "flashShare": 0.0016666666666666668
+        },
+        {
+          "index": 5,
+          "yaw": 0.002423076923076923,
+          "pose": "-0.1574,0.0963,0.5261,0.8301,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.5058590842353,
+          "deviation": 36.327086356109184,
+          "adjacentMeanDelta": 3.2821387623680964,
+          "flashShare": 0.001576388888888889
+        },
+        {
+          "index": 6,
+          "yaw": 0.004846153846153846,
+          "pose": "-0.1581,0.0973,0.5259,0.83,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.51749467314615,
+          "deviation": 36.329596059969,
+          "adjacentMeanDelta": 3.282233627213372,
+          "flashShare": 0.0016944444444444444
+        },
+        {
+          "index": 7,
+          "yaw": 0.007269230769230769,
+          "pose": "-0.1587,0.0983,0.5257,0.8299,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.52847291938464,
+          "deviation": 36.33710958710597,
+          "adjacentMeanDelta": 3.2739352307584553,
+          "flashShare": 0.0016597222222222222
+        },
+        {
+          "index": 8,
+          "yaw": 0.009692307692307693,
+          "pose": "-0.1594,0.0993,0.5255,0.8298,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.52449151934518,
+          "deviation": 36.342082807423886,
+          "adjacentMeanDelta": 3.257565614514881,
+          "flashShare": 0.001625
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "home",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1596,-0.3174,0.6357,0.6853,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.38851527606117,
+          "deviation": 29.30526522416146,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1586,-0.3164,0.6359,0.6858,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.40063214919302,
+          "deviation": 29.312260144197456,
+          "adjacentMeanDelta": 3.497359028100967,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1577,-0.3154,0.6361,0.6863,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.40733235155211,
+          "deviation": 29.320915649080728,
+          "adjacentMeanDelta": 3.497795444700453,
+          "flashShare": 0.0033125
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1567,-0.3143,0.6364,0.6868,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.42372521752782,
+          "deviation": 29.321250515731396,
+          "adjacentMeanDelta": 3.4929342936939665,
+          "flashShare": 0.0032847222222222223
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1558,-0.3133,0.6366,0.6872,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.43784153723716,
+          "deviation": 29.352075983333457,
+          "adjacentMeanDelta": 3.5197205141915213,
+          "flashShare": 0.0034027777777777776
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1548,-0.3123,0.6368,0.6877,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.45555057991875,
+          "deviation": 29.35379111051879,
+          "adjacentMeanDelta": 3.533194160328971,
+          "flashShare": 0.003472222222222222
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1539,-0.3112,0.6371,0.6882,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.48186936844719,
+          "deviation": 29.364341395396714,
+          "adjacentMeanDelta": 3.5497446156077914,
+          "flashShare": 0.0033333333333333335
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1529,-0.3102,0.6373,0.6886,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.51753310031361,
+          "deviation": 29.397005892499774,
+          "adjacentMeanDelta": 3.5491274962690142,
+          "flashShare": 0.003479166666666667
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.152,-0.3092,0.6375,0.6891,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.54990996940931,
+          "deviation": 29.429320585282692,
+          "adjacentMeanDelta": 3.561205631732941,
+          "flashShare": 0.003423611111111111
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "pine",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0693,-0.19,0.637,0.7439,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.53326832358043,
+          "deviation": 36.278352756629175,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0703,-0.1889,0.6369,0.7442,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.48990100187726,
+          "deviation": 36.21473875939224,
+          "adjacentMeanDelta": 3.9425618749194675,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0712,-0.1878,0.6368,0.7444,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.45006559456719,
+          "deviation": 36.157086640965794,
+          "adjacentMeanDelta": 3.94435579029719,
+          "flashShare": 0.00125
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0722,-0.1867,0.6366,0.7447,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.40690577557352,
+          "deviation": 36.09094032921647,
+          "adjacentMeanDelta": 3.9447499701446955,
+          "flashShare": 0.0014583333333333334
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0732,-0.1856,0.6365,0.745,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.36883328824572,
+          "deviation": 36.02813113931471,
+          "adjacentMeanDelta": 3.947850666496489,
+          "flashShare": 0.0014166666666666668
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.0741,-0.1844,0.6364,0.7453,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.32151296067238,
+          "deviation": 35.96286707184088,
+          "adjacentMeanDelta": 3.949316325743993,
+          "flashShare": 0.0013194444444444445
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.0751,-0.1833,0.6363,0.7456,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.27141177670161,
+          "deviation": 35.890769622875624,
+          "adjacentMeanDelta": 3.9533513978587256,
+          "flashShare": 0.0012777777777777779
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.076,-0.1822,0.6362,0.7458,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.2254686272939,
+          "deviation": 35.82966328583257,
+          "adjacentMeanDelta": 3.956897226545546,
+          "flashShare": 0.0012222222222222222
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.077,-0.1811,0.6361,0.7461,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.17820777299669,
+          "deviation": 35.76748204880555,
+          "adjacentMeanDelta": 3.9622817090352376,
+          "flashShare": 0.0012430555555555556
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "plum",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.00443076923076923,
+          "pose": "0.0157,-0.3004,0.6471,0.7005,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.37442194281684,
+          "deviation": 50.33932349781571,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0033230769230769225,
+          "pose": "0.0153,-0.3,0.6471,0.7007,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.38394469541973,
+          "deviation": 50.31705959026935,
+          "adjacentMeanDelta": 2.204161170217726,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.002215384615384615,
+          "pose": "0.015,-0.2996,0.6471,0.7009,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.38702176316579,
+          "deviation": 50.302020762376145,
+          "adjacentMeanDelta": 2.1930250010490417,
+          "flashShare": 2.0833333333333333e-05
+        },
+        {
+          "index": 3,
+          "yaw": -0.0011076923076923076,
+          "pose": "0.0146,-0.2993,0.6471,0.701,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.38962912678718,
+          "deviation": 50.270478575917046,
+          "adjacentMeanDelta": 2.189867995129691,
+          "flashShare": 4.1666666666666665e-05
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0143,-0.2989,0.6471,0.7012,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.40488471921284,
+          "deviation": 50.23746620809503,
+          "adjacentMeanDelta": 2.198619192838669,
+          "flashShare": 6.944444444444445e-06
+        },
+        {
+          "index": 5,
+          "yaw": 0.0011076923076923076,
+          "pose": "0.0139,-0.2985,0.6471,0.7014,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.40944740864965,
+          "deviation": 50.23035149861057,
+          "adjacentMeanDelta": 2.194715595430798,
+          "flashShare": 4.861111111111111e-05
+        },
+        {
+          "index": 6,
+          "yaw": 0.002215384615384615,
+          "pose": "0.0135,-0.2981,0.6471,0.7015,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.40973602636655,
+          "deviation": 50.19603601724068,
+          "adjacentMeanDelta": 2.1940277383062576,
+          "flashShare": 2.777777777777778e-05
+        },
+        {
+          "index": 7,
+          "yaw": 0.0033230769230769225,
+          "pose": "0.0132,-0.2977,0.6472,0.7017,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.41471934917239,
+          "deviation": 50.15738524163278,
+          "adjacentMeanDelta": 2.208719185537762,
+          "flashShare": 2.0833333333333333e-05
+        },
+        {
+          "index": 8,
+          "yaw": 0.00443076923076923,
+          "pose": "0.0128,-0.2973,0.6472,0.7019,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.417578641812,
+          "deviation": 50.15137613575458,
+          "adjacentMeanDelta": 2.1926019348303476,
+          "flashShare": 2.0833333333333333e-05
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "reported",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1085,-0.3624,0.6607,0.6483,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.7085966893567,
+          "deviation": 36.42861141486267,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1075,-0.3614,0.6609,0.6489,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.71156972662608,
+          "deviation": 36.42590551995932,
+          "adjacentMeanDelta": 4.282720023181703,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1065,-0.3604,0.6611,0.6494,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.70384430991278,
+          "deviation": 36.42513099092096,
+          "adjacentMeanDelta": 4.269276897960239,
+          "flashShare": 0.0020625
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1055,-0.3595,0.6612,0.6499,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.70462283190092,
+          "deviation": 36.441954388701596,
+          "adjacentMeanDelta": 4.2482890808052485,
+          "flashShare": 0.002125
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1045,-0.3585,0.6614,0.6505,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.71217095449235,
+          "deviation": 36.45844025108159,
+          "adjacentMeanDelta": 4.234598641581005,
+          "flashShare": 0.0021319444444444446
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1035,-0.3575,0.6615,0.651,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.72692755121655,
+          "deviation": 36.46328356412959,
+          "adjacentMeanDelta": 4.232665703455607,
+          "flashShare": 0.0020625
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1025,-0.3565,0.6617,0.6516,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.75317936899927,
+          "deviation": 36.476684694348485,
+          "adjacentMeanDelta": 4.223110598537657,
+          "flashShare": 0.001979166666666667
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1015,-0.3556,0.6618,0.6521,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.783574246592,
+          "deviation": 36.51060429077294,
+          "adjacentMeanDelta": 4.208405261357625,
+          "flashShare": 0.0019444444444444444
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.1005,-0.3546,0.662,0.6526,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.81766363490952,
+          "deviation": 36.54701032226862,
+          "adjacentMeanDelta": 4.207804307142894,
+          "flashShare": 0.0020486111111111113
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "roof",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.010153846153846154,
+          "pose": "0.0488,-0.2959,0.6341,0.7127,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.72793098360962,
+          "deviation": 42.76339896197624,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007615384615384616,
+          "pose": "0.048,-0.295,0.6342,0.7131,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.77503254429499,
+          "deviation": 42.78174682326531,
+          "adjacentMeanDelta": 4.654063762545586,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.005076923076923077,
+          "pose": "0.0472,-0.2941,0.6342,0.7135,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.81100602177779,
+          "deviation": 42.817400721659624,
+          "adjacentMeanDelta": 4.672137404508061,
+          "flashShare": 0.0015833333333333333
+        },
+        {
+          "index": 3,
+          "yaw": -0.0025384615384615385,
+          "pose": "0.0464,-0.2932,0.6343,0.7138,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.86426469100846,
+          "deviation": 42.81695099087354,
+          "adjacentMeanDelta": 4.680316175394588,
+          "flashShare": 0.0016111111111111111
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0456,-0.2923,0.6344,0.7142,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.91663445411788,
+          "deviation": 42.82951468568011,
+          "adjacentMeanDelta": 4.6907984564569265,
+          "flashShare": 0.0016111111111111111
+        },
+        {
+          "index": 5,
+          "yaw": 0.0025384615384615385,
+          "pose": "0.0448,-0.2914,0.6344,0.7146,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.97336241865158,
+          "deviation": 42.859415275583274,
+          "adjacentMeanDelta": 4.689566508478588,
+          "flashShare": 0.0014513888888888888
+        },
+        {
+          "index": 6,
+          "yaw": 0.005076923076923077,
+          "pose": "0.044,-0.2904,0.6345,0.715,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 110.02324572834704,
+          "deviation": 42.902883332534856,
+          "adjacentMeanDelta": 4.698931534118122,
+          "flashShare": 0.0017638888888888888
+        },
+        {
+          "index": 7,
+          "yaw": 0.007615384615384616,
+          "pose": "0.0432,-0.2895,0.6345,0.7153,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 110.07839965000417,
+          "deviation": 42.916395159782596,
+          "adjacentMeanDelta": 4.693766254080667,
+          "flashShare": 0.0016805555555555556
+        },
+        {
+          "index": 8,
+          "yaw": 0.010153846153846154,
+          "pose": "0.0423,-0.2886,0.6346,0.7157,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 110.13224892607,
+          "deviation": 42.93262012313576,
+          "adjacentMeanDelta": 4.698186447223027,
+          "flashShare": 0.0014930555555555556
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "steps",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.003507692307692307,
+          "pose": "0.1123,-0.3831,0.6284,0.6677,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.72024087754886,
+          "deviation": 61.96048529049735,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0026307692307692304,
+          "pose": "0.112,-0.3828,0.6284,0.6678,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.75306721610494,
+          "deviation": 61.97293187594815,
+          "adjacentMeanDelta": 1.4163131004969278,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.0017538461538461536,
+          "pose": "0.1117,-0.3825,0.6285,0.668,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.77950294330384,
+          "deviation": 61.98117204032558,
+          "adjacentMeanDelta": 1.4092728114393023,
+          "flashShare": 7.638888888888889e-05
+        },
+        {
+          "index": 3,
+          "yaw": -0.0008769230769230768,
+          "pose": "0.1115,-0.3822,0.6285,0.6682,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.82407134689225,
+          "deviation": 62.009202939175076,
+          "adjacentMeanDelta": 1.4189989230632782,
+          "flashShare": 6.25e-05
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1112,-0.3819,0.6286,0.6683,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.8556513052649,
+          "deviation": 62.02651742712321,
+          "adjacentMeanDelta": 1.407158438589838,
+          "flashShare": 0.00011111111111111112
+        },
+        {
+          "index": 5,
+          "yaw": 0.0008769230769230768,
+          "pose": "0.1109,-0.3816,0.6286,0.6685,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.88757493672105,
+          "deviation": 62.03993083905435,
+          "adjacentMeanDelta": 1.4108018044895596,
+          "flashShare": 0.00013194444444444443
+        },
+        {
+          "index": 6,
+          "yaw": 0.0017538461538461536,
+          "pose": "0.1106,-0.3813,0.6287,0.6687,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.92729382108317,
+          "deviation": 62.06117672478213,
+          "adjacentMeanDelta": 1.4099210935698616,
+          "flashShare": 9.027777777777777e-05
+        },
+        {
+          "index": 7,
+          "yaw": 0.0026307692307692304,
+          "pose": "0.1104,-0.381,0.6287,0.6688,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.95587730067305,
+          "deviation": 62.07763833202466,
+          "adjacentMeanDelta": 1.4044034344885084,
+          "flashShare": 8.333333333333333e-05
+        },
+        {
+          "index": 8,
+          "yaw": 0.003507692307692307,
+          "pose": "0.1101,-0.3807,0.6288,0.669,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.992124953919,
+          "deviation": 62.09389851904213,
+          "adjacentMeanDelta": 1.4104688919650183,
+          "flashShare": 6.25e-05
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "water",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009230769230769232,
+          "pose": "0.1129,-0.2366,0.6396,0.7226,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.35638531147109,
+          "deviation": 33.67970748228575,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.006923076923076924,
+          "pose": "0.1122,-0.2358,0.6397,0.7229,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.35904450885455,
+          "deviation": 33.65333931926739,
+          "adjacentMeanDelta": 2.790166117721134,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004615384615384616,
+          "pose": "0.1115,-0.2349,0.6398,0.7232,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.36876164674759,
+          "deviation": 33.646084529091866,
+          "adjacentMeanDelta": 2.779571795596017,
+          "flashShare": 0.0011319444444444445
+        },
+        {
+          "index": 3,
+          "yaw": -0.002307692307692308,
+          "pose": "0.1107,-0.2341,0.64,0.7235,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.3940691863166,
+          "deviation": 33.650176040371555,
+          "adjacentMeanDelta": 2.7681895269287957,
+          "flashShare": 0.0011041666666666667
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.11,-0.2333,0.6401,0.7237,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.41072476832072,
+          "deviation": 33.644787083924705,
+          "adjacentMeanDelta": 2.7587949653201633,
+          "flashShare": 0.0011180555555555555
+        },
+        {
+          "index": 5,
+          "yaw": 0.002307692307692308,
+          "pose": "0.1092,-0.2324,0.6402,0.724,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.44225367818939,
+          "deviation": 33.643944578203325,
+          "adjacentMeanDelta": 2.748639301644431,
+          "flashShare": 0.0009513888888888889
+        },
+        {
+          "index": 6,
+          "yaw": 0.004615384615384616,
+          "pose": "0.1085,-0.2316,0.6404,0.7243,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.47194985840056,
+          "deviation": 33.65999189759484,
+          "adjacentMeanDelta": 2.7616787842379678,
+          "flashShare": 0.0010902777777777777
+        },
+        {
+          "index": 7,
+          "yaw": 0.006923076923076924,
+          "pose": "0.1078,-0.2307,0.6405,0.7245,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.51221426259147,
+          "deviation": 33.6733905206119,
+          "adjacentMeanDelta": 2.7578252348370023,
+          "flashShare": 0.00125
+        },
+        {
+          "index": 8,
+          "yaw": 0.009230769230769232,
+          "pose": "0.107,-0.2299,0.6406,0.7248,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.54169900992181,
+          "deviation": 33.67856731994019,
+          "adjacentMeanDelta": 2.743066725651423,
+          "flashShare": 0.0009722222222222222
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "bridge",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0104,-0.1239,0.619,0.7755,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 148.31092818631066,
+          "deviation": 59.52723169745659,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0113,-0.1227,0.619,0.7756,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 148.24309261775016,
+          "deviation": 59.459149026845985,
+          "adjacentMeanDelta": 4.83414938182301,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0122,-0.1215,0.619,0.7758,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 148.17602256743112,
+          "deviation": 59.38665480431344,
+          "adjacentMeanDelta": 4.7990853509638045,
+          "flashShare": 0.0030416666666666665
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0132,-0.1204,0.619,0.776,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 148.10946306991576,
+          "deviation": 59.31536124689006,
+          "adjacentMeanDelta": 4.793039705965254,
+          "flashShare": 0.0028194444444444443
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0141,-0.1192,0.619,0.7762,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 148.02419652785196,
+          "deviation": 59.24001786804812,
+          "adjacentMeanDelta": 4.776013440026177,
+          "flashShare": 0.002840277777777778
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.015,-0.118,0.6189,0.7764,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.94420574357775,
+          "deviation": 59.16138745535358,
+          "adjacentMeanDelta": 4.78980070787006,
+          "flashShare": 0.0029097222222222224
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.016,-0.1169,0.6189,0.7765,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.8641754152775,
+          "deviation": 59.088217347935434,
+          "adjacentMeanDelta": 4.778287097003725,
+          "flashShare": 0.0029861111111111113
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.0169,-0.1157,0.6189,0.7767,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.76698863493073,
+          "deviation": 59.00557527396518,
+          "adjacentMeanDelta": 4.781759381029341,
+          "flashShare": 0.003097222222222222
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.0178,-0.1146,0.6189,0.7769,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.66452539393637,
+          "deviation": 58.941140796608394,
+          "adjacentMeanDelta": 4.7772630577087405,
+          "flashShare": 0.0031319444444444446
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "cedar",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009692307692307693,
+          "pose": "-0.1543,0.0913,0.5271,0.8307,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.67291323778363,
+          "deviation": 71.22929120127525,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007269230769230769,
+          "pose": "-0.1549,0.0923,0.5269,0.8306,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.69409276559617,
+          "deviation": 71.25497312144552,
+          "adjacentMeanDelta": 4.881721282323202,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004846153846153846,
+          "pose": "-0.1555,0.0933,0.5267,0.8305,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.7170689037906,
+          "deviation": 71.27478268713062,
+          "adjacentMeanDelta": 4.899870389699936,
+          "flashShare": 0.0021944444444444446
+        },
+        {
+          "index": 3,
+          "yaw": -0.002423076923076923,
+          "pose": "-0.1562,0.0943,0.5265,0.8304,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.76399604233106,
+          "deviation": 71.28827407893831,
+          "adjacentMeanDelta": 4.8861330859926015,
+          "flashShare": 0.0021319444444444446
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.1568,0.0953,0.5263,0.8303,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.8074806569682,
+          "deviation": 71.29448485533385,
+          "adjacentMeanDelta": 4.870304165840149,
+          "flashShare": 0.0019236111111111112
+        },
+        {
+          "index": 5,
+          "yaw": 0.002423076923076923,
+          "pose": "-0.1574,0.0963,0.5261,0.8301,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.84623084057702,
+          "deviation": 71.31557446699318,
+          "adjacentMeanDelta": 4.866335291888979,
+          "flashShare": 0.0018819444444444445
+        },
+        {
+          "index": 6,
+          "yaw": 0.004846153846153846,
+          "pose": "-0.1581,0.0973,0.5259,0.83,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.89129324913026,
+          "deviation": 71.32156540843982,
+          "adjacentMeanDelta": 4.8664208554691735,
+          "flashShare": 0.002076388888888889
+        },
+        {
+          "index": 7,
+          "yaw": 0.007269230769230769,
+          "pose": "-0.1587,0.0983,0.5257,0.8299,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.92463344653447,
+          "deviation": 71.33788070246959,
+          "adjacentMeanDelta": 4.856888867378235,
+          "flashShare": 0.0020833333333333333
+        },
+        {
+          "index": 8,
+          "yaw": 0.009692307692307693,
+          "pose": "-0.1594,0.0993,0.5255,0.8298,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.9431279915439,
+          "deviation": 71.35284279448562,
+          "adjacentMeanDelta": 4.84379932612843,
+          "flashShare": 0.0021666666666666666
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "home",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1596,-0.3174,0.6357,0.6853,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.25261280404197,
+          "deviation": 63.48369163853686,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1586,-0.3164,0.6359,0.6858,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.28887747356626,
+          "deviation": 63.504875534097756,
+          "adjacentMeanDelta": 5.084125774595472,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1577,-0.3154,0.6361,0.6863,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.31667323014472,
+          "deviation": 63.520849756377544,
+          "adjacentMeanDelta": 5.094286369880041,
+          "flashShare": 0.0036458333333333334
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1567,-0.3143,0.6364,0.6868,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.339509343995,
+          "deviation": 63.521111240535454,
+          "adjacentMeanDelta": 5.103891034682592,
+          "flashShare": 0.003833333333333333
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1558,-0.3133,0.6366,0.6872,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.3678408516248,
+          "deviation": 63.54299596857468,
+          "adjacentMeanDelta": 5.1434311024347945,
+          "flashShare": 0.0036875
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1548,-0.3123,0.6368,0.6877,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.38216257431773,
+          "deviation": 63.54187129121775,
+          "adjacentMeanDelta": 5.162646872123083,
+          "flashShare": 0.0038680555555555556
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1539,-0.3112,0.6371,0.6882,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.41484029812284,
+          "deviation": 63.54464115262137,
+          "adjacentMeanDelta": 5.1878927987151675,
+          "flashShare": 0.0037291666666666667
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1529,-0.3102,0.6373,0.6886,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.43728601988155,
+          "deviation": 63.54546846835362,
+          "adjacentMeanDelta": 5.186277722967995,
+          "flashShare": 0.0037430555555555555
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.152,-0.3092,0.6375,0.6891,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 142.46709390415086,
+          "deviation": 63.54263496657341,
+          "adjacentMeanDelta": 5.199005098766751,
+          "flashShare": 0.0037291666666666667
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "pine",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0693,-0.19,0.637,0.7439,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.2523902149995,
+          "deviation": 73.05937779227382,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0703,-0.1889,0.6369,0.7442,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.21142152108087,
+          "deviation": 73.06987931000884,
+          "adjacentMeanDelta": 4.917289740377003,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0712,-0.1878,0.6368,0.7444,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.17248958169088,
+          "deviation": 73.09054701576012,
+          "adjacentMeanDelta": 4.909573774072859,
+          "flashShare": 0.0014652777777777778
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0722,-0.1867,0.6366,0.7447,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.1306079507669,
+          "deviation": 73.1065905082359,
+          "adjacentMeanDelta": 4.906102871338526,
+          "flashShare": 0.0016666666666666668
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0732,-0.1856,0.6365,0.745,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.0944591796398,
+          "deviation": 73.1189864762274,
+          "adjacentMeanDelta": 4.905901156001621,
+          "flashShare": 0.0015694444444444445
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.0741,-0.1844,0.6364,0.7453,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.0515821923415,
+          "deviation": 73.12684750241873,
+          "adjacentMeanDelta": 4.920809744252099,
+          "flashShare": 0.0014930555555555556
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.0751,-0.1833,0.6363,0.7456,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.00666247751977,
+          "deviation": 73.13912137874401,
+          "adjacentMeanDelta": 4.923069681273566,
+          "flashShare": 0.0016736111111111112
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.076,-0.1822,0.6362,0.7458,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.97698210612933,
+          "deviation": 73.16077524783725,
+          "adjacentMeanDelta": 4.932741463396284,
+          "flashShare": 0.0016666666666666668
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.077,-0.1811,0.6361,0.7461,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.94572371024555,
+          "deviation": 73.17763072528379,
+          "adjacentMeanDelta": 4.937360534191131,
+          "flashShare": 0.0016666666666666668
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "plum",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.00443076923076923,
+          "pose": "0.0157,-0.3004,0.6471,0.7005,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.6464267018106,
+          "deviation": 73.85205573069332,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0033230769230769225,
+          "pose": "0.0153,-0.3,0.6471,0.7007,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.6668264333142,
+          "deviation": 73.84698622245027,
+          "adjacentMeanDelta": 3.0837339075671304,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.002215384615384615,
+          "pose": "0.015,-0.2996,0.6471,0.7009,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.6757696052922,
+          "deviation": 73.84486670819943,
+          "adjacentMeanDelta": 3.06142133585612,
+          "flashShare": 0.00031944444444444446
+        },
+        {
+          "index": 3,
+          "yaw": -0.0011076923076923076,
+          "pose": "0.0146,-0.2993,0.6471,0.701,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.70524098769823,
+          "deviation": 73.83479118347,
+          "adjacentMeanDelta": 3.0710451213518777,
+          "flashShare": 0.0003402777777777778
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0143,-0.2989,0.6471,0.7012,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.74049880949656,
+          "deviation": 73.82759320415343,
+          "adjacentMeanDelta": 3.078317219813665,
+          "flashShare": 0.00021527777777777778
+        },
+        {
+          "index": 5,
+          "yaw": 0.0011076923076923076,
+          "pose": "0.0139,-0.2985,0.6471,0.7014,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.75613268033663,
+          "deviation": 73.82305773524953,
+          "adjacentMeanDelta": 3.069290771457884,
+          "flashShare": 0.00031944444444444446
+        },
+        {
+          "index": 6,
+          "yaw": 0.002215384615384615,
+          "pose": "0.0135,-0.2981,0.6471,0.7015,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.77540138045947,
+          "deviation": 73.80506935194799,
+          "adjacentMeanDelta": 3.0764790932337442,
+          "flashShare": 0.0002777777777777778
+        },
+        {
+          "index": 7,
+          "yaw": 0.0033230769230769225,
+          "pose": "0.0132,-0.2977,0.6472,0.7017,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.79634380756485,
+          "deviation": 73.7960269581363,
+          "adjacentMeanDelta": 3.074286413086785,
+          "flashShare": 0.0002986111111111111
+        },
+        {
+          "index": 8,
+          "yaw": 0.00443076923076923,
+          "pose": "0.0128,-0.2973,0.6472,0.7019,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.80239364125993,
+          "deviation": 73.7884736839663,
+          "adjacentMeanDelta": 3.0830839114454056,
+          "flashShare": 0.00034722222222222224
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "reported",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1085,-0.3624,0.6607,0.6483,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.76816234466764,
+          "deviation": 71.3842634492725,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1075,-0.3614,0.6609,0.6489,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.78003782937262,
+          "deviation": 71.39589937834673,
+          "adjacentMeanDelta": 6.501194443994098,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1065,-0.3604,0.6611,0.6494,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.79880337206524,
+          "deviation": 71.41625251037988,
+          "adjacentMeanDelta": 6.488042164352205,
+          "flashShare": 0.004784722222222222
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1055,-0.3595,0.6612,0.6499,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.8240114993519,
+          "deviation": 71.44118470042534,
+          "adjacentMeanDelta": 6.484104605727725,
+          "flashShare": 0.004701388888888889
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1045,-0.3585,0.6614,0.6505,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.84930393192502,
+          "deviation": 71.462285839405,
+          "adjacentMeanDelta": 6.476948707156711,
+          "flashShare": 0.004902777777777778
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1035,-0.3575,0.6615,0.651,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.88221651739545,
+          "deviation": 71.46899644616036,
+          "adjacentMeanDelta": 6.499943861166636,
+          "flashShare": 0.0047083333333333335
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1025,-0.3565,0.6617,0.6516,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.93168630915218,
+          "deviation": 71.47951191278665,
+          "adjacentMeanDelta": 6.503344980902142,
+          "flashShare": 0.004826388888888889
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1015,-0.3556,0.6618,0.6521,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 175.99371253916954,
+          "deviation": 71.49516459831418,
+          "adjacentMeanDelta": 6.484816828091939,
+          "flashShare": 0.004916666666666666
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.1005,-0.3546,0.662,0.6526,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 176.04845869819323,
+          "deviation": 71.5056321578634,
+          "adjacentMeanDelta": 6.478394373257955,
+          "flashShare": 0.004791666666666666
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "roof",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.010153846153846154,
+          "pose": "0.0488,-0.2959,0.6341,0.7127,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.08655704935393,
+          "deviation": 73.00247630656625,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007615384615384616,
+          "pose": "0.048,-0.295,0.6342,0.7131,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.12120989831288,
+          "deviation": 72.9917350288619,
+          "adjacentMeanDelta": 6.107273995982276,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.005076923076923077,
+          "pose": "0.0472,-0.2941,0.6342,0.7135,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.13968614056375,
+          "deviation": 72.99758884590705,
+          "adjacentMeanDelta": 6.140263450834486,
+          "flashShare": 0.0032430555555555554
+        },
+        {
+          "index": 3,
+          "yaw": -0.0025384615384615385,
+          "pose": "0.0464,-0.2932,0.6343,0.7138,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.16891662241352,
+          "deviation": 72.96360222705563,
+          "adjacentMeanDelta": 6.121087011986309,
+          "flashShare": 0.0032847222222222223
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0456,-0.2923,0.6344,0.7142,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.20148862755298,
+          "deviation": 72.9386301304502,
+          "adjacentMeanDelta": 6.134413990947936,
+          "flashShare": 0.0032916666666666667
+        },
+        {
+          "index": 5,
+          "yaw": 0.0025384615384615385,
+          "pose": "0.0448,-0.2914,0.6344,0.7146,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.25490304350853,
+          "deviation": 72.93384573168399,
+          "adjacentMeanDelta": 6.129205370412932,
+          "flashShare": 0.0033055555555555555
+        },
+        {
+          "index": 6,
+          "yaw": 0.005076923076923077,
+          "pose": "0.044,-0.2904,0.6345,0.715,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.29928859375582,
+          "deviation": 72.94181597837057,
+          "adjacentMeanDelta": 6.13965429283513,
+          "flashShare": 0.0036944444444444446
+        },
+        {
+          "index": 7,
+          "yaw": 0.007615384615384616,
+          "pose": "0.0432,-0.2895,0.6345,0.7153,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.35098597109317,
+          "deviation": 72.92384945993943,
+          "adjacentMeanDelta": 6.147177877399656,
+          "flashShare": 0.003611111111111111
+        },
+        {
+          "index": 8,
+          "yaw": 0.010153846153846154,
+          "pose": "0.0423,-0.2886,0.6346,0.7157,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 160.39246906326878,
+          "deviation": 72.91984175592944,
+          "adjacentMeanDelta": 6.145542765484916,
+          "flashShare": 0.0034444444444444444
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "steps",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.003507692307692307,
+          "pose": "0.1123,-0.3831,0.6284,0.6677,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.1837215159999,
+          "deviation": 74.34070109346993,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0026307692307692304,
+          "pose": "0.112,-0.3828,0.6284,0.6678,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.18786582806376,
+          "deviation": 74.3349376808616,
+          "adjacentMeanDelta": 1.4712380712297228,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.0017538461538461536,
+          "pose": "0.1117,-0.3825,0.6285,0.668,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.19060222323736,
+          "deviation": 74.32922120848279,
+          "adjacentMeanDelta": 1.4670957589944205,
+          "flashShare": 9.027777777777777e-05
+        },
+        {
+          "index": 3,
+          "yaw": -0.0008769230769230768,
+          "pose": "0.1115,-0.3822,0.6285,0.6682,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.21149851907623,
+          "deviation": 74.33094126509717,
+          "adjacentMeanDelta": 1.4695080531173281,
+          "flashShare": 6.25e-05
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1112,-0.3819,0.6286,0.6683,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.21343648564815,
+          "deviation": 74.3280731304722,
+          "adjacentMeanDelta": 1.461969162609842,
+          "flashShare": 9.722222222222222e-05
+        },
+        {
+          "index": 5,
+          "yaw": 0.0008769230769230768,
+          "pose": "0.1109,-0.3816,0.6286,0.6685,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.21335483284793,
+          "deviation": 74.32354202421608,
+          "adjacentMeanDelta": 1.4643315851423475,
+          "flashShare": 0.000125
+        },
+        {
+          "index": 6,
+          "yaw": 0.0017538461538461536,
+          "pose": "0.1106,-0.3813,0.6287,0.6687,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.22337972091304,
+          "deviation": 74.3213278025811,
+          "adjacentMeanDelta": 1.4626349337630802,
+          "flashShare": 0.00010416666666666667
+        },
+        {
+          "index": 7,
+          "yaw": 0.0026307692307692304,
+          "pose": "0.1104,-0.381,0.6287,0.6688,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.23083547503418,
+          "deviation": 74.32197373466298,
+          "adjacentMeanDelta": 1.4586848797003429,
+          "flashShare": 9.722222222222222e-05
+        },
+        {
+          "index": 8,
+          "yaw": 0.003507692307692307,
+          "pose": "0.1101,-0.3807,0.6288,0.669,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.2434119654364,
+          "deviation": 74.31940580268753,
+          "adjacentMeanDelta": 1.461597995493147,
+          "flashShare": 7.638888888888889e-05
+        }
+      ]
+    },
+    {
+      "width": 960,
+      "height": 600,
+      "view": "water",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009230769230769232,
+          "pose": "0.1129,-0.2366,0.6396,0.7226,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.37156129598617,
+          "deviation": 50.790829002089104,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.006923076923076924,
+          "pose": "0.1122,-0.2358,0.6397,0.7229,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.40534811459648,
+          "deviation": 50.78605384530542,
+          "adjacentMeanDelta": 3.5688392907248603,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004615384615384616,
+          "pose": "0.1115,-0.2349,0.6398,0.7232,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.43618950600094,
+          "deviation": 50.788102225732324,
+          "adjacentMeanDelta": 3.560573489136166,
+          "flashShare": 0.0015902777777777777
+        },
+        {
+          "index": 3,
+          "yaw": -0.002307692307692308,
+          "pose": "0.1107,-0.2341,0.64,0.7235,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.48685204638375,
+          "deviation": 50.796603485520556,
+          "adjacentMeanDelta": 3.5576635468271043,
+          "flashShare": 0.0015972222222222223
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.11,-0.2333,0.6401,0.7237,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.52165798213747,
+          "deviation": 50.79660971634619,
+          "adjacentMeanDelta": 3.5502561786439686,
+          "flashShare": 0.0014791666666666666
+        },
+        {
+          "index": 5,
+          "yaw": 0.002307692307692308,
+          "pose": "0.1092,-0.2324,0.6402,0.724,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.5808590373198,
+          "deviation": 50.807692885485146,
+          "adjacentMeanDelta": 3.536597171386083,
+          "flashShare": 0.0013819444444444445
+        },
+        {
+          "index": 6,
+          "yaw": 0.004615384615384616,
+          "pose": "0.1085,-0.2316,0.6404,0.7243,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.6263245745235,
+          "deviation": 50.822531153551274,
+          "adjacentMeanDelta": 3.5491039974689484,
+          "flashShare": 0.0014583333333333334
+        },
+        {
+          "index": 7,
+          "yaw": 0.006923076923076924,
+          "pose": "0.1078,-0.2307,0.6405,0.7245,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.6944396387736,
+          "deviation": 50.834763117969636,
+          "adjacentMeanDelta": 3.548474365287357,
+          "flashShare": 0.0017083333333333334
+        },
+        {
+          "index": 8,
+          "yaw": 0.009230769230769232,
+          "pose": "0.107,-0.2299,0.6406,0.7248,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.7416762860086,
+          "deviation": 50.83420548546212,
+          "adjacentMeanDelta": 3.5360667619175383,
+          "flashShare": 0.0015833333333333333
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "bridge",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0104,-0.1239,0.619,0.7755,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.52360363719198,
+          "deviation": 30.96742280119702,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0113,-0.1227,0.619,0.7756,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.55280564618111,
+          "deviation": 30.983850099881995,
+          "adjacentMeanDelta": 3.457022699356079,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0122,-0.1215,0.619,0.7758,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.58196244931221,
+          "deviation": 31.000675907527768,
+          "adjacentMeanDelta": 3.464088271194034,
+          "flashShare": 0.0018958333333333334
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0132,-0.1204,0.619,0.776,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.62485734613736,
+          "deviation": 31.021507925593358,
+          "adjacentMeanDelta": 3.4456065296067133,
+          "flashShare": 0.0018680555555555555
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0141,-0.1192,0.619,0.7762,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.64167234669792,
+          "deviation": 31.02201031736065,
+          "adjacentMeanDelta": 3.4313576952351466,
+          "flashShare": 0.0019652777777777776
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.015,-0.118,0.6189,0.7764,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.65835156477821,
+          "deviation": 31.034687401742122,
+          "adjacentMeanDelta": 3.45024316851298,
+          "flashShare": 0.0020555555555555557
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.016,-0.1169,0.6189,0.7765,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.6892769132985,
+          "deviation": 31.047308676304205,
+          "adjacentMeanDelta": 3.437063569466273,
+          "flashShare": 0.002236111111111111
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.0169,-0.1157,0.6189,0.7767,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.71135947871208,
+          "deviation": 31.066478972027483,
+          "adjacentMeanDelta": 3.4266251232359144,
+          "flashShare": 0.002215277777777778
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.0178,-0.1146,0.6189,0.7769,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 120.73271124739117,
+          "deviation": 31.086238353531847,
+          "adjacentMeanDelta": 3.441247983958986,
+          "flashShare": 0.0018611111111111111
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "cedar",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009692307692307693,
+          "pose": "-0.1543,0.0913,0.5271,0.8307,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.01856228759554,
+          "deviation": 36.452325350108104,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007269230769230769,
+          "pose": "-0.1549,0.0923,0.5269,0.8306,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.01330605016814,
+          "deviation": 36.48163364246684,
+          "adjacentMeanDelta": 3.2874616362518734,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004846153846153846,
+          "pose": "-0.1555,0.0933,0.5267,0.8305,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.01507932866944,
+          "deviation": 36.49306021780925,
+          "adjacentMeanDelta": 3.2949269341892666,
+          "flashShare": 0.00125
+        },
+        {
+          "index": 3,
+          "yaw": -0.002423076923076923,
+          "pose": "-0.1562,0.0943,0.5265,0.8304,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.0187399969101,
+          "deviation": 36.483744707955154,
+          "adjacentMeanDelta": 3.28229300321473,
+          "flashShare": 0.0011458333333333333
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.1568,0.0953,0.5263,0.8303,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.02190553874439,
+          "deviation": 36.49008338920935,
+          "adjacentMeanDelta": 3.273008144617081,
+          "flashShare": 0.0009305555555555556
+        },
+        {
+          "index": 5,
+          "yaw": 0.002423076923076923,
+          "pose": "-0.1574,0.0963,0.5261,0.8301,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.03165694832802,
+          "deviation": 36.51298503887708,
+          "adjacentMeanDelta": 3.282833355585734,
+          "flashShare": 0.0010694444444444445
+        },
+        {
+          "index": 6,
+          "yaw": 0.004846153846153846,
+          "pose": "-0.1581,0.0973,0.5259,0.83,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.04203796556261,
+          "deviation": 36.51930462462906,
+          "adjacentMeanDelta": 3.278340876340866,
+          "flashShare": 0.001201388888888889
+        },
+        {
+          "index": 7,
+          "yaw": 0.007269230769230769,
+          "pose": "-0.1587,0.0983,0.5257,0.8299,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.05400133821699,
+          "deviation": 36.52000665598042,
+          "adjacentMeanDelta": 3.2631038125356038,
+          "flashShare": 0.0011180555555555555
+        },
+        {
+          "index": 8,
+          "yaw": 0.009692307692307693,
+          "pose": "-0.1594,0.0993,0.5255,0.8298,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 119.04919434142113,
+          "deviation": 36.52259972896425,
+          "adjacentMeanDelta": 3.2476167713536155,
+          "flashShare": 0.0011527777777777777
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "home",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1596,-0.3174,0.6357,0.6853,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.13551787349913,
+          "deviation": 29.176215740452516,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1586,-0.3164,0.6359,0.6858,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.13569724684291,
+          "deviation": 29.17551343174539,
+          "adjacentMeanDelta": 3.3223470186922284,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1577,-0.3154,0.6361,0.6863,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.15154246611066,
+          "deviation": 29.187655972322155,
+          "adjacentMeanDelta": 3.3217445986270904,
+          "flashShare": 0.00225
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1567,-0.3143,0.6364,0.6868,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.1641860136721,
+          "deviation": 29.185852010573065,
+          "adjacentMeanDelta": 3.3226127943727706,
+          "flashShare": 0.0020486111111111113
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1558,-0.3133,0.6366,0.6872,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.19151321289274,
+          "deviation": 29.206328521805652,
+          "adjacentMeanDelta": 3.354367372168435,
+          "flashShare": 0.0021180555555555558
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1548,-0.3123,0.6368,0.6877,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.20712689447403,
+          "deviation": 29.214227507943345,
+          "adjacentMeanDelta": 3.3674957230885822,
+          "flashShare": 0.0020694444444444445
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1539,-0.3112,0.6371,0.6882,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.23179818956058,
+          "deviation": 29.22571946076111,
+          "adjacentMeanDelta": 3.3694714314937593,
+          "flashShare": 0.0020902777777777777
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1529,-0.3102,0.6373,0.6886,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.25971556854248,
+          "deviation": 29.25860044291906,
+          "adjacentMeanDelta": 3.3940347073607975,
+          "flashShare": 0.0023333333333333335
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.152,-0.3092,0.6375,0.6891,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 115.2935667599572,
+          "deviation": 29.27918191965771,
+          "adjacentMeanDelta": 3.3933106869591607,
+          "flashShare": 0.0022916666666666667
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "pine",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0693,-0.19,0.637,0.7439,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.36848795949088,
+          "deviation": 36.094592157417324,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0703,-0.1889,0.6369,0.7442,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.32314245886273,
+          "deviation": 36.03173179156942,
+          "adjacentMeanDelta": 3.8400800219641793,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0712,-0.1878,0.6368,0.7444,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.27646408886379,
+          "deviation": 35.97294520421418,
+          "adjacentMeanDelta": 3.842310966067844,
+          "flashShare": 0.0008680555555555555
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0722,-0.1867,0.6366,0.7447,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.23145333486133,
+          "deviation": 35.90825087038087,
+          "adjacentMeanDelta": 3.8422572244008384,
+          "flashShare": 0.0010138888888888888
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0732,-0.1856,0.6365,0.745,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.19063381441434,
+          "deviation": 35.847942332393785,
+          "adjacentMeanDelta": 3.8460028978718652,
+          "flashShare": 0.0009652777777777778
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.0741,-0.1844,0.6364,0.7453,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.14630754168829,
+          "deviation": 35.78455658950365,
+          "adjacentMeanDelta": 3.853058642625809,
+          "flashShare": 0.0008055555555555556
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.0751,-0.1833,0.6363,0.7456,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.09708713732826,
+          "deviation": 35.71965857829173,
+          "adjacentMeanDelta": 3.854174857298533,
+          "flashShare": 0.0009513888888888889
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.076,-0.1822,0.6362,0.7458,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 106.04482772906621,
+          "deviation": 35.661906802457274,
+          "adjacentMeanDelta": 3.859837194336785,
+          "flashShare": 0.0009583333333333333
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.077,-0.1811,0.6361,0.7461,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 105.99733652888403,
+          "deviation": 35.594085147442556,
+          "adjacentMeanDelta": 3.8654856646325855,
+          "flashShare": 0.0008819444444444444
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "plum",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.00443076923076923,
+          "pose": "0.0157,-0.3004,0.6471,0.7005,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.34067473287053,
+          "deviation": 50.12899587628461,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0033230769230769225,
+          "pose": "0.0153,-0.3,0.6471,0.7007,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.35064891351594,
+          "deviation": 50.100949295657806,
+          "adjacentMeanDelta": 2.1721314731174046,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.002215384615384615,
+          "pose": "0.015,-0.2996,0.6471,0.7009,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.35295661942165,
+          "deviation": 50.08949628801618,
+          "adjacentMeanDelta": 2.163033459213045,
+          "flashShare": 2.777777777777778e-05
+        },
+        {
+          "index": 3,
+          "yaw": -0.0011076923076923076,
+          "pose": "0.0146,-0.2993,0.6471,0.701,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.36239396749602,
+          "deviation": 50.05809957046857,
+          "adjacentMeanDelta": 2.1730089190006256,
+          "flashShare": 0.00011805555555555556
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0143,-0.2989,0.6471,0.7012,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.37125224190288,
+          "deviation": 50.024095398355904,
+          "adjacentMeanDelta": 2.177680642339918,
+          "flashShare": 6.944444444444444e-05
+        },
+        {
+          "index": 5,
+          "yaw": 0.0011076923076923076,
+          "pose": "0.0139,-0.2985,0.6471,0.7014,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.37133875523674,
+          "deviation": 50.01628432914445,
+          "adjacentMeanDelta": 2.1679490644931794,
+          "flashShare": 7.638888888888889e-05
+        },
+        {
+          "index": 6,
+          "yaw": 0.002215384615384615,
+          "pose": "0.0135,-0.2981,0.6471,0.7015,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.38328645088937,
+          "deviation": 49.98061916116992,
+          "adjacentMeanDelta": 2.176883209678862,
+          "flashShare": 0.00011805555555555556
+        },
+        {
+          "index": 7,
+          "yaw": 0.0033230769230769225,
+          "pose": "0.0132,-0.2977,0.6472,0.7017,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.39118754723337,
+          "deviation": 49.945591018688866,
+          "adjacentMeanDelta": 2.181968782848782,
+          "flashShare": 8.333333333333333e-05
+        },
+        {
+          "index": 8,
+          "yaw": 0.00443076923076923,
+          "pose": "0.0128,-0.2973,0.6472,0.7019,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 123.39359553260273,
+          "deviation": 49.94018916557038,
+          "adjacentMeanDelta": 2.1641532845497133,
+          "flashShare": 9.027777777777777e-05
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "reported",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1085,-0.3624,0.6607,0.6483,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.34521313916312,
+          "deviation": 36.64518478252718,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1075,-0.3614,0.6609,0.6489,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.3543744582865,
+          "deviation": 36.640917584774435,
+          "adjacentMeanDelta": 4.3722057991822565,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1065,-0.3604,0.6611,0.6494,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.34559114127688,
+          "deviation": 36.6535258420111,
+          "adjacentMeanDelta": 4.3559948207272425,
+          "flashShare": 0.0018541666666666667
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1055,-0.3595,0.6612,0.6499,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.3366632355849,
+          "deviation": 36.667721926453176,
+          "adjacentMeanDelta": 4.338793763769997,
+          "flashShare": 0.0017777777777777779
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1045,-0.3585,0.6614,0.6505,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.34507418865628,
+          "deviation": 36.6802215242366,
+          "adjacentMeanDelta": 4.333421876404021,
+          "flashShare": 0.0017916666666666667
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1035,-0.3575,0.6615,0.651,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.35735370228025,
+          "deviation": 36.69338196096321,
+          "adjacentMeanDelta": 4.327393978065914,
+          "flashShare": 0.0018472222222222223
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1025,-0.3565,0.6617,0.6516,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.37764532319704,
+          "deviation": 36.715886045545105,
+          "adjacentMeanDelta": 4.334370994965235,
+          "flashShare": 0.0019027777777777778
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1015,-0.3556,0.6618,0.6521,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.40799411159091,
+          "deviation": 36.75095665866366,
+          "adjacentMeanDelta": 4.304625122361713,
+          "flashShare": 0.0017291666666666666
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.1005,-0.3546,0.662,0.6526,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.43965412788921,
+          "deviation": 36.79560171486285,
+          "adjacentMeanDelta": 4.309280674007204,
+          "flashShare": 0.0016805555555555556
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "roof",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.010153846153846154,
+          "pose": "0.0488,-0.2959,0.6341,0.7127,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.5261734468672,
+          "deviation": 42.59851611756281,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007615384615384616,
+          "pose": "0.048,-0.295,0.6342,0.7131,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.57186370660199,
+          "deviation": 42.621912092539326,
+          "adjacentMeanDelta": 4.639613537483745,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.005076923076923077,
+          "pose": "0.0472,-0.2941,0.6342,0.7135,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.61512194875876,
+          "deviation": 42.66533456013992,
+          "adjacentMeanDelta": 4.654992179897096,
+          "flashShare": 0.0012847222222222223
+        },
+        {
+          "index": 3,
+          "yaw": -0.0025384615384615385,
+          "pose": "0.0464,-0.2932,0.6343,0.7138,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.66707427000999,
+          "deviation": 42.66470753466202,
+          "adjacentMeanDelta": 4.669202841824956,
+          "flashShare": 0.0014375
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0456,-0.2923,0.6344,0.7142,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.71222725950346,
+          "deviation": 42.67732666754306,
+          "adjacentMeanDelta": 4.676897551642524,
+          "flashShare": 0.001388888888888889
+        },
+        {
+          "index": 5,
+          "yaw": 0.0025384615384615385,
+          "pose": "0.0448,-0.2914,0.6344,0.7146,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.76602947266896,
+          "deviation": 42.70790458250285,
+          "adjacentMeanDelta": 4.678923124657737,
+          "flashShare": 0.0012569444444444444
+        },
+        {
+          "index": 6,
+          "yaw": 0.005076923076923077,
+          "pose": "0.044,-0.2904,0.6345,0.715,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.82194269939264,
+          "deviation": 42.747976606430534,
+          "adjacentMeanDelta": 4.679538363443481,
+          "flashShare": 0.0014375
+        },
+        {
+          "index": 7,
+          "yaw": 0.007615384615384616,
+          "pose": "0.0432,-0.2895,0.6345,0.7153,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.87446179611153,
+          "deviation": 42.766662360179154,
+          "adjacentMeanDelta": 4.678317511876424,
+          "flashShare": 0.0014930555555555556
+        },
+        {
+          "index": 8,
+          "yaw": 0.010153846153846154,
+          "pose": "0.0423,-0.2886,0.6346,0.7157,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 109.92999797679319,
+          "deviation": 42.776891408954114,
+          "adjacentMeanDelta": 4.685251925018099,
+          "flashShare": 0.0014236111111111112
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "steps",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.003507692307692307,
+          "pose": "0.1123,-0.3831,0.6284,0.6677,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.68182364402878,
+          "deviation": 61.89118952877917,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0026307692307692304,
+          "pose": "0.112,-0.3828,0.6284,0.6678,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.71566715044446,
+          "deviation": 61.900932700628516,
+          "adjacentMeanDelta": 1.3128077569272782,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.0017538461538461536,
+          "pose": "0.1117,-0.3825,0.6285,0.668,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.751465524541,
+          "deviation": 61.91743074570889,
+          "adjacentMeanDelta": 1.3147160733805763,
+          "flashShare": 0
+        },
+        {
+          "index": 3,
+          "yaw": -0.0008769230769230768,
+          "pose": "0.1115,-0.3822,0.6285,0.6682,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.78808929665882,
+          "deviation": 61.94326095057233,
+          "adjacentMeanDelta": 1.3194933186372122,
+          "flashShare": 1.388888888888889e-05
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1112,-0.3819,0.6286,0.6683,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.81909327806366,
+          "deviation": 61.95410604866217,
+          "adjacentMeanDelta": 1.3121324915091197,
+          "flashShare": 0
+        },
+        {
+          "index": 5,
+          "yaw": 0.0008769230769230768,
+          "pose": "0.1109,-0.3816,0.6286,0.6685,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.8571056743463,
+          "deviation": 61.961533003309604,
+          "adjacentMeanDelta": 1.3100455730756124,
+          "flashShare": 0
+        },
+        {
+          "index": 6,
+          "yaw": 0.0017538461538461536,
+          "pose": "0.1106,-0.3813,0.6287,0.6687,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.89240040127436,
+          "deviation": 61.99071150227952,
+          "adjacentMeanDelta": 1.3160789178477392,
+          "flashShare": 0
+        },
+        {
+          "index": 7,
+          "yaw": 0.0026307692307692304,
+          "pose": "0.1104,-0.381,0.6287,0.6688,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.92609820037418,
+          "deviation": 62.00355028212111,
+          "adjacentMeanDelta": 1.3118151962492202,
+          "flashShare": 1.388888888888889e-05
+        },
+        {
+          "index": 8,
+          "yaw": 0.003507692307692307,
+          "pose": "0.1101,-0.3807,0.6288,0.669,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 145.96279785633087,
+          "deviation": 62.01317159731983,
+          "adjacentMeanDelta": 1.3133409743309021,
+          "flashShare": 0
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "water",
+      "season": "rain",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009230769230769232,
+          "pose": "0.1129,-0.2366,0.6396,0.7226,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.1097598317994,
+          "deviation": 33.539929855448634,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.006923076923076924,
+          "pose": "0.1122,-0.2358,0.6397,0.7229,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.11000125228034,
+          "deviation": 33.512190157557704,
+          "adjacentMeanDelta": 2.7865483439233567,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004615384615384616,
+          "pose": "0.1115,-0.2349,0.6398,0.7232,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.12834199179544,
+          "deviation": 33.50465807482108,
+          "adjacentMeanDelta": 2.7781555236710442,
+          "flashShare": 0.0010972222222222223
+        },
+        {
+          "index": 3,
+          "yaw": -0.002307692307692308,
+          "pose": "0.1107,-0.2341,0.64,0.7235,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.14110259156757,
+          "deviation": 33.49387220182497,
+          "adjacentMeanDelta": 2.7614796528286405,
+          "flashShare": 0.0010138888888888888
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.11,-0.2333,0.6401,0.7237,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.17427983106508,
+          "deviation": 33.50621872487236,
+          "adjacentMeanDelta": 2.75240838487943,
+          "flashShare": 0.0009861111111111112
+        },
+        {
+          "index": 5,
+          "yaw": 0.002307692307692308,
+          "pose": "0.1092,-0.2324,0.6402,0.724,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.2036509955724,
+          "deviation": 33.50882449624847,
+          "adjacentMeanDelta": 2.7463294824759164,
+          "flashShare": 0.0009375
+        },
+        {
+          "index": 6,
+          "yaw": 0.004615384615384616,
+          "pose": "0.1085,-0.2316,0.6404,0.7243,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.22976794751486,
+          "deviation": 33.517696108043815,
+          "adjacentMeanDelta": 2.761116950141059,
+          "flashShare": 0.001048611111111111
+        },
+        {
+          "index": 7,
+          "yaw": 0.006923076923076924,
+          "pose": "0.1078,-0.2307,0.6405,0.7245,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.26958207779461,
+          "deviation": 33.533652415085356,
+          "adjacentMeanDelta": 2.751650975730684,
+          "flashShare": 0.0011180555555555555
+        },
+        {
+          "index": 8,
+          "yaw": 0.009230769230769232,
+          "pose": "0.107,-0.2299,0.6406,0.7248,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 122.302134827137,
+          "deviation": 33.54348275346453,
+          "adjacentMeanDelta": 2.748954876396391,
+          "flashShare": 0.0009722222222222222
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "bridge",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0104,-0.1239,0.619,0.7755,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.72317652077146,
+          "deviation": 59.47875666991451,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0113,-0.1227,0.619,0.7756,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.66047103246052,
+          "deviation": 59.41315978756373,
+          "adjacentMeanDelta": 4.864135075728099,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0122,-0.1215,0.619,0.7758,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.59366554511917,
+          "deviation": 59.33919342727084,
+          "adjacentMeanDelta": 4.874472831752565,
+          "flashShare": 0.003097222222222222
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0132,-0.1204,0.619,0.776,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.54148604840702,
+          "deviation": 59.273102225422406,
+          "adjacentMeanDelta": 4.841351924790277,
+          "flashShare": 0.0030208333333333333
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0141,-0.1192,0.619,0.7762,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.44590429107348,
+          "deviation": 59.181121669096605,
+          "adjacentMeanDelta": 4.824159295982785,
+          "flashShare": 0.0031041666666666665
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.015,-0.118,0.6189,0.7764,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.36496173773872,
+          "deviation": 59.107114157373054,
+          "adjacentMeanDelta": 4.839455570936203,
+          "flashShare": 0.0031944444444444446
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.016,-0.1169,0.6189,0.7765,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.27783794082535,
+          "deviation": 59.0190699432584,
+          "adjacentMeanDelta": 4.817859913693534,
+          "flashShare": 0.0033888888888888888
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.0169,-0.1157,0.6189,0.7767,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.19349162960052,
+          "deviation": 58.942175859521804,
+          "adjacentMeanDelta": 4.8161403915882115,
+          "flashShare": 0.0032708333333333335
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.0178,-0.1146,0.6189,0.7769,0.8425",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 147.10091069462564,
+          "deviation": 58.8618903626339,
+          "adjacentMeanDelta": 4.8315668023162415,
+          "flashShare": 0.003013888888888889
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "cedar",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009692307692307693,
+          "pose": "-0.1543,0.0913,0.5271,0.8307,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.6098924305704,
+          "deviation": 71.63194987213724,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007269230769230769,
+          "pose": "-0.1549,0.0923,0.5269,0.8306,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.6352926220629,
+          "deviation": 71.6638679959208,
+          "adjacentMeanDelta": 4.992133169200685,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004846153846153846,
+          "pose": "-0.1555,0.0933,0.5267,0.8305,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.66441047268444,
+          "deviation": 71.68930595290864,
+          "adjacentMeanDelta": 5.009363305356768,
+          "flashShare": 0.0022291666666666666
+        },
+        {
+          "index": 3,
+          "yaw": -0.002423076923076923,
+          "pose": "-0.1562,0.0943,0.5265,0.8304,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.70665171747737,
+          "deviation": 71.7078067603208,
+          "adjacentMeanDelta": 5.003331987222036,
+          "flashShare": 0.002034722222222222
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.1568,0.0953,0.5263,0.8303,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.74502969710034,
+          "deviation": 71.7092494377883,
+          "adjacentMeanDelta": 4.9824661412503986,
+          "flashShare": 0.0019097222222222222
+        },
+        {
+          "index": 5,
+          "yaw": 0.002423076923076923,
+          "pose": "-0.1574,0.0963,0.5261,0.8301,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.78446735141011,
+          "deviation": 71.72765634149252,
+          "adjacentMeanDelta": 4.986076847102907,
+          "flashShare": 0.0019930555555555556
+        },
+        {
+          "index": 6,
+          "yaw": 0.004846153846153846,
+          "pose": "-0.1581,0.0973,0.5259,0.83,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.82886553141805,
+          "deviation": 71.74057188507037,
+          "adjacentMeanDelta": 4.978894853009118,
+          "flashShare": 0.002125
+        },
+        {
+          "index": 7,
+          "yaw": 0.007269230769230769,
+          "pose": "-0.1587,0.0983,0.5257,0.8299,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.8679755285846,
+          "deviation": 71.7485190206785,
+          "adjacentMeanDelta": 4.967494708961911,
+          "flashShare": 0.0021319444444444446
+        },
+        {
+          "index": 8,
+          "yaw": 0.009692307692307693,
+          "pose": "-0.1594,0.0993,0.5255,0.8298,0.8222",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.87838713757196,
+          "deviation": 71.75770392809846,
+          "adjacentMeanDelta": 4.961994115591049,
+          "flashShare": 0.0022083333333333334
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "home",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1596,-0.3174,0.6357,0.6853,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.60660950469972,
+          "deviation": 63.291755358263565,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1586,-0.3164,0.6359,0.6858,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.63465364694596,
+          "deviation": 63.31014591836648,
+          "adjacentMeanDelta": 5.104949588457743,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1577,-0.3154,0.6361,0.6863,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.67356005273925,
+          "deviation": 63.322995604967765,
+          "adjacentMeanDelta": 5.10499483815829,
+          "flashShare": 0.0036875
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1567,-0.3143,0.6364,0.6868,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.68843073444896,
+          "deviation": 63.33443267289122,
+          "adjacentMeanDelta": 5.118242349730598,
+          "flashShare": 0.0035833333333333333
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1558,-0.3133,0.6366,0.6872,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.7233018732336,
+          "deviation": 63.341624808156844,
+          "adjacentMeanDelta": 5.180670814567142,
+          "flashShare": 0.0035833333333333333
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1548,-0.3123,0.6368,0.6877,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.74209612838428,
+          "deviation": 63.337004758107035,
+          "adjacentMeanDelta": 5.195243316809337,
+          "flashShare": 0.0038055555555555555
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1539,-0.3112,0.6371,0.6882,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.75784718818136,
+          "deviation": 63.33575440991412,
+          "adjacentMeanDelta": 5.197995722611745,
+          "flashShare": 0.0035625
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1529,-0.3102,0.6373,0.6886,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.77973422389562,
+          "deviation": 63.337528574568715,
+          "adjacentMeanDelta": 5.2259592950873905,
+          "flashShare": 0.003909722222222222
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.152,-0.3092,0.6375,0.6891,0.8041",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 141.7994165822135,
+          "deviation": 63.32672030818685,
+          "adjacentMeanDelta": 5.228298638926612,
+          "flashShare": 0.0039375
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "pine",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "-0.0693,-0.19,0.637,0.7439,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.29516876130634,
+          "deviation": 73.41900129326142,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "-0.0703,-0.1889,0.6369,0.7442,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.2442155344751,
+          "deviation": 73.42898441635752,
+          "adjacentMeanDelta": 5.055923503398895,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "-0.0712,-0.1878,0.6368,0.7444,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.1999800699022,
+          "deviation": 73.45866632066988,
+          "adjacentMeanDelta": 5.05168892537223,
+          "flashShare": 0.001888888888888889
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "-0.0722,-0.1867,0.6366,0.7447,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.14907221860355,
+          "deviation": 73.47661399316307,
+          "adjacentMeanDelta": 5.057816296762891,
+          "flashShare": 0.0017777777777777779
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "-0.0732,-0.1856,0.6365,0.745,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.10684306202995,
+          "deviation": 73.48726719614211,
+          "adjacentMeanDelta": 5.061148720184962,
+          "flashShare": 0.0018680555555555555
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "-0.0741,-0.1844,0.6364,0.7453,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.0640679371092,
+          "deviation": 73.5008006577142,
+          "adjacentMeanDelta": 5.071816720485687,
+          "flashShare": 0.0017847222222222223
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "-0.0751,-0.1833,0.6363,0.7456,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 157.02649267101287,
+          "deviation": 73.51784624419427,
+          "adjacentMeanDelta": 5.0725775386492415,
+          "flashShare": 0.002
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "-0.076,-0.1822,0.6362,0.7458,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 156.98068021146457,
+          "deviation": 73.54205487320459,
+          "adjacentMeanDelta": 5.090416237910588,
+          "flashShare": 0.0019097222222222222
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "-0.077,-0.1811,0.6361,0.7461,0.7414",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 156.94552101869053,
+          "deviation": 73.55409407557067,
+          "adjacentMeanDelta": 5.092116000440385,
+          "flashShare": 0.0019722222222222224
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "plum",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.00443076923076923,
+          "pose": "0.0157,-0.3004,0.6471,0.7005,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 151.90133072699442,
+          "deviation": 73.54551578633772,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0033230769230769225,
+          "pose": "0.0153,-0.3,0.6471,0.7007,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 151.9314499071969,
+          "deviation": 73.53453151026524,
+          "adjacentMeanDelta": 3.1370629391670226,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.002215384615384615,
+          "pose": "0.015,-0.2996,0.6471,0.7009,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 151.9530556497044,
+          "deviation": 73.54284147384051,
+          "adjacentMeanDelta": 3.1232941415574818,
+          "flashShare": 0.0002708333333333333
+        },
+        {
+          "index": 3,
+          "yaw": -0.0011076923076923076,
+          "pose": "0.0146,-0.2993,0.6471,0.701,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 151.98197194314002,
+          "deviation": 73.52706049226205,
+          "adjacentMeanDelta": 3.138260531346003,
+          "flashShare": 0.00043055555555555555
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0143,-0.2989,0.6471,0.7012,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.006273980697,
+          "deviation": 73.5215945449017,
+          "adjacentMeanDelta": 3.139905210759905,
+          "flashShare": 0.0003125
+        },
+        {
+          "index": 5,
+          "yaw": 0.0011076923076923076,
+          "pose": "0.0139,-0.2985,0.6471,0.7014,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.0199604307016,
+          "deviation": 73.51308807125503,
+          "adjacentMeanDelta": 3.1338784138361615,
+          "flashShare": 0.00024305555555555555
+        },
+        {
+          "index": 6,
+          "yaw": 0.002215384615384615,
+          "pose": "0.0135,-0.2981,0.6471,0.7015,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.04795144115553,
+          "deviation": 73.49170514301659,
+          "adjacentMeanDelta": 3.156446299235026,
+          "flashShare": 0.0004236111111111111
+        },
+        {
+          "index": 7,
+          "yaw": 0.0033230769230769225,
+          "pose": "0.0132,-0.2977,0.6472,0.7017,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.06802686066098,
+          "deviation": 73.48047457119002,
+          "adjacentMeanDelta": 3.1368389574951596,
+          "flashShare": 0.0003333333333333333
+        },
+        {
+          "index": 8,
+          "yaw": 0.00443076923076923,
+          "pose": "0.0128,-0.2973,0.6472,0.7019,0.9798",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 152.08642146828439,
+          "deviation": 73.48051201522377,
+          "adjacentMeanDelta": 3.1390496463510726,
+          "flashShare": 0.0003333333333333333
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "reported",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.012,
+          "pose": "0.1085,-0.3624,0.6607,0.6483,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.47402815887662,
+          "deviation": 71.92469922755008,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.009000000000000001,
+          "pose": "0.1075,-0.3614,0.6609,0.6489,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.50193754148484,
+          "deviation": 71.93201740517372,
+          "adjacentMeanDelta": 6.764247402985891,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.006,
+          "pose": "0.1065,-0.3604,0.6611,0.6494,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.51033506658342,
+          "deviation": 71.96041101598946,
+          "adjacentMeanDelta": 6.741531542725033,
+          "flashShare": 0.005131944444444444
+        },
+        {
+          "index": 3,
+          "yaw": -0.003,
+          "pose": "0.1055,-0.3595,0.6612,0.6499,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.53426932705773,
+          "deviation": 71.98544131438538,
+          "adjacentMeanDelta": 6.741520931031969,
+          "flashShare": 0.004965277777777778
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1045,-0.3585,0.6614,0.6505,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.57003453625572,
+          "deviation": 72.00616941378235,
+          "adjacentMeanDelta": 6.735542270766365,
+          "flashShare": 0.004819444444444445
+        },
+        {
+          "index": 5,
+          "yaw": 0.003,
+          "pose": "0.1035,-0.3575,0.6615,0.651,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.60277105021476,
+          "deviation": 72.01947389742128,
+          "adjacentMeanDelta": 6.752046179638969,
+          "flashShare": 0.005013888888888889
+        },
+        {
+          "index": 6,
+          "yaw": 0.006,
+          "pose": "0.1025,-0.3565,0.6617,0.6516,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.65311097277535,
+          "deviation": 72.03621591299004,
+          "adjacentMeanDelta": 6.758438043355942,
+          "flashShare": 0.0051736111111111115
+        },
+        {
+          "index": 7,
+          "yaw": 0.009000000000000001,
+          "pose": "0.1015,-0.3556,0.6618,0.6521,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.69639796969625,
+          "deviation": 72.05001486566624,
+          "adjacentMeanDelta": 6.744189511431588,
+          "flashShare": 0.004993055555555555
+        },
+        {
+          "index": 8,
+          "yaw": 0.012,
+          "pose": "0.1005,-0.3546,0.662,0.6526,0.83",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.74552662735516,
+          "deviation": 72.06743170642706,
+          "adjacentMeanDelta": 6.731656631522709,
+          "flashShare": 0.005055555555555555
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "roof",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.010153846153846154,
+          "pose": "0.0488,-0.2959,0.6341,0.7127,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 158.97593565601773,
+          "deviation": 73.19705054532693,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.007615384615384616,
+          "pose": "0.048,-0.295,0.6342,0.7131,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.00584995223417,
+          "deviation": 73.18680649509098,
+          "adjacentMeanDelta": 6.322432704091072,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.005076923076923077,
+          "pose": "0.0472,-0.2941,0.6342,0.7135,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.0293209403091,
+          "deviation": 73.18580090252026,
+          "adjacentMeanDelta": 6.337345512562328,
+          "flashShare": 0.0034375
+        },
+        {
+          "index": 3,
+          "yaw": -0.0025384615384615385,
+          "pose": "0.0464,-0.2932,0.6343,0.7138,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.06343190079266,
+          "deviation": 73.16100953665826,
+          "adjacentMeanDelta": 6.3374796130127375,
+          "flashShare": 0.0035694444444444445
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.0456,-0.2923,0.6344,0.7142,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.09233583029112,
+          "deviation": 73.1400992959685,
+          "adjacentMeanDelta": 6.352941493034363,
+          "flashShare": 0.003840277777777778
+        },
+        {
+          "index": 5,
+          "yaw": 0.0025384615384615385,
+          "pose": "0.0448,-0.2914,0.6344,0.7146,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.13318081853126,
+          "deviation": 73.1268870496657,
+          "adjacentMeanDelta": 6.35327128150728,
+          "flashShare": 0.0036944444444444446
+        },
+        {
+          "index": 6,
+          "yaw": 0.005076923076923077,
+          "pose": "0.044,-0.2904,0.6345,0.715,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.18963862860204,
+          "deviation": 73.13417459345851,
+          "adjacentMeanDelta": 6.360481916069984,
+          "flashShare": 0.0038125
+        },
+        {
+          "index": 7,
+          "yaw": 0.007615384615384616,
+          "pose": "0.0432,-0.2895,0.6345,0.7153,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.2208377327919,
+          "deviation": 73.11454349328703,
+          "adjacentMeanDelta": 6.360848191168573,
+          "flashShare": 0.003944444444444445
+        },
+        {
+          "index": 8,
+          "yaw": 0.010153846153846154,
+          "pose": "0.0423,-0.2886,0.6346,0.7157,0.759",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 159.2760353578329,
+          "deviation": 73.11044793917264,
+          "adjacentMeanDelta": 6.365332231508361,
+          "flashShare": 0.003930555555555555
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "steps",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.003507692307692307,
+          "pose": "0.1123,-0.3831,0.6284,0.6677,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 173.980740729226,
+          "deviation": 74.35500457979813,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.0026307692307692304,
+          "pose": "0.112,-0.3828,0.6284,0.6678,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 173.98862142769497,
+          "deviation": 74.34567151766261,
+          "adjacentMeanDelta": 1.3771926146083409,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.0017538461538461536,
+          "pose": "0.1117,-0.3825,0.6285,0.668,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 173.9989426603847,
+          "deviation": 74.34476805072124,
+          "adjacentMeanDelta": 1.3761101529333326,
+          "flashShare": 1.388888888888889e-05
+        },
+        {
+          "index": 3,
+          "yaw": -0.0008769230769230768,
+          "pose": "0.1115,-0.3822,0.6285,0.6682,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.0074891810682,
+          "deviation": 74.34640281951042,
+          "adjacentMeanDelta": 1.379919580856959,
+          "flashShare": 1.388888888888889e-05
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.1112,-0.3819,0.6286,0.6683,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.01190561919742,
+          "deviation": 74.33791484559002,
+          "adjacentMeanDelta": 1.3747004856798384,
+          "flashShare": 0
+        },
+        {
+          "index": 5,
+          "yaw": 0.0008769230769230768,
+          "pose": "0.1109,-0.3816,0.6286,0.6685,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.02164043741757,
+          "deviation": 74.32533021010829,
+          "adjacentMeanDelta": 1.3703802512751686,
+          "flashShare": 6.944444444444445e-06
+        },
+        {
+          "index": 6,
+          "yaw": 0.0017538461538461536,
+          "pose": "0.1106,-0.3813,0.6287,0.6687,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.03065149256918,
+          "deviation": 74.33306076552252,
+          "adjacentMeanDelta": 1.3753027997016907,
+          "flashShare": 6.944444444444445e-06
+        },
+        {
+          "index": 7,
+          "yaw": 0.0026307692307692304,
+          "pose": "0.1104,-0.381,0.6287,0.6688,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.03657793045045,
+          "deviation": 74.32627481758115,
+          "adjacentMeanDelta": 1.3725520622730256,
+          "flashShare": 6.944444444444445e-06
+        },
+        {
+          "index": 8,
+          "yaw": 0.003507692307692307,
+          "pose": "0.1101,-0.3807,0.6288,0.669,0.9846",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 174.0472338406245,
+          "deviation": 74.31542867852848,
+          "adjacentMeanDelta": 1.3720467770364548,
+          "flashShare": 0
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "height": 1200,
+      "view": "water",
+      "season": "snow",
+      "state": {
+        "time": 12,
+        "frozen": true,
+        "renderScale": 1,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)"
+      },
+      "redraws": [
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        },
+        {
+          "changed": 0,
+          "over16": 0,
+          "max": 0
+        }
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "yaw": -0.009230769230769232,
+          "pose": "0.1129,-0.2366,0.6396,0.7226,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 138.85404658555984,
+          "deviation": 50.637043687767175,
+          "adjacentMeanDelta": 0,
+          "flashShare": 0
+        },
+        {
+          "index": 1,
+          "yaw": -0.006923076923076924,
+          "pose": "0.1122,-0.2358,0.6397,0.7229,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 138.88118688906565,
+          "deviation": 50.62979158521985,
+          "adjacentMeanDelta": 3.5954695817099678,
+          "flashShare": 0
+        },
+        {
+          "index": 2,
+          "yaw": -0.004615384615384616,
+          "pose": "0.1115,-0.2349,0.6398,0.7232,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 138.9239015027682,
+          "deviation": 50.624894573015474,
+          "adjacentMeanDelta": 3.5862834605111016,
+          "flashShare": 0.0015277777777777779
+        },
+        {
+          "index": 3,
+          "yaw": -0.002307692307692308,
+          "pose": "0.1107,-0.2341,0.64,0.7235,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 138.9572212567859,
+          "deviation": 50.629916236341735,
+          "adjacentMeanDelta": 3.5687287468910216,
+          "flashShare": 0.001486111111111111
+        },
+        {
+          "index": 4,
+          "yaw": 0,
+          "pose": "0.11,-0.2333,0.6401,0.7237,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.01660636350843,
+          "deviation": 50.64298531766616,
+          "adjacentMeanDelta": 3.560714883592394,
+          "flashShare": 0.0015
+        },
+        {
+          "index": 5,
+          "yaw": 0.002307692307692308,
+          "pose": "0.1092,-0.2324,0.6402,0.724,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.06692683855692,
+          "deviation": 50.647477138567055,
+          "adjacentMeanDelta": 3.5657665273878307,
+          "flashShare": 0.0014722222222222222
+        },
+        {
+          "index": 6,
+          "yaw": 0.004615384615384616,
+          "pose": "0.1085,-0.2316,0.6404,0.7243,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.1179117252032,
+          "deviation": 50.66202538847086,
+          "adjacentMeanDelta": 3.57840503443612,
+          "flashShare": 0.001548611111111111
+        },
+        {
+          "index": 7,
+          "yaw": 0.006923076923076924,
+          "pose": "0.1078,-0.2307,0.6405,0.7245,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.17593923335605,
+          "deviation": 50.675368912771326,
+          "adjacentMeanDelta": 3.571490258799659,
+          "flashShare": 0.00175
+        },
+        {
+          "index": 8,
+          "yaw": 0.009230769230769232,
+          "pose": "0.107,-0.2299,0.6406,0.7248,0.8606",
+          "repeat": {
+            "changed": 0,
+            "over16": 0,
+            "max": 0
+          },
+          "mean": 139.22001490110821,
+          "deviation": 50.67597633868229,
+          "adjacentMeanDelta": 3.564354448053572,
+          "flashShare": 0.0014930555555555556
+        }
+      ]
+    }
+  ]
+}

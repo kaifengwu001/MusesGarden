@@ -34,3 +34,5 @@ dist-environments/
 environments/muse-*/
 environments/generated.json
 src/assets/postcards/muse-*/
+.vite-ukiyoe-cache/
+.vite-ukiyoe-build-cache/

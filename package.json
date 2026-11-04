@@ -45,7 +45,10 @@
     "dev:sequoia": "vite --host 127.0.0.1 --port 5245 --strictPort",
     "check:sequoia": "tsc -p environments/sequoia-shrine/tsconfig.json && eslint environments/sequoia-shrine",
     "build:sequoia": "tsc -p environments/sequoia-shrine/tsconfig.json && vite build --config environments/sequoia-shrine/vite.config.ts",
-    "test:sequoia:browser": "playwright test --config environments/sequoia-shrine/playwright.config.ts"
+    "test:sequoia:browser": "playwright test --config environments/sequoia-shrine/playwright.config.ts",
+    "dev:ukiyoe": "vite --port 5237 --strictPort",
+    "check:ukiyoe": "tsc -p environments/ukiyoe-pine-hamlet/tsconfig.json && eslint environments/ukiyoe-pine-hamlet",
+    "build:ukiyoe": "tsc -p environments/ukiyoe-pine-hamlet/tsconfig.json && vite build --config environments/ukiyoe-pine-hamlet/vite.config.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
