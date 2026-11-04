@@ -16,6 +16,8 @@ import { startLiveClock } from './http/clock';
 import { fakeCommands, fakeQueries } from './http/fake';
 import { mediaCache } from './http/media';
 import { clientsFromEnv, createWorkshop, workshopFiles } from './workshop/index';
+import { loadGeneratedPlanets } from './workshop/planet/index';
+import { museCodeBuilder } from './workshop/planet/builder';
 import { PIPELINES } from './workshop/pipelines';
 
 type Backend = Garden & {
@@ -65,11 +67,14 @@ async function buildBackend(): Promise<Backend> {
   for (const m of cast.members.filter((c) => c.agent === true)) {
     await garden.agent.addAgentMuse(m.id, { name: m.name, planet: m.planet, look: m.look, worldSeed: m.worldSeed, timezone: m.timezone });
   }
+  // Planets the workshop built for real Muses (environments/generated.json), named as they were approved.
+  loadGeneratedPlanets(process.cwd());
   // The workshop: Meta's models for pictures, cut-outs and judging; Tripo (only with TRIPO_LIVE=1) for bodies and
   // pieces of furniture; WORKSHOP_FAKE=1 fakes every outside service. Renders need the page's dev server.
   const workshop = createWorkshop({
     dataDir: dir,
-    clients: clientsFromEnv({ mesher: tripoMesherFromEnv(dir) ?? undefined }),
+    // Muse Code (Meta's coding agent) answers Muse's notes on its planet's drafts.
+    clients: clientsFromEnv({ mesher: tripoMesherFromEnv(dir) ?? undefined, builder: museCodeBuilder() }),
     pipelines: PIPELINES,
     now: () => garden.engine.now(),
     repo: process.cwd(),

@@ -32,4 +32,5 @@ dist-environments/
 
 # Planets and postcard stills the workshop builds for each real Muse (server/workshop/planet)
 environments/muse-*/
+environments/generated.json
 src/assets/postcards/muse-*/

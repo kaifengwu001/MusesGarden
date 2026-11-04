@@ -7,6 +7,8 @@ export default defineConfig({
   assetsInclude: ['**/*.glb'],
   test: {
     include: ['src/**/*.test.ts', 'server/**/*.test.ts', 'environments/**/*.test.ts'],
+    // Planets the workshop forks for real Muses are per-laptop and git-ignored (server/workshop/planet).
+    exclude: ['**/node_modules/**', 'environments/muse-*/**'],
     environment: 'node',
   },
 });
