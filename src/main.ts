@@ -320,7 +320,7 @@ async function boot(): Promise<void> {
     garden.update(clock.realDt);
     if (ownerView) {
       const name = gardenUi?.state.snapshot?.muse.name;
-      if (name) {
+      if (name && document.title !== `${name}’s Garden`) {
         ui.setTitle(`${name}’s Garden`);
         document.title = `${name}’s Garden`;
       }
