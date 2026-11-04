@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS jobs_by_state ON jobs (state, created_at);
 
 /** A job as the runner keeps it: the record pipelines see, plus the runner's own counts. */
 export interface StoredJob extends JobRecord {
-  /** 'approve' rounds shown so far: notes on the third are refused. */
+  /** Drafts shown so far ('approve' rounds without a contract): notes on the third are refused. */
   readonly drafts: number;
   /** Extra views asked for in the current round. */
   readonly views: number;

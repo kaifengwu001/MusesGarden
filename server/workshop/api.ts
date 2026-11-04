@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import type { AgentResult, AgentStatus, Instant, MuseId } from '../../src/muse/contract';
 import type { WorkshopClients } from './clients';
 import type { Runner } from './runner';
-import { createRunner, plain } from './runner';
+import { createRunner, isDraft, plain } from './runner';
 import type { JobStore, StoredJob } from './store';
 import { isJobId, jobDir, newJobId, openJobStore } from './store';
 import type { JobId, JobKind, JobRecord, JobResult, JobView, Pipeline, Verdict, Workshop } from './types';
 
-/** 'approve' rounds per job: notes on the last one are refused (approve it, or stop). */
+/** Drafts per job ('approve' rounds without a contract): notes on the last one are refused (approve it, or stop). */
 export const MAX_DRAFTS = 3;
 /** Extra views (workshop_view) per round. */
 export const MAX_VIEWS = 4;
@@ -198,7 +198,7 @@ export function createWorkshop(deps: WorkshopDeps): WorkshopRuntime {
     if (verdict.approve === false && notes.length === 0 && picks.length === 0) {
       return { ok: true, value: toView(save(job, { state: 'failed', packet: null, message: `You stopped this job at round ${job.round}.` })) };
     }
-    if (packet.ask === 'approve' && verdict.approve !== true && notes.length > 0 && job.drafts >= MAX_DRAFTS) {
+    if (isDraft(packet) && verdict.approve !== true && notes.length > 0 && job.drafts >= MAX_DRAFTS) {
       return refuse(
         422,
         `This is the last draft (${MAX_DRAFTS} of ${MAX_DRAFTS}), so it can’t take more notes: approve it, or stop with approve false and no notes.`,

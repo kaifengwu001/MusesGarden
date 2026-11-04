@@ -44,6 +44,9 @@ export function plain(e: unknown): string {
   return text.length > MAX_MESSAGE ? `${text.slice(0, MAX_MESSAGE - 1)}…` : text;
 }
 
+/** A draft is an 'approve' round showing what was made; a visual contract to approve (packet.contract) isn't one. */
+export const isDraft = (packet: { readonly ask: string; readonly contract?: string }): boolean => packet.ask === 'approve' && packet.contract === undefined;
+
 const isOutcome = (o: unknown): o is StepOutcome =>
   typeof o === 'object' && o !== null && ['continue', 'wait', 'done', 'failed'].includes((o as { kind?: unknown }).kind as string);
 
@@ -94,7 +97,7 @@ export function createRunner(deps: RunnerDeps): Runner {
           stage: outcome.stage,
           data: outcome.data,
           round,
-          drafts: job.drafts + (outcome.packet.ask === 'approve' ? 1 : 0),
+          drafts: job.drafts + (isDraft(outcome.packet) ? 1 : 0),
           views: 0,
           packet: { ...outcome.packet, job: job.id, kind: job.kind, round },
           message: `Round ${round} is ready for you.`,

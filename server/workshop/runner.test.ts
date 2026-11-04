@@ -236,6 +236,39 @@ describe('the workshop runner', () => {
     expect(workshop.job(PIP, job.id)?.state).toBe('done');
   });
 
+  it('doesn’t count a contract to approve as a draft', async () => {
+    const trace: Trace = { steps: [] };
+    const base = twoStage('planet', trace);
+    const extra: Partial<Pipeline> = {
+      step: (job, io) =>
+        job.stage === 'sketch'
+          ? Promise.resolve({
+              kind: 'wait',
+              stage: 'contract',
+              data: job.data,
+              packet: { stage: 'contract', ask: 'approve', text: 'Approve the contract.', pictures: [], contract: 'Moss, mist, pale blue.' },
+            })
+          : base.step(job, io),
+      answer: (job, verdict) =>
+        job.stage === 'contract' ? { ok: true, stage: verdict.approve ? 'draft' : 'sketch', data: job.data } : base.answer(job, verdict),
+    };
+    const { workshop } = setup({ trace, extra });
+    const job = await started(workshop, PIP, brief('planet'));
+    for (let i = 0; i < 4; i++) {
+      await workshop.idle();
+      expect((await workshop.review(PIP, job.id, { notes: [{ text: 'mistier' }] })).ok).toBe(true);
+    }
+    await workshop.idle();
+    expect((await workshop.review(PIP, job.id, { approve: true })).ok).toBe(true);
+    for (let draft = 1; draft < MAX_DRAFTS; draft++) {
+      await workshop.idle();
+      expect((await workshop.review(PIP, job.id, { notes: [{ text: 'more flowers' }] })).ok).toBe(true);
+    }
+    await workshop.idle();
+    expect(workshop.job(PIP, job.id)).toMatchObject({ state: 'waiting', round: 5 + MAX_DRAFTS });
+    expect(await workshop.review(PIP, job.id, { notes: [{ text: 'and a moon' }] })).toMatchObject({ ok: false, status: 422 });
+  });
+
   it('stops a job when Muse answers approve false with no notes', async () => {
     const { workshop } = setup();
     const job = await started(workshop);
