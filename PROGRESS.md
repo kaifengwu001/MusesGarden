@@ -30,6 +30,46 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The making of Muse: a shot for the demo film (2026-11-04, in the lab)
+
+Kai asked for a clip of the original Muse alone, showing how it was made. Its untextured mesh is generated in, in its
+own T-pose, with the blue wave from the hut-interior film. Then triangles, clay, rough, weights, and the bones (it walks
+now). Then colour, the bones taken off and the fur added, and the camera turning back to the front. It is
+`src/dev/museLab.html#making=1` (`src/dev/museMaking.ts`), 12.3 s on the lab's white.
+
+- **The stages:** each is made by a front sweeping up the body in rest space, so a pass stays on the skin once Muse
+  walks. A point's stage is how many fronts have passed it, and each look draws only its own stage.
+  - **Generated (0.2–2.5 s):** the sculpt's file as exported, untextured: Tripo's mesh with its sculpted eyes, scaled
+    to 1 m as the rig fits it, in the lab's rawclay grey. The front is the hut film's (hut.frag.glsl FILM in that
+    session's worktree): ragged ±0.12 m, a 6 mm white-blue core, 6 cm of blue glow cooling into the grey. On the
+    lab's white the hollow inside showed the background through the cut, and shaded it read as a bowl. So the inside
+    is one flat glowing blue, and the cut reads as a solid cross-section.
+  - **Triangles (from 2.8 s):** the same file with flat faces and its wire.
+  - **Clay (3.8 s):** the skin as rigged takes over from the file: refined, its coat inset, the face plate smooth.
+  - **Rough (4.8 s), weights (5.8 s):** the lab's looks, computed at rest.
+  - **Colour (8.9 s):** Muse's own shaders, the bare skin first.
+  - The passes' line is thinner than the generation's: ±0.025 m, 3.5 cm of glow.
+- **Bones (from 6.75 s):** a ball at each joint and a rod to its parent, drawn over the body in the lab's magenta. They
+  pop in from the pelvis out, and fade from 9.5 s.
+- **It walks (from 7.5 s):** it comes out of the T-pose over 0.9 s as its legs start stepping. Each joint's turn from its
+  parent is slerped from rest and chained down the skeleton, so the arms come down in arcs. At full strength the blend
+  matches the rig's own pose to 1e-16. It stops at 11.2 s, turned to you, with happy eyes (∩) and a blush.
+- **The fur (9.5–10.5 s):** it grows to full length. Its tips lighten as it grows, because shells drawn with full-length
+  tips made the whole body brighten in a single frame.
+- **The camera:** it drifts round Muse's left from 30° to 62° while Muse is made, and comes back to the front from
+  9.9 s (power-3 ease). At first it went on to the profile, but there the bones overlapped.
+- **The hash:** `beats=gen,tris,clay,rough,weights,bones,walk,colour,fur,front,stop,end`, `cam=round,up,distance`,
+  `live=1`.
+- **Muse's shaders are unchanged.** The film adds its code to their source inside the scene, and each piece it hooks
+  onto is checked to occur exactly once. So the meadow and the lab draw as before.
+- **Rendering:** `node tools/workflows/muse-look/scripts/making.mjs out.mp4 1920 1080 30 16` takes about 40 s.
+  `lib.mjs filmLab` now films both lab scenes, so `parade.mjs` is a one-liner on it with its command unchanged.
+- **Checked:**
+  - The film is 369 frames at 1080p, in `shots/making/` (gitignored).
+  - A scan of the change between frames finds no pop. The only one, at the fur's start, is fixed.
+  - Contact sheets were read through every stage, plus full-size frames of the generation, the triangles, the
+    colour pass and the end.
+
 ## The muses' parade: a shot for the demo film (2026-11-04, in the lab)
 
 Kai asked for a 7-second shot in the lab: the walking animation, then the wave, swapping through all the muses on
