@@ -97,7 +97,8 @@ describe('the floor through the cutaway’s camera', () => {
   });
 
   it('keeps every piece clear of the bed, the hearth, the showpiece, the door’s way and the greeting spot', () => {
-    const zones = keepClear(ANCHORS);
+    // (the floor Muse needs: the hearth's front, the bed's side and foot, the front of the showpiece's shelves, the ways)
+    const zones = keepClear(ANCHORS, true);
     const onThem = [
       block('on the bed', 3.0, -0.8, 0.8, 1, 0.8),
       block('at the hearth', -0.5, -1.0, 0.8, 1, 0.8),
@@ -114,6 +115,23 @@ describe('the floor through the cutaway’s camera', () => {
       // and of each other
       for (const r of rects) if (r !== p.rect) expect(p.rect.x1 <= r.x0 || p.rect.x0 >= r.x1 || p.rect.z1 <= r.z0 || p.rect.z0 >= r.z1).toBe(true);
     });
+  });
+
+  it('keeps a piece where the picture put it when only the roomier aprons are in its way', () => {
+    // (the record player Blu's picture stood against the back wall by the showpiece's back end: in its apron and beside
+    // the hearth's, but clear of the shelves and the stove's front; it was moved 2 m onto the rug)
+    const [p] = place([block('record player', -2.88, -1.84, 0.54, 0.585, 0.6, 0)], room());
+    expect(p).not.toBeNull();
+    expect(Math.hypot(p!.x + 2.88, p!.z + 1.84)).toBeLessThan(0.15);
+    expect(free(p!.rect, keepClear(ANCHORS, true), [])).toBe(true);
+  });
+
+  it('keeps a piece clear of the roomier aprons too when a short move does it', () => {
+    // (just past the showpiece's front end: inside its apron, not before its shelves)
+    const [p] = place([block('stool', -3.0, 1.3, 0.4, 0.6, 0.4)], room());
+    expect(p).not.toBeNull();
+    expect(free(p!.rect, keepClear(ANCHORS), [])).toBe(true);
+    expect(Math.hypot(p!.x + 3.0, p!.z - 1.3)).toBeLessThan(0.5);
   });
 
   it('keeps pieces within the walls and their heights within reason', () => {

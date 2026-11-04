@@ -1,7 +1,8 @@
 // Where the home's new pieces stand in Muse's room (the hut inside: src/life/hut.ts). A piece is found as a box in
 // the furnished picture; the cutaway's camera (src/view/cutaway.ts) maps the room's floor onto the picture, so the
-// box's foot gives its place on the floor and its size its height. Then it is snapped clear of what Muse needs: its
-// bed, its hearth, its showpiece, the front door's way in and the spot on the rug where it greets you.
+// box's foot gives its place on the floor and its size its height. Then it is kept clear of what Muse needs: its
+// bed, its hearth, its showpiece, the front door's way in and the spot on the rug where it greets you; the roomier
+// aprons round them too, when that moves it only a little.
 // All in the homestead's local metres: x across the front, z toward the pond, y over the clearing.
 
 /** The room inside the walls (hut.ts ROOM): half its width and depth to the walls' inner faces, its floor's height. */
@@ -36,15 +37,34 @@ export const ANCHORS: readonly Anchor[] = [
   { name: 'display-cabinet', rect: { x0: -4.014, x1: -3.266, z0: -1.775, z1: 0.975 }, top: 3.24 },
 ];
 
+/** Floor out from each side of an anchor's footprint (m). */
+interface Margins {
+  readonly x0: number;
+  readonly x1: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
 /**
- * The floor Muse needs clear round each anchor (m out from each side of its footprint): in front of the stove where
- * it cooks, the side of the bed toward the room's middle where it climbs in, in front of the showpiece where the
- * camera looks at its shelves.
+ * The floor kept clear round each anchor where there's room (m out from each side of its footprint): in front of the
+ * stove where it cooks and a little either side, the side of the bed toward the room's middle where it climbs in, in
+ * front of the showpiece where the camera looks at its shelves and a little past each end.
  */
-const APRON: Readonly<Record<string, { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }>> = {
+const APRON: Readonly<Record<string, Margins>> = {
   'wood-stove': { x0: 0.35, x1: 0.45, z0: 0, z1: 1.05 },
   'single-bed': { x0: 0.85, x1: 0, z0: 0, z1: 0.35 },
   'display-cabinet': { x0: 0, x1: 0.7, z0: 0.2, z1: 0.2 },
+};
+
+/**
+ * The floor Muse can't do without round each anchor, kept clear always: in front of the stove across its own width,
+ * the bed's side and foot, and in front of the showpiece only along where its favourites stand (`ends`: the share of
+ * its length, z, left off each end; hut.ts COLUMNS 0.14 … 0.86).
+ */
+const NEED: Readonly<Record<string, Margins & { readonly ends?: number }>> = {
+  'wood-stove': { x0: 0, x1: 0, z0: 0, z1: 1.05 },
+  'single-bed': { x0: 0.85, x1: 0, z0: 0, z1: 0.35 },
+  'display-cabinet': { x0: 0, x1: 0.7, z0: 0, z1: 0, ends: 0.14 },
 };
 
 /**
@@ -60,8 +80,9 @@ const WAYS: readonly Rect[] = [
 
 /** How far apart two pieces stand at least (m). */
 const GAP = 0.1;
-/** The step of the search for a free place (m), and how far it looks. */
-const STEP = 0.1;
+/** The step of the search for a free place (m); how far it looks clear of the aprons, and how far at all. */
+const STEP = 0.05;
+const NEAR = 0.5;
 const REACH = 4;
 /** A new piece's height (m): no smaller or larger than this. */
 const HEIGHT = [0.3, 2.3] as const;
@@ -212,11 +233,17 @@ function footprint(found: Found, x: number, z: number, turn: number, height: num
 
 const overlaps = (a: Rect, b: Rect, margin = 0): boolean => a.x0 < b.x1 + margin && a.x1 > b.x0 - margin && a.z0 < b.z1 + margin && a.z1 > b.z0 - margin;
 
-/** The floor kept clear: each anchor with its apron, and the ways Muse walks. */
-export function keepClear(anchors: readonly Anchor[]): Rect[] {
-  const zones = anchors.map(({ name, rect: r }) => {
-    const a = APRON[name] ?? { x0: 0.25, x1: 0.25, z0: 0.25, z1: 0.25 };
-    return { x0: r.x0 - a.x0, x1: r.x1 + a.x1, z0: r.z0 - a.z0, z1: r.z1 + a.z1 };
+const grown = (r: Rect, m: Margins): Rect => ({ x0: r.x0 - m.x0, x1: r.x1 + m.x1, z0: r.z0 - m.z0, z1: r.z1 + m.z1 });
+
+/** The floor kept clear: each anchor with its apron (or, `needsOnly`, with only the floor Muse needs round it), and the ways Muse walks. */
+export function keepClear(anchors: readonly Anchor[], needsOnly = false): Rect[] {
+  const even = { x0: 0.25, x1: 0.25, z0: 0.25, z1: 0.25 };
+  const zones = anchors.flatMap(({ name, rect: r }) => {
+    if (!needsOnly) return [grown(r, APRON[name] ?? even)];
+    const need = NEED[name] ?? even;
+    const front = grown(r, need);
+    const cut = (r.z1 - r.z0) * (need.ends ?? 0);
+    return [r, { ...front, z0: front.z0 + cut, z1: front.z1 - cut }];
   });
   return [...zones, ...WAYS];
 }
@@ -231,12 +258,14 @@ export function free(rect: Rect, zones: readonly Rect[], placed: readonly Rect[]
  * Stand each found piece in the room: its foot under its box's bottom middle (moved back by half its depth, the box's
  * bottom being its front), turned away from a wall it stands by or else to face the view; its size from its box's
  * width against the camera's scale there and its model's own proportions as it is turned (seen from 69° above, a
- * box's height is mostly floor going back, too unsteady to read a height from); then moved to the nearest free floor
- * (on a 10 cm grid). A piece with no free floor within reach is left out (null).
+ * box's height is mostly floor going back, too unsteady to read a height from); then moved to the nearest floor clear
+ * of the aprons within half a metre, or else to the nearest clear of what Muse needs (on a 5 cm grid), so it stays
+ * about where the picture put it. A piece with no free floor within reach is left out (null).
  */
 export function place(found: readonly Found[], room: RoomInfo): Array<Placement | null> {
   const view = new FloorView(room.samples);
-  const zones = keepClear(room.anchors);
+  const roomy = keepClear(room.anchors);
+  const needs = keepClear(room.anchors, true);
   const placed: Rect[] = [];
   return found.map((f) => {
     const [x1, , x2, y2] = f.box;
@@ -264,7 +293,7 @@ export function place(found: readonly Found[], room: RoomInfo): Array<Placement 
     const cz = fz + away[1] * (first.back / 2);
     const turn = facing(cx, cz);
     const height = turned(turn).scale * f.model.y;
-    const spot = nearestFree(f, cx, cz, turn, height, zones, placed);
+    const spot = nearestFree(f, cx, cz, turn, height, roomy, placed, NEAR) ?? nearestFree(f, cx, cz, turn, height, needs, placed, REACH);
     if (!spot) return null;
     placed.push(spot.rect);
     return { name: f.name, x: round(spot.x), z: round(spot.z), turn: round(turn, 4), height: round(height), rect: spot.rect };
@@ -282,13 +311,14 @@ function facing(x: number, z: number): number {
   return near.d < 0.5 ? near.turn : snapTurn(VIEW_AZIMUTH);
 }
 
-function nearestFree(f: Found, x: number, z: number, turn: number, height: number, zones: readonly Rect[], placed: readonly Rect[]): { x: number; z: number; rect: Rect } | null {
+/** The free floor nearest (x, z) within `reach`, else null. */
+function nearestFree(f: Found, x: number, z: number, turn: number, height: number, zones: readonly Rect[], placed: readonly Rect[], reach: number): { x: number; z: number; rect: Rect } | null {
   let best: { x: number; z: number; rect: Rect; d: number } | null = null;
-  const n = Math.round(REACH / STEP);
+  const n = Math.round(reach / STEP);
   for (let i = -n; i <= n; i++)
     for (let k = -n; k <= n; k++) {
       const d = Math.hypot(i, k) * STEP;
-      if (best && d >= best.d) continue;
+      if (d > reach + 1e-9 || (best && d >= best.d)) continue;
       const px = x + i * STEP;
       const pz = z + k * STEP;
       const rect = footprint(f, px, pz, turn, height);

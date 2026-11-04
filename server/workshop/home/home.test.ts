@@ -116,7 +116,7 @@ describe('the home job', () => {
     expect(home.keep).toEqual([...KEEP]);
     expect(home.pieces.length).toBeGreaterThan(0);
     expect(home.pieces.length).toBeLessThanOrEqual(MAX_PIECES);
-    const zones = keepClear(ANCHORS);
+    const zones = keepClear(ANCHORS, true);
     for (const p of home.pieces) {
       expect(existsSync(join(fork, 'assets', 'home', p.file)), p.file).toBe(true);
       expect(p.height).toBeGreaterThanOrEqual(0.3);
