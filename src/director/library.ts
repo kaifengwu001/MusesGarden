@@ -1,4 +1,4 @@
-import { BOUNCE_LENGTH, COOK, FISH, FLUFF_LENGTH, WAVE_LENGTH, YAWN_LENGTH, type Expression } from '../life/museRig';
+import { BOUNCE_LENGTH, COOK, FISH, FLUFF_LENGTH, IDEA_LENGTH, LOVE_LENGTH, WAVE_LENGTH, YAWN_LENGTH, type Expression } from '../life/museRig';
 import type { MuseLook } from '../muse/contract';
 
 // What the director can have a Muse do (director.ts, timeline.ts): the moves Muse's rig already has (museRig.ts), each
@@ -7,7 +7,7 @@ import type { MuseLook } from '../muse/contract';
 // so many seconds, or done so many times), what it needs (the rig's moves, the things, a bench or a stove placed on the
 // planet), and the posture it leaves Muse in.
 
-export type ActionId = 'stand' | 'wave' | 'bounce' | 'petted' | 'fluff' | 'yawn' | 'sit' | 'nap' | 'water' | 'fish' | 'cook' | 'perch';
+export type ActionId = 'stand' | 'wave' | 'bounce' | 'petted' | 'fluff' | 'yawn' | 'idea' | 'love' | 'sit' | 'nap' | 'water' | 'fish' | 'cook' | 'perch';
 
 /** What Muse is left in after an action: on its feet, sat in the grass, lying asleep, up on a bench. */
 export type Posture = 'stand' | 'sit' | 'lie' | 'perch';
@@ -39,6 +39,8 @@ export const ACTIONS: readonly ActionDef[] = [
   { id: 'petted', label: 'Being petted', group: 'Gestures', unit: 'seconds', amount: 3.5, min: 0.8, max: 30, posture: 'stand', needs: 'moves', note: 'Leans into a hand: > < eyes, hearts, its fur up on a long hold, shaken out after.' },
   { id: 'fluff', label: 'Fur stands up', group: 'Gestures', unit: 'times', amount: 1, min: 1, max: 6, each: FLUFF_LENGTH + 0.3, posture: 'stand', needs: 'moves' },
   { id: 'yawn', label: 'Yawn', group: 'Gestures', unit: 'times', amount: 1, min: 1, max: 4, each: YAWN_LENGTH + 0.3, posture: 'stand', needs: 'moves' },
+  { id: 'idea', label: 'An idea', group: 'Gestures', unit: 'times', amount: 1, min: 1, max: 6, each: IDEA_LENGTH + 0.3, posture: 'stand', needs: 'moves', note: 'Delighted, its arms thrown up, a light bulb lighting up over its head.' },
+  { id: 'love', label: 'Adoring', group: 'Gestures', unit: 'times', amount: 1, min: 1, max: 6, each: LOVE_LENGTH + 0.3, posture: 'stand', needs: 'moves', note: 'Its head tilted, its eyes in happy arcs and blushing, a heart beating over its head.' },
   { id: 'sit', label: 'Sit in the grass', group: 'Sitting and lying', unit: 'seconds', amount: 10, min: 1, max: 300, posture: 'sit', needs: 'moves', note: 'Plops down; gets up again before it walks on.' },
   { id: 'nap', label: 'Nap', group: 'Sitting and lying', unit: 'seconds', amount: 20, min: 2, max: 300, posture: 'lie', needs: 'moves', note: 'Plops down and lies back asleep; wakes and gets up before it walks on.' },
   { id: 'water', label: 'Water the flowers', group: 'With its things', unit: 'times', amount: 3, min: 1, max: 10, each: 5, posture: 'stand', needs: 'props', note: 'The can out of its pocket, poured now long, now short; kept out for the next watering.' },

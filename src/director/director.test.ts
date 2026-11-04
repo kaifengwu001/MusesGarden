@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { angleBetween } from '../planet/geo';
 import { planRoute, ROUTE, walkable, type RouteGround } from './route';
 import { newBeat, parseScene, sceneText, type Actor, type DirectorScene, type Mark } from './scene';
+import { IDEA_LENGTH, MuseRig } from '../life/museRig';
 import { aim, newLife, play, Take, type TakeWorld } from './timeline';
 
 // The director's routes and takes, without a world: a planet of R 128 with a round pond and a wall on it.
@@ -158,6 +159,27 @@ describe('takes', () => {
       play(a, t, t, out);
       expect(out.cues.water?.grip).toBe(1);
     }
+  });
+
+  it('plays an idea and adoring as gestures, each its icon over its head', () => {
+    const s = scene([actor('a', mark(0, 0, SOUTH), [{ ...newBeat('idea', mark(2, 0, SOUTH)), amount: 2 }, newBeat('love', null)])]);
+    const take = Take.write(s, world());
+    const [idea, love] = [...take.actors.get('a')!.beats.values()];
+    const a = take.actors.get('a')!;
+    const out = newLife();
+    const rig = new MuseRig();
+    // the bulb lit over its head, each of the two times
+    for (const t of [idea.arrives + 1.2, idea.arrives + IDEA_LENGTH + 0.3 + 1.2]) {
+      play(a, t, 0, out);
+      expect(out.action.moves.some((m) => m.kind === 'idea')).toBe(true);
+      rig.pose(out.action);
+      expect(rig.emote.lit).toBeGreaterThan(0.99);
+    }
+    expect(love.starts).toBeGreaterThanOrEqual(idea.ends - 1e-6);
+    play(a, love.arrives + 1.4, 0, out);
+    rig.pose(out.action);
+    expect(rig.emote.heart).toBeGreaterThan(0.99);
+    expect(rig.squint).toBeGreaterThan(0.9);
   });
 
   it('waits on another Muse’s cue', () => {

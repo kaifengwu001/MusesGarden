@@ -95,6 +95,8 @@ Each action is Muse's own, played as its life plays it on the planet (`museRoam.
 | Being petted | seconds | > < eyes and hearts; its fur stands up on a long hold and is shaken out as it's let go. |
 | Fur stands up | times | |
 | Yawn | times | |
+| An idea | times | Delighted: its arms thrown up in a V, a light bulb lighting up over its head, its rays flashing out. |
+| Adoring | times | Its head tilted (to one side or the other, as the beat's seed has it), its eyes in happy arcs and blushing, a heart beating over its head. |
 | Sit in the grass | seconds | Plops down; gets up before it walks on. |
 | Nap | seconds | Plops down and lies back asleep, its snore bubble and Zzz; wakes and gets up before it walks on. The grass is pressed under it. |
 | Water the flowers | times | The can out of its pocket; poured now long, now short, now swept. The can stays out from one watering to the next, carried as it walks. |

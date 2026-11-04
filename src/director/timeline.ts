@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import { smoothstep } from '../core/math';
 import { rampIntegral, withTool } from '../life/museLife';
-import { BOUNCE_LENGTH, COOK, FISH, FLUFF, FLUFF_LENGTH, HOP, LIE_BACK, PET, PLOP, POCKET, RISE, STEP, WAKE, WAVE_LENGTH, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind } from '../life/museRig';
+import { BOUNCE_LENGTH, COOK, FISH, FLUFF, FLUFF_LENGTH, HOP, IDEA_LENGTH, LIE_BACK, LOVE_LENGTH, PET, PLOP, POCKET, RISE, STEP, WAKE, WAVE_LENGTH, YAWN_LENGTH, hopArc, perchBeats, type Move, type MoveKind } from '../life/museRig';
 import { angleBetween, tangentToward } from '../planet/geo';
 import type { ActedLife } from '../visit/world';
 import { ACTION, type Posture } from './library';
@@ -23,7 +23,9 @@ const PATH = { ease: 1.1, swing: 0.9 } as const;
 /** A pastime's motions eased in and out over this long (s): museRoam.ts play. */
 const EASE = 0.7;
 /** The gap after each wave, bounce, fluff or yawn before the next (s). */
-const GAP = { wave: 0.35, bounce: 0.25, fluff: 0.3, yawn: 0.3 } as const;
+const GAP = { wave: 0.35, bounce: 0.25, fluff: 0.3, yawn: 0.3, idea: 0.3, love: 0.3 } as const;
+/** The gestures done so many times on the spot: each one's length (s). */
+const GESTURE = { bounce: BOUNCE_LENGTH, fluff: FLUFF_LENGTH, yawn: YAWN_LENGTH, idea: IDEA_LENGTH, love: LOVE_LENGTH } as const;
 /** How long a petting takes to let go of (s): back from the hand, and its fur shaken out. */
 const LET_GO = PET.out + FLUFF.shake + FLUFF.settle;
 /** Nearer than this (m), a mark is where it already is: no walk. */
@@ -429,15 +431,19 @@ class Writer {
       }
       case 'bounce':
       case 'fluff':
-      case 'yawn': {
-        const length = def.id === 'bounce' ? BOUNCE_LENGTH : def.id === 'fluff' ? FLUFF_LENGTH : YAWN_LENGTH;
+      case 'yawn':
+      case 'idea':
+      case 'love': {
+        const length = GESTURE[def.id];
         const gap = GAP[def.id];
         const each = length + gap;
         const kind: MoveKind = def.id;
+        // (adoring tilts its head to one side or the other, as the beat's seed has it)
+        const side = kind === 'love' && rand() < 0.5 ? -1 : 1;
         this.mark(
           this.stand('do', n > 1 ? `${def.label.toLowerCase()} ×${n}` : def.label.toLowerCase(), n * each - gap, (s, out) => {
             const u = s % each;
-            if (u < length) out.action.moves.push({ kind, time: u, amount: 1 });
+            if (u < length) out.action.moves.push({ kind, time: u, amount: 1, side });
             if (kind === 'yawn') out.lookAt = null;
           }),
         );
