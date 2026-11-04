@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { GardenSnapshot } from '../../src/garden/types';
 import type { GardenFrame, Instant, MuseId } from '../../src/muse/contract';
-import { PLANETS } from '../../src/muse/planets';
+import { PLANETS, planetOf } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { loadCorpus } from '../adapters/sources/corpus';
 import { siteOf } from '../adapters/sources/media';
@@ -149,7 +149,7 @@ describe('the garden snapshot on a seeded engine', () => {
         // A ticket names the host's own planet, at the seed and growth the host has, and the body its Muse wears.
         const host = garden.engine.state(inv.host)!;
         const member = loadCast().members.find((m) => m.id === inv.host)!;
-        expect(card?.invitation).toMatchObject({ from: inv.host, world: member.planet, worldName: PLANETS[member.planet].title, seed: host.seed.worldSeed, look: member.look });
+        expect(card?.invitation).toMatchObject({ from: inv.host, world: member.planet, worldName: planetOf(member.planet).title, seed: host.seed.worldSeed, look: member.look });
         expect(card?.invitation?.g).toBe(garden.views.world(inv.host)?.g);
         expect(card?.invitation?.blurb).toMatch(new RegExp(`^${host.seed.name}’s planet · `));
       }

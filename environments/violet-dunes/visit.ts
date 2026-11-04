@@ -1,3 +1,4 @@
+import { knownLook } from '../../src/muse/looks';
 import { Vector3 } from 'three';
 import type { VisitWorld } from '../../src/visit/world';
 import { bedAt, layOut } from './garden/placement';
@@ -26,11 +27,11 @@ export function violetVisit(world: World): VisitWorld {
     planet: 'violet-dunes',
     scene: world,
     host: world.muse,
-    dressHost: (look) => world.muse.useModel(look),
+    dressHost: (look) => world.muse.useModel(knownLook(look)),
     makeGuest: (look) => {
       const isolated = Object.fromEntries(Object.entries(world.shared).filter(([key]) => key !== 'uMusePress' && key !== 'uMusePressK'));
       const guest = new Muse(isolated);
-      guest.useModel(look);
+      guest.useModel(knownLook(look));
       world.addVisitor(guest);
       return guest;
     },

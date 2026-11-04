@@ -1,3 +1,4 @@
+import { knownLook } from './muse/looks';
 import { bedAt, layOut } from './garden/placement';
 import { FindBeds } from './life/findBeds';
 import type { Muse } from './life/muse';
@@ -20,8 +21,8 @@ export function meadowVisit(world: World): VisitWorld {
     planet: 'meadow',
     scene: world,
     host: world.muse,
-    dressHost: (look) => world.muse.useModel(look),
-    makeGuest: (look) => world.addVisitor(look),
+    dressHost: (look) => world.muse.useModel(knownLook(look)),
+    makeGuest: (look) => world.addVisitor(knownLook(look)),
     // (the meadow has no residents of its own)
     hideOthers: () => undefined,
     marks: {
@@ -65,8 +66,8 @@ export function meadowCompanions(world: World): CompanionWorld<Muse> {
   return {
     host: world.muse,
     growth: world.growth,
-    makeGuest: (look) => world.addVisitor(look),
-    dress: (guest, look) => guest.useModel(look),
+    makeGuest: (look) => world.addVisitor(knownLook(look)),
+    dress: (guest, look) => guest.useModel(knownLook(look)),
     ground: (dir) => world.terrain.sample(dir, sample),
     standable: (dir) => world.muse.life?.standable(dir) ?? true,
   };

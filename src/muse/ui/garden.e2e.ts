@@ -7,7 +7,7 @@ import type {} from '../../dev/harnessApi';
 import type { Find, GardenSnapshot, MediaKind } from '../../garden/types';
 import { FIRST_PLANET } from '../../planet/firstPlanet';
 import type { InvitationCard, NowView, PlanetId, VisitWorldView } from '../contract';
-import { isPlanetId, PLANETS } from '../planets';
+import { isPlanetId, planetOf } from '../planets';
 
 // The garden's interface on the real engine: the hero's planet, a basket that arrives over the event stream, opens
 // out of the rail with its finds as flowers, and sends them home into their patches where they were found, hover and
@@ -673,7 +673,7 @@ test('a ticket takes the hero and Muse to the host’s own planet: both Muses th
   await ticket.click();
   expect((await used).status(), 'boarding: the engine took the invitation').toBe(200);
   await page.waitForURL(
-    (url) => url.pathname === PLANETS[planet as PlanetId].path && url.searchParams.get('visit') === card.id && url.searchParams.get('as') === HERO,
+    (url) => url.pathname === planetOf(planet as PlanetId).path && url.searchParams.get('visit') === card.id && url.searchParams.get('as') === HERO,
     { timeout: 60_000 },
   );
 

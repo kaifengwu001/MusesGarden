@@ -1,5 +1,5 @@
 import type { PlanetId } from '../muse/contract';
-import { isPlanetId, PLANETS } from '../muse/planets';
+import { isPlanetId, planetOf } from '../muse/planets';
 
 // A visit is reached by its URL alone, `<the host's planet>/?visit=<ticket>&as=<guest>&garden=<base>`, so a reload is
 // the same visit. Home is the guest's own planet with its garden: `<the guest's planet>/?garden=<base>`. A page opened
@@ -25,7 +25,7 @@ function query(fields: Record<string, string>, dev: boolean | undefined): string
 
 /** Whether a planet takes visits: one of the planets, and one its entry in src/muse/planets.ts marks `visitable`. */
 export function visitable(planet: string): planet is PlanetId {
-  return isPlanetId(planet) && PLANETS[planet].visitable;
+  return isPlanetId(planet) && planetOf(planet).visitable;
 }
 
 /** The visit a page's query names, or null when it names none. Without `garden`, the guest's own on this host. */
@@ -39,12 +39,12 @@ export function readVisit(search: string): VisitParams | null {
 
 /** The visit's page on a planet. */
 export function visitUrl(planet: PlanetId, p: VisitParams): string {
-  return `${PLANETS[planet].path}?${query({ visit: p.invitation, as: p.as, garden: p.garden }, p.dev)}`;
+  return `${planetOf(planet).path}?${query({ visit: p.invitation, as: p.as, garden: p.garden }, p.dev)}`;
 }
 
 /** Home: the guest's own planet, with its garden; the meadow's page for a planet that has no garden page yet. */
 export function homeUrl(planet: PlanetId, p: Pick<VisitParams, 'garden' | 'dev'>): string {
-  return `${PLANETS[visitable(planet) ? planet : 'meadow'].path}?${query({ garden: p.garden }, p.dev)}`;
+  return `${planetOf(visitable(planet) ? planet : 'meadow').path}?${query({ garden: p.garden }, p.dev)}`;
 }
 
 /** An API route (an absolute path, from src/muse/routes.ts) on the garden backend's host, which `garden` may put on another origin. */

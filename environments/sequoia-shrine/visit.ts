@@ -1,3 +1,4 @@
+import { knownLook } from '../../src/muse/looks';
 import type { VisitWorld } from '../../src/visit/world';
 import { bedAt, layOut } from './garden/placement';
 import { FindBeds } from './life/findBeds';
@@ -18,12 +19,12 @@ export function sequoiaVisit(world: World): VisitWorld {
     planet: 'sequoia-shrine',
     scene: world,
     host: world.muse,
-    dressHost: (look) => world.muse.useModel(look),
+    dressHost: (look) => world.muse.useModel(knownLook(look)),
     makeGuest: (look) => {
       // A guest must never press the host's grass: the shared uniforms, less the press.
       const isolated = Object.fromEntries(Object.entries(world.shared).filter(([key]) => key !== 'uMusePress' && key !== 'uMusePressK'));
       const guest = new Muse(isolated, { homeProps: false });
-      guest.useModel(look);
+      guest.useModel(knownLook(look));
       world.addVisitor(guest);
       return guest;
     },

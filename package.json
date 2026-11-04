@@ -47,8 +47,11 @@
     "test:sequoia:browser": "playwright test --config environments/sequoia-shrine/playwright.config.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "lil-gui": "0.21.0",
-    "three": "0.184.0"
+    "sharp": "0.35.5",
+    "three": "0.184.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

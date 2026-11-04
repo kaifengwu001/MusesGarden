@@ -1,5 +1,5 @@
 import type { CommandResult, GardenQueries, MetricsRow, MindView, MuseId, RelationshipOrigin, SharingView } from '../contract';
-import { PLANETS } from '../planets';
+import { planetOf as planetInfo } from '../planets';
 import type { ClockMode, MuseApi } from './api';
 import { button, day, el, time } from './dom';
 
@@ -34,8 +34,8 @@ function section(title: string, open: boolean, ...children: HTMLElement[]): HTML
 /** A Muse as /api/muses lists it: its name, and the planet it lives on. */
 type Listed = ReturnType<GardenQueries['muses']>[number];
 
-const planetOf = (p: Listed): string => PLANETS[p.planet].title;
-const openForVisits = (p: Listed): boolean => PLANETS[p.planet].visitable;
+const planetOf = (p: Listed): string => planetInfo(p.planet).title;
+const openForVisits = (p: Listed): boolean => planetInfo(p.planet).visitable;
 
 /**
  * Dev only: the sim clock, the host simulator (the Muse app's side), the owner's share code, introductions and basket

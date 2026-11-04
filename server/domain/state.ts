@@ -174,6 +174,19 @@ function fold(s: MuseState, stored: StoredEvent): MuseState {
     case 'relationship.changed':
     case 'invitation':
       return s;
+    // A real Muse (server/agent).
+    case 'agent.joined':
+      return { ...s, agent: true };
+    case 'look.changed':
+      return { ...s, look: e.look };
+    case 'planet.changed':
+      return { ...s, planet: { id: e.planet, worldSeed: e.worldSeed, name: e.name } };
+    case 'muse.checkedOut':
+      return { ...s, lastCheckout: { at, mood: e.mood, plan: e.plan } };
+    // Their effects arrive as the hops and basket events that follow (lane B folds more here if it needs to).
+    case 'trip.reported':
+    case 'basket.composed':
+      return s;
   }
 }
 

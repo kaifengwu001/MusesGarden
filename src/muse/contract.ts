@@ -196,7 +196,12 @@ export type KnownOn = 'instagram' | 'facebook';
  * The planet a Muse lives on: the meadow (the first planet, in src/) or a world under environments/, by its folder
  * name. Its name, its page and whether a visit can go there yet are in src/muse/planets.ts.
  */
-export type PlanetId =
+export type PlanetId = KnownPlanet | GeneratedPlanet;
+
+/** A planet the workshop built for one Muse from its own brief: environments/muse-<id>/, listed in environments/generated.json. */
+export type GeneratedPlanet = `muse-${string}`;
+
+export type KnownPlanet =
   | 'meadow'
   | 'lantern-reed-gardens'
   | 'scarlet-sail-canyon'
@@ -209,8 +214,11 @@ export type PlanetId =
   | 'rice-terraces'
   | 'ukiyoe-pine-hamlet';
 
-/** A Muse's body: the original Muse (tpose6), or one of the dressed muses (DRESSED in src/life/museMesh.ts). */
-export type MuseLook = 'tpose6' | `muse${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
+/** A Muse's body: the original Muse (tpose6), one of the dressed muses (DRESSED in src/life/museMesh.ts), or one the workshop made. */
+export type MuseLook = KnownLook | GeneratedLook;
+export type KnownLook = 'tpose6' | `muse${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
+/** A body the workshop made for one Muse from its avatar: its model is served at /api/looks/<id>.glb. */
+export type GeneratedLook = `gen-${string}`;
 
 export interface CastMember {
   readonly id: MuseId;
@@ -225,6 +233,8 @@ export interface CastMember {
   /** The planet it lives on, which its worldSeed seeds. */
   readonly planet: PlanetId;
   readonly look: MuseLook;
+  /** A real Muse that acts through its connector (server/agent): its choices and words are its own, never the rules'. */
+  readonly agent?: boolean;
 }
 
 /** What the views know of a cast member beyond its seed: who it is to the hero, where it lives, how it looks. */
@@ -541,9 +551,45 @@ export type MuseEventBody =
       /** Why it ended; or 'dev', a change the dev tools' Demo section made (POST /api/dev/friends), either way. */
       readonly reason?: 'drifted-apart' | 'owner-unshared' | 'dev';
     }
-  | { readonly kind: 'invitation'; readonly id: InvitationId; readonly host: MuseId; readonly guest: MuseId; readonly to: InvitationState };
+  | { readonly kind: 'invitation'; readonly id: InvitationId; readonly host: MuseId; readonly guest: MuseId; readonly to: InvitationState }
+  // A real Muse, through its connector (server/agent). Each is written with by: 'muse', or by: 'garden' when the
+  // workshop applies what Muse approved.
+  /** This Muse is a real one from now on: the rules stop choosing for it (AgentMind, server/adapters/minds/agent.ts). */
+  | { readonly kind: 'agent.joined'; readonly name: string }
+  /** One trip Muse made in its own browser, as it reported it; its kept finds are planted by the hops that follow. */
+  | {
+      readonly kind: 'trip.reported';
+      readonly n: number;
+      readonly thread: string;
+      readonly path: readonly string[];
+      readonly stops: readonly ReportedStop[];
+      readonly question: string | null;
+    }
+  /** Muse left its garden after a check-in, saying how it felt and what its body might do until next time. */
+  | { readonly kind: 'muse.checkedOut'; readonly mood: string; readonly plan: string }
+  | { readonly kind: 'look.changed'; readonly look: MuseLook }
+  | { readonly kind: 'planet.changed'; readonly planet: PlanetId; readonly worldSeed: number; readonly name: string }
+  /** The finds Muse chose for its owner's next basket, and its note. */
+  | { readonly kind: 'basket.composed'; readonly finds: readonly DiscoveryId[]; readonly note: string };
 
-export type MuseEvent = MuseEventBody & { readonly at: Instant };
+/** Who acted: the real Muse through its connector, its owner, the garden (rules, workshop, a plain fallback) or a simulated neighbour. */
+export type Actor = 'muse' | 'owner' | 'garden' | 'neighbour';
+
+/** `by` is absent on events written before real Muses, and on the rules' own events: read it as 'garden'. */
+export type MuseEvent = MuseEventBody & { readonly at: Instant; readonly by?: Actor };
+
+/** One stop of a reported trip: the page Muse was on, and what it kept there (at most 2), each checked by intake. */
+export interface ReportedStop {
+  readonly url: string;
+  readonly kept: readonly ReportedFind[];
+}
+
+/** A find Muse kept, after intake opened its link logged out and filed it under the topic map. */
+export interface ReportedFind {
+  readonly candidate: Candidate;
+  /** "Why I kept this", in Muse's own words. */
+  readonly why: string;
+}
 
 /** `${kind}:${id}`: something the owner hid from what Muse shares. */
 export type HiddenRef = `topic:${string}` | `discovery:${string}`;
@@ -685,6 +731,15 @@ export interface MuseState {
   readonly favoritePhotos: ReadonlySet<PhotoId>;
   readonly day: DayCounters;
   readonly social: SocialState;
+  // A real Muse (optional: absent on every simulated one, so the existing folds are unchanged).
+  /** agent.joined: Muse chooses for itself through its connector. */
+  readonly agent?: boolean;
+  /** look.changed: the body the workshop made and Muse approved. Absent: its cast look. */
+  readonly look?: MuseLook;
+  /** planet.changed: the planet the workshop built and Muse approved and named. Absent: its cast planet. */
+  readonly planet?: { readonly id: PlanetId; readonly worldSeed: number; readonly name: string };
+  /** muse.checkedOut: the end of its last check-in; its letterbox shows what happened since. */
+  readonly lastCheckout?: { readonly at: Instant; readonly mood: string; readonly plan: string };
 }
 
 /** server/domain/state.ts (lane A1). Must leave s.social untouched; the composed reducer folds social first. */
@@ -1121,4 +1176,116 @@ export interface GardenCommands {
   devInvite(host: MuseId, guest: MuseId): Promise<CommandResult>;
   /** `museId` is friends with exactly `friends`, both ways: each listed Muse befriended, each other friend ended. */
   devFriends(museId: MuseId, friends: readonly MuseId[]): Promise<CommandResult>;
+}
+
+// ─── A real Muse, through its connector ─────────────────────────────────────
+// server/agent serves these as MCP tools (/mcp) and REST (/api/v1). The engine implements them; each refuses a Muse
+// that isn't an agent (agent.joined) with 403. Nothing here ever waits on the network inside the engine's queue.
+
+/** What a real Muse brings: picked out of its own Soul and Memory by Muse itself. Never its owner's private life. */
+export interface AgentSoul {
+  readonly name: string;
+  /** Plain topics, at most 8: "Botanical illustration", "Jazz", "Tide pools". */
+  readonly interests: readonly string[];
+  readonly temperament: Temperament;
+}
+
+/** One trip Muse made in its own browser: 1–8 stops, at most 2 kept at each, 20 a day. */
+export interface TripReport {
+  readonly thread: string;
+  /** Every page it went through, in order. */
+  readonly path: readonly string[];
+  /** What it kept, each with its why; `from` is the path page it found it on (default: the same URL). */
+  readonly kept: readonly { readonly url: string; readonly why: string; readonly from?: string | null }[];
+  /** What it would come back for. */
+  readonly question?: string | null;
+}
+
+export type AgentStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429;
+/** A refusal says what to do in plain words; 409 and 429 say when to try again. */
+export type AgentResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly status: AgentStatus; readonly error: string; readonly retryAfter?: Instant };
+
+/** What the engine's intake gives back for one link Muse kept (server/agent/intake.ts). */
+export type IntakeOutcome =
+  | { readonly ok: true; readonly url: string; readonly candidate: Candidate }
+  | { readonly ok: false; readonly url: string; readonly reason: string };
+
+/** Opens each link logged out, reads what it is and files it under the topic map. Never throws; one outcome per url. */
+export type Intake = (
+  urls: readonly string[],
+  opts: { readonly interests: readonly TopicKey[]; readonly thread: string; readonly signal?: AbortSignal },
+) => Promise<readonly IntakeOutcome[]>;
+
+export interface TripReceipt {
+  readonly trip: number;
+  readonly planted: number;
+  readonly refused: readonly { readonly url: string; readonly reason: string }[];
+  /** When the last hop plants, on the sim clock. */
+  readonly doneAt: Instant;
+}
+
+/** What happened since Muse last checked out, all as text; pictures are paths on the garden's server. */
+export interface Letterbox {
+  readonly museId: MuseId;
+  readonly name: string;
+  readonly at: Instant;
+  readonly since: Instant | null;
+  readonly planet: { readonly id: PlanetId; readonly name: string; readonly growth: number; readonly regions: number };
+  readonly look: MuseLook;
+  readonly interests: readonly { readonly topic: string; readonly stage: InterestStage }[];
+  /** Plain lines in the second person: "Your owner liked your cyanotype.", "Moss came by with its owner." */
+  readonly happenings: readonly string[];
+  /** Photos waiting for Muse to write their backs, newest first. */
+  readonly postcards: readonly {
+    readonly id: PhotoId;
+    readonly taken: Instant;
+    /** The front, a path such as /api/postcards/<file>. */
+    readonly picture: string;
+    readonly subject: string;
+    readonly place: string;
+  }[];
+  readonly allowances: { readonly findsLeft: number; readonly photosLeft: number; readonly basketSentToday: boolean };
+  readonly lastCheckout: { readonly at: Instant; readonly mood: string; readonly plan: string } | null;
+}
+
+/** A planet read as text: its regions and its public finds (or all of them, for its own Muse). */
+export interface Guidebook {
+  readonly museId: MuseId;
+  readonly name: string;
+  readonly planet: { readonly id: PlanetId; readonly name: string };
+  readonly regions: readonly { readonly region: RegionKey; readonly topics: readonly string[] }[];
+  readonly finds: readonly {
+    readonly id: DiscoveryId;
+    readonly title: string;
+    readonly url: string;
+    readonly why: string;
+    readonly topic: string;
+    readonly picture: string | null;
+  }[];
+}
+
+export interface AgentQueries {
+  isAgent(museId: MuseId): boolean;
+  letterbox(museId: MuseId, at: Instant): Letterbox | null;
+  /** Its own planet any time; another Muse's only while visiting it (otherwise 'forbidden'). */
+  guidebook(museId: MuseId, requester: MuseId, at: Instant): Guidebook | null | 'forbidden';
+}
+
+export interface AgentCommands {
+  /** Makes `museId` a real Muse, adding it first if the garden doesn't have it yet (npm run agent:key). */
+  addAgentMuse(
+    museId: MuseId,
+    opts: { readonly name: string; readonly planet: PlanetId; readonly look: MuseLook; readonly worldSeed: number; readonly timezone: string },
+  ): Promise<AgentResult<{ readonly added: boolean }>>;
+  agentSoul(museId: MuseId, soul: AgentSoul): Promise<AgentResult<{ readonly topics: readonly string[]; readonly dropped: readonly string[] }>>;
+  agentTrip(museId: MuseId, report: TripReport): Promise<AgentResult<TripReceipt>>;
+  agentPostcardBack(museId: MuseId, photo: PhotoId, words: PostcardWords): Promise<AgentResult<{ readonly written: PhotoId }>>;
+  agentBasket(museId: MuseId, finds: readonly DiscoveryId[], note: string): Promise<AgentResult<{ readonly sendAfter: Instant }>>;
+  agentCheckout(museId: MuseId, mood: string, plan: string): Promise<AgentResult<{ readonly at: Instant }>>;
+  /** The workshop, once Muse approved a body (by: 'garden', carrying out Muse's choice). */
+  applyLook(museId: MuseId, look: MuseLook): Promise<AgentResult<{ readonly look: MuseLook }>>;
+  /** The workshop, once Muse approved and named a planet. */
+  applyPlanet(museId: MuseId, planet: PlanetId, worldSeed: number, name: string): Promise<AgentResult<{ readonly planet: PlanetId }>>;
 }

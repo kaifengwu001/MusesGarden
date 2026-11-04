@@ -2,7 +2,7 @@
 // exists. Only the hero Muse has samples; the rest of the cast is known but empty.
 import type { Find, GardenSnapshot, Postcard } from '../../src/garden/types';
 import type { GardenCommands, GardenQueries, Instant, MuseId, Page, TopicKey } from '../../src/muse/contract';
-import { PLANETS } from '../../src/muse/planets';
+import { planetOf } from '../../src/muse/planets';
 import {
   HERO,
   sampleBaskets,
@@ -91,7 +91,7 @@ function sampleGarden(): GardenSnapshot {
         fromName: host.name,
         coat: coatOf(host.museId),
         world: sampleVisit.planet,
-        worldName: PLANETS[sampleVisit.planet].title,
+        worldName: planetOf(sampleVisit.planet).title,
         blurb: `${host.name}’s planet · Where ${host.name} keeps Lichen.`,
         seed: sampleVisit.worldSeed,
         g: sampleVisit.g,

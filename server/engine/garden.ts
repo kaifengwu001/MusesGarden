@@ -3,7 +3,7 @@
 import { assignStills, PLAIN, STILLS, type PlanetStills, type Shown, type StillKey } from '../../src/assets/postcards/stills';
 import { hash32, salt, unit } from '../../src/core/hash';
 import { mediaOf } from '../../src/garden/media';
-import { PLANETS } from '../../src/muse/planets';
+import { planetOf } from '../../src/muse/planets';
 import type {
   Basket,
   Find,
@@ -323,7 +323,7 @@ function invitationCard(input: GardenInput, inv: MuseInvitation, index: LogIndex
     fromName: name,
     coat: coatOf(inv.host),
     world: home.planet,
-    worldName: PLANETS[home.planet].title,
+    worldName: planetOf(home.planet).title,
     blurb: `${name}’s planet · ${loves.length > 0 ? `Where ${name} keeps ${list(loves)}.` : `${name} would like to show you round.`}`,
     seed: home.seed,
     g: home.g,

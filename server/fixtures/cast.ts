@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CastFile, CastMember, KnownOn, MemberInfo, MuseId, MuseLook } from '../../src/muse/contract';
+import type { CastFile, CastMember, KnownLook, KnownOn, MemberInfo, MuseId, MuseLook } from '../../src/muse/contract';
 import { isPlanetId } from '../../src/muse/planets';
 import { arr, num, obj, str } from '../adapters/sources/json';
 
@@ -10,7 +10,7 @@ export const FIXTURES_DIR = fileURLToPath(new URL('./', import.meta.url));
 const ROLES: readonly CastMember['role'][] = ['hero', 'friend', 'known', 'stranger'];
 const NETWORKS: readonly KnownOn[] = ['instagram', 'facebook'];
 /** Every body a Muse can wear: a record, so the compiler holds it to MuseLook exactly. */
-const LOOKS: Readonly<Record<MuseLook, true>> = {
+const LOOKS: Readonly<Record<KnownLook, true>> = {
   tpose6: true,
   muse0: true,
   muse1: true,
@@ -26,7 +26,10 @@ const LOOKS: Readonly<Record<MuseLook, true>> = {
   muse11: true,
   muse12: true,
 };
-const isLook = (v: unknown): v is MuseLook => typeof v === 'string' && Object.hasOwn(LOOKS, v);
+/** A body the workshop made: gen-<muse>-<n>, served at /api/looks/<id>.glb. */
+const GENERATED_LOOK = /^gen-[a-z0-9][a-z0-9-]*$/;
+export const isLook = (v: unknown): v is MuseLook =>
+  typeof v === 'string' && (Object.hasOwn(LOOKS, v) || GENERATED_LOOK.test(v));
 
 function timezone(v: unknown, what: string): string {
   const zone = str(v, what);
@@ -59,6 +62,7 @@ export function parseCastFile(raw: unknown): CastFile {
       role,
       planet: member.planet,
       look: member.look,
+      ...(member.agent === true ? { agent: true } : {}),
     };
   });
   const ids = new Set(members.map((m) => m.id));

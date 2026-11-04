@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DRESSED } from '../../src/life/museMesh';
 import type { CastMember, TopicKey } from '../../src/muse/contract';
-import { PLANET_IDS, PLANETS } from '../../src/muse/planets';
+import { PLANET_IDS, PLANETS, planetOf } from '../../src/muse/planets';
 import { FIRST_PLANET } from '../../src/planet/firstPlanet';
 import { FixtureSource, loadCorpus } from '../adapters/sources/corpus';
 import { HeuristicMind } from '../adapters/minds/heuristic';
@@ -75,13 +75,13 @@ describe('cast.json', () => {
     expect(others).toHaveLength(10);
     expect(new Set(others).size).toBe(10);
     expect(others).not.toContain('meadow');
-    for (const id of others) expect(PLANETS[id].path, id).toBe(`/environments/${id}/`);
+    for (const id of others) expect(planetOf(id).path, id).toBe(`/environments/${id}/`);
   });
 
   it('can visit every planet whose world is on this branch with an engine, and none of the others yet', () => {
     const page = (id: string) => existsSync(fileURLToPath(new URL(`../../environments/${id}/index.html`, import.meta.url)));
-    const visitable = PLANET_IDS.filter((id) => PLANETS[id].visitable);
-    expect(PLANET_IDS.filter((id) => !PLANETS[id].visitable).sort()).toEqual(['rice-terraces', 'ukiyoe-pine-hamlet']);
+    const visitable = PLANET_IDS.filter((id) => planetOf(id).visitable);
+    expect(PLANET_IDS.filter((id) => !planetOf(id).visitable).sort()).toEqual(['rice-terraces', 'ukiyoe-pine-hamlet']);
     for (const id of visitable) if (id !== 'meadow') expect(page(id), id).toBe(true);
     expect(page('rice-terraces'), 'a standalone viewer with no engine link').toBe(true);
     expect(page('ukiyoe-pine-hamlet'), 'only in an open pull request: make it visitable once it lands').toBe(false);

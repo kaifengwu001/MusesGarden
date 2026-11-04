@@ -3,6 +3,7 @@ import type {
   EventRef,
   Instant,
   MuseEvent,
+  Actor,
   MuseEventBody,
   MuseId,
   MuseState,
@@ -32,17 +33,18 @@ export class Tx {
     return this.working.get(id) ?? this.base(id);
   }
 
-  emit(id: MuseId, body: MuseEventBody): EventRef {
+  /** `by` names who acted; leave it out for the garden's own rules (read as 'garden'). */
+  emit(id: MuseId, body: MuseEventBody, by?: Actor): EventRef {
     const s = this.state(id);
-    const event = { ...body, at: this.now } as MuseEvent;
+    const event = (by === undefined ? { ...body, at: this.now } : { ...body, at: this.now, by }) as MuseEvent;
     const stored: StoredEvent = { museId: id, seq: s.seq + 1, event };
     this.events.push(stored);
     this.working.set(id, this.fold(s, stored));
     return `${id}#${stored.seq}` as EventRef;
   }
 
-  emitAll(id: MuseId, bodies: readonly MuseEventBody[]): void {
-    for (const b of bodies) this.emit(id, b);
+  emitAll(id: MuseId, bodies: readonly MuseEventBody[], by?: Actor): void {
+    for (const b of bodies) this.emit(id, b, by);
   }
 
   schedule(item: ScheduleItem): void {
