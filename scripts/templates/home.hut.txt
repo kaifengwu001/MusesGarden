@@ -1,0 +1,19 @@
+
+// Muse's own home, made in the workshop (server/workshop/home): home.json beside this world's page names the pieces
+// of the meadow's room it keeps (the hearth, the bed, the showpiece) and the pieces it made, each one's model under
+// assets/home/ (its pictures at most 512²). Without home.json the room is the meadow's.
+interface HomePiece {
+  name: string;
+  file: string;
+  height: number;
+  place: { x: number; z: number; turn: number };
+  lift?: number;
+  rests?: boolean;
+}
+interface Home {
+  keep: readonly string[];
+  pieces: readonly HomePiece[];
+  rug?: { x: number; z: number; length: number; width: number; turn: number };
+}
+const HOME: Home | null = Object.values(import.meta.glob<Home>('../home.json', { eager: true, import: 'default' }))[0] ?? null;
+const homeModel = (file: string): string => new URL(`../assets/home/${file}`, import.meta.url).href;
