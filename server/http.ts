@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { Instant } from '../src/muse/contract';
 import type { AgentHandler } from './agent/index';
+import { forwarded } from './agent/auth';
 import { createAgentHandler } from './agent/index';
 import { defaultIntake } from './agent/intake';
 import { tripoMesherFromEnv } from './adapters/tripo';
@@ -120,7 +121,21 @@ async function buildBackend(): Promise<Backend> {
 
 const backend = await buildBackend();
 const port = Number(process.env.MUSE_PORT ?? 8787);
-const server = createServer(createApp(backend, backend.agent));
+/**
+ * What a request through the public tunnel may reach: only what a real Muse uses (its connector, doorbell and guide,
+ * and the pictures it downloads). The garden's own routes trust `?as=`, and the host simulator and dev tools have no
+ * key, so from outside they stay hidden; the owner's page reaches them from this laptop as before.
+ */
+const PUBLIC_PATHS = [/^\/mcp\/?$/, /^\/api\/v1\//, /^\/d\//, /^\/garden\.md$/, /^\/w\//, /^\/api\/looks\//, /^\/api\/postcards\//, /^\/api\/media\//];
+const app = createApp(backend, backend.agent);
+const server = createServer((req, res) => {
+  const path = (req.url ?? '/').split('?')[0] ?? '/';
+  if (forwarded(req) && !PUBLIC_PATHS.some((p) => p.test(path))) {
+    res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify({ error: 'not found' }));
+    return;
+  }
+  app(req, res);
+});
 // Wall time, not the engine's: ticking to the engine's own now would never move it.
 const clock = startLiveClock({ tick: backend.tick });
 
