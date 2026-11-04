@@ -17,10 +17,12 @@
   <body>
     <canvas id="lab"></canvas>
     <script type="module">
-      // lineup=1: the muses in clothes in a row (museLineup.ts); desk=1: Momo at its desk, for the demo film (museDesk.ts); else one Muse (museLab.ts)
+      // lineup=1: the muses in clothes in a row (museLineup.ts); desk=1: Momo at its desk, for the demo film (museDesk.ts);
+      // parade=1: the muses one after another on match cuts, walking then waving, the camera once round (museParade.ts); else one Muse (museLab.ts)
       const hash = new URLSearchParams(location.hash.slice(1));
       if (hash.get('lineup') === '1') import('./museLineup.ts');
       else if (hash.get('desk') === '1') import('./museDesk.ts');
+      else if (hash.get('parade') === '1') import('./museParade.ts');
       else import('./museLab.ts');
     </script>
   </body>

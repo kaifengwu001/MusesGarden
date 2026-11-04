@@ -21,6 +21,7 @@ Run them with `node` from anywhere in the repo. Put the output in the session's 
 | Many lab stills at once, each its own model, pose, view and look (every muse, before and after) | `scripts/batch.mjs <out> '[["muse1","idle",2,"front","kind"],["tpose6","hang",0,"turn:30","clay"]]'` |
 | All the muses in two rows (`museLab.html#lineup=1`): taps, holds, stills or a film | `scripts/lineup.mjs <out> '[["tap","tpose6",1.2],["hold","muse5",2],["shot","pet"],["letgo",1]]' [--video]` |
 | Momo at its desk (`museLab.html#desk=1`), the demo film, rendered frame by frame with motion blur | `scripts/desk.mjs out.mp4 1920 1080 30 16` (`'&beats=…'`, `'&hi=0'`, `'&cam=…'` for other timings and views) |
+| The muses' parade (`museLab.html#parade=1`): every muse in turn on match cuts, walking then waving, the camera once round (7 s) | `scripts/parade.mjs out.mp4 1920 1080 30 16` (`'&order=…'`, `'&length=…'`, `'&wave=…'`, `'&ease=…'`, `'&look=0'`, `'&cam=…'`; `STILLS=<dir>` for pngs) |
 | A labelled contact sheet of any stills | `python3 scripts/sheet.py out.png 4 a.png b.png …` |
 
 ## The server

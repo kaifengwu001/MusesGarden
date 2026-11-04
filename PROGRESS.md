@@ -30,6 +30,47 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## The muses' parade: a shot for the demo film (2026-11-04, in the lab)
+
+Kai asked for a 7-second shot in the lab: the walking animation, then the wave, swapping through all the muses on
+match cuts, with the camera orbiting 360° and starting and stopping in front of the muse. It is
+`src/dev/museLab.html#parade=1` (`src/dev/museParade.ts`). The original Muse (Momo, tpose6) and the muses in clothes
+0–12 stand on the lab's white one after another, each on for 0.5 s. Each takes over from the last in the same pose at
+the same moment, so it reads as one Muse whose clothes change at every cut.
+
+- **The walk (0–3.5 s):** the lab's walk on the spot, at one step per muse (gait 1.0 cycle a second), so every cut
+  falls on a footfall. The last step, muse5's, brings it to a stop.
+- **The wave (3.5–6.85 s):** the rig's wave as it is (3.35 s), thrown up on the cut to muse6. In the last 0.15 s
+  muse12 stands with its arm down.
+- **The camera:** once round at 2.95 m, 6° above the point it looks at (0.56 m up), with a 30° lens. It goes round
+  Muse's right while it walks, is behind it as the wave goes up, and comes round its left, the waving arm's side.
+  - Kai asked for a very exaggerated acceleration and deceleration, so that more of the shot is in front of the
+    muses. The share of the way round is u⁵ / (u⁵ + (1 − u)⁵), so the camera is at rest at both ends.
+  - It holds within 10° of the front for the first and last 2.3 s: Momo and muses 0–3 walking toward you, muses 8–12
+    waving to you.
+  - It swings the other 340° in the 2.4 s between, passing behind at five times the even pace (257°/s). muse4 and
+    muse7 are seen from about 40° off the front, muse5 and muse6 as it whips round behind.
+  - `ease=` sets the power (1 goes round evenly). The first take's sine ease, round = −180°·(1 − cos πu), was close to
+    a power of 2.
+- **Turning to you:** while the camera is near its front, at either end, Muse turns its head to the camera (the
+  rig's look): fully within 25° of its front, fading out by 70°. From about 4.4 s, once the camera has come round,
+  it looks at you with happy eyes (∩) and a blush as it waves. `look=0` leaves both out.
+- **The hash:** `order=` (the muses in turn), `length=` (each muse is on for length / their number, and the gait
+  keeps a whole number of steps per muse), `wave=` (when the walk ends and the wave begins), `ease=` (the camera's
+  curve), `cam=round,up,distance` (holds the camera, for checking), `live=1` (plays it in the browser).
+- **Rendering:** `node tools/workflows/muse-look/scripts/parade.mjs out.mp4 1920 1080 30 16`, about 25 s once the 14
+  muses are rigged. It works as the desk film's renderer does: each frame averages 16 renders over half a frame's
+  shutter, moving the shadow light over a small disc and the view by a fraction of a pixel. The muse whose turn it
+  is at a frame stays on for its whole shutter, so no frame mixes two. The floor is the white going on for ever. It
+  shows only a soft shade under the feet and the shadow of Muse's skin (a depth-only copy, skinned as drawn), cast
+  by a higher light than the one Muse is shaded by. `STILLS=<dir>` writes the frames as pngs instead.
+- **Checked:** the film is 210 frames at 1080p (`shots/parade/muses-parade-1080p.mp4`, gitignored, with the first
+  take beside it as `-gentle-ease`). A scan of the change between frames finds no pop away from the 13 cuts. Contact
+  sheets were read through the cuts, the stop, the wave's raise, the whip round behind and the end.
+- **Known:** with the first take's gentler curve, muse3 was seen from behind its right side as it walked. Its face
+  plate showed edge on there, with the eye at its rim. That is the model at that angle, not a fault in the film. With
+  the exaggerated curve muse3 is seen from the front.
+
 ## Momo at its desk: the demo film (2026-11-03, in the lab)
 
 For the demo video's voiceover ("Say hi to Momo… advanced personal agent stuff. But what does Muse do when it's… not
