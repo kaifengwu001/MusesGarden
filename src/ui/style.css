@@ -490,3 +490,11 @@ body.postcard .lil-gui.meadow-panel {
   letter-spacing: 0.04em;
   cursor: pointer;
 }
+
+/* The owner's view of a real Muse's garden (?garden=…): no parameters, hints, world line or world controls. */
+body.owner-view .hints,
+body.owner-view .world-line,
+body.owner-view .controlbar,
+body.owner-view .lil-gui.meadow-panel {
+  display: none;
+}

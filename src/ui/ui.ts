@@ -6,6 +6,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: stri
 
 /** Editorial chrome: the title and its metadata line, and the interaction hints. */
 export class Ui {
+  private readonly title: HTMLElement;
   private readonly line: HTMLElement;
   private readonly hints: HTMLElement;
 
@@ -13,10 +14,15 @@ export class Ui {
     const masthead = element('header', 'masthead');
     const title = element('h1');
     title.textContent = 'Muse’s Garden';
+    this.title = title;
     this.line = element('p', 'world-line');
     masthead.append(title, this.line);
     this.hints = element('ul', 'hints');
     root.append(masthead, this.hints);
+  }
+
+  setTitle(text: string): void {
+    if (this.title.textContent !== text) this.title.textContent = text;
   }
 
   setWorldLine(text: string): void {

@@ -109,6 +109,14 @@ async function boot(): Promise<void> {
   const hud = new PerfHud(uiRoot);
   const ui = new Ui(uiRoot);
   const panel = createPanel(store);
+  // The owner's view of a real Muse's garden (?garden=…, without ?dev): only what an owner uses (no parameters, hints
+  // or world controls), under the Muse's own name once its garden has loaded.
+  const query = new URLSearchParams(location.search);
+  const ownerView = query.has('garden') && !query.has('dev');
+  if (ownerView) {
+    document.body.classList.add('owner-view');
+    ui.setTitle('');
+  }
   ui.setHints([
     ['drag', 'orbit · glide'],
     ['scroll', 'down to the meadow'],
@@ -158,11 +166,8 @@ async function boot(): Promise<void> {
   // On a visit, the visit's interface in its place, with no engine of our own (in the photo studio, the studio's).
   // Otherwise a friend's Muse visiting Momo (the engine's view names it) is drawn beside it (visit/companions.ts).
   const companions = visit || studio ? null : new Companions(meadowCompanions(world));
-  const garden = studio
-    ? studio.open(meadowVisit(world), clock)
-    : visit
-      ? new MeadowVisitUi(uiRoot, meadowVisit(world), visit)
-      : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world, (view) => companions?.view(view)));
+  const gardenUi = studio || visit ? null : new GardenUi(uiRoot, world, store, connectEngine(uiRoot, world, (view) => companions?.view(view)));
+  const garden = studio ? studio.open(meadowVisit(world), clock) : visit ? new MeadowVisitUi(uiRoot, meadowVisit(world), visit) : (gardenUi as GardenUi);
 
   // a press on Muse (while it is drawn) is Muse's: a tap and it answers, a hold and it is petted; one on a find or a
   // pin is the garden's: a tap, a double-click or a hold there opens its card. The meadow's own click, double-click
@@ -311,6 +316,13 @@ async function boot(): Promise<void> {
       garden.interrupt();
     }
     garden.update(clock.realDt);
+    if (ownerView) {
+      const name = gardenUi?.state.snapshot?.muse.name;
+      if (name) {
+        ui.setTitle(`${name}’s Garden`);
+        document.title = `${name}’s Garden`;
+      }
+    }
     companions?.update(clock.realDt);
     world.update(clock, window.innerWidth / Math.max(window.innerHeight, 1), viewSize.y);
     garden.frame(clock.realDt);
