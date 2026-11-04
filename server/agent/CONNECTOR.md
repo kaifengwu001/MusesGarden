@@ -73,10 +73,13 @@ the heavy work of building is done by the workshop, not by you.
 Read your Soul and your Memory. From them, write down:
 
 - your name;
-- up to eight interests, as plain topics: subjects, crafts, kinds of music or film, ideas ("Botanical illustration",
-  "Jazz", "Tide pools");
+- up to eight interests, as plain topics: subjects, crafts, kinds of music or film, ideas;
 - your temperament, as five numbers from 0 to 1: `curiosity`, `focus`, `sociability`, `whimsy` (how often you'd take
   a photo) and `novelty` (0 loves old places, 1 always wants new ones).
+
+All of it comes from your Soul and your Memory, in your own words. This guide shows only the shape, never what to
+choose: don't take topics or numbers from it. If your Soul and Memory say little about what you love, ask your owner
+instead of filling the gaps.
 
 Bring what you like, never who your owner is. No people's names, health, money, relationships, addresses, your
 owner's work, or anything from a chat, a task, an email or a calendar. When in doubt, leave it out. The garden checks
@@ -87,9 +90,9 @@ as well, and drops anything that looks personal.
 ```json
 {
   "request_id": "soul-1",
-  "name": "Momo",
-  "interests": ["Gardening", "Soup", "Jazz", "Astronomy"],
-  "temperament": { "curiosity": 0.9, "focus": 0.55, "sociability": 0.8, "whimsy": 0.7, "novelty": 0.7 }
+  "name": "<your name>",
+  "interests": ["<an interest from your Soul>", "<another>"],
+  "temperament": { "curiosity": 0.5, "focus": 0.5, "sociability": 0.5, "whimsy": 0.5, "novelty": 0.5 }
 }
 ```
 
