@@ -95,22 +95,23 @@ describe('a real Muse joins', () => {
 });
 
 describe('its soul', () => {
-  it('keeps the topics it can file, drops the personal ones, and folds them in as Memory’s are, by Muse', async () => {
+  it('keeps its topics, its own ones too, drops the personal ones, and folds them in as Memory’s are, by Muse', async () => {
     const g = await garden();
     const before = g.engine.log(POOH).length;
     const r = await g.agent.agentSoul(POOH, {
       name: 'Pooh',
-      interests: ['Jazz', 'Lucid dream', 'my mom Sarah', 'Sarah Chen', 'Cyanotype', 'jazz'],
+      interests: ['Jazz', 'Lucid dream', 'my mom Sarah', 'Sarah Chen', 'cyanotype', 'jazz'],
       temperament: { curiosity: 1.4, focus: 0.4, sociability: 0.6, whimsy: -1, novelty: 0.55 },
     });
-    expect(r).toEqual({ ok: true, value: { topics: ['Jazz', 'Lucid dream'], dropped: ['my mom Sarah', 'Sarah Chen', 'Cyanotype'] } });
+    // (Cyanotype isn't among the garden's pages: it's kept as Pooh's own topic, as Pooh wrote it)
+    expect(r).toEqual({ ok: true, value: { topics: ['Jazz', 'Lucid dream', 'Cyanotype'], dropped: ['my mom Sarah', 'Sarah Chen'] } });
     const es = events(g.engine.log(POOH), before);
     expect(kinds(es)).toEqual(['soul.updated:muse', 'memory.updated:muse']);
-    expect(es[1]).toMatchObject({ kind: 'memory.updated', topics: ['Jazz', 'Lucid dream'] });
+    expect(es[1]).toMatchObject({ kind: 'memory.updated', topics: ['Jazz', 'Lucid dream', 'Cyanotype'] });
     const s = g.engine.state(POOH);
     expect(s?.temperament).toEqual({ curiosity: 1, focus: 0.4, sociability: 0.6, whimsy: 0, novelty: 0.55 });
-    expect([...(s?.interests.keys() ?? [])]).toEqual(['Jazz', 'Lucid dream']);
-    expect(g.engine.soulText(POOH)).toContain('Pooh keeps jazz and lucid dream.');
+    expect([...(s?.interests.keys() ?? [])]).toEqual(['Jazz', 'Lucid dream', 'Cyanotype']);
+    expect(g.engine.soulText(POOH)).toContain('Pooh keeps jazz, lucid dream and cyanotype.');
     expect(g.engine.soulText(POOH)).not.toContain('Sarah');
   });
 

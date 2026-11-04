@@ -115,6 +115,9 @@ function notAgent(s: MuseState | undefined): Refusal | null {
 
 const agentOnly: AgentCheck = (s) => notAgent(s);
 
+/** A topic of the Muse's own: its words, capitalised as the garden's topic names are. */
+const ownTopic = (label: string): TopicKey => (label.charAt(0).toUpperCase() + label.slice(1)) as TopicKey;
+
 export class AgentApi implements AgentCommands, AgentQueries {
   constructor(
     private readonly engine: Engine,
@@ -261,10 +264,12 @@ export class AgentApi implements AgentCommands, AgentQueries {
     }
     // Each label on a line of its own: a label that names someone or something private is dropped, as Memory's are.
     const passed = privacyFilterIn(labels, labels.join('\n')).filter((l) => !instructionLike(l) && !personalFact(l));
+    // A topic the garden has pages on is filed under its name there; any other is the Muse's own and kept as it said it
+    // (it finds its own links, so it needs no recorded pages to grow one).
     const kept: { label: string; topic: TopicKey }[] = [];
     for (const label of passed) {
-      const topic = await this.engine.resolveTopic(label);
-      if (topic && !kept.some((k) => k.topic === topic)) kept.push({ label, topic });
+      const topic = (await this.engine.resolveTopic(label)) ?? ownTopic(label);
+      if (!kept.some((k) => k.topic === topic)) kept.push({ label, topic });
     }
     const keptLabels = new Set(kept.map((k) => k.label));
     const text = agentSoulText(name.text, temperament, kept.map((k) => k.label));
