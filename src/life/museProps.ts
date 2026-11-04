@@ -27,6 +27,7 @@ import { smoothstep } from '../core/math';
 import { travel } from '../planet/geo';
 import type { Terrain } from '../planet/terrain';
 import { JOINT } from './museBody';
+import { MuseEmotes } from './museEmotes';
 import lineFragment from './museLine.frag.glsl?raw';
 import lineVertex from './museLine.vert.glsl?raw';
 import moteFragment from './museMotes.frag.glsl?raw';
@@ -41,7 +42,8 @@ import type { Roaming } from './museRoam';
 // fishing rod with its line, float and the odd fish, a ladle for the pot on
 // its hut's stove), and the little things that float about it (its snore
 // bubble, Zzz, hearts as you pet it, notes as it hums, the pot's steam,
-// drops of water). They are as the lab's stage has them
+// drops of water; and the icon over its head that some of its moves show, a
+// light bulb or a heart: museEmotes.ts). They are as the lab's stage has them
 // (museStage.ts), in Muse's heights, set in planet space by its frame and
 // its mittens, painted and lit like the meadow (museProps.frag.glsl) and
 // warped like everything else. Rings spread on the water where the float
@@ -145,6 +147,8 @@ export class MuseProps {
   private readonly moteAt: InstancedBufferAttribute;
   private readonly moteLook: InstancedBufferAttribute;
   private moteCount = 0;
+  /** The icon over its head (a light bulb, a heart) as its moves set it. */
+  private readonly emotes: MuseEmotes;
   /** Splashes already sent (their time), so each is sent once. */
   private readonly splashed = new Set<number>();
 
@@ -223,6 +227,8 @@ export class MuseProps {
     this.motes.frustumCulled = false;
     this.motes.renderOrder = 4;
     this.group.add(this.motes);
+    this.emotes = new MuseEmotes(shared);
+    this.group.add(this.emotes.mesh);
   }
 
   /** Add a mote: where (planet space), how big (m), which picture, how opaque, its turn. */
@@ -446,6 +452,7 @@ export class MuseProps {
     this.moteLook.needsUpdate = true;
     (this.motes.geometry as InstancedBufferGeometry).instanceCount = this.moteCount;
     this.motes.visible = this.moteCount > 0;
+    this.emotes.update(rig, place, H, shown);
   }
 }
 

@@ -30,6 +30,41 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Two new moves: an idea and adoring you (2026-11-04)
+
+Kai asked for two more animations for Momo: "delighted, raises its arms up, and a light bulb icon appears over its
+head", and "tilting its head, eyes squint, and a love sign above head". Both are rig moves (`museRig.ts`), so they play
+on Momo and on every muse in clothes, on the meadow and every world but Violet Dunes (its own rig), in the lab and in
+the director's mode.
+
+- **`idea` (2.8 s, `IDEA`):** it dawns on it: a little dip, its eyes wide, its head lifting, as an unlit bulb pops in
+  over its head (0.06–0.36 s). The bulb lights at 0.4 s with a burst of glow and its rays flash out. Then it throws its
+  arms up in a V (a wave's raise on each side, opened out and straightened, as the desk's stretch), springing up onto
+  its toes and drawn up tall, beaming (∩ ∩) with a blush. It holds them up, swaying with delight: the arms are carried
+  by the sway, not waved. Its arms come down from 2.0 s and the bulb rises a little and goes by 2.6 s. I made the bulb
+  light up smoothly (0.12 s) rather than flicker on, so it can't read as a dropped frame.
+- **`love` (3.45 s, `LOVE`):** its head tilts to one side (`side`, as petting's) and a little down, the body leaning
+  after it, its paws drawn in a little, eyes in happy arcs and a deep blush, swaying slowly. A heart pops up over its
+  head at 0.22 s, beats a lub-dub three times (0.85, 1.75, 2.65 s), tipped as its head is, and floats up and away as it
+  comes back upright. The face is eyes only, as Kai's rule has it: no mouth shapes.
+- **The icon** is set on the rig as the face is (`rig.emote`, reset every pose, closed form) and drawn by
+  `src/life/museEmotes.ts` over the head as posed: on a planet as the motes are (`MuseEmotes`: camera-facing squares
+  with the motes' shaders, warped with the planet), from a sheet of its own (glow, rays, the bulb unlit and lit, the
+  heart), so the motes atlas is unchanged; in the lab as sprites (`SpriteEmotes`). Every world's `museProps.ts` draws
+  it (six lines each). It draws nothing unless one of the two moves plays.
+- **Where they are:**
+  - The lab: `museLab.html#model=tpose6&pose=idea` and `pose=love` loop them on the spot (live=1 to play them; the icon
+    rides above the front reference's frame, so look in a `persp:` view). In the lab's day on the stage, an idea comes
+    to it after it looks about (and off it goes to water its flowers), and it adores you when it comes home, before the
+    closing bounce.
+  - The photo studio (`?studio`): two more postures for the guest, "an idea (a light bulb)" and "adoring (a heart)".
+  - The director's mode (branch `director`): two more gestures in its library, "An idea" and "Adoring".
+  - Muse's own days on the planets are unchanged: it does neither there yet.
+- **Checked:** stills from the front, three-quarter, side and back in clay (the raised arms are as smooth as the
+  stretch's), frame-by-frame films of both on the turntable (no jumps: the biggest frame change is the bulb lighting
+  up, over four frames), the stage, the meadow and Golden Rye. Three new invariants in `museLife.test.ts`. Without the
+  moves the meadow draws pixel-identical frames to main (6f99010) in all nine views.
+
 ## The making of Muse: a shot for the demo film (2026-11-04, in the lab)
 
 Kai asked for a clip of the original Muse alone, showing how it was made, with the blue wave from the hut-interior

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { JOINT, JOINTS } from '../../life/museBody';
 import { MuseLife } from '../../life/museLife';
 import { SCULPTS } from '../../life/museMesh';
-import { BOUNCE, MuseRig, type MuseAction, type Move } from '../../life/museRig';
+import { BOUNCE, IDEA, IDEA_LENGTH, LOVE, LOVE_LENGTH, MuseRig, type MuseAction, type Move } from '../../life/museRig';
 
 const still = (time: number, moves: Move[] = []): MuseAction => ({ time, walk: 0, stride: 1, gait: 0, wave: -1, lookYaw: 0, lookPitch: 0, look: 0, moves });
 const camera = { x: 0.5, y: 1.7, z: 4.3 };
@@ -43,6 +43,56 @@ describe("Muse's moves", () => {
     rig.pose(still(0, [{ kind: 'pet', time: 1, amount: 1, side: 1, release: -1 }]));
     expect(rig.squeeze).toBeGreaterThan(0.9);
     expect(rig.blush).toBeGreaterThan(0.5);
+  });
+
+  it('throws both arms up as an idea comes to it, beaming, a lit bulb over its head; nothing there before or after', () => {
+    const rig = new MuseRig(SCULPTS.tpose6.fit);
+    const at = new Float32Array(JOINTS * 3);
+    rig.pose(still(0));
+    const head = rig.joints(at)[JOINT.head * 3 + 1];
+    expect(rig.emote.bulb).toBe(0);
+    rig.pose(still(0, [{ kind: 'idea', time: 1.3, amount: 1 }]));
+    // both mittens up over its shoulders, the eyes in happy arcs, the bulb lit and its rays out
+    for (const side of [1, -1]) expect(new Vector3().setFromMatrixPosition(rig.handFrame(side, new Matrix4())).y).toBeGreaterThan(head);
+    expect(rig.squint).toBeGreaterThan(0.9);
+    expect(rig.emote.bulb).toBeGreaterThan(0.99);
+    expect(rig.emote.lit).toBeGreaterThan(0.99);
+    expect(rig.emote.rays).toBeGreaterThan(0.5);
+    // unlit as it dawns, gone by the end
+    rig.pose(still(0, [{ kind: 'idea', time: (IDEA.bulb[1] + IDEA.on) / 2, amount: 1 }]));
+    expect(rig.emote.bulb).toBeGreaterThan(0.9);
+    expect(rig.emote.lit).toBe(0);
+    rig.pose(still(0, [{ kind: 'idea', time: IDEA_LENGTH, amount: 1 }]));
+    expect(rig.emote.bulb).toBe(0);
+  });
+
+  it('tilts its head as it adores you, its eyes in happy arcs, a heart over its head that beats', () => {
+    const rig = new MuseRig(SCULPTS.tpose6.fit);
+    const head = new Matrix4();
+    rig.pose(still(0, [{ kind: 'love', time: 1.4, amount: 1, side: 1 }]));
+    const up = new Vector3(0, 1, 0).transformDirection(rig.frameOf(JOINT.head, head));
+    expect(Math.abs(up.x)).toBeGreaterThan(0.2);
+    expect(rig.squint).toBeGreaterThan(0.9);
+    expect(rig.blush).toBeGreaterThan(0.8);
+    expect(rig.emote.heart).toBeGreaterThan(0.99);
+    const rest = rig.emote.heartSize;
+    rig.pose(still(0, [{ kind: 'love', time: LOVE.beats[1] + 0.065, amount: 1, side: 1 }]));
+    expect(rig.emote.heartSize).toBeGreaterThan(rest * 1.1);
+    rig.pose(still(0, [{ kind: 'love', time: LOVE_LENGTH, amount: 1, side: 1 }]));
+    expect(rig.emote.heart).toBe(0);
+    expect(rig.squint).toBeCloseTo(0, 6);
+  });
+
+  it('sets its icon in closed form: the same moment shows the same icon, whatever came before', () => {
+    const a = new MuseRig();
+    const b = new MuseRig();
+    const at = still(4.2, [{ kind: 'idea', time: 0.9, amount: 1 }]);
+    a.pose(at);
+    b.pose(still(1, [{ kind: 'love', time: 2, amount: 1 }]));
+    b.pose(at);
+    expect(b.emote).toEqual(a.emote);
+    b.pose(still(1));
+    expect(Object.values(b.emote).every((x) => x === 0)).toBe(true);
   });
 });
 

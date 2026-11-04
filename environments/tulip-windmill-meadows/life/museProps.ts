@@ -31,6 +31,7 @@ import { smoothstep } from '../../../src/core/math';
 import { travel } from '../../../src/planet/geo';
 import type { Terrain } from '../planet/terrain';
 import { JOINT } from '../../../src/life/museBody';
+import { MuseEmotes } from '../../../src/life/museEmotes';
 import lineFragment from '../../../src/life/museLine.frag.glsl?raw';
 import lineVertex from '../../../src/life/museLine.vert.glsl?raw';
 import moteFragment from '../../../src/life/museMotes.frag.glsl?raw';
@@ -153,6 +154,8 @@ export class MuseProps {
   private readonly moteAt: InstancedBufferAttribute;
   private readonly moteLook: InstancedBufferAttribute;
   private moteCount = 0;
+  /** The icon over its head (a light bulb, a heart) as its moves set it. */
+  private readonly emotes: MuseEmotes;
   /** Splashes already sent (their time), so each is sent once. */
   private readonly splashed = new Set<number>();
 
@@ -246,6 +249,8 @@ export class MuseProps {
     this.motes.frustumCulled = false;
     this.motes.renderOrder = 4;
     this.group.add(this.motes);
+    this.emotes = new MuseEmotes(shared);
+    this.group.add(this.emotes.mesh);
   }
 
   /** Add a mote: where (planet space), how big (m), which picture, how opaque, its turn. */
@@ -479,6 +484,7 @@ export class MuseProps {
     this.moteLook.needsUpdate = true;
     (this.motes.geometry as InstancedBufferGeometry).instanceCount = this.moteCount;
     this.motes.visible = this.moteCount > 0;
+    this.emotes.update(rig, place, H, shown);
   }
 }
 

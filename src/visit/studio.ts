@@ -3,7 +3,7 @@ import { Vector3 } from 'three';
 import castFile from '../../server/fixtures/cast.json?raw';
 import type { FrameClock } from '../core/clock';
 import { parseHash } from '../core/hashSync';
-import { FLUFF_LENGTH, WAKE, YAWN_LENGTH, type Expression, type HeldLook, type Move } from '../life/museRig';
+import { FLUFF_LENGTH, IDEA_LENGTH, LOVE_LENGTH, WAKE, YAWN_LENGTH, type Expression, type HeldLook, type Move } from '../life/museRig';
 import type { MuseLook, PlanetId } from '../muse/contract';
 import { Flight, type Framing } from '../view/flight';
 import { FOLLOW, Follower } from './follow';
@@ -138,12 +138,14 @@ const BENCH_WORK = 'at work on its bench';
 const DAY_AHEAD = 3 * 3600;
 
 /** The guest's postures, held on its pose over standing beside the host: each a move (museRig.ts), how long before it plays again (s; Infinity: held), the moment first shown (s). */
-const POSTURES: Readonly<Record<string, { readonly kind: 'sit' | 'sleep' | 'yawn' | 'wake' | 'fluff'; readonly length: number; readonly at: number }>> = {
+const POSTURES: Readonly<Record<string, { readonly kind: 'sit' | 'sleep' | 'yawn' | 'wake' | 'fluff' | 'idea' | 'love'; readonly length: number; readonly at: number }>> = {
   'sitting in the grass': { kind: 'sit', length: Infinity, at: 3 },
   napping: { kind: 'sleep', length: Infinity, at: 6 },
   yawning: { kind: 'yawn', length: YAWN_LENGTH, at: 1.3 },
   'waking up': { kind: 'wake', length: WAKE, at: 2 },
   'fur standing up': { kind: 'fluff', length: FLUFF_LENGTH, at: 1.6 },
+  'an idea (a light bulb)': { kind: 'idea', length: IDEA_LENGTH + 0.6, at: 1.2 },
+  'adoring (a heart)': { kind: 'love', length: LOVE_LENGTH + 0.6, at: 1.3 },
 };
 const BESIDE = 'standing beside';
 
