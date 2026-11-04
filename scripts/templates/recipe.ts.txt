@@ -1,0 +1,54 @@
+// This planet's recipe: recipe.json beside this file, written by the workshop that built the planet
+// (server/workshop/planet). It holds only where the planet differs from the meadow it was forked from: palette rows
+// by name, and parameter defaults. render/palette.ts and params.ts each lay it over their own tables once, at load.
+
+type Time = 'NOON' | 'DAWN' | 'GOLDEN';
+type Rows = Partial<Record<number, readonly string[]>>;
+
+interface Recipe {
+  readonly palette?: Readonly<Partial<Record<Time, Readonly<Record<string, readonly string[]>>>>>;
+  readonly params?: Readonly<Record<string, Readonly<Record<string, number>>>>;
+}
+
+interface NumberLike {
+  kind: string;
+  def: unknown;
+  min?: number;
+  max?: number;
+  int?: boolean;
+}
+
+const RECIPE = (Object.values(import.meta.glob('./recipe.json', { eager: true, import: 'default' }))[0] ?? {}) as Recipe;
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/** The recipe's colours over the palette's rows (named as ROW names them), column by column. */
+export function recipePalette(times: Readonly<Record<Time, Rows>>, row: Readonly<Record<string, number>>): void {
+  for (const [time, rows] of Object.entries(RECIPE.palette ?? {})) {
+    if (!Object.hasOwn(times, time) || !rows) continue;
+    const into = times[time as Time];
+    for (const [name, colours] of Object.entries(rows)) {
+      const r = Object.hasOwn(row, name) ? row[name] : undefined;
+      const base = r === undefined ? undefined : into[r];
+      if (r === undefined || !base) continue;
+      into[r] = base.map((hex, i) => {
+        const c = colours[i];
+        return typeof c === 'string' && HEX.test(c) ? c : hex;
+      });
+    }
+  }
+}
+
+/** The recipe's defaults over the schema's, each held to its field's range. */
+export function recipeParams(schema: object): void {
+  const groups = schema as Record<string, Record<string, NumberLike>>;
+  for (const [group, values] of Object.entries(RECIPE.params ?? {})) {
+    if (!Object.hasOwn(groups, group)) continue;
+    for (const [key, value] of Object.entries(values)) {
+      const field = Object.hasOwn(groups[group], key) ? groups[group][key] : undefined;
+      if (field?.kind !== 'number' || field.min === undefined || field.max === undefined) continue;
+      if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+      const v = Math.min(field.max, Math.max(field.min, value));
+      field.def = field.int ? Math.round(v) : v;
+    }
+  }
+}
