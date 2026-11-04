@@ -1,7 +1,9 @@
 // A stand-in Muse, for tests only (never in a real garden): an agent on Meta's chat completions that follows
 // CONNECTOR.md through the garden's connector, does its first visit and one check-in, and is scored.
 //   npx tsx server/agent/standin/run.ts --server <url> --key <key> [--model muse-spark-1.3-contributor] [--steps 40]
-//     [--effort low|medium|high] [--out transcript.json]
+//     [--effort low|medium|high] [--out transcript.json] [--check-ins N]
+// With --check-ins N it checks in N times; before each one after the first it waits, as its schedule and doorbell
+// would, until a workshop round is ready for it (at most 45 minutes), or a minute when nothing is being made.
 //   npx tsx server/agent/standin/run.ts --rescore transcript.json   (scores a saved run again, no model calls)
 // --steps caps the model's turns in each session. It reads MODEL_API_KEY from the environment, or from
 // ~/.muse-garden.env. Its Memory is the privacy test's (server/fixtures/privacy/MEMORY.sensitive.md), so the
@@ -24,6 +26,7 @@ const { values } = parseArgs({
     steps: { type: 'string', default: '40' },
     effort: { type: 'string', default: 'medium' },
     out: { type: 'string' },
+    'check-ins': { type: 'string', default: '1' },
   },
 });
 if (values.rescore) {
@@ -37,6 +40,7 @@ if (!values.server || !values.key) {
   console.error('usage: run.ts --server <url> --key <key> [--model <id>] [--steps 40] [--effort medium] [--out file.json]');
   process.exit(2);
 }
+const { server, key } = values;
 const effort = values.effort;
 if (effort !== 'minimal' && effort !== 'low' && effort !== 'medium' && effort !== 'high') throw new Error('--effort is minimal, low, medium or high');
 
@@ -48,12 +52,14 @@ if (!apiKey) {
 
 const started = Date.now();
 const run = await runStandin({
-  server: values.server,
-  key: values.key,
+  server,
+  key,
   model: metaModel({ apiKey, model: values.model, effort, ...(process.env.MUSE_LLM_BASE_URL ? { baseUrl: process.env.MUSE_LLM_BASE_URL } : {}) }),
   steps: Number(values.steps),
   planted: PLANTED,
   log: (line) => console.info(line),
+  checkIns: Number(values['check-ins']),
+  between: (n) => untilSomethingWaits(server, key, n),
 });
 for (const s of run.sessions) console.info(`${s.session}: ${s.steps} turns, ${s.stopped}${s.final ? `\n  "${s.final.replace(/\s+/g, ' ').slice(0, 600)}"` : ''}`);
 console.info(`to its owner: ${run.toOwner.length} messages`);
@@ -62,6 +68,35 @@ console.info(`${run.transcript.length} calls in ${Math.round((Date.now() - start
 console.info(formatScore(run.score));
 if (values.out) writeFileSync(values.out, JSON.stringify({ model: values.model, sessions: run.sessions, toOwner: run.toOwner, transcript: run.transcript, score: run.score }, null, 2));
 process.exit(run.score.pass ? 0 : 1);
+
+/**
+ * Waits as the stand-in's schedule and doorbell would before check-in `n`: until one of its workshop rounds is ready
+ * (at most 45 minutes, a planet's notes round being the longest), or a minute when nothing is being made.
+ */
+async function untilSomethingWaits(server: string, key: string, n: number): Promise<boolean> {
+  const jobs = async (): Promise<{ state: string }[]> => {
+    const res = await fetch(`${server.replace(/\/+$/, '')}/api/v1/tools/workshop_round`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: '{}',
+    }).catch(() => null);
+    const body = res?.ok ? ((await res.json()) as { jobs?: { state: string }[] }) : null;
+    return body?.jobs ?? [];
+  };
+  const until = Date.now() + 45 * 60_000;
+  for (;;) {
+    const all = await jobs();
+    if (all.some((j) => j.state === 'waiting')) break;
+    if (!all.some((j) => j.state === 'working')) {
+      await new Promise((r) => setTimeout(r, 60_000));
+      break;
+    }
+    if (Date.now() > until) break;
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
+  console.info(`(before check-in ${n}: ${(await jobs()).map((j) => j.state).join(', ') || 'no jobs'})`);
+  return true;
+}
 
 /** KEY=value lines, with or without `export`. */
 function envFile(path: string): Record<string, string> {

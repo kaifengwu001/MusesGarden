@@ -29,6 +29,10 @@ export interface StandinOptions {
   readonly planted?: string;
   readonly log?: (line: string) => void;
   readonly fetch?: typeof fetch;
+  /** Check-ins after the first visit (1 by default). */
+  readonly checkIns?: number;
+  /** Before each check-in after the first: waits as a schedule would (e.g. for a round to be ready); false stops. */
+  readonly between?: (checkIn: number) => Promise<boolean>;
 }
 
 export interface StandinRun {
@@ -44,10 +48,13 @@ export async function runStandin(opts: StandinOptions): Promise<StandinRun> {
   const local = localWorld({ media: opts.media ?? loadMedia(FILES.media), avatarFile: FILES.avatar, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
   const transcript: CallRecord[] = [];
   const sessions: SessionResult[] = [];
-  for (const [session, user] of [
+  const checkIns = Math.max(1, opts.checkIns ?? 1);
+  const plan: [string, string][] = [
     ['onboarding', ONBOARDING],
-    ['check-in', CHECK_IN],
-  ] as const) {
+    ...Array.from({ length: checkIns }, (_, i): [string, string] => [i === 0 ? 'check-in' : `check-in ${i + 1}`, CHECK_IN]),
+  ];
+  for (const [k, [session, user]] of plan.entries()) {
+    if (k >= 2 && opts.between && !(await opts.between(k))) break;
     opts.log?.(`── ${session}`);
     // Each session is a fresh connection, as a scheduled run would make.
     const garden = await connectGarden({ server: opts.server, key: opts.key, ...(opts.fetch ? { fetch: opts.fetch } : {}) }).catch((e: unknown) => {
