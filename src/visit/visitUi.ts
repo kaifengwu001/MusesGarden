@@ -82,10 +82,16 @@ export async function prepareVisit(store: VisitStore, planet: PlanetId, search: 
 
 /**
  * Or, before the page makes its World, the photo studio its URL asks for (`?studio`: studio.ts, loaded only then), the
- * planet set as a visit to it has it. Null when the URL asks for none. The page then opens it in place of its garden.
+ * planet set as a visit to it has it; or the director's mode, for filming (`?director`: src/director/, loaded only
+ * then). Null when the URL asks for neither. The page then opens it in place of its garden.
  */
 export async function prepareStudio(store: VisitStore, planet: PlanetId, search: string = location.search): Promise<Studio | null> {
-  if (!new URLSearchParams(search).has('studio')) return null;
+  const asked = new URLSearchParams(search);
+  if (asked.has('director')) {
+    const { openDirector } = await import('../director/director');
+    return openDirector(store, planet);
+  }
+  if (!asked.has('studio')) return null;
   const { openStudio } = await import('./studio');
   return openStudio(store, planet, search);
 }

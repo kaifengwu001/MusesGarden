@@ -34,8 +34,11 @@ export function meadowVisit(world: World): VisitWorld {
     ground: (dir) => world.terrain.sample(dir, sample),
     shape: () => world.terrain.layout,
     standable: (dir) => world.muse.life?.standable(dir) ?? true,
+    walkable: (dir) => world.muse.life?.walkableAt(dir) ?? true,
     // (the host's home: the cottage, as the painting sees it)
     frameHome: () => world.cameraPreset('homestead', false),
+    // (the director's benches and stoves, lit by the meadow's own uniforms: src/director/)
+    stage: { add: (...objects) => world.scene.add(...objects), remove: (...objects) => world.scene.remove(...objects), shared: world.shared },
   };
 }
 

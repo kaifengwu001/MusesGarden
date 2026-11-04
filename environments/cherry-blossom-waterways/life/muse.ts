@@ -11,6 +11,7 @@ import vertexShader from '../../../src/life/muse.vert.glsl?raw';
 import { MuseProps } from './museProps';
 import { MuseRig, STEP } from '../../../src/life/museRig';
 import { MuseRoam, PACE, type Roaming } from './museRoam';
+import type { ActedLife } from '../../../src/visit/world';
 // This world keeps Muse's optical-depth shadow in the cloud map.
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from '../../../src/life/museShadow.vert.glsl?raw';
@@ -329,8 +330,36 @@ export class Muse {
     this.away = direction.kind === 'hidden';
   }
 
-  /** Its life at a time, unless the engine has it out on the planet or working at home. */
+  /** A life handed over whole by the director (src/director/), in place of its own (null: its own), and what it is played as. */
+  private acted: ActedLife | null = null;
+  private actedLife: Roaming | null = null;
+  /** What an acted life can show on it: all its rig's moves and its things, at its height. */
+  readonly acts = { moves: true, props: true, height: MUSE_HEIGHT } as const;
+
+  /**
+   * The director's say over it (src/director/): a life handed over whole, frame by frame, played in place of its own
+   * (its feet at the life's height over the ground its own life would stand on there); null gives it back its own.
+   * Acted, it is drawn (not away).
+   */
+  act(life: ActedLife | null): void {
+    this.acted = life;
+    if (life) this.away = false;
+  }
+
+  /** Its life at a time, unless the director acts it, or the engine has it out on the planet or working at home. */
   private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
+    if (this.acted) {
+      const a = this.acted;
+      const r = (this.actedLife ??= { dir: new Vector3(), height: 0, heading: new Vector3(), action: a.action, lookAt: null, cues: a.cues, home: false });
+      r.dir.copy(a.dir);
+      r.height = roam.groundAt(r.dir) + a.height;
+      r.heading.copy(a.heading);
+      r.action = a.action;
+      r.lookAt = a.lookAt;
+      r.cues = a.cues;
+      r.home = a.home;
+      return r;
+    }
     const d = this.direction;
     const life = roam.at(time, camera);
     if (d.kind === 'hidden' || (d.kind === 'home' && !d.busy)) return life;

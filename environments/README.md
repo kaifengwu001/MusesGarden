@@ -80,6 +80,17 @@ time held (`src/visit/studio.ts`; C puts the panel away, T holds the time). In `
 the world's Muse itself: the parts of its day its life writes, `tap`, `hold` and `letGo`, and a `pose` (its rig) to
 hold a look on.
 
+The director's mode, for filming (`?director` on its page: [docs/director.md](../docs/director.md)), comes with the studio's
+hook and asks two small things more of a world, as each world here has them:
+
+- **Its Muse takes a life handed over whole**, frame by frame, in place of its own: `act(life)` (and `acts`, what it can
+  show). In `life/muse.ts`, `lifeAt` returns that life first, its feet at its roam's `groundAt` plus the life's height
+  (copy Golden Rye's). Its things' ladle follows a pot the director gives (`cues.cook.pot`, in `life/museProps.ts`).
+- **Its adapter offers a stage** for the director's benches and stoves: `stage: { add, remove, shared: world.shared }`
+  in `visit.ts`.
+
+Without them the page still opens `?director`, and its Muses walk and turn as a visit directs them.
+
 ## Running, testing and building a world
 
 | | Command |

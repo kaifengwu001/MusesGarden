@@ -345,6 +345,14 @@ export class MuseProps {
     const potX = v9.set(this.stove.matrix.elements[0], this.stove.matrix.elements[1], this.stove.matrix.elements[2]);
     const potZ = v10.set(this.stove.matrix.elements[8], this.stove.matrix.elements[9], this.stove.matrix.elements[10]);
     const soup = v11.copy(potMiddle).addScaledVector(potUp, 0.63).addScaledVector(potX, -0.04);
+    // (cooking where the director has it, at a pot of its own: src/director/)
+    const elsewhere = (c as { pot?: Vector3 } | null)?.pot ?? null;
+    if (elsewhere) {
+      soup.copy(elsewhere);
+      potUp.copy(elsewhere).normalize();
+      potX.addScaledVector(potUp, -potX.dot(potUp)).normalize();
+      potZ.crossVectors(potX, potUp);
+    }
     if (c && on) {
       const head = m4.multiplyMatrices(place, rig.frameOf(JOINT.head, m5));
       const mouth = v12.set(0, 0.01, 0.27).applyMatrix4(head);
@@ -365,7 +373,7 @@ export class MuseProps {
     const cooking = c ? 1 : 0;
     const flicker = 0.85 + 0.25 * Math.sin(time * 11) * Math.sin(time * 7.3);
     this.glow.set(1.4, 0.8, 0.35).multiplyScalar((0.25 + 0.75 * cooking) * flicker);
-    if (cooking && this.homeProps) {
+    if (cooking && (this.homeProps || elsewhere)) {
       for (let k = 0; k < 7; k++) {
         const u = (((time / 2.8 + k / 7) % 1) + 1) % 1;
         const p = v12

@@ -41,6 +41,7 @@ import { MuseRig, STEP } from './museRig';
 import { MuseRoam, PACE, type Indoors, type Roaming, type Room } from './museRoam';
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from './museShadow.vert.glsl?raw';
+import type { ActedLife } from '../visit/world';
 
 // Muse, who lives here: a cream plush about as tall as you, built from its
 // reference (museBody.ts: one distance field, meshed off the main thread, or
@@ -219,6 +220,11 @@ export class Muse {
   private readonly cloudLook: Vector4 | null;
   /** Muses beside this one (a friend's, visiting: src/visit/): their shadows drawn into this one's map, which widens to take them in. */
   private readonly guests: Muse[] = [];
+  /** A life handed over whole by the director (src/director/), in place of its own (null: its own), and what it is played as. */
+  private acted: ActedLife | null = null;
+  private actedLife: Roaming | null = null;
+  /** What an acted life can show on it: all its rig's moves and its things, at its height. */
+  readonly acts = { moves: true, props: true, height: MUSE_HEIGHT } as const;
 
   constructor(shared: Record<string, IUniform>) {
     // an empty body until the worker's arrives, so the program is built with the others before the first frame
@@ -501,8 +507,30 @@ export class Muse {
     this.away = direction.kind === 'hidden';
   }
 
-  /** Its life at a time, unless the engine has it out on the planet or working at home. */
+  /**
+   * The director's say over it (src/director/): a life handed over whole, frame by frame, played in place of its own
+   * (its feet at the life's height over the ground its own life would stand on there: a deck's, the meadow's); null
+   * gives it back its own. Acted, it is drawn (not away).
+   */
+  act(life: ActedLife | null): void {
+    this.acted = life;
+    if (life) this.away = false;
+  }
+
+  /** Its life at a time, unless the director acts it, or the engine has it out on the planet or working at home. */
   private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
+    if (this.acted) {
+      const a = this.acted;
+      const r = (this.actedLife ??= { dir: new Vector3(), height: 0, heading: new Vector3(), action: a.action, lookAt: null, cues: a.cues, home: false });
+      r.dir.copy(a.dir);
+      r.height = roam.groundAt(r.dir) + a.height;
+      r.heading.copy(a.heading);
+      r.action = a.action;
+      r.lookAt = a.lookAt;
+      r.cues = a.cues;
+      r.home = a.home;
+      return r;
+    }
     const d = this.direction;
     if (d.kind === 'inside') {
       // in its hut: its life puts it there, cooking if there is a pot, answering you as anywhere

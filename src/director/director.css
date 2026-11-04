@@ -1,0 +1,573 @@
+/* The director's mode (director.ts): its panel on the right, the timeline along the bottom, its marks and gumballs
+   over the planet. The page's own interface stays put away (studio.css: body.is-studio). H hides all of this. */
+
+.director {
+  --d-ink: var(--ink, #3e3a36);
+  --d-soft: var(--ink-soft, rgba(62, 58, 54, 0.62));
+  --d-paper: rgba(251, 248, 238, 0.9);
+  --d-line: rgba(62, 58, 54, 0.14);
+  --d-pick: #2f7cc4;
+  --d-panel: 340px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 12px;
+  color: var(--d-ink);
+}
+
+/* ---- the marks over the planet ---- */
+
+.director-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 20;
+  overflow: visible;
+}
+.director-overlay .d-route {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+  stroke-dasharray: 1 6;
+}
+.director-overlay .d-route.is-dim {
+  opacity: 0.4;
+}
+.director-overlay .d-route.is-blocked {
+  stroke-dasharray: 6 5;
+  stroke-width: 3;
+  opacity: 1;
+}
+.director-overlay .d-mark {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.director-overlay .d-mark path {
+  fill: currentColor;
+  fill-opacity: 0.12;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.director-overlay .d-mark.is-piece path {
+  fill: #7a5b33;
+  fill-opacity: 0.18;
+  stroke-dasharray: 4 3;
+}
+.director-overlay .d-mark polygon {
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 1;
+}
+.director-overlay .d-mark circle {
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.director-overlay .d-mark.is-start circle {
+  fill: #fff;
+  stroke: currentColor;
+  stroke-width: 3;
+}
+.director-overlay .d-mark text {
+  fill: #fff;
+  font: 700 10px var(--font-ui, system-ui, sans-serif);
+  text-anchor: middle;
+  pointer-events: none;
+}
+.director-overlay .d-mark.is-dim {
+  opacity: 0.55;
+}
+.director-overlay .d-mark.is-picked circle {
+  stroke: #ffd54a;
+  stroke-width: 3;
+}
+.director-overlay .d-tag {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.director-overlay .d-tag rect {
+  rx: 9px;
+  opacity: 0.88;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+.director-overlay .d-tag.is-picked rect {
+  stroke: #ffd54a;
+  stroke-width: 2.5;
+  opacity: 1;
+}
+.director-overlay .d-tag text {
+  fill: #fff;
+  font: 600 11px var(--font-ui, system-ui, sans-serif);
+  text-anchor: middle;
+  pointer-events: none;
+}
+.director-overlay .d-ring {
+  fill: none;
+  stroke: #ffd54a;
+  stroke-width: 9;
+  stroke-opacity: 0.001;
+  pointer-events: stroke;
+  cursor: grab;
+}
+.director-overlay [data-layer='gumball'] .d-ring {
+  stroke-opacity: 0.55;
+  stroke-width: 4;
+}
+.director-overlay .d-ring:hover {
+  stroke-opacity: 0.9;
+}
+.director-overlay .d-knob {
+  fill: #ffd54a;
+  stroke: #3e3a36;
+  stroke-width: 1.5;
+  pointer-events: auto;
+  cursor: grab;
+}
+.director-overlay .d-axis {
+  pointer-events: auto;
+  cursor: grab;
+}
+.director-overlay .d-axis line {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.director-overlay .d-axis-forward line,
+.director-overlay .d-axis-forward polygon {
+  stroke: #2f7cc4;
+  fill: #2f7cc4;
+}
+.director-overlay .d-axis-across line,
+.director-overlay .d-axis-across polygon {
+  stroke: #e05a4f;
+  fill: #e05a4f;
+}
+.director-overlay .d-axis:hover line {
+  stroke-width: 6;
+}
+.director-overlay .d-middle {
+  fill: rgba(255, 255, 255, 0.75);
+  stroke: #3e3a36;
+  stroke-width: 2;
+  pointer-events: auto;
+  cursor: move;
+}
+
+/* ---- the panel ---- */
+
+.director-panel {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: var(--d-panel);
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  background: var(--d-paper);
+  border-radius: 12px;
+  box-shadow: 0 6px 28px rgba(40, 36, 30, 0.22);
+  backdrop-filter: blur(8px);
+  z-index: 30;
+  overflow: hidden;
+}
+.director-panel .d-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--d-line);
+}
+.director-panel h2 {
+  margin: 0;
+  font: 600 18px var(--font-serif, Georgia, serif);
+}
+.director-panel h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--d-soft);
+}
+.director-panel .d-body {
+  overflow-y: auto;
+  padding: 6px 12px 12px;
+  flex: 1;
+}
+.director-panel .d-section {
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--d-line);
+}
+.director-panel .d-section:last-child {
+  border-bottom: 0;
+}
+.director-panel .d-note {
+  margin: 0;
+  padding: 0 12px;
+  max-height: 0;
+  overflow: hidden;
+  background: #ffd54a;
+  font-weight: 600;
+  transition: max-height 0.15s;
+}
+.director-panel .d-note.is-on {
+  padding: 7px 12px;
+  max-height: 60px;
+}
+.director-panel ul,
+.director-panel ol {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+.director-panel button,
+.director-panel select,
+.director-panel input {
+  font: inherit;
+  color: inherit;
+}
+.director-panel button {
+  border: 1px solid var(--d-line);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.director-panel button:hover {
+  background: #fff;
+}
+.director-panel button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.director-panel .d-danger {
+  color: #b6433b;
+}
+.director-panel select {
+  border: 1px solid var(--d-line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 2px 4px;
+  max-width: 100%;
+}
+.director-panel .d-add {
+  width: 100%;
+}
+.director-panel .d-actor,
+.director-panel .d-piece {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.director-panel .d-actor.is-picked,
+.director-panel .d-piece.is-picked {
+  background: rgba(47, 124, 196, 0.12);
+  box-shadow: inset 0 0 0 1.5px rgba(47, 124, 196, 0.5);
+}
+.director-panel .d-actor.is-hidden {
+  opacity: 0.5;
+}
+.director-panel .d-piece span {
+  flex: 1;
+}
+.director-panel .d-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
+.director-panel .d-swatch.is-loading {
+  animation: d-loading 0.9s ease-in-out infinite alternate;
+}
+@keyframes d-loading {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+.director-panel .d-name {
+  width: 78px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  padding: 1px 3px;
+  font-weight: 600;
+}
+.director-panel .d-name:hover,
+.director-panel .d-name:focus {
+  border-color: var(--d-line);
+  background: #fff;
+}
+.director-panel .d-look {
+  flex: 1;
+  min-width: 0;
+}
+.director-panel .d-icon {
+  border: 0;
+  background: transparent;
+  padding: 1px 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+.director-panel .d-host {
+  color: var(--d-soft);
+  cursor: default;
+}
+.director-panel .d-beat {
+  border: 1px solid var(--d-line);
+  border-radius: 8px;
+  margin-bottom: 5px;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+.director-panel .d-beat.is-picked {
+  background: #fff;
+  border-color: rgba(47, 124, 196, 0.55);
+  box-shadow: 0 1px 8px rgba(47, 124, 196, 0.15);
+}
+.director-panel .d-beat-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+}
+.director-panel .d-num {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 10px;
+  display: grid;
+  place-items: center;
+}
+.director-panel .d-beat-line b {
+  flex: 1;
+  font-weight: 600;
+}
+.director-panel .d-amount {
+  color: var(--d-soft);
+}
+.director-panel .d-when {
+  color: var(--d-soft);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+.director-panel .d-warn {
+  margin: 0 7px 6px;
+  color: #b6433b;
+  font-size: 11px;
+}
+.director-panel .d-inspector {
+  padding: 4px 8px 8px;
+  border-top: 1px solid var(--d-line);
+  cursor: default;
+}
+.director-panel .d-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 5px 0;
+  flex-wrap: wrap;
+}
+.director-panel .d-row > span:first-child {
+  width: 52px;
+  flex: none;
+  color: var(--d-soft);
+}
+.director-panel .d-row select {
+  flex: 1;
+  min-width: 0;
+}
+.director-panel .d-where {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.director-panel .d-num-input {
+  width: 64px;
+  border: 1px solid var(--d-line);
+  border-radius: 6px;
+  padding: 2px 4px;
+  background: #fff;
+}
+.director-panel .d-dim {
+  color: var(--d-soft);
+}
+.director-panel .d-hint {
+  margin: 2px 0 4px 58px;
+  font-size: 11px;
+}
+.director-panel .d-keys {
+  margin-top: 8px;
+  font-size: 11px;
+}
+.director-panel .d-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.director-panel .d-empty {
+  color: var(--d-soft);
+  margin: 0;
+}
+
+/* ---- the timeline ---- */
+
+.director-timeline {
+  position: fixed;
+  left: 12px;
+  right: calc(var(--d-panel) + 24px);
+  bottom: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  background: var(--d-paper);
+  border-radius: 12px;
+  box-shadow: 0 6px 28px rgba(40, 36, 30, 0.22);
+  backdrop-filter: blur(8px);
+  padding: 8px 10px;
+  z-index: 30;
+  user-select: none;
+}
+.director-timeline .d-transport {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: stretch;
+  width: 96px;
+  flex: none;
+}
+.director-timeline button {
+  font: inherit;
+  border: 1px solid var(--d-line);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.director-timeline .d-play {
+  font-size: 14px;
+  padding: 5px 0;
+}
+.director-timeline .d-play.is-on {
+  background: #2f7cc4;
+  color: #fff;
+}
+.director-timeline .d-clock {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  text-align: center;
+  color: var(--d-soft);
+}
+.director-timeline .d-loop {
+  font-size: 11px;
+  text-align: center;
+  color: var(--d-soft);
+}
+.director-timeline .d-lanes {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  cursor: ew-resize;
+}
+.director-timeline .d-ruler {
+  position: relative;
+  height: 14px;
+  margin-left: 64px;
+  border-bottom: 1px solid var(--d-line);
+}
+.director-timeline .d-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--d-soft);
+}
+.director-timeline .d-tracks {
+  margin-left: 64px;
+  position: relative;
+}
+.director-timeline .d-lane {
+  position: relative;
+  height: 20px;
+  margin: 4px 0;
+  border-radius: 5px;
+  background: rgba(62, 58, 54, 0.05);
+}
+.director-timeline .d-lane.is-picked {
+  background: rgba(47, 124, 196, 0.1);
+}
+.director-timeline .d-lane-name {
+  position: absolute;
+  right: 100%;
+  margin-right: 6px;
+  width: 58px;
+  text-align: right;
+  top: 3px;
+  font-weight: 600;
+  color: var(--c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.director-timeline .d-block {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 4px;
+  background: var(--c);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.director-timeline .d-block.is-walk,
+.director-timeline .d-block.is-turn {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 45%, transparent) 0 4px, color-mix(in srgb, var(--c) 20%, transparent) 4px 8px);
+}
+.director-timeline .d-block.is-into,
+.director-timeline .d-block.is-out {
+  background: color-mix(in srgb, var(--c) 60%, transparent);
+}
+.director-timeline .d-block.is-wait {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--c) 60%, transparent);
+}
+.director-timeline .d-block.is-picked {
+  box-shadow: 0 0 0 2px #ffd54a;
+}
+.director-timeline .d-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #e05a4f;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .director {
+    --d-panel: min(300px, calc(100vw - 32px));
+  }
+  .director-timeline {
+    right: 12px;
+    bottom: auto;
+    top: 12px;
+  }
+}

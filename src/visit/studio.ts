@@ -87,10 +87,27 @@ export function readStudio(planet: PlanetId, search: string, cast: readonly Memb
   };
 }
 
-/** The studio a page's URL asks for, ready to open once the page has its World (visitUi.ts prepareStudio). */
+/**
+ * What a page opens in its garden's place for the photo studio (StudioUi) or the director (src/director/): the page
+ * calls update() before its world moves, frame() after, offers it taps, drags and zooms first, and tells it of any
+ * move of the camera.
+ */
+export interface StudioPage {
+  readonly ready: Promise<void>;
+  readonly gizmo: boolean;
+  update(dt: number): void;
+  frame(dt: number): void;
+  tap(x: number, y: number, width: number, height: number): boolean;
+  drag(dx: number, dy: number, width: number, height: number): boolean;
+  zoom(delta: number): boolean;
+  claims(x: number, y: number, width: number, height: number): boolean;
+  interrupt(): void;
+}
+
+/** The studio (or the director) a page's URL asks for, ready to open once the page has its World (visitUi.ts prepareStudio). */
 export interface Studio {
   readonly cast: StudioCast;
-  open(world: VisitWorld, clock: FrameClock): StudioUi;
+  open(world: VisitWorld, clock: FrameClock): StudioPage;
 }
 
 /**

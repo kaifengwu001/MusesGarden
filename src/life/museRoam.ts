@@ -467,6 +467,18 @@ export class MuseRoam {
     return [[DECK_FOOT, 0], [-DECK_FOOT, 0], [0, DECK_FOOT], [0, -DECK_FOOT]].every(([dx, dz]) => this.deckAt(x + dx, z + dz) === null);
   }
 
+  /**
+   * Whether a Muse may walk at a place on its way somewhere (the director's routes, src/director/): on the deck where
+   * it is free, off it anywhere but against the house's walls. As `standable`, but for the ground at the deck's foot,
+   * where the steps come down onto the meadow.
+   */
+  walkableAt(dir: Vector3): boolean {
+    const c = this.terrain.cottageLocal(dir, localTmp);
+    if (Math.abs(c.x) >= 14 || Math.abs(c.z) >= 14) return true;
+    if (this.deckAt(c.x, c.z) !== null) return this.deckFree(c.x, c.z);
+    return !(Math.abs(c.x) < SIDE + GIRTH && c.z > -OUTER.z - GIRTH && c.z < OUTER.z + GIRTH);
+  }
+
   /** A unit tangent at a spot toward a direction. */
   private toward(at: Spot, dir: Vector3): Vector3 {
     return tangentToward(at.dir, dir, new Vector3());

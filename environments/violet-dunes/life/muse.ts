@@ -12,6 +12,7 @@ import vertexShader from './muse.vert.glsl?raw';
 import { MuseRig, STEP, WAVE_LENGTH, type MuseAction } from './museRig';
 import shadowFragment from './museShadow.frag.glsl?raw';
 import shadowVertex from './museShadow.vert.glsl?raw';
+import type { ActedLife } from '../../../src/visit/world';
 
 // Muse, who lives here: a cream plush a little over a meter tall, built
 // from its reference (museBody.ts: one distance field, meshed off the main
@@ -163,6 +164,10 @@ export class Muse {
   readonly where = { dir: new Vector3(0, 1, 0), height: 0, heading: new Vector3(1, 0, 0) };
   /** What a visit has it doing (its own day until one says otherwise). */
   private direction: MuseDirection = { kind: 'home', busy: false };
+  /** A life handed over whole by the director (src/director/), in place of its day (null: its own). */
+  private acted: ActedLife | null = null;
+  /** What an acted life can show on it: its walk, its wave and where it looks (its rig has no other moves, and it has no things), at its height. */
+  readonly acts = { moves: false, props: false, height: MUSE_HEIGHT } as const;
   /** When you last tapped it (world s): it waves to you (its rig plays a wave and nothing else of yours). */
   private tappedAt = -Infinity;
 
@@ -317,9 +322,23 @@ export class Muse {
     const cx = rel.dot(this.X);
     const cz = rel.dot(this.Z);
     const cy = rel.dot(this.U) - MUSE_FLOOR;
-    const out = this.direction.kind === 'out' ? this.direction : null;
+    const acted = this.acted;
+    const out = acted ? null : this.direction.kind === 'out' ? this.direction : null;
     let pos: Vector3;
-    if (out) {
+    if (acted) {
+      // the director's (src/director/): where it has it, over the sand there, facing, walking and waving as it has it
+      this.up.copy(acted.dir).normalize();
+      this.where.height = terrain.height(this.up) + acted.height;
+      pos = this.uniforms.uMusePos.value.copy(this.up).multiplyScalar(R + this.where.height);
+      this.forward.copy(acted.heading).addScaledVector(this.up, -acted.heading.dot(this.up));
+      if (this.forward.lengthSq() < 1e-10) this.forward.copy(this.Z).addScaledVector(this.up, -this.Z.dot(this.up));
+      this.forward.normalize();
+      const a = this.action;
+      a.walk = acted.action.walk;
+      a.stride = acted.action.stride;
+      a.wave = acted.action.wave;
+      a.gait = acted.action.gait;
+    } else if (out) {
       // out on the planet where a visit has it: on the ground at its spot, facing the way it goes
       this.up.copy(out.dir).normalize();
       this.where.height = terrain.height(this.up);
@@ -361,7 +380,7 @@ export class Muse {
     const flat = Math.hypot(dx, dz);
     const yaw = wrap(Math.atan2(dx, dz) - this.heading);
     const pitch = Math.atan2(cy - 0.77 * MUSE_HEIGHT, Math.max(flat, 0.3));
-    const near = out ? 0 : smoothstep(14, 7, flat) * smoothstep(1.9, 1.2, Math.abs(yaw));
+    const near = out || acted ? 0 : smoothstep(14, 7, flat) * smoothstep(1.9, 1.2, Math.abs(yaw));
     // otherwise it looks about on its own
     const idleYaw = 0.32 * Math.sin(0.47 * time + 1) + 0.14 * Math.sin(1.27 * time);
     const idlePitch = -0.04 + 0.06 * Math.sin(0.37 * time + 2);
@@ -369,6 +388,11 @@ export class Muse {
     a.lookYaw = idleYaw + (yaw - idleYaw) * near;
     a.lookPitch = idlePitch + (pitch - idlePitch) * near;
     a.look = a.walk > 0.5 ? 0.4 : 1;
+    if (acted) {
+      a.lookYaw = acted.action.lookYaw;
+      a.lookPitch = acted.action.lookPitch;
+      a.look = acted.action.look;
+    }
     a.time = time;
     // (tapped, it waves to you, whatever its day or a visit has it doing)
     const waved = time - this.tappedAt;
@@ -384,7 +408,7 @@ export class Muse {
     const push = FUR_LENGTH * 0.9 * strength * (0.75 + 0.25 * Math.sin(1.3 * time) * Math.sin(0.41 * time + 1));
     this.uniforms.uMuseWind.value.set(along.x * push, along.y * push, along.z * push, 0.3 * strength);
     const far = camera.distanceTo(pos);
-    const seen = show && this.loaded && far < SEEN && this.direction.kind !== 'hidden';
+    const seen = show && this.loaded && far < SEEN && (acted !== null || this.direction.kind !== 'hidden');
     this.mesh.visible = seen;
     this.shadowMesh.visible = seen;
     // as many shells as the fur's length on screen in pixels
@@ -456,6 +480,11 @@ export class Muse {
   /** Whether Muse is drawn now: shown, near enough, in view. */
   get drawn(): boolean {
     return this.mesh.visible;
+  }
+
+  /** The director's say over it (src/director/): a life handed over whole, frame by frame, in place of its day; null gives it back its own. */
+  act(life: ActedLife | null): void {
+    this.acted = life;
   }
 
   /** A visit's say over Muse (src/visit/): its own day, out on the planet, or out of sight. */

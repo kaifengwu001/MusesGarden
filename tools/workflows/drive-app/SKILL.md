@@ -40,6 +40,8 @@ Typed in `src/dev/harnessApi.ts`. The calls you'll use:
 
 In dev servers and probe builds (`VITE_PROBE=1`, which `build-at.sh` makes), `window.__world` exposes the World itself: `rig` (the camera), `terrain`, `clouds`, `grass`, `flowers`, `surface`, `renderer`, `scene` and so on. Production pages have only `__meadow`.
 
+The director's mode (`?director` on any planet's page, docs/director.md) adds `window.__director` there: its scene, its take, seeking and playing, marks under a point of the screen, and whether every Muse's body is in. `scripts/director.mjs` plays a scene headless on any planet and takes stills (`HIDE=1` for the shot with nothing of the director drawn).
+
 **Hash keys.** The camera and time keys:
 
 - `t`: frozen time.

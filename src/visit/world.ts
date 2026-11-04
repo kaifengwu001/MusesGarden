@@ -1,6 +1,7 @@
-import type { PerspectiveCamera, Vector3, Vector4 } from 'three';
+import type { IUniform, Object3D, PerspectiveCamera, Vector3, Vector4 } from 'three';
 import type { Basket, Find } from '../garden/types';
-import type { HeldLook } from '../life/museRig';
+import type { HeldLook, Move, MuseAction } from '../life/museRig';
+import type { RoamCues } from '../life/museRoam';
 import type { MuseLook, PlanetId } from '../muse/contract';
 import type { WarpFrame } from '../render/warp';
 import type { Flight } from '../view/flight';
@@ -33,9 +34,49 @@ export interface VisitBody {
     readonly names: readonly { readonly name: string; readonly start: number }[];
     seek(now: number, at: number): void;
     at(now: number, camera: Vector3): unknown;
+    /** The height a Muse stands at at a place (m over R): a deck's or a porch's where the home has one, else the ground's. */
+    groundAt?(dir: Vector3): number;
   } | null;
-  readonly pose?: { held: HeldLook | null };
+  readonly pose?: { held: HeldLook | null; readonly lying?: number };
   readonly spheres?: readonly Vector4[];
+  // What the director (src/director/) asks of a Muse besides, where a world's Muse has it: a life handed over whole each
+  // frame in place of its own (null gives it its own life back), what such a life can show on it, and its things.
+  act?(life: ActedLife | null): void;
+  readonly acts?: ActedAbilities;
+  readonly props?: { readonly group: Object3D };
+  /** Put it in another body (a guest's: the host's is the world's dressHost). */
+  useModel?(look: MuseLook): void;
+}
+
+/**
+ * A life handed to a Muse whole, frame by frame (the director's: src/director/), in place of its own: where its feet
+ * are (a unit direction, and their height over the ground its own life would stand on there, m: 0 standing, a seat's
+ * on a bench), its heading there (a unit tangent), its action for its rig, what it looks at (planet space, or null),
+ * its things' cues, and whether it is at home. A world's Roaming (life/museRoam.ts) in shape, but for the height, so a
+ * world's Muse plays it as it plays its own life.
+ */
+export interface ActedLife {
+  readonly dir: Vector3;
+  height: number;
+  readonly heading: Vector3;
+  readonly action: MuseAction & { moves: Move[] };
+  lookAt: Vector3 | null;
+  readonly cues: RoamCues;
+  home: boolean;
+}
+
+/** What an acted life can show on a world's Muse: its rig's moves (sitting, lying, petting…), its things in its mittens (the can, the rod, the ladle), and its height (m). */
+export interface ActedAbilities {
+  readonly moves: boolean;
+  readonly props: boolean;
+  readonly height: number;
+}
+
+/** Where the director puts its own things in a world (its benches and stoves), and the world's shared uniforms they are lit by. */
+export interface VisitStage {
+  add(...objects: Object3D[]): void;
+  remove(...objects: Object3D[]): void;
+  readonly shared: Record<string, IUniform>;
 }
 
 /** A find's bed as it grows: its bed, and the flower it grows as (the find's topic's, from the visit view). */
@@ -93,6 +134,10 @@ export interface VisitWorld {
   readonly musesView?: { readonly distance: number; readonly height: number; readonly aim: number };
   /** Where a Muse may stand beyond dry ground (off the walls of a house, on a deck's free part), if the world knows. */
   standable?(dir: Vector3): boolean;
+  /** Where a Muse may walk on its way somewhere (as `standable`, but down the steps off a deck too), if the world knows: the director's routes. */
+  walkable?(dir: Vector3): boolean;
   /** The world's own view of the host's home (its homestead, or a cabin), for the rail's home button; without it the camera flies to the house from out in front. */
   frameHome?(): void;
+  /** Where the director puts its own things (src/director/), if the world lets it. */
+  readonly stage?: VisitStage;
 }
