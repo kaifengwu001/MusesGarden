@@ -85,6 +85,12 @@ export class Cutaway {
   private readonly X = new Vector3();
   private readonly U = new Vector3();
   private readonly Z = new Vector3();
+  /**
+   * A film holding the view (dev/hutFilm.ts): while set, the room's view looks at `at` (the homestead's local m) from
+   * this bearing and height (rad), this field of view (°) and half-height at the room (m), exactly (no easing toward
+   * it); a drag or the wheel does nothing.
+   */
+  film: { at: Vector3; azimuth: number; elevation: number; fov: number; size: number } | null = null;
 
   constructor(private readonly world: World) {}
 
@@ -210,7 +216,7 @@ export class Cutaway {
 
   /** Drag (px in a viewport): turn round the room, tip the view (at the shelf, a little either way). */
   drag(dx: number, dy: number, width: number, height: number): void {
-    if (!this.entering) return;
+    if (!this.entering || this.film) return;
     if (this.shelfAsked) {
       const l = SHELF.limits;
       this.aim.azimuth = clamp(this.aim.azimuth - (dx / width) * Math.PI * 0.5, l.azimuth[0], l.azimuth[1]);
@@ -223,7 +229,7 @@ export class Cutaway {
 
   /** The wheel or a pinch (the rig's zoom steps: + comes closer); at the shelf, scrolling out goes back to the room. */
   zoom(delta: number): void {
-    if (!this.entering) return;
+    if (!this.entering || this.film) return;
     if (this.shelfAsked && delta < 0) {
       this.fromShelf();
       return;
@@ -238,6 +244,13 @@ export class Cutaway {
     const w = this.world;
     const rig = w.rig;
     if (this.phase === 'open') {
+      const f = this.film;
+      if (f) {
+        // (a film holds the view exactly)
+        this.view.azimuth = this.aim.azimuth = f.azimuth;
+        this.view.elevation = this.aim.elevation = f.elevation;
+        this.view.size = this.aim.size = f.size;
+      }
       const k = damp(dt, this.shelfAsked || this.shelf > 0.02 ? 0.3 : 0.18);
       this.view.azimuth += wrapAngle(this.aim.azimuth - this.view.azimuth) * k;
       this.view.elevation += (this.aim.elevation - this.view.elevation) * k;
@@ -350,13 +363,14 @@ export class Cutaway {
 
   /** The view into the room as it stands now (toward the shelf as far as it has gone there). */
   private inside(): Ends {
-    const room = this.local(VIEW.at[0], VIEW.at[1], VIEW.at[2], new Vector3());
+    const at = this.film?.at;
+    const room = at ? this.local(at.x, at.y, at.z, new Vector3()) : this.local(VIEW.at[0], VIEW.at[1], VIEW.at[2], new Vector3());
     const e = smoothstep(0, 1, this.shelf);
     return {
       look: e > 0 ? room.lerp(this.local(this.shelfLook.x, this.shelfLook.y, this.shelfLook.z, new Vector3()), e) : room,
       azimuth: this.view.azimuth,
       elevation: this.view.elevation,
-      fov: VIEW.fov,
+      fov: this.film?.fov ?? VIEW.fov,
       size: this.view.size,
       up: this.U.clone(),
     };

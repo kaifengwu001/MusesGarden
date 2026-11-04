@@ -190,6 +190,8 @@ export class Muse {
   private direction: MuseDirection = { kind: 'home', busy: false };
   /** When it came into its hut (world s; NaN until its first moment there). */
   private insideSince = Number.NaN;
+  /** A film's say over Muse (dev/hutFilm.ts): its whole life at a time (world s) and toward a camera (planet space), while set. */
+  film: ((time: number, camera: Vector3) => Roaming) | null = null;
   private readonly directed: Roaming = {
     dir: new Vector3(0, 1, 0),
     height: 0,
@@ -503,6 +505,7 @@ export class Muse {
 
   /** Its life at a time, unless the engine has it out on the planet or working at home. */
   private lifeAt(time: number, camera: Vector3, roam: MuseRoam): Roaming {
+    if (this.film) return this.film(time, camera);
     const d = this.direction;
     if (d.kind === 'inside') {
       // in its hut: its life puts it there, cooking if there is a pot, answering you as anywhere

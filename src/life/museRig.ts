@@ -307,6 +307,8 @@ export interface Move {
   /** Typing at a desk, at its wits' end: its fur standing up in a wave, as in the lab's fluff (s since it began; < 0 not), and shaken out (s since it began to lie back down; < 0 not yet). */
   fur?: number;
   furDown?: number;
+  /** The happy bounce: how high its hops go (× BOUNCE.height; 1 unless a film wants them seen from high above, dev/hutFilm.ts). */
+  hop?: number;
 }
 
 export interface MuseAction {
@@ -767,7 +769,7 @@ export class MuseRig {
     const e = k * (mv.ease ?? 1);
     switch (mv.kind) {
       case 'bounce':
-        return this.bounce(t, k);
+        return this.bounce(t, k, mv.hop ?? 1);
       case 'pet':
         return this.pet(t, mv.release ?? -1, mv.side ?? 1, k);
       case 'fluff':
@@ -918,7 +920,7 @@ export class MuseRig {
    * floating up through the flight, the forearms a beat behind; after the
    * last landing they settle.
    */
-  private bounce(t: number, k: number): void {
+  private bounce(t: number, k: number, hop = 1): void {
     const J = JOINT;
     const B = BOUNCE;
     const end = B.hops * B.period;
@@ -935,7 +937,7 @@ export class MuseRig {
         stretch = (n > 0 ? 0.07 * (1 - smoothstep(0, 0.3, s)) : 0) - 0.14 * Math.sin(Math.PI * s) + 0.07 * smoothstep(0.65, 1, s);
       } else {
         const s = (u - g) / (1 - g);
-        lift = 4 * B.height * s * (1 - s);
+        lift = 4 * B.height * hop * s * (1 - s);
         stretch = 0.07 * (1 - 2 * s) * (1 - 2 * s);
       }
     } else {

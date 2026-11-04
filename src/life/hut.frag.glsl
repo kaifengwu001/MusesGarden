@@ -38,6 +38,36 @@ varying vec3 vUp;
 
 const vec3 FIRE = vec3(1.0, 0.5, 0.2);
 
+#ifdef FILM
+// The film of the room furnishing itself (dev/hutFilm.ts; the meadow never defines FILM): each piece comes into
+// being from its foot up, its front ragged with noise, a glowing blue edge at it and a blue glow just behind it
+// cooling into the piece's own colours; its inside, seen through the front as it rises, glows. The rug bubbles in
+// out from a point (where Muse stands), the front's noise outrunning it. What stands on the floor darkens it round
+// its foot as it comes, and Muse, bouncing, darkens the floor under it.
+uniform vec4 uBuild;          // the front (m, as buildAt counts), the piece's foot (local m), how ragged the front (m), and 1 once whole (drawn as ever then)
+uniform vec4 uBuildFrom;      // the rug: where it bubbles out from (local x, z), how far out a meter of the rug counts (as buildAt), unused
+uniform float uRestK[RESTS];  // how far each thing on the floor has come (its shade round its foot comes with it)
+uniform vec4 uFilmMuse;       // Muse's shade on the floor: where (local x, z), how wide (m), how dark (0 … 1)
+uniform vec3 uBuildGlow;      // the edge's core width (m), the glow's reach behind it (m), its brightness
+const vec3 EDGE = vec3(0.16, 0.55, 2.0);
+
+// Where a point comes into being, as how far the front has to have gone (m): up a piece from its foot, ragged; across
+// the rug, out from uBuildFrom and ragged far more, so it comes in bubbles.
+float buildAt(vec3 p) {
+  float n = 0.62 * gnoise(p * 2.4, 2101u) + 0.38 * gnoise(p * 6.7 + 3.1, 2102u);
+#ifdef RUG
+  return length(p.xz - uBuildFrom.xy) * uBuildFrom.z + uBuild.z * n;
+#else
+  return p.y - uBuild.y + uBuild.z * n;
+#endif
+}
+
+// Muse's shade on the floor under it (0 … 1).
+float museShade(vec2 p) {
+  return uFilmMuse.w * (1.0 - smoothstep(0.3, 1.0, length(p - uFilmMuse.xy) / max(uFilmMuse.z, 1e-3)));
+}
+#endif
+
 // The cut's height over the clearing at a point of the walls (props.ts cutAt): the front and the right end low, over
 // the front's lintels; the back and the left end whole.
 float cutHeight(vec2 xz) {
@@ -100,7 +130,11 @@ float underfoot(vec2 p) {
     vec4 r = uRest[k];
     vec2 q = abs(p - r.xy) - r.zw;
     float out_ = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+#ifdef FILM
+    shade = max(shade, uRestK[k] * (1.0 - smoothstep(-0.12, 0.22, out_)));
+#else
     shade = max(shade, 1.0 - smoothstep(-0.12, 0.22, out_));
+#endif
   }
   return shade;
 }
@@ -165,6 +199,21 @@ void main() {
   // the walls inside go no higher than the cut; what stands in front of Muse's shelf, looked at, dissolves
   if (uKind == 1 && uCut > 0.5 && p.y > cutHeight(p.xz) + 0.002) discard;
   if (uKind != 0 && uKind != 4 && uShowpiece < 0.5 && screenDoor(occluded(vWorld))) discard;
+#ifdef FILM
+  // (a piece or the rug coming into being: nothing yet where the front has not reached, and its back faces drawn only
+  // while it comes, its inside glowing; whole, it is drawn as ever, its back faces culled)
+  bool building = (uKind == 3 || uKind == 4) && uBuild.w < 0.5;
+  float behind = 1e3;
+  if (uKind == 3 || uKind == 4) {
+    if (!gl_FrontFacing && !building) discard;
+    if (building) {
+      behind = uBuild.x - buildAt(p);
+      if (behind < 0.0) discard;
+      // (inside the piece only its edge shows, the far side of the cut glowing: no slab of its inside)
+      if (!gl_FrontFacing && behind > max(2.0 * uBuildGlow.x, 2.0 * fwidth(behind))) discard;
+    }
+  }
+#endif
   vec3 col;
   if (uKind == 2) {
     // the cut: the wall's stones in their courses, the plaster's skin at each face (uv: along the wall and in from its
@@ -198,6 +247,9 @@ void main() {
       vec2 wall = vec2(ROOM_X, ROOM_Z) - abs(p.xz);
       ao = mix(0.55, 1.0, smoothstep(0.0, 0.5, min(wall.x, wall.y)));
       ao *= 1.0 - 0.6 * underfoot(p.xz);
+#ifdef FILM
+      ao *= 1.0 - museShade(p.xz);
+#endif
     } else if (uKind == 1) {
       albedo = plasterIn(vec2(vUv.x, vPaint.z), vPaint.y);
       float height = vPaint.z;
@@ -209,10 +261,25 @@ void main() {
 #ifdef RUG
       if (tex.a < 0.5) discard;
       ao = 1.0 - 0.35 * underfoot(p.xz);
+#ifdef FILM
+      ao *= 1.0 - museShade(p.xz);
+#endif
 #endif
       albedo = tex.rgb;
     }
     col = albedo * roomLight(p, n) * ao;
   }
+#ifdef FILM
+  if (building) {
+    // the edge: a hairline core (at least a pixel and a half wide) burning white-blue, a blue glow fading behind it,
+    // the piece's colours cooling in from blue; seen through the front, the far side of the cut, its edge alone
+    float core = 1.0 - smoothstep(0.0, max(uBuildGlow.x, 1.5 * fwidth(behind)), behind);
+    float glow = exp(-behind / uBuildGlow.y);
+    float cool = 1.0 - smoothstep(0.0, 4.0 * uBuildGlow.y, behind);
+    col = mix(col, (col + 0.04) * vec3(0.32, 0.55, 1.3), 0.85 * cool);
+    col += EDGE * uBuildGlow.z * (0.45 * glow + 3.2 * core);
+    if (!gl_FrontFacing) col = EDGE * uBuildGlow.z * (0.6 + 1.6 * core);
+  }
+#endif
   gl_FragColor = vec4(applyAerial(col, length(toCam), dir), 1.0);
 }

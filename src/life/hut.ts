@@ -3,6 +3,7 @@ import {
   BufferGeometry,
   Matrix3,
   CustomBlending,
+  DoubleSide,
   Float32BufferAttribute,
   Matrix4,
   Mesh,
@@ -142,6 +143,31 @@ const PLATE = { width: 0.17, height: 0.13 } as const;
 const LINTEL = { depth: 0.15, bearing: 0.22 } as const;
 /** The door in the cut: how far in from the wall's face the cottage's door stands (its outside face, m: props.ts sets it 0.6 of the wall in, 3 cm either side), and how thick the door shows cut through (m). */
 const DOOR = { face: COTTAGE.thickness * 0.6 - 0.03, depth: 0.12 } as const;
+
+/**
+ * The film of the room furnishing itself (dev/hutFilm.ts), as it looks: the glowing edge's core (its least width, m),
+ * how far behind it the glow reaches (m) and how bright it is; how ragged a piece's front is (m, either way); the
+ * rug's, and how far a meter out across the rug counts against its front (so its noise outruns it and it bubbles in).
+ */
+export interface FilmLook {
+  core: number;
+  reach: number;
+  glow: number;
+  ragged: number;
+  rugRagged: number;
+  rugOut: number;
+}
+const FILM_LOOK: FilmLook = { core: 0.006, reach: 0.06, glow: 1, ragged: 0.12, rugRagged: 0.55, rugOut: 0.5 };
+/** Each piece (and the rug) while the film plays: its mesh, its own material and the film's, the front's way (m: none in at `from`, all at `to`) and how ragged it is. */
+interface FilmPiece {
+  name: string;
+  mesh: Mesh<BufferGeometry, ShaderMaterial>;
+  own: ShaderMaterial;
+  film: ShaderMaterial;
+  rug: boolean;
+  from: number;
+  to: number;
+}
 
 /** The room's shell: the floor, the walls' inner faces (their openings cut through), the walls' cut tops, and the timber in the cut. */
 function shell(faces: readonly WallFace[]): { floor: BufferGeometry; walls: BufferGeometry; tops: BufferGeometry; timber: BufferGeometry } {
@@ -394,6 +420,16 @@ export class HutInterior {
   /** The furniture and the rug, and their bytes on the GPU while drawn. */
   private readonly furniture: Array<Mesh<BufferGeometry, ShaderMaterial>> = [];
   private bytes = 0;
+  /**
+   * The film of the room furnishing itself (dev/hutFilm.ts), while it plays: each piece's and the rug's material
+   * swapped for the film's (FILM in hut.frag.glsl), the floor's too, and what they share. Null otherwise, and the
+   * room is drawn exactly as ever.
+   */
+  private filming: { pieces: FilmPiece[]; floor: { own: ShaderMaterial; film: ShaderMaterial }; uniforms: Record<string, IUniform> } | null = null;
+  /** While the film plays: how far each piece (and the rug) has come into being, by name (0 not yet … 1 whole; unset, whole). */
+  readonly built = new Map<string, number>();
+  /** While the film plays: how its edge looks (FilmLook). */
+  readonly filmLook: FilmLook = { ...FILM_LOOK };
 
   constructor(shared: Record<string, IUniform>, faces: readonly WallFace[]) {
     this.uniforms = {
@@ -665,6 +701,117 @@ export class HutInterior {
     const fire = this.uniforms.uFire.value as Vector4;
     const flicker = 1 + 0.1 * Math.sin(time * 11.3) + 0.07 * Math.sin(time * 6.1 + 1.3) + 0.05 * Math.sin(time * 17.9 + 0.4);
     fire.w = this.loaded ? FIRE * flicker : 0;
+    if (this.filming) this.playFilm(this.filming);
+  }
+
+  // ---- the film of the room furnishing itself (dev/hutFilm.ts) ----------------------------------------
+
+  /**
+   * Start the film (the room loaded): each piece's and the rug's material, and the floor's, swapped for the film's,
+   * every piece whole until `built` says otherwise, the showpiece's dots put away. Stopped, the room is as it was.
+   */
+  film(on: boolean): void {
+    if (on === (this.filming !== null)) return;
+    if (!on) {
+      const f = this.filming!;
+      for (const p of f.pieces) {
+        p.mesh.material = p.own;
+        p.film.dispose();
+      }
+      this.shellMeshes[0].material = f.floor.own;
+      f.floor.film.dispose();
+      this.filming = null;
+      this.built.clear();
+      this.beacon.visible = this.dots.visible = true;
+      this.refresh();
+      return;
+    }
+    if (!this.loaded) throw new Error('hut film: load the room first');
+    const uniforms: Record<string, IUniform> = {
+      uBuildFrom: { value: new Vector4(RUG.x, RUG.z, FILM_LOOK.rugOut, 0) },
+      uRestK: { value: new Array<number>(RESTS).fill(1) },
+      uFilmMuse: { value: new Vector4(0, 0, 0.5, 0) },
+      uBuildGlow: { value: new Vector3() },
+    };
+    const make = (own: ShaderMaterial, defines: Record<string, string>): ShaderMaterial => {
+      const m = own.clone();
+      m.defines = { ...own.defines, ...defines, FILM: '' };
+      // (the pieces' places, their pictures and the room's light are the same objects as their own materials')
+      m.uniforms = { ...own.uniforms, ...uniforms, uBuild: { value: new Vector4(0, 0, 0, 1) } };
+      m.side = DoubleSide;
+      return m;
+    };
+    const floorOwn = this.shellMeshes[0].material as ShaderMaterial;
+    const pieces: FilmPiece[] = [];
+    for (const mesh of this.furniture) {
+      const own = mesh.material;
+      const rug = mesh.name === 'rug';
+      pieces.push({ name: mesh.name, mesh, own, film: make(own, {}), rug, from: 0, to: 1 });
+    }
+    this.filming = { pieces, floor: { own: floorOwn, film: make(floorOwn, {}) }, uniforms };
+    for (const p of pieces) p.mesh.material = p.film;
+    this.shellMeshes[0].material = this.filming.floor.film;
+    this.beacon.visible = this.dots.visible = false;
+    this.filmFrom(RUG.x, RUG.z);
+  }
+
+  /** While the film plays: where the rug bubbles in from (local m). */
+  filmFrom(x: number, z: number): void {
+    const f = this.filming;
+    if (!f) return;
+    (f.uniforms.uBuildFrom.value as Vector4).setX(x).setY(z);
+  }
+
+  /** While the film plays: Muse's shade on the floor under it (local m; how wide, m; how dark, 0 … 1). */
+  filmMuse(x: number, z: number, width: number, dark: number): void {
+    if (this.filming) (this.filming.uniforms.uFilmMuse.value as Vector4).set(x, z, width, dark);
+  }
+
+  /** The film's names for what comes into being: each piece's and the rug's. */
+  get filmPieces(): string[] {
+    return this.furniture.map((m) => m.name);
+  }
+
+  /** Each frame while the film plays: each front where `built` has it, the floor's shade round each thing's foot, the fire and the lamps coming alight as their pieces come. */
+  private playFilm(f: NonNullable<HutInterior['filming']>): void {
+    const look = this.filmLook;
+    const k = (name: string): number => Math.min(1, Math.max(0, this.built.get(name) ?? 1));
+    const from = f.uniforms.uBuildFrom.value as Vector4;
+    from.z = look.rugOut;
+    (f.uniforms.uBuildGlow.value as Vector3).set(look.core, look.reach, look.glow);
+    for (const p of f.pieces) {
+      const placed = this.placed.find((e) => e.name === p.name);
+      if (!placed) continue;
+      const box = placed.box.clone().applyMatrix4(placed.place.value);
+      const ragged = p.rug ? look.rugRagged : look.ragged;
+      // (none of it in at `from`; at `to` all of it, the glow long gone)
+      p.from = -ragged - 0.01;
+      if (p.rug) {
+        let far = 0;
+        for (let c = 0; c < 4; c++) far = Math.max(far, Math.hypot((c & 1 ? box.max.x : box.min.x) - from.x, (c & 2 ? box.max.z : box.min.z) - from.y));
+        p.to = far * look.rugOut + ragged + 6 * look.reach;
+      } else {
+        p.to = box.max.y - box.min.y + ragged + 6 * look.reach;
+      }
+      const share = k(p.name);
+      (p.film.uniforms.uBuild.value as Vector4).set(p.from + (p.to - p.from) * share, box.min.y, ragged, share >= 1 ? 1 : 0);
+    }
+    // the shade round each thing's foot comes as its foot does (in refresh()'s order of uRest)
+    const restK = f.uniforms.uRestK.value as number[];
+    const resting = this.placed.filter((p) => p.piece?.rests && p.raw && p.matrix).slice(0, RESTS);
+    restK.fill(1);
+    resting.forEach((p, i) => (restK[i] = smoothstep(0.02, 0.3, k(p.name))));
+    // the fire alight once its stove is nearly in, the candle and the lantern once theirs are
+    const fire = this.uniforms.uFire.value as Vector4;
+    const lamps = this.uniforms.uLamps.value as Vector4[];
+    let lamp = 0;
+    for (const p of this.placed) {
+      const glow = p.piece?.glow;
+      if (!glow || !p.raw || !p.matrix) continue;
+      const on = smoothstep(0.55, 1, k(p.name));
+      if (glow.kind === 'fire') fire.w *= on;
+      else if (lamp < lamps.length) lamps[lamp++].w = glow.strength * on;
+    }
   }
 
   // ---- Muse's showpiece and its favourites ------------------------------------------------------------
