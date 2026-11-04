@@ -15,6 +15,7 @@ import { createApp } from './http/app';
 import { startLiveClock } from './http/clock';
 import { fakeCommands, fakeQueries } from './http/fake';
 import { mediaCache } from './http/media';
+import { fakeClients } from './workshop/clients';
 import { clientsFromEnv, createWorkshop, workshopFiles } from './workshop/index';
 import { loadGeneratedPlanets } from './workshop/planet/index';
 import { museCodeBuilder } from './workshop/planet/builder';
@@ -74,7 +75,11 @@ async function buildBackend(): Promise<Backend> {
   const workshop = createWorkshop({
     dataDir: dir,
     // Muse Code (Meta's coding agent) answers Muse's notes on its planet's drafts.
-    clients: clientsFromEnv({ mesher: tripoMesherFromEnv(dir) ?? undefined, builder: museCodeBuilder() }),
+    // TRIPO_FAKE=1: everything live but Tripo (muse6's model stands in), for testing without spending.
+    clients: clientsFromEnv({
+      mesher: process.env.TRIPO_FAKE === '1' ? fakeClients().mesher : (tripoMesherFromEnv(dir) ?? undefined),
+      builder: museCodeBuilder(),
+    }),
     pipelines: PIPELINES,
     now: () => garden.engine.now(),
     repo: process.cwd(),
