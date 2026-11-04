@@ -66,7 +66,8 @@ export function localWorld(opts: LocalOptions): LocalWorld {
   const toOwner: string[] = [];
   let made = 0;
   const send = opts.fetch ?? fetch.bind(globalThis);
-  const byUrl = new Map(opts.media.map((m) => [m.url, m]));
+  // An Instagram post opens under either link; social search gives the one that names the account.
+  const byUrl = new Map(opts.media.flatMap((m) => [[m.url, m] as const, [publicUrl(m), m] as const]));
   let avatar: Promise<string> | null = null;
   const avatarDataUrl = () =>
     (avatar ??= sharp(opts.avatarFile)
@@ -88,7 +89,7 @@ export function localWorld(opts: LocalOptions): LocalWorld {
           if (!item) return Promise.resolve({ text: `This page didn't load: ${args.open}`, isError: true });
           const links = opts.media.filter((m) => m.url !== item.url && (m.area === item.area || m.topics.some((t) => item.topics.includes(t)))).slice(0, 4);
           return Promise.resolve({
-            text: JSON.stringify({ ...page(item), text: item.text ?? '', author: item.author ?? null, links: links.map((l) => ({ url: l.url, title: l.title })) }),
+            text: JSON.stringify({ ...page(item), text: item.text ?? '', author: item.author ?? null, links: links.map((l) => ({ url: publicUrl(l), title: l.title })) }),
           });
         }
         if (typeof args.search === 'string' && args.search.trim() !== '') {
@@ -153,7 +154,29 @@ function defaultOwner(): string {
 
 function page(m: MediaItem) {
   const text = m.text ?? '';
-  return { url: m.url, title: m.title, summary: text.length > 220 ? `${text.slice(0, 217)}…` : text, site: m.site ?? m.network, kind: m.kind, network: m.network };
+  return { url: publicUrl(m), title: m.title, summary: text.length > 220 ? `${text.slice(0, 217)}…` : text, site: m.site ?? m.network, kind: m.kind, network: m.network };
+}
+
+const INSTAGRAM_POST = /^\/(p|reel|reels|tv)\/([^/]+)\/?$/;
+const INSTAGRAM_ACCOUNT_POST = /^\/([^/]+)\/(p|reel|reels|tv)\/([^/]+)\/?$/;
+
+/** An item's link as social search gives it: an Instagram post names its account (instagram.com/<account>/reel/<code>/). */
+export function publicUrl(m: MediaItem): string {
+  const u = new URL(m.url);
+  const post = INSTAGRAM_POST.exec(u.pathname);
+  const account = m.author?.startsWith('@') ? m.author.slice(1) : null;
+  return u.hostname.endsWith('instagram.com') && post && account ? `https://www.instagram.com/${account}/${post[1]}/${post[2]}/` : m.url;
+}
+
+/** instagram.com/<account>/reel/<code>/ → instagram.com/reel/<code>/, the recording's own form. Anything else as it is. */
+export function bareInstagram(url: string): string {
+  try {
+    const u = new URL(url);
+    const post = INSTAGRAM_ACCOUNT_POST.exec(u.pathname);
+    return u.hostname.endsWith('instagram.com') && post ? `https://www.instagram.com/${post[2]}/${post[3]}/` : url;
+  } catch {
+    return url;
+  }
 }
 
 /** The recording's items that match the most of the query's words, best first. */

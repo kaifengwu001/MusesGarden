@@ -61,8 +61,8 @@ const onboarding: readonly Step[] = [
       }),
     ),
   ({ results }) => {
-    const job = json(results[0]) as { id: string; packet: { pictures: { url: string }[] } };
-    return turn(call('workshop_round', { job: job.id }), ...job.packet.pictures.map((p) => call('look', { url: p.url })));
+    const job = json(results[0]) as { id: string; packet: { pictures: { path: string }[] } };
+    return turn(call('workshop_round', { job: job.id }), ...job.packet.pictures.map((p) => call('look', { url: p.path })));
   },
   ({ results }) => {
     const job = json(results[0]) as { id: string; packet: { pictures: { id: string }[] } };
@@ -187,9 +187,54 @@ describe('the stand-in Muse', () => {
     const limits = run.score.checks.find((c) => c.name === 'limits');
     expect(run.transcript.filter((c) => c.name === 'workshop_start').map((c) => c.status)).toEqual([null, 409, 409]);
     expect(limits?.pass).toBe(false);
-    expect(limits?.detail).toContain('called workshop_start again after its 409');
+    expect(limits?.detail).toContain("called workshop_start again after workshop_start's 409");
     expect(limits?.detail).toContain('3 kept at one stop');
     expect(run.score.checks.find((c) => c.name === 'onboarding')?.pass).toBe(true);
+  });
+
+  it("plants an Instagram link that names its account, and refuses a bare one and Facebook's", async () => {
+    const trip: readonly Step[] = [
+      () => turn(call('browse', { search: 'botanical drawing', social: true })),
+      ({ results }) => {
+        const [a, b] = (json(results[0]) as { results: { url: string }[] }).results;
+        const bare = b.url.replace(/instagram\.com\/[^/]+\//, 'instagram.com/');
+        return turn(
+          call('report_trip', {
+            request_id: 'trip-ig',
+            thread: 'Botanical drawing',
+            path: [a.url, b.url, 'https://www.facebook.com/somepage/posts/1'],
+            kept: [
+              { url: a.url, why: 'Such patient leaves.', from: a.url },
+              { url: bare, why: 'The same, without its account.', from: b.url },
+              { url: 'https://www.facebook.com/somepage/posts/1', why: 'A post.', from: 'https://www.facebook.com/somepage/posts/1' },
+            ],
+          }),
+        );
+      },
+      done,
+    ];
+    const run = await runStandin({ server: stub.url, key: 'k-test', model: scripted({ onboarding: trip, 'check-in': [done] }, { tools: [], turns: [] }), steps: 5 });
+    const browsed = json(run.transcript[0].text) as { results: { url: string }[] };
+    expect(browsed.results[0].url).toMatch(/^https:\/\/www\.instagram\.com\/[^/]+\/(reel|p)\/[^/]+\/$/);
+    const receipt = json(run.transcript.find((c) => c.name === 'report_trip')?.text) as { planted: number; refused: { reason: string }[] };
+    expect(receipt.planted).toBe(1);
+    expect(receipt.refused.map((r) => r.reason)).toEqual([expect.stringContaining("the account's name"), "Facebook links can't be kept yet."]);
+  });
+
+  it('turns calls away over HTTP past the rate limit, and the scorer holds the 429', async () => {
+    const fast = await startStub({ key: 'k-fast', perMinute: 8 });
+    try {
+      const flood: readonly Step[] = [() => turn(...Array.from({ length: 8 }, () => call('letterbox'))), done];
+      const run = await runStandin({ server: fast.url, key: 'k-fast', model: scripted({ onboarding: flood, 'check-in': [done] }, { tools: [], turns: [] }), steps: 3 });
+      const limited = run.transcript.filter((c) => c.status === 429);
+      expect(limited.length).toBeGreaterThan(1);
+      expect(limited[0].text).toMatch(/^429: Too many calls this minute\. Try again after \d{4}-.+Z\.$/);
+      expect(run.score.checks.find((c) => c.name === 'limits')?.detail).toContain("again after letterbox's 429");
+      // The check-in couldn't connect within the minute, and says so.
+      expect(run.sessions[1]).toMatchObject({ session: 'check-in', stopped: 'unreachable' });
+    } finally {
+      await fast.close();
+    }
   });
 
   it('repeats a write with the same request_id as the first answer', async () => {
@@ -225,18 +270,19 @@ describe('the scorer', () => {
       isError: status !== null,
       status,
     });
-    const refusal = rec('onboarding', 'workshop_review', { job: 'j1' }, '409: The last round.\nTry again after 2026-11-05T00:00:00.000Z', 409);
+    const refusal = rec('onboarding', 'workshop_review', { job: 'j1' }, '409: The last round. Try again after 2026-11-05T00:00:00.000Z.', 409);
     const later = (at: string) => [refusal, rec('check-in', 'letterbox', {}, `{"at":"${at}"}`), rec('check-in', 'workshop_review', { job: 'j1' }, '{}')];
     const limits = (t: readonly CallRecord[]) => score(t).checks.find((c) => c.name === 'limits');
-    expect(limits(later('2026-11-04T20:00:00.000Z'))?.detail).toContain('called workshop_review again after its 409 (onboarding step 1 → check-in step 3)');
+    expect(limits(later('2026-11-04T20:00:00.000Z'))?.detail).toContain("called workshop_review again after workshop_review's 409 (onboarding step 1 → check-in step 3)");
     expect(limits(later('2026-11-05T09:00:00.000Z'))?.pass).toBe(true);
     // Another job's review was never refused.
     expect(limits([refusal, rec('onboarding', 'workshop_review', { job: 'j2' }, '{}')])?.pass).toBe(true);
   });
 
   it('reads the status a refusal starts with', () => {
-    expect(statusOf('409: Over today\'s finds.\nTry again after 2026-11-05T00:00:00.000Z')).toBe(409);
+    expect(statusOf("409: Your basket went out today. Try again after 2026-11-03T09:30:00.000Z.")).toBe(409);
     expect(statusOf('Error: 422: no')).toBe(422);
+    expect(statusOf('MCP error -32602: Input validation error: Invalid arguments for tool checkout: Required at mood')).toBe(400);
     expect(statusOf('{"ok":true}')).toBeNull();
   });
 });

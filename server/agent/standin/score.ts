@@ -80,7 +80,7 @@ function keyOf(c: CallRecord): string {
 
 /** The time a refusal says to try again after, on the garden's clock. */
 function retryAfter(text: string): number | null {
-  const m = /Try again after (\S+)/i.exec(text);
+  const m = /Try again after (\d{4}-\d\d-\d\dT[\d:.]+Z)/i.exec(text);
   const t = m ? Date.parse(m[1]) : NaN;
   return Number.isNaN(t) ? null : t;
 }
@@ -94,21 +94,24 @@ function gardenTime(text: string): number | null {
 
 /**
  * A 409 holds until the time it names, on the garden's clock (the latest the garden has said, in any session); a
- * 429 for a minute of wall-clock time. Calling the same tool on the same thing again while it holds ignores it.
+ * 429 until the wall-clock time it names, or a minute. Calling the same tool on the same thing again while it holds
+ * ignores it.
  */
 function ignoredRefusals(garden: readonly CallRecord[]): string[] {
   const broken: string[] = [];
+  /** By what was refused; a 429 refuses every call, under '*'. */
   const refused = new Map<string, { readonly call: CallRecord; readonly until: number | null }>();
   let now: number | null = null;
   for (const c of garden) {
-    const key = keyOf(c);
-    const before = refused.get(key);
-    if (before) {
-      const holds = before.call.status === 429 ? c.at - before.call.at < 60_000 : before.until === null || now === null || now < before.until;
-      if (holds) broken.push(`called ${c.name} again after its ${before.call.status} (${before.call.session} step ${before.call.step} → ${c.session} step ${c.step})`);
+    for (const key of [keyOf(c), '*']) {
+      const before = refused.get(key);
+      if (!before) continue;
+      const holds = before.call.status === 429 ? c.at < (before.until ?? before.call.at + 60_000) : before.until === null || now === null || now < before.until;
+      if (holds) broken.push(`called ${c.name} again after ${before.call.name}'s ${before.call.status} (${before.call.session} step ${before.call.step} → ${c.session} step ${c.step})`);
       else refused.delete(key);
     }
-    if (c.status === 409 || c.status === 429) refused.set(key, { call: c, until: retryAfter(c.text) });
+    if (c.status === 409) refused.set(keyOf(c), { call: c, until: retryAfter(c.text) });
+    if (c.status === 429) refused.set('*', { call: c, until: retryAfter(c.text) });
     const t = gardenTime(c.text);
     if (t !== null) now = now === null ? t : Math.max(now, t);
   }

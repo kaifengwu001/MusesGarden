@@ -50,7 +50,13 @@ export async function runStandin(opts: StandinOptions): Promise<StandinRun> {
   ] as const) {
     opts.log?.(`── ${session}`);
     // Each session is a fresh connection, as a scheduled run would make.
-    const garden = await connectGarden({ server: opts.server, key: opts.key, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
+    const garden = await connectGarden({ server: opts.server, key: opts.key, ...(opts.fetch ? { fetch: opts.fetch } : {}) }).catch((e: unknown) => {
+      const why = e instanceof Error ? e.message : String(e);
+      opts.log?.(`[${session}] couldn't connect: ${why}`);
+      sessions.push({ session, steps: 0, stopped: 'unreachable', final: why });
+      return null;
+    });
+    if (garden === null) continue;
     try {
       sessions.push(await runSession({ session, model: opts.model, garden, local, system, user, steps: opts.steps, transcript, ...(opts.log ? { log: opts.log } : {}) }));
     } finally {
