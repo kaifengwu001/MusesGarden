@@ -52,6 +52,10 @@ the director's mode.
   with the motes' shaders, warped with the planet), from a sheet of its own (glow, rays, the bulb unlit and lit, the
   heart), so the motes atlas is unchanged; in the lab as sprites (`SpriteEmotes`). Every world's `museProps.ts` draws
   it (six lines each). It draws nothing unless one of the two moves plays.
+  - A muse in clothes is scaled by its eyes, so a hat stands above tpose6's top (up to 1.2). Its fit now records how
+    high its top stands (`MuseFit.crown`, measured off it with its joints), and the icon rides up by as much as that
+    stands over 1: Kiki's beret, Van's straw hat and Pooh's nightcap had reached into it. tpose6 rigs byte for byte as
+    before (the muse-rig hash, 7417347f).
 - **Where they are:**
   - The lab: `museLab.html#model=tpose6&pose=idea` and `pose=love` loop them on the spot (live=1 to play them; the icon
     rides above the front reference's frame, so look in a `persp:` view). In the lab's day on the stage, an idea comes
