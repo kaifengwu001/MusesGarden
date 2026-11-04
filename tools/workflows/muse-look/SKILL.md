@@ -18,7 +18,9 @@ Run them with `node` from anywhere in the repo. Put the output in the session's 
 | The lab's stage at moments, from any angle | `scripts/stage.mjs <out> '[["bench",3,35,12,2.6]]'` (part, s, round°, up°, distance m) |
 | Scripted taps and holds on the lab stage, frame by frame | `scripts/labtouch.mjs <out> nap 5 '[["tap",0],["shot",0.6,"a"]]'` |
 | Poses and moves on the spot in the lab, in clay or as a heat map | `scripts/poses.mjs <out> '[["pet",2],["sit",3,"persp:35"]]' tpose6 clay` |
+| Many lab stills at once, each its own model, pose, view and look (every muse, before and after) | `scripts/batch.mjs <out> '[["muse1","idle",2,"front","kind"],["tpose6","hang",0,"turn:30","clay"]]'` |
 | All the muses in two rows (`museLab.html#lineup=1`): taps, holds, stills or a film | `scripts/lineup.mjs <out> '[["tap","tpose6",1.2],["hold","muse5",2],["shot","pet"],["letgo",1]]' [--video]` |
+| Momo at its desk (`museLab.html#desk=1`), the demo film, rendered frame by frame with motion blur | `scripts/desk.mjs out.mp4 1920 1080 30 16` (`'&beats=…'`, `'&hi=0'`, `'&cam=…'` for other timings and views) |
 | A labelled contact sheet of any stills | `python3 scripts/sheet.py out.png 4 a.png b.png …` |
 
 ## The server
@@ -38,7 +40,7 @@ On the planet, `museRoam.ts` writes a seeded itinerary of parts. The scripts wri
 
 The lab's stage (`museLab.html#model=tpose6&live=1`) is a separate ~4-minute day on a round lawn (`museLife.ts`). `stage.mjs --list` prints its parts.
 
-The muses in clothes (museMesh.ts `DRESSED`) load in the lab as `model=muse0` … `muse12`, so `poses.mjs` and `stage.mjs` take them as their model (`node poses.mjs <out> '[["idle",2,"persp:30"]]' muse5`). `look=kind` colours their fur cream, cloth blue and face pink: check it whenever a muse's fur or clothes look wrong. Their hats reach above the lab's one-muse frame: use a `persp:` or `cam:` view. On the meadow the Body parameter takes them too (`mm=muse5`, drawn as in the lab by `src/life/museDress.ts`): `EXTRA="&mm=muse5" node meadow.mjs <out> '[["bench",3]]'`.
+The muses in clothes (museMesh.ts `DRESSED`) load in the lab as `model=muse0` … `muse12`, so `poses.mjs` and `stage.mjs` take them as their model (`node poses.mjs <out> '[["idle",2,"persp:30"]]' muse5`). `look=kind` colours their fur cream, cloth blue and face pink: check it whenever a muse's fur or clothes look wrong. Their hats reach above the lab's one-muse frame: use a `persp:` or `cam:` view. On the meadow the Body parameter takes them too (`mm=muse5`, drawn as in the lab by `src/life/museDress.ts`): `EXTRA="&mm=muse5" node meadow.mjs <out> '[["bench",3]]'`. To rig a new model or fix a model's mesh (holes, sleeves, arms, the face), use muse-rig.
 
 ## What to check, and how
 

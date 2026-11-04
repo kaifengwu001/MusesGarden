@@ -93,6 +93,174 @@ const TASTE = { x: -0.19, y: 0.56, z: 0.3 } as const;
 /** How long a tap's stirring lasts while it sleeps (s). */
 export const ROUSE = 1.8;
 
+/**
+ * At a desk (the lab's desk scene, museDesk.ts), in Muse's frame as it sits on the chair before it (H): the desk's
+ * top; its laptop (the middle of the base's front edge, its width, the base's depth and thickness, the lid's height
+ * and how far it opens, rad from shut); where each mitten's middle rests over the keys (out from the middle, up,
+ * forward) and how far its keys spread (across, back); where the mittens rest on the laptop once it is shut (out,
+ * forward); and the headphones on its head (rest: the middle between the cups, height and depth; the cups' middles
+ * out from it, the band's height over them).
+ */
+export const DESK = {
+  top: 0.3,
+  laptop: { z: 0.23, width: 0.31, depth: 0.155, base: 0.015, lid: 0.145, open: 1.78 },
+  keys: { x: 0.13, y: 0.39, z: 0.29, across: 0.026, back: 0.02 },
+  rest: { x: 0.13, z: 0.29 },
+  phones: { y: 0.72, z: -0.012, cup: 0.272, rest: 0.13, band: 0.27 },
+} as const;
+/**
+ * Where its arms start from for each of its reaches at the desk (the left arm's turns from where it hangs there, x,
+ * z and the elbow; the right's mirrored), each found by search as the turns that bring its mitten nearest that place
+ * on tpose6: on the keys and resting on the shut laptop (the arm swung forward), up toward the lid's top and its edge
+ * half down (forward and up as far as it goes), at the cups on its head, holding the headphones before it and setting
+ * them down (raised, the elbow out). Each reach is fitted from its start, and the starts blended as the reaches are:
+ * one solve for a place far off can flip between two ways of reaching it (the elbow out, then down) from one frame to
+ * the next.
+ */
+const ARMS = {
+  keys: [-1.6, -1.5, 0.34],
+  lidTop: [-2.14, -1.64, 0.18],
+  lidHalf: [-1.94, -1.64, 0.22],
+  rest: [-1.58, -1.44, 0.32],
+  cupOn: [0.8, 2.14, 1.78],
+  held: [1.2, 2.32, 2.2],
+  laid: [1.8, 2.72, 1.32],
+} as const;
+
+/** Closing its laptop (s): its mittens from the keys up to the lid's top edge (leaning in to it), the lid folded down onto the keys, a pat on it, the mittens resting on it. */
+export const LID = { reach: 0.75, shut: 1.55, pat: [1.75, 2.25], rest: 2.6 } as const;
+export const LID_LENGTH = LID.rest;
+/** Taking its headphones off (s): the mittens off the laptop, down to its sides and up to the cups; the cups drawn forward so the band tips over its face; the headphones set down round the laptop; let go, the arms down at its sides. */
+export const PHONES = { reach: 0.95, off: 1.75, down: 2.5, go: 2.7, rest: 3.3 } as const;
+export const PHONES_LENGTH = PHONES.rest;
+/** Leaning back in its chair for a long stretch (s): sinking back, the arms flung up and out (\(> ~ <)/), held with a quiver, let fall, a long happy sigh; then at its ease, leaning back. */
+export const UNWIND = { back: [0, 0.8], up: [0.3, 1.05], hold: 2.35, down: [2.35, 3.0], sigh: [2.8, 4.4] } as const;
+export const UNWIND_LENGTH = UNWIND.sigh[1];
+
+/** Which mitten strikes the nth key (1 its left, −1 its right): in turn, now and then the same one twice. */
+function striker(n: number): number {
+  const turn = n % 2 === 0 ? 1 : -1;
+  return luck(n, 11) < 0.2 ? -turn : turn;
+}
+
+/**
+ * A mitten at the keys (taps: the tap clock, a key struck at each whole number of it; side: which mitten; rush: 0
+ * calm … 1 frantic): how high it is lifted off the keys (H), how far the key under it is from its home key (across,
+ * back, H), and how long since it last struck one (taps). Up quickly after each strike, hovering, down quickly on the
+ * next, sliding over to its next key while up; hurried, higher and wilder.
+ */
+export function keyBeats(taps: number, side: number, rush: number): { lift: number; across: number; back: number; since: number } {
+  const n = Math.floor(taps);
+  let prev = Number.NEGATIVE_INFINITY;
+  let next = Number.POSITIVE_INFINITY;
+  for (let i = n; i > n - 9; i--) {
+    if (striker(i) === side) {
+      prev = i;
+      break;
+    }
+  }
+  for (let i = n + 1; i < n + 10; i++) {
+    if (striker(i) === side) {
+      next = i;
+      break;
+    }
+  }
+  if (taps < 0 || !Number.isFinite(prev) || !Number.isFinite(next)) return { lift: 0, across: 0, back: 0, since: 99 };
+  const key = (i: number): [number, number] => [(luck(i, 12) - 0.5) * 2 * (0.7 + 0.9 * rush), (luck(i, 13) - 0.5) * 2 * (0.7 + 0.6 * rush)];
+  const gap = next - prev;
+  const u = (taps - prev) / gap;
+  const high = (0.02 + 0.032 * rush) * Math.min(1.25, 0.6 + 0.3 * gap) * (0.85 + 0.3 * luck(next, 14));
+  const lift = high * smoothstep(0, 0.3, u) * (1 - smoothstep(0.7, 1, u));
+  const a = key(prev);
+  const b = key(next);
+  const slide = smoothstep(0.12, 0.72, u);
+  return { lift, across: (a[0] + (b[0] - a[0]) * slide) * DESK.keys.across, back: (a[1] + (b[1] - a[1]) * slide) * DESK.keys.back, since: taps - prev };
+}
+
+/** Where closing the laptop is at (s): the lid's opening (1 open … 0 shut, a little bounce as it shuts), how far the mittens have come from the keys to it, the lean in toward it, and a pat on it once shut (0 … 1 up). */
+export function lidBeats(t: number): { open: number; reach: number; lean: number; pat: number } {
+  const fold = Math.max(0, Math.min(1, (t - LID.reach + 0.12) / (LID.shut - LID.reach + 0.12)));
+  // slow to start over, quicker as it falls, a soft bump as it shuts
+  const open = 1 - fold * fold + 0.035 * hump(LID.shut, LID.shut + 0.22, t);
+  const reach = smoothstep(0, LID.reach, t);
+  // leaning in as far as the lid's top edge is from it: furthest while it is up
+  const lean = reach * Math.min(1, open * 1.15);
+  const pat = hump(LID.pat[0], LID.pat[0] + 0.24, t) + 0.7 * hump(LID.pat[0] + 0.26, LID.pat[1], t);
+  return { open, reach, lean, pat };
+}
+
+/** Where taking the headphones off is at (s): the mittens off the laptop down to its sides (0 … 1) and up to the cups (0 … 1), the headphones off its head (0 on it … 1 drawn forward off it), set down (0 … 1), and the arms let go and down at its sides (0 … 1). */
+export function phonesBeats(t: number): { leave: number; reach: number; off: number; down: number; back: number } {
+  return {
+    leave: smoothstep(0, PHONES.reach * 0.5, t),
+    reach: smoothstep(PHONES.reach * 0.3, PHONES.reach, t),
+    off: smoothstep(PHONES.reach - 0.05, PHONES.off, t),
+    down: smoothstep(PHONES.off - 0.1, PHONES.down, t),
+    back: smoothstep(PHONES.go - 0.05, PHONES.rest, t),
+  };
+}
+
+/**
+ * Where the headphones are (Muse's frame, H; their middle between the cups, x along from the right cup to the left,
+ * y up the band, z forward) at a moment of taking them off (off, down: phonesBeats), given the head's frame as posed
+ * and its joint's rest: on its head; drawn forward off it, the band tipping forward over its face; set down on the
+ * shut laptop before it, lying flat with the band over its back edge (their own shape as they go: phonesShape).
+ */
+export function phonesFrame(off: number, down: number, head: Matrix4, headRest: readonly number[], out: Matrix4): Matrix4 {
+  const P = DESK.phones;
+  // on its head (the head's frame, about its joint), then drawn forward and down a little, the band tipped forward
+  const tip = 1.5 * smoothstep(0, 1, off);
+  out.copy(head).multiply(m3.makeTranslation(0, P.y - headRest[1] - 0.13 * smoothstep(0.25, 1, off), P.z - headRest[2] + 0.2 * off));
+  out.multiply(m4.makeRotationX(tip));
+  if (down <= 0) return out;
+  // set down on the shut laptop: lying with their cups flat on it (swivelled: phonesShape), the band over its back edge
+  const L = DESK.laptop;
+  const laid = m4.makeRotationX(1.75);
+  laid.setPosition(0, DESK.top + 2 * L.base + 0.037, L.z + 0.07);
+  out.decompose(dv, dq1, dsc);
+  laid.decompose(dv2, dq2, dsc);
+  const k = smoothstep(0, 1, down);
+  dv.lerp(dv2, k);
+  // (lifted over the way between)
+  dv.y += 0.06 * hump(0, 1, down);
+  dq1.slerp(dq2, k);
+  return out.compose(dv, dq1, dsc.set(1, 1, 1));
+}
+
+/**
+ * The headphones' own shape as they come off (s into taking them off): how far the band has clamped back from its
+ * head's width (0 on its head … 1 at rest, a little past as it springs shut): partly as its mittens carry them, the
+ * whole way once let go; and how far the cups have swivelled flat to lie down (0 … 1).
+ */
+export function phonesShape(t: number): { clamp: number; swivel: number } {
+  const { off, down } = phonesBeats(t);
+  const freed = smoothstep(PHONES.go - 0.02, PHONES.go + 0.26, t);
+  const clamp = 0.65 * smoothstep(0.15, 0.85, off) * (1 - freed) + freed + 0.09 * hump(PHONES.go + 0.16, PHONES.go + 0.55, t);
+  return { clamp, swivel: smoothstep(0.2, 0.95, down) };
+}
+/** How far each cup's middle is from the headphones' middle (H) as the band clamps (0 on its head … 1 at rest). */
+export function phonesSpan(clamp: number): number {
+  return DESK.phones.cup + (DESK.phones.rest - DESK.phones.cup) * clamp;
+}
+
+/** Where a mitten holds a cup (H, Muse's frame, from the cup's middle: out, up, forward) as the headphones come off (off, 0 … 1): by its front rim while they are on its head, from behind and outside once off. */
+export function phonesGrip(off: number): [number, number, number] {
+  const held = smoothstep(0, 0.6, off);
+  return [0.035 + 0.035 * held, -0.035 + 0.035 * held, 0.085 - 0.11 * held];
+}
+
+/** Where the long stretch is at (s): leaning back in the chair (0 … 1, kept after), the arms up (0 … 1), the quiver at the top of it, the happy sigh (0 … 1). */
+export function unwindBeats(t: number): { back: number; up: number; quiver: number; sigh: number } {
+  const U = UNWIND;
+  const up = during(U.up[0], U.up[1], U.down[0], U.down[1], t);
+  return {
+    back: smoothstep(U.back[0], U.back[1], t),
+    up: up < 1 ? up : 1,
+    quiver: during(U.up[1] - 0.1, U.up[1] + 0.25, U.hold - 0.35, U.hold, t),
+    sigh: during(U.sigh[0], U.sigh[0] + 0.5, U.sigh[1] - 0.6, U.sigh[1], t),
+  };
+}
+
 export type MoveKind =
   | 'bounce'
   | 'pet'
@@ -110,7 +278,11 @@ export type MoveKind =
   | 'fish'
   | 'water'
   | 'stir'
-  | 'pocket';
+  | 'pocket'
+  | 'type'
+  | 'lid'
+  | 'phones'
+  | 'unwind';
 
 /** Something Muse is doing besides (museLife.ts): which, how far into it (s), how much of it shows (0 … 1). */
 export interface Move {
@@ -129,6 +301,12 @@ export interface Move {
   /** Watering: how far the can is tipped (0 … 1), and a content look (0 … 1), as its life has them (else they come in turn). */
   tip?: number;
   glad?: number;
+  /** Typing at a desk: how hurried (0 calm … 1 frantic), and its tap clock (a key struck at each whole number; it runs faster as it hurries). */
+  rush?: number;
+  taps?: number;
+  /** Typing at a desk, at its wits' end: its fur standing up in a wave, as in the lab's fluff (s since it began; < 0 not), and shaken out (s since it began to lie back down; < 0 not yet). */
+  fur?: number;
+  furDown?: number;
 }
 
 export interface MuseAction {
@@ -175,6 +353,16 @@ const m = new Matrix4();
 const m2 = new Matrix4();
 const v = new Vector3();
 const sc = new Vector3();
+// (the desk's: the headphones' frame and its parts as they are blended, the head's frame for them)
+const m3 = new Matrix4();
+const m4 = new Matrix4();
+const m5 = new Matrix4();
+const m6 = new Matrix4();
+const dv = new Vector3();
+const dv2 = new Vector3();
+const dsc = new Vector3();
+const dq1 = new Quaternion();
+const dq2 = new Quaternion();
 
 /** Ease out with a little overshoot (back), 0 → 1. */
 function easeOutBack(x: number): number {
@@ -361,6 +549,15 @@ export class MuseRig {
   squint = 0;
   squeeze = 0;
   blush = 0;
+  /**
+   * Flustered at a desk (the lab's desk scene; muse.frag.glsl MUSE_FLUSTER): its eyes turned to spirals (0 … 1), and
+   * their turn (rad); its mouth a wavy line (0 … 1), how many ripples across it, and their phase (rad).
+   */
+  spiral = 0;
+  spiralTurn = 0;
+  wavy = 0;
+  ripples = 2;
+  ripplePhase = 0;
   /** The fur standing up: how far up the body the wave has come (H, at rest), how much stands behind it, the crest's extra at its front, the front's width (H). */
   readonly fluff = new Vector4(0, 0, 0, 0.12);
   /**
@@ -380,8 +577,16 @@ export class MuseRig {
   lying = 0;
   /** A look held over every pose (a photo's: HeldLook), or null: the poses' own. */
   held: HeldLook | null = null;
+  /**
+   * How each arm's reach is found: the damped steps it takes (more where reaches go far, as at the desk), and its
+   * preference for small turns (per turn: the upper arm's x, y, z, the elbow, the forearm's twist; H² per rad²).
+   */
+  reachSteps = 12;
+  reachPrior: readonly number[] = PRIOR;
   /** Where the hands are wanted this pose. */
   private readonly reaches: Reach[] = [];
+  /** Where each mitten (the left, the right) was last wanted (H, Muse's frame) and how much: for checking a reach against where the mitten got to (handFrame). */
+  readonly wanted = [new Vector4(), new Vector4()];
   /** Each mitten's middle in its forearm's own frame. */
   private readonly hands = [new Vector3(), new Vector3()];
   /** The left upper arm's direction (the chest's frame) as it hangs, and the arc it rises along (its plane's normal, the way along it from hanging); the arc's angles at the pose it was made in and at the top of a wave. */
@@ -533,6 +738,11 @@ export class MuseRig {
     this.squint = 0;
     this.squeeze = 0;
     this.blush = 0;
+    this.spiral = 0;
+    this.spiralTurn = 0;
+    this.wavy = 0;
+    this.ripples = 2;
+    this.ripplePhase = 0;
     this.lying = 0;
     this.reach();
     this.idle(a.time, a.walk);
@@ -590,6 +800,14 @@ export class MuseRig {
         return this.stir(t, e);
       case 'pocket':
         return this.pocket(k);
+      case 'type':
+        return this.type(t, k, e, mv.rush ?? 0, mv.taps ?? t * 4, mv.fur ?? -1, mv.furDown ?? -1);
+      case 'lid':
+        return this.lid(t, k, e);
+      case 'phones':
+        return this.phones(t, k, e);
+      case 'unwind':
+        return this.unwind(t, k, e);
     }
   }
 
@@ -779,11 +997,7 @@ export class MuseRig {
     const J = JOINT;
     const F = FLUFF;
     const tuck = smoothstep(0, F.tuck, t) * (shake >= 0 ? 1 - smoothstep(0.05, 0.3, shake) : 1);
-    // the wave up the body: its front from below the feet to over the head
-    const rise = smoothstep(F.tuck * 0.4, F.tuck + F.rise, t);
-    const down = shake >= 0 ? smoothstep(F.shake * 0.4, F.shake + F.settle, shake) : 0;
-    const standing = rise * (1 - down);
-    this.fluff.set(Math.max(this.fluff.x, -0.15 + 1.35 * rise), Math.max(this.fluff.y, standing * k), Math.max(this.fluff.z, 0.6 * hump(0, 1, rise) * k), 0.12);
+    this.furUp(t, shake, k);
     // scrunched down, the head in, the shoulders up; a tremble of delight
     if (scrunch) {
       const pop = shake >= 0 ? 0.045 * hump(0.08, 0.42, shake) : 0;
@@ -792,15 +1006,35 @@ export class MuseRig {
       for (const side of [1, -1]) this.armBy(side, -0.15 * tuck * k, 0, 0.28 * tuck * k, 0.35 * tuck * k);
     }
     this.addTurn(J.chest, 0, 0.012 * Math.sin(TAU * 11 * t) * tuck * k, 0);
-    // shaken out: the body twisting back and forth, the head after it
+    this.shakeOut(shake, k);
+    const shut = tuck * (shake >= 0 ? 1 - smoothstep(F.shake * 0.6, F.shake + 0.2, shake) : 1);
+    this.express(shut * k, alone ? { squint: 1, smile: 0.7 } : { squeeze: 1, smile: 0.7 });
+    if (alone) this.express(k * smoothstep(F.shake, F.shake + F.settle, shake) * (1 - smoothstep(F.shake + F.settle * 0.6, F.shake + F.settle, shake)), { smile: 1 });
+  }
+
+  /**
+   * The fur standing up in a wave (t since it began; shake since it began to lie back down, < 0 while it stands): the
+   * wave's front rising from below its feet to over its head, a crest at the front, the fur behind it standing; let
+   * go, it lies back down.
+   */
+  private furUp(t: number, shake: number, k: number): void {
+    const F = FLUFF;
+    // the wave up the body: its front from below the feet to over the head
+    const rise = smoothstep(F.tuck * 0.4, F.tuck + F.rise, t);
+    const down = shake >= 0 ? smoothstep(F.shake * 0.4, F.shake + F.settle, shake) : 0;
+    const standing = rise * (1 - down);
+    this.fluff.set(Math.max(this.fluff.x, -0.15 + 1.35 * rise), Math.max(this.fluff.y, standing * k), Math.max(this.fluff.z, 0.6 * hump(0, 1, rise) * k), 0.12);
+  }
+
+  /** Shaken out (shake s since it began, < 0 not yet): the body twisting back and forth, the head after it, dying away. */
+  private shakeOut(shake: number, k: number): void {
+    const J = JOINT;
+    const F = FLUFF;
     if (shake >= 0 && shake < F.shake) {
       const s = Math.sin(TAU * 5 * shake) * (1 - shake / F.shake) * smoothstep(0, 0.08, shake);
       this.addTurn(J.pelvis, 0, 0.16 * s * k, 0.04 * s * k);
       this.addTurn(J.head, 0, -0.1 * s * k, -0.08 * s * k);
     }
-    const shut = tuck * (shake >= 0 ? 1 - smoothstep(F.shake * 0.6, F.shake + 0.2, shake) : 1);
-    this.express(shut * k, alone ? { squint: 1, smile: 0.7 } : { squeeze: 1, smile: 0.7 });
-    if (alone) this.express(k * smoothstep(F.shake, F.shake + F.settle, shake) * (1 - smoothstep(F.shake + F.settle * 0.6, F.shake + F.settle, shake)), { smile: 1 });
   }
 
   /** A big yawn and a stretch: the arms up over its head, the body drawn up tall, the head back, the mouth wide, the eyes screwed shut. */
@@ -1081,6 +1315,229 @@ export class MuseRig {
     this.addTurn(J.head, 0.07 * k, 0, 0);
   }
 
+  // ---- at a desk (the lab's desk scene) ----
+
+  /**
+   * Sat at a desk (0 standing … 1 sat), leaning in toward it (0 … 1 well over it) or back in the chair (back, 0 … 1):
+   * on the chair's seat with its hips less rolled back than when perched, its weight over its bottom and its shoulders
+   * forward, so its short arms reach the desk; leaning in from the hips, the waist and the chest, its head kept up
+   * toward the screen; leaning back, its hips rolled back again and its waist and chest back, settled into the seat.
+   */
+  private deskBase(k: number, lean: number, back = 0): void {
+    const J = JOINT;
+    const up = 1 - back;
+    this.seated(PERCH, k);
+    this.addTurn(J.pelvis, (0.2 * up + 0.22 * lean - 0.05 * back) * k, 0, 0);
+    this.addTurn(J.spine, (0.14 * lean - 0.17 * back) * k, 0, 0);
+    this.addTurn(J.chest, (0.08 * lean - 0.08 * back) * k, 0, 0);
+    this.addTurn(J.head, (-0.13 * up - 0.2 * lean + 0.07 * back) * k, 0, 0);
+    this.addShift(J.root, 0, -0.008 * back * k, -0.02 * back * k);
+    // the arms down at its sides, a little out (as perched)
+    for (const side of [1, -1]) this.armBy(side, 0.1 * k, 0, 0.12 * k, 0.1 * k);
+  }
+
+  /** Both arms turned toward a blend of their starts (ARMS: [start, weight] pairs, weights summing to how much). */
+  private armsFrom(starts: readonly (readonly [readonly number[], number])[]): void {
+    let x = 0;
+    let z = 0;
+    let fore = 0;
+    for (const [a, w] of starts) {
+      x += a[0] * w;
+      z += a[1] * w;
+      fore += a[2] * w;
+    }
+    for (const side of [1, -1]) this.armBy(side, x, 0, z, fore);
+  }
+
+  /** The mittens' middles resting on the shut laptop (H, Muse's frame), one side's. */
+  private restOnLaptop(side: number, out: Vector3): Vector3 {
+    return out.set(side * DESK.rest.x, DESK.top + 2 * DESK.laptop.base + 0.075, DESK.rest.z);
+  }
+
+  /**
+   * Typing at its laptop (taps: its tap clock; rush: 0 calm … 1 frantic). Leaning in, its mittens on the keys, each
+   * up off them and down on its next key in turn (keyBeats), the strikes jolting it a little. Calm, it sways as it
+   * reads, content; hurried, it leans in closer, the strikes come quicker and higher, its head bobs to them and a
+   * tremble runs through it, its face strained and blushing; at its wits' end, its eyes spin (🌀), its mouth goes wavy
+   * and its fur stands up in a wave as in the lab's fluff (fur, s since it began), shaken out when it stops (furDown).
+   */
+  private type(t: number, k: number, e: number, rush: number, taps: number, fur: number, furDown: number): void {
+    const J = JOINT;
+    const K = DESK.keys;
+    const hurry = smoothstep(0.25, 1, rush);
+    this.deskBase(k, 0.55 + 0.4 * hurry);
+    this.addSwell(J.spine, 0.02 * k, 0, -0.07 * k);
+    this.armsFrom([[ARMS.keys, e]]);
+    for (const side of [1, -1]) {
+      const b = keyBeats(taps, side, rush);
+      this.reachFor(side, side * K.x + b.across, K.y + b.lift, K.z + b.back, -1, e);
+    }
+    // each strike jolts it a little; hurried, its head bobs to them and turns a touch toward the striking mitten
+    const f = taps - Math.floor(taps);
+    const jolt = taps >= 0 ? 1 - smoothstep(0, 0.5, f) : 0;
+    this.addShift(J.chest, 0, -0.003 * (0.4 + hurry) * jolt * e, 0);
+    this.addTurn(J.head, 0.03 * hurry * jolt * e, 0.035 * hurry * striker(Math.floor(taps)) * jolt * e, 0);
+    // hurried, a tremble runs through it
+    this.addTurn(J.chest, 0, 0.012 * hurry * Math.sin(TAU * 7.3 * t) * e, 0.008 * hurry * Math.sin(TAU * 5.1 * t) * e);
+    this.addTurn(J.head, 0, 0, 0.012 * hurry * Math.sin(TAU * 6.1 * t + 1) * e);
+    // calm, a slow sway now and then as it reads
+    const calm = 1 - hurry;
+    this.addTurn(J.head, 0.025 * Math.sin(TAU * 0.21 * t) * calm * e, 0.05 * Math.sin(TAU * 0.11 * t + 1) * calm * e, 0.035 * Math.sin(TAU * 0.16 * t + 2) * calm * e);
+    this.addTurn(J.chest, 0, 0.02 * Math.sin(TAU * 0.13 * t) * calm * e, 0);
+    // the face: content and intent, then strained and blushing, then dizzy
+    const strained = smoothstep(0.35, 0.62, rush);
+    const dizzy = smoothstep(0.84, 0.97, rush);
+    this.express(e, { smile: 0.24 });
+    this.express(strained * e, { smile: 0, blush: 0.4 });
+    this.express(dizzy * e, { blush: 0.65 });
+    this.spiral = Math.max(this.spiral, dizzy * e);
+    this.spiralTurn = -TAU * 1.15 * t;
+    this.wavy = Math.max(this.wavy, smoothstep(0.76, 0.93, rush) * e);
+    this.ripples = 2;
+    this.ripplePhase = TAU * 1.7 * t;
+    // its fur standing up in a wave at its wits' end (the lab's fluff), shaken out when it stops
+    if (fur >= 0) {
+      this.furUp(fur, furDown, e);
+      this.shakeOut(furDown, e);
+    }
+  }
+
+  /**
+   * Closing its laptop (lidBeats): its mittens from the keys up to the lid's top edge, leaning in to it, the lid
+   * folded down onto the keys (pulled over, then pressed down), a pat on it once shut, the mittens resting on it; a
+   * contented look as it shuts.
+   */
+  private lid(t: number, k: number, e: number): void {
+    const J = JOINT;
+    const L = DESK.laptop;
+    const K = DESK.keys;
+    const { open, reach, lean, pat } = lidBeats(t);
+    this.deskBase(k, 0.55 + 0.65 * lean);
+    // (a little stretch of the arms to reach up over it)
+    this.lengthen(J.upperArmL, J.foreArmL, 0.035 * lean * e);
+    this.lengthen(J.upperArmR, J.foreArmR, 0.035 * lean * e);
+    // (its belly pressed against the desk as it leans in)
+    this.addSwell(J.spine, 0.02 * lean * k, 0, -0.07 * lean * k);
+    // the mittens: from its home keys up to the lid's top edge (over it, as the lid is up), then down with it round
+    // its arc (by way of the edge half down) to resting on it shut, patting it; the arms set off toward each from its
+    // start (ARMS), blended as the places are
+    const hingeY = DESK.top + L.base;
+    const hingeZ = L.z + L.depth;
+    const r = smoothstep(0, 1, reach);
+    const f = 1 - Math.min(1, open);
+    const w = [(1 - r) * e, r * (1 - f) * (1 - f) * e, r * 2 * f * (1 - f) * e, r * f * f * e];
+    this.armsFrom([
+      [ARMS.keys, w[0]],
+      [ARMS.lidTop, w[1]],
+      [ARMS.lidHalf, w[2]],
+      [ARMS.rest, w[3]],
+    ]);
+    const edge = (a: number, over: number, out: Vector3, side: number): Vector3 => {
+      const dy = Math.sin(a);
+      const dz = -Math.cos(a);
+      const l = Math.hypot(over * dy + Math.cos(a), over * dz + Math.sin(a)) || 1;
+      return out.set(side * (L.width / 2 - 0.06), hingeY + L.lid * 0.96 * dy + (0.05 * (over * dy + Math.cos(a))) / l, hingeZ + L.lid * 0.96 * dz + (0.05 * (over * dz + Math.sin(a))) / l);
+    };
+    for (const side of [1, -1]) {
+      this.reachFor(side, side * K.x, K.y, K.z, -1, w[0]);
+      const top = edge(L.open, 1, v, side);
+      this.reachFor(side, top.x, top.y + 0.04 * hump(0, 1, reach), top.z, -1, w[1]);
+      const half = edge(L.open * 0.45, 0.6, v, side);
+      this.reachFor(side, half.x, half.y, half.z, -1, w[2]);
+      const rest = this.restOnLaptop(side, v);
+      this.reachFor(side, rest.x, rest.y + 0.035 * pat, rest.z, -1, w[3]);
+    }
+    this.addTurn(J.head, 0.06 * reach * e - 0.05 * pat * e, 0, 0);
+    const shut = smoothstep(LID.shut - 0.25, LID.shut + 0.2, t);
+    this.express(shut * e * (1 - smoothstep(LID.pat[1], LID.rest, t)), { squint: -1, smile: 0.5 });
+    this.express(e * smoothstep(LID.pat[1], LID.rest, t), { smile: 0.35 });
+  }
+
+  /**
+   * Taking its headphones off (phonesBeats, phonesFrame, phonesShape): its mittens off the laptop and up to the cups,
+   * the cups drawn forward so the band tips over its face (its head ducking out from under it), the band clamping in
+   * as they carry them, the headphones set down flat on the laptop and let go (the band springing shut), the mittens
+   * resting by them; a little shake of its head after.
+   */
+  private phones(t: number, k: number, e: number): void {
+    const J = JOINT;
+    const { leave, reach, off, down, back } = phonesBeats(t);
+    // (leaning in as it ends closing the lid, sitting up a little as it takes them off)
+    this.deskBase(k, 0.55 - 0.2 * reach + 0.2 * hump(0, 1, off));
+    // its head ducking out from under them, then a little shake
+    this.addTurn(J.head, 0.12 * hump(0, 1, off) * e, 0, 0);
+    const shake = t - PHONES.go;
+    if (shake > 0 && shake < 0.7) this.addTurn(J.head, 0, 0.09 * Math.sin(TAU * 3.2 * shake) * (1 - shake / 0.7) * e, 0.04 * Math.sin(TAU * 3.2 * shake + 0.6) * (1 - shake / 0.7) * e);
+    // the mittens: off the laptop and down to its sides, then up to the cups on its head (by their front rims), with
+    // them as they come off and forward, down with them onto the laptop; let go, resting there by them. The arms go
+    // from start to start (ARMS; down at its sides between, so they rise to the cups as in a wave), each reach fitted
+    // only near its own place
+    this.frameNow(J.head, m5);
+    const hr = this.fit.rest[J.head];
+    const onLaptop = (1 - leave) * e;
+    // (let go, its mittens stay resting by them until it leans back to stretch)
+    const away = reach * e;
+    const held = [1 - smoothstep(0, 1, off), smoothstep(0, 1, off) * (1 - smoothstep(0, 1, down)), smoothstep(0, 1, down)];
+    this.armsFrom([
+      [ARMS.rest, onLaptop],
+      [ARMS.cupOn, away * held[0]],
+      [ARMS.held, away * held[1]],
+      [ARMS.laid, away * held[2]],
+    ]);
+    for (const side of [1, -1]) {
+      const rest = this.restOnLaptop(side, v);
+      this.reachFor(side, rest.x, rest.y, rest.z, -1, onLaptop * onLaptop);
+      ([[0, 0, 0], [1, 0, 0.65], [1, 1, 0.65]] as const).forEach(([o, d, c], i) => {
+        if (held[i] <= 0) return;
+        phonesFrame(o, d, m5, hr, m6);
+        const g = phonesGrip(o);
+        const cup = v.set(side * phonesSpan(c), 0, 0).applyMatrix4(m6);
+        // (once let go, nothing to reach for: the arm falls to its side on its starts alone)
+        this.reachFor(side, cup.x + side * g[0], cup.y + g[1], cup.z + g[2], -1, ((away * away * held[i]) / Math.max(e, 1e-6)) * (1 - smoothstep(0, 0.35, back)));
+      });
+    }
+    this.express(e * hump(0.3, 1, off), { squint: 1, smile: 0.3 });
+    this.express(e * back, { smile: 0.4 });
+  }
+
+  /**
+   * Leaning back in its chair for a long stretch (unwindBeats): sinking back, its arms up and out in a V and its body
+   * drawn up long, its fur standing up in a wave (the lab's fluff), held with a quiver, eyes squeezed shut and a wavy
+   * little mouth (\(> ~ <)/); the arms let fall and the fur shaken out, a long happy sigh; then at its ease, leaning
+   * back, its eyes content.
+   */
+  private unwind(t: number, k: number, e: number): void {
+    const J = JOINT;
+    const { back, up, quiver, sigh } = unwindBeats(t);
+    this.deskBase(k, 0.35 * (1 - back), back);
+    const q = Math.sin(TAU * 8.5 * t) * quiver;
+    // (its arms from resting by the headphones, as it set them down, straight up into the stretch)
+    this.armsFrom([[ARMS.laid, e * (1 - smoothstep(UNWIND.up[0], UNWIND.up[1], t))]]);
+    // (a wave's raise, then brought down out to the side into a V, the forearm straightened, quivering)
+    for (const side of [1, -1]) {
+      this.waveArm(side, up * e, 0);
+      this.armBy(side, 0.06 * up * e, 0, (-0.38 * up + 0.025 * q) * e, -0.5 * up * e);
+    }
+    this.stretch += (0.05 * up - 0.025 * hump(UNWIND.down[0], UNWIND.down[1] + 0.3, t)) * e;
+    // its fur standing up in a wave as it stretches (the lab's fluff), shaken out as its arms come down
+    const fur = t - UNWIND.up[0] - 0.1;
+    if (fur >= 0) {
+      const down = t >= UNWIND.down[0] ? t - UNWIND.down[0] : -1;
+      this.furUp(fur, down, e);
+      this.shakeOut(down, 0.7 * e);
+    }
+    this.addTurn(J.head, -0.16 * up * e, 0, 0.02 * q * e);
+    this.addTurn(J.chest, -0.07 * up * e, 0.01 * q * e, 0);
+    // the face: > ~ < as it stretches, then a content sigh, then at its ease
+    this.express(up * e, { squeeze: 1, smile: 0.3, blush: 0.55 });
+    this.wavy = Math.max(this.wavy, smoothstep(0.15, 0.6, up) * e);
+    this.ripples = 1;
+    this.ripplePhase = Math.PI;
+    this.express(sigh * e, { squint: -1, smile: 0.65, blush: 0.3 });
+    const after = smoothstep(UNWIND.sigh[1] - 0.6, UNWIND.sigh[1], t) * e;
+    this.express(after, { smile: 0.45 });
+  }
+
   /** The arms hung as the fit hangs them, nothing else moved: a sculpt's roots are measured so (museMesh.ts). */
   hang(): void {
     this.turn.fill(0);
@@ -1143,6 +1600,7 @@ export class MuseRig {
         wz += at.z * r.amount;
         total += r.amount;
       }
+      this.wanted[side > 0 ? 0 : 1].set(wx / Math.max(total, 1e-9), wy / Math.max(total, 1e-9), wz / Math.max(total, 1e-9), total);
       if (total <= 0) continue;
       target.set(wx / total, wy / total, wz / total);
       const p = this.solveArm(side, target);
@@ -1201,7 +1659,7 @@ export class MuseRig {
     const jac = new Float64Array(15);
     const A = new Float64Array(25);
     const b = new Float64Array(5);
-    for (let iteration = 0; iteration < 12; iteration++) {
+    for (let iteration = 0; iteration < this.reachSteps; iteration++) {
       reachOf(p, at);
       const ex = goal.x - at.x;
       const ey = goal.y - at.y;
@@ -1219,8 +1677,8 @@ export class MuseRig {
       // (JᵀJ + damping + prior) step = Jᵀe − prior·p
       for (let r = 0; r < 5; r++) {
         for (let c = 0; c < 5; c++) A[r * 5 + c] = jac[r] * jac[c] + jac[5 + r] * jac[5 + c] + jac[10 + r] * jac[10 + c];
-        A[r * 5 + r] += 2e-3 + PRIOR[r];
-        b[r] = jac[r] * ex + jac[5 + r] * ey + jac[10 + r] * ez - PRIOR[r] * p[r];
+        A[r * 5 + r] += 2e-3 + this.reachPrior[r];
+        b[r] = jac[r] * ex + jac[5 + r] * ey + jac[10 + r] * ez - this.reachPrior[r] * p[r];
       }
       solve5(A, b);
       for (let c = 0; c < 5; c++) p[c] += b[c];
