@@ -30,7 +30,7 @@ import type {
   TripReport,
 } from '../../src/muse/contract';
 import { isPlanetId, planetOf } from '../../src/muse/planets';
-import { parsePostcard } from '../adapters/minds/prompts/postcard';
+import { BACK_LIMITS, parsePostcard } from '../adapters/minds/prompts/postcard';
 import {
   AGENT_LIMITS,
   agentSoulText,
@@ -51,12 +51,12 @@ import {
 } from '../domain/agent';
 import { instructionLike, museLine } from '../domain/agentText';
 import { nextBasketCheck } from '../domain/policy/basket';
-import { kindsFor, planOf } from '../domain/policy/postcard';
+import { anyPlan, BACK_KINDS, kindsFor, postcardPlan } from '../domain/policy/postcard';
 import { tooClose, wordsOf } from '../domain/postcardWords';
 import { personalFact, privacyFilterIn } from '../domain/privacy';
 import { localDay } from '../domain/time';
 import type { AgentCheck, Engine } from './engine';
-import { topicLabel, waitingPostcards } from './garden';
+import { topicLabel, waitingPostcards, type GardenInput, type WaitingPostcard } from './garden';
 import type { Views } from './views';
 
 export interface AgentOptions {
@@ -78,6 +78,22 @@ const LOOK = /^(?:tpose6|muse(?:1[0-2]|[0-9])|gen-[a-z0-9][a-z0-9-]*)$/;
 const MUSE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const DOODLES: ReadonlySet<string> = new Set<Doodle>(['sun', 'cloud', 'rain', 'muse', 'laptop', 'flower', 'bird', 'fish', 'house', 'planet', 'heart', 'leaf', 'boat', 'stars']);
 const NEUTRAL = { curiosity: 0.5, focus: 0.5, sociability: 0.5, whimsy: 0.5, novelty: 0.5 } as const;
+
+const L = BACK_LIMITS;
+/** What each kind of back holds, for a refusal to say. */
+const BACK_SHAPES: Readonly<Record<PostcardBack['kind'], string>> = {
+  line: `text (up to ${L.text} characters)`,
+  doodle: `caption (up to ${L.short}); doodle optional, one of ${[...DOODLES].join(', ')}`,
+  map: `label (up to ${L.short})`,
+  note: `title (up to ${L.title}) and 2 or 3 lines (up to ${L.item} each)`,
+  list: `title (up to ${L.title}) and 2 to 4 items, each text (up to ${L.item}) and done (true or false)`,
+  pressed: `label (up to ${L.short}); find optional, the id of a find you keep`,
+  ticket: `note (up to ${L.short})`,
+  game: `caption (up to ${L.short})`,
+  riddle: `question (up to ${L.question}) and answer (up to ${L.short})`,
+  tally: `what (up to ${L.short}) and count (1 to 40)`,
+  poem: `3 lines (up to ${L.item} each)`,
+};
 
 const isLook = (v: unknown): v is MuseLook => typeof v === 'string' && LOOK.test(v);
 
@@ -131,7 +147,7 @@ export class AgentApi implements AgentCommands, AgentQueries {
       look,
       interests: strongest(s, at, this.opts.salienceAt).map((i) => ({ topic: topicLabel(i.topic), stage: i.stage })),
       happenings: happenings(s, log, at, (id) => this.engine.state(id)?.seed.name ?? 'a friend'),
-      postcards: waitingPostcards(input),
+      postcards: this.waiting(s, input),
       allowances: {
         findsLeft: Math.max(0, AGENT_LIMITS.findsPerDay - reportedOn(log, today, tz)),
         photosLeft: Math.max(0, this.social.photoSlotsLeft(s, at)),
@@ -139,6 +155,21 @@ export class AgentApi implements AgentCommands, AgentQueries {
       },
       lastCheckout: s.lastCheckout ?? null,
     };
+  }
+
+  /**
+   * Muse's unwritten postcards, each with `kinds`, a hint it may ignore: the back the garden's rules would have
+   * planned for the photo first, then the other kinds that suit it.
+   */
+  private waiting(s: MuseState, input: GardenInput): (WaitingPostcard & { readonly kinds: readonly PostcardBack['kind'][] })[] {
+    const specs = new Map(s.photos.map((p) => [p.id, p]));
+    const draw = this.engine.draw(s.seed.id, 0);
+    return waitingPostcards(input).map((p) => {
+      const spec = specs.get(p.id);
+      if (!spec) return { ...p, kinds: [] };
+      const planned = postcardPlan(s, spec, draw).kind;
+      return { ...p, kinds: [planned, ...kindsFor(spec).filter((k) => k !== planned)] };
+    });
   }
 
   guidebook(museId: MuseId, requester: MuseId, at: Instant): Guidebook | null | 'forbidden' {
@@ -319,22 +350,19 @@ export class AgentApi implements AgentCommands, AgentQueries {
     if (refused || !s) return refused ?? refuse(404, 'no such Muse');
     const spec = s.photos.find((p) => p.id === photo);
     if (!spec) return refuse(404, 'you took no such photo');
-    const kinds = kindsFor(spec);
-    const kind = (words as { kind?: unknown } | null)?.kind;
-    if (typeof kind !== 'string' || !kinds.includes(kind as PostcardBack['kind'])) {
-      return refuse(400, `this photo’s back can be: ${kinds.join(', ')}`);
-    }
-    const parsed = parsePostcard(words, kind as PostcardBack['kind']);
-    if (!parsed) return refuse(400, `those words don’t fit a ${kind} back: check its parts and keep each short`);
+    // Muse picks any kind of back; the photo only settles what that kind draws (anyPlan).
+    const extra = (typeof words === 'object' && words !== null ? words : {}) as { kind?: unknown; doodle?: unknown; find?: unknown };
+    const kind = BACK_KINDS.find((k) => k === extra.kind);
+    if (!kind) return refuse(400, `a back is one of: ${BACK_KINDS.join(', ')}`);
+    const parsed = parsePostcard(words, kind);
+    if (!parsed) return refuse(400, `those words don’t fit a ${kind} back: ${BACK_SHAPES[kind]}`);
     const said = wordsOf(parsed);
     const why = instructionLike(said) ?? personalFact(said);
     if (why) return refuse(422, `the postcard was refused: ${why}. Write it again in your own words, without that.`);
     if (tooClose(said, s.recentWords)) return refuse(422, 'you wrote nearly the same on a recent postcard; say something new');
-    const plan = planOf(parsed.kind, s, spec, this.engine.draw(museId, 0));
-    const doodle = (words as { doodle?: unknown }).doodle;
-    const chosen = plan.kind === 'doodle' && typeof doodle === 'string' && DOODLES.has(doodle) ? { doodle: doodle as Doodle } : {};
-    const back = { ...plan, ...chosen, ...parsed, kind: plan.kind } as PostcardBack;
-    if (back.kind !== parsed.kind) return refuse(400, `this photo’s back can be: ${kinds.join(', ')}`);
+    const plan = anyPlan(kind, s, spec, this.engine.draw(museId, 0), typeof extra.find === 'string' ? (extra.find as DiscoveryId) : undefined);
+    const chosen = plan.kind === 'doodle' && typeof extra.doodle === 'string' && DOODLES.has(extra.doodle) ? { doodle: extra.doodle as Doodle } : {};
+    const back = { ...plan, ...chosen, ...parsed, kind } as PostcardBack;
     const r = await this.engine.writeBack(museId, photo, back, (now, log) => notAgent(now) ?? (written(log(), photo) ? refuse(409, 'that postcard’s back is written already') : null));
     return r.ok ? { ok: true, value: { written: photo } } : r;
   }

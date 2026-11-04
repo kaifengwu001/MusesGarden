@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CanonicalUrl, DiscoveryId, Instant, StoredEvent, TopicKey, TripReport } from '../../src/muse/contract';
+import type { CanonicalUrl, DiscoveryId, Instant, MuseId, PhotoId, PhotoSpec, StoredEvent, TopicKey, TripReport } from '../../src/muse/contract';
 import { agentSoulText, clampTemperament, composedBasket, nextMidnight, planTrip, stopsOf, waitingBasket } from './agent';
+import { anyPlan } from './policy/postcard';
 import { parseSoul } from './soul';
 import { emptyState } from './state';
 import { find } from './social/testkit';
@@ -64,5 +65,25 @@ describe('a real Muse’s soul and basket', () => {
     expect(composedBasket(sent, composed, (six + 60_000) as Instant)).toBeNull();
     expect(waitingBasket([...log, { museId: seed.id, seq: 2, event: { kind: 'basket.delivered', basket: sent.baskets[0], at: six } }])).toBeNull();
     expect(nextMidnight(T0, TZ)).toBe(Date.parse('2026-11-03T00:00:00-08:00'));
+  });
+});
+
+describe('a back of any kind', () => {
+  const seed = { id: 'm' as MuseId, name: 'M', worldSeed: 1, timezone: TZ };
+  const photo: PhotoSpec = { id: 'p:m:1' as PhotoId, at: T0, subject: 'sky', context: 'planet', planetOf: seed.id, dir: [0, 1, 0], forward: [1, 0, 0], zoom: 0.5, companions: [] };
+  const draw = () => 0.3;
+
+  it('presses the find Muse names, else its newest, else none; and plays a solo photo’s game with its closest friend', () => {
+    const [old, recent] = [find('old', ['Jazz'], { at: T0 }), find('recent', ['Jazz'], { at: (T0 + 1) as Instant })];
+    const s = { ...emptyState(seed), discoveries: new Map([[old.id, old], [recent.id, recent]]) };
+    expect(anyPlan('pressed', s, photo, draw, old.id)).toEqual({ kind: 'pressed', find: old.id });
+    expect(anyPlan('pressed', s, photo, draw, 'nope' as DiscoveryId)).toEqual({ kind: 'pressed', find: recent.id });
+    expect(anyPlan('pressed', emptyState(seed), photo, draw)).toEqual({ kind: 'pressed', find: '' });
+    const friend = (other: string, rapport: number) => [other as MuseId, { other: other as MuseId, status: 'friends', rapport }] as const;
+    const social = { ...s.social, relationships: new Map([friend('ada', 1), friend('bo', 3)]) as never };
+    const game = anyPlan('game', { ...s, social }, photo, draw);
+    expect(game.kind === 'game' && [game.friend, /^[xo.]{9}$/.test(game.board)]).toEqual(['bo', true]);
+    expect(anyPlan('map', s, photo, draw)).toEqual({ kind: 'map', dir: [0, 1, 0] });
+    expect(anyPlan('line', s, photo, draw)).toEqual({ kind: 'line' });
   });
 });
