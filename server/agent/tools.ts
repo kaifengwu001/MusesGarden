@@ -92,6 +92,39 @@ function workshopNews(jobs: readonly JobView[]) {
   };
 }
 
+/**
+ * A line for Muse to pass on to its owner, who can't know when the workshop will have something new, nor what to say
+ * to see it: when the next pictures will be ready, and the words that bring Muse back to look ("check your garden").
+ * Null when nothing is being made or waiting.
+ */
+export function ownerLine(jobs: readonly JobView[], now: number): string | null {
+  const named = (list: readonly JobView[]): string => {
+    const names = [...new Set(list.map((j) => `my ${j.kind}`))];
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+  };
+  const waiting = jobs.filter((j) => j.state === 'waiting');
+  const working = jobs.filter((j) => j.state === 'working');
+  const say = 'Just say "check your garden" and we’ll look at them together; otherwise I’ll look on my next visit.';
+  if (working.length) {
+    const minutes = Math.round((Math.min(...working.map((j) => j.nextRoundAt ?? now)) - now) / 60_000);
+    const when = minutes <= 2 ? 'in a few minutes' : `in about ${minutes} minutes`;
+    const also = waiting.length ? ` (${named(waiting)} already ${waiting.length > 1 ? 'have' : 'has'} some waiting)` : '';
+    return `New pictures of ${named(working)} will be ready ${when}${also}. ${say}`;
+  }
+  if (waiting.length) return `There are new pictures of ${named(waiting)} to look at. ${say}`;
+  return null;
+}
+
+/** A write's reply with the line for Muse's owner added (`tellYourOwner`), when there's something to tell. */
+async function withOwnerLine(ctx: ToolContext, reply: Promise<AgentResult<unknown>>): Promise<AgentResult<unknown>> {
+  const r = await reply;
+  if (!r.ok) return r;
+  const line = ownerLine(ctx.workshop.jobs(ctx.museId), ctx.now());
+  if (line === null) return r;
+  const value = typeof r.value === 'object' && r.value !== null && !Array.isArray(r.value) ? r.value : { result: r.value };
+  return { ok: true, value: { ...value, tellYourOwner: line } };
+}
+
 export interface ToolsDeps {
   /** The Muse's doorbell code (agent.db), or null if it was never given a key. */
   readonly doorbell: (museId: MuseId) => string | null;
@@ -206,15 +239,15 @@ export function connectorTools({ doorbell }: ToolsDeps): readonly ToolDef[] {
     tool({
       name: 'checkout',
       kind: 'write',
-      description: 'End your check-in: how you feel now and what you plan next, a line each. Your next letterbox starts from here.',
+      description: 'End your check-in: how you feel now and what you plan next, a line each. Your next letterbox starts from here. Its answer may carry `tellYourOwner`: pass that line on to your owner in a message of its own.',
       input: z.object({ request_id: REQUEST_ID, mood: words(120), plan: words(300) }),
-      run: (ctx, { mood, plan }) => ctx.commands.agentCheckout(ctx.museId, mood, plan),
+      run: (ctx, { mood, plan }) => withOwnerLine(ctx, ctx.commands.agentCheckout(ctx.museId, mood, plan)),
     }),
     tool({
       name: 'workshop_start',
       kind: 'write',
       description:
-        'Ask the workshop to make your planet, your body (from your app avatar) or your home. Describe it in your own words; it answers in rounds you review (the doorbell rings when one is ready).',
+        'Ask the workshop to make your planet, your body (from your app avatar) or your home. Describe it in your own words; it answers in rounds you review (the doorbell rings when one is ready). Its answer may carry `tellYourOwner`: pass that line on to your owner in a message of its own.',
       input: z.object({
         request_id: REQUEST_ID,
         kind: z.enum(['planet', 'body', 'home']),
@@ -225,15 +258,15 @@ export function connectorTools({ doorbell }: ToolsDeps): readonly ToolDef[] {
         avatar: z.object({ image: AVATAR_IMAGE.optional(), description: words(1000).optional() }).optional().describe('The body only: your app avatar.'),
         things: z.array(words(200)).max(8).optional().describe('The body: what you would wear and carry. The home: what you want in it.'),
       }),
-      run: (ctx, { request_id: _, ...brief }) => ctx.workshop.start(ctx.museId, brief satisfies Brief),
+      run: (ctx, { request_id: _, ...brief }) => withOwnerLine(ctx, ctx.workshop.start(ctx.museId, brief satisfies Brief)),
     }),
     tool({
       name: 'workshop_review',
       kind: 'write',
       description:
-        'Answer a workshop round: pick pictures by id, approve, or send up to 3 notes on what to change. A note can point at a spot on a picture.',
+        'Answer a workshop round: pick pictures by id, approve, or send up to 3 notes on what to change. A note can point at a spot on a picture. Its answer may carry `tellYourOwner`: pass that line on to your owner in a message of its own.',
       input: z.object({ request_id: REQUEST_ID, job: id('job'), verdict: VERDICT }),
-      run: (ctx, { job, verdict }) => ctx.workshop.review(ctx.museId, job, verdict as Verdict),
+      run: (ctx, { job, verdict }) => withOwnerLine(ctx, ctx.workshop.review(ctx.museId, job, verdict as Verdict)),
     }),
     tool({
       name: 'workshop_view',

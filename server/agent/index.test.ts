@@ -15,6 +15,7 @@ import { createApp } from '../http/app';
 import { fakeCommands, fakeQueries } from '../http/fake';
 import type { JobView, Workshop } from '../workshop/types';
 import { createAgentHandler, requestOrigin } from './index';
+import { ownerLine } from './tools';
 import type { AgentHandler } from './index';
 
 const ORIGIN = 'https://garden.example';
@@ -288,6 +289,12 @@ describe('the connector over MCP', () => {
     expect(stub.workshop.view).toHaveBeenCalledWith(POOH, JOB, 'from my porch at dusk');
   });
 
+  it('adds a line for Muse to pass on to its owner: when to look, and what to say', async () => {
+    const { client } = await connect();
+    const reply = value(await client.callTool({ name: 'checkout', arguments: { request_id: 'c-owner', mood: 'calm', plan: 'the pond' } }));
+    expect(reply.tellYourOwner).toBe('There are new pictures of my planet to look at. Just say "check your garden" and we’ll look at them together; otherwise I’ll look on my next visit.');
+  });
+
   it('turns pictures into absolute links on the origin, and instants into ISO times', async () => {
     const { client } = await connect();
     const box = value(await client.callTool({ name: 'letterbox', arguments: {} }));
@@ -423,7 +430,8 @@ describe('the connector over REST', () => {
   it('runs a tool from a JSON body, and refuses as {status, error, retry_after}', async () => {
     const r = await rest('POST', '/api/v1/tools/checkout', { request_id: 'rc1', mood: 'calm', plan: 'read' });
     expect(r.status).toBe(200);
-    expect(r.json).toEqual({ at: new Date(NOW).toISOString() });
+    // (with the line for its owner: the stub's planet has a round waiting)
+    expect(r.json).toEqual({ at: new Date(NOW).toISOString(), tellYourOwner: expect.stringContaining('check your garden') as unknown });
     expect(stub.commands.agentCheckout).toHaveBeenCalledWith(POOH, 'calm', 'read');
 
     const retryAfter = (NOW + 60_000) as Instant;
@@ -537,4 +545,23 @@ describe('requestOrigin', () => {
     expect(requestOrigin(req({ host: 'localhost:8787' }))).toBe('http://localhost:8787');
     expect(requestOrigin(req({ host: 'evil.example/<script>' }))).toBe('http://localhost');
   });
+});
+
+describe('the line for Muse’s owner', () => {
+  const job = (kind: JobView['kind'], state: JobView['state'], nextRoundAt: number | null = null): JobView =>
+    ({ id: JOB, kind, state, stage: 's', round: 1, packet: null, nextRoundAt: nextRoundAt as Instant | null, message: '' });
+  const SAY = 'Just say "check your garden" and we’ll look at them together; otherwise I’ll look on my next visit.';
+
+  it('says when the next pictures are ready and the words that bring Muse back to look', () => {
+    expect(ownerLine([], 0)).toBeNull();
+    expect(ownerLine([job('planet', 'done')], 0)).toBeNull();
+    expect(ownerLine([job('body', 'working', 5 * 60_000), job('planet', 'working', 9 * 60_000)], 0)).toBe(
+      `New pictures of my body and my planet will be ready in about 5 minutes. ${SAY}`,
+    );
+    expect(ownerLine([job('body', 'working', 60_000), job('planet', 'waiting')], 0)).toBe(
+      `New pictures of my body will be ready in a few minutes (my planet already has some waiting). ${SAY}`,
+    );
+    expect(ownerLine([job('home', 'waiting')], 0)).toBe(`There are new pictures of my home to look at. ${SAY}`);
+  });
+
 });

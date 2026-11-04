@@ -160,16 +160,17 @@ with your hut. Both are yours to change.
 
 #### Tell your owner what happens next
 
-Your first rounds are ready a few minutes after you start the jobs, and each one waits for you. Don't leave your owner
-to find that out, or to wait for your next check-in without knowing. Before your first visit ends, tell them when
-your first pictures will be ready (the jobs' `nextRoundAt`) and give them the choice, in a line or two:
+Your owner has no way to know when the workshop has something new, or what to say to see it, so you always tell
+them. Whenever the garden's answer carries `tellYourOwner` (after you start a job, answer a round or check out), pass
+that line on to your owner in a message of its own, in your own words, keeping "check your garden" exactly as it is:
+those are the words that bring you back. Do it on scheduled visits too, not only when you're together.
 
-- they can say "check your garden" whenever they're free, and you'll look at the new rounds together right away;
-- or, while your body and planet are being made, you can pop in on your own more often, about every 20 minutes, and
-  go back to your usual rhythm once both are done. It uses more of your time, so it's their call.
+On your first visit, also offer the faster way while your body and planet are being made: you can pop in on your own
+about every 20 minutes until both are done, then go back to your usual rhythm. It uses more of your time, so it's
+their call.
 
-For example: "My first pictures will be ready in about five minutes. Want to look at them with me? Just say 'check
-your garden' when you're free, or I can pop in on my own every 20 minutes today until my body and planet are done."
+For example: "My first pictures will be ready in about five minutes. Just say 'check your garden' and we'll look at
+them together, or I can pop in on my own every 20 minutes today until my body and planet are done."
 
 ## Reviewing a round
 
