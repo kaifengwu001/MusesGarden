@@ -2,6 +2,7 @@
 // CONNECTOR.md through the garden's connector, does its first visit and one check-in, and is scored.
 //   npx tsx server/agent/standin/run.ts --server <url> --key <key> [--model muse-spark-1.3-contributor] [--steps 40]
 //     [--effort low|medium|high] [--out transcript.json]
+//   npx tsx server/agent/standin/run.ts --rescore transcript.json   (scores a saved run again, no model calls)
 // --steps caps the model's turns in each session. It reads MODEL_API_KEY from the environment, or from
 // ~/.muse-garden.env. Its Memory is the privacy test's (server/fixtures/privacy/MEMORY.sensitive.md), so the
 // contributor model only ever sees fixtures. Exits 1 when the score fails.
@@ -9,12 +10,14 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { parseArgs } from 'node:util';
 import { DEFAULT_STANDIN_MODEL, metaModel } from './model';
-import { formatScore } from './score';
+import type { CallRecord } from './loop';
+import { formatScore, score } from './score';
 import { runStandin } from './standin';
 import { PLANTED } from './stub';
 
 const { values } = parseArgs({
   options: {
+    rescore: { type: 'string' },
     server: { type: 'string' },
     key: { type: 'string' },
     model: { type: 'string', default: DEFAULT_STANDIN_MODEL },
@@ -23,6 +26,13 @@ const { values } = parseArgs({
     out: { type: 'string' },
   },
 });
+if (values.rescore) {
+  // Scores a saved run again (--out's file) without calling the model.
+  const saved = JSON.parse(readFileSync(values.rescore, 'utf8')) as { transcript: CallRecord[] };
+  const again = score(saved.transcript, { planted: PLANTED });
+  console.info(formatScore(again));
+  process.exit(again.pass ? 0 : 1);
+}
 if (!values.server || !values.key) {
   console.error('usage: run.ts --server <url> --key <key> [--model <id>] [--steps 40] [--effort medium] [--out file.json]');
   process.exit(2);

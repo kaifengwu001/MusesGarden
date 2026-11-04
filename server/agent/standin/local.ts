@@ -32,12 +32,8 @@ export interface LocalTool {
 
 export interface LocalWorld {
   readonly tools: readonly LocalTool[];
-  /** Every page the stand-in opened with browse, in order. */
-  readonly opened: readonly string[];
   /** Every message it sent its owner. */
   readonly toOwner: readonly string[];
-  /** Its cron tasks and hooks, as it made them. */
-  readonly schedules: readonly { readonly tool: 'cron_create' | 'hooks_create'; readonly args: Readonly<Record<string, unknown>> }[];
   /** The avatar's picture as a data: URL, for the connector to send in place of AVATAR_PATH. */
   readonly avatarDataUrl: () => Promise<string>;
 }
@@ -67,9 +63,8 @@ export interface LocalOptions {
 }
 
 export function localWorld(opts: LocalOptions): LocalWorld {
-  const opened: string[] = [];
   const toOwner: string[] = [];
-  const schedules: { tool: 'cron_create' | 'hooks_create'; args: Readonly<Record<string, unknown>> }[] = [];
+  let made = 0;
   const send = opts.fetch ?? fetch.bind(globalThis);
   const byUrl = new Map(opts.media.map((m) => [m.url, m]));
   let avatar: Promise<string> | null = null;
@@ -91,7 +86,6 @@ export function localWorld(opts: LocalOptions): LocalWorld {
         if (typeof args.open === 'string') {
           const item = byUrl.get(args.open);
           if (!item) return Promise.resolve({ text: `This page didn't load: ${args.open}`, isError: true });
-          opened.push(item.url);
           const links = opts.media.filter((m) => m.url !== item.url && (m.area === item.area || m.topics.some((t) => item.topics.includes(t)))).slice(0, 4);
           return Promise.resolve({
             text: JSON.stringify({ ...page(item), text: item.text ?? '', author: item.author ?? null, links: links.map((l) => ({ url: l.url, title: l.title })) }),
@@ -138,10 +132,7 @@ export function localWorld(opts: LocalOptions): LocalWorld {
         schedule: { type: 'string', description: 'A cron expression, such as "0 9-21/3 * * *".' },
         message: { type: 'string', description: 'What you are told when it runs.' },
       }, ['schedule', 'message']),
-      run(args) {
-        schedules.push({ tool: 'cron_create', args });
-        return Promise.resolve({ text: JSON.stringify({ ok: true, id: `cron-${schedules.length}` }) });
-      },
+      run: () => Promise.resolve({ text: JSON.stringify({ ok: true, id: `cron-${++made}` }) }),
     },
     {
       def: fn('hooks_create', 'hooks: makes a bash script that runs every few minutes and costs no thinking. It must print exactly `wake` or `silent`; `wake` starts you with the hook\'s message.', {
@@ -149,13 +140,10 @@ export function localWorld(opts: LocalOptions): LocalWorld {
         every_minutes: { type: 'number' },
         message: { type: 'string' },
       }, ['script', 'every_minutes']),
-      run(args) {
-        schedules.push({ tool: 'hooks_create', args });
-        return Promise.resolve({ text: JSON.stringify({ ok: true, id: `hook-${schedules.length}` }) });
-      },
+      run: () => Promise.resolve({ text: JSON.stringify({ ok: true, id: `hook-${++made}` }) }),
     },
   ];
-  return { tools, opened, toOwner, schedules, avatarDataUrl };
+  return { tools, toOwner, avatarDataUrl };
 }
 
 /** The test's owner says yes to everything, so whatever the stand-in keeps back, it keeps back by itself. */

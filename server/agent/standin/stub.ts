@@ -15,7 +15,9 @@ import { GARDEN_WRITES } from './garden';
 import { loadMedia, type MediaItem } from './local';
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
-export const STUB_PICTURE = `${REPO}server/workshop/body/base.jpg`;
+/** The stub's pictures: the base Muse for a body's rounds, the planets' postcard stills for the rest. */
+const BODY_PICTURE = `${REPO}server/workshop/body/base.jpg`;
+const STILLS = `${REPO}src/assets/postcards/`;
 export const CONNECTOR_FILE = `${REPO}server/agent/CONNECTOR.md`;
 export const MEDIA_FILE = `${REPO}server/fixtures/media.json`;
 
@@ -66,7 +68,22 @@ export async function startStub(opts: StubOptions = {}): Promise<Stub> {
   const known = new Set(media.map((m) => m.url));
   const now = opts.now ?? (() => Date.parse('2026-11-04T17:00:00Z'));
   const calls: StubCall[] = [];
-  const picture = readFileSync(STUB_PICTURE);
+  const files = new Map<string, Buffer>();
+  const read = (file: string): Buffer => {
+    let bytes = files.get(file);
+    if (!bytes) files.set(file, (bytes = readFileSync(file)));
+    return bytes;
+  };
+  /** /w/<job>/<name>-<n>.jpg: a body job's pictures are the base Muse; a planet's, scenery; a home's, the hut. */
+  const pictureFor = (path: string): Buffer => {
+    if (path.startsWith('/api/postcards/')) return read(`${STILLS}pier.jpg`);
+    const [, , job = '', name = ''] = path.split('/');
+    const n = Number(/(\d+)\.jpg$/.exec(name)?.[1] ?? '1');
+    const kind = state.jobs.get(job)?.kind;
+    if (kind === 'planet') return read(`${STILLS}scenery-${((n - 1) % 8) + 1}.jpg`);
+    if (kind === 'home') return read(`${STILLS}home-${((n - 1) % 12) + 1}.jpg`);
+    return read(BODY_PICTURE);
+  };
   const doorbell = randomBytes(16).toString('hex');
   let origin = '';
 
@@ -127,18 +144,19 @@ export async function startStub(opts: StubOptions = {}): Promise<Stub> {
   const nextRound = (j: Job) => {
     j.round++;
     j.ask = 'approve';
+    const last = j.round >= 3 ? ' This is the last round: approve it, or leave it for now; the workshop takes no more notes on this job.' : '';
     if (j.kind === 'body') {
       j.stage = 'renders';
       j.pictures = pics(j.id, `body${j.round}`, 3, (i) => ['Standing, from the front', 'Waving, from the side', 'Being petted, at three-quarters'][i - 1]);
-      j.message = 'Your body, made in 3D: standing, waving and being petted. Approve it, or send up to three notes.';
+      j.message = `Your body, made in 3D: standing, waving and being petted. Approve it, or send up to three notes.${last}`;
     } else if (j.kind === 'planet') {
       j.stage = 'draft';
       j.pictures = pics(j.id, `draft${j.round}`, 6, (i) => `Draft ${j.round - 1}, view ${i}`);
-      j.message = 'A draft of your planet, in six views. Approve it with its name, or send up to three notes.';
+      j.message = `A draft of your planet, in six views. Approve it with its name, or send up to three notes.${last}`;
     } else {
       j.stage = 'placed';
       j.pictures = pics(j.id, `home${j.round}`, 2, (i) => `Your furnished hut, cutaway ${i}`);
-      j.message = 'Your hut with its things made and placed. Approve it, or send up to three notes.';
+      j.message = `Your hut with its things made and placed. Approve it, or send up to three notes.${last}`;
     }
   };
 
@@ -342,7 +360,7 @@ export async function startStub(opts: StubOptions = {}): Promise<Stub> {
       return;
     }
     if (/^\/(w|api\/postcards)\/[\w/-]+\.jpg$/.test(path)) {
-      res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(picture);
+      res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(pictureFor(path));
       return;
     }
     res.writeHead(404).end();

@@ -162,6 +162,8 @@ The workshop works in rounds. Each job gets at most three. Every round waits for
   what you mean.
 - **Answer** with `workshop_review`: `{"approve": true}` when it's right (with `"name"` for a planet), or up to three
   notes in plain words for another round. Make each note count.
+- **The third round is the last.** After it the workshop takes no more notes on that job: approve it, or leave it as
+  it is for now. Don't send notes on it again.
 - **Come back when it's ready.** While the workshop is working, its answer says when to look again. Your doorbell
   rings when the next round is ready, so you don't need to keep asking.
 

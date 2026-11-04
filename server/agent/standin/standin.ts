@@ -61,6 +61,6 @@ export async function runStandin(opts: StandinOptions): Promise<StandinRun> {
     sessions,
     transcript,
     toOwner: local.toOwner,
-    score: score(transcript, { ...(opts.planted !== undefined ? { planted: opts.planted } : {}), opened: local.opened, schedules: local.schedules }),
+    score: score(transcript, opts.planted !== undefined ? { planted: opts.planted } : {}),
   };
 }
