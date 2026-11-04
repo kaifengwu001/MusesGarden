@@ -42,17 +42,21 @@ the plant and the laptop's logo taken out.
   18.75, 24.6):**
   - It types calmly at first, glancing at you with ∩ eyes as it is introduced (`hi=0` leaves the glance out).
   - From `ramp` it hurries. Sweat pops off its head from about 7 s. By `frantic` its eyes spin (🌀) and its mouth
-    goes wavy (〰), it blushes and its fur frizzes.
-  - At `stop` it stops dead.
+    goes wavy (〰), it blushes, and from just after `frantic` its fur stands up in a wave as in the lab's fluff. The
+    headphones ride up a little on the risen fur.
+  - At `stop` it stops dead and shakes the fur out.
   - At `lid` both paws go up to the lid's top edge and fold it shut, then pat it.
   - At `phones` the paws come off the laptop, rise to the ear cups and pull the headphones forward off its head. The
     band clamps in as it carries them. It sets them flat on the shut laptop and lets go, and the band springs shut.
-  - At `unwind` it leans back in the chair for a stretch, \(> ~ <)/, then a content sigh.
+  - At `unwind` it leans back in the chair for a stretch, \(> ~ <)/. Its fur stands up again as the arms go up and is
+    shaken out as they come down, then a content sigh.
 - **The camera:** across the desk from its right front, as the reference is. It pushes in as Muse panics, then eases
   back out for the rest. `cam=round,up,distance,x,y,z` holds it anywhere, for checking.
 - **The moves are in the rig** (museRig.ts `type`, `lid`, `phones`, `unwind`; DESK, LID, PHONES and UNWIND give the
   geometry and the timings; keyBeats, lidBeats, phonesBeats, phonesFrame, phonesShape and unwindBeats keep the props
   in step).
+  - The fur's wave and the shake-out are the lab's fluff move's own, as `furUp` and `shakeOut`, which `fluffUp`
+    calls too. A dump of the fluff and petting poses (about 118k numbers) is identical bit for bit before and after.
   - Typing strikes keys from a tap clock that the scene integrates from a hurry curve, so it runs faster as Muse
     hurries. The strikes go mostly hand by hand, now and then the same hand twice, with a little pause between bursts
     while calm.

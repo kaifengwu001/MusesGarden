@@ -304,6 +304,9 @@ export interface Move {
   /** Typing at a desk: how hurried (0 calm … 1 frantic), and its tap clock (a key struck at each whole number; it runs faster as it hurries). */
   rush?: number;
   taps?: number;
+  /** Typing at a desk, at its wits' end: its fur standing up in a wave, as in the lab's fluff (s since it began; < 0 not), and shaken out (s since it began to lie back down; < 0 not yet). */
+  fur?: number;
+  furDown?: number;
 }
 
 export interface MuseAction {
@@ -798,7 +801,7 @@ export class MuseRig {
       case 'pocket':
         return this.pocket(k);
       case 'type':
-        return this.type(t, k, e, mv.rush ?? 0, mv.taps ?? t * 4);
+        return this.type(t, k, e, mv.rush ?? 0, mv.taps ?? t * 4, mv.fur ?? -1, mv.furDown ?? -1);
       case 'lid':
         return this.lid(t, k, e);
       case 'phones':
@@ -994,11 +997,7 @@ export class MuseRig {
     const J = JOINT;
     const F = FLUFF;
     const tuck = smoothstep(0, F.tuck, t) * (shake >= 0 ? 1 - smoothstep(0.05, 0.3, shake) : 1);
-    // the wave up the body: its front from below the feet to over the head
-    const rise = smoothstep(F.tuck * 0.4, F.tuck + F.rise, t);
-    const down = shake >= 0 ? smoothstep(F.shake * 0.4, F.shake + F.settle, shake) : 0;
-    const standing = rise * (1 - down);
-    this.fluff.set(Math.max(this.fluff.x, -0.15 + 1.35 * rise), Math.max(this.fluff.y, standing * k), Math.max(this.fluff.z, 0.6 * hump(0, 1, rise) * k), 0.12);
+    this.furUp(t, shake, k);
     // scrunched down, the head in, the shoulders up; a tremble of delight
     if (scrunch) {
       const pop = shake >= 0 ? 0.045 * hump(0.08, 0.42, shake) : 0;
@@ -1007,15 +1006,35 @@ export class MuseRig {
       for (const side of [1, -1]) this.armBy(side, -0.15 * tuck * k, 0, 0.28 * tuck * k, 0.35 * tuck * k);
     }
     this.addTurn(J.chest, 0, 0.012 * Math.sin(TAU * 11 * t) * tuck * k, 0);
-    // shaken out: the body twisting back and forth, the head after it
+    this.shakeOut(shake, k);
+    const shut = tuck * (shake >= 0 ? 1 - smoothstep(F.shake * 0.6, F.shake + 0.2, shake) : 1);
+    this.express(shut * k, alone ? { squint: 1, smile: 0.7 } : { squeeze: 1, smile: 0.7 });
+    if (alone) this.express(k * smoothstep(F.shake, F.shake + F.settle, shake) * (1 - smoothstep(F.shake + F.settle * 0.6, F.shake + F.settle, shake)), { smile: 1 });
+  }
+
+  /**
+   * The fur standing up in a wave (t since it began; shake since it began to lie back down, < 0 while it stands): the
+   * wave's front rising from below its feet to over its head, a crest at the front, the fur behind it standing; let
+   * go, it lies back down.
+   */
+  private furUp(t: number, shake: number, k: number): void {
+    const F = FLUFF;
+    // the wave up the body: its front from below the feet to over the head
+    const rise = smoothstep(F.tuck * 0.4, F.tuck + F.rise, t);
+    const down = shake >= 0 ? smoothstep(F.shake * 0.4, F.shake + F.settle, shake) : 0;
+    const standing = rise * (1 - down);
+    this.fluff.set(Math.max(this.fluff.x, -0.15 + 1.35 * rise), Math.max(this.fluff.y, standing * k), Math.max(this.fluff.z, 0.6 * hump(0, 1, rise) * k), 0.12);
+  }
+
+  /** Shaken out (shake s since it began, < 0 not yet): the body twisting back and forth, the head after it, dying away. */
+  private shakeOut(shake: number, k: number): void {
+    const J = JOINT;
+    const F = FLUFF;
     if (shake >= 0 && shake < F.shake) {
       const s = Math.sin(TAU * 5 * shake) * (1 - shake / F.shake) * smoothstep(0, 0.08, shake);
       this.addTurn(J.pelvis, 0, 0.16 * s * k, 0.04 * s * k);
       this.addTurn(J.head, 0, -0.1 * s * k, -0.08 * s * k);
     }
-    const shut = tuck * (shake >= 0 ? 1 - smoothstep(F.shake * 0.6, F.shake + 0.2, shake) : 1);
-    this.express(shut * k, alone ? { squint: 1, smile: 0.7 } : { squeeze: 1, smile: 0.7 });
-    if (alone) this.express(k * smoothstep(F.shake, F.shake + F.settle, shake) * (1 - smoothstep(F.shake + F.settle * 0.6, F.shake + F.settle, shake)), { smile: 1 });
   }
 
   /** A big yawn and a stretch: the arms up over its head, the body drawn up tall, the head back, the mouth wide, the eyes screwed shut. */
@@ -1340,9 +1359,9 @@ export class MuseRig {
    * up off them and down on its next key in turn (keyBeats), the strikes jolting it a little. Calm, it sways as it
    * reads, content; hurried, it leans in closer, the strikes come quicker and higher, its head bobs to them and a
    * tremble runs through it, its face strained and blushing; at its wits' end, its eyes spin (🌀), its mouth goes wavy
-   * and its fur frizzes.
+   * and its fur stands up in a wave as in the lab's fluff (fur, s since it began), shaken out when it stops (furDown).
    */
-  private type(t: number, k: number, e: number, rush: number, taps: number): void {
+  private type(t: number, k: number, e: number, rush: number, taps: number, fur: number, furDown: number): void {
     const J = JOINT;
     const K = DESK.keys;
     const hurry = smoothstep(0.25, 1, rush);
@@ -1376,9 +1395,11 @@ export class MuseRig {
     this.wavy = Math.max(this.wavy, smoothstep(0.76, 0.93, rush) * e);
     this.ripples = 2;
     this.ripplePhase = TAU * 1.7 * t;
-    // its fur frazzled at the end of its tether
-    const frizz = smoothstep(0.82, 1, rush) * e;
-    if (frizz > 0) this.fluff.set(Math.max(this.fluff.x, 1.4), Math.max(this.fluff.y, 0.32 * frizz), this.fluff.z, 0.12);
+    // its fur standing up in a wave at its wits' end (the lab's fluff), shaken out when it stops
+    if (fur >= 0) {
+      this.furUp(fur, furDown, e);
+      this.shakeOut(furDown, e);
+    }
   }
 
   /**
@@ -1481,8 +1502,9 @@ export class MuseRig {
 
   /**
    * Leaning back in its chair for a long stretch (unwindBeats): sinking back, its arms up and out in a V and its body
-   * drawn up long, held with a quiver, eyes squeezed shut and a wavy little mouth (\(> ~ <)/); the arms let fall, a
-   * long happy sigh; then at its ease, leaning back, its eyes content.
+   * drawn up long, its fur standing up in a wave (the lab's fluff), held with a quiver, eyes squeezed shut and a wavy
+   * little mouth (\(> ~ <)/); the arms let fall and the fur shaken out, a long happy sigh; then at its ease, leaning
+   * back, its eyes content.
    */
   private unwind(t: number, k: number, e: number): void {
     const J = JOINT;
@@ -1497,6 +1519,13 @@ export class MuseRig {
       this.armBy(side, 0.06 * up * e, 0, (-0.38 * up + 0.025 * q) * e, -0.5 * up * e);
     }
     this.stretch += (0.05 * up - 0.025 * hump(UNWIND.down[0], UNWIND.down[1] + 0.3, t)) * e;
+    // its fur standing up in a wave as it stretches (the lab's fluff), shaken out as its arms come down
+    const fur = t - UNWIND.up[0] - 0.1;
+    if (fur >= 0) {
+      const down = t >= UNWIND.down[0] ? t - UNWIND.down[0] : -1;
+      this.furUp(fur, down, e);
+      this.shakeOut(down, 0.7 * e);
+    }
     this.addTurn(J.head, -0.16 * up * e, 0, 0.02 * q * e);
     this.addTurn(J.chest, -0.07 * up * e, 0.01 * q * e, 0);
     // the face: > ~ < as it stretches, then a content sigh, then at its ease

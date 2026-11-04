@@ -63,7 +63,7 @@ import { registerShaderChunks } from '../render/glsl';
 // Muse (tpose6, as in the meadow) on an orange shell chair at a white desk
 // in a sunny room, headphones on, typing away at its laptop; hurrying,
 // then frantic (sweat popping off it, its eyes spinning 🌀, its mouth
-// wavy, its fur frizzing); stopping; closing the laptop; taking the
+// wavy, its fur standing up); stopping, shaking it out; closing the laptop; taking the
 // headphones off and setting them down on it; leaning back in the chair
 // for a long stretch (\(> ~ <)/) and a happy sigh. Round it on the desk:
 // a pen pot, a phone on a stand, a notebook and a paper crane. Everything is in meters, Muse one tall (so its heights
@@ -845,7 +845,9 @@ function act(t: number): { moves: Move[]; glance: number } {
   const lidIn = fade(B.lid);
   const phonesIn = fade(B.phones);
   const unwindIn = fade(B.unwind);
-  const moves: Move[] = [{ kind: 'type', time: t, amount: 1 - lidIn, rush: rushAt(t), taps: tapsAt(t) }];
+  // (its fur standing up at the height of it, shaken out when it stops)
+  const fur = t - B.frantic - 0.2;
+  const moves: Move[] = [{ kind: 'type', time: t, amount: 1 - lidIn, rush: rushAt(t), taps: tapsAt(t), fur, furDown: t >= B.stop ? t - B.stop : -1 }];
   if (t >= B.lid) moves.push({ kind: 'lid', time: t - B.lid, amount: lidIn * (1 - phonesIn) });
   if (t >= B.phones) moves.push({ kind: 'phones', time: t - B.phones, amount: phonesIn * (1 - unwindIn) });
   if (t >= B.unwind) moves.push({ kind: 'unwind', time: t - B.unwind, amount: unwindIn });
@@ -939,6 +941,13 @@ function pose(t: number): void {
   rig.frameOf(JOINT.head, head);
   const p = t < BEATS.phones ? { off: 0, down: 0 } : phonesBeats(t - BEATS.phones);
   phonesFrame(p.off, p.down, head, headRest, held);
+  // (on its head, lifted a little by its fur as it stands up)
+  if (p.off < 1) {
+    const lift = 0.016 * rig.fluff.y * (1 - p.off);
+    held.elements[12] += head.elements[4] * lift;
+    held.elements[13] += head.elements[5] * lift;
+    held.elements[14] += head.elements[6] * lift;
+  }
   const shape = t < BEATS.phones ? { clamp: 0, swivel: 0 } : phonesShape(t - BEATS.phones);
   shapePhones(shape.clamp, shape.swivel);
   // (while its mittens hold them, they go where the mittens are: moved by how far the mittens' middle is from the grip's)
