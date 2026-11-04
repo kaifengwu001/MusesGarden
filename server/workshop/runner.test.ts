@@ -266,7 +266,7 @@ describe('the workshop runner', () => {
 
   it('adds another view to the round on show, when the pipeline can make one', async () => {
     const extra: Partial<Pipeline> = {
-      view: (job, ask, io) => {
+      view: (_job, ask, io) => {
         writeFileSync(join(io.dir, 'porch.txt'), ask);
         return Promise.resolve({ ok: true, picture: { id: 'porch', path: io.url('porch.txt'), caption: ask } });
       },
