@@ -185,7 +185,9 @@ export class VisitUi {
     this.where.textContent = `Visiting ${view.host.name}’s planet`;
     this.banner.classList.add('is-on');
     // the guest's own face, by the body it wears
-    this.portrait.style.backgroundImage = `url(${faceOf(view.guest.look) ?? museFace})`;
+    // (a made body's face is fetched: the stand-in behind it shows if it's missing)
+    const own = faceOf(view.guest.look);
+    this.portrait.style.backgroundImage = own ? `url(${own}), url(${museFace})` : `url(${museFace})`;
     this.portrait.dataset.label = view.guest.name;
     this.portrait.setAttribute('aria-label', view.guest.name);
     this.portrait.title = view.guest.name;

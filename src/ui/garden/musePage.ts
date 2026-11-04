@@ -102,7 +102,7 @@ export class MuseSheet extends Sheet {
       // its own face, by the body it wears; without one, the stand-in tinted with its coat
       const own = faceOf(f.look);
       const face = el('span', `g-friend-face${own ? ' is-own' : ''}`);
-      face.style.backgroundImage = `url(${own ?? this.faces.friend})`;
+      face.style.backgroundImage = own ? `url(${own}), url(${this.faces.friend})` : `url(${this.faces.friend})`;
       face.style.setProperty('--coat', f.coat);
       const text = el('div', 'g-friend-text');
       const top = el('p', 'g-friend-name');
