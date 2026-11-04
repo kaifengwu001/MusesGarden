@@ -8,7 +8,7 @@ import type { Runner } from './runner';
 import { createRunner, isDraft, plain } from './runner';
 import type { JobStore, StoredJob } from './store';
 import { isJobId, jobDir, newJobId, openJobStore } from './store';
-import type { JobId, JobKind, JobRecord, JobResult, JobView, Pipeline, Verdict, Workshop } from './types';
+import type { JobId, JobKind, JobRecord, JobResult, JobView, Packet, Pipeline, Verdict, Workshop } from './types';
 
 /** Drafts per job ('approve' rounds without a contract): notes on the last one are refused (approve it, or stop). */
 export const MAX_DRAFTS = 3;
@@ -151,13 +151,22 @@ export function createWorkshop(deps: WorkshopDeps): WorkshopRuntime {
     return (deps.now() + Math.max(0, ms)) as Instant;
   };
 
-  const toView = (job: JobRecord): JobView => ({
+  /**
+   * On the last draft the packet says so itself: a Muse checking in later with fresh context reads only the packet,
+   * and would otherwise send notes the workshop must refuse (seen with the stand-in).
+   */
+  const lastDraftSaid = (packet: Packet, drafts: number): Packet =>
+    isDraft(packet) && drafts >= MAX_DRAFTS
+      ? { ...packet, text: `${packet.text}\n\nThis is the last draft (${MAX_DRAFTS} of ${MAX_DRAFTS}): it takes no more notes. Approve it, or stop the job with approve false and no notes.` }
+      : packet;
+
+  const toView = (job: StoredJob): JobView => ({
     id: job.id,
     kind: job.kind,
     state: job.state,
     stage: job.stage,
     round: job.round,
-    packet: job.state === 'waiting' ? job.packet : null,
+    packet: job.state === 'waiting' && job.packet ? lastDraftSaid(job.packet, job.drafts) : null,
     nextRoundAt: nextRoundAt(job),
     message: job.message,
   });
