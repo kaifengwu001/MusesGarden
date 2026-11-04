@@ -26,7 +26,8 @@ export interface CallRecord {
 export interface SessionResult {
   readonly session: string;
   readonly steps: number;
-  readonly stopped: 'answered' | 'steps';
+  /** unreachable: the connector couldn't be reached, and `final` says why. */
+  readonly stopped: 'answered' | 'steps' | 'unreachable';
   readonly final: string | null;
 }
 

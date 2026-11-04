@@ -1,7 +1,7 @@
 // The stand-in's connector: the garden's MCP tools at <server>/mcp, through the SDK client, as the Muse the key
 // belongs to. Each MCP tool becomes a function tool for the model, under its own name.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { FunctionTool } from './model';
 
 /** The connector's writes (server/agent/types.ts ToolKind). Anything else is a read. */
@@ -57,18 +57,33 @@ export async function connectGarden(opts: { readonly server: string; readonly ke
         const isError = result.isError === true;
         return { text, isError, status: isError ? statusOf(text) : null };
       } catch (e) {
-        const text = e instanceof Error ? e.message : String(e);
-        return { text, isError: true, status: statusOf(text) };
+        // 401 and 429 come before MCP starts, as HTTP errors: the SDK throws with the HTTP status as its code.
+        const text = rpcMessage(e instanceof Error ? e.message : String(e));
+        const code = e instanceof StreamableHTTPError ? e.code : undefined;
+        return { text, isError: true, status: code !== undefined && code >= 400 && code < 600 ? code : statusOf(text) };
       }
     },
     close: () => client.close(),
   };
 }
 
-/** "409: Over today's finds. Try again after ..." → 409. */
+/** "409: Over today's finds. Try again after ..." → 409; the SDK's "MCP error -32602: Input validation error" → 400. */
 export function statusOf(text: string): number | null {
-  const m = /^\s*(?:Error:\s*)?(\d{3})\b/.exec(text);
-  return m ? Number(m[1]) : null;
+  const m = /^\s*(?:Error:\s*)?(\d{3}):/.exec(text);
+  if (m) return Number(m[1]);
+  return /MCP error -32602\b/.test(text) ? 400 : null;
+}
+
+/** "Streamable HTTP error: Error POSTing to endpoint: {json-rpc error}" → the error's own message, when it has one. */
+function rpcMessage(text: string): string {
+  const at = text.indexOf('{');
+  if (at < 0) return text;
+  try {
+    const body = JSON.parse(text.slice(at)) as { error?: { message?: unknown } };
+    return typeof body.error?.message === 'string' ? body.error.message : text;
+  } catch {
+    return text;
+  }
 }
 
 /** Function parameters accept plain JSON Schema; drop the keys that only describe the schema itself. */
