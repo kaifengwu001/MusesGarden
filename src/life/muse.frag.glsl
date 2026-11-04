@@ -26,6 +26,12 @@ uniform float uRadius;
 uniform vec4 uMuseSize;  // height (m), the fur's length (m), shells, -
 uniform vec4 uMuseFace;  // the eyes' openness, the smile (0 at rest … 1 beaming), the squint (+1 happy arcs ∩, −1 content ones ∪), the eyes squeezed shut (> <, 0 … 1)
 uniform vec4 uMuseMood;  // the blush (0 … 1 more), -, -, -
+#ifdef MUSE_FLUSTER
+// flustered (the lab's desk scene, museDesk.ts): the eyes as spirals (0 … 1) and their turn (rad); the mouth a wavy line
+// (0 … 1) and how many ripples run across it; and the ripples' phase (rad)
+uniform vec4 uMuseFluster;
+uniform float uMuseRipple;
+#endif
 uniform mat3 uMuseFrame;
 #ifdef MUSE_STUDIO
 uniform vec3 uStudioSun;
@@ -176,7 +182,23 @@ vec3 face(vec2 f, float eyes, float smile, float squint, float squeeze, float bl
     float pinched = (1.0 - smoothstep(ARC.w - soft, ARC.w + soft, chevron)) / max(1.0, soft / ARC.w);
     arc = mix(arc, pinched, pinch);
     float cover = max(inside * (1.0 - shut), arc * shut);
+#ifdef MUSE_FLUSTER
+    // dizzy: the eye a spiral, turning (🌀), drawn in lines as a shut eye's (mirrored, so the two turn opposite ways)
+    float swirl = 0.0;
+    if (uMuseFluster.x > 0.0) {
+      vec2 g = (f - c) / EYE_AT.z;
+      g.x *= float(k);
+      float rr = length(g);
+      float arm = rr / 0.5 - (atan(g.y, g.x) + uMuseFluster.y) / 6.2831853;
+      float off = abs(fract(arm + 0.5) - 0.5) * 0.5;
+      swirl = (1.0 - smoothstep(0.12 - soft, 0.12 + soft, off)) * (1.0 - smoothstep(1.22 - soft, 1.22 + soft, rr)) / max(1.0, soft / 0.12);
+    }
+    float sp = smoothstep(0.0, 1.0, uMuseFluster.x);
+    cover = mix(cover, swirl, sp);
+    col = mix(col, mix(eye, EYE, max(shut, sp)), cover);
+#else
     col = mix(col, mix(eye, EYE, shut), cover);
+#endif
     dark = max(dark, cover);
   }
   // the smile: a short arc rising to its corners, round-ended
@@ -193,6 +215,21 @@ vec3 face(vec2 f, float eyes, float smile, float squint, float squeeze, float bl
     dm = length(m - vec2(sign(u) * span, rise));
   }
   float mouth = 1.0 - smoothstep(MOUTH_WIDTH * (0.5 + 0.12 * smile) - aa, MOUTH_WIDTH * (0.5 + 0.12 * smile) + aa, dm);
+#ifdef MUSE_FLUSTER
+  // flustered: a wavy line, its ripples running along it (〰), or a single ripple (~)
+  if (uMuseFluster.z > 0.0) {
+    vec2 h = f - MOUTH_AT.xy - vec2(0.0, 0.45 * MOUTH_AT.w);
+    float span2 = MOUTH_AT.z * 1.3;
+    float lift = MOUTH_AT.w * 0.62;
+    float kx = 3.14159265 * uMuseFluster.w / span2;
+    float x = clamp(h.x, -span2, span2);
+    float y = lift * sin(kx * x + uMuseRipple);
+    float slope2 = lift * kx * cos(kx * x + uMuseRipple);
+    float dw = abs(h.x) <= span2 ? abs(h.y - y) * inversesqrt(1.0 + slope2 * slope2) : length(h - vec2(x, y));
+    float wave = 1.0 - smoothstep(MOUTH_WIDTH * 0.56 - aa, MOUTH_WIDTH * 0.56 + aa, dw);
+    mouth = mix(mouth, wave, smoothstep(0.0, 1.0, uMuseFluster.z));
+  }
+#endif
   col = mix(col, MOUTH, mouth);
   dark = max(dark, mouth);
   return col;

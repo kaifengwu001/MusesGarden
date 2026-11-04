@@ -30,6 +30,54 @@ checkout as iteration N and as the latest; `scripts/publish.sh N <commit>`
 publishes an older commit; `scripts/publish.sh latest` publishes the checkout
 as the latest alone (a fix between iterations).
 
+## Momo at its desk: the demo film (2026-11-03, in the lab)
+
+For the demo video's voiceover ("Say hi to Momo… advanced personal agent stuff. But what does Muse do when it's… not
+working?"), the lab has a scene of its own: `src/dev/museLab.html#desk=1` (`src/dev/museDesk.ts`). The original Muse
+(tpose6) sits on an orange shell chair at a white desk, headphones on, typing at its laptop, after the owner's
+reference still. A pen pot, a phone on a stand, a notebook and a paper crane sit round it on the desk. The owner had
+the plant and the laptop's logo taken out.
+
+- **The beats (s, from the hash `beats=ramp,frantic,stop,lid,phones,unwind,end`, defaults 2.6, 9.2, 11.6, 12.6, 15.4,
+  18.75, 24.6):**
+  - It types calmly at first, glancing at you with ∩ eyes as it is introduced (`hi=0` leaves the glance out).
+  - From `ramp` it hurries. Sweat pops off its head from about 7 s. By `frantic` its eyes spin (🌀) and its mouth
+    goes wavy (〰), it blushes and its fur frizzes.
+  - At `stop` it stops dead.
+  - At `lid` both paws go up to the lid's top edge and fold it shut, then pat it.
+  - At `phones` the paws come off the laptop, rise to the ear cups and pull the headphones forward off its head. The
+    band clamps in as it carries them. It sets them flat on the shut laptop and lets go, and the band springs shut.
+  - At `unwind` it leans back in the chair for a stretch, \(> ~ <)/, then a content sigh.
+- **The camera:** across the desk from its right front, as the reference is. It pushes in as Muse panics, then eases
+  back out for the rest. `cam=round,up,distance,x,y,z` holds it anywhere, for checking.
+- **The moves are in the rig** (museRig.ts `type`, `lid`, `phones`, `unwind`; DESK, LID, PHONES and UNWIND give the
+  geometry and the timings; keyBeats, lidBeats, phonesBeats, phonesFrame, phonesShape and unwindBeats keep the props
+  in step).
+  - Typing strikes keys from a tap clock that the scene integrates from a hurry curve, so it runs faster as Muse
+    hurries. The strikes go mostly hand by hand, now and then the same hand twice, with a little pause between bursts
+    while calm.
+  - **Short arms.** Perched, the paws fell 12–40 cm short of the keys and the lid. At the desk Muse sits with its hips
+    less rolled back and leans in. The laptop is smaller (31 cm for a 1 m Muse) and its belly presses against the
+    desk.
+  - **No flips.** A single solve for a far, moving target flipped between "elbow out" and "elbow down" from one frame
+    to the next (11–30 cm pops). So each reach now starts from a measured pose (`ARMS`: forward for the keys and the
+    lid, raised for the cups), and the solver only refines from there. The upper arm's and forearm's twists are held
+    still (`reachPrior`, the desk only). Between the forward and raised poses the arm goes by way of hanging at its
+    side, carried by the poses alone. The worst frame-to-frame move is now about 4.7 cm in 1/60 s, a fast sweep.
+  - **Contact.** The owner asked for gestures, not perfect contact. The paws come within about 4–7 cm of their marks
+    (about 10 cm at the furthest point of the lid's top). The headphones ride with the paws while carried.
+- **The face** (owner's request for this film): the eyes as spirals and the mouth as a wavy line are in muse.frag.glsl
+  under `MUSE_FLUSTER`, which only the desk scene defines. The meadow's shader is unchanged, and Kai's note
+  (expressions by the eyes alone) still holds there.
+- **Rendering:** `node tools/workflows/muse-look/scripts/desk.mjs out.mp4 1920 1080 30 16` draws each frame at its own
+  moment, so it doesn't depend on the frame rate. Each frame averages 16 renders over half a frame's shutter, with
+  the sun moved over its window and the view by a fraction of a pixel. That gives motion blur on the hammering paws
+  and the sweat, soft shadows and smooth edges. Muse's skin casts real shadows: a depth-only copy, skinned as drawn.
+- **Known:**
+  - From the film's camera the lid hides the keys, as in the reference, so the frantic typing reads from the arm,
+    the head, the sweat and the face.
+  - The band crosses Muse's face for about a third of a second as the headphones come off.
+
 ## Visits (2026-11-02)
 
 A ticket from a friend's Muse takes its owner, and now their Muse with them, to the friend's own planet, and a

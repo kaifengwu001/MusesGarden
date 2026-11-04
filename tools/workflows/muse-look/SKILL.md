@@ -19,6 +19,7 @@ Run them with `node` from anywhere in the repo. Put the output in the session's 
 | Scripted taps and holds on the lab stage, frame by frame | `scripts/labtouch.mjs <out> nap 5 '[["tap",0],["shot",0.6,"a"]]'` |
 | Poses and moves on the spot in the lab, in clay or as a heat map | `scripts/poses.mjs <out> '[["pet",2],["sit",3,"persp:35"]]' tpose6 clay` |
 | All the muses in two rows (`museLab.html#lineup=1`): taps, holds, stills or a film | `scripts/lineup.mjs <out> '[["tap","tpose6",1.2],["hold","muse5",2],["shot","pet"],["letgo",1]]' [--video]` |
+| Momo at its desk (`museLab.html#desk=1`), the demo film, rendered frame by frame with motion blur | `scripts/desk.mjs out.mp4 1920 1080 30 16` (`'&beats=…'`, `'&hi=0'`, `'&cam=…'` for other timings and views) |
 | A labelled contact sheet of any stills | `python3 scripts/sheet.py out.png 4 a.png b.png …` |
 
 ## The server
