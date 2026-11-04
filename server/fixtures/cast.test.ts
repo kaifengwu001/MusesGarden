@@ -84,7 +84,7 @@ describe('cast.json', () => {
     expect(PLANET_IDS.filter((id) => !planetOf(id).visitable).sort()).toEqual(['rice-terraces', 'ukiyoe-pine-hamlet']);
     for (const id of visitable) if (id !== 'meadow') expect(page(id), id).toBe(true);
     expect(page('rice-terraces'), 'a standalone viewer with no engine link').toBe(true);
-    expect(page('ukiyoe-pine-hamlet'), 'only in an open pull request: make it visitable once it lands').toBe(false);
+    expect(page('ukiyoe-pine-hamlet'), 'a standalone viewer with no engine link yet: make it visitable once its page hosts visits').toBe(true);
   });
 
   it('dresses every Muse in a body the renderer has: the original Muse or one of the dressed muses', () => {
