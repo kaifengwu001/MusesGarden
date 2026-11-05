@@ -16,6 +16,7 @@ import { Flight } from '../view/flight';
 import { loadVisit, planetOf, returnFromVisit, type VisitLoad } from './api';
 import { FOLLOW, Follower } from './follow';
 import { homeFraming, hostFraming, musesFraming } from './framing';
+import { planetOf as planetEntry } from '../muse/planets';
 import { homeUrl, leftPhrase, readVisit, visitable, visitUrl, type VisitParams } from './params';
 import { moved, snapBeds, type SnapBed } from './snap';
 import type { Studio } from './studio';
@@ -31,8 +32,11 @@ import type { VisitBody, VisitWorld } from './world';
 // VisitUi in place of its GardenUi: update() before the world moves, frame() after, tap() first, interrupt() on any
 // move of the camera.
 
-/** How often the visit is read again (ms): the two set off together, or it ended. */
+/** How often the visit is read again (ms): the two set off together, or it ended; more often while one is on the way. */
 const POLL_MS = 30_000;
+const APART_POLL_MS = 4_000;
+/** The longest the arrival's ticket waits for the two Muses' bodies (ms) before the planet shows anyway. */
+const ARRIVAL_MAX_MS = 20_000;
 /** How long the ended screen stays before going home on its own (ms). */
 const ENDED_MS = 4_000;
 /** A find's framing (as the garden's): the camera's distance and height over the bed, and where it looks (m). */
@@ -179,6 +183,9 @@ export class VisitUi {
   // ---- the visit ---------------------------------------------------------------------------
 
   private begin(view: VisitWorldView): void {
+    // (the ticket stays up until both Muses are drawn and in view: neither appears out of nothing in front of you)
+    this.transit.arrive(planetEntry(view.planet).title, view.host.name);
+    window.setTimeout(() => this.transit.hide(), ARRIVAL_MAX_MS);
     this.sync(view);
     this.world.dressHost(view.host.look);
     this.guest = this.world.makeGuest(view.guest.look);
@@ -199,13 +206,19 @@ export class VisitUi {
     this.hostHome.title = home;
     this.showStatus(view);
     this.rail.classList.add('is-on');
-    const timer = window.setInterval(() => void this.poll(), POLL_MS);
-    window.addEventListener('pagehide', () => window.clearInterval(timer));
+    let timer = 0;
+    const again = (): void => {
+      if (this.phase !== 'visiting') return;
+      timer = window.setTimeout(() => void this.poll().finally(again), this.view?.together ? POLL_MS : APART_POLL_MS);
+    };
+    again();
+    window.addEventListener('pagehide', () => window.clearTimeout(timer));
     void Promise.all([this.world.host.ready, this.guest.ready]).then(async () => {
       // (the beds wait for the planet's ground: laid out in the first frame)
       while (this.laidFor.shape === null) await wait(50);
       if (this.phase !== 'visiting') return;
       if (!/(^|[#&])pose=/.test(location.hash)) this.frameMuses();
+      this.transit.hide();
       this.markReady();
     });
   }
@@ -247,6 +260,7 @@ export class VisitUi {
   private async stop(phase: Exclude<Phase, 'visiting'>): Promise<void> {
     if (this.leaving) return;
     this.phase = phase;
+    this.transit.hide();
     this.banner.classList.remove('is-on');
     this.rail.classList.remove('is-on');
     this.closeCard();

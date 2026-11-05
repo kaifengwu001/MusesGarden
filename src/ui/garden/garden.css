@@ -3308,6 +3308,11 @@ button.g-ticket:focus-visible .g-ticket-go {
   pointer-events: auto;
 }
 
+/* (arriving on a planet: up at once, and fading only as it goes) */
+.g-transit.is-arriving {
+  transition: none;
+}
+
 .g-transit-ticket {
   position: relative;
   width: min(420px, 80vw);

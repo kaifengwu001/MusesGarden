@@ -59,6 +59,13 @@ createServer((req, res) => {
     res.writeHead(301, { location: `${path}/${q}` }).end();
     return;
   }
+  // (a world's copy of a model the meadow's build has too, by the same content-hashed name: the meadow's, so a browser
+  // downloads each Muse's body once, whichever worlds it goes on to)
+  const model = /^\/environments\/[a-z0-9-]+\/assets\/([A-Za-z0-9_-]+\.glb)$/.exec(path);
+  if (model?.[1] && existsSync(join(repo, 'dist', 'assets', model[1]))) {
+    res.writeHead(301, { location: `/assets/${model[1]}`, 'cache-control': 'public, max-age=31536000, immutable' }).end();
+    return;
+  }
   let file: string | null;
   try {
     file = fileFor(path);

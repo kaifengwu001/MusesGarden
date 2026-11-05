@@ -33,6 +33,15 @@ export class Transit {
     await wait(900);
   }
 
+  /**
+   * Arrive on a planet: its ticket, stamped, up at once (no fade in, so the planet isn't seen before its Muses are in
+   * it), and held until the visit is ready to be seen (hide).
+   */
+  arrive(where: string, host: string): void {
+    this.el.replaceChildren(ticket(where, host));
+    this.el.classList.add('is-arriving', 'is-on', 'is-stamped');
+  }
+
   /** Come home: the ticket stamped “Welcome back”, for a moment. */
   async home(): Promise<void> {
     this.el.replaceChildren(ticket('Home', 'Muse'));
@@ -41,6 +50,6 @@ export class Transit {
   }
 
   hide(): void {
-    this.el.classList.remove('is-on', 'is-stamped', 'is-home');
+    this.el.classList.remove('is-arriving', 'is-on', 'is-stamped', 'is-home');
   }
 }

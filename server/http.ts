@@ -141,6 +141,10 @@ async function buildBackend(): Promise<Backend> {
             const host = cast.members.find((m) => m.id !== hero && (m.id === key || m.name.toLowerCase() === key || m.planet === key));
             if (!host) return { ok: false as const, status: 404, error: `No friend called “${who}” lives on a planet here.` };
             if (!visitable(host.planet)) return { ok: false as const, status: 404, error: `${host.name}’s planet isn’t open for visits yet.` };
+            // (on a link the two meet now: each leaves off working, as at the end of a stretch of it, so the trip sets
+            // off as the ticket is used and the visit opens with both Muses there, not one of them on the way)
+            await garden.engine.hostWork(host.id, 'ended');
+            await garden.engine.hostWork(hero, 'ended');
             // (a ticket from the friend, used at once: boarding ends any other trip, and the visit lasts as a ticket's does)
             const ticket: InvitationId = await garden.engine.sendInvitation(host.id, hero);
             const used = await garden.engine.invitationAction(ticket, hero, 'use');
