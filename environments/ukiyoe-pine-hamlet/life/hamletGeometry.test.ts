@@ -14,7 +14,8 @@ const terrainAt = (radius = 128, seed = 412): Terrain => {
 const meshes = (scenery: HamletScenery): Mesh<InstancedBufferGeometry>[] => scenery.group.children.filter((o): o is Mesh<InstancedBufferGeometry> => o instanceof Mesh && o.geometry instanceof InstancedBufferGeometry);
 const anchorSnapshot = (scenery: HamletScenery): number[][] => meshes(scenery).map(m => Array.from(m.geometry.getAttribute('aAnchor').array).slice(0, m.geometry.instanceCount * 4));
 
-describe('ukiyoe natural scenery', () => {
+// (building the hamlet's scenery takes a second or so a case, more on a busy machine)
+describe('ukiyoe natural scenery', { timeout: 30_000 }, () => {
   it('builds five distinct solid silhouettes with finite triangles, grounded roots and independent snow', () => {
     const assets = createHamletAssets();
     for (const asset of Object.values(assets)) {

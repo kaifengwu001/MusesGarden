@@ -140,6 +140,8 @@ export class VisitUi {
     this.root = el('div', 'garden visit');
     parent.append(this.root);
     document.body.classList.add('is-visiting');
+    // (a visitor's view, as the owner's view of a garden: no parameters, hints, world line or world controls; ?dev keeps them)
+    if (!start.params.dev) document.body.classList.add('owner-view');
     this.flight = new Flight(world.scene.rig);
     this.card = new FindCard(this.root, {
       // (a friend's find: nothing to like or keep private here)

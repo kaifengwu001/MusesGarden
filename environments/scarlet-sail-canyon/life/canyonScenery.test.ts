@@ -18,7 +18,8 @@ function surfaceHeight(geometry:BufferGeometry,x:number,z:number):number {
   return height;
 }
 
-describe('Scarlet canopy and fractured cliff mesh contracts',()=>{
+// (counting the whole instanced canyon takes about 3 s, more on a busy machine)
+describe('Scarlet canopy and fractured cliff mesh contracts',{timeout:30_000},()=>{
   it('keeps every template finite, nondegenerate and within its instancing budget',()=>{
     const templates:[BufferGeometry,number][]=[[fanTreeGeometry(),1250],[fanTreeGeometry(1),1250],[fanTreeGeometry(2),1250],[chalkGeometry(),150],[chalkShelfGeometry(),4000],[fernGeometry(),650],[coralGeometry(),450],[lichenGeometry(),1000],[lichenGeometry(1),1000],[mossGeometry(),120],[mossGeometry(1),120],[mossGeometry(2),120]];
     for(let variant=1;variant<CHALK_SHELF_VARIANTS;variant++)templates.push([chalkShelfGeometry(variant),4000]);

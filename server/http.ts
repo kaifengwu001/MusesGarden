@@ -1,7 +1,8 @@
 // npm run serve: the garden API on MUSE_PORT (default 8787), with the live clock ticking each minute.
 import { mkdirSync } from 'node:fs';
-import { createServer } from 'node:http';
-import type { Instant } from '../src/muse/contract';
+import { createServer, type ServerResponse } from 'node:http';
+import type { Instant, InvitationId } from '../src/muse/contract';
+import { visitable, visitUrl } from '../src/visit/params';
 import type { AgentHandler } from './agent/index';
 import { forwarded } from './agent/auth';
 import { createAgentHandler } from './agent/index';
@@ -29,7 +30,23 @@ type Backend = Garden & {
   readonly close: () => void | Promise<void>;
   /** A real Muse's connector (/mcp, /api/v1, /d/, /garden.md) and the workshop's files (/w/, /api/looks/). */
   readonly agent?: AgentHandler;
+  /** A garden open to the public (MUSE_OPEN_GARDEN=1): its default Muse off to a friend's planet on a ticket of that
+   * friend's, sent and used now; the visit's page, or why there's none. */
+  readonly visitFriend?: (who: string) => Promise<{ readonly ok: true; readonly url: string } | { readonly ok: false; readonly status: number; readonly error: string }>;
 };
+
+/** GET /visit/<friend> (a garden open to the public): off to that friend's planet, with the friend there. */
+async function visitFromRequest(res: ServerResponse, who: string, visit: NonNullable<Backend['visitFriend']>): Promise<void> {
+  const r = await visit(who);
+  if (r.ok) {
+    res.writeHead(302, { location: r.url, 'cache-control': 'no-store' }).end();
+    return;
+  }
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c);
+  res
+    .writeHead(r.status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    .end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Muse's Garden</title><body style="font:18px/1.5 Georgia,serif;max-width:32em;margin:15vh auto;padding:0 16px;color:#2b2a24;background:#f6f3ea"><p>${esc(r.error)}</p><p><a href="/">Back to the garden</a></p></body>`);
+}
 
 /** MUSE_BACKEND=fake serves the samples; otherwise the real engine on a SQLite file, seeded with the cast on first run. */
 async function buildBackend(): Promise<Backend> {
@@ -50,7 +67,8 @@ async function buildBackend(): Promise<Backend> {
   mkdirSync(dir, { recursive: true });
   const cast = loadCast();
   const hero = cast.members.find((m) => m.role === 'hero')?.id ?? null;
-  const start = (clock === 'live' ? Date.now() : Date.parse('2026-11-02T08:00:00-08:00')) as Instant;
+  // (MUSE_START: when a fast-forward garden's life begins, for a garden that then goes live with some days behind it)
+  const start = (clock === 'live' ? Date.now() : Date.parse(process.env.MUSE_START ?? '2026-11-02T08:00:00-08:00')) as Instant;
   const garden = buildGarden({
     db: `${dir}/garden.db`,
     mind: process.env.MODEL_API_KEY ? 'meta' : 'heuristic',
@@ -116,6 +134,21 @@ async function buildBackend(): Promise<Backend> {
     media: mediaCache({ dir: `${dir}/media`, items: garden.recording.items }),
     subscribe: (museId, after, send) => garden.views.subscribeGarden(museId, after, send),
     tick: (now) => garden.commands.tick(now),
+    ...(process.env.MUSE_OPEN_GARDEN === '1' && hero
+      ? {
+          visitFriend: async (who: string) => {
+            const key = who.trim().toLowerCase();
+            const host = cast.members.find((m) => m.id !== hero && (m.id === key || m.name.toLowerCase() === key || m.planet === key));
+            if (!host) return { ok: false as const, status: 404, error: `No friend called “${who}” lives on a planet here.` };
+            if (!visitable(host.planet)) return { ok: false as const, status: 404, error: `${host.name}’s planet isn’t open for visits yet.` };
+            // (a ticket from the friend, used at once: boarding ends any other trip, and the visit lasts as a ticket's does)
+            const ticket: InvitationId = await garden.engine.sendInvitation(host.id, hero);
+            const used = await garden.engine.invitationAction(ticket, hero, 'use');
+            if (!used.ok) return { ok: false as const, status: used.status, error: used.error };
+            return { ok: true as const, url: visitUrl(host.planet, { invitation: ticket, as: hero, garden: `/api/muses/${hero}` }) };
+          },
+        }
+      : {}),
     close: async () => {
       agent.close();
       await workshop.close();
@@ -133,11 +166,32 @@ const port = Number(process.env.MUSE_PORT ?? 8787);
  * key, so from outside they stay hidden; the owner's page reaches them from this laptop as before.
  */
 const PUBLIC_PATHS = [/^\/mcp\/?$/, /^\/api\/v1\//, /^\/d\//, /^\/s\//, /^\/garden\.md$/, /^\/w\//, /^\/api\/looks\//, /^\/api\/postcards\//, /^\/api\/media\//];
+/**
+ * A garden open to the public (MUSE_OPEN_GARDEN=1): from outside, every Muse's garden and the visits on it can be
+ * read, and its default Muse's owner's own routes used (a like, a basket opened, a setting, a ticket used or a visit
+ * ended), as its page does; the host simulator and the dev tools stay on this laptop. The routes trust `?as=`, so the
+ * owner's ones answer only as the default Muse.
+ */
+const OPEN_AS = process.env.MUSE_OPEN_GARDEN === '1' ? (loadCast().members.find((m) => m.role === 'hero')?.id ?? null) : null;
+function openToAll(method: string | undefined, path: string, as: string | null): boolean {
+  if (!OPEN_AS) return false;
+  if (method === 'GET' || method === 'HEAD') return /^\/api\/muses(\/[a-z0-9-]+(\/.*)?)?$/.test(path) || /^\/api\/visits\/[^/]+\/world$/.test(path) || /^\/visit\/[^/]+\/?$/.test(path);
+  if (method !== 'POST') return false;
+  const own = new RegExp(`^/api/muses/${OPEN_AS}/(settings/(basket-time|hidden|introductions|unshare)|garden/reactions)$`);
+  return own.test(path) || (as === OPEN_AS && /^\/api\/(invitations\/[^/]+\/withdraw|visits\/[^/]+\/return)$/.test(path));
+}
 const app = createApp(backend, backend.agent);
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0] ?? '/';
-  if (forwarded(req) && !PUBLIC_PATHS.some((p) => p.test(path))) {
+  const open = openToAll(req.method, path, new URL(req.url ?? '/', 'http://garden').searchParams.get('as'));
+  if (forwarded(req) && !open && !PUBLIC_PATHS.some((p) => p.test(path))) {
     res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }).end(JSON.stringify({ error: 'not found' }));
+    return;
+  }
+  // (a garden open to the public: /visit/<friend> takes its default Muse to that friend's planet)
+  const friend = /^\/visit\/([^/]+)\/?$/.exec(path);
+  if (backend.visitFriend && friend && (req.method === 'GET' || req.method === 'HEAD')) {
+    void visitFromRequest(res, decodeURIComponent(friend[1] ?? ''), backend.visitFriend);
     return;
   }
   app(req, res);

@@ -13,7 +13,8 @@ const prototypes = makeGeologyPrototypes();
 const PARAMS: FieldParams = { roll:2.1,hummocks:0.12,wetlands:0,waterLevel:0,grain:0.75,density:0,patchiness:0.78,patchSize:13,weights:[0.4,0.24,0.22,0.14] };
 afterAll(() => prototypes.forEach(prototype => { prototype.geometry.dispose();prototype.outline.dispose(); }));
 
-describe('Cobalt fractured geology', () => {
+// (building the windfields' geology at every size takes a second or three, more on a busy machine)
+describe('Cobalt fractured geology', { timeout: 30_000 }, () => {
   it('keeps bedrock and finite sand mantles closed, nondegenerate and supported', () => {
     for(const prototype of prototypes) {
       const positions=prototype.geometry.getAttribute('position');

@@ -491,7 +491,8 @@ body.postcard .lil-gui.meadow-panel {
   cursor: pointer;
 }
 
-/* The owner's view of a real Muse's garden (?garden=…): no parameters, hints, world line or world controls. */
+/* The owner's view of a real Muse's garden (?garden=…), and a visitor's on a friend's planet: no parameters, hints,
+   world line or world controls. */
 body.owner-view .hints,
 body.owner-view .world-line,
 body.owner-view .controlbar,

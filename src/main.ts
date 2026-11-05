@@ -1,3 +1,5 @@
+// (first: a build with a garden of its own opens on it, before anything reads the address)
+import './defaultGarden';
 import './ui/style.css';
 import { NoToneMapping, SRGBColorSpace, Vector2, WebGLRenderer } from 'three';
 import { BuildBudget } from './core/buildBudget';
